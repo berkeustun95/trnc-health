@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, Switch, StyleSheet } from 'react-native'
 import { supabase, isGuest } from '../../lib/supabase'
 import { loadCheckinPrefs, loadMine, deleteCheckin, setCheckinsPublic, MINE_PAGE } from '../../utils/checkins'
-import { useGoogleNames } from '../../utils/googlePlaces'
+import { useGoogleNames, notifyCheckinsChanged } from '../../utils/googlePlaces'
 import GoogleMapsAttribution from './GoogleMapsAttribution'
 import { IconButton, ConfirmDialog, Button } from '../ui'
 import { colors, type } from '../../constants/theme'
@@ -58,6 +58,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
     setDelBusy(false)
     if (!ok) { setDelError(t('checkinDeleteFailed', lang)); return }
     setRows(r => r.filter(x => x.id !== confirm.id)); setConfirm(null)
+    notifyCheckinsChanged()
   }
 
   async function loadMore() {
@@ -88,7 +89,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
               {!!r.google_place_id && <GoogleMapsAttribution />}
               <Text style={s.date}>{new Date(r.created_at).toLocaleDateString(LANG_CODES[lang] ?? 'en', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
             </View>
-            <IconButton icon="trash-outline" color={colors.textSecondary} onPress={() => { setDelError(null); setConfirm(r) }}
+            <IconButton icon="trash-outline" color={colors.dangerInk} onPress={() => { setDelError(null); setConfirm(r) }}
               accessibilityLabel={t('checkinDelete', lang)} />
           </View>
         ))}

@@ -108,6 +108,12 @@ export function googleWithinReach(place, fix) {
   return metresBetween(fix, { latitude: place.lat, longitude: place.lng }) <= CHECKIN_RADIUS_M
 }
 
+// "Check-ins changed" (a delete in Profile → Check-in'lerim, or a new check-in): screens that are
+// already mounted — the Keşfet map above all, whose pins depend on visible check-ins — re-read.
+const checkinListeners = new Set()
+export function onCheckinsChanged(fn) { checkinListeners.add(fn); return () => checkinListeners.delete(fn) }
+export function notifyCheckinsChanged() { checkinListeners.forEach(fn => { try { fn() } catch { /* a listener's own bug */ } }) }
+
 export async function loadGooglePins(client) {
   const { data, error } = await client.rpc('get_google_place_pins')
   return error ? [] : data ?? []

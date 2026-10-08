@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { requestWithPrimer } from '../../utils/permissionPrimer'
 import { loadCheckinPrefs, checkIn, precheck, CHECKIN_ACCURACY_M } from '../../utils/checkins'
-import { nearbyAda, nearbyGoogle, checkInGoogle, googleWithinReach } from '../../utils/googlePlaces'
+import { nearbyAda, nearbyGoogle, checkInGoogle, googleWithinReach, notifyCheckinsChanged } from '../../utils/googlePlaces'
 import { bestFix, Outcome, CheckinNoticeSheet } from './CheckinAction'
 import GoogleMapsAttribution from './GoogleMapsAttribution'
 import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../../constants/exploreCategories'
@@ -72,7 +72,7 @@ function NearbySheet({ visible, lang, onClose, onCheckedIn, onAddPlace }) {
     setStates(st => ({ ...st, [key]: { busy: true } }))
     const res = await run()
     setStates(st => ({ ...st, [key]: res.ok ? { code: 'DONE', already: res.already } : res }))
-    if (res.ok) onCheckedIn?.()
+    if (res.ok) { onCheckedIn?.(); notifyCheckinsChanged() }
   }
 
   function checkAda(p) {

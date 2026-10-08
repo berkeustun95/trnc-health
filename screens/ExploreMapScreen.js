@@ -15,7 +15,7 @@
 import { StatusBar } from 'expo-status-bar'
 import { REDESIGN, CHECKINS } from '../constants/redesign'
 import { MAP_PROVIDER, NO_POI_STYLE, GOOGLE_MAP_OK } from '../utils/googleMap'
-import { loadGooglePins } from '../utils/googlePlaces'
+import { loadGooglePins, onCheckinsChanged } from '../utils/googlePlaces'
 import GooglePlaceSheet from '../components/checkins/GooglePlaceSheet'
 import { requestWithPrimer } from '../utils/permissionPrimer'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
@@ -436,8 +436,12 @@ export default function ExploreMapScreen({
   useEffect(() => {
     if (!GOOGLE_LAYER || !session) return
     let gone = false
-    loadGooglePins(supabase).then(rows => { if (!gone) setGooglePins(rows) })
-    return () => { gone = true }
+    const load = () => loadGooglePins(supabase).then(rows => { if (!gone) setGooglePins(rows) })
+    load()
+    // A check-in deleted (or added) elsewhere while this map stays mounted: a pin that existed only
+    // because of it must go now, not on the next remount.
+    const off = onCheckinsChanged(load)
+    return () => { gone = true; off() }
   }, [session?.user?.id])
 
   useEffect(() => {
