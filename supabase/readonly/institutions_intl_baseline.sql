@@ -15,7 +15,7 @@ select json_build_object(
               from pg_constraint where confrelid = 'public.institutions'::regclass),
   'functions_reading_institutions', (select json_agg(p.oid::regprocedure::text order by 1) from pg_proc p
               join pg_namespace n on n.oid = p.pronamespace
-             where n.nspname = 'public' and pg_get_functiondef(p.oid) ~* '\minstitutions\M'),
+             where n.nspname = 'public' and p.prokind = 'f' and pg_get_functiondef(p.oid) ~* '\minstitutions\M'),
   'functions_calling_is_listed_student', (select json_agg(p.oid::regprocedure::text order by 1) from pg_proc p
               join pg_namespace n on n.oid = p.pronamespace
              where n.nspname = 'public' and p.prokind = 'f' and p.proname <> 'is_listed_student'
