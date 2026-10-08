@@ -35,6 +35,13 @@ const RESULT_META = {
   towing:       { icon: 'car-outline',       category: 'city' },
 }
 
+// Shown until ADA has its own mic (VOICE_INPUT), then kept as that mic's fallback when the
+// recognizer lacks the language or the permission is denied. Conditional wording: iOS shows
+// no keyboard mic with Dictation off, and some third-party keyboards have none.
+function KeyboardMicHint({ lang }) {
+  return <Text style={s.micHint}>{t('oliVoiceHint', lang)}</Text>
+}
+
 export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenResult, onOpenChange, openRef, closeRef }) {
   const insets = useSafeAreaInsets()
   const [open, setOpen] = useState(false)
@@ -164,6 +171,7 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
 
         {!q && !picked ? (
           <View style={s.home}>
+            <KeyboardMicHint lang={lang} />
             <Text style={s.greeting}>{t('oliGreeting', lang)}</Text>
             <View style={s.chips}>
               {CHIPS.map(c => (
@@ -204,6 +212,7 @@ const s = StyleSheet.create({
                backgroundColor: colors.card, paddingLeft: 18, paddingRight: 4, marginHorizontal: 16, marginVertical: 12 },
   input:     { ...type.body, fontSize: 15, color: colors.textPrimary, flex: 1, padding: 0 },
   home:      { paddingHorizontal: 20, paddingTop: 8, alignItems: 'center' },
+  micHint:   { ...type.small, color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
   greeting:  { ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginBottom: 16 },
   chips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   chip:      { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radii.pill,

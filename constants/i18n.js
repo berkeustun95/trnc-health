@@ -139,6 +139,7 @@ const translations = {
     hrTileRoutes: "Walking routes",
     hrSoonBadge: "Soon",
     hrOliField: "Ask Oli or search…",
+    oliVoiceHint: "If your keyboard has a 🎤, tap it to speak",
     hrOliAskSub: "Ask, search",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Ask Oli",
@@ -2142,6 +2143,7 @@ const translations = {
     hrTileRoutes: "Yürüyüş Rotaları",
     hrSoonBadge: "Yakında",
     hrOliField: "Oli'ye sor veya ara…",
+    oliVoiceHint: "Klavyende 🎤 varsa, ona dokunup konuşabilirsin",
     hrOliAskSub: "Sor, ara, keşfet",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Oli'ye sor",
@@ -4117,6 +4119,7 @@ const translations = {
     hrTileRoutes: "مسارات المشي",
     hrSoonBadge: "قريباً",
     hrOliField: "اسأل أولي أو ابحث…",
+    oliVoiceHint: "إذا كان في لوحة مفاتيحك 🎤، اضغط عليه وتحدّث",
     hrOliAskSub: "اسأل وابحث",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "اسأل أولي",
@@ -5870,6 +5873,7 @@ const translations = {
     hrTileRoutes: "Пешие маршруты",
     hrSoonBadge: "Скоро",
     hrOliField: "Спросите Оли или ищите…",
+    oliVoiceHint: "Если на клавиатуре есть 🎤, нажмите и говорите",
     hrOliAskSub: "Вопрос, поиск",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Спросите Оли",
@@ -7629,6 +7633,7 @@ const translations = {
     hrTileRoutes: "Διαδρομές περιπάτου",
     hrSoonBadge: "Σύντομα",
     hrOliField: "Ρώτα τον Oli ή αναζήτησε…",
+    oliVoiceHint: "Αν το πληκτρολόγιό σου έχει 🎤, πάτα το για να μιλήσεις",
     hrOliAskSub: "Ρώτα, ψάξε",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Ρώτα τον Oli",
@@ -9378,6 +9383,7 @@ const translations = {
     hrTileRoutes: "Balades à pied",
     hrSoonBadge: "Bientôt",
     hrOliField: "Demandez à Oli ou cherchez…",
+    oliVoiceHint: "Si votre clavier a un 🎤, touchez-le pour parler",
     hrOliAskSub: "Posez, cherchez",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Parlez à Oli",
@@ -11131,6 +11137,7 @@ const translations = {
     hrTileRoutes: "Rutas a pie",
     hrSoonBadge: "Pronto",
     hrOliField: "Pregunta a Oli o busca…",
+    oliVoiceHint: "Si tu teclado tiene 🎤, tócalo para hablar",
     hrOliAskSub: "Pregunta, busca",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Pregunta a Oli",
@@ -12881,6 +12888,7 @@ const translations = {
     hrTileRoutes: "Routen zu Fuß",
     hrSoonBadge: "Bald",
     hrOliField: "Frag Oli oder such…",
+    oliVoiceHint: "Hat deine Tastatur ein 🎤, tippe darauf, um zu sprechen",
     hrOliAskSub: "Fragen, suchen",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Frag Oli",
@@ -14631,6 +14639,7 @@ const translations = {
     hrTileRoutes: "مسیرهای پیاده‌روی",
     hrSoonBadge: "به‌زودی",
     hrOliField: "از اولی بپرس یا جستجو کن…",
+    oliVoiceHint: "اگر کیبوردت 🎤 دارد، رویش بزن و حرف بزن",
     hrOliAskSub: "بپرس و بگرد",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "از اولی بپرس",
