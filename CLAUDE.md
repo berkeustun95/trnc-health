@@ -311,8 +311,8 @@ pending ToS §4.4 legal item in vault `2026-09-24_store-privacy-forms-AS-ENTERED
    device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp). ⚠ While
    explore-v2 is on Preview, `npm run ota` from main is refused by the preview-lineage guard until
    explore-v2 lands on main (or Berke hands over `PREVIEW_LINEAGE_OVERRIDE=1`).
-4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
-   draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
+4. **Policy PUBLISHED 2026-10-08** (LEGAL_VERSION 2026-10-08; web + docs live, `legal:live` PASS; the
+   in-app copies ship with the flip OTA). Then store forms, then **flip `MODULE_FLAGS.checkins`** (both files, one commit). `privacy:check` refuses the flip
    without the disclosure (incl. the Google lines) in all four copies.
    **Before the flip:** give Berke a click-by-click list for Play Console (Data safety: Precise
    location **Shared: yes**) and App Store Connect (App Privacy: Precise Location, linked, no
