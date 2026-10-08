@@ -26,7 +26,8 @@ if [ "$before" != "absent" ] && [ "${before%% *}" != "$want" ]; then
 fi
 [ "$go" = "--go" ] || { echo "DRY RUN — re-run with --go (Berke's go first)."; exit 0; }
 flag=(); [ "$want" = "false" ] && flag=(--no-verify-jwt)
-scripts/sb.sh functions deploy "$f" --use-api "${flag[@]}"
+# ${flag[@]+…}: macOS bash 3.2 + set -u treats an EMPTY array as unbound (verify_jwt=true case).
+scripts/sb.sh functions deploy "$f" --use-api ${flag[@]+"${flag[@]}"}
 after=$(live)
 read -r a_jwt a_ver a_status <<<"$after"
 b_ver=$([ "$before" = "absent" ] && echo 0 || echo "$before" | cut -d' ' -f2)
