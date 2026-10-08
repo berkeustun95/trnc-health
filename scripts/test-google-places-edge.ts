@@ -46,7 +46,8 @@ const PLACES: Record<string, { lat: number; lng: number; types: string[]; name: 
   ChIJroute00000000001: { lat: 35.1001, lng: 33.1, types: ['route'], name: 'Some Road' },
   ChIJfaraway000000001: { lat: 35.2, lng: 33.1, types: ['park'], name: 'Far Park' },
 }
-const googleLog: { url: string; mask: string | null; key: string | null; body: any }[] = []
+const googleLog: { url: string; mask: string | null; key: string | null; body: any; headers: Record<string, string> }[] = []
+const allGoogle: string[] = []   // every Google request, whole (url + all headers + body), never cleared
 
 const realFetch = globalThis.fetch
 globalThis.fetch = async (input: Request | URL | string, init: RequestInit = {}) => {
@@ -55,7 +56,9 @@ globalThis.fetch = async (input: Request | URL | string, init: RequestInit = {})
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
   if (url.host === 'places.googleapis.com') {
     const body = req.method === 'POST' ? await req.json() : null
-    googleLog.push({ url: url.pathname + url.search, mask: req.headers.get('X-Goog-FieldMask'), key: req.headers.get('X-Goog-Api-Key'), body })
+    const headers = Object.fromEntries(req.headers)
+    googleLog.push({ url: url.pathname + url.search, mask: req.headers.get('X-Goog-FieldMask'), key: req.headers.get('X-Goog-Api-Key'), body, headers })
+    allGoogle.push(JSON.stringify({ url: req.url, headers, body }))
     if (url.pathname === '/v1/places:searchNearby') {
       return json(200, { places: Object.entries(PLACES).map(([id, p]) => ({
         id, displayName: { text: p.name }, location: { latitude: p.lat, longitude: p.lng }, types: p.types, primaryType: p.types[0] })) })
@@ -206,6 +209,14 @@ x = await q(`SELECT google_place_id, latitude, fetched_at > now() - interval '1 
 ok('cafe pin re-read from Google (lat 35.1) and re-dated; young pin untouched; others gone',
   JSON.stringify(x.map(r => [r.google_place_id, r.latitude, r.fresh])) === JSON.stringify([['ChIJcafe000000000001', 35.1, true], ['ChIJfaraway000000001', 9, false]]), x)
 ok('refresh mask id,location,types; only the 3 due pins asked', googleLog.length === 3 && googleLog.every(g => g.mask === 'id,location,types'), googleLog)
+
+// ── §4.4 closed on these two facts (Berke, 2026-10-08): no user identifier reaches Google, and the
+//    position is rounded. Scans EVERY Google request this run made, whole.
+const ids = [U(1), U(2), U(3), 'adult', 'nonotice', 'eyJ', '@', 'sub', 'Bearer']
+const leaks = allGoogle.flatMap(r => ids.filter(s => r.includes(s)).map(s => `${s} in ${r.slice(0, 80)}`))
+ok(`no user identifier in any of ${allGoogle.length} Google requests (uids, usernames, JWT, email, Bearer)`, allGoogle.length >= 10 && leaks.length === 0, leaks.slice(0, 3))
+const centres = allGoogle.map(r => JSON.parse(r).body?.locationRestriction?.circle?.center).filter(Boolean)
+ok(`every nearby centre has <= 4 decimals (${centres.length} seen)`, centres.length >= 1 && centres.every(c => [c.latitude, c.longitude].every(v => Math.abs(v * 1e4 - Math.round(v * 1e4)) < 1e-6)), centres)
 
 console.log(`${pass} pass, ${fail} fail`)
 Deno.exit(fail ? 1 : 0)

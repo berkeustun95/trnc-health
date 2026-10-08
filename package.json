@@ -113,7 +113,8 @@
     "backchain:check": "node scripts/check-back-chain.cjs",
     "backlistener:check": "node scripts/check-back-listener.mjs",
     "check:prod-writes": "node scripts/check-prod-write-guard.mjs",
-    "googleplaces:edge": "deno run -A scripts/test-google-places-edge.ts"
+    "googleplaces:edge": "deno run -A scripts/test-google-places-edge.ts",
+    "googleplaces:anon": "node scripts/check-google-calls-anonymous.mjs && node scripts/check-google-calls-anonymous.mjs --self"
   },
   "private": true,
   "devDependencies": {
