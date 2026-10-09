@@ -171,10 +171,27 @@ function keywordHits(kw, q, words) {
   return words.some(w => w === nkw || w.startsWith(nkw) || (w.length >= 5 && nkw.startsWith(w)))
 }
 
+// "Oli" said at the START of a query is a wake word, not part of it — and speech recognisers
+// often hear it as something else. It is stripped before matching so it can never select an
+// intent, whatever keywords are added later. Only the first word (after an optional greeting:
+// "Hey Oli"), so "Ali" inside a real query is untouched. Turkish "Oli'ye/ya" and trailing
+// punctuation count. Search (search_content) still receives the text as typed or spoken.
+const WAKE_WORDS = new Set(['oli', 'olli', 'oly', 'olie', 'ollie', 'olly', 'holy', 'holi', 'ali', 'alli',
+  'όλι', 'ολι', 'оли', 'олли', 'али', 'оля', 'أولي', 'اولي', 'علي', 'اولی', 'علی'].map(normalize))
+const GREETINGS = new Set(['hey', 'hi', 'hello', 'merhaba', 'selam', 'hallo', 'hola', 'salut', 'bonjour',
+  'привет', 'γεια', 'مرحبا', 'سلام'].map(normalize))
+const bare = w => w.replace(/['’](ye|ya)$/, '').replace(/[,.!?:;،]+$/, '')
+export function stripWakeWord(q) {
+  const words = q.split(' ')
+  if (words.length > 1 && GREETINGS.has(bare(words[0])) && WAKE_WORDS.has(bare(words[1]))) return words.slice(2).join(' ')
+  if (WAKE_WORDS.has(bare(words[0]))) return words.slice(1).join(' ')
+  return q
+}
+
 // The single resolver boundary. Returns matched intents (most-relevant order =
 // array order), capped. Empty array ⇒ caller shows the no-match fallback.
 export function resolveOliQuery(text, { limit = 3 } = {}) {
-  const q = normalize(text)
+  const q = stripWakeWord(normalize(text))
   if (!q) return []
   const words = q.split(' ').filter(Boolean)
   const matches = []

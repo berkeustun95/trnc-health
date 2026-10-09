@@ -20,6 +20,11 @@ const RECOGNIZER_LOCALE = {
   French: 'fr-FR', Spanish: 'es-ES', German: 'de-DE', Persian: 'fa-IR',
 }
 
+// Words the recogniser should prefer (iOS contextualStrings; Android 13+ EXTRA_BIASING_STRINGS,
+// ignored below 13). "Oli" took many tries without it (device test 2026-10-09).
+const BIAS = ['Oli', 'Maki', 'ADA', 'nöbetçi eczane', 'Lefkoşa', 'Girne', 'Gazimağusa', 'Mağusa', 'Güzelyurt',
+  'İskele', 'Lefke', 'Kyrenia', 'Famagusta', 'Nicosia', 'KKTC']
+
 let Speech
 function loadSpeech() {
   if (Speech === undefined) {
@@ -104,6 +109,7 @@ export function useVoiceInput({ lang, getText, onText }) {
       interimResults: true,
       continuous: false,
       requiresOnDeviceRecognition: session.current.onDevice,
+      contextualStrings: BIAS,
       recordingOptions: { persist: false },
     })
   }
