@@ -198,6 +198,8 @@ export default function HomeScreen({
   onOpenMenu,
   onShowNotifs,
   onShowDutyList,
+  openFacilityList = false,    // Oli's clinic card: open the facility list once, then report back
+  onFacilityListOpened,
   onSelectFacility,
   onUnclaimedFacility,
   onToggleFavorite,
@@ -297,6 +299,11 @@ export default function HomeScreen({
   })
   // Leaving the directory / search ON PURPOSE starts them fresh next time.
   const closeFacilityList = () => { setShowFacilityList(false); forgetScroll('home:facilities') }
+  useEffect(() => {
+    if (!openFacilityList) return
+    setShowFacilityList(true)
+    onFacilityListOpened?.()
+  }, [openFacilityList])
   const closeSearch = () => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]); forgetScroll('home:search') }
   const [isSearching, setIsSearching]       = useState(false)
 
