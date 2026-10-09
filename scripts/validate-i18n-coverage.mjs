@@ -283,7 +283,7 @@ const SURFACES = [
   'components/shell/Sheets.js',
   'components/shell/Settings.js',
   'screens/NotificationsScreen.js',
-  // Check-ins (20261069), added with the surfaces.
+  // Check-ins (20261092), added with the surfaces.
   'components/checkins/CheckinAction.js',
   'components/checkins/CheckinFeed.js',
   'components/checkins/MyCheckins.js',
@@ -355,7 +355,7 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
-  // Check-ins (20261069): "check-in" is the loanword these languages use for it (Foursquare/Swarm,
+  // Check-ins (20261092): "check-in" is the loanword these languages use for it (Foursquare/Swarm,
   // Facebook all ship it untranslated in fr/es/de); every sentence around it is translated.
   'checkinTab':           { French: 'Check-ins is the French loanword', Spanish: 'Check-ins is the Spanish loanword', German: 'Check-ins is the German loanword' },
   // ─── Redesign (feat/redesign), 2026-09-30 ────────────────────────────────

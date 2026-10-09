@@ -124,6 +124,9 @@ WITH report AS (
                 WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
+    ('1095_institutions_country','institutions','country'),
+    ('1095_institutions_country','institutions','city_name'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','checkins','google_place_id'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
@@ -543,6 +546,13 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Institutions outside the TRNC (1095). The UNIQUE is per country: names repeat across
+    -- countries (YÖK's Ankara Sosyal Bilimler shared our TRNC row …0017's name until 1101).
+    ('1095_institutions_country','institutions_country_check'),
+    ('1095_institutions_country','institutions_country_required_check'),
+    ('1095_institutions_country','institutions_city_country_check'),
+    ('1095_institutions_country','institutions_city_name_check'),
+    ('1095_institutions_country','institutions_country_name_unique'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','checkins_one_place'),
     ('1093_checkins_google_places','checkins_google_place_id_shape'),
@@ -657,9 +667,8 @@ WITH report AS (
     ('1001_profile_completion','profiles_nationality_code_check'),
     ('1001_profile_completion','profiles_schema_version_check'),
     ('1001_profile_completion','profiles_completion_requires_fields_check'),
-    -- UNIQUE: correctness. institutions.name is what the seed's ON CONFLICT and any
-    -- future admin add both key on.
-    ('1001_profile_completion','institutions_name_unique'),
+    -- ⚠ RETIRED 2026-10-08 by 20261095: institutions_name_unique (dropped; names are unique
+    --   per country now — institutions_country_name_unique, 1095 above, owns that).
     ('1001_profile_completion','institutions_city_check'),
     -- ad_banners (1008). destination_check is the load-bearing one: EXACTLY one of
     -- link_url / route, so a paid banner can carry neither two destinations nor none.
@@ -838,6 +847,7 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    ('1095_institutions_country','institutions_country_idx'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','checkins_one_per_day_google'),
     ('1093_checkins_google_places','checkins_google_feed_idx'),
@@ -2040,9 +2050,9 @@ WITH report AS (
     --   the trigger on profiles is dropped. The FUNCTION survives and the rule is still enforced — 1026 token "check_profile_study_years is bound to student_education" owns that now. One fact, one owner.
     --   Retired rather than left to go red: a drift report carrying a known-stale row
     --   teaches the reader to skim, and the next real MISSING is skimmed with it.
-    UNION ALL SELECT '1021_institutions_held_three','institutions: 25 rows, 24 active',
-      (SELECT count(*) FROM public.institutions) = 25
-      AND (SELECT count(*) FROM public.institutions WHERE is_active) = 24
+    -- ⚠ RETIRED 2026-10-08 by 20261095: "institutions: 25 rows, 24 active". The table now holds
+    --   other countries; the TRNC half of that count is 1095's "24 XN rows" token, and each
+    --   country's seed owns its own count. One fact, one owner.
     -- (2) Netkent stays deleted. 20261001's seed is ON CONFLICT (id) DO NOTHING, so
     --     re-running 1001 re-inserts it at sort_order 140 without a word. If this reads
     --     MISSING: supabase/recovery_institutions_netkent.sql (not 20261018 — it refuses).
@@ -2072,10 +2082,12 @@ WITH report AS (
     --     carries an https link and nothing else does. A university added or reactivated
     --     without one, or a link pasted onto Kıbrıs İlim or Other, reads MISSING — add the
     --     link or change this count in the same commit, and say why.
-    UNION ALL SELECT '1025_institutions_website_urls','institutions: the 23 active universities carry an https link; …0006 and …00ff NULL',
-      (SELECT count(*) FROM public.institutions WHERE website_url IS NOT NULL) = 23
+    --     Scoped to the TRNC by 20261095: other countries' links are the seeds' (and may be
+    --     NULL where a university's site could not be verified).
+    UNION ALL SELECT '1025_institutions_website_urls','institutions: the 23 active TRNC universities carry an https link; …0006 and …00ff NULL',
+      (SELECT count(*) FROM public.institutions WHERE website_url IS NOT NULL AND (to_jsonb(institutions) ->> 'country') = 'XN') = 23
       AND NOT EXISTS(SELECT 1 FROM public.institutions
-        WHERE is_active AND website_url IS NULL AND id <> '00000000-0000-4000-b000-0000000000ff')
+        WHERE is_active AND website_url IS NULL AND (to_jsonb(institutions) ->> 'country') = 'XN')
       AND NOT EXISTS(SELECT 1 FROM public.institutions WHERE website_url !~ '^https://')
       AND NOT EXISTS(SELECT 1 FROM public.institutions
         WHERE id IN ('00000000-0000-4000-b000-000000000006', '00000000-0000-4000-b000-0000000000ff')
@@ -2089,9 +2101,10 @@ WITH report AS (
     -- (5) Nothing buried. 19 put the eight rows at 150–220, under every existing university;
     --     20 moved them into the order. 150 is where the burying started, so any active row
     --     but Other at or past it means 19 was re-pasted or a new row was dropped at the bottom.
-    UNION ALL SELECT '1020_institutions_sort_prominence','institutions: no active row except Other sorts at 150 or later',
+    --     Scoped to the TRNC by 20261095: other countries sort at 500, below every TRNC row.
+    UNION ALL SELECT '1020_institutions_sort_prominence','institutions: no active TRNC row sorts at 150 or later',
       NOT EXISTS(SELECT 1 FROM public.institutions
-        WHERE is_active AND id <> '00000000-0000-4000-b000-0000000000ff' AND sort_order >= 150)
+        WHERE is_active AND (to_jsonb(institutions) ->> 'country') = 'XN' AND sort_order >= 150)
     -- ── 1008 ad_banners. FOUR tokens, because nothing that makes this system safe creates
     --    a named object sections A-G can see.
     --
@@ -4064,6 +4077,49 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.get_google_place_pins()')) LIKE '%p.checkins_public IS TRUE%'
            AND NOT has_function_privilege('anon', to_regprocedure('public.get_google_place_pins()'), 'EXECUTE')
            AND has_function_privilege('authenticated', to_regprocedure('public.get_google_place_pins()'), 'EXECUTE'), false)
+    -- ── 1095 institutions.country + the reciprocity join.
+    -- (1) The TRNC rows: 24 XN (23 active + Kıbrıs İlim), Other the only row without a country.
+    UNION ALL SELECT '1095_institutions_country','institutions: 24 XN rows (23 active), Other the only NULL country',
+      COALESCE((SELECT count(*) FROM public.institutions WHERE (to_jsonb(institutions) ->> 'country') = 'XN') = 24
+           AND (SELECT count(*) FROM public.institutions WHERE (to_jsonb(institutions) ->> 'country') = 'XN' AND is_active) = 23
+           AND (SELECT count(*) FROM public.institutions WHERE (to_jsonb(institutions) ->> 'country') IS NULL) = 1
+           AND (SELECT (to_jsonb(institutions) ->> 'country') IS NULL FROM public.institutions
+                 WHERE id = '00000000-0000-4000-b000-0000000000ff'), false)
+    -- (2) RECIPROCITY: is_listed_student and get_student_list count the SAME enrolments —
+    --     an active institution that is not Other. If they differ, somebody sees without
+    --     being seen. Anchored to the join's code shape in BOTH bodies.
+    UNION ALL SELECT '1095_institutions_country','is_listed_student + get_student_list share the active-and-not-Other institution join',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.is_listed_student(uuid)'))
+                 LIKE '%JOIN institutions i ON i.id = e.institution_id AND i.is_active%AND i.id <> ''00000000-0000-4000-b000-0000000000ff''%'
+           AND pg_get_functiondef(to_regprocedure('public.get_student_list(uuid,text,integer)'))
+                 LIKE '%JOIN institutions i ON i.id = e.institution_id AND i.is_active%AND i.id <> ''00000000-0000-4000-b000-0000000000ff''%', false)
+    -- ── 1096–1099 universities outside the TRNC (generated by scripts/gen-institution-seeds.mjs).
+    --    Each count is the seed's own, and binds only once its file is in the ledger, so a
+    --    seed applied before its siblings does not turn the others' rows red. A university
+    --    added to or removed from a country later changes its count here, in the same commit.
+    UNION ALL SELECT '20261096_institutions_seed_tr','institutions: TR holds exactly 202 rows once 20261096_institutions_seed_tr is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261096_institutions_seed_tr.sql')
+      OR (SELECT count(*) FROM public.institutions WHERE (to_jsonb(institutions) ->> 'country') = 'TR') = 202
+    UNION ALL SELECT '20261097_institutions_seed_cy','institutions: CY holds exactly 12 rows once 20261097_institutions_seed_cy is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261097_institutions_seed_cy.sql')
+      OR (SELECT count(*) FROM public.institutions WHERE (to_jsonb(institutions) ->> 'country') = 'CY') = 12
+    UNION ALL SELECT '20261098_institutions_seed_gb','institutions: GB holds exactly 151 rows once 20261098_institutions_seed_gb is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261098_institutions_seed_gb.sql')
+      OR (SELECT count(*) FROM public.institutions WHERE (to_jsonb(institutions) ->> 'country') = 'GB') = 151
+    -- 1099 is an UPDATE: no object to name. After it, the three countries are listed (a
+    -- university may be deactivated later, so this asserts "some", not "all").
+    UNION ALL SELECT '20261099_institutions_activate_intl','institutions: TR, CY and GB each have active rows once 1099 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261099_institutions_activate_intl.sql')
+      OR (SELECT count(DISTINCT (to_jsonb(institutions) ->> 'country')) FROM public.institutions
+           WHERE is_active AND (to_jsonb(institutions) ->> 'country') IN ('TR','CY','GB')) = 3
+    -- 1101 is an UPDATE: the TRNC ASBÜ campus carries its campus name, and no TRNC row
+    -- shares a name with a row of another country (the generator's allowance is empty).
+    UNION ALL SELECT '20261101_institutions_asbu_campus_name','institutions: …0017 is "Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi" and no TRNC name repeats abroad once 1101 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261101_institutions_asbu_campus_name.sql')
+      OR ((SELECT name FROM public.institutions WHERE id = '00000000-0000-4000-b000-000000000017')
+            IS NOT DISTINCT FROM 'Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi'
+          AND NOT EXISTS (SELECT 1 FROM public.institutions x JOIN public.institutions o ON lower(o.name) = lower(x.name)
+                           WHERE (to_jsonb(x) ->> 'country') = 'XN' AND (to_jsonb(o) ->> 'country') IS DISTINCT FROM 'XN'))
   ) z
 
   UNION ALL

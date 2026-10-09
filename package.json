@@ -47,7 +47,7 @@
     "ads:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs",
     "ads:selftest": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs --self",
     "ota": "node scripts/check-release-freeze.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ota-preflight.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-preview-lineage.mjs && node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n-duplicates.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-pets-staleness.mjs && node scripts/check-back-listener.mjs && node scripts/check-back-chain.cjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-contact-outbox.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hotel-search.mjs && eas update --channel production",
-    "ota:preview": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs && node scripts/check-back-listener.mjs && node scripts/check-back-chain.cjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-contact-outbox.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hotel-search.mjs && APP_VARIANT=preview eas update --channel preview --environment preview",
+    "ota:preview": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ota-preview-target.mjs && node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs && node scripts/check-back-listener.mjs && node scripts/check-back-chain.cjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-contact-outbox.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hotel-search.mjs && APP_VARIANT=preview eas update --channel preview --environment preview",
     "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
     "eas-build-pre-install": "node scripts/check-module-flags.mjs",
     "ios:build": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 build --platform ios --profile production --non-interactive --no-wait",
@@ -113,7 +113,9 @@
     "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs",
     "backchain:check": "node scripts/check-back-chain.cjs",
     "backlistener:check": "node scripts/check-back-listener.mjs",
-    "check:prod-writes": "node scripts/check-prod-write-guard.mjs"
+    "check:prod-writes": "node scripts/check-prod-write-guard.mjs",
+    "googleplaces:edge": "deno run -A scripts/test-google-places-edge.ts",
+    "googleplaces:anon": "node scripts/check-google-calls-anonymous.mjs && node scripts/check-google-calls-anonymous.mjs --self"
   },
   "private": true,
   "devDependencies": {

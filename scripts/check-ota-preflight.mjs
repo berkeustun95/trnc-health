@@ -21,6 +21,9 @@
 //      present and well-formed. A SECRET key in the anon slot is refused too. Values are
 //      never printed — only where each came from.
 //
+//  (c) VARIANT (2026-10-07). The config this publish resolves must not be ADA Preview's —
+//      extra.appVariant switches on REDESIGN/CHECKINS for everyone. See the block below.
+//
 // No override flag, deliberately. If EAS cannot be reached the lineage is UNKNOWN, and an
 // unknown lineage is a refusal: fix the network, don't publish blind.
 import { execFileSync } from 'node:child_process'
@@ -60,6 +63,23 @@ console.log('\nOTA preflight')
   if (!wired) problems.push('lib/supabase.js no longer reads process.env.EXPO_PUBLIC_SUPABASE_URL — this check would be checking the wrong thing')
   console.log(`  ${urlOk ? '✓' : '✗'} Supabase URL   ${url ? `from ${url.f}` : 'not found'}`)
   console.log(`  ${keyOk ? '✓' : '✗'} Supabase key   ${key ? `from ${key.f}${isSecret ? ' (SECRET KEY — refused)' : ''}` : 'not found'}`)
+}
+
+// ── (c) variant: production must never publish the ADA Preview config ────────
+// constants/redesign.js turns REDESIGN and CHECKINS on when extra.appVariant === 'preview',
+// and app.config.js sets that ONLY when APP_VARIANT=preview. A stray APP_VARIANT in the shell
+// or a .env file (Expo loads .env before evaluating app.config.js) would ship check-ins and the
+// redesign to every production user. Asked of the resolver itself — the config this publish
+// would carry — not of the variable, so any other route to the same key is caught too.
+{
+  let variant = null, err = null
+  try {
+    const cfg = JSON.parse(sh('npx', ['expo', 'config', '--json'], { env: { ...process.env, CI: '1' } }))
+    variant = cfg?.extra?.appVariant ?? null
+  } catch (e) { err = String(e.message).split('\n')[0] }
+  if (err) problems.push(`could not resolve the app config (${err}) — cannot prove this is not the Preview variant`)
+  else if (variant !== null) problems.push(`the resolved config carries extra.appVariant = '${variant}' (APP_VARIANT set in the shell or a .env file) — this would switch on Preview-only features (REDESIGN, CHECKINS) for every production user`)
+  console.log(`  ${!err && variant === null ? '✓' : '✗'} variant        ${err ? 'unresolved' : variant === null ? 'production (no extra.appVariant)' : `PREVIEW ('${variant}') — refused`}`)
 }
 
 // ── (a) lineage: HEAD must contain the commit this runtime is running ─────────

@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed. Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -43,6 +43,7 @@ const cases4=[
  ['Explore layer (saved/submit/group) -> module step, no close', {...base, showExplore:true}, {exploreBackRef:()=>true}, r=>r.calls===''],
  ['Explore top level -> closes module', {...base, showExplore:true}, {exploreBackRef:()=>false}, r=>r.calls==='setShowExplore(false)'],
  ['Check-in feed (Keşfet) -> closes the feed', {...base, activeTab:'map', showCheckinFeed:true}, {}, r=>r.calls==='setShowCheckinFeed(false)'],
+ ['Check-in feed + add-place form -> closes the form, NOT the feed', {...base, activeTab:'map', showCheckinFeed:true}, {checkinFeedBackRef:()=>true}, r=>r.r===true && r.calls===''],
  ['Check-in feed + place open -> closes the place, NOT the feed', {...base, activeTab:'map', showCheckinFeed:true, selectedExplorePlace:{id:1}}, {placeBackRef:()=>false}, r=>r.calls==='setSelectedExplorePlace(null)'],
  ['Renovation layer (partner/category) -> module step, no close', {...base, showHomeServices:true}, {homeServicesBackRef:()=>true}, r=>r.calls===''],
  ['Renovation top -> closes module', {...base, showHomeServices:true}, {homeServicesBackRef:()=>false}, r=>r.calls==='setShowHomeServices(false)'],

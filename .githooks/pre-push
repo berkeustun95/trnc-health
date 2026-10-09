@@ -96,6 +96,13 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitme
   exit 1
 }
 
+# Google calls stay anonymous (Maps ToS §4.4, closed 2026-10-08 on exactly this): no user
+# identifier in any google-places request to Google, nearby centre rounded to 4 dp.
+node scripts/check-google-calls-anonymous.mjs || {
+  echo "  push blocked: a google-places request to Google would carry user data or an unrounded position."
+  exit 1
+}
+
 # Ad placement. Blocks a push that would mount an advert on a surface the permanent
 # exclusion list forbids — duty pharmacy, emergency contacts, health facilities, search
 # results, push notifications, Ask Oli — or point one at an excluded destination.

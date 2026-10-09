@@ -36,13 +36,13 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   read; Database, Edge Functions, Edge Function Secrets read-write; NO API-keys read (so `supabase link`
   fails — not needed, and it keeps the service key unreadable). Always through `scripts/sb.sh` (token +
   `--project-ref`; CLI 2.104.0's `secrets` ignores the Keychain; allowlist: `functions`/`secrets` only).
-  Claude sets function secrets itself (`scripts/sb.sh secrets set --env-file <600 file>`, never the value
-  on a command line; check by digest: `secrets list` value = sha256) and deploys functions itself with
-  `scripts/fn-deploy.sh <fn> --go` (verify_jwt from deploy-config.json) — **only after Berke's go**, like
-  every migration and OTA. Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod —
-  migrations only via `supabase-migrate`. Fallback without this Mac: `supabase-functions-deploy` (and the
-  `supabase-function-secrets` workflow, which lands with feat/explore-v2). Lost Mac → revoke the token
-  (Supabase → Account → Access Tokens).
+  Claude sets function secrets itself
+  (`scripts/sb.sh secrets set --env-file <600 file>`, never the value on a command line; check by digest:
+  `secrets list` value = sha256) and deploys functions itself with `scripts/fn-deploy.sh <fn> --go`
+  (verify_jwt from deploy-config.json) — **only after Berke's go**, like every migration and OTA.
+  Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod — migrations only via
+  `supabase-migrate`. Fallback without this Mac: `supabase-function-secrets` + `supabase-functions-deploy`.
+  Lost Mac → revoke the token (Supabase → Account → Access Tokens).
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
@@ -83,6 +83,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
   preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
   build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
+- **Google keys for check-ins (2026-10-07, both in ada-app-499617 "ADA App", billing country Cyprus →
+  Maps Platform EEA terms):** iOS map `AIzaSyCa…w3Ic` "ADA Maps – iOS" (Maps SDK for iOS, bundle ids
+  `com.berkeustun95.ada` + `.preview`) = EAS env `GOOGLE_MAPS_IOS_API_KEY` (production + preview,
+  sensitive) — from now on EVERY iOS build carries the Google Maps SDK (`app.config.js` adds it when
+  set). Places `AIzaSyAK…azbM` "ADA Places – server" (Places API (New) only) = Edge Function secret
+  `GOOGLE_PLACES_SERVER_KEY`, used only by `google-places`.
 - **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
   `wrangler.jsonc`); both URLs are registered with the stores. `npm run web:deploy`, never
   `npx wrangler deploy`: it runs `check-web-assets.mjs`, and wrangler REPLACES the asset manifest, so
@@ -100,7 +106,7 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
 - Edge functions: `scripts/fn-deploy.sh <name> --go` from this Mac, or `supabase-functions-deploy -f
   function=<name>|all`. verify_jwt comes from `supabase/functions/deploy-config.json` (read from prod);
   a new function is added there first (and to the workflow's choice list). Secrets: `scripts/sb.sh
-  secrets …`.
+  secrets …` or `supabase-function-secrets -f name=<NAME>` (from the repo secret of that name).
 - Health: `daily-health` (05:00 UTC daily: hotels, novest health, novest photos (fails > 10% of live
   listings photo-less), notify). A red run emails. `npm run novest:verify` is post-import only, by hand in CI.
 - Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`.
@@ -287,34 +293,17 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
-## Check-ins go-live (ordered — approved 2026-10-02; app code on `feat/explore-v2`)
-**DB LIVE, FEATURE DARK (Berke, 2026-10-07 — replaces "migration only at go-live").** `20261092_checkins`
-+ `20261093_checkins_google_places` APPLIED 2026-10-07 (QUERY 1: 1018/1018); `google-places` deployed
-(v1, verify_jwt on); `GOOGLE_PLACES_SERVER_KEY` set. `MODULE_FLAGS.checkins` stays false until step 4.
-Until then check_in / get_checkin_feed / accept_checkin_notice / get_google_place_pins are callable
-through the API by signed-in non-guests; no production bundle calls them. ⚠ Never dispatch the stale
-`20261078_checkins.sql` (feat/checkins-ready) or `20261069_checkins.sql` (feat/checkins-db): it would
-put check_in back to the pre-helper body and add a second get_checkin_feed overload (ambiguous call).
-Test data from preview testing: `supabase/readonly/checkins_test_data.sql` — remove before the flip.
-Policy draft on `docs/checkins-privacy` (Google lines in); store-form answers + Google addendum + the
-pending ToS §4.4 legal item in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
-1. **Redesign live first** (`REDESIGN_LIVE`) ✓.
-2. ✓ 2026-10-07: applied; prod's live profiles triggers re-checked verbatim
-   (`scripts/test-checkins-live-triggers.mjs` + fixture, 10/10).
-3. `CHECKINS_PREVIEW = true` (`constants/redesign.js`, feat/explore-v2), **`npm run ota:preview`** →
-   device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp). ⚠ While
-   explore-v2 is on Preview, `npm run ota` from main is refused by the preview-lineage guard until
-   explore-v2 lands on main (or Berke hands over `PREVIEW_LINEAGE_OVERRIDE=1`).
-4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
-   draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
-   without the disclosure (incl. the Google lines) in all four copies.
-   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety: Precise
-   location **Shared: yes**) and App Store Connect (App Privacy: Precise Location, linked, no
-   tracking, App Functionality; plus the Google Maps SDK's declarations on the iOS Google build).
-   He enters it and confirms; no flip before his confirmation. Remove the test data first.
-5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
-Feeds only: no per-person check-in history anywhere (decided 2026-10-02). EEA Maps terms apply
-(billing Cyprus): no Google place name on or next to a map.
+## Check-ins (LIVE 2026-10-09)
+Launched: flag flip `843c01a`, production OTA `27cdaa7d` (Android `01a1201f`), waitlist 3/3 notified (20261100).
+DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edge Function; policy 2026-10-08.
+- Feeds only: no per-person check-in history anywhere (decided 2026-10-02). EEA Maps terms apply (billing Cyprus):
+  no Google place name on or next to a map. Google calls stay anonymous + 4-dp rounded (pre-push guard
+  `check-google-calls-anonymous.mjs`; Maps ToS §4.4 closed on exactly that).
+- iPhones show Google pins only from a build carrying the Google Maps SDK (`GOOGLE_MAPS_IOS_API_KEY`, every iOS build
+  from 2026-10-07); App Store privacy must add the SDK's data types (vault store-forms file) with that build.
+- ⚠ Never dispatch `20261078`/`20261069` check-ins files from old branches (deleted 2026-10-08).
+- Watch: `gh workflow run supabase-readonly -f file=supabase/readonly/checkins_launch_watch.sql` (calls vs caps,
+  check-ins, pins, notices, submissions). Function errors: Dashboard → Edge Functions → google-places → Logs.
 
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.

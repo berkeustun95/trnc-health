@@ -27,7 +27,7 @@ import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../comp
 import {
   MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, RESIDENT_STATUSES, STUDENT_LEVELS,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
-  DISPLAY_NAME_MAX, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
+  DISPLAY_NAME_MAX, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE, TRNC_NATIONALITY_CODE,
 } from '../constants/profileGate'
 // affiliationPatch is deliberately NOT imported any more. It writes the five profiles
 // columns 20261027 drops, and this screen is the last thing that was still calling it.
@@ -36,6 +36,9 @@ import {
   enrolmentRow, isInstitutionCouplingBlock, profilesAffiliationClear,
 } from '../utils/education'
 import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
+import {
+  useCountryInstitutions, countryOptions, countryLabel, institutionLabel, OTHER_INSTITUTION_ID,
+} from '../utils/institutions'
 import LegalScreen from './LegalScreen'
 import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS, ROUTE_MEDALS_LIVE } from '../constants/flags'
 import { OwnRouteBadges } from '../components/RouteBadges'
@@ -102,9 +105,10 @@ const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist
 //
 // Renders the same for a current and a past enrolment; the only difference is the years
 // line, and "still studying" is what study_end_year IS NULL means to a reader.
-function EnrolmentRow({ row, lang, institutions, subjects, onEdit, onRemove, disabled }) {
-  const inst = institutions.find(i => i.id === row.institution_id)
-  const instLabel = inst ? (inst.short_name ? `${inst.name} (${inst.short_name})` : inst.name) : '—'
+function EnrolmentRow({ row, lang, subjects, onEdit, onRemove, disabled }) {
+  // From the row's own embed (EDUCATION_SELECT), not the picker's list: the picker holds one
+  // country at a time, and a past university may be in another.
+  const instLabel = institutionLabel(row.institutions) || '—'
   const subject = subjectOptions(subjects, lang).find(o => o.value === row.subject_id)
   const years = row.study_start_year == null
     ? (row.study_end_year == null ? '' : String(row.study_end_year))
@@ -139,6 +143,8 @@ function draftFromRow(row) {
     startYear: row.study_start_year,
     endYear: row.study_end_year,
     subjectId: row.subject_id,
+    // Other has no country; it is offered under every one, so it opens on the TRNC.
+    country: row.institutions?.country ?? TRNC_NATIONALITY_CODE,
   }
 }
 
@@ -158,7 +164,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     // neither reads nor writes the profiles copies — see the note above the save.
     student_level: null, preferred_language: 'English',
   })
-  const [institutions, setInstitutions]     = useState([])
   const [picker, setPicker]                 = useState(null)  // 'day'|'month'|'year'|'nat'|'cc'|'inst'|'region'|'status'|'level'|'pastInst'|'subject'|'startYear'|'endYear'
   const [nameState, setNameState]           = useDisplayNameCheck(form.display_name)
   const [savedForm, setSavedForm]           = useState(null)
@@ -274,11 +279,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     loadBlocks()
     loadEnrolments()
     refreshCanSee()
-    supabase.from('institutions')
-      .select('id, name, short_name')
-      .eq('is_active', true)
-      .order('sort_order')
-      .then(({ data }) => setInstitutions(data ?? []))
     if (MODULE_FLAGS.studentHub) {
       supabase.from('subjects')
         .select('id, sort_order, subject_i18n(lang, name)')
@@ -793,7 +793,13 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const regionOptions = REGIONS.map(v => ({ value: v, label: t(REGION_LABEL_KEY[v], lang) }))
   const statusOptions = RESIDENT_STATUSES.map(v => ({ value: v, label: t(RESIDENT_STATUS_LABEL_KEY[v], lang) }))
   const levelOptions = STUDENT_LEVELS.map(v => ({ value: v, label: t(STUDENT_LEVEL_LABEL_KEY[v], lang) }))
-  const instOptions = institutions.map(i => ({ value: i.id, label: i.short_name ? `${i.name} (${i.short_name})` : i.name }))
+  // The picker lists the DRAFT's country (one country per read; see utils/institutions).
+  const instList = useCountryInstitutions(draft?.country ?? TRNC_NATIONALITY_CODE)
+  const instOptions = (instList.rows ?? []).map(i => ({ value: i.id, label: institutionLabel(i) }))
+  // A saved enrolment's label comes from its embed, so editing one shows its name before
+  // (or without) its country's list.
+  const instLabelFor = id => instOptions.find(o => o.value === id)?.label
+    || institutionLabel((enrolments ?? []).find(r => r.institution_id === id)?.institutions)
   const dayOptions = Array.from({ length: daysInMonth(form.dobY, form.dobM) }, (_, i) => ({ value: i + 1, label: String(i + 1) }))
   const monthOptions = months.map((m, i) => ({ value: i + 1, label: m }))
   const thisYear = new Date().getFullYear()
@@ -857,6 +863,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const draftNeedsClose = draft != null && draft.endYear == null &&
     currentEnrol != null && currentEnrol.id !== draft.id
   const listedCount = (enrolments ?? []).filter(r => r.listing_opt_in).length
+  // is_listed_student() counts only enrolments at an institution that HAS a list: active and
+  // not Other (20261095). With none, the switch would read ON and list nobody.
+  const hasListableEnrolment = (enrolments ?? []).some(r =>
+    r.institution_id !== OTHER_INSTITUTION_ID && r.institutions?.is_active === true)
   const studyYearMax = studyYearCeiling()
   const subjectOpts = [{ value: null, label: '—' }, ...subjectOptions(subjects, lang)]
   // A student may clear either year; a past university may not, so its lists carry no blank.
@@ -1134,7 +1144,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                     <ActivityIndicator color={colors.primary} style={s.eduLoading} />
                   ) : currentEnrol ? (
                     <EnrolmentRow
-                      row={currentEnrol} lang={lang} institutions={institutions} subjects={subjects}
+                      row={currentEnrol} lang={lang} subjects={subjects}
                       onEdit={() => { setEduError(null); setDraft(draftFromRow(currentEnrol)) }}
                       onRemove={() => { setEduError(null); setRemoving(currentEnrol) }}
                       disabled={eduBusy || draft != null}
@@ -1149,7 +1159,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   )}
                   {pastEnrol.map(row => (
                     <EnrolmentRow
-                      key={row.id} row={row} lang={lang} institutions={institutions} subjects={subjects}
+                      key={row.id} row={row} lang={lang} subjects={subjects}
                       onEdit={() => { setEduError(null); setDraft(draftFromRow(row)) }}
                       onRemove={() => { setEduError(null); setRemoving(row) }}
                       disabled={eduBusy || draft != null}
@@ -1182,7 +1192,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   {!draft && !removing && (
                     <TouchableOpacity
                       style={s.eduAddBtn}
-                      onPress={() => { setEduError(null); setDraft({ level: 'university', startYear: null, endYear: null, subjectId: null, institutionId: null }) }}
+                      onPress={() => { setEduError(null); setDraft({ level: 'university', startYear: null, endYear: null, subjectId: null, institutionId: null, country: TRNC_NATIONALITY_CODE }) }}
                       activeOpacity={0.7}
                     >
                       <Feather name="plus" size={16} color={colors.primary} />
@@ -1193,10 +1203,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   {draft && (
                     <View style={s.eduDraft}>
                       <View style={s.fieldGroup}>
+                        <Text style={s.fieldLabel}>{t('pgInstitutionCountry', lang)}</Text>
+                        <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('instCountry')} activeOpacity={0.7}>
+                          <Text style={s.pickerBtnText} numberOfLines={1}>{countryLabel(draft.country, lang)}</Text>
+                          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={s.fieldGroup}>
                         <Text style={s.fieldLabel}>{t('pgInstitution', lang)}</Text>
-                        <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('inst')} activeOpacity={0.7}>
+                        <TouchableOpacity style={s.pickerBtn}
+                          onPress={() => { if (instList.failed) instList.retry(); setPicker('inst') }} activeOpacity={0.7}>
                           <Text style={[s.pickerBtnText, !draft.institutionId && s.pickerBtnPlaceholder]} numberOfLines={1}>
-                            {instOptions.find(o => o.value === draft.institutionId)?.label || t('pgInstitutionSearch', lang)}
+                            {instLabelFor(draft.institutionId) || t('pgInstitutionSearch', lang)}
                           </Text>
                           <Feather name="chevron-down" size={16} color={colors.textSecondary} />
                         </TouchableOpacity>
@@ -1249,8 +1267,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                       {draftNeedsClose && (
                         <View style={s.fieldGroup}>
                           <Text style={s.fieldLabel}>
-                            {t('eduCloseCurrentLabel', lang).replace('{uni}',
-                              instOptions.find(o => o.value === currentEnrol.institution_id)?.label ?? '')}
+                            {t('eduCloseCurrentLabel', lang).replace('{uni}', institutionLabel(currentEnrol.institutions))}
                           </Text>
                           <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('closeYear')} activeOpacity={0.7}>
                             <Text style={[s.pickerBtnText, !draft.closeYear && s.pickerBtnPlaceholder]}>
@@ -1302,7 +1319,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   onValueChange={toggleListing}
                   // Nothing to write to until an enrolment exists — the opt-in is a column
                   // on student_education, one per row, not a property of the person.
-                  disabled={listingBusy || !enrolments?.length || !hasDisplayName}
+                  disabled={listingBusy || !enrolments?.length || !hasDisplayName || (!listingOn && !hasListableEnrolment)}
                   trackColor={{ true: colors.primary }}
                   thumbColor="#fff"
                 />
@@ -1323,6 +1340,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 <Text style={s.fieldHint}>{t('eduListingNeedsDisplayName', lang)}</Text>
               ) : !enrolments?.length ? (
                 <Text style={s.fieldHint}>{t('eduListingNeedsEnrolment', lang)}</Text>
+              ) : !hasListableEnrolment ? (
+                <Text style={s.fieldHint}>{t('eduListingNeedsRealUni', lang)}</Text>
               ) : !listingOn ? (
                 <Text style={s.fieldHint}>{t('eduListingOffHint', lang)}</Text>
               ) : null}
@@ -1340,7 +1359,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   list and adds university and study level, which is exactly the pair the
                   policy itself got wrong before this. If either RETURNS TABLE changes,
                   this sentence is the other half of that edit. */}
-              {hasDisplayName && enrolments?.length ? (
+              {hasDisplayName && hasListableEnrolment ? (
                 <Text style={s.fieldHint}>{ROUTE_MEDALS_LIVE ? t('eduListingDisclosureBadges', lang) : t('eduListingDisclosure', lang)}</Text>
               ) : null}
             </View>
@@ -1501,6 +1520,17 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           {/* Every education picker writes to the DRAFT, never to the profile form — the
               five columns those fields used to feed are not written by this screen any
               more. `pastInst` is gone with the past-university shape it belonged to. */}
+          <SearchModal lang={lang} visible={picker === 'instCountry'} title={t('pgInstitutionCountry', lang)}
+            options={countryOptions(lang)}
+            value={draft?.country ?? null}
+            // Other belongs to every country, so it survives a country change; a real
+            // university does not.
+            onSelect={v => {
+              setDraft(d => ({ ...d, country: v,
+                institutionId: d.country === v || d.institutionId === OTHER_INSTITUTION_ID ? d.institutionId : null }))
+              setPicker(null)
+            }}
+            onClose={() => setPicker(null)} />
           <SearchModal lang={lang} visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
             searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
             value={draft?.institutionId ?? null}

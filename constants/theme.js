@@ -89,6 +89,9 @@ export const placeColors = {
   // duty-pharmacy accent (hue 18) above all. validate-map-sources.mjs asserts >= 30 degrees
   // from every source. Text on bg is 4.82:1.
   petHotel: { bg: '#F7FEE7', text: '#4D7C0F' },
+  // Google place pin (check-ins, 20261093). Hue 298, the widest free gap: 36 deg from the
+  // pharmacy pin (262), 37 from grooming (335) — Android markers keep only the hue.
+  googlePlace: { bg: '#FAE8FF', text: '#A01DA5' },
 }
 
 export const gameColors = {

@@ -258,15 +258,20 @@ function readStudentHubFlag(raw) {
   return m[1] === 'true'
 }
 
-// ─── CHECK-INS TRIPWIRE (20261069) ──────────────────────────────────────────
+// ─── CHECK-INS TRIPWIRE (20261092) ──────────────────────────────────────────
 // The opposite question to the one above: not "is a retracted claim gone" but "is the new
 // disclosure THERE". Flipping MODULE_FLAGS.checkins against copy that does not describe
 // check-ins would publish a feature the policy says nothing about, to a 13+ audience. The
 // markers are the facts a reader most needs, one per copy language; the wording itself is
 // Berke's (docs/checkins-privacy). Silent while the flag is off.
+// The last two per language (2026-10-07, 20261093): Google as the recipient of the position on
+// "Buradayım" in Explore → Check-ins, at the precision the google-places function sends
+// (r4 ≈ 10 m), and Google as an independent controller (Maps Platform ToS §4.4).
 const CHECKINS_MARKERS = {
-  en: [/within 150 metres of the place/, /Hide my check-ins/, /no page that lists one person's check-ins/],
-  tr: [/150 metre yakınında/, /Check-in'lerimi gizle/, /check-in'lerini listeleyen bir sayfa yoktur/],
+  en: [/within 150 metres of the place/, /Hide my check-ins/, /no page that lists one person's check-ins/,
+       /rounded to about 10 metres, is sent to our server, which asks Google \(Google Maps Platform\)/, /Google receives these coordinates as an independent controller/],
+  tr: [/150 metre yakınında/, /Check-in'lerimi gizle/, /check-in'lerini listeleyen bir sayfa yoktur/,
+       /yaklaşık 10 metreye yuvarlanmış konumunuz sunucumuza gönderilir; sunucumuz 100 metre içindeki mekanları Google'dan/, /Google bu koordinatları bağımsız bir veri sorumlusu olarak alır/],
 }
 function readModuleFlag(name, raw) {
   const src = raw ?? readFileSync(join(ROOT, 'constants/flags.js'), 'utf8')
@@ -494,6 +499,13 @@ function self() {
         return [copies, columns, { ...realWorld, checkinsOn: true, texts }]
       },
       ([,,w]) => w.checkinsOn === true && !/Check-in'lerimi gizle/.test(w.texts['constants/legal/privacy.tr.js'])],
+    ['check-ins live, a copy not naming Google as recipient of the position',
+      () => {
+        const texts = { ...realWorld.texts }
+        texts['docs/privacy.html'] = (texts['docs/privacy.html'] ?? '').replace(/independent controller/g, 'partner')
+        return [copies, columns, { ...realWorld, checkinsOn: true, texts }]
+      },
+      ([,,w]) => w.checkinsOn === true && !/independent controller/.test(w.texts['docs/privacy.html'] ?? '')],
   ]
   let bad = 0
   for (const [name, build, landed] of cases) {

@@ -130,17 +130,11 @@ export const MODULE_FLAGS = {
   // self-serve. Stays false until Slice 3 seeds real firms — an emergency screen with
   // an empty list is worse than no screen at all.
   towing:       true,
-  // Place check-ins ("Buradayım"). Entry point only: the button on a place profile opens
-  // ComingSoonScreen and captures a waitlist signup. There is no check-in table, no
-  // location capture and no write of a user position anywhere — and there must not be one
-  // added behind this flag without that being its own decision.
-  //
-  // ⚠ UNLIKE EVERY OTHER KEY HERE, ITS ENTRY POINT IS NOT GATED. ExploreProfileScreen is
-  //   live today through the beaches path, so the button ships on the next OTA and starts
-  //   collecting demand immediately. That is deliberate: towing collected ZERO signups
-  //   because every entry point was flag-gated, so the flag hid the very demand it was
-  //   waiting for. This flag gates the eventual FEATURE, not the signup.
-  checkins:     false,
+  // Place check-ins ("Buradayım"). LIVE 2026-10-08 (Berke). DB: 20261092 + 20261093 (check_in,
+  // feeds, Google places via the google-places Edge Function); privacy policy 2026-10-08 names
+  // the one-off position check and Google. No position is ever stored on a check-in row.
+  // Off = the place-page button opens ComingSoonScreen and takes waitlist signups again.
+  checkins:     true,
 }
 
 // Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.

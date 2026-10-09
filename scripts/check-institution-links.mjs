@@ -5,6 +5,7 @@
 //   node scripts/check-institution-links.mjs --self   # prove every classification is reachable
 //   node scripts/check-institution-links.mjs --file links.tsv   # check a PROPOSED list (name<TAB>url
 //                                                                 per line) before it is migrated
+//   node scripts/check-institution-links.mjs --country TR       # one country (XN, TR, CY, GB; 20261095)
 //
 // A link is content that EXPIRES: a university rebrands (World Peace → Altınbaş, same
 // domain for now), moves its site, or lets a domain lapse. The Student Hub page would keep
@@ -26,7 +27,9 @@
 //               host that times out FOREVER never turns this red — read the no-answer line.
 //   dead        DNS gone, an expired/invalid certificate, a refused connection, or a
 //               definitive HTTP error (4xx/5xx without the challenge header). Exit 1.
-//   missing     an active university with no link — 20261025 set one on every row. Exit 1.
+//   missing     an active TRNC university with no link — 20261025 set one on every row. Exit 1.
+//               Other countries (20261096-98) carry NULL where no https homepage answered,
+//               on purpose, so a NULL there is not a failure.
 //
 // GET, never HEAD — this repo already learned that hosts throttle HEAD harder than GET.
 
@@ -109,8 +112,11 @@ if (fileIdx !== -1) {
   const { error: authErr } = await supabase.auth.signInWithPassword({ email: ADA_TEST_EMAIL, password: ADA_TEST_PASSWORD })
   if (authErr) { console.error(c.r(`\n  sign-in failed: ${authErr.message}\n`)); process.exit(1) }
 
-  const { data, error } = await supabase.from('institutions')
-    .select('id, name, is_active, website_url').eq('is_active', true).neq('id', OTHER_INSTITUTION_ID).order('name')
+  const countryIdx = process.argv.indexOf('--country')
+  let q = supabase.from('institutions')
+    .select('id, name, is_active, website_url, country').eq('is_active', true).neq('id', OTHER_INSTITUTION_ID)
+  if (countryIdx !== -1) q = q.eq('country', process.argv[countryIdx + 1])
+  const { data, error } = await q.order('name')
   await supabase.auth.signOut({ scope: 'local' })
   // POSITIVE CONTROL: the table is seeded and cannot be empty. Zero rows means this reader
   // is blind (RLS, a degraded token), not that there is nothing to check.
@@ -137,9 +143,22 @@ async function probe(url) {
 
 console.log(`university links — ${rows.length} ${fileIdx !== -1 ? 'from ' + process.argv[fileIdx + 1] : 'active universities (Other excluded)'}\n`)
 const buckets = { ok: [], challenge: [], 'bad chain': [], dead: [], 'no answer': [], missing: [] }
-const results = await Promise.all(rows.map(async r => (r.website_url ? { r, p: await probe(r.website_url) } : { r })))
+// Eight at a time. All-at-once was fine for 23 rows; at ~390 (20261096-98) it starved its
+// own sockets and read as 223 "no answer" on 2026-10-08.
+const results = new Array(rows.length)
+let next = 0
+await Promise.all(Array.from({ length: 8 }, async () => {
+  while (next < rows.length) {
+    const i = next++
+    const r = rows[i]
+    results[i] = r.website_url ? { r, p: await probe(r.website_url) } : { r }
+  }
+}))
 for (const { r, p } of results) {
-  if (!p) { buckets.missing.push(r); console.log(`  ${c.r('✗ missing  ')} ${r.name}`); continue }
+  if (!p) {
+    if (r.country && r.country !== 'XN') { console.log(`  ${c.d('· no link  ')} ${r.name}`); continue }
+    buckets.missing.push(r); console.log(`  ${c.r('✗ missing  ')} ${r.name}`); continue
+  }
   const kind = classify(p)
   buckets[kind].push(r)
   const moved = p.finalUrl && p.finalUrl.replace(/\/$/, '') !== r.website_url.replace(/\/$/, '') ? c.d(` → ${p.finalUrl}`) : ''
