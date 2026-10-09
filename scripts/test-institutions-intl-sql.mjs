@@ -171,6 +171,241 @@ INSERT INTO public.student_education (user_id, institution_id, level, listing_op
   ('${NOBODY}', '${DAU}', 'university', false);
 `
 
+// Messaging (20261029 as live, readonly messaging_defs 2026-10-09): start_conversation,
+// send_message and may_initiate_by_age verbatim. Tables carry only the columns those bodies
+// touch; the messages triggers (sender stamp, age rule, UGC screen) are NOT modelled —
+// this tests the LISTED gates, which is what 20261095 changed.
+const LIVE_MSG_DEFS = `CREATE OR REPLACE FUNCTION public.may_initiate_by_age(p_sender uuid, p_recipient uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_sender    date;
+  v_recipient date;
+  v_cutoff    date := (current_date - interval '18 years')::date;  -- ADULT_AGE
+BEGIN
+  -- ⚠ TWO CLAUSES, AND THE SECOND ONE IS 20261036. Without it a guest — one tap from a
+  --   cold start, no credentials — gets a minor/adult bit on any uuid they name. The
+  --   first clause alone reads like "a real user is asking"; in this app it only means
+  --   "a session exists", and signInAnonymously() makes one.
+  IF auth.uid() IS NULL OR is_anonymous_session() THEN
+    RETURN false;
+  END IF;
+
+  SELECT date_of_birth INTO v_sender    FROM profiles WHERE id = p_sender;
+  SELECT date_of_birth INTO v_recipient FROM profiles WHERE id = p_recipient;
+
+  -- Born AFTER the cutoff = younger than 18 = a minor.
+  IF v_sender IS NOT NULL AND v_sender > v_cutoff THEN
+    RETURN true;   -- the sender is a known minor
+  END IF;
+  IF v_recipient IS NOT NULL AND v_recipient <= v_cutoff THEN
+    RETURN true;   -- the recipient is a known adult
+  END IF;
+
+  RETURN false;
+END;
+$function$;
+CREATE OR REPLACE FUNCTION public.start_conversation(p_recipient_id uuid, p_body text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_me      uuid := auth.uid();
+  v_body    text := btrim(coalesce(p_body, ''));
+  v_refused boolean;
+  v_conv    uuid;
+  v_msg     uuid;
+BEGIN
+  -- ── the gates that RAISE: nothing was attempted, nothing is counted ──────
+  IF v_me IS NULL OR is_anonymous_session() THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+  IF NOT can_see_student_lists() THEN
+    RAISE EXCEPTION 'NOT_LISTED';
+  END IF;
+  IF p_recipient_id IS NULL OR p_recipient_id = v_me THEN
+    RAISE EXCEPTION 'INVALID_RECIPIENT';
+  END IF;
+  IF char_length(v_body) < 1 OR char_length(v_body) > 1000 THEN
+    RAISE EXCEPTION 'BODY_LENGTH';
+  END IF;
+
+  -- A live thread already exists; the client should have opened it. Not a secret — the
+  -- caller is a participant of it by definition.
+  IF EXISTS (
+    SELECT 1 FROM conversations
+     WHERE pair_lo = least(v_me, p_recipient_id) AND pair_hi = greatest(v_me, p_recipient_id)
+       AND declined_at IS NULL AND closed_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'CONVERSATION_EXISTS';
+  END IF;
+
+  -- ── THE CAP. Fifty new conversations a day, counting refusals. ───────────
+  -- SECURITY DEFINER is not decoration here. An INVOKER count would read
+  -- conversation_attempts under the caller's own RLS, which grants them nothing, so it
+  -- would return 0 forever and the cap would be structurally dead — the exact defect
+  -- \`check_report_rate_limit\` shipped with, where a non-admin counting an admin-read
+  -- table could never reach the threshold. A rate limit that cannot see its own
+  -- denominator is not a rate limit.
+  IF (SELECT count(*) FROM conversation_attempts
+       WHERE initiator_id = v_me AND created_at > now() - interval '24 hours') >= 50 THEN
+    RAISE EXCEPTION 'RATE_LIMITED';
+  END IF;
+
+  -- A uuid that is nobody is not an attempt on anyone, so it records nothing. (It costs
+  -- no slot either, which is an oracle only in the sense that spending fifty attempts a
+  -- day and watching for the cap would distinguish it. The answer is identical, the cost
+  -- is a day per bit, and the alternative is a foreign-key error that says "no such
+  -- user" outright.)
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_recipient_id) THEN
+    RETURN 'refused';
+  END IF;
+
+  -- ── the refusable gates, evaluated together and answered as one word ─────
+  v_refused :=
+       EXISTS (SELECT 1 FROM blocks
+                WHERE (blocker_id = v_me AND blocked_id = p_recipient_id)
+                   OR (blocker_id = p_recipient_id AND blocked_id = v_me))
+    OR NOT is_listed_student(p_recipient_id)
+    -- PERMANENT, ONE-DIRECTIONAL DECLINE: any past thread this person declined while I
+    -- was the initiator seals me out of initiating again. It does not seal them out of
+    -- initiating to me — a decline means "not from you", not "this pair is over".
+    OR EXISTS (SELECT 1 FROM conversations
+                WHERE pair_lo = least(v_me, p_recipient_id)
+                  AND pair_hi = greatest(v_me, p_recipient_id)
+                  AND declined_at IS NOT NULL
+                  AND initiator_id = v_me)
+    OR NOT may_initiate_by_age(v_me, p_recipient_id);
+
+  INSERT INTO conversation_attempts (initiator_id, recipient_id, outcome)
+  VALUES (v_me, p_recipient_id, CASE WHEN v_refused THEN 'refused' ELSE 'sent' END);
+
+  IF v_refused THEN
+    RETURN 'refused';
+  END IF;
+
+  -- The EXISTS check above and this INSERT are not atomic with respect to another
+  -- session doing the same thing, so two simultaneous openers both pass it and the
+  -- second meets the partial unique index as a raw 23505 the client cannot read.
+  -- 20261026's own belt, worn for the same reason.
+  BEGIN
+    INSERT INTO conversations (initiator_id, recipient_id) VALUES (v_me, p_recipient_id)
+    RETURNING id INTO v_conv;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'CONVERSATION_EXISTS';
+  END;
+
+  -- sender_display_name is stamped by msg_10; the placeholder is never stored.
+  INSERT INTO messages (conversation_id, sender_id, sender_display_name, body)
+  VALUES (v_conv, v_me, '-', v_body)
+  RETURNING id INTO v_msg;
+
+  PERFORM notify_new_message(v_msg);
+  RETURN 'sent';
+END;
+$function$;
+CREATE OR REPLACE FUNCTION public.send_message(p_conversation_id uuid, p_body text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_me   uuid := auth.uid();
+  v_body text := btrim(coalesce(p_body, ''));
+  c      conversations%ROWTYPE;
+  v_them uuid;
+  v_msg  uuid;
+BEGIN
+  IF v_me IS NULL OR is_anonymous_session() THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED';
+  END IF;
+  IF NOT can_see_student_lists() THEN
+    RAISE EXCEPTION 'NOT_LISTED';
+  END IF;
+  IF char_length(v_body) < 1 OR char_length(v_body) > 1000 THEN
+    RAISE EXCEPTION 'BODY_LENGTH';
+  END IF;
+
+  SELECT * INTO c FROM conversations WHERE id = p_conversation_id;
+  -- A non-participant gets the same answer as a nonexistent id: the thread is not
+  -- theirs, and "wrong id" versus "not yours" is a membership oracle.
+  IF c.id IS NULL OR v_me NOT IN (coalesce(c.initiator_id, '00000000-0000-0000-0000-000000000000'::uuid),
+                                  coalesce(c.recipient_id, '00000000-0000-0000-0000-000000000000'::uuid)) THEN
+    RAISE EXCEPTION 'NO_SUCH_CONVERSATION';
+  END IF;
+
+  v_them := CASE WHEN c.initiator_id = v_me THEN c.recipient_id ELSE c.initiator_id END;
+
+  -- Left by either side, or the other person is gone.
+  IF c.closed_at IS NOT NULL OR v_them IS NULL THEN
+    RAISE EXCEPTION 'CONVERSATION_CLOSED';
+  END IF;
+
+  -- A block in either direction closes the thread in practice. The blocked party is told
+  -- the conversation is closed, never that they were blocked.
+  IF EXISTS (SELECT 1 FROM blocks
+              WHERE (blocker_id = v_me AND blocked_id = v_them)
+                 OR (blocker_id = v_them AND blocked_id = v_me)) THEN
+    RAISE EXCEPTION 'CONVERSATION_CLOSED';
+  END IF;
+
+  IF c.initiator_id = v_me THEN
+    -- ACCEPT-FIRST: one opener, then nothing until the recipient lets it through.
+    -- Declined threads land here too, wearing the same answer. See the note above.
+    IF c.accepted_at IS NULL THEN
+      RAISE EXCEPTION 'AWAITING_ACCEPTANCE';
+    END IF;
+  ELSE
+    IF c.declined_at IS NOT NULL THEN
+      RAISE EXCEPTION 'CONVERSATION_CLOSED';
+    END IF;
+    -- REPLYING IS ACCEPTING. An explicit accept exists too, but making somebody tap
+    -- Accept before they may answer is a step that means nothing: the reply IS the
+    -- acceptance. Declining stays explicit, because it is permanent.
+    IF c.accepted_at IS NULL THEN
+      UPDATE conversations SET accepted_at = now() WHERE id = c.id;
+    END IF;
+  END IF;
+
+  IF NOT is_listed_student(v_them) THEN
+    -- They left the hub. Nothing more lands in the thread; it stays readable.
+    RAISE EXCEPTION 'CONVERSATION_CLOSED';
+  END IF;
+
+  INSERT INTO messages (conversation_id, sender_id, sender_display_name, body)
+  VALUES (c.id, v_me, '-', v_body)
+  RETURNING id INTO v_msg;
+
+  PERFORM notify_new_message(v_msg);
+  RETURN 'sent';
+END;
+$function$;`
+const MSG_SEED = `
+ALTER TABLE public.profiles ADD COLUMN date_of_birth date;
+-- All adults: the age rule (may_initiate_by_age) refuses an unknown-age pair, and it is not
+-- what this tests. Positive control below: the legitimate pair IS sent.
+UPDATE public.profiles SET date_of_birth = '2000-01-01';
+CREATE TABLE public.conversations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  initiator_id uuid, recipient_id uuid, created_at timestamptz NOT NULL DEFAULT now(),
+  accepted_at timestamptz, declined_at timestamptz, closed_at timestamptz, closed_by uuid,
+  last_message_at timestamptz,
+  pair_lo uuid GENERATED ALWAYS AS (least(initiator_id, recipient_id)) STORED,
+  pair_hi uuid GENERATED ALWAYS AS (greatest(initiator_id, recipient_id)) STORED);
+CREATE TABLE public.messages (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), conversation_id uuid,
+  sender_id uuid, sender_display_name text, body text, created_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz, hidden_at timestamptz, hidden_reason text);
+CREATE TABLE public.conversation_attempts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  initiator_id uuid, recipient_id uuid, outcome text, created_at timestamptz NOT NULL DEFAULT now());
+CREATE FUNCTION public.notify_new_message(p uuid) RETURNS void LANGUAGE sql AS 'SELECT';
+${LIVE_MSG_DEFS}
+`
+
 const results = []
 const check = (name, ok, got) => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  got: ' + JSON.stringify(got)}`) }
 const one = async (db, sql) => (await db.query(sql)).rows[0]
@@ -338,6 +573,55 @@ const variant = (from, to) => {
   check('committed 1095–1099 apply in order', out.every(x => x === 'ok'), out)
   const led = (await db.query(`SELECT count(*)::int n FROM schema_migrations_applied WHERE filename = ANY($1)`, [files])).rows[0].n
   check('…each stamps its ledger row', led === 5, led)
+}
+
+// 6. MESSAGING at universities outside the TRNC, through the live RPC bodies.
+//    A listed at a GB university, B listed at a TR university, C opted in only at Other.
+{
+  const A = LISTED, B = NOBODY, C = OTHER_ONLY
+  const call = (uid, sql) => asRole(db6, 'authenticated', uid, sql)
+  let db6
+  // RED-first: on the LIVE (pre-1095) bodies, C — opted in only at Other — can message.
+  db6 = await freshDb(SEED + MSG_SEED)
+  await db6.exec(`INSERT INTO student_education (user_id, institution_id, level, listing_opt_in) VALUES ('${C}', '${OTHER}', 'university', true)`)
+  const holeC = await call(C, `SELECT start_conversation('${A}', 'merhaba') r`)
+  check('RED messaging: on the live bodies, Other-only C can open a conversation (the hole)', holeC.ok && holeC.rows[0].r === 'sent', holeC)
+
+  db6 = await freshDb(SEED + MSG_SEED)
+  const dirM = fileURLToPath(new URL('../supabase/migrations/', import.meta.url))
+  for (const f of ['20261095_institutions_country.sql', '20261096_institutions_seed_tr.sql',
+                   '20261097_institutions_seed_cy.sql', '20261098_institutions_seed_gb.sql',
+                   '20261099_institutions_activate_intl.sql']) {
+    const r = await applyFile(db6, dirM + f)
+    if (!r.ok) check(`messaging fixture: ${f} applies`, false, r.msg)
+  }
+  const gbId = (await db6.query(`SELECT id FROM institutions WHERE country = 'GB' AND name = 'Imperial College London'`)).rows[0].id
+  const trId = (await db6.query(`SELECT id FROM institutions WHERE country = 'TR' AND name = 'Boğaziçi Üniversitesi'`)).rows[0].id
+  await db6.exec(`DELETE FROM student_education;
+    INSERT INTO student_education (user_id, institution_id, level, listing_opt_in) VALUES
+      ('${A}', '${gbId}', 'university', true), ('${B}', '${trId}', 'university', true),
+      ('${C}', '${OTHER}', 'university', true)`)
+
+  const listGb = await call(B, `SELECT count(*)::int n FROM get_student_list('${gbId}')`)
+  check('messaging: TR-listed B sees GB-listed A in Imperial\'s list', listGb.ok && listGb.rows[0].n === 1, listGb)
+  const open = await call(A, `SELECT start_conversation('${B}', 'hello from London') r`)
+  check('messaging: GB-listed A opens a conversation with TR-listed B → sent', open.ok && open.rows[0].r === 'sent', open)
+  const conv = (await db6.query(`SELECT id FROM conversations WHERE initiator_id = '${A}' AND recipient_id = '${B}'`)).rows[0]?.id
+  const early = await call(A, `SELECT send_message('${conv}', 'second') r`)
+  check('messaging: accept-first still holds (A cannot send again before B replies)', !early.ok && /AWAITING_ACCEPTANCE/.test(early.msg), early)
+  const reply = await call(B, `SELECT send_message('${conv}', 'merhaba') r`)
+  check('messaging: B replies (= accepts) → sent', reply.ok && reply.rows[0].r === 'sent', reply)
+  const again = await call(A, `SELECT send_message('${conv}', 'great') r`)
+  check('messaging: after acceptance A can send → sent', again.ok && again.rows[0].r === 'sent', again)
+
+  const cOpen = await call(C, `SELECT start_conversation('${A}', 'hi') r`)
+  check('messaging: Other-only C cannot open a conversation (NOT_LISTED)', !cOpen.ok && /NOT_LISTED/.test(cOpen.msg), cOpen)
+  const cList = await call(C, `SELECT count(*) FROM get_student_list('${gbId}')`)
+  check('messaging: Other-only C cannot read any list (NOT_LISTED)', !cList.ok && /NOT_LISTED/.test(cList.msg), cList)
+  const toC = await call(A, `SELECT start_conversation('${C}', 'hi') r`)
+  check('messaging: nobody can open a conversation with Other-only C → refused', toC.ok && toC.rows[0].r === 'refused', toC)
+  const msgs = (await db6.query(`SELECT count(*)::int n FROM messages`)).rows[0].n
+  check('messaging: exactly the 3 legitimate messages were stored', msgs === 3, msgs)
 }
 
 const failed = results.filter(x => !x).length
