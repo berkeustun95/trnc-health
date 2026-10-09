@@ -65,6 +65,7 @@ import DutyListScreen from './screens/DutyListScreen'
 import EventsScreen from './screens/EventsScreen'
 import OrganizerScreen from './screens/OrganizerScreen'
 import AccommodationScreen from './screens/AccommodationScreen'
+import HotelsScreen from './screens/HotelsScreen'
 import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
@@ -629,6 +630,7 @@ export default function App() {
   const [expandedMuni, setExpandedMuni] = useState(null)
   const [showEvents, setShowEvents] = useState(false)
   const [showAccommodation, setShowAccommodation] = useState(false)
+  const [showHotels, setShowHotels] = useState(false)
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
@@ -1072,6 +1074,7 @@ export default function App() {
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
+      if (showHotels) { setShowHotels(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (selectedFacility) { if (facilityBackRef.current?.()) return true; setSelectedFacility(null); return true }
       if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
@@ -1120,7 +1123,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2116,6 +2119,8 @@ export default function App() {
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={() => setShowAccommodation(false)} />
     )
+  } else if (showHotels) {
+    content = <HotelsScreen lang={lang} onClose={() => setShowHotels(false)} />
   } else if (showHomeServices) {
     content = (MODULE_FLAGS.homeServices || isAdmin)
       ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} backRef={homeServicesBackRef} />
@@ -2560,6 +2565,7 @@ export default function App() {
             onShowEvents={() => setShowEvents(true)}
             onOpenEvent={openEventFromHome}
             onShowAccommodation={() => setShowAccommodation(true)}
+            onShowHotels={() => setShowHotels(true)}
             onShowPets={() => setShowPets(true)}
             onShowHomeServices={() => setShowHomeServices(true)}
             onShowJobPostings={() => setShowJobPostings(true)}
@@ -2810,7 +2816,7 @@ export default function App() {
   }
 
   const oliNavigate = (target) => {
-    setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
+    setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
@@ -2839,7 +2845,7 @@ export default function App() {
   const cityNavigate = (target) => {
     const region = cityWelcome?.region
     setCityWelcome(null)
-    setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
+    setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)

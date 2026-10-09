@@ -84,10 +84,10 @@ check(liveIds.includes('dorm'),  `live tabs are missing 'dorm': ${liveIds.join('
 check(liveIds.join(',') === 'dorm,property', `tabs are not Yurtlar | Emlak when live: ${liveIds.join(',')}`)
 check(liveIds.length === darkIds.length + 1, `live tabs should be exactly one longer than dark (${liveIds.length} vs ${darkIds.length})`)
 
-// Oteller (HOTELS_LIVE) never appears on the dorm flag alone, and all three read in order.
+// Oteller left this module for its own Home tile (2026-10-09): even with hotels live the
+// tabs are Yurtlar | Emlak.
 const allIds = accomTabs({ dorm: true, hotel: true }).map(s => s.id)
-check(!liveIds.includes('hotel'), `'hotel' shows without its own flag: ${liveIds.join(',')}`)
-check(allIds.join(',') === 'hotel,dorm,property', `all-live tabs are not Oteller | Yurtlar | Emlak: ${allIds.join(',')}`)
+check(allIds.join(',') === 'dorm,property', `tabs with hotels live are not Yurtlar | Emlak: ${allIds.join(',')}`)
 
 // Yurtlar is a TAB now, never an intent chip: 'dorm' reaching the chip row would send
 // .eq('intent', 'dorm') to a CHECK constraint that has never heard of it.
@@ -95,9 +95,9 @@ check(!ACCOM_SEGMENTS.some(s => s.id === 'dorm'), `'dorm' is back in the Emlak c
 check(ACCOM_SEGMENTS.some(s => s.id === ACCOM_LANDING), `ACCOM_LANDING '${ACCOM_LANDING}' is not an Emlak chip`)
 
 // The module must never open on a tab it is not showing.
-// Opens on the first visible tab: Oteller with hotels, else Yurtlar (Berke 2026-09-29).
+// Opens on the first visible tab: Yurtlar (Berke 2026-10-09; Oteller has its own tile).
 check(accomLandingTab({ dorm: true }) === 'dorm', `accomLandingTab(dorm live) is ${accomLandingTab({ dorm: true })}, expected dorm`)
-check(accomLandingTab({ dorm: true, hotel: true }) === 'hotel', `accomLandingTab(all live) is ${accomLandingTab({ dorm: true, hotel: true })}, expected hotel`)
+check(accomLandingTab({ dorm: true, hotel: true }) === 'dorm', `accomLandingTab(hotels live) is ${accomLandingTab({ dorm: true, hotel: true })}, expected dorm`)
 check(darkIds.includes(accomLandingTab({ dorm: false })),
   `accomLandingTab(dark) returned '${accomLandingTab({ dorm: false })}', which is NOT a visible tab [${darkIds.join(',')}]`)
 
