@@ -92,11 +92,14 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
     items.push({ kind: 'header', key: 'h-oli', label: 'Oli' })
     for (const i of intents) items.push({ kind: 'intent', key: `i-${i.id}`, intent: i })
   }
-  if (q) {
+  // A search that came back empty under an Oli card is not "no results": Oli answered, so the
+  // whole section (heading included) is left out. "No results" only when neither has anything.
+  const searchEmpty = search.status === 'ok' && !search.rows.length
+  if (q && !(searchEmpty && intents.length)) {
     items.push({ kind: 'header', key: 'h-res', label: t('hrSearchResults', lang) })
     if (search.status === 'loading' && !search.rows.length) items.push({ kind: 'skeleton', key: 'sk' })
     else if (search.status === 'error') items.push({ kind: 'error', key: 'err' })
-    else if (search.status === 'ok' && !search.rows.length) items.push({ kind: 'empty', key: 'empty' })
+    else if (searchEmpty) items.push({ kind: 'empty', key: 'empty' })
     else search.rows.forEach((r, n) => items.push({ kind: 'result', key: `r-${r.module}-${r.id}-${n}`, row: r }))
   }
 
@@ -123,7 +126,7 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
       case 'error':
         return <ErrorState lang={lang} onRetry={() => runSearch(q)} />
       case 'empty':
-        return <Text style={s.empty}>{intents.length ? t('noResultsTitle', lang) : t('oliNoMatch', lang)}</Text>
+        return <Text style={s.empty}>{t('noResultsTitle', lang)}</Text>
       case 'result': {
         const meta = RESULT_META[item.row.module] ?? { icon: 'search-outline', category: 'city' }
         return (
