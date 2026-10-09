@@ -643,4 +643,4 @@ export const SOCIAL_AUTH_LIVE = true
 // exist only in builds from feat/voice-input on; OliMic also checks the module is present,
 // so a flip reaching an older binary shows the hint instead of crashing. Before flipping:
 // privacy line on getadaapp.com/privacy + store Audio answers (vault 2026-10-08 note).
-export const VOICE_INPUT = false
+export const VOICE_INPUT = true   // on from the 1.4.0 store build (2026-10-09); runtime 1.4.0 fences older binaries

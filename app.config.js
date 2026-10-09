@@ -39,7 +39,7 @@ export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
-    version: '1.3.0',
+    version: '1.4.0',
     orientation: 'portrait',
     icon: IS_PREVIEW ? './assets/preview/icon.png' : './assets/icon.png',
     splash: {
