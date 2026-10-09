@@ -99,6 +99,38 @@ ok('Google check-in then ADA place 20 km away -> TOO_FAST', x.msg === 'TOO_FAST'
 x = await as('authenticated', U(1), `SELECT * FROM public.check_in('${P(1)}', 35.0, 33.0, 10)`)
 ok('…and 14 km away too (from the pin, not an older row)', x.msg === 'TOO_FAST', x)
 
+// ── delete own check-ins (Profile → Check-in'lerim) ──
+await db.exec(`DELETE FROM public.google_place_pins; DELETE FROM public.checkins WHERE google_place_id IS NOT NULL;
+  INSERT INTO public.google_place_pins VALUES ('${G(7)}', 35.1, 33.1, now()), ('${G(8)}', 35.1, 33.1, now());
+  INSERT INTO public.checkins (user_id, google_place_id, checked_in_on, created_at, display_name_snapshot) VALUES
+   ('${U(1)}', '${G(7)}', current_date - 400, now() - interval '400 days', 'adult'),
+   ('${U(1)}', '${G(8)}', current_date, now(), 'adult'),
+   ('${U(2)}', '${G(8)}', current_date, now(), 'viewer');`)
+ok('before: both pins visible', JSON.stringify(await pins(4)) === JSON.stringify([G(7), G(8)]), await pins(4))
+x = await as('authenticated', U(2), `DELETE FROM public.checkins WHERE user_id = '${U(1)}' RETURNING id`)
+ok('nobody deletes another person\'s check-in', x.ok && x.rows.length === 0, x)
+x = await as('authenticated', U(1), `DELETE FROM public.checkins WHERE google_place_id = '${G(7)}' RETURNING id`)
+ok('owner deletes a 400-day-old check-in (no time limit)', x.ok && x.rows.length === 1, x)
+ok('its pin (only that check-in) is gone at once', !(await pins(4)).includes(G(7)), await pins(4))
+x = await as('authenticated', U(1), `DELETE FROM public.checkins WHERE google_place_id = '${G(8)}' RETURNING id`)
+ok('owner deletes the second', x.ok && x.rows.length === 1, x)
+ok("a pin another visible user's check-in still backs stays", (await pins(4)).includes(G(8)), await pins(4))
+x = await as('authenticated', U(2), `SELECT count(*)::int n FROM public.get_checkin_feed(p_google_place_id => '${G(8)}') WHERE display_name = 'adult'`)
+ok('deleted check-in is gone from the place feed', x.ok && x.rows[0].n === 0, x)
+x = await as('authenticated', U(2), `SELECT count(*)::int n FROM public.checkins`)
+ok("own-list privacy: a user's table read returns only their own rows", x.ok && x.rows[0].n === 1, x)
+x = await as('authenticated', U(1), `SELECT count(*)::int n FROM public.checkins WHERE user_id = '${U(2)}'`)
+ok('…even when asking for someone else by id', x.ok && x.rows[0].n === 0, x)
+await db.exec(`INSERT INTO public.checkins (user_id, google_place_id, checked_in_on, display_name_snapshot) VALUES ('${U(4)}', '${G(9)}', current_date, 'guestrow')`)
+const asGuest = async (anon) => {
+  await db.exec('RESET ROLE;')
+  await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: U(4), role: 'authenticated', is_anonymous: anon })])
+  await db.exec('SET ROLE authenticated;')
+  try { return (await db.query(`SELECT count(*)::int n FROM public.checkins`)).rows[0].n } finally { await db.exec('RESET ROLE;') }
+}
+x = [await asGuest(true), await asGuest(false)]
+ok('a guest session reads none of its own rows; the same user signed in reads 1 (positive control)', x[0] === 0 && x[1] === 1, x)
+
 // ── shape ──
 
 try { await db.exec(`INSERT INTO public.checkins (user_id, place_id, google_place_id, checked_in_on, display_name_snapshot) VALUES ('${U(1)}', '${P(5)}', '${G(9)}', current_date, 'x')`); ok('both ids refused', false, 'inserted') }

@@ -75,3 +75,5 @@ data/hnc/
 
 # supabase link state (project ref, CLI versions) — per checkout, never committed
 supabase/.temp/
+# Deno lockfile from the local Edge Function harness (scripts/test-google-places-edge.ts)
+deno.lock

@@ -1,9 +1,9 @@
 // Check-ins — every network call the app makes for them, in one place.
-// Server half and who-sees-what: supabase/migrations/20261069_checkins.sql.
+// Server half and who-sees-what: supabase/migrations/20261092_checkins.sql.
 //
 // Each function takes the Supabase client as its first argument instead of importing
 // lib/supabase: that import pulls AsyncStorage and cannot load in Node, and this module is
-// exercised in Node against the real SQL (scratchpad harness, PGlite) until 20261069 is
+// exercised in Node against the real SQL (scratchpad harness, PGlite) until 20261092 is
 // applied at go-live. Screens pass `supabase`.
 //
 // Nothing here widens App.js PROFILE_COLUMNS: the three check-in columns are read in their
@@ -11,12 +11,12 @@
 // fails alone, not the profile load every screen depends on.
 import { metresBetween } from '../constants/walkingRoutes.js'
 
-// Mirrors check_in() in 20261069. The client pre-check is UX only; the server decides.
+// Mirrors check_in() in 20261092. The client pre-check is UX only; the server decides.
 export const CHECKIN_RADIUS_M   = 150
 export const CHECKIN_ACCURACY_M = 50
 // The notice text's version, stamped by accept_checkin_notice(). Bump it when the wording
-// of checkinNoticeBody changes in any language.
-export const CHECKIN_NOTICE_VERSION = '2026-10-02'
+// of checkinNoticeBody changes in any language. 2026-10-07: + the Google line (20261093).
+export const CHECKIN_NOTICE_VERSION = '2026-10-07'
 export const FEED_PAGE = 20
 
 const CODES = ['AUTH_REQUIRED', 'NOT_ELIGIBLE', 'BANNED', 'NAME_REQUIRED', 'NOTICE_REQUIRED',
@@ -66,9 +66,11 @@ export async function checkIn(client, placeId, fix) {
 
 // One page, newest first. `before` is the last row of the previous page. `more` is true when
 // the page came back full — the next call may still return zero rows, which ends the list.
-export async function loadFeed(client, { placeId = null, before = null, limit = FEED_PAGE } = {}) {
+// A Google row (20261093) has google_place_id set and no place_* — its name is looked up live.
+export async function loadFeed(client, { placeId = null, googlePlaceId = null, before = null, limit = FEED_PAGE } = {}) {
   const { data, error, status } = await client.rpc('get_checkin_feed', {
     p_place_id: placeId,
+    p_google_place_id: googlePlaceId,
     p_before_at: before?.created_at ?? null,
     p_before_id: before?.checkin_id ?? null,
     p_limit: limit,
@@ -78,11 +80,16 @@ export async function loadFeed(client, { placeId = null, before = null, limit = 
   return { ok: true, rows, more: rows.length === limit }
 }
 
-// The caller's own check-ins (owner-only RLS), newest first, with the place for the label.
-export async function loadMine(client, uid, limit = 50) {
+// The caller's own check-ins (owner-only RLS), newest first, with the place for the label
+// (ADA places; a Google row carries google_place_id and a null `places`).
+// PAGED, not capped: the policy promises a user can delete ANY of their check-ins, so the list
+// must reach all of them. id breaks created_at ties so a page boundary never skips or repeats.
+export const MINE_PAGE = 30
+export async function loadMine(client, uid, offset = 0, limit = MINE_PAGE) {
   const { data, error } = await client.from('checkins')
-    .select('id, created_at, place_id, places(name, name_i18n, category)')
-    .eq('user_id', uid).order('created_at', { ascending: false }).limit(limit)
+    .select('id, created_at, place_id, google_place_id, places(name, name_i18n, category)')
+    .eq('user_id', uid).order('created_at', { ascending: false }).order('id', { ascending: false })
+    .range(offset, offset + limit - 1)
   return error ? null : data ?? []
 }
 

@@ -717,6 +717,7 @@ export default function App() {
   const homeBackRef = useRef(null)
   // Explore module + place profile back steps (slice 2), asked by the chain like homeBackRef.
   const exploreBackRef = useRef(null)
+  const checkinFeedBackRef = useRef(null)
   const placeBackRef = useRef(null)
   const homeServicesBackRef = useRef(null)
   const studentHubBackRef = useRef(null)
@@ -1094,7 +1095,7 @@ export default function App() {
       if ((showExploreBeach || showExplore) && exploreBackRef.current?.()) return true
       if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
-      if (showCheckinFeed)      { setShowCheckinFeed(false); return true }
+      if (showCheckinFeed)      { if (checkinFeedBackRef.current?.()) return true; setShowCheckinFeed(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (showLiveScores) { if (liveScoresBackRef.current?.()) return true; setShowLiveScores(false); return true }
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
@@ -2188,7 +2189,7 @@ export default function App() {
     content = (
       <BLErrorBoundary lang={lang}>
         <CheckinFeedScreen session={session} lang={lang} onBack={() => setShowCheckinFeed(false)} onRequireAccount={requireAccount}
-          onSelectPlace={setSelectedExplorePlace} placeOverlay={explorePlaceEl} />
+          onSelectPlace={setSelectedExplorePlace} placeOverlay={explorePlaceEl} backRef={checkinFeedBackRef} />
       </BLErrorBoundary>
     )
   } else if (selectedExplorePlace) {
