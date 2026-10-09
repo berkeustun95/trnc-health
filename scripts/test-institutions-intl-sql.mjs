@@ -327,6 +327,19 @@ const variant = (from, to) => {
   check('RED seeds: a name shared with a TRNC row outside the allowance is refused', !r.ok && /shared with TRNC rows are \[Imperial College London\]/.test(r.msg), r.msg)
 }
 
+// 5. The COMMITTED, stamped files (not the generator's fresh output), in apply order.
+{
+  const db = await freshDb(SEED)
+  const dirM = fileURLToPath(new URL('../supabase/migrations/', import.meta.url))
+  const files = ['20261095_institutions_country.sql', '20261096_institutions_seed_tr.sql', '20261097_institutions_seed_cy.sql',
+                 '20261098_institutions_seed_gb.sql', '20261099_institutions_activate_intl.sql']
+  const out = []
+  for (const f of files) { const r = await applyFile(db, dirM + f); out.push(r.ok ? 'ok' : `${f}: ${r.msg}`) }
+  check('committed 1095–1099 apply in order', out.every(x => x === 'ok'), out)
+  const led = (await db.query(`SELECT count(*)::int n FROM schema_migrations_applied WHERE filename = ANY($1)`, [files])).rows[0].n
+  check('…each stamps its ledger row', led === 5, led)
+}
+
 const failed = results.filter(x => !x).length
 console.log(`\n${results.length - failed}/${results.length} passed`)
 process.exit(failed ? 1 : 0)
