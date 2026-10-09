@@ -181,6 +181,19 @@ const WAKE_WORDS = new Set(['oli', 'olli', 'oly', 'olie', 'ollie', 'olly', 'holy
 const GREETINGS = new Set(['hey', 'hi', 'hello', 'merhaba', 'selam', 'hallo', 'hola', 'salut', 'bonjour',
   'привет', 'γεια', 'مرحبا', 'سلام'].map(normalize))
 const bare = w => w.replace(/['’](ye|ya)$/, '').replace(/[,.!?:;،]+$/, '')
+// Voice only (OliMic): the recogniser writes "Ali"/"Holy"/… where the user said "Oli". The
+// FIRST spoken word (after an optional greeting) is shown as "Oli", keeping a Turkish 'ye/'ya
+// suffix and trailing punctuation. Typed text and later words are never touched. `name` is how
+// the UI spells Oli in that language (hrOliField: Оли, أولي, اولی).
+const WAKE_TOKEN = /^(.*?)((?:['’](?:ye|ya))?[,.!?:;،]*)$/
+export function showWakeWordAsOli(text, name = 'Oli') {
+  const words = text.split(' ')
+  const at = words.length > 1 && GREETINGS.has(bare(normalize(words[0]))) ? 1 : 0
+  const m = (words[at] ?? '').match(WAKE_TOKEN)
+  if (!m || !m[1] || !WAKE_WORDS.has(normalize(m[1]))) return text
+  words[at] = name + m[2]
+  return words.join(' ')
+}
 export function stripWakeWord(q) {
   const words = q.split(' ')
   if (words.length > 1 && GREETINGS.has(bare(words[0])) && WAKE_WORDS.has(bare(words[1]))) return words.slice(2).join(' ')

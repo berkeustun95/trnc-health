@@ -4,6 +4,7 @@ import { VOICE_INPUT } from '../constants/flags'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { IconButton } from './ui'
+import { showWakeWordAsOli } from '../constants/oliIntents'
 
 // ─── Ask Oli voice input (VOICE_INPUT) ───────────────────────────────────────
 // Speech becomes text in the existing field; Oli's routing is unchanged and nothing is sent
@@ -24,6 +25,9 @@ const RECOGNIZER_LOCALE = {
 // ignored below 13). "Oli" took many tries without it (device test 2026-10-09).
 const BIAS = ['Oli', 'Maki', 'ADA', 'nöbetçi eczane', 'Lefkoşa', 'Girne', 'Gazimağusa', 'Mağusa', 'Güzelyurt',
   'İskele', 'Lefke', 'Kyrenia', 'Famagusta', 'Nicosia', 'KKTC']
+
+// Oli as each language's UI writes it (hrOliField), for the first spoken word.
+const OLI_NAME = { Russian: 'Оли', Arabic: 'أولي', Persian: 'اولی' }
 
 let Speech
 function loadSpeech() {
@@ -77,7 +81,7 @@ export function useVoiceInput({ lang, getText, onText }) {
       mod.addListener('start', () => setListening(true)),
       mod.addListener('end', () => setListening(false)),
       mod.addListener('result', e => {
-        const said = e.results?.[0]?.transcript ?? ''
+        const said = showWakeWordAsOli(e.results?.[0]?.transcript ?? '', OLI_NAME[lang] ?? 'Oli')
         const { base } = session.current
         onText(base && said ? `${base} ${said}` : base || said)
       }),
