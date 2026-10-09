@@ -18,6 +18,11 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   If a task seems to need a version bump, STOP and ask.
 
 ## ⚠ Standing warnings
+- ⚠ **main = 1.3.0 until 1.4.0 is live in BOTH stores; don't merge `feat/voice-input` early** (Berke,
+  2026-10-09). `feat/voice-input` holds 1.4.0 (version bump, `expo-speech-recognition`, RECORD_AUDIO, `VOICE_INPUT`
+  on); its store builds are made from that branch. Main stays the 1.3.0 OTA + fix lane: a 1.4.0 main would send every
+  `npm run ota` to a runtime nobody has yet. **Merge every new main fix into `feat/voice-input`** so 1.4.0 doesn't
+  miss it. Merge `feat/voice-input` → main the day 1.4.0 is live in both stores. Vault `2026-10-08_ask-oli-voice-input.md`.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
