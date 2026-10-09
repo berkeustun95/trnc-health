@@ -75,7 +75,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
   (he hands it over; log it). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json`.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
-  android --profile production`, AAB to Play closed testing by hand (Play key = listing only).
+  android --profile production`. **Play releases go through Code** (since 2026-10-09; the service account has
+  "Release to production"): `fastlane supply --aab <aab> --track production` with `changelogs/<versionCode>.txt` in all 9
+  folders (`store:check` covers them), skipping metadata/images; `--validate_only true` first, then read the track back
+  (`google_play_track_version_codes`). Production updates go through Google's review. No more manual AAB uploads.
 - **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`
   (outside repo) → ASC key "EAS Build" (`WYJ38BNP8L`, Admin, team MAQ8XPJ8Z6). Only a key passed via
   `EXPO_ASC_API_KEY_PATH`/`_KEY_ID`/`_ISSUER_ID` (+ `EXPO_APPLE_TEAM_ID`/`_TYPE`) regenerates profiles;
