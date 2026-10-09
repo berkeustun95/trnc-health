@@ -28,8 +28,8 @@
 
 // ─── THE TOP TABS AND THE EMLAK CHIP ROW, AS DATA ────────────────────────────
 //
-// The module opens with top tabs — Oteller | Yurtlar | Emlak (Berke 2026-09-29, after the
-// device test; was Emlak | Yurtlar | Oteller) — and Emlak keeps its own intent chip row. Yurtlar
+// The module opens with top tabs — Yurtlar | Emlak (Oteller was the first tab from 2026-09-29
+// until 2026-10-09, when it moved to its own Home tile and screen) — and Emlak keeps its own intent chip row. Yurtlar
 // was a fifth chip in that row until 2026-09-29; it is a TAB now, because it is not a
 // filter on `properties` at all (no query, no filters, no sort).
 //
@@ -39,15 +39,13 @@
 // was promised survives the restructure. The dot is absolutely positioned in
 // AccommodationScreen so it never changes the tab's size.
 export const ACCOM_TABS = [
-  { id: 'hotel', gated: true },
   { id: 'dorm', promoted: true, gated: true },
   { id: 'property' },
 ]
 
 export const accomTabs = live => ACCOM_TABS.filter(tab => !tab.gated || live[tab.id] === true)
 
-// The module OPENS on its first visible tab (Berke 2026-09-29): Oteller when HOTELS_LIVE,
-// else Yurtlar, else Emlak. Derived from the visible list, so it can never be a tab the user
+// The module OPENS on its first visible tab (Berke 2026-09-29): Yurtlar, else Emlak. Derived from the visible list, so it can never be a tab the user
 // can neither see nor leave.
 export function accomLandingTab(live) {
   return accomTabs(live)[0].id

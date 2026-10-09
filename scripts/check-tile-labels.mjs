@@ -214,7 +214,7 @@ export function headroom(str, px, box, maxLines) {
 }
 
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
-import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, ACCOM_TILE_STATES } from '../constants/homeModules.js'
+import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, ACCOM_TILE_STATES, HIDDEN_TILES } from '../constants/homeModules.js'
 import { HOTEL_ACTIONS, HOTEL_BOOK } from '../constants/hotels.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
@@ -327,10 +327,13 @@ for (const W of WIDTHS) {
     for (const m of modules) {
       // BOTH labels, and dropping either would leave a real surface unmeasured.
       //
-      // labelKey is what the FAVOURITES row and the edit sheet's picker render — they do
-      // not receive the override — so it stays measured at 11pt / 2 lines for every
-      // module including the one that overrides.
-      assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L), 2, true)
+      // labelKey at 11pt is what the grid draws for a module WITHOUT a gridLabel. A module
+      // with one never shows its labelKey in this box: the grid, the favourites row and
+      // (since 2026-10-09) the Düzenle picker all pass the override. Its labelKey now
+      // renders only in the Düzenle slot boxes, measured in their own geometry below.
+      if (!m.gridLabel) {
+        assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L), 2, true)
+      }
       // gridLabel is what the GRID renders. Size and line count are READ FROM THE CONFIG,
       // never assumed here: if this file hardcoded 8.5 and 3 it would be a second copy of
       // a number that lives in constants/homeModules.js, and the day somebody tuned one
@@ -386,6 +389,53 @@ for (const W of WIDTHS) {
     // The subtitle loop is gone with the subtitles (2026-09-10). Measuring keys that no
     // longer render would be the guard reporting on ghosts — it would keep passing while
     // saying nothing, which is worse than not checking.
+  }
+}
+
+// ═══ THE DÜZENLE SHEET (components/home/FavouritesEditSheet.js) ════════════
+// Its own geometry, scraped: the sheet's side padding sets the picker tiles' width (16 since
+// 2026-10-09, equal to the page's, so the picker box IS the grid box), and its slot boxes are a quarter of the padded width
+// minus three gaps, their own padding and border. Picker = ModuleTile (the grid's face),
+// label = gridLabel when the module has one, else labelKey at 11pt. Slot = labelKey at the
+// slotLabel size and face, two lines. Only modules the sheet can offer (not HIDDEN_TILES).
+{
+  const SHEET_FILE = 'components/home/FavouritesEditSheet.js'
+  const SG = {
+    pad:      num(SHEET_FILE, 'sheet', 'paddingHorizontal'),
+    gap:      num(SHEET_FILE, 'slots', 'gap'),
+    slotPadX: num(SHEET_FILE, 'slot', 'paddingHorizontal'),
+    border:   num(SHEET_FILE, 'slot', 'borderWidth'),
+    slotPx:   num(SHEET_FILE, 'slotLabel', 'fontSize'),
+  }
+  const slotFace = (/slotLabel:\s*\{[^}]*fontFamily:\s*'Inter_(\d{3})/.exec(read(SHEET_FILE)) || [])[1]
+  const sErr = Object.entries(SG).filter(([, r]) => r.err).map(([k, r]) => `sheet ${k}: ${r.err}`)
+  if (!FONTS[slotFace]) sErr.push(`sheet: cannot read the slotLabel Inter weight from ${SHEET_FILE}`)
+  if (sErr.length) { for (const e of sErr) problems.push(e) } else {
+    const S = Object.fromEntries(Object.entries(SG).map(([k, r]) => [k, r.v]))
+    const pickBox = W => (W - S.pad * 2) / GRID_COLUMNS - G.tilePad * 2
+    const slotBox = W => (W - S.pad * 2 - S.gap * 3) / 4 - S.slotPadX * 2 - S.border * 2
+    const offered = HOME_MODULES.filter(m => !HIDDEN_TILES.has(m.id))
+    const gridFace = advance
+    for (const W of WIDTHS) for (const L of Object.keys(LANG_CODES)) for (const m of offered) {
+      const g = m.gridLabel
+      assess('tile', t(g ? g.key : m.labelKey, L), g ? g.size : 11, pickBox(W),
+             `${W}dp ${L} sheetPicker:${m.id}`, CURSIVE.has(L), g ? g.lines : 2, true)
+    }
+    advance = loadFont(FONTS[slotFace])
+    // ⚠ REPORT-ONLY, NOT A GATE (2026-10-09). The slot boxes were never measured, and the
+    //   first measurement found ~two dozen labels already breaking mid-word at 320dp
+    //   ("Belediyele/r", "Транспор/т", "Événemen/ts"). That is a pre-existing defect of the
+    //   53pt box, logged in the vault (2026-10-09_hotels-own-tile.md) as its own fix. Make
+    //   this a gate (assess() into `problems`) in the commit that fixes the box.
+    const gateProblems = problems.length
+    for (const W of WIDTHS) for (const L of Object.keys(LANG_CODES)) for (const m of offered) {
+      assess('tile', t(m.labelKey, L), S.slotPx, slotBox(W), `${W}dp ${L} sheetSlot:${m.id}`, CURSIVE.has(L), 2, true)
+    }
+    const slotProblems = problems.splice(gateProblems)
+    advance = gridFace
+    console.log(`  Düzenle slots (REPORT-ONLY, pre-existing): ${slotProblems.length} label(s) do not fit the ${slotBox(320).toFixed(1)}pt box at 320dp`
+      + (slotProblems.length ? '\n' + slotProblems.map(p => '    ' + p).join('\n') : ''))
+    console.log(`  Düzenle sheet: picker box ${pickBox(320).toFixed(1)}pt / slot box ${slotBox(320).toFixed(1)}pt at 320dp, ${offered.length} offered modules`)
   }
 }
 
@@ -484,7 +534,8 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
     const cur = CURSIVE.has(L), at = `redesign ${W}dp ×${S} ${L}`
     for (const w of [R_LABEL_WEIGHT]) {
       for (const m of HOME_MODULES) {
-        rAssess(w, t(m.labelKey, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${m.id}`, cur, 2)
+        // ServiceTile draws gridLabel ?? labelKey, so a module with a gridLabel never shows its labelKey here.
+        if (!m.gridLabel) rAssess(w, t(m.labelKey, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${m.id}`, cur, 2)
         if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, lCap(W), S, rLabel(W), `${at} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)
       }
       for (const k of extraKeys) rAssess(w, t(k, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${k}`, cur, 2)
