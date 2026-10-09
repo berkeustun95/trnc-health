@@ -1,0 +1,3 @@
+Oli'yle konuş! 🎤 Oli'ye sor'daki yeni mikrofona dokun ve ne istediğini söyle — söylediklerin kutuya yazılır, sen seçmeden hiçbir şey olmaz. ADA ses kaydetmez, saklamaz. (Sesli giriş, telefonun dilini destekliyorsa çalışır.)
+
+Oli'nin cevapları da artık daha net: her biri orada ne bulacağını söylüyor, düğmesi de seni nereye götüreceğini gösteriyor.
