@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile, asRole } from './migration-harness.mjs'
-import { loadCountry, migration } from './gen-institution-seeds.mjs'
+import { loadCountry, migration, activation } from './gen-institution-seeds.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261095_institutions_country.sql', import.meta.url))
 const OTHER = '00000000-0000-4000-b000-0000000000ff'
@@ -293,6 +293,20 @@ const variant = (from, to) => {
   check('seeds: the TRNC rows are untouched (24 XN, 23 active)', by.XN?.n === 24 && by.XN?.a === 23, by.XN)
   const asbu = (await db.query(`SELECT count(*)::int n FROM institutions WHERE name = 'Ankara Sosyal Bilimler Üniversitesi'`)).rows[0].n
   check('seeds: ASBÜ exists in both XN and TR', asbu === 2, asbu)
+  // Activation publishes exactly the seeded rows, leaves a hand-added row alone, re-runs clean.
+  await db.exec(`INSERT INTO institutions (name, country, is_active) VALUES ('Hand Added', 'GB', false)`)
+  const act = activation('99999996')
+  writeFileSync(join(dir, act.file), act.sql)
+  const redAct = await applyFile(db, join(dir, act.file))
+  check('RED activation: refuses while a country holds rows its seed does not have', !redAct.ok && /GB holds 152 rows, its seed has 151/.test(redAct.msg), redAct.msg)
+  await db.exec('ROLLBACK; RESET ROLE;')   // the refused apply left its transaction open
+  await db.exec(`DELETE FROM institutions WHERE name = 'Hand Added'`)
+  const a1 = await applyFile(db, join(dir, act.file))
+  const a2 = await applyFile(db, join(dir, act.file))
+  const on = (await db.query(`SELECT country, count(*) FILTER (WHERE is_active)::int a FROM institutions GROUP BY 1`)).rows
+  const onBy = Object.fromEntries(on.map(r => [r.country ?? 'NULL', r.a]))
+  check('activation: every seeded row active, TRNC unchanged, re-run clean',
+    a1.ok && a2.ok && ['TR', 'CY', 'GB'].every(c => onBy[c] === want[c]) && onBy.XN === 23, { a1: a1.msg, a2: a2.msg, onBy })
   // RED: a name already taken in the country under another id is refused by name.
   await db.exec(`UPDATE institutions SET name = name || ' (x)' WHERE country = 'CY'`)
   await db.exec(`INSERT INTO institutions (name, country) VALUES ('University of Cyprus', 'CY')`)
@@ -300,6 +314,17 @@ const variant = (from, to) => {
   writeFileSync(join(dir, cy.file), cy.sql)
   const r = await applyFile(db, join(dir, cy.file))
   check('RED seeds: a same-country name under another id is refused by name', !r.ok && /already in CY under another id: University of Cyprus/.test(r.msg), r.msg)
+}
+{
+  // RED: a seed name equal to a TRNC row's name (outside the reviewed allowance) is refused.
+  const db = await freshDb(SEED)
+  await applyFile(db, FILE)
+  await db.exec(`UPDATE institutions SET name = 'Imperial College London' WHERE id = '00000000-0000-4000-b000-000000000019'`)
+  const dir = mkdtempSync(join(tmpdir(), 'seed-'))
+  const gb = migration('GB', '99999997', loadCountry('GB'))
+  writeFileSync(join(dir, gb.file), gb.sql)
+  const r = await applyFile(db, join(dir, gb.file))
+  check('RED seeds: a name shared with a TRNC row outside the allowance is refused', !r.ok && /shared with TRNC rows are \[Imperial College London\]/.test(r.msg), r.msg)
 }
 
 const failed = results.filter(x => !x).length

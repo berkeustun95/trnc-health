@@ -51,6 +51,8 @@ TR_NAME = {
     'Tobb Ekonomi ve Teknoloji Üniversitesi': 'TOBB Ekonomi ve Teknoloji Üniversitesi',
     'Sanko Üniversitesi': 'SANKO Üniversitesi',
     'Bezm-İ Âlem Vakıf Üniversitesi': 'Bezm-i Âlem Vakıf Üniversitesi',
+    'İzmir Katip Çelebi Üniversitesi': 'İzmir Kâtip Çelebi Üniversitesi',  # the university's own spelling (Berke, 2026-10-09)
+    'Ostim Teknik Üniversitesi': 'OSTİM Teknik Üniversitesi',
 }
 tr = []
 for x in csv.DictReader(open('official_tr.csv', encoding='utf-8')):
@@ -85,7 +87,7 @@ GB_NAME = {  # UKPRN → student-facing name, where the OfS legal name is not it
     '10008397': 'Norland University of Early Childhood', '10031982': 'BPP University',
     '10039956': 'The University of Law', '10005451': 'Arden University', '10037544': 'BIMM University',
     '10086591': "Regent's University London", '10032036': 'Amity University London',
-    '10048199': 'Northeastern University London', '10082728': 'INTO University Partnerships',
+    '10048199': 'Northeastern University London',
     '10005470': 'Richmond American University London', '10008173': 'University of the Built Environment',
     '10004063': 'London School of Economics and Political Science',
     '10007162': 'University of the Arts London',
@@ -105,6 +107,7 @@ gb = []
 OFS = 'https://register-api.officeforstudents.org.uk/api/Download/ (OfS Register, file 2026-10-02)'
 for x in csv.DictReader(open('official_uk_ofs_england.csv', encoding='utf-8')):
     if x['flag']: continue
+    if x['ukprn'] == '10082728': continue  # INTO University Partnerships: a pathway company, not a university (Berke, 2026-10-09)
     gb.append(dict(source_key='ukprn:' + x['ukprn'], name=GB_NAME.get(x['ukprn'], gb_clean(x['name'])),
                    city_name=GB_CITY.get(x['city'], x['city']), website_url=homepage(x['website']),
                    source_url=OFS, note='England, OfS university title'))

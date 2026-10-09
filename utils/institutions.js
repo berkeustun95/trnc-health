@@ -24,9 +24,10 @@ export const INSTITUTION_COUNTRIES = [TRNC_NATIONALITY_CODE, 'TR', 'CY', 'GB']
 const NATIONALITY_NAME = { [TRNC_NATIONALITY_CODE]: 'Northern Cyprus', TR: 'Turkey', GB: 'United Kingdom' }
 
 // The Republic of Cyprus is deliberately NOT a nationality in constants/nationalityTranslations
-// (adding it there adds it to both nationality pickers), so its label is its own key.
+// (adding it there adds it to both nationality pickers), so its label is its own key:
+// "Güney Kıbrıs" in Turkish, "Cyprus" in the other eight (decided 2026-10-09).
 export function countryLabel(code, lang) {
-  if (code === 'CY') return t('countryCyprusSouth', lang)
+  if (code === 'CY') return t('countryCyprus', lang)
   return getNatLabel(NATIONALITY_NAME[code] ?? code, lang)
 }
 
