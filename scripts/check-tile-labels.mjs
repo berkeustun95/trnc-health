@@ -257,7 +257,7 @@ const usesSymbol = (file, block, prop, sym) =>
   new RegExp(block + ':\\s*\\{[^}]*' + prop + ':\\s*' + sym + '\\b').test(read(file))
   ? { v: true } : { err: `${file}: \`${block}\` must set ${prop}: ${sym}` }
 const SHARED = {
-  pageInset:   constNum(PANELS, 'PAGE_INSET'),
+  insetR:      constNum(PANELS, 'PAGE_INSET'),
   panelGutter: constNum(PANELS, 'PANEL_GUTTER'),
   tilePadR:    constNum(PANELS, 'TILE_PAD'),
   homeInset:   usesSymbol('screens/HomeScreen.js', 'rBelow', 'paddingHorizontal', 'PAGE_INSET'),
@@ -456,10 +456,10 @@ const SHEET_WIDTHS = [...new Set([320, 350, 360, 393, 430, NARROW_W])].filter(Bo
   const { SLOT_LABEL_PX, SLOT_LABEL_MIN_PX, SLOT_LABEL_FIT } = await import('../constants/homeFavourites.js')
   if (!(SLOT_LABEL_PX > 0) || !(SLOT_LABEL_MIN_PX > 0) || SLOT_LABEL_MIN_PX > SLOT_LABEL_PX) sErr.push('sheet: SLOT_LABEL_PX / SLOT_LABEL_MIN_PX unreadable or inverted')
   if (sErr.length) { for (const e of sErr) problems.push(e) } else {
-    const S = { ...Object.fromEntries(Object.entries(SG).map(([k, r]) => [k, r.v])), pad: G.pageInset }
+    const S = { ...Object.fromEntries(Object.entries(SG).map(([k, r]) => [k, r.v])), pad: G.insetR }
     const cap = W => (W < S.narrowW ? S.labelCapN : S.labelCap)
     const pickBox = W => (W - S.pad * 2) / GRID_COLUMNS - G.tilePad * 2
-    const homeCol = W => (W - G.pageInset * 2 - G.panelGutter * 2) / 4
+    const homeCol = W => (W - G.insetR * 2 - G.panelGutter * 2) / 4
     const slotBox = W => homeCol(W) - G.tilePadR * 2 - S.border * 2 - S.slotPadX * 2
     const offered = HOME_MODULES.filter(m => !HIDDEN_TILES.has(m.id))
     const gridFace = advance
