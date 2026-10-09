@@ -293,35 +293,17 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
-## Check-ins go-live (ordered — approved 2026-10-02; app code on `feat/explore-v2`)
-**DB LIVE, FEATURE DARK (Berke, 2026-10-07 — replaces "migration only at go-live").** `20261092_checkins`
-+ `20261093_checkins_google_places` APPLIED 2026-10-07 (QUERY 1: 1018/1018); `google-places` deployed
-(v1, verify_jwt on); `GOOGLE_PLACES_SERVER_KEY` set. `MODULE_FLAGS.checkins` stays false until step 4.
-Until then check_in / get_checkin_feed / accept_checkin_notice / get_google_place_pins are callable
-through the API by signed-in non-guests; no production bundle calls them. ⚠ Never dispatch the stale
-`20261078_checkins.sql` (feat/checkins-ready) or `20261069_checkins.sql` (feat/checkins-db): it would
-put check_in back to the pre-helper body and add a second get_checkin_feed overload (ambiguous call).
-Test data from preview testing: `supabase/readonly/checkins_test_data.sql` — remove before the flip.
-Policy draft on `docs/checkins-privacy` (Google lines in); store-form answers + Google addendum + the
-pending ToS §4.4 legal item in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
-1. **Redesign live first** (`REDESIGN_LIVE`) ✓.
-2. ✓ 2026-10-07: applied; prod's live profiles triggers re-checked verbatim
-   (`scripts/test-checkins-live-triggers.mjs` + fixture, 10/10).
-3. `CHECKINS_PREVIEW = true` (`constants/redesign.js`, feat/explore-v2), **`npm run ota:preview`** →
-   device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp). ⚠ While
-   explore-v2 is on Preview, `npm run ota` from main is refused by the preview-lineage guard until
-   explore-v2 lands on main (or Berke hands over `PREVIEW_LINEAGE_OVERRIDE=1`).
-4. **Policy PUBLISHED 2026-10-08** (LEGAL_VERSION 2026-10-08; web + docs live, `legal:live` PASS; the
-   in-app copies ship with the flip OTA). Then store forms, then **flip `MODULE_FLAGS.checkins`** (both files, one commit). `privacy:check` refuses the flip
-   without the disclosure (incl. the Google lines) in all four copies.
-   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety: Precise
-   location **Shared: yes**) and App Store Connect (App Privacy: Precise Location, linked, no
-   tracking, App Functionality; plus the Google Maps SDK's declarations on the iOS Google build).
-   He enters it and confirms; no flip before his confirmation. Remove the test data first.
-   ⚠ **main also carries the Ask Oli keyboard-mic hint** (merged `734ab0e`, Preview-checked 2026-10-08 by Berke). The check-ins launch OTA ships both; **name both in the OTA message.** Preview lineage PASSES on `734ab0e` (checked 2026-10-09), so the guard forces no re-Preview — but main HEAD (check-ins flip + hint) has never been on Preview as one bundle. Per "every production OTA goes to PREVIEW first", run `npm run ota:preview` from main HEAD (worktree) and get Berke's device check as part of this SOP, before `npm run ota`.
-5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
-Feeds only: no per-person check-in history anywhere (decided 2026-10-02). EEA Maps terms apply
-(billing Cyprus): no Google place name on or next to a map.
+## Check-ins (LIVE 2026-10-09)
+Launched: flag flip `843c01a`, production OTA `27cdaa7d` (Android `01a1201f`), waitlist 3/3 notified (20261100).
+DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edge Function; policy 2026-10-08.
+- Feeds only: no per-person check-in history anywhere (decided 2026-10-02). EEA Maps terms apply (billing Cyprus):
+  no Google place name on or next to a map. Google calls stay anonymous + 4-dp rounded (pre-push guard
+  `check-google-calls-anonymous.mjs`; Maps ToS §4.4 closed on exactly that).
+- iPhones show Google pins only from a build carrying the Google Maps SDK (`GOOGLE_MAPS_IOS_API_KEY`, every iOS build
+  from 2026-10-07); App Store privacy must add the SDK's data types (vault store-forms file) with that build.
+- ⚠ Never dispatch `20261078`/`20261069` check-ins files from old branches (deleted 2026-10-08).
+- Watch: `gh workflow run supabase-readonly -f file=supabase/readonly/checkins_launch_watch.sql` (calls vs caps,
+  check-ins, pins, notices, submissions). Function errors: Dashboard → Edge Functions → google-places → Logs.
 
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
