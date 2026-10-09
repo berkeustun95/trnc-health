@@ -23,6 +23,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   on); its store builds are made from that branch. Main stays the 1.3.0 OTA + fix lane: a 1.4.0 main would send every
   `npm run ota` to a runtime nobody has yet. **Merge every new main fix into `feat/voice-input`** so 1.4.0 doesn't
   miss it. Merge `feat/voice-input` → main the day 1.4.0 is live in both stores. Vault `2026-10-08_ask-oli-voice-input.md`.
+  **The 1.4.0 store binaries (Android versionCode 25, iOS build 14) are built from `bdb674f` and do NOT contain the
+  Oteller tile / "Yurt · Emlak" (`feat/hotels-tile`, live on 1.3.0 by OTA `b28930ca`).** It reaches 1.4.0 only by a
+  runtime 1.4.0 production OTA from `feat/voice-input` (Preview → Berke's device check → OTA), ideally published
+  before the stores release 1.4.0 so first launches pick it up. Until then a 1.4.0 install shows the old Home.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
