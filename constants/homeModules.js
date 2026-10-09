@@ -1,5 +1,3 @@
-import { HOTELS_LIVE } from './flags.js'
-
 // Home V2 module grid — the whole grid, as data.
 //
 // ─── WHY THIS IS A CONFIG FILE AND NOT A LIST INSIDE HomeScreen ─────────────
@@ -119,8 +117,8 @@ export const HIDDEN_TILES = new Set([
 // "Hotels" rather than "Accommodation", which breaks mid-word at 320dp even on three lines.
 // labelKey (favourites row, edit sheet: 11pt / 2 lines) stays the module name.
 export const ACCOM_TILE_STATES = {
-  base:   { labelKey: 'menuAccommodations', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
-  hotels: { labelKey: 'menuAccommodations', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
+  base:   { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
+  hotels: { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
 }
 
 export const HOME_MODULES = [
@@ -136,11 +134,14 @@ export const HOME_MODULES = [
   // browsable DIRECTORY, the one thing the map tab does not offer. Icon must not be
   // compass-outline either — that is the tab's icon.
   { id: 'explore',            icon: 'albums-outline',           tint: 'standard', labelKey: 'menuPlaces' },
-  // The tile names what is inside, in the module's tab order (Berke 2026-09-29): "Yurt · Emlak",
-  // and with HOTELS_LIVE "Konaklama · Yurt · Emlak". Each '·' is bound to the word before it
-  // with U+00A0 so a wrap never starts a line with the separator. BOTH states are measured by
-  // scripts/check-tile-labels.mjs whatever the flag says (ACCOM_TILE_STATES).
-  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', ...ACCOM_TILE_STATES[HOTELS_LIVE ? 'hotels' : 'base'] },
+  // The tile names what is inside, in the module's tab order (Berke 2026-09-29): "Yurt · Emlak".
+  // Each '·' is bound to the word before it with U+00A0 so a wrap never starts a line with the
+  // separator. Hotels left this module for their own tile on 2026-10-09 (below); the 'hotels'
+  // state stays measured by scripts/check-tile-labels.mjs (ACCOM_TILE_STATES) but is unused.
+  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', ...ACCOM_TILE_STATES.base },
+  // Gated by HOTELS_LIVE, which is not a MODULE_FLAGS key (constants/homeGroups.js GATES,
+  // constants/homeFavourites.js FAVOURITE_FLAGS). Placed in the Keşfet ve Eğlence panel.
+  { id: 'hotels',             icon: 'bed-outline',              tint: 'standard', labelKey: 'accomTabHotels' },
   { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },   // V2 vocabulary — screens/HomeScreen.js's V1 copy says 'lifestyle'; both are correct
   { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
 

@@ -143,6 +143,9 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
                 lang={lang}
                 onPress={assign}
                 width="25%"
+                // The grid's own label (and, with the sheet inset matching the page's 16, the
+                // grid's own box), so the picker reads exactly like Home. Since 2026-10-09.
+                labelOverride={mod.gridLabel}
                 trailing={draft.includes(mod.id)
                   ? <View style={s.pinDot}><Ionicons name="pin" size={11} color="#fff" /></View>
                   : null}
@@ -161,7 +164,7 @@ const s = StyleSheet.create({
   // maxHeight rather than a fixed one: the module list scrolls, and on a short screen the
   // sheet must not push its own Bitti button off the bottom.
   sheet:       { backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-                 padding: 20, paddingBottom: 30, maxHeight: '78%' },
+                 padding: 20, paddingHorizontal: 16, paddingBottom: 30, maxHeight: '78%' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title:       { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   done:        { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.primary },

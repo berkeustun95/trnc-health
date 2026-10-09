@@ -74,7 +74,7 @@ export const OLI_INTENTS = [
       'وظيفة', 'عمل', 'شغل', 'کار', 'استخدام'],
   },
   {
-    id: 'accommodation', msgKey: 'oliMsgAccommodation', titleKey: 'menuAccommodations',
+    id: 'accommodation', msgKey: 'oliMsgAccommodation', titleKey: 'menuAccomTile',
     // ─── Vocabulary taken from the SOURCE TAXONOMY, not invented ─────────────
     // The second block below is derived from Novest's own 21 `property_type` terms
     // (Arsa, Arazi, Tarla, Dükkan, İşyeri, Depo, Mağaza, Ofis, Ticari, Villa, Müstakil
