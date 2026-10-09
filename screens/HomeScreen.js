@@ -45,7 +45,7 @@ import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, EventBanner, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
-import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
+import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
@@ -1749,7 +1749,7 @@ const s = StyleSheet.create({
   rCanvas:      { flex: 1, backgroundColor: colors.canvas },
   rStatusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.canvas,
                   borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
-  rBelow:       { paddingHorizontal: 16 },
+  rBelow:       { paddingHorizontal: PAGE_INSET },
   rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 12 },
   rCol:         { flex: 1 },
 

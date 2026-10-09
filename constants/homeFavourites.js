@@ -242,3 +242,15 @@ export function eligibleModules({ flags = FAVOURITE_FLAGS, overrides = {} } = {}
 // Asserted rather than asserted-about: `npm run home:check` computes this against an
 // all-false flag set on every run.
 export const MIN_ALWAYS_ELIGIBLE = UNGATED_MODULES.size
+
+// ─── Düzenle slot label size ────────────────────────────────────────────────
+// Slot labels render at SLOT_LABEL_PX. A label that would break mid-word in the slot box
+// (Home's tile width, 320dp and up, font scale 1.0 and capped 1.3) renders at its entry
+// here instead, never below SLOT_LABEL_MIN_PX. Keys are full language names. The table is
+// DERIVED by `npm run labels:check`, which fails on a missing, stale or over-shrunk entry
+// and prints the table it expects.
+export const SLOT_LABEL_PX = 10
+export const SLOT_LABEL_MIN_PX = 8.5
+export const SLOT_LABEL_FIT = {
+  Russian: { accommodation: 8.5 },
+}
