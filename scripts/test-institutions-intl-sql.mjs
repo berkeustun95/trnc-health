@@ -12,6 +12,7 @@ import { freshDb, applyFile, asRole } from './migration-harness.mjs'
 import { loadCountry, migration, activation } from './gen-institution-seeds.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261095_institutions_country.sql', import.meta.url))
+const ASBU = fileURLToPath(new URL('../supabase/migrations/20261101_institutions_asbu_campus_name.sql', import.meta.url))
 const OTHER = '00000000-0000-4000-b000-0000000000ff'
 const ILIM = '00000000-0000-4000-b000-000000000006'
 const DAU = '00000000-0000-4000-b000-000000000001'
@@ -509,6 +510,10 @@ const variant = (from, to) => {
 {
   const db = await freshDb(SEED)
   check('seeds: 1095 applies first', (await applyFile(db, FILE)).ok)
+  // 1101 before the generated seeds: every future regeneration runs against the renamed campus,
+  // and the generator's TRNC-name allowance is empty.
+  const r1101 = await applyFile(db, ASBU)
+  check('1101: renames the TRNC ASBÜ row before any TR row exists', r1101.ok, r1101.msg)
   const dir = mkdtempSync(join(tmpdir(), 'seed-'))
   const want = {}
   for (const c of ['TR', 'CY', 'GB']) {
@@ -526,8 +531,9 @@ const variant = (from, to) => {
   check('seeds: counts per country match the CSVs, all inactive',
     ['TR', 'CY', 'GB'].every(c => by[c]?.n === want[c] && by[c]?.a === 0), got)
   check('seeds: the TRNC rows are untouched (24 XN, 23 active)', by.XN?.n === 24 && by.XN?.a === 23, by.XN)
-  const asbu = (await db.query(`SELECT count(*)::int n FROM institutions WHERE name = 'Ankara Sosyal Bilimler Üniversitesi'`)).rows[0].n
-  check('seeds: ASBÜ exists in both XN and TR', asbu === 2, asbu)
+  const asbu = (await db.query(`SELECT country, id::text FROM institutions WHERE name IN ('Ankara Sosyal Bilimler Üniversitesi', 'Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi') ORDER BY name`)).rows
+  check('seeds: ASBÜ is the TR row; the TRNC row is its campus (…0017)',
+    asbu.length === 2 && asbu[0].country === 'TR' && asbu[1].country === 'XN' && asbu[1].id === '00000000-0000-4000-b000-000000000017', asbu)
   // Activation publishes exactly the seeded rows, leaves a hand-added row alone, re-runs clean.
   await db.exec(`INSERT INTO institutions (name, country, is_active) VALUES ('Hand Added', 'GB', false)`)
   const act = activation('99999996')
@@ -567,12 +573,30 @@ const variant = (from, to) => {
   const db = await freshDb(SEED)
   const dirM = fileURLToPath(new URL('../supabase/migrations/', import.meta.url))
   const files = ['20261095_institutions_country.sql', '20261096_institutions_seed_tr.sql', '20261097_institutions_seed_cy.sql',
-                 '20261098_institutions_seed_gb.sql', '20261099_institutions_activate_intl.sql']
+                 '20261098_institutions_seed_gb.sql', '20261099_institutions_activate_intl.sql',
+                 '20261101_institutions_asbu_campus_name.sql']
   const out = []
   for (const f of files) { const r = await applyFile(db, dirM + f); out.push(r.ok ? 'ok' : `${f}: ${r.msg}`) }
-  check('committed 1095–1099 apply in order', out.every(x => x === 'ok'), out)
+  check('committed 1095–1099 + 1101 apply in order', out.every(x => x === 'ok'), out)
   const led = (await db.query(`SELECT count(*)::int n FROM schema_migrations_applied WHERE filename = ANY($1)`, [files])).rows[0].n
-  check('…each stamps its ledger row', led === 5, led)
+  check('…each stamps its ledger row', led === 6, led)
+  const names = (await db.query(`SELECT country, id::text FROM institutions WHERE name LIKE 'Ankara Sosyal Bilimler%' ORDER BY name`)).rows
+  check('…after them, one ASBÜ in TR and the campus name on …0017',
+    names.length === 2 && names[0].country === 'TR' && names[1].id === '00000000-0000-4000-b000-000000000017', names)
+  const again = await applyFile(db, ASBU)
+  check('1101 re-run is a no-op', again.ok, again.msg)
+}
+
+{
+  // RED: 1101 refuses when another TRNC row already carries the campus name, and changes nothing.
+  const db = await freshDb(SEED)
+  await applyFile(db, FILE)
+  await db.exec(`UPDATE institutions SET name = 'Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi' WHERE id = '00000000-0000-4000-b000-000000000019'`)
+  const r = await applyFile(db, ASBU)
+  await db.exec('ROLLBACK; RESET ROLE;')   // the refused apply left its transaction open
+  const kept = (await db.query(`SELECT name FROM institutions WHERE id = '00000000-0000-4000-b000-000000000017'`)).rows[0]?.name
+  check('RED 1101: refuses when another TRNC row holds the campus name, …0017 unchanged',
+    !r.ok && /another TRNC row already carries/.test(r.msg) && kept === 'Ankara Sosyal Bilimler Üniversitesi', { msg: r.msg, kept })
 }
 
 // 6. MESSAGING at universities outside the TRNC, through the live RPC bodies.

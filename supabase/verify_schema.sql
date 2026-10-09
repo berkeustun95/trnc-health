@@ -547,7 +547,7 @@ WITH report AS (
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
     -- Institutions outside the TRNC (1095). The UNIQUE is per country: names repeat across
-    -- countries (YÖK's Ankara Sosyal Bilimler = our TRNC row …0017's name).
+    -- countries (YÖK's Ankara Sosyal Bilimler shared our TRNC row …0017's name until 1101).
     ('1095_institutions_country','institutions_country_check'),
     ('1095_institutions_country','institutions_country_required_check'),
     ('1095_institutions_country','institutions_city_country_check'),
@@ -4112,6 +4112,14 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261099_institutions_activate_intl.sql')
       OR (SELECT count(DISTINCT (to_jsonb(institutions) ->> 'country')) FROM public.institutions
            WHERE is_active AND (to_jsonb(institutions) ->> 'country') IN ('TR','CY','GB')) = 3
+    -- 1101 is an UPDATE: the TRNC ASBÜ campus carries its campus name, and no TRNC row
+    -- shares a name with a row of another country (the generator's allowance is empty).
+    UNION ALL SELECT '20261101_institutions_asbu_campus_name','institutions: …0017 is "Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi" and no TRNC name repeats abroad once 1101 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261101_institutions_asbu_campus_name.sql')
+      OR ((SELECT name FROM public.institutions WHERE id = '00000000-0000-4000-b000-000000000017')
+            IS NOT DISTINCT FROM 'Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi'
+          AND NOT EXISTS (SELECT 1 FROM public.institutions x JOIN public.institutions o ON lower(o.name) = lower(x.name)
+                           WHERE (to_jsonb(x) ->> 'country') = 'XN' AND (to_jsonb(o) ->> 'country') IS DISTINCT FROM 'XN'))
   ) z
 
   UNION ALL

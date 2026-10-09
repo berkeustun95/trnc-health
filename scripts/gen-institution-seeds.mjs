@@ -29,11 +29,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // uuidv5(DNS namespace, 'institutions.getadaapp.com'). Fixed forever.
 const NAMESPACE = uuidv5('6ba7b810-9dad-11d1-80b4-00c04fd430c8', 'institutions.getadaapp.com')
 const SORT_ORDER = 500   // below every TRNC row (10–145), above Other (999)
-// Names this seed may share with a TRNC row (case-insensitive), reviewed 2026-10-09. A TRNC
-// campus of a Turkish university can carry its parent's exact name (ASBÜ …0017). Anything
-// else matching an XN row refuses the seed: it is either a duplicate or a mislabelled row.
+// Names this seed may share with a TRNC row (case-insensitive). Empty since 20261101 renamed the
+// TRNC ASBÜ campus (…0017) to "… KKTC Yerleşkesi" (2026-10-09): the seeds 1096–1099 ran while
+// it still carried its parent's exact name. Anything matching an XN row refuses the seed: it
+// is a duplicate, a mislabelled row, or a campus that needs its campus name first.
 const XN_NAME_ALLOWED = {
-  TR: ['Ankara Sosyal Bilimler Üniversitesi'],
+  TR: [],
   CY: [],
   GB: [],
 }
