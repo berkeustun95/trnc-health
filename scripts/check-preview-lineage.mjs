@@ -7,7 +7,8 @@
 // Profile layout fix was Previewed from fix/open-now-json, never merged, and production 01a1109b
 // shipped without it. So: every Preview update on this runtime's major.minor (1.3.x for 1.3.0)
 // must have been built from a commit HEAD contains. Commits come from `update:view` (update:list
-// has no commit field); one page of 50 groups is read, and a full page is a refusal, not a guess.
+// has no commit field); every page of 50 groups is read (--offset, 2026-10-09: the branch passed 50),
+// and more than MAX_PAGES pages is a refusal, not a guess.
 // The unit is the WORK, not the merge commit: a Preview built from a release-branch merge passes
 // when every non-merge commit under it is in HEAD (860b89a / 0fcb597 on release/redesign-1, whose
 // duty commits reached main through feat/redesign). Those are printed, never silent.
@@ -24,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
 const PAGE = 50
+const MAX_PAGES = 20
 const run = promisify(execFile)
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const bar = '═'.repeat(72)
@@ -49,10 +51,17 @@ const inSeries = rv => typeof rv === 'string' && rv.split('.').slice(0, 2).join(
 
 let groups
 try {
-  const { stdout } = await run('npx', [...EAS, 'update:list', '--branch', 'preview', '--limit', String(PAGE), '--json', '--non-interactive'], { cwd: ROOT, maxBuffer: 1 << 24 })
-  const page = JSON.parse(stdout).currentPage ?? []
-  if (page.length >= PAGE) refuse([`the preview branch has ${page.length}+ updates; only one page of ${PAGE} is read — older ${series}.x Previews would go unchecked. Page with --offset first.`])
-  groups = page.filter(g => inSeries(g.runtimeVersion))
+  const all = []
+  for (let n = 0; ; n++) {
+    if (n >= MAX_PAGES) refuse([`the preview branch has ${all.length}+ updates, more than ${MAX_PAGES} pages of ${PAGE} — older ${series}.x Previews would go unchecked.`])
+    const { stdout } = await run('npx', [...EAS, 'update:list', '--branch', 'preview', '--limit', String(PAGE), '--offset', String(n * PAGE), '--json', '--non-interactive'], { cwd: ROOT, maxBuffer: 1 << 24 })
+    const page = JSON.parse(stdout).currentPage ?? []
+    all.push(...page)
+    if (page.length < PAGE) break
+  }
+  if (new Set(all.map(g => g.group)).size !== all.length) refuse([`EAS paging returned a group twice (${all.length} rows) — the pages overlap, so the list cannot be trusted.`])
+  console.log(`\nPreview lineage: read ${all.length} Preview update group(s) in ${Math.ceil((all.length + 1) / PAGE)} page(s)`)
+  groups = all.filter(g => inSeries(g.runtimeVersion))
 } catch (e) {
   refuse([`could not list Preview updates from EAS (${String(e.message).split('\n')[0]}) — lineage unknown.`])
 }
