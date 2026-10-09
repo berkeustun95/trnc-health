@@ -291,6 +291,32 @@ function checkCheckinsDisclosure(problems, log, flagOn, texts) {
   }
 }
 
+// ─── VOICE INPUT TRIPWIRE (Ask Oli mic, 1.4.0) ──────────────────────────────
+// Same question as check-ins: VOICE_INPUT on turns the microphone on, so every copy must say
+// what happens to speech. Added quietly, no LEGAL_VERSION bump (Berke, 2026-10-09). The
+// marker is the promise a reader needs; silent while the flag is off.
+const VOICE_MARKERS = {
+  en: [/ADA never records or stores audio/],
+  tr: [/ADA hiçbir zaman ses kaydetmez veya saklamaz/],
+}
+function readScalarFlag(name, raw) {
+  const src = raw ?? readFileSync(join(ROOT, 'constants/flags.js'), 'utf8')
+  const m = src.match(new RegExp(`export\\s+const\\s+${name}\\s*=\\s*(true|false)`))
+  if (!m) throw new Error(`could not read ${name} from constants/flags.js`)
+  return m[1] === 'true'
+}
+function checkVoiceDisclosure(problems, log, flagOn, texts) {
+  log(`\n  voice input tripwire (VOICE_INPUT = ${flagOn})`)
+  if (!flagOn) { log('    · silent until the flag flips; then all four copies must describe the microphone'); return }
+  for (const c of GOLIVE_COPIES) {
+    const missing = VOICE_MARKERS[c.lang].filter(re => !re.test(texts[c.path])).map(String)
+    if (missing.length) {
+      problems.push(`VOICE_INPUT is on but ${c.label} does not describe the microphone (missing ${missing.join(', ')}).`)
+      log(`    ✗ ${c.label.padEnd(34)} missing ${missing.join(', ')}`)
+    } else log(`    ✓ ${c.label.padEnd(34)} describes the microphone`)
+  }
+}
+
 function checkGoLive(problems, log, flagOn, texts) {
   log(`\n  go-live tripwire (MODULE_FLAGS.${GOLIVE_FLAG} = ${flagOn})`)
   for (const st of GOLIVE_STALE) {
@@ -374,6 +400,7 @@ function check(copies, columns, log = console.log, world = null) {
   checkEncoding(problems, log)
   checkGoLive(problems, log, flagOn, texts)
   checkCheckinsDisclosure(problems, log, world ? !!world.checkinsOn : readModuleFlag('checkins'), texts)
+  checkVoiceDisclosure(problems, log, world ? !!world.voiceOn : readScalarFlag('VOICE_INPUT'), texts)
 
   // ── 1. same "Last updated" ──
   log('  dates')
@@ -428,7 +455,7 @@ function self() {
   // has flipped the module on locally to preview it — which is step 4 of the go-live SOP,
   // i.e. a normal and correct working state. The tripwire's own paths are driven by
   // flipping flagOn to true as a MUTATION in the two cases below, so nothing goes unchecked.
-  const realWorld = { flagOn: false, checkinsOn: false, texts: loadGoLiveTexts() }
+  const realWorld = { flagOn: false, checkinsOn: false, voiceOn: false, texts: loadGoLiveTexts() }
   if (check(copies, columns, quiet, realWorld).length) {
     console.error('  --self cannot run: the real files are already failing.')
     return 1
@@ -506,6 +533,20 @@ function self() {
         return [copies, columns, { ...realWorld, checkinsOn: true, texts }]
       },
       ([,,w]) => w.checkinsOn === true && !/independent controller/.test(w.texts['docs/privacy.html'] ?? '')],
+    ['voice input on, docs copy without the microphone line',
+      () => {
+        const texts = { ...realWorld.texts }
+        texts['docs/privacy.html'] = (texts['docs/privacy.html'] ?? '').replace(/ADA never records or stores audio/g, 'ADA may keep audio')
+        return [copies, columns, { ...realWorld, voiceOn: true, texts }]
+      },
+      ([,,w]) => w.voiceOn === true && !/ADA never records or stores audio/.test(w.texts['docs/privacy.html'] ?? '')],
+    ['voice input on, Turkish copy without the microphone line',
+      () => {
+        const texts = { ...realWorld.texts }
+        texts['constants/legal/privacy.tr.js'] = texts['constants/legal/privacy.tr.js'].replace(/ADA hiçbir zaman ses kaydetmez veya saklamaz/g, 'ADA ses saklayabilir')
+        return [copies, columns, { ...realWorld, voiceOn: true, texts }]
+      },
+      ([,,w]) => w.voiceOn === true && !/ADA hiçbir zaman ses kaydetmez veya saklamaz/.test(w.texts['constants/legal/privacy.tr.js'])],
   ]
   let bad = 0
   for (const [name, build, landed] of cases) {

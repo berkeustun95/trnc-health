@@ -72,6 +72,8 @@ Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bu
 • İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
 • Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
 
+Mikrofon (Oli'ye sor): Oli'ye sor alanındaki mikrofona dokunursanız, konuşmanız cihazınızın konuşma tanıma hizmeti tarafından yazıya çevrilir. ADA hiçbir zaman ses kaydetmez veya saklamaz.
+
 Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları kullanmıyoruz. Uygulamada reklam etkinleştirildiğinde geçerli olacak sınırlı istisna 5. bölümde açıklanmıştır.
 
 2. VERİLERİNİZİ NEDEN VE HANGİ HUKUKİ DAYANAKLA İŞLİYORUZ

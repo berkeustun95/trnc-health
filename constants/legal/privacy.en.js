@@ -72,6 +72,8 @@ Location: ADA uses your device's location only if you allow it, and you can turn
 • Contact taps — when you tap a call, WhatsApp, website or directions button for a listed business or partner, we record that the tap happened, for which business, and one of the seven broad districts of the TRNC it relates to (for example Girne or Lefke): the district your location places you in, or the one you chose in the app. We never record your account, your device or your exact position with it, so it cannot be traced back to you. We use these counts to tell businesses how many people contacted them through ADA.
 • Places you submit — if you submit a place and use your current location for its pin, that position is saved as the place's location and shown publicly once the place is approved.
 
+Microphone (Ask Oli): if you tap the microphone in Ask Oli, your speech is converted to text by your device's speech service. ADA never records or stores audio.
+
 Usage data: we do not use analytics SDKs or third-party trackers. Section 5 describes the limited exception that applies if and when advertising is enabled in the app.
 
 2. WHY WE PROCESS YOUR DATA, AND ON WHAT LEGAL BASIS
