@@ -91,10 +91,8 @@ const WAITLIST_BLAST_DONE = new Set([
   'homeServices',
   'pets',    // 4 notified 2026-08-23, 16 days late — see the note above
   'events',  // 1 signup
-  // 3 OWED, NOT YET SENT (measured 2026-10-08: 3 total, 0 notified). Send with
-  //    notify_module_waitlist('checkins') AFTER the flip OTA is verified on the Play Store build
-  //    (two open/kill/reopen cycles); then replace this note with "3 notified <date>".
-  'checkins',
+  'checkins', // 3 notified 2026-10-09 10:16 UTC (20261100), after Berke verified OTA 01a1201f on the
+              // Play Store build — the blast asserted 0/3 before and 3/3 stamped today after.
   'towing',  // 0 signups: every entry point was flag-gated, so nobody could reach
              // its Coming Soon screen to sign up. Nothing owed, ever.
 
