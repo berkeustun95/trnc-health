@@ -582,6 +582,9 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
   const [showDutyList, setShowDutyList] = useState(false)
+  // One-shot: Oli's clinic card asks Home to open its facility list (Home-local state). Home
+  // opens it and clears this, so a later return to the Home tab does not reopen the list.
+  const [openFacilityList, setOpenFacilityList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
@@ -2548,6 +2551,8 @@ export default function App() {
             onOpenMenu={REDESIGN ? undefined : openMenu}
             onShowNotifs={() => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) }}
             onShowDutyList={() => setShowDutyList(true)}
+            openFacilityList={openFacilityList}
+            onFacilityListOpened={() => setOpenFacilityList(false)}
             onSelectFacility={setSelectedFacility}
             onUnclaimedFacility={setUnclaimedFacility}
             onToggleFavorite={toggleFavorite}
@@ -2813,7 +2818,7 @@ export default function App() {
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
-      case 'clinic':        setActiveTab('home'); break
+      case 'clinic':        setActiveTab('home'); setOpenFacilityList(true); break
       case 'events':        setShowEvents(true); break
       case 'homeServices':  setShowHomeServices(true); break
       case 'jobs':          setShowJobPostings(true); break

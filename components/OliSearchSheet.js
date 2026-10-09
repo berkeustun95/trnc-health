@@ -115,7 +115,7 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
               <Text style={s.intentMsg}>{t(item.intent.msgKey, lang)}</Text>
               <TouchableOpacity style={s.goBtn} activeOpacity={press.small} accessibilityRole="button"
                 onPress={() => { closeSheet(); onNavigate?.(item.intent.id) }}>
-                <Text style={s.goText}>{t('oliTakeMeThere', lang)}</Text>
+                <Text style={s.goText}>{t(item.intent.titleKey, lang)}</Text>
                 <Ionicons name="arrow-forward" size={15} color={colors.onPrimary} />
               </TouchableOpacity>
             </View>
@@ -232,7 +232,7 @@ const s = StyleSheet.create({
   intentMsg: { ...type.body, color: colors.textPrimary },
   goBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 44,
                marginTop: 10, paddingHorizontal: 16, borderRadius: radii.pill, backgroundColor: colors.primary },
-  goText:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.onPrimary },
+  goText:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.onPrimary, flexShrink: 1 },
   rowsBox:   { backgroundColor: colors.card, borderRadius: radii.card, paddingHorizontal: 14 },
   result:    { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 14,
                backgroundColor: colors.card, borderRadius: radii.md, marginBottom: 8 },

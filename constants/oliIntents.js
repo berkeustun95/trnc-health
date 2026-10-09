@@ -1,5 +1,6 @@
 // Ask Oli — local intent map (pure data). No LLM, no network.
-// Each intent: { id (= navigation target), keywords (multilingual), msgKey (i18n) }.
+// Each intent: { id (= navigation target), keywords (multilingual), msgKey (i18n), titleKey (the
+// destination's own title — its Home tile or screen header — shown on the card's button) }.
 // App.js owns oliNavigate(id) → the matching navigation state setter.
 // resolveOliQuery() is the single resolver seam: [] ⇒ no-match fallback. A future
 // LLM path slots in only where this returns [] — nothing else needs to change.
@@ -22,13 +23,13 @@ export function normalize(str = '') {
 
 export const OLI_INTENTS = [
   {
-    id: 'pharmacy', msgKey: 'oliMsgPharmacy',
+    id: 'pharmacy', msgKey: 'oliMsgPharmacy', titleKey: 'dutyPharmacies',
     keywords: ['pharmacy', 'pharmacies', 'chemist', 'drugstore', 'duty pharmacy', 'on duty', 'medicine', 'prescription',
       'eczane', 'nobetci eczane', 'nobetci', 'ilac', 'recete',
       'аптека', 'дежурная аптека', 'лекарство', 'apotheke', 'pharmacie', 'farmacia', 'صيدلية', 'دواء', 'داروخانه'],
   },
   {
-    id: 'clinic', msgKey: 'oliMsgClinic',
+    id: 'clinic', msgKey: 'oliMsgClinic', titleKey: 'hubMedicalTitle',
     keywords: ['doctor', 'clinic', 'hospital', 'dentist', 'physician', 'medical', 'gp', 'health',
       'doktor', 'klinik', 'hastane', 'dis', 'disci', 'hekim', 'saglik', 'muayene',
       'врач', 'больница', 'клиника', 'стоматолог', 'arzt', 'klinik', 'krankenhaus', 'zahnarzt',
@@ -36,7 +37,7 @@ export const OLI_INTENTS = [
       'طبيب', 'عيادة', 'مستشفى', 'اسنان', 'پزشک', 'دکتر', 'بیمارستان', 'دندانپزشک'],
   },
   {
-    id: 'emergency', msgKey: 'oliMsgEmergency',
+    id: 'emergency', msgKey: 'oliMsgEmergency', titleKey: 'menuEmergency',
     keywords: ['emergency', 'ambulance', 'police', 'fire', 'urgent', '112', '155', '199',
       'acil', 'ambulans', 'polis', 'itfaiye', 'yardim',
       'скорая', 'полиция', 'помощь', 'пожар', 'notruf', 'krankenwagen', 'polizei', 'feuerwehr',
@@ -44,21 +45,21 @@ export const OLI_INTENTS = [
       'طوارئ', 'اسعاف', 'شرطة', 'اورژانس', 'امبولانس', 'پلیس'],
   },
   {
-    id: 'newcomer', msgKey: 'oliMsgNewcomer',
+    id: 'newcomer', msgKey: 'oliMsgNewcomer', titleKey: 'menuNewcomerEssentials',
     keywords: ['new', 'newcomer', 'guide', 'welcome', 'essentials', 'border', 'crossing', 'moving', 'settle', 'visa', 'residence', 'permit',
       'yeni', 'rehber', 'hos geldin', 'sinir', 'gecis', 'kapi', 'tasinma', 'oturum', 'vize', 'ikamet',
       'новичок', 'граница', 'гид', 'виза', 'neu', 'grenze', 'leitfaden', 'nouveau', 'frontiere', 'guide',
       'nuevo', 'frontera', 'guia', 'جديد', 'حدود', 'دليل', 'تازه وارد', 'مرز', 'راهنما'],
   },
   {
-    id: 'events', msgKey: 'oliMsgEvents',
+    id: 'events', msgKey: 'oliMsgEvents', titleKey: 'menuEvents',
     keywords: ['event', 'events', 'concert', 'festival', 'whats on', 'nightlife', 'party', 'gig', 'show',
       'etkinlik', 'konser', 'festival', 'gece hayati', 'parti', 'neler var', 'ne var',
       'концерт', 'событие', 'вечеринка', 'veranstaltung', 'konzert', 'evenement', 'concert',
       'evento', 'concierto', 'حفلة', 'فعالية', 'كونسير', 'کنسرت', 'رویداد', 'برنامه'],
   },
   {
-    id: 'homeServices', msgKey: 'oliMsgHomeServices',
+    id: 'homeServices', msgKey: 'oliMsgHomeServices', titleKey: 'menuHomeServices',
     keywords: ['plumber', 'electrician', 'cleaner', 'cleaning', 'handyman', 'repair', 'home service', 'painter', 'ac repair',
       'tesisatci', 'elektrikci', 'temizlik', 'tamir', 'tamirci', 'usta', 'ustasi', 'tadilat', 'boyaci', 'ev hizmet',
       'сантехник', 'электрик', 'уборка', 'ремонт', 'klempner', 'elektriker', 'reinigung',
@@ -66,14 +67,14 @@ export const OLI_INTENTS = [
       'سباك', 'كهربائي', 'تنظيف', 'لوله', 'برق کار', 'نظافت'],
   },
   {
-    id: 'jobs', msgKey: 'oliMsgJobs',
+    id: 'jobs', msgKey: 'oliMsgJobs', titleKey: 'menuJobPostings',
     keywords: ['job', 'jobs', 'work', 'vacancy', 'hiring', 'employment', 'career', 'cv',
       'is', 'isler', 'is ilani', 'kariyer', 'eleman', 'calismak', 'ise',
       'работа', 'вакансия', 'arbeit', 'stelle', 'emploi', 'travail', 'trabajo', 'empleo',
       'وظيفة', 'عمل', 'شغل', 'کار', 'استخدام'],
   },
   {
-    id: 'accommodation', msgKey: 'oliMsgAccommodation',
+    id: 'accommodation', msgKey: 'oliMsgAccommodation', titleKey: 'menuAccommodations',
     // ─── Vocabulary taken from the SOURCE TAXONOMY, not invented ─────────────
     // The second block below is derived from Novest's own 21 `property_type` terms
     // (Arsa, Arazi, Tarla, Dükkan, İşyeri, Depo, Mağaza, Ofis, Ticari, Villa, Müstakil
@@ -119,7 +120,7 @@ export const OLI_INTENTS = [
       'فيلا', 'استوديو', 'ویلا', 'διαμερισμα', 'κατοικια', 'ακινητα'],
   },
   {
-    id: 'pets', msgKey: 'oliMsgPets',
+    id: 'pets', msgKey: 'oliMsgPets', titleKey: 'menuPets',
     keywords: ['pet', 'pets', 'dog', 'cat', 'vet', 'veterinary', 'veterinarian', 'animal', 'puppy', 'kitten',
       'evcil', 'kopek', 'kedi', 'veteriner', 'hayvan',
       'собака', 'кошка', 'ветеринар', 'животное', 'hund', 'katze', 'tierarzt', 'haustier',
@@ -127,7 +128,7 @@ export const OLI_INTENTS = [
       'كلب', 'قطة', 'بيطري', 'حيوان', 'سگ', 'گربه', 'دامپزشک', 'حیوان'],
   },
   {
-    id: 'transport', msgKey: 'oliMsgTransport',
+    id: 'transport', msgKey: 'oliMsgTransport', titleKey: 'menuTransportation',
     keywords: ['bus', 'taxi', 'car', 'transport', 'transportation', 'getting around', 'rental car', 'drive', 'minibus',
       'otobus', 'taksi', 'araba', 'ulasim', 'dolmus', 'kiralik araba', 'arac',
       'автобус', 'такси', 'машина', 'транспорт', 'bus', 'taxi', 'auto', 'transport',
@@ -135,21 +136,21 @@ export const OLI_INTENTS = [
       'اتوبوس', 'تاکسی', 'ماشین', 'حمل و نقل'],
   },
   {
-    id: 'beaches', msgKey: 'oliMsgBeaches',
+    id: 'beaches', msgKey: 'oliMsgBeaches', titleKey: 'menuBeachesLandmarks',
     keywords: ['beach', 'beaches', 'landmark', 'landmarks', 'sightseeing', 'things to do', 'explore', 'attractions', 'sea', 'tourist',
       'plaj', 'sahil', 'gezilecek', 'gezi', 'deniz', 'tarihi yer', 'gorulecek',
       'пляж', 'достопримечательности', 'море', 'strand', 'sehenswurdigkeiten',
       'plage', 'sites', 'playa', 'lugares', 'شاطئ', 'معالم', 'بحر', 'ساحل', 'دیدنی', 'جاهای دیدنی'],
   },
   {
-    id: 'exchange', msgKey: 'oliMsgExchange',
+    id: 'exchange', msgKey: 'oliMsgExchange', titleKey: 'menuExchangeRates',
     keywords: ['exchange', 'exchange rate', 'rate', 'currency', 'money', 'convert', 'lira', 'forex', 'euro', 'dollar', 'pound',
       'kur', 'doviz', 'para', 'cevir', 'lira', 'kur cevir',
       'курс', 'валюта', 'деньги', 'обмен', 'wechselkurs', 'wahrung', 'geld',
       'change', 'devise', 'taux', 'cambio', 'moneda', 'divisa', 'صرف', 'عملة', 'نقود', 'نرخ ارز', 'ارز', 'پول'],
   },
   {
-    id: 'municipal', msgKey: 'oliMsgMunicipal',
+    id: 'municipal', msgKey: 'oliMsgMunicipal', titleKey: 'menuMunicipalities',
     keywords: ['municipality', 'municipalities', 'council', 'town hall', 'mayor',
       'belediye', 'muhtar', 'муниципалитет', 'gemeinde', 'rathaus', 'mairie', 'municipalite',
       'municipio', 'ayuntamiento', 'بلدية', 'شهرداری'],
