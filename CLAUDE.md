@@ -318,6 +318,7 @@ pending ToS §4.4 legal item in vault `2026-09-24_store-privacy-forms-AS-ENTERED
    location **Shared: yes**) and App Store Connect (App Privacy: Precise Location, linked, no
    tracking, App Functionality; plus the Google Maps SDK's declarations on the iOS Google build).
    He enters it and confirms; no flip before his confirmation. Remove the test data first.
+   ⚠ **main also carries the Ask Oli keyboard-mic hint** (merged `734ab0e`, Preview-checked 2026-10-08 by Berke). The check-ins launch OTA ships both; **name both in the OTA message.** Preview lineage PASSES on `734ab0e` (checked 2026-10-09), so the guard forces no re-Preview — but main HEAD (check-ins flip + hint) has never been on Preview as one bundle. Per "every production OTA goes to PREVIEW first", run `npm run ota:preview` from main HEAD (worktree) and get Berke's device check as part of this SOP, before `npm run ota`.
 5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
 Feeds only: no per-person check-in history anywhere (decided 2026-10-02). EEA Maps terms apply
 (billing Cyprus): no Google place name on or next to a map.
