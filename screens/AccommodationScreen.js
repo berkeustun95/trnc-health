@@ -13,7 +13,6 @@ import AccommodationListInlineSlot from '../components/ads/AccommodationListInli
 import AccommodationListBottomSlot from '../components/ads/AccommodationListBottomSlot'
 import PropertyDetailScreen from './PropertyDetailScreen'
 import DormPartnerScreen from './DormPartnerScreen'
-import HotelsTab from '../components/accommodation/HotelsTab'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../constants/theme'
@@ -27,7 +26,7 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE, HOTELS_LIVE } from '../constants/flags'
+import { DORMS_LIVE } from '../constants/flags'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
 
@@ -75,7 +74,7 @@ const PAGE = 20
 // All config, in constants/dorms.js. Tabs are derived from the flags, never read straight
 // off the config, so a dark tab can neither render nor be landed on. Module scope is
 // correct: both are constant for a given bundle.
-const LIVE_TABS      = { dorm: DORMS_LIVE, hotel: HOTELS_LIVE }
+const LIVE_TABS      = { dorm: DORMS_LIVE }
 const TABS           = accomTabs(LIVE_TABS)
 const LANDING_TAB    = accomLandingTab(LIVE_TABS)
 const SEGMENTS       = ACCOM_SEGMENTS
@@ -119,13 +118,12 @@ function intentLabel(intent, lang) {
 
 function tabLabel(tab, lang) {
   if (tab === 'dorm') return t('accomDorms', lang)
-  if (tab === 'hotel') return t('accomTabHotels', lang)
   return t('accomTabProperty', lang)
 }
 
-// The title names the tabs in their order ("Konaklama · Yurt · Emlak", or "Yurt · Emlak" while
-// hotels are dark) — the same key the Home tile shows. No subtitle: it only repeated the tabs.
-const TITLE_KEY = HOTELS_LIVE ? 'menuAccomTileHotels' : 'menuAccomTile'
+// The title names the tabs in their order ("Yurt · Emlak") — the same key the Home tile shows.
+// No subtitle: it only repeated the tabs.
+const TITLE_KEY = 'menuAccomTile'
 
 // ─── THE TOP TABS ─────────────────────────────────────────────────────────────
 // Equal-width segments on ONE line, so every tab is visible without scrolling in every
@@ -463,13 +461,8 @@ export default function AccommodationScreen({
   // pagination. Switching tabs never touches Emlak's intent or filters, so coming back to
   // Emlak finds the list exactly as it was left.
   const isDorm = tab === 'dorm'
-  const isHotel = tab === 'hotel'
-  // Oteller is mounted on first visit and then only HIDDEN when you leave it, so its
-  // filters and scroll survive a trip to Emlak and back — as Emlak's do.
   // Bottom inset for the Emlak/Yurtlar list: the SafeAreaView pads only the top (edge-to-edge).
   const insets = useSafeAreaInsets()
-  const [hotelsMounted, setHotelsMounted] = useState(LANDING_TAB === 'hotel')
-  function changeTab(next) { if (next === 'hotel') setHotelsMounted(true); setTab(next) }
 
   // 'all' mixes intents, currencies and rent periods, so a price sort there is
   // meaningless. Offer it only on a single-intent tab.
@@ -609,7 +602,7 @@ export default function AccommodationScreen({
         </>
       )}
 
-      {TABS.length > 1 && <TabBar tab={tab} onChange={changeTab} lang={lang} />}
+      {TABS.length > 1 && <TabBar tab={tab} onChange={setTab} lang={lang} />}
 
       {/* ─── EMLAK'S INTENT CHIPS: A WRAPPING ROW, NOT A HORIZONTAL SCROLL ─────
           Four chips did not fit on one line in ar/ru/el/fr, and a horizontal ScrollView
@@ -709,12 +702,10 @@ export default function AccommodationScreen({
       </PillRow>
       )}
 
-      {/* Emlak / Yurtlar list and the Oteller tab are HIDDEN, never unmounted, when you
-          switch away, so each keeps its scroll position. */}
-      {/* One container for both panes; each pane FILLS it (absoluteFill), so a pane's size never
-          depends on how the column shares space with the header and tabs. */}
+      {/* The pane FILLS its container (absoluteFill), so its size never depends on how the
+          column shares space with the header and tabs. */}
       <View style={cs.panes}>
-      <View style={[StyleSheet.absoluteFill, isHotel && cs.hidden]}>
+      <View style={StyleSheet.absoluteFill}>
       {loading ? (
         REDESIGN
           ? <View style={cs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={280} style={{ marginBottom: 12 }} />)}</View>
@@ -812,12 +803,6 @@ export default function AccommodationScreen({
         />
       )}
       </View>
-
-      {hotelsMounted && (
-        <View style={[StyleSheet.absoluteFill, !isHotel && cs.hidden]}>
-          <HotelsTab lang={lang} />
-        </View>
-      )}
       </View>
 
       {/* Price range + currency. Currency matters here beyond filtering: a price sort

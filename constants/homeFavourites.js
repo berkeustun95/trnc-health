@@ -5,7 +5,7 @@
 // cityWelcome split applied again, and it exists in that shape so the degradation rules
 // below can be tested by a script rather than by tapping a phone.
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules.js'
-import { MODULE_FLAGS } from './flags.js'
+import { MODULE_FLAGS, HOTELS_LIVE } from './flags.js'
 
 export const FAVOURITE_SLOTS = 4
 
@@ -105,6 +105,11 @@ export const UNGATED_MODULES = new Set([
   'health', 'emergency', 'games', 'exchangeRates', 'newcomerEssentials', 'esim', 'municipal',
 ])
 
+// Hotels is gated by HOTELS_LIVE, a launch constant with no waitlist, so it is NOT a
+// MODULE_FLAGS key (see HIDDEN_TILES in homeModules.js for why a key must not be minted).
+// It joins the flag set here, the one place eligibility reads flags from.
+export const FAVOURITE_FLAGS = { ...MODULE_FLAGS, hotels: HOTELS_LIVE }
+
 const MODULE_IDS    = HOME_MODULES.map(m => m.id)
 const MODULE_INDEX  = new Map(MODULE_IDS.map((id, i) => [id, i]))
 const DEFAULT_INDEX = new Map(DEFAULT_FAVOURITES.map((id, i) => [id, i]))
@@ -132,7 +137,7 @@ const DEFAULT_INDEX = new Map(DEFAULT_FAVOURITES.map((id, i) => [id, i]))
 // `overrides` is for the one case a flag cannot express: HomeScreen already computes
 // garagesTileVisible (GARAGES_LIVE || admin || ownsGarage), and a garage owner genuinely
 // uses that module while it is dark for everyone else.
-export function moduleEligible(id, { flags = MODULE_FLAGS, overrides = {} } = {}) {
+export function moduleEligible(id, { flags = FAVOURITE_FLAGS, overrides = {} } = {}) {
   if (!MODULE_INDEX.has(id)) return false
   // ⚠ HIDDEN BEATS EVERYTHING, INCLUDING AN OVERRIDE. A shortcut to a tile the grid does
   //   not show is an orphan: the user cannot find it again, cannot see what it belongs to,
@@ -192,7 +197,7 @@ function compareCandidates(a, b, usage) {
 //   build and read by an older one.
 //
 // Returns AT MOST FAVOURITE_SLOTS ids, never duplicated.
-export function resolveFavourites({ pins = [], usage = {}, flags = MODULE_FLAGS, overrides = {} } = {}) {
+export function resolveFavourites({ pins = [], usage = {}, flags = FAVOURITE_FLAGS, overrides = {} } = {}) {
   const opts  = { flags, overrides }
   const slots = new Array(FAVOURITE_SLOTS).fill(null)
   const taken = new Set()
@@ -222,7 +227,7 @@ export function resolveFavourites({ pins = [], usage = {}, flags = MODULE_FLAGS,
 // Everything the Düzenle sheet may offer, in grid order. Same eligibility as the row —
 // a sheet that let you pin a dark module would be a way to put a dead tile on Home by
 // hand, which is the thing the resolver refuses to do by itself.
-export function eligibleModules({ flags = MODULE_FLAGS, overrides = {} } = {}) {
+export function eligibleModules({ flags = FAVOURITE_FLAGS, overrides = {} } = {}) {
   return MODULE_IDS.filter(id => moduleEligible(id, { flags, overrides }))
 }
 

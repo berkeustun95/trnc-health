@@ -19,11 +19,12 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { HOME_MODULES } from '../constants/homeModules.js'
-import { MODULE_FLAGS } from '../constants/flags.js'
 import {
   DEFAULT_FAVOURITES, MODULE_FLAG_KEY, UNGATED_MODULES, FAVOURITE_SLOTS,
-  resolveFavourites, moduleEligible,
+  resolveFavourites, moduleEligible, FAVOURITE_FLAGS,
 } from '../constants/homeFavourites.js'
+// The flag set eligibility actually reads: MODULE_FLAGS plus HOTELS_LIVE as `hotels`.
+const MODULE_FLAGS = FAVOURITE_FLAGS
 import { HIDDEN_TILES } from '../constants/homeModules.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')

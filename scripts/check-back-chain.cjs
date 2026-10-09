@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -58,6 +58,7 @@ const cases4=[
  ['SCROLL SPOT Hub <- Welcome Guide (guide closes, hub stays)', {...base, showStudentHub:true, showNewcomerEssentials:true}, {studentHubBackRef:()=>{throw new Error('hub asked')}}, r=>r.calls==='setShowNewcomerEssentials(false)'],
  ['S8 Guide card open -> closes card, not guide', {...base, showNewcomerEssentials:true}, {guideBackRef:()=>true}, r=>r.calls===''],
  ['S8 Rates over guide -> closes rates, guide stays', {...base, showNewcomerEssentials:true, showExchangeRates:true}, {guideBackRef:()=>{throw new Error('guide asked')}}, r=>r.calls==='setShowExchangeRates(false)'],
+ ['Hotels (Home tile) -> closes hotels', {...base, showHotels:true}, {}, r=>r.r===true && r.calls==='setShowHotels(false)'],
  ['S10 Duty over notifications -> closes duty, notifs stay', {...base, showNotifs:true, showDutyList:true}, {}, r=>r.calls==='closeDutyList()'],
  ['S10 Facility reviews -> closes reviews, not profile', {...base, selectedFacility:{id:1}}, {facilityBackRef:()=>true}, r=>r.calls===''],
  ['S10 Facility over Garages -> closes facility, garages stay', {...base, showGarages:true, selectedFacility:{id:1}}, {facilityBackRef:()=>false, garagesBackRef:()=>{throw new Error('garages asked')}}, r=>r.calls==='setSelectedFacility(null)'],

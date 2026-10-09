@@ -8,19 +8,18 @@
 // COMING SOON (Slice 1 revision, Berke 2026-09-30): jobs, transport, insurance and eSIM show
 // in their groups with a "Yakında" badge and open their existing Coming Soon / waitlist
 // screens — that is how a dark module collects demand ("the towing lesson",
-// constants/homeModules.js). Hotels stays HIDDEN (HOTELS_LIVE); grooming and garages stay
+// constants/homeModules.js). Hotels shows while HOTELS_LIVE; grooming and garages stay
 // hidden (HIDDEN_TILES). A module that goes live loses its badge automatically.
 import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE, LIVE_SCORES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'
 
-// Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes,
-// hotels and live scores have no grid tile in V2 (so the pre-redesign ModuleGrid, which
+// Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes
+// and live scores have no grid tile in V2 (so the pre-redesign ModuleGrid, which
 // deliberately shows dark modules, never shows these flag-hidden ones).
 const EXTRA = {
   duty:          { id: 'duty',          icon: 'medkit-outline',     labelKey: 'hrTileDuty' },
   exploreTab:    { id: 'exploreTab',    icon: 'compass-outline',    labelKey: 'menuExplore' },
   walkingRoutes: { id: 'walkingRoutes', icon: 'walk-outline',       labelKey: 'hrTileRoutes' },
-  hotels:        { id: 'hotels',        icon: 'bed-outline',        labelKey: 'accomTabHotels' },
   liveScores:    { id: 'liveScores',    icon: 'football-outline',   labelKey: 'menuLiveScores' },
 }
 
