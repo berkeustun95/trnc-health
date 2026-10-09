@@ -119,7 +119,7 @@ const MODULES = [
   { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
   { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
   { id: 'studentHub',         icon: 'school-outline',      tint: 'service',   labelKey: 'menuStudentHub' },
-  { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccommodations' },
+  { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccomTile' },
   { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },   // V1 vocabulary — see the note above MODULES
   { id: 'games',         icon: 'game-controller-outline', tint: 'lifestyle', labelKey: 'menuGames' },
   { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },

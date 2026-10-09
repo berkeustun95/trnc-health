@@ -2117,7 +2117,7 @@ export default function App() {
         onCloseDorm={() => setOpenedDorm(null)}
       />
     ) : (
-      <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={() => setShowAccommodation(false)} />
+      <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />
     )
   } else if (showHotels) {
     content = <HotelsScreen lang={lang} onClose={() => setShowHotels(false)} />

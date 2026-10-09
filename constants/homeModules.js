@@ -117,8 +117,8 @@ export const HIDDEN_TILES = new Set([
 // "Hotels" rather than "Accommodation", which breaks mid-word at 320dp even on three lines.
 // labelKey (favourites row, edit sheet: 11pt / 2 lines) stays the module name.
 export const ACCOM_TILE_STATES = {
-  base:   { labelKey: 'menuAccommodations', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
-  hotels: { labelKey: 'menuAccommodations', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
+  base:   { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
+  hotels: { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
 }
 
 export const HOME_MODULES = [
