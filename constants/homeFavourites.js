@@ -33,9 +33,8 @@ export const FAVOURITE_SLOTS = 4
 // take that position automatically on the day it launches — no edit, no follow-up ticket,
 // no "why is this not in the row" three months later.
 //
-// `transport` is exactly that case today: MODULE_FLAGS.transport is false, so the row
-// currently renders explore · events · exchangeRates · newcomerEssentials, and becomes
-// explore · events · transport · exchangeRates the moment transport goes live.
+// `transport` is that case, twice over: dark, and hidden from Home since 2026-10-10, so the
+// row renders events · accommodation · exchangeRates · newcomerEssentials until both end.
 //
 // ─── WHY THESE FOUR (2026-09-05) ────────────────────────────────────────────
 //
@@ -56,7 +55,7 @@ export const DEFAULT_FAVOURITES = [
   // becomes eligible again takes its position back with no edit.
   'explore',
   'events',
-  'transport',          // dark today — see the note above; takes its slot on launch
+  'transport',          // dark AND hidden since 2026-10-10 — skipped until both are undone
   // ⚠ ADDED WHEN explore WAS HIDDEN, AND THE GUARD IS WHY. Hiding explore took the
   //   eligible-default count from 4 to 3, which would have filled one shortcut slot from
   //   GRID ORDER — health, emergency, towing, the coral block this set was chosen to get
@@ -235,13 +234,13 @@ export function eligibleModules({ flags = FAVOURITE_FLAGS, overrides = {} } = {}
 //
 // Structural, not hopeful, and it matters because the section HEADING lives in HomeScreen
 // (so it uses the same token as the other headings) and would otherwise be left standing
-// over nothing. UNGATED_MODULES holds seven ids that no flag can turn off, so the
-// auto-fill pool is never smaller than seven whatever the flags say, whatever is stored,
-// and whatever the network is doing. Four slots cannot outrun that.
+// over nothing. UNGATED_MODULES holds ids that no flag can turn off; the ones not in
+// HIDDEN_TILES (five since games and esim were hidden, 2026-10-10) are the auto-fill pool's
+// floor whatever the flags say, whatever is stored, and whatever the network is doing.
 //
 // Asserted rather than asserted-about: `npm run home:check` computes this against an
 // all-false flag set on every run.
-export const MIN_ALWAYS_ELIGIBLE = UNGATED_MODULES.size
+export const MIN_ALWAYS_ELIGIBLE = [...UNGATED_MODULES].filter(id => !HIDDEN_TILES.has(id)).length
 
 // ─── Düzenle slot label size ────────────────────────────────────────────────
 // Slot labels render at SLOT_LABEL_PX. A label that would break mid-word in the slot box
