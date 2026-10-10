@@ -40,6 +40,9 @@ WITH report AS (
   SELECT 'A-table' section, e.m migration, e.o object,
          CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
   FROM (VALUES
+    -- Duyurular (1102): registered ahead of the apply; red until it runs.
+    ('1102_duyurular','announcement_sources'),
+    ('1102_duyurular','announcements'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','google_place_pins'),
     ('1093_checkins_google_places','google_places_usage'),
@@ -556,6 +559,27 @@ WITH report AS (
     ('1095_institutions_country','institutions_city_country_check'),
     ('1095_institutions_country','institutions_city_name_check'),
     ('1095_institutions_country','institutions_country_name_unique'),
+    -- Duyurular (1102): registered ahead of the apply; red until it runs.
+    ('1102_duyurular','announcement_sources_pkey'),
+    ('1102_duyurular','announcement_sources_key_key'),
+    ('1102_duyurular','announcement_sources_key_check'),
+    ('1102_duyurular','announcement_sources_url_check'),
+    ('1102_duyurular','announcement_sources_type_check'),
+    ('1102_duyurular','announcement_sources_category_check'),
+    ('1102_duyurular','announcement_sources_region_check'),
+    ('1102_duyurular','announcement_sources_filter_mode_check'),
+    ('1102_duyurular','announcement_sources_numbers_check'),
+    ('1102_duyurular','announcement_sources_error_check'),
+    ('1102_duyurular','announcements_pkey'),
+    ('1102_duyurular','announcements_source_id_fkey'),
+    ('1102_duyurular','announcements_official_url_key'),
+    ('1102_duyurular','announcements_url_check'),
+    ('1102_duyurular','announcements_text_check'),
+    ('1102_duyurular','announcements_category_check'),
+    ('1102_duyurular','announcements_region_check'),
+    ('1102_duyurular','announcements_kind_check'),
+    ('1102_duyurular','announcements_deadline_check'),
+    ('1102_duyurular','announcements_expiry_check'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','checkins_one_place'),
     ('1093_checkins_google_places','checkins_google_place_id_shape'),
@@ -851,6 +875,11 @@ WITH report AS (
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
     ('1095_institutions_country','institutions_country_idx'),
+    -- Duyurular (1102): registered ahead of the apply; red until it runs.
+    ('1102_duyurular','announcements_list_idx'),
+    ('1102_duyurular','announcements_deadline_idx'),
+    ('1102_duyurular','announcements_title_key_idx'),
+    ('1102_duyurular','announcements_source_idx'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','checkins_one_per_day_google'),
     ('1093_checkins_google_places','checkins_google_feed_idx'),
@@ -3444,6 +3473,32 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) ILIKE '%FROM places p%'
            AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM landmarks l%'
            AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM beaches b%', false)
+    -- ── 1102: Duyurular ──────────────────────────────────────────────────────────
+    -- (1) The pre-launch inversion, twice: a reverted DEFAULT creates no named object, and
+    --     either one reverted publishes rows before activation (SOP step 3).
+    UNION ALL SELECT '1102_duyurular','announcement_sources.publish + announcements.is_published DEFAULT false',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND column_default = 'false'
+          AND ((table_name='announcement_sources' AND column_name='publish')
+            OR (table_name='announcements' AND column_name='is_published'))) = 2
+    -- (2) announcements: exactly one permissive SELECT policy, and it filters on BOTH published
+    --     and unexpired (live rendering of the qual); clients hold no write privilege.
+    UNION ALL SELECT '1102_duyurular','announcements: 1 SELECT policy (is_published AND expires_at > now()), RLS on, no client writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.announcements')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='announcements') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='announcements'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND qual LIKE '%is_published%' AND qual LIKE '%expires_at > now()%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.announcements'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.announcements'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.announcements'), 'SELECT'), false)
+    -- (3) announcement_sources: operational state, no client access at all; positive control:
+    --     service_role writes.
+    UNION ALL SELECT '1102_duyurular','announcement_sources: RLS on, 0 policies, no anon/authenticated privilege, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.announcement_sources')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='announcement_sources') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('service_role', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE'), false)
     -- ── 1048: walking routes ─────────────────────────────────────────────────────
     -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object; without it a
     --     route inserted without the column publishes itself before the flag flips.
