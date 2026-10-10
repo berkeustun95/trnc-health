@@ -3,10 +3,10 @@
 # Plan: vault 10-ada/2026-10-10_duyurular-plan.md. Script: scripts/fetch-duyurular.mjs.
 # Dry unless `-f apply=true`:  gh workflow run duyurular-fetch [-f apply=true] [-f only=khk-disa-acik-munhal]
 #
-# ─── NO SCHEDULE YET, ON PURPOSE ────────────────────────────────────────────
-# 20261102_duyurular.sql is not applied. A cron here before it is would fail every run and email
-# every 30 minutes. The schedule ('*/30 * * * *'; each source keeps its own fetch_interval_min)
-# is added in the same commit that follows the apply, after one green `-f apply=true` dispatch.
+# ─── SCHEDULE ───────────────────────────────────────────────────────────────
+# Added 2026-10-10 after 20261102 was applied (15:32 UTC) and the first apply dispatch was green
+# (run 38064201761: 227 rows, 0 published, 0 failed sources). A scheduled run always writes;
+# rows land with is_published = false until announcement_sources.publish is flipped (go-live).
 #
 # ─── THIS REPO IS PUBLIC, SO THESE LOGS ARE PUBLIC ──────────────────────────
 # The script prints counts and source keys only. Titles, URLs and per-item deadline outcomes go
@@ -20,6 +20,10 @@
 name: duyurular-fetch
 
 on:
+  schedule:
+    # Every 30 min; each source keeps its own fetch_interval_min (30 min to a day), so most
+    # runs fetch a handful of listings. GitHub may start a scheduled run late or skip one.
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       apply:
