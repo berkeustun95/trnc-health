@@ -3,7 +3,7 @@ import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet, useWindowD
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { HOME_MODULES } from '../../constants/homeModules'
+import { HOME_MODULES, tileLabel } from '../../constants/homeModules'
 import { FAVOURITE_SLOTS, eligibleModules, resolveFavourites, SLOT_LABEL_PX, SLOT_LABEL_FIT } from '../../constants/homeFavourites'
 import ModuleTile from './ModuleTile'
 import { PAGE_INSET, PANEL_GUTTER, TILE_PAD, TILE_WIDTH, labelCap } from './redesign/ServicePanels'
@@ -158,7 +158,7 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
                 width="25%"
                 // The grid's own label (and, with the sheet inset matching the page's 16, the
                 // grid's own box), so the picker reads exactly like Home. Since 2026-10-09.
-                labelOverride={mod.gridLabel}
+                labelOverride={tileLabel(mod, lang)}
                 trailing={draft.includes(mod.id)
                   ? <View style={s.pinDot}><Ionicons name="pin" size={11} color="#fff" /></View>
                   : null}

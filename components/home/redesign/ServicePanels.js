@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { colors, category as CATEGORY, type, radii, elevation, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
-import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT } from '../../../constants/homeModules'
+import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT, tileLabel } from '../../../constants/homeModules'
 import { liveGroups, categoryOf } from '../../../constants/homeGroups'
 import { CategoryIcon } from '../../ui'
 
@@ -34,9 +34,9 @@ const LABEL_BOX = 38
 
 export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
   const cap = labelCap(useWindowDimensions().width)
-  const override = mod.gridLabel
-  const lines = override?.lines ?? 2
-  const label = t(override?.key ?? mod.labelKey, lang)
+  const fit = tileLabel(mod, lang)
+  const lines = fit.lines
+  const label = t(fit.key, lang)
   return (
     <TouchableOpacity style={[s.tile, { width }]} onPress={() => onPress(mod)} activeOpacity={press.small}
       accessibilityRole="button" accessibilityLabel={mod.soon ? `${label}, ${t('hrSoonBadge', lang)}` : label}>
@@ -48,8 +48,7 @@ export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
       </View>
       <View style={s.labelBox}>
         <Text
-          style={[s.label,
-            override && { fontSize: override.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
+          style={[s.label, { fontSize: fit.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
           numberOfLines={lines}
           maxFontSizeMultiplier={cap}
         >

@@ -214,7 +214,8 @@ export function headroom(str, px, box, maxLines) {
 }
 
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
-import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, ACCOM_TILE_STATES, HIDDEN_TILES } from '../constants/homeModules.js'
+import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, HIDDEN_TILES, tileLabel, GRID_LABEL_FIT, TILE_LABEL_PX, LABEL_MIN_PX,
+  LABEL_FLOOR_EXCEPTIONS } from '../constants/homeModules.js'
 import { HOTEL_ACTIONS, HOTEL_BOOK } from '../constants/hotels.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
@@ -344,10 +345,10 @@ function assess(label, str, px, box, where, cursive, maxLines = 2, leadingDot = 
 
 for (const W of WIDTHS) {
   for (const L of Object.keys(LANG_CODES)) {
-    // The accommodation tile has two label states (HOTELS_LIVE off / on). Both are measured
-    // whatever the flag is, so a green check never depends on which state the file is in.
-    const modules = [...HOME_MODULES, ...Object.entries(ACCOM_TILE_STATES).map(([k, st]) => ({ id: `accommodation[${k}]`, ...st }))]
-    for (const m of modules) {
+    // Live modules only. ACCOM_TILE_STATES.hotels is unused since 2026-10-09; sizes are per
+    // language now (GRID_LABEL_FIT), so if that state is spread into HOME_MODULES again the
+    // derivation below measures it and demands its entries.
+    for (const m of HOME_MODULES) {
       // BOTH labels, and dropping either would leave a real surface unmeasured.
       //
       // labelKey at 11pt is what the grid draws for a module WITHOUT a gridLabel. A module
@@ -363,8 +364,9 @@ for (const W of WIDTHS) {
       // the guard would be measuring a tile that no longer exists — the standing
       // frame-of-reference hazard this file documents at length.
       if (m.gridLabel) {
-        assess('tile', t(m.gridLabel.key, L), m.gridLabel.size, labelBox(W),
-               `${W}dp ${L} gridLabel:${m.id}`, CURSIVE.has(L), m.gridLabel.lines, true)
+        const f = tileLabel(m, L)
+        assess('tile', t(f.key, L), f.size, labelBox(W),
+               `${W}dp ${L} gridLabel:${m.id} @${f.size}pt`, CURSIVE.has(L), f.lines, true)
       }
     }
     // ─── The hotel card's three action buttons (Oteller) ─────────────────────
@@ -463,10 +465,16 @@ const SHEET_WIDTHS = [...new Set([320, 350, 360, 393, 430, NARROW_W])].filter(Bo
     const slotBox = W => homeCol(W) - G.tilePadR * 2 - S.border * 2 - S.slotPadX * 2
     const offered = HOME_MODULES.filter(m => !HIDDEN_TILES.has(m.id))
     const gridFace = advance
-    for (const W of SHEET_WIDTHS) for (const L of Object.keys(LANG_CODES)) for (const m of offered) {
-      const g = m.gridLabel
-      assess('tile', t(g ? g.key : m.labelKey, L), g ? g.size : 11, pickBox(W),
-             `${W}dp ${L} sheetPicker:${m.id}`, CURSIVE.has(L), g ? g.lines : 2, true)
+    // ModuleTile caps font scale with Home's labelCap (asserted below), so the list is measured
+    // at normal and large text like Home.
+    if (!/maxFontSizeMultiplier=\{cap\}/.test(read('components/home/ModuleTile.js'))
+        || !/const cap\s+= labelCap\(screenW\)/.test(read('components/home/ModuleTile.js'))) {
+      problems.push('ModuleTile.js: the label no longer caps font scale with labelCap — the Düzenle list model is wrong')
+    }
+    for (const W of SHEET_WIDTHS) for (const sc of [1.0, 1.3]) for (const L of Object.keys(LANG_CODES)) for (const m of offered) {
+      const f = tileLabel(m, L)
+      assess('tile', t(f.key, L), f.size * Math.min(sc, cap(W)), pickBox(W),
+             `${W}dp ×${sc} ${L} sheetPicker:${m.id} @${f.size}pt`, CURSIVE.has(L), f.lines, true)
     }
     advance = loadFont(FONTS[slotFace])
     const SCALES_S = [1.0, 1.3]
@@ -601,8 +609,8 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
     for (const w of [R_LABEL_WEIGHT]) {
       for (const m of HOME_MODULES) {
         // ServiceTile draws gridLabel ?? labelKey, so a module with a gridLabel never shows its labelKey here.
-        if (!m.gridLabel) rAssess(w, t(m.labelKey, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${m.id}`, cur, 2)
-        if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, lCap(W), S, rLabel(W), `${at} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)
+        const f = tileLabel(m, L)
+        rAssess(w, t(f.key, L), f.size, lCap(W), S, rLabel(W), `${at} ${w} ${m.gridLabel ? 'gridLabel' : 'tile'}:${m.id} @${f.size}pt`, cur, f.lines)
       }
       for (const k of extraKeys) rAssess(w, t(k, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${k}`, cur, 2)
     }
@@ -707,6 +715,64 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
     + `band ${rBand(320).toFixed(1)}pt at 320dp; tightest ${JSON.stringify(rTight.str)} at ${rTight.where}, ${rTight.spare.toFixed(1)}pt headroom`)
 }
 
+// ═══ GRID_LABEL_FIT: NO LABEL SHRINKS WITHOUT NEED (Home tiles + Düzenle list) ═══
+// One table serves both places: Home's label box (W − 2·PAGE_INSET − 2·PANEL_GUTTER)/4 − 2·TILE_PAD
+// and the list's (W − 2·PAGE_INSET)/4 − 2·tilePad are both measured, at every width and scale.
+// Expected entry per (language, module): the largest size on a 0.25 grid in [LABEL_MIN_PX, 11]
+// that fits 2 lines everywhere; else 3 lines at LABEL_MIN_PX if gridLabel allows 3; else, only for
+// LABEL_FLOOR_EXCEPTIONS, the largest size below the floor that fits. Missing, stale, unneeded or
+// over-shrunk entries all fail, and the expected table is printed.
+{
+  const P = Object.fromEntries(Object.entries({
+    gut: constNum(PANELS, 'PANEL_GUTTER'), pad: constNum(PANELS, 'TILE_PAD'),
+    cap: constNum(PANELS, 'LABEL_CAP'), capN: constNum(PANELS, 'LABEL_CAP_NARROW'), nW: constNum(PANELS, 'NARROW_W'),
+    mt: num('components/home/ModuleTile.js', 'tile', 'paddingHorizontal'),
+  }).map(([k, r]) => [k, r.v]))
+  if (Object.values(P).some(v => !(v >= 0))) problems.push('GRID_LABEL_FIT: could not read the tile geometry')
+  else {
+    const homeFace = Number(((read(PANELS).match(/\blabel:\s*\{[^}]*fontFamily:\s*'Inter_(\d{3})/) || [])[1]))
+    const listFace = WEIGHT
+    if (homeFace !== listFace) problems.push(`Düzenle list draws Inter ${listFace}, Home tiles Inter ${homeFace} — they must match`)
+    const capW = W => (W < P.nW ? P.capN : P.cap)
+    const boxes = [W => (W - G.insetR * 2 - P.gut * 2) / 4 - P.pad * 2, W => (W - G.insetR * 2) / 4 - P.mt * 2]
+    const saved = advance
+    advance = loadFont(FONTS[homeFace])
+    const fitsAt = (str, px, lines) => SHEET_WIDTHS.every(W => [1.0, 1.3].every(sc => boxes.every(b => {
+      const r = wrap(str, px * Math.min(sc, capW(W)), b(W))
+      return !r.midWord && r.lines.length <= lines && !r.lines.some(l => l.startsWith('·'))
+    })))
+    const expected = {}, shrunk = []
+    for (const L of Object.keys(LANG_CODES)) for (const m of HOME_MODULES.filter(x => !HIDDEN_TILES.has(x.id) || x.gridLabel)) {
+      const str = t(m.gridLabel?.key ?? m.labelKey, L), maxLines = m.gridLabel?.lines ?? 2
+      let want = null
+      for (let px = TILE_LABEL_PX; px >= LABEL_MIN_PX - 1e-9; px -= 0.25) if (fitsAt(str, px, 2)) { want = { size: px }; break }
+      if (!want && maxLines >= 3 && fitsAt(str, LABEL_MIN_PX, 3)) want = { size: LABEL_MIN_PX, lines: 3 }
+      if (!want && LABEL_FLOOR_EXCEPTIONS[L]?.includes(m.id)) {
+        for (let px = LABEL_MIN_PX - 0.25; px >= 6 && !want; px -= 0.25) {
+          if (fitsAt(str, px, 2)) want = { size: px }
+          else if (maxLines >= 3 && fitsAt(str, px, 3)) want = { size: px, lines: 3 }
+        }
+      }
+      if (!want) { problems.push(`GRID_LABEL_FIT ${L} ${m.id}: ${JSON.stringify(str)} fits no size ≥ ${LABEL_MIN_PX}pt on Home/Düzenle list`); continue }
+      if (want.size < TILE_LABEL_PX || want.lines) { (expected[L] ??= {})[m.id] = want; shrunk.push(`${L}:${m.id}=${want.size}${want.lines ? '/3' : ''}`) }
+    }
+    advance = saved
+    const norm = o => JSON.stringify(Object.keys(LANG_CODES).map(L => [L, Object.entries(o[L] ?? {}).sort()
+      .map(([id, e]) => [id, e.size, e.lines ?? 2])]))
+    if (norm(GRID_LABEL_FIT) !== norm(expected)) {
+      const flat = o => Object.entries(o).flatMap(([L, e]) => Object.entries(e).map(([id, v]) => `${L}:${id}=${v.size}${v.lines ? '/' + v.lines : ''}`))
+      const have = flat(GRID_LABEL_FIT), want = flat(expected)
+      problems.push(`GRID_LABEL_FIT (constants/homeModules.js) is not the derived table — `
+        + `unneeded/wrong: ${have.filter(x => !want.includes(x)).join(', ') || '-'}; missing: ${want.filter(x => !have.includes(x)).join(', ') || '-'}; `
+        + `expected exactly ${JSON.stringify(expected)}`)
+    }
+    for (const [L, ids] of Object.entries(LABEL_FLOOR_EXCEPTIONS)) for (const id of ids) {
+      if (!(expected[L]?.[id]?.size < LABEL_MIN_PX)) problems.push(`LABEL_FLOOR_EXCEPTIONS ${L}:${id} is no longer needed — remove it`)
+    }
+    console.log(`  tile label sizes (Home + Düzenle list, GATE): ${shrunk.length} label(s) below ${TILE_LABEL_PX}pt, each needed — ${shrunk.join(', ') || 'none'}`)
+  }
+}
+
 if (checked === 0) {
   problems.push('measured ZERO strings — HOME_MODULES or LANG_CODES came back empty, so this '
     + 'guard was about to pass on nothing')
@@ -722,8 +788,8 @@ if (problems.length) {
   // misdescribes the constraint sends the reader to change the wrong number.
   console.error(`  ${problems.length} of ${checked} strings do not fit. The label box is a fixed `
     + `${GRID_LABEL_HEIGHT}pt in every locale; a label's line count divides it rather than `
-    + `growing it, so the grid keeps one row rhythm. Shorten the copy, or — for a gridLabel `
-    + `— lower its \`size\` in constants/homeModules.js.\n`)
+    + `growing it, so the grid keeps one row rhythm. Tile and slot sizes come from GRID_LABEL_FIT `
+    + `(constants/homeModules.js) and SLOT_LABEL_FIT (constants/homeFavourites.js): set them to the expected table above.\n`)
   process.exit(1)
 }
 console.log(`tile labels: OK — ${checked} strings from ${ACTIVE_FAMILY} (the face ModuleTile actually renders) at ${WIDTHS.join('dp / ')}dp`)

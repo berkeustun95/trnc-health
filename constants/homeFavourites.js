@@ -4,7 +4,7 @@
 // AsyncStorage, no React and no side effect in this file: it is the cityWelcomeRules /
 // cityWelcome split applied again, and it exists in that shape so the degradation rules
 // below can be tested by a script rather than by tapping a phone.
-import { HOME_MODULES, HIDDEN_TILES } from './homeModules.js'
+import { HOME_MODULES, HIDDEN_TILES, LABEL_MIN_PX } from './homeModules.js'
 import { MODULE_FLAGS, HOTELS_LIVE } from './flags.js'
 
 export const FAVOURITE_SLOTS = 4
@@ -250,7 +250,7 @@ export const MIN_ALWAYS_ELIGIBLE = UNGATED_MODULES.size
 // DERIVED by `npm run labels:check`, which fails on a missing, stale or over-shrunk entry
 // and prints the table it expects.
 export const SLOT_LABEL_PX = 10
-export const SLOT_LABEL_MIN_PX = 8.5
+export const SLOT_LABEL_MIN_PX = LABEL_MIN_PX
 export const SLOT_LABEL_FIT = {
   Russian: { accommodation: 8.5 },
 }

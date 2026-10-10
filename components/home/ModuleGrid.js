@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native'
-import { HOME_MODULES, GRID_COLUMNS, HIDDEN_TILES } from '../../constants/homeModules'
+import { HOME_MODULES, GRID_COLUMNS, HIDDEN_TILES, tileLabel } from '../../constants/homeModules'
 import ModuleTile from './ModuleTile'
 
 // Tüm modüller — every module, four across, bare icons.
@@ -50,7 +50,7 @@ export default function ModuleGrid({ lang, onPress }) {
           // label here from the one it shows in the favourites row — today exactly one
           // does, and its reasoning is on the config row. Undefined for every other
           // module, which is the normal path.
-          labelOverride={mod.gridLabel}
+          labelOverride={tileLabel(mod, lang)}
         />
       ))}
     </View>

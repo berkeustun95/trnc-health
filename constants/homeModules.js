@@ -117,8 +117,8 @@ export const HIDDEN_TILES = new Set([
 // "Hotels" rather than "Accommodation", which breaks mid-word at 320dp even on three lines.
 // labelKey (favourites row, edit sheet: 11pt / 2 lines) stays the module name.
 export const ACCOM_TILE_STATES = {
-  base:   { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
-  hotels: { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
+  base:   { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTile', lines: 2 } },
+  hotels: { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTileHotels', lines: 3 } },
 }
 
 export const HOME_MODULES = [
@@ -173,7 +173,7 @@ export const HOME_MODULES = [
   // at 8.5 against the 68pt box (mid-word break); at 8.2 it is 67.5pt. Decided by Berke. ModuleTile DERIVES lineHeight as GRID_LABEL_HEIGHT / lines, so the label box
   // stays exactly 32pt and this tile cannot alter the grid's row rhythm.
   { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
-    gridLabel: { key: 'hsTitle', lines: 3, size: 8.2 } },
+    gridLabel: { key: 'hsTitle', lines: 3 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
@@ -207,3 +207,33 @@ export const HOME_MODULES = [
 export const GRID_LABEL_LINE_HEIGHT = 16
 export const GRID_LABEL_HEIGHT = GRID_LABEL_LINE_HEIGHT * 2
 export const GRID_COLUMNS = 4
+
+// ─── Tile label size, per language (Home tiles + Düzenle list) ──────────────
+// Until 2026-10-10 a gridLabel carried ONE size for all nine languages, set by the worst
+// one (Russian), so Turkish "Yurt · Emlak" drew at 8.5pt beside 11pt labels of the same
+// length. Now a label renders at TILE_LABEL_PX on 2 lines unless its GRID_LABEL_FIT entry
+// says otherwise. `gridLabel.lines` is the most lines a module may take. Rule (derived and
+// enforced by `npm run labels:check`, which prints the expected table): the largest size on
+// a 0.25 grid from 11 down to LABEL_MIN_PX that fits 2 lines at every width and font scale;
+// failing that, 3 lines at LABEL_MIN_PX (3 lines share the fixed 32pt box, so they cannot
+// be larger). LABEL_FLOOR_EXCEPTIONS may go below the floor, at the largest size that fits.
+export const TILE_LABEL_PX = 11
+export const LABEL_MIN_PX = 8.5
+// Russian "Отделка · Обслуживание · Ремонт" (partner-signed): "Обслуживание ·" is bound by
+// U+00A0 and fits the 68pt box at 320dp only at 8.25pt (8.2 before 2026-10-10).
+export const LABEL_FLOOR_EXCEPTIONS = { Russian: ['homeServices'] }
+export const GRID_LABEL_FIT = {
+  English: { homeServices: { size: 8.5, lines: 3 } },
+  Turkish: { homeServices: { size: 9.25 } },
+  Arabic:  { homeServices: { size: 9 } },
+  Russian: { accommodation: { size: 8.75 }, homeServices: { size: 8.25, lines: 3 } },
+  Greek:   { homeServices: { size: 8.5, lines: 3 } },
+  French:  { homeServices: { size: 8.5, lines: 3 } },
+  Spanish: { accommodation: { size: 10.5 }, homeServices: { size: 8.5, lines: 3 } },
+  German:  { accommodation: { size: 10.75 }, homeServices: { size: 8.5, lines: 3 } },
+  Persian: { homeServices: { size: 8.5, lines: 3 } },
+}
+export function tileLabel(mod, lang) {
+  const fit = GRID_LABEL_FIT[lang]?.[mod.id]
+  return { key: mod.gridLabel?.key ?? mod.labelKey, size: fit?.size ?? TILE_LABEL_PX, lines: fit?.lines ?? 2 }
+}
