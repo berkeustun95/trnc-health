@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { colors, category as CATEGORY, type, radii, elevation, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
-import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT } from '../../../constants/homeModules'
+import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT, tileLabel } from '../../../constants/homeModules'
 import { liveGroups, categoryOf } from '../../../constants/homeGroups'
 import { CategoryIcon } from '../../ui'
 
@@ -12,8 +12,12 @@ import { CategoryIcon } from '../../ui'
 // page gutter would shrink the box, so the panel keeps only a 4pt inner gutter and the tile
 // a 1pt side pad: (320 − 2·16 − 2·4) / 4 − 2·1 = 68pt, exactly V2's box. Do not add panel
 // padding without re-measuring (vault: 2026-09-05_tile-label-metrics.mjs).
-const PANEL_GUTTER = 4
-const TILE_PAD = 1
+// Exported so the Düzenle slot boxes (FavouritesEditSheet) are built from the same three
+// numbers as these tiles and cannot drift from them. HomeScreen's rBelow pads by PAGE_INSET.
+export const PAGE_INSET = 16
+export const PANEL_GUTTER = 4
+export const TILE_PAD = 1
+export const TILE_WIDTH = '25%'
 // Large system text: labels grow at most 1.15×, and the label area is fixed at two lines of
 // that (2 · 16 · 1.15 ≈ 37 → 38), so every row keeps one height and nothing spills into the
 // tile below or beside it. labels:check measures at font scale 1.0 and 1.3 against this cap.
@@ -22,15 +26,17 @@ const LABEL_CAP = 1.15
 // "Renovation" would break mid-word), so narrow phones keep the designed size instead of
 // rewording ~45 labels — including a partner-signed one — for one corner case.
 const LABEL_CAP_NARROW = 1.0
-const NARROW_W = 350
+// 360, not 350 (2026-10-09): at 350dp the 1.15× cap broke Russian "Обслуживание" mid-word
+// (labels:check now samples NARROW_W itself, the wide band's narrowest and worst width).
+const NARROW_W = 360
 export function labelCap(width) { return width < NARROW_W ? LABEL_CAP_NARROW : LABEL_CAP }
 const LABEL_BOX = 38
 
-export function ServiceTile({ mod, cat, lang, onPress, width = '25%' }) {
+export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
   const cap = labelCap(useWindowDimensions().width)
-  const override = mod.gridLabel
-  const lines = override?.lines ?? 2
-  const label = t(override?.key ?? mod.labelKey, lang)
+  const fit = tileLabel(mod, lang)
+  const lines = fit.lines
+  const label = t(fit.key, lang)
   return (
     <TouchableOpacity style={[s.tile, { width }]} onPress={() => onPress(mod)} activeOpacity={press.small}
       accessibilityRole="button" accessibilityLabel={mod.soon ? `${label}, ${t('hrSoonBadge', lang)}` : label}>
@@ -42,8 +48,7 @@ export function ServiceTile({ mod, cat, lang, onPress, width = '25%' }) {
       </View>
       <View style={s.labelBox}>
         <Text
-          style={[s.label,
-            override && { fontSize: override.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
+          style={[s.label, { fontSize: fit.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
           numberOfLines={lines}
           maxFontSizeMultiplier={cap}
         >

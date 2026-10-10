@@ -1,20 +1,17 @@
--- Duty notification cron jobs
--- These are already live in Supabase (cron.job table). This file is documentation only.
--- To verify: SELECT jobname, schedule FROM cron.job WHERE jobname ILIKE '%duty%';
+-- Duty notification schedule — documentation only. The live job is created by
+-- supabase/migrations/20261103_duty_push_famagusta.sql (applied via supabase-migrate).
+-- To verify: gh workflow run supabase-readonly -f file=supabase/readonly/duty_push_schedule.sql
 --
--- All times UTC. TRNC is UTC+3.
+-- One pg_cron job, 'duty-push', every 30 minutes ('0,30 * * * *', UTC). It POSTs only when
+-- public.duty_push_due() says the current Asia/Famagusta (TRNC) 30-minute slot is today's
+-- send time, so it stays on local time across DST (UTC+3 summer, UTC+2 winter):
 --
--- Mon/Tue/Wed/Fri at 14:00 UTC = 17:00 TRNC (30 min before 17:30 close)
--- select cron.schedule('duty-notif-mtwf', '0 14 * * 1,2,3,5', $$
---   select net.http_post(url:='...', headers:='...', body:='{}');
--- $$);
+--   Mon/Tue/Wed/Fri  17:00 TRNC   (30 min before 17:30 close)
+--   Thursday         public.duty_thursday_closing_local() − 30 min
+--                    winter 17:30 → 17:00 · summer 13:30 → 13:00
+--   Saturday         13:00 TRNC   (30 min before 13:30 close)
+--   Sunday           08:00 TRNC   (at pharmacy open time)
 --
--- Thu/Sat at 10:00 UTC = 13:00 TRNC (30 min before 13:30 close)
--- select cron.schedule('duty-notif-thu-sat', '0 10 * * 4,6', $$
---   select net.http_post(url:='...', headers:='...', body:='{}');
--- $$);
---
--- Sunday at 05:00 UTC = 08:00 TRNC (at pharmacy open time)
--- select cron.schedule('duty-notif-sun', '0 5 * * 0', $$
---   select net.http_post(url:='...', headers:='...', body:='{}');
--- $$);
+-- Seasonal switch = a migration that CREATE OR REPLACEs duty_thursday_closing_local() with the
+-- new time, plus the 1103 H token in verify_schema.sql.
+-- Key: Vault 'novest_sync_key', never inline in cron.job.

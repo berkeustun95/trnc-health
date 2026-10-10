@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { HOME_MODULES } from '../../constants/homeModules'
-import { FAVOURITE_SLOTS, eligibleModules, resolveFavourites } from '../../constants/homeFavourites'
+import { HOME_MODULES, tileLabel } from '../../constants/homeModules'
+import { FAVOURITE_SLOTS, eligibleModules, resolveFavourites, SLOT_LABEL_PX, SLOT_LABEL_FIT } from '../../constants/homeFavourites'
 import ModuleTile from './ModuleTile'
+import { PAGE_INSET, PANEL_GUTTER, TILE_PAD, TILE_WIDTH, labelCap } from './redesign/ServicePanels'
 
 // Düzenle — pin or replace the four favourite slots.
 //
@@ -30,23 +31,35 @@ import ModuleTile from './ModuleTile'
 //
 // "Otomatik sırala" clears every pin and hands the row back to usage.
 
+const SLOT_LINE_H = 13
+
+// Each slot is one Home "Sık kullandıkların" tile wide: the same PAGE_INSET + PANEL_GUTTER
+// row inset, the same TILE_WIDTH column and TILE_PAD, so the two cannot drift apart.
 function SlotBox({ mod, index, selected, lang, onPress }) {
+  const cap = labelCap(useWindowDimensions().width)
+  const px = (mod && SLOT_LABEL_FIT[lang]?.[mod.id]) || SLOT_LABEL_PX
   return (
-    <TouchableOpacity
-      style={[s.slot, selected && s.slotSelected]}
-      onPress={() => onPress(index)}
-      activeOpacity={0.8}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${index + 1}. ${mod ? t(mod.labelKey, lang) : t('favSlotEmpty', lang)}`}
-    >
-      {mod
-        ? <Ionicons name={mod.icon} size={22} color={selected ? colors.primary : colors.textSecondary} />
-        : <Ionicons name="add" size={22} color={colors.textSecondary} />}
-      <Text style={[s.slotLabel, selected && s.slotLabelSelected]} numberOfLines={2}>
-        {mod ? t(mod.labelKey, lang) : t('favSlotEmpty', lang)}
-      </Text>
-    </TouchableOpacity>
+    <View style={s.slotCell}>
+      <TouchableOpacity
+        style={[s.slot, selected && s.slotSelected]}
+        onPress={() => onPress(index)}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${index + 1}. ${mod ? t(mod.labelKey, lang) : t('favSlotEmpty', lang)}`}
+      >
+        {mod
+          ? <Ionicons name={mod.icon} size={22} color={selected ? colors.primary : colors.textSecondary} />
+          : <Ionicons name="add" size={22} color={colors.textSecondary} />}
+        <Text
+          style={[s.slotLabel, { fontSize: px, height: Math.ceil(SLOT_LINE_H * 2 * cap) }, selected && s.slotLabelSelected]}
+          numberOfLines={2}
+          maxFontSizeMultiplier={cap}
+        >
+          {mod ? t(mod.labelKey, lang) : t('favSlotEmpty', lang)}
+        </Text>
+      </TouchableOpacity>
+    </View>
   )
 }
 
@@ -145,7 +158,7 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
                 width="25%"
                 // The grid's own label (and, with the sheet inset matching the page's 16, the
                 // grid's own box), so the picker reads exactly like Home. Since 2026-10-09.
-                labelOverride={mod.gridLabel}
+                labelOverride={tileLabel(mod, lang)}
                 trailing={draft.includes(mod.id)
                   ? <View style={s.pinDot}><Ionicons name="pin" size={11} color="#fff" /></View>
                   : null}
@@ -164,15 +177,14 @@ const s = StyleSheet.create({
   // maxHeight rather than a fixed one: the module list scrolls, and on a short screen the
   // sheet must not push its own Bitti button off the bottom.
   sheet:       { backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-                 padding: 20, paddingHorizontal: 16, paddingBottom: 30, maxHeight: '78%' },
+                 padding: 20, paddingHorizontal: PAGE_INSET, paddingBottom: 30, maxHeight: '78%' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title:       { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   done:        { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   hint:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
-  slots:       { flexDirection: 'row', gap: 8, marginTop: 16 },
-  // flex:1 so four boxes share the width evenly in every locale — a content-sized box
-  // would make each one a different width as the labels change language.
-  slot:        { flex: 1, alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 4,
+  slots:       { flexDirection: 'row', marginTop: 16, paddingHorizontal: PANEL_GUTTER },
+  slotCell:    { width: TILE_WIDTH, paddingHorizontal: TILE_PAD },
+  slot:        { alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 0,
                  borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
                  backgroundColor: 'transparent' },
   // Selection is carried by BORDER + BACKGROUND + label colour, not by colour alone —
@@ -184,8 +196,9 @@ const s = StyleSheet.create({
   // Eczaneler" and "Yeni Gelenler Rehberi" would both ellipse to near-identical stubs on
   // one line — and a preview whose whole job is to say WHICH module is in the slot must
   // not render two different modules as the same string. Fixed height so all four boxes
-  // stay the same size whatever the locale does.
-  slotLabel:   { fontSize: 10, lineHeight: 13, height: 26, fontFamily: 'Inter_500Medium',
+  // stay the same size whatever the locale does. Size and height are set inline: SlotBox
+  // reads the per-label size (SLOT_LABEL_FIT) and the font-scale cap.
+  slotLabel:   { lineHeight: SLOT_LINE_H, fontFamily: 'Inter_500Medium',
                  color: colors.textSecondary, textAlign: 'center' },
   // primaryDark, not primary: primary on primaryLight is 4.44:1, under the 4.5 floor for
   // 10pt text. primaryDark is 6.71:1 on the same tint.

@@ -107,18 +107,29 @@ export const HIDDEN_TILES = new Set([
   //   and the featured tier. If the map/list control is ever removed, this line has to come
   //   out in the same commit.
   'explore',
+  // ─── decluttering Home, 2026-10-10 (Berke) ───────────────────────────────
+  // Little or no use (vault 2026-10-10_home-hide-unused-modules.md). Flags untouched.
+  // ⚠ insurance, jobPostings and transport are DARK: their Coming Soon screens, and so their
+  //   waitlists, are reachable only from this tile, so intake pauses while they are hidden
+  //   (accepted). transport is still reachable through its Oli intent; games, insurance
+  //   and jobPostings have no other entry point.
+  'insurance',
+  'jobPostings',
+  'transport',
+  'games',
+  // eSIM: Connectivity is dark (CONNECTIVITY_LIVE false), so this was a "Yakında" tile; hidden
+  // so Şehir is one clean row of four. Its waitlist pauses with it.
+  'esim',
 ])
 
 // The Emlak & Konaklama tile's two label states; AccommodationScreen's title reads the same
-// gridLabel key. MEASURED 2026-09-29 (check-tile-labels, both widths, all nine locales): neither
-// fits two lines at 11pt — "Yurt · Emlak" breaks mid-word at 320dp in ru/fr/es/de, and the
-// three-part label needs three lines in every locale even at 7.8pt. Largest sizes that fit:
-// base 8.5pt on 2 lines, hotels 8.5pt on 3 lines (Ev Hizmetleri runs 8.2pt / 3). English says
-// "Hotels" rather than "Accommodation", which breaks mid-word at 320dp even on three lines.
-// labelKey (favourites row, edit sheet: 11pt / 2 lines) stays the module name.
+// gridLabel key. `lines` is the most lines the label may take; its SIZE is per language in
+// GRID_LABEL_FIT (below), derived by labels:check. English says "Hotels" rather than
+// "Accommodation", which breaks mid-word at 320dp even on three lines. labelKey (the Düzenle
+// slot boxes) stays the module name.
 export const ACCOM_TILE_STATES = {
-  base:   { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
-  hotels: { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
+  base:   { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTile', lines: 2 } },
+  hotels: { labelKey: 'menuAccomTile', gridLabel: { key: 'menuAccomTileHotels', lines: 3 } },
 }
 
 export const HOME_MODULES = [
@@ -137,7 +148,7 @@ export const HOME_MODULES = [
   // The tile names what is inside, in the module's tab order (Berke 2026-09-29): "Yurt · Emlak".
   // Each '·' is bound to the word before it with U+00A0 so a wrap never starts a line with the
   // separator. Hotels left this module for their own tile on 2026-10-09 (below); the 'hotels'
-  // state stays measured by scripts/check-tile-labels.mjs (ACCOM_TILE_STATES) but is unused.
+  // state is unused and unmeasured — spread it here again and labels:check measures it.
   { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', ...ACCOM_TILE_STATES.base },
   // Gated by HOTELS_LIVE, which is not a MODULE_FLAGS key (constants/homeGroups.js GATES,
   // constants/homeFavourites.js FAVOURITE_FLAGS). Placed in the Keşfet ve Eğlence panel.
@@ -149,31 +160,23 @@ export const HOME_MODULES = [
   { id: 'jobPostings',        icon: 'briefcase-outline',        tint: 'standard', labelKey: 'menuJobPostings' },
   // ─── THE ONE TILE THAT CARRIES A PHRASE INSTEAD OF A NAME ────────────────
   //
-  // `gridLabel` is read ONLY by the module grid (ModuleGrid passes it; ModuleTile takes
-  // it as a prop and never looks a module up). Everywhere else this module appears —
-  // the favourites row, the edit sheet's picker, the edit sheet's slot preview — falls
-  // back to labelKey and shows the short form.
-  //
-  // ⚠ THAT SPLIT IS FORCED, NOT A PREFERENCE. The partner requires the full phrase; the
-  //   slot preview is a 56pt box at 320dp and would need SEVEN-POINT-THREE type to hold
-  //   it. There is no single size that serves both surfaces, so there are two labels.
+  // `gridLabel` is what every tile draws (Home, favourites, the Düzenle list — via
+  // tileLabel()). Only the Düzenle slot boxes show labelKey, the short form: the partner
+  // requires the full phrase, and a slot box is too small to hold it at a readable size.
   //
   // ⚠ THE KEY IS hsTitle, THE SCREEN HEADER'S OWN KEY — deliberately not a second copy.
   //   This is a phrase a commercial partner signed off; two copies of it in i18n.js is
   //   two things to keep in step across nine locales, and the tile and the screen it
   //   opens must never disagree about the partner's name. One string, one place.
   //
-  // `lines` and `size` are the price of a 32-char phrase in a quarter-width box. The
-  // blocker is NOT the line count — it is the longest single WORD: Russian
-  // "Обслуживание" is 84.2pt at 11pt against a 68pt box at 320dp, so it breaks mid-word
-  // however many lines it is given (4 lines measures identical to 3). 8.5pt was the
-  // largest size that cleared all nine locales at 320dp (true floor 8.88pt, Russian).
-  // 8.2pt since 2026-09-29: ru and fa bind each '·' to the word before it with U+00A0 so no
-  // line starts with the separator, and the bound Russian token "Обслуживание ·" is 69.9pt
-  // at 8.5 against the 68pt box (mid-word break); at 8.2 it is 67.5pt. Decided by Berke. ModuleTile DERIVES lineHeight as GRID_LABEL_HEIGHT / lines, so the label box
-  // stays exactly 32pt and this tile cannot alter the grid's row rhythm.
+  // A 3-part phrase in a quarter-width box never fits 11pt; its size per language is in
+  // GRID_LABEL_FIT. Every locale binds each '·' to the word before it with U+00A0 (since
+  // 2026-10-10; ru/fa since 2026-09-29) so no line starts with the separator. The binding
+  // token is Russian "Обслуживание ·", which fits the 68pt box only at 8.25pt — the one
+  // LABEL_FLOOR_EXCEPTIONS entry. Tiles DERIVE lineHeight as GRID_LABEL_HEIGHT / lines, so the
+  // label box stays exactly 32pt and this tile cannot alter the grid's row rhythm.
   { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
-    gridLabel: { key: 'hsTitle', lines: 3, size: 8.2 } },
+    gridLabel: { key: 'hsTitle', lines: 3 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
@@ -207,3 +210,33 @@ export const HOME_MODULES = [
 export const GRID_LABEL_LINE_HEIGHT = 16
 export const GRID_LABEL_HEIGHT = GRID_LABEL_LINE_HEIGHT * 2
 export const GRID_COLUMNS = 4
+
+// ─── Tile label size, per language (Home tiles + Düzenle list) ──────────────
+// Until 2026-10-10 a gridLabel carried ONE size for all nine languages, set by the worst
+// one (Russian), so Turkish "Yurt · Emlak" drew at 8.5pt beside 11pt labels of the same
+// length. Now a label renders at TILE_LABEL_PX on 2 lines unless its GRID_LABEL_FIT entry
+// says otherwise. `gridLabel.lines` is the most lines a module may take. Rule (derived and
+// enforced by `npm run labels:check`, which prints the expected table): the largest size on
+// a 0.25 grid from 11 down to LABEL_MIN_PX that fits 2 lines at every width and font scale;
+// failing that, 3 lines at LABEL_MIN_PX (3 lines share the fixed 32pt box, so they cannot
+// be larger). LABEL_FLOOR_EXCEPTIONS may go below the floor, at the largest size that fits.
+export const TILE_LABEL_PX = 11
+export const LABEL_MIN_PX = 8.5
+// Russian "Отделка · Обслуживание · Ремонт" (partner-signed): "Обслуживание ·" is bound by
+// U+00A0 and fits the 68pt box at 320dp only at 8.25pt (8.2 before 2026-10-10).
+export const LABEL_FLOOR_EXCEPTIONS = { Russian: ['homeServices'] }
+export const GRID_LABEL_FIT = {
+  English: { homeServices: { size: 8.5, lines: 3 } },
+  Turkish: { homeServices: { size: 9.25 } },
+  Arabic:  { homeServices: { size: 9 } },
+  Russian: { accommodation: { size: 8.75 }, homeServices: { size: 8.25, lines: 3 } },
+  Greek:   { homeServices: { size: 8.5, lines: 3 } },
+  French:  { homeServices: { size: 8.5, lines: 3 } },
+  Spanish: { accommodation: { size: 10.5 }, homeServices: { size: 8.5, lines: 3 } },
+  German:  { accommodation: { size: 10.75 }, homeServices: { size: 8.5, lines: 3 } },
+  Persian: { homeServices: { size: 8.5, lines: 3 } },
+}
+export function tileLabel(mod, lang) {
+  const fit = GRID_LABEL_FIT[lang]?.[mod.id]
+  return { key: mod.gridLabel?.key ?? mod.labelKey, size: fit?.size ?? TILE_LABEL_PX, lines: fit?.lines ?? 2 }
+}
