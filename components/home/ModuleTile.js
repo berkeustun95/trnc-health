@@ -1,16 +1,18 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { GRID_COLUMNS, GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT } from '../../constants/homeModules'
 import { TILE_FONT_MANROPE } from '../../constants/flags'
+import { labelCap } from './redesign/ServicePanels'
 
 // ─── THE LABEL'S FAMILY IS A FLAG, AND IT IS RESOLVED ONCE ──────────────────
 // Both faces are registered in App.js — useFonts cannot be called conditionally — so this
 // chooses which one the label NAMES. Measured before it was offered: Manrope Medium has
 // identical script coverage to Inter (Arabic and Persian fall back to the system font in
 // both) and is 2.1% narrower at the same weight, so no label needs new copy.
-const LABEL_FAMILY = TILE_FONT_MANROPE ? 'Manrope_500Medium' : 'Inter_700Bold'
+// Inter Medium since 2026-10-10, matching the redesigned Home tiles (was Inter_700Bold).
+const LABEL_FAMILY = TILE_FONT_MANROPE ? 'Manrope_500Medium' : 'Inter_500Medium'
 
 // ONE tile, rendered identically by the module grid and the favourites row.
 //
@@ -70,6 +72,10 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
   const tint     = TINTS[mod.tint] || TINTS.standard
   const labelKey = labelOverride?.key ?? mod.labelKey
   const lines    = labelOverride?.lines ?? 2
+  // Same large-text rule as Home's tiles (labelCap: 1.0 below 360dp, 1.15 above). The box
+  // grows with the CAPPED scale only, so at normal text size the row height is unchanged.
+  const { width: screenW, fontScale } = useWindowDimensions()
+  const cap      = labelCap(screenW)
   return (
     <TouchableOpacity
       style={[s.tile, { width }]}
@@ -86,13 +92,14 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
       {/* The edit sheet's check/pin marker. A render prop rather than a boolean, so this
           file never learns what a pin is — it only knows something may sit on the icon. */}
       {trailing}
-      <View style={s.labelBox}>
+      <View style={[s.labelBox, { height: Math.ceil(GRID_LABEL_HEIGHT * Math.min(fontScale, cap)) }]}>
         <Text
           style={[s.label, labelOverride && {
             fontSize: labelOverride.size,
             lineHeight: GRID_LABEL_HEIGHT / lines,
           }]}
           numberOfLines={lines}
+          maxFontSizeMultiplier={cap}
         >
           {t(labelKey, lang)}
         </Text>

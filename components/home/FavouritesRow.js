@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native'
-import { HOME_MODULES } from '../../constants/homeModules'
+import { HOME_MODULES, tileLabel } from '../../constants/homeModules'
 import { FAVOURITE_SLOTS } from '../../constants/homeFavourites'
 import ModuleTile from './ModuleTile'
 
@@ -66,7 +66,7 @@ export default function FavouritesRow({ ids, lang, onPress }) {
             // GRID_LABEL_HEIGHT / lines, so three lines occupy the same 32pt two do, and
             // this tile stays uniform with the other three by construction rather than by
             // luck.
-            labelOverride={mod.gridLabel}
+            labelOverride={tileLabel(mod, lang)}
           />
         )
       })}
