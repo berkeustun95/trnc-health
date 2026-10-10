@@ -2,7 +2,7 @@
 // "son başvuru") would be attributed to the wrong item, so deadline text comes from the main
 // content region only, and the whole body is used only once header/nav/footer/aside are removed.
 
-import { htmlToText, decodeEntities, oneLine } from './text.mjs'
+import { htmlToText, decodeEntities, oneLine, parseListingDate } from './text.mjs'
 
 // Most specific first: an <article> often opens with a <footer class="entry-meta"> that would
 // end the region before the body (AKUN, 2026-10-10).
@@ -37,6 +37,23 @@ export function metaDescription(html) {
   const m = html.match(/<meta[^>]+(?:property|name)=["'](?:og:description|description)["'][^>]+content=["']([^"']{20,})["']/i)
     || html.match(/<meta[^>]+content=["']([^"']{20,})["'][^>]+(?:property|name)=["'](?:og:description|description)["']/i)
   return m ? oneLine(decodeEntities(m[1])) : null
+}
+
+// Title of a detail page, for listing titles the site truncated ("…").
+export function pageTitle(html) {
+  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']{6,})["']/i)
+  if (og) return oneLine(decodeEntities(og[1]))
+  const h1 = mainContentHtml(html).match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+  return h1 ? oneLine(htmlToText(h1[1])) : null
+}
+
+// Publication date of a detail page, for listings that show none: article:published_time,
+// a <time datetime>, or the first listing-style date at the top of the main content.
+export function pageDate(html) {
+  const meta = html.match(/<meta[^>]+(?:property|name)=["'](?:article:published_time|datePublished|date)["'][^>]+content=["']([^"']+)["']/i)
+  const time = html.match(/<time[^>]+datetime=["']([^"']+)["']/i)
+  for (const v of [meta?.[1], time?.[1]]) { const d = v && new Date(v); if (d && !isNaN(d)) return d }
+  return parseListingDate(mainText(html).slice(0, 600))
 }
 
 export function pdfLinks(html, baseUrl, limit = 2) {

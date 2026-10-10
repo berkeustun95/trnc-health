@@ -48,11 +48,15 @@ export const titleKey = t => trLower(oneLine(t)).replace(/[^\p{L}\p{N}]+/gu, ' '
 export const MONTHS = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık']
 const MONTHS_EN = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 export const MONTH_RE = '(?:' + MONTHS.join('|') + '|subat|mayis|agustos|eylul|kasim|aralik)'
+// Full or abbreviated Turkish month ("Ağu", "Eyl" — SSD and EasyDNN listings), ASCII-folded
+// spellings, or English.
 const monthIndex = m => {
-  const x = trLower(m).replace('subat', 'şubat').replace('mayis', 'mayıs').replace('agustos', 'ağustos')
+  const x = trLower(m).replace(/\.$/, '').replace('subat', 'şubat').replace('mayis', 'mayıs').replace('agustos', 'ağustos')
     .replace('eylul', 'eylül').replace('kasim', 'kasım').replace('aralik', 'aralık')
   const i = MONTHS.indexOf(x)
-  return i >= 0 ? i : MONTHS_EN.indexOf(x.slice(0, 3))
+  if (i >= 0) return i
+  if (x.length >= 3) { const j = MONTHS.findIndex(n => n.startsWith(x)); if (j >= 0) return j }
+  return MONTHS_EN.indexOf(x.slice(0, 3))
 }
 
 // A calendar date that exists (31.02 does not), as {y, m (0-11), d}, or null.
@@ -79,8 +83,11 @@ export function parseListingDate(s) {
   if (m) { const v = validDate(+m[1], +m[2] - 1, +m[3]); if (v) return dateAtTrnc(v) }
   m = t.match(/\b(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b/)
   if (m) { const v = validDate(+m[3], +m[2] - 1, +m[1]); if (v) return dateAtTrnc(v) }
-  m = t.match(new RegExp('\\b(\\d{1,2})\\s+(' + MONTH_RE + '|[a-z]{3,9})\\s+(\\d{4})'))
+  m = t.match(/(?:^|[^\p{L}\d])(\d{1,2})\s+([\p{L}]{3,9})\.?,?\s+(\d{4})/u)
   if (m) { const mi = monthIndex(m[2]); const v = mi >= 0 && validDate(+m[3], mi, +m[1]); if (v) return dateAtTrnc(v) }
+  // "Eyl 24, 2026" (EasyDNN "Yayınlanma tarihi")
+  m = t.match(/(?:^|[^\p{L}])([\p{L}]{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/u)
+  if (m) { const mi = monthIndex(m[1]); const v = mi >= 0 && validDate(+m[3], mi, +m[2]); if (v) return dateAtTrnc(v) }
   return null
 }
 

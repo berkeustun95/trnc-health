@@ -5,6 +5,11 @@
 //   • Dropped by decision: eul.edu.tr feed, arucad feed, Gazimağusa /kat/haberler, Başbakanlık
 //     basın açıklamaları, Tatlısu (newest item 2021), KTTB.
 //   • Deferred: ktmmob.org (Vue SPA), Gönyeli kesintiler (map widget), kktcmeteor.
+//   • Deferred 2026-10-10 (slice c): ODTÜ KKK acadpos (one static page, not a listing); Dikmen
+//     tenders (the API works, but the public site answers 500 to non-browsers and no detail URL
+//     could be verified, so there is no official link to give users).
+//     UKÜ kariyer (a static page with one apply link). Çatalköy-Esentepe tenders (the only date
+//     column is unlabelled, items are ZIP downloads, newest item 2026-02-06).
 //   • The four KHK HTML münhal pages are replaced by KHK's hidden EasyDNN category feeds.
 // crawl_delay_s mirrors the measured robots.txt Crawl-delay; the fetcher also re-reads robots.txt
 // every run and takes the larger value.
@@ -55,12 +60,10 @@ export const SOURCES = [
   html({ key: 'asbu-kktc', name: 'ASBÜ KKTC — Duyurular', institution: 'Ankara Sosyal Bilimler Üniversitesi KKTC', url: 'https://kktc.asbu.edu.tr/tr/duyurular', parser: 'asbu', category: 'egitim' }),
   html({ key: 'emu-duyurular', name: 'DAÜ — Duyurular', institution: 'Doğu Akdeniz Üniversitesi', url: 'https://www.emu.edu.tr/duyurular', parser: 'emu', category: 'egitim', crawl_delay_s: 5, region: 'gazimagusa' }),
   html({ key: 'gau-duyurular', name: 'GAÜ — Duyurular', institution: 'Girne Amerikan Üniversitesi', url: 'https://www.gau.edu.tr/servisler/duyurular', parser: 'gau', category: 'egitim', region: 'girne' }),
-  html({ key: 'metu-ncc-positions', name: 'ODTÜ KKK — Akademik kadrolar', institution: 'ODTÜ Kuzey Kıbrıs Kampusu', url: 'https://app.ncc.metu.edu.tr/acadpos/drupal_ana_sayfa_baglanti.php', parser: 'metuncc', category: 'egitim', filter_mode: 'all', region: 'guzelyurt', fetch_interval_min: 1440 }),
-  html({ key: 'ciu-kariyer', name: 'UKÜ — Kariyer', institution: 'Uluslararası Kıbrıs Üniversitesi', url: 'https://ciu.edu.tr/tr/kariyer', parser: 'ciu', category: 'egitim', filter_mode: 'all', region: 'lefkosa', fetch_interval_min: 1440 }),
 
   // ─── İhaleler ────────────────────────────────────────────────────────────
   { key: 'ted-tcc', name: 'TED — AB Kıbrıs Türk Toplumu Yardım Programı', institution: 'Avrupa Birliği', url: 'https://api.ted.europa.eu/v3/notices/search',
-    type: 'ted', parser: 'ted', category: 'ihale', region: 'all', filter_mode: 'all', crawl_delay_s: 2, fetch_interval_min: 720, rank: 3 },
+    type: 'ted', parser: 'ted', category: 'ihale', kind: 'open', region: 'all', filter_mode: 'all', crawl_delay_s: 2, fetch_interval_min: 720, rank: 3 },
   rss({ key: 'gazimagusa-ihaleler', name: 'Gazimağusa Belediyesi — İhaleler', institution: 'Gazimağusa Belediyesi', url: 'https://www.gazimagusabelediyesi.org/kat/ihaleler/feed/', category: 'ihale', filter_mode: 'all', region: 'gazimagusa', rank: 2 }),
   rss({ key: 'girne-ihaleler', name: 'Girne Belediyesi — İhaleler', institution: 'Girne Belediyesi', url: 'https://www.girnebelediyesi.com/ihaleler/feed/', category: 'ihale', filter_mode: 'all', region: 'girne', rank: 2 }),
   rss({ key: 'maliye', name: 'Maliye Bakanlığı — Duyurular', institution: 'Maliye Bakanlığı', url: 'https://maliye.gov.ct.tr/tr/duyurular/index.xml', category: 'ihale', rank: 3 }),
@@ -68,8 +71,6 @@ export const SOURCES = [
   rss({ key: 'kibtek', name: 'KIB-TEK — İhale ve ilanlar', institution: 'Kıbrıs Türk Elektrik Kurumu', url: 'https://www.kibtek.com/feed/', category: 'ihale', rank: 2 }),
   html({ key: 'emu-ihale-portal', name: 'DAÜ — İhale portalı', institution: 'Doğu Akdeniz Üniversitesi', url: 'http://ihaleportal.emu.edu.tr/sartnamelisteleme.aspx', parser: 'emuihale', category: 'ihale', filter_mode: 'all', region: 'gazimagusa' }),
   html({ key: 'degirmenlik-ihaleler', name: 'Değirmenlik-Akıncılar Belediyesi — İhaleler', institution: 'Değirmenlik-Akıncılar Belediyesi', url: 'https://www.degirmenlikakincilar.org/ihaleler/', parser: 'degirmenlik', category: 'ihale', filter_mode: 'all', region: 'lefkosa', rank: 2 }),
-  { key: 'dikmen-ihaleler', name: 'Dikmen Belediyesi — İhaleler', institution: 'Dikmen Belediyesi', url: 'https://api.dikmenbelediyesi.com/api/latest-tenders?perPage=10&page=1&orderby=desc',
-    type: 'json', parser: 'dikmen', category: 'ihale', region: 'girne', filter_mode: 'all', crawl_delay_s: 2, fetch_interval_min: 360, rank: 2 },
   html({ key: 'erenkoy-karpaz-ihaleler', name: 'Erenköy-Karpaz Belediyesi — İhaleler', institution: 'Erenköy-Karpaz Belediyesi', url: 'https://erenkoykarpazbelediyesi.com/kurumsal/ihale-duyurulari.html', parser: 'joomlaihale', category: 'ihale', filter_mode: 'all', region: 'iskele', crawl_delay_s: 15, rank: 2 }),
   html({ key: 'gecitkale-ihaleler', name: 'Geçitkale-Serdarlı Belediyesi — İhaleler', institution: 'Geçitkale-Serdarlı Belediyesi', url: 'https://www.gecitkaleserdarlibelediyesi.com/kurumsal/ihale-duyurulari.html', parser: 'joomlaihale', category: 'ihale', filter_mode: 'all', region: 'gazimagusa', crawl_delay_s: 15, rank: 2 }),
   html({ key: 'yenibogazici-ihaleler', name: 'Yeniboğaziçi Belediyesi — İhaleler', institution: 'Yeniboğaziçi Belediyesi', url: 'https://www.yenibogazicibelediyesi.com/kurumsal/ihale-duyurular%C4%B1.html', parser: 'joomlaihale', category: 'ihale', filter_mode: 'all', region: 'gazimagusa', crawl_delay_s: 15, rank: 2 }),
@@ -81,7 +82,6 @@ export const SOURCES = [
   html({ key: 'lefke-ihaleler', name: 'Lefke Belediyesi — İhale duyuruları', institution: 'Lefke Belediyesi', url: 'https://lefkebelediyesi.com/ihale-duyurulari/', parser: 'lefkeihale', category: 'ihale', filter_mode: 'all', region: 'lefke', rank: 2 }),
   html({ key: 'rkmmd-duyurular', name: 'Ruhsat ve Kamu Mal Müdürlüğü — Duyurular', institution: 'Ruhsat ve Kamu Mal Müdürlüğü', url: 'https://rkmmd.gov.ct.tr/DUYURULAR', parser: 'easydnn', category: 'ihale', crawl_delay_s: 5, rank: 3 }),
   html({ key: 'ticaret', name: 'Ticaret Dairesi', institution: 'Ticaret Dairesi', url: 'https://ticaret.gov.ct.tr/HABERLER', parser: 'easydnn', category: 'ihale', crawl_delay_s: 5, rank: 3 }),
-  html({ key: 'catalkoy-esentepe-ihaleler', name: 'Çatalköy-Esentepe Belediyesi — İhaleler', institution: 'Çatalköy-Esentepe Belediyesi', url: 'https://catalkoyesentepebelediyesi.com/ihaleler-2/', parser: 'catalkoy', category: 'ihale', filter_mode: 'all', region: 'girne', rank: 2 }),
 
   // ─── Belediyeler ─────────────────────────────────────────────────────────
   rss({ key: 'gazimagusa-duyurular', name: 'Gazimağusa Belediyesi — Duyurular', institution: 'Gazimağusa Belediyesi', url: 'https://www.gazimagusabelediyesi.org/kat/duyurular/feed/', category: 'belediye', filter_mode: 'all', region: 'gazimagusa', fetch_interval_min: 60, rank: 2 }),

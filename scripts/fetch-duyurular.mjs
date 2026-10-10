@@ -38,7 +38,7 @@ const { PARSERS } = await import('./duyurular/lib/parsers.mjs')
 const { passesFilter, kindOf, categoryOf, CATEGORY_RANK } = await import('./duyurular/lib/classify.mjs')
 const { extractDeadline } = await import('./duyurular/lib/deadline.mjs')
 const { excerptOf, titleKey, oneLine } = await import('./duyurular/lib/text.mjs')
-const { mainText, metaDescription, pdfLinks } = await import('./duyurular/lib/page.mjs')
+const { mainText, metaDescription, pdfLinks, pageTitle, pageDate } = await import('./duyurular/lib/page.mjs')
 
 if (SELFTEST) {
   const { runSelftest } = await import('./duyurular/selftest.mjs')
@@ -84,7 +84,7 @@ function blankResult(src) {
     new: 0, by_kind: { open: 0, result: 0, info: 0 }, by_category: {},
     deadline: { feed: 0, page: 0, pdf: 0, api: 0 }, deadline_status: {},
     requests: { page: 0, pdf: 0 }, pdf: { read: 0, no_text: 0, robots_blocked: 0, not_pdf: 0, failed: 0 },
-    page: { robots_blocked: 0, failed: 0 }, errors: [], items: [] }
+    page: { robots_blocked: 0, failed: 0 }, enriched: { title: 0, date: 0 }, undated: 0, errors: [], items: [] }
 }
 
 async function listingItems(src, row, res) {
@@ -109,7 +109,9 @@ async function deadlineHunt(item, src, r) {
   if (fromFeed.date) return { date: fromFeed.date, source: item.apiDeadline ? 'api' : 'feed', status: 'found' }
   if (item.apiDeadline) return { date: item.apiDeadline, source: 'api', status: 'found' }
   let last = fromFeed
-  if (!DETAIL || item.kind === 'result') return { date: null, status: last.status }
+  // A truncated listing title or a missing date can only come from the page itself.
+  const needPage = item.truncated || !item.published
+  if (!DETAIL || (item.kind === 'result' && !needPage)) return { date: null, status: last.status }
 
   // 2. the item's own page (once)
   const wantPdf = PDF_CATEGORIES.has(item.category)
@@ -125,6 +127,9 @@ async function deadlineHunt(item, src, r) {
     return readPdf(page.bytes, item, r)
   }
   if (!item.description) { const d = metaDescription(page.text); if (d) item.description = d }
+  if (item.truncated) { const t = pageTitle(page.text); if (t && t.length > item.title.length - 4) { item.title = t.slice(0, 400); r.enriched.title++ } }
+  if (!item.published) { const d = pageDate(page.text); if (d && d <= NOW) { item.published = d; r.enriched.date++ } }
+  if (item.kind === 'result') return { date: null, status: 'result' }
   const fromPage = extractDeadline(mainText(page.text), { published: item.published, now: NOW })
   if (fromPage.date) return { date: fromPage.date, source: 'page', status: 'found' }
   last = fromPage
@@ -171,12 +176,14 @@ async function runSource(src) {
     r.etag = res.etag || null; r.lastModified = res.lastModified || null
     const raw = await listingItems(src, row, res)
     r.parsed = raw.length
-    if (!raw.length) throw new Error('parsed 0 items')
+    // An empty feed is broken; an HTML list with nothing open is not (the parser throws when the
+    // page's structure is gone).
+    if (!raw.length && src.type === 'rss') throw new Error('parsed 0 items')
 
     const candidates = []
     for (const it of raw) {
       let url
-      try { url = canonicalUrl(it.url, res.url || src.url) } catch { r.errors.push(`bad url ${it.url}`); continue }
+      try { url = it.keepHash ? it.url : canonicalUrl(it.url, res.url || src.url) } catch { r.errors.push(`bad url ${it.url}`); continue }
       const title = oneLine(it.title).slice(0, 400)
       if (title.length < 3) continue
       if (it.published && NOW - it.published > MAX_AGE_DAYS * DAY) { r.filtered.too_old++; continue }
@@ -192,7 +199,7 @@ async function runSource(src) {
       }
       const entry = { category, key: src.key }
       seenUrl.set(url, entry)
-      candidates.push({ ...it, url, title, category, entry, kind: kindOf(title), published: it.published || null })
+      candidates.push({ ...it, url, title, category, entry, kind: src.kind || kindOf(title), published: it.published || null })
     }
 
     let known = new Set()
@@ -216,14 +223,19 @@ async function runSource(src) {
       seenTitle.set(tk, { rank: src.rank, published: pub, key: src.key })
 
       const dl = await deadlineHunt(item, src, r)
+      if (item.truncated || !item.published) { item.kind = src.kind || kindOf(item.title); item.entry.category = categoryOf(item.title, src) }
+      // A date found on the page can reveal an old item the listing did not date.
+      if (item.published && NOW - item.published > MAX_AGE_DAYS * DAY) { r.filtered.too_old++; continue }
+      if (!item.published) r.undated++
+      const pubFinal = item.published || NOW
       r.deadline_status[dl.status] = (r.deadline_status[dl.status] || 0) + 1
       if (dl.date) r.deadline[dl.source]++
-      const expires = dl.date ? new Date(dl.date.getTime() + 30 * DAY) : new Date(pub.getTime() + 60 * DAY)
+      const expires = dl.date ? new Date(dl.date.getTime() + 30 * DAY) : new Date(pubFinal.getTime() + 60 * DAY)
       r.new++; r.by_kind[item.kind]++
       r.items.push({
-        title: item.title, title_key: tk, excerpt: excerptOf(item.description), official_url: item.url,
+        title: item.title, title_key: titleKey(item.title), excerpt: excerptOf(item.description), official_url: item.url,
         institution: src.institution, category: item.entry.category, region: src.region, kind: item.kind,
-        published_at: pub.toISOString(), published_known: !!item.published,
+        published_at: pubFinal.toISOString(), published_known: !!item.published,
         deadline_at: dl.date ? dl.date.toISOString() : null, deadline_source: dl.date ? dl.source : null,
         deadline_status: dl.status, expires_at: expires.toISOString(), expired_on_arrival: expires < NOW,
       })

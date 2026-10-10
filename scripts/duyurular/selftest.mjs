@@ -89,6 +89,21 @@ export async function runSelftest() {
   t('main text skips the nav', /12\.10/.test(mainText(page)), false)
   t('pdf links from the article only', pdfLinks(page, 'https://a.gov.ct.tr/n/1'), ['https://a.gov.ct.tr/Portals/1/x.pdf?ver=1'])
 
+  console.log('Parsers (markup measured 2026-10-10)')
+  const res = (text, url) => ({ text, url })
+  const emuRows = PARSERS.emuihale(res(`<td>İHALE KAPANIŞ TARİHİ</td><a id="ctl00_ContentPlaceHolder1_DataList2_ctl00_LinkButton2" href="javascript:__doPostBack('x','')"> 26028 - DAÜ 2MW GÜNEŞ ENERJİ SANTRALİ (GES) PROJESİ İHALESİ 90,000,000 TL + KDV'dir. 2026-10-14 00:00:00 </a>`, 'http://ihaleportal.emu.edu.tr/sartnamelisteleme.aspx'))
+  t('EMU tender row → title, fragment url, closing date', emuRows.map(i => [i.title, i.url, i.apiDeadline.toISOString()]),
+    [['26028 - DAÜ 2MW GÜNEŞ ENERJİ SANTRALİ (GES) PROJESİ İHALESİ', 'http://ihaleportal.emu.edu.tr/sartnamelisteleme.aspx#26028', '2026-10-14T20:59:59.000Z']])
+  const ssd = PARSERS.ssd(res(`<a href="/haber/2026/08/151" class="haber"><div class="ana"><div class="baslik">Af Duyurusu</div><div class="metin">1 Ocak 2010 – 30 Haziran 2026 dönemine ait</div><div class="tarih">1 Ağu 2026</div></div></a>`, 'https://ssd.gov.ct.tr/'))
+  t('SSD card: title from .baslik, date from .tarih (not the excerpt)', ssd.map(i => [i.title, i.published.toISOString()]), [['Af Duyurusu', '2026-07-31T21:00:00.000Z']])
+  const ev = PARSERS.evkaf(res(`<div class="ihale-item suresi-gecti"><h3 class="ihale-baslik">Eski</h3><span>Süresi Geçti</span><a href="/a.pdf">x</a></div><div class="ihale-item"><h3 class="ihale-baslik">Yeni ihale</h3><div class="ihale-tarih-label">Son Katılım Tarihi</div><span class="tarih-text">30.10.2026</span><a href="/uploads/b.pdf">Dosyayı Görüntüle</a></div>`, 'https://evkaf.org/ihaleler/'))
+  t('Evkaf: expired card skipped, Son Katılım Tarihi = deadline', ev.map(i => [i.title, i.url, i.apiDeadline.toISOString()]), [['Yeni ihale', 'https://evkaf.org/uploads/b.pdf', '2026-10-30T20:59:59.000Z']])
+  const eu = PARSERS.euburs(res(`<div><strong class="yellow-stroke">INTERNSHIP FOR GIZ 2026</strong><p>10.06.2026</p><a href="announcement/153" class="border-button">LEARN MORE</a></div>`, 'https://www.euburs.eu/announcements'))
+  t('EU Burs: title from the <strong> above "LEARN MORE"', eu.map(i => i.title), ['INTERNSHIP FOR GIZ 2026'])
+  t('EasyDNN date "Eyl 24, 2026"', parseListingDate('Yayınlanma tarihi: Eyl 24, 2026')?.toISOString(), '2026-09-23T21:00:00.000Z')
+  let threw = false; try { PARSERS.ssd(res('<html>redesigned</html>', 'https://ssd.gov.ct.tr/')) } catch { threw = true }
+  t('a redesigned page throws (failing source), not []', threw, true)
+
   console.log('Registry')
   const keys = SOURCES.map(s => s.key)
   t('keys unique', new Set(keys).size, keys.length)
