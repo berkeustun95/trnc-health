@@ -9,7 +9,7 @@
 // in their groups with a "Yakında" badge and open their existing Coming Soon / waitlist
 // screens — that is how a dark module collects demand ("the towing lesson",
 // constants/homeModules.js). Hotels shows while HOTELS_LIVE; grooming and garages stay
-// hidden (HIDDEN_TILES), and since 2026-10-10 so do jobs, transport, insurance and games.
+// hidden (HIDDEN_TILES), and since 2026-10-10 so do jobs, transport, insurance, games and eSIM.
 // A module that goes live loses its badge automatically.
 import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE, LIVE_SCORES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'

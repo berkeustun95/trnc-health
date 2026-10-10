@@ -117,6 +117,9 @@ export const HIDDEN_TILES = new Set([
   'jobPostings',
   'transport',
   'games',
+  // eSIM: Connectivity is dark (CONNECTIVITY_LIVE false), so this was a "Yakında" tile; hidden
+  // so Şehir is one clean row of four. Its waitlist pauses with it.
+  'esim',
 ])
 
 // The Emlak & Konaklama tile's two label states; AccommodationScreen's title reads the same

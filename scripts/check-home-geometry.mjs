@@ -362,15 +362,16 @@ for (const hid of HIDDEN_TILES) {
 }
 
 // 4. A pin holds its SLOT, and unpinned slots still auto-fill around it.
-scenario('a pin in slot 3 holds position 3', { pins: [null, null, 'esim', null], flags: liveFlags },
-  out => out[2] === 'esim' ? null : 'the pin did not land in slot 3')
+scenario('a pin in slot 3 holds position 3', { pins: [null, null, 'municipal', null], flags: liveFlags },
+  out => out[2] === 'municipal' ? null : 'the pin did not land in slot 3')
 
 // 5. Usage outranks the editorial defaults once it exists, and a pin outranks usage.
 scenario('usage reorders the auto-filled slots',
-  { pins: [], usage: { esim: 90, municipal: 80, newcomerEssentials: 70, exchangeRates: 60 }, flags: liveFlags },
-  out => out[0] === 'esim' && out[1] === 'municipal' ? null : 'usage did not drive the order')
+  { pins: [], usage: { health: 90, municipal: 80, newcomerEssentials: 70, exchangeRates: 60 }, flags: liveFlags },
+  out => out[0] === 'health' && out[1] === 'municipal' ? null : 'usage did not drive the order')
 scenario('a pin outranks a heavily-used module',
-  { pins: ['municipal', null, null, null], usage: { esim: 90 }, flags: liveFlags },
+  // The heavy user must be VISIBLE (health, not a hidden tile) or this passes without testing anything.
+  { pins: ['municipal', null, null, null], usage: { health: 90 }, flags: liveFlags },
   out => out[0] === 'municipal' ? null : 'usage beat an explicit pin')
 
 // 6. A fresh device shows the editorial defaults, in their editorial order. The one that
