@@ -74,6 +74,7 @@ import Avatar from './components/Avatar'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import JobPostingsScreen from './screens/JobPostingsScreen'
 import TransportScreen from './screens/TransportScreen'
+import DuyurularScreen from './screens/DuyurularScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
 import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
@@ -648,6 +649,7 @@ export default function App() {
                                                                          // not a per-surface boolean.
   const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — sole place-profile state (frozen beaches flow removed in Slice 5 pt B)
   const [showTransport, setShowTransport] = useState(false)
+  const [showDuyurular, setShowDuyurular] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
   const [showGrooming, setShowGrooming] = useState(false)
@@ -730,6 +732,7 @@ export default function App() {
   // Slice 10: the rest of the modules' inner layers, asked the same way.
   const jobsBackRef = useRef(null)
   const transportBackRef = useRef(null)
+  const duyurularBackRef = useRef(null)
   const insuranceBackRef = useRef(null)
   const groomingBackRef = useRef(null)
   const garagesBackRef = useRef(null)
@@ -1083,6 +1086,7 @@ export default function App() {
       if (showHomeServices) { if (homeServicesBackRef.current?.()) return true; setShowHomeServices(false); return true }
       if (showJobPostings)  { if (jobsBackRef.current?.()) return true; setShowJobPostings(false);  return true }
       if (showTransport) { if (transportBackRef.current?.()) return true; setShowTransport(false); return true }
+      if (showDuyurular) { if (duyurularBackRef.current?.()) return true; setShowDuyurular(false); return true }
       if (showInsurance) { if (insuranceBackRef.current?.()) return true; setShowInsurance(false); return true }
       if (showGrooming) { if (groomingBackRef.current?.()) return true; setShowGrooming(false); return true }
       // Towing before Garages: Garages opens it on top of itself (slice 10).
@@ -1123,7 +1127,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2133,6 +2137,10 @@ export default function App() {
     content = (MODULE_FLAGS.transport || isAdmin)
       ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)}  backRef={transportBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={() => setShowTransport(false)} />
+  } else if (showDuyurular) {
+    content = (MODULE_FLAGS.duyurular || isAdmin)
+      ? <DuyurularScreen lang={lang} onBack={() => setShowDuyurular(false)} backRef={duyurularBackRef} />
+      : <ComingSoonScreen lang={lang} moduleKey="duyurular" titleKey="menuDuyurular" session={session} onBack={() => setShowDuyurular(false)} />
   } else if (showInsurance) {
     content = (MODULE_FLAGS.insurance || isAdmin)
       ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)}  backRef={insuranceBackRef} />
@@ -2572,6 +2580,7 @@ export default function App() {
             onShowExploreBeach={() => setShowExploreBeach(true)}
             onShowExplore={() => setShowExplore(true)}
             onShowTransport={() => setShowTransport(true)}
+            onShowDuyurular={() => setShowDuyurular(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
             onShowGarages={() => setShowGarages(true)}
@@ -2818,7 +2827,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -2847,7 +2856,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)

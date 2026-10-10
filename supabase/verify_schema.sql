@@ -3499,6 +3499,18 @@ WITH report AS (
       AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
                AND NOT has_table_privilege('authenticated', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
                AND has_table_privilege('service_role', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    -- ── 1104: Duyurular in the waitlist notify path ──────────────────────────────
+    -- CREATE OR REPLACE only: no named object. Both bodies must name the module, and the RPC
+    -- must still be closed to anon (positive control: the admin guard text is still there).
+    UNION ALL SELECT '1104_duyurular_waitlist_notify','module_notif_text + notify_module_waitlist carry duyurular; RPC still admin-only, no anon EXECUTE',
+      COALESCE((SELECT bool_and(pg_get_functiondef(p.oid) LIKE '%''duyurular''%') AND count(*) = 2 FROM pg_proc p
+                 JOIN pg_namespace n ON n.oid = p.pronamespace
+                WHERE n.nspname = 'public' AND p.proname IN ('module_notif_text', 'notify_module_waitlist')), false)
+      AND COALESCE((SELECT pg_get_functiondef(p.oid) LIKE '%NOT is_admin()%' FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                     WHERE n.nspname = 'public' AND p.proname = 'notify_module_waitlist'), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                       WHERE n.nspname = 'public' AND p.proname = 'notify_module_waitlist' AND a.privilege_type = 'EXECUTE'
+                         AND a.grantee IN (SELECT oid FROM pg_roles WHERE rolname = 'anon'))
     -- ── 1048: walking routes ─────────────────────────────────────────────────────
     -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object; without it a
     --     route inserted without the column publishes itself before the flag flips.

@@ -178,6 +178,11 @@ export const HOME_MODULES = [
   { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
     gridLabel: { key: 'hsTitle', lines: 3 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
+  // Official TRNC announcements (MODULE_FLAGS.duyurular). Şehir panel, "Yakında" while dark.
+  // gridLabel (same key) so the grid draws the per-language size: Greek "Ανακοινώσεις" breaks
+  // mid-word at 11pt in the 68pt box at 320dp (labels:check, 2026-10-10) and fits at 9.75.
+  { id: 'duyurular',          icon: 'megaphone-outline',        tint: 'standard', labelKey: 'menuDuyurular',
+    gridLabel: { key: 'menuDuyurular', lines: 2 } },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
   { id: 'grooming',           icon: 'cut-outline',              tint: 'standard', labelKey: 'menuGrooming' },
@@ -230,7 +235,7 @@ export const GRID_LABEL_FIT = {
   Turkish: { homeServices: { size: 9.25 } },
   Arabic:  { homeServices: { size: 9 } },
   Russian: { accommodation: { size: 8.75 }, homeServices: { size: 8.25, lines: 3 } },
-  Greek:   { homeServices: { size: 8.5, lines: 3 } },
+  Greek:   { homeServices: { size: 8.5, lines: 3 }, duyurular: { size: 9.75 } },
   French:  { homeServices: { size: 8.5, lines: 3 } },
   Spanish: { accommodation: { size: 10.5 }, homeServices: { size: 8.5, lines: 3 } },
   German:  { accommodation: { size: 10.75 }, homeServices: { size: 8.5, lines: 3 } },

@@ -135,6 +135,11 @@ export const MODULE_FLAGS = {
   // the one-off position check and Google. No position is ever stored on a check-in row.
   // Off = the place-page button opens ComingSoonScreen and takes waitlist signups again.
   checkins:     true,
+  // Duyurular — official TRNC announcements (20261102 + 20261104). DARK: Coming Soon + waitlist.
+  // ⚠ The flag does NOT publish anything. Rows stay invisible until
+  //   `UPDATE announcement_sources SET publish = true` + `UPDATE announcements SET is_published = true`
+  //   (SOP step 3) — a separate switch, so a device check can run with the flag flipped locally.
+  duyurular:    false,
 }
 
 // Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.

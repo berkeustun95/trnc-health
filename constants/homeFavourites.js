@@ -252,4 +252,5 @@ export const SLOT_LABEL_PX = 10
 export const SLOT_LABEL_MIN_PX = LABEL_MIN_PX
 export const SLOT_LABEL_FIT = {
   Russian: { accommodation: 8.5 },
+  Greek:   { duyurular: 9.25 },
 }

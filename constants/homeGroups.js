@@ -28,6 +28,7 @@ const EXTRA = {
 const GATES = {
   jobPostings:   () => MODULE_FLAGS.jobs !== false,
   transport:     () => MODULE_FLAGS.transport !== false,
+  duyurular:     () => MODULE_FLAGS.duyurular !== false,
   insurance:     () => MODULE_FLAGS.insurance !== false,
   grooming:      () => MODULE_FLAGS.grooming !== false,
   garages:       () => MODULE_FLAGS.garages !== false,
@@ -48,7 +49,7 @@ const GATES = {
   explore:       () => false,
 }
 
-const COMING_SOON = new Set(['jobPostings', 'transport', 'insurance', 'esim'])
+const COMING_SOON = new Set(['jobPostings', 'transport', 'insurance', 'esim', 'duyurular'])
 
 // A hidden tile is not live, so without the HIDDEN_TILES check it would come back as "Yakında".
 export function isComingSoon(id, unlocked) {
@@ -74,7 +75,7 @@ export const HOME_GROUPS = [
                                                         'studentHub' /* ★ */] },
   { key: 'city',     titleKey: 'hrGroupCity',    ids: ['transport', 'esim', 'municipal',
                                                         'towing' /* ★ */, 'exchangeRates' /* ★ */,
-                                                        'newcomerEssentials' /* ★ */, 'jobPostings'] },
+                                                        'newcomerEssentials' /* ★ */, 'jobPostings', 'duyurular'] },
 ]
 
 const BY_ID = new Map([...HOME_MODULES.map(m => [m.id, m]), ...Object.values(EXTRA).map(m => [m.id, m])])
