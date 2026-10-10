@@ -33,7 +33,7 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE } from './constants/flags'
-import { REDESIGN, CHECKINS } from './constants/redesign'
+import { REDESIGN, CHECKINS, DUYURULAR } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
@@ -2138,7 +2138,7 @@ export default function App() {
       ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)}  backRef={transportBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={() => setShowTransport(false)} />
   } else if (showDuyurular) {
-    content = (MODULE_FLAGS.duyurular || isAdmin)
+    content = (DUYURULAR || isAdmin)
       ? <DuyurularScreen lang={lang} onBack={() => setShowDuyurular(false)} backRef={duyurularBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="duyurular" titleKey="menuDuyurular" session={session} onBack={() => setShowDuyurular(false)} />
   } else if (showInsurance) {
