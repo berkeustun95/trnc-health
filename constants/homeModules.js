@@ -107,6 +107,16 @@ export const HIDDEN_TILES = new Set([
   //   and the featured tier. If the map/list control is ever removed, this line has to come
   //   out in the same commit.
   'explore',
+  // ─── decluttering Home, 2026-10-10 (Berke) ───────────────────────────────
+  // Little or no use (vault 2026-10-10_home-hide-unused-modules.md). Flags untouched.
+  // ⚠ insurance, jobPostings and transport are DARK: their Coming Soon screens, and so their
+  //   waitlists, are reachable only from this tile, so intake pauses while they are hidden
+  //   (accepted). transport is still reachable through its Oli intent; games, insurance
+  //   and jobPostings have no other entry point.
+  'insurance',
+  'jobPostings',
+  'transport',
+  'games',
 ])
 
 // The Emlak & Konaklama tile's two label states; AccommodationScreen's title reads the same

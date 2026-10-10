@@ -337,19 +337,21 @@ scenario('pin points at a deleted module', { pins: ['nopeNotAModule', null, null
 
 // 2. DARK — a pin naming a real module whose flag is false.
 //
-//    ⚠ `insurance`, NOT `grooming`. This scenario used grooming until 2026-09-10, when
+//    ⚠ `pets`, NOT `grooming` or `insurance`. This scenario used grooming until 2026-09-10, when
 //      grooming entered HIDDEN_TILES — at which point it stopped being a test of DARKNESS
 //      and became a test of hiddenness, and scenario 3 below (the same pin coming back
 //      when the flag flips) could never pass again. The subject has to be a module that is
 //      dark and NOT hidden, or the pair asserts something other than what it says.
+//      insurance then took its place until it, too, was hidden on 2026-10-10; pets is live
+//      and unhidden, made dark here by the scenario's own flags.
 scenario('pin points at a dark module',
-  { pins: ['insurance', null, null, null], flags: { ...liveFlags, insurance: false } },
-  out => out.includes('insurance') ? 'a Coming Soon module reached the row' : null)
+  { pins: ['pets', null, null, null], flags: { ...liveFlags, pets: false } },
+  out => out.includes('pets') ? 'a Coming Soon module reached the row' : null)
 
 // 3. The same pin must COME BACK when the module goes live — storage is never rewritten,
 //    so the user's arrangement survives a module being dark for a release.
-scenario('the same pin once the module is live', { pins: ['insurance', null, null, null], flags: liveFlags },
-  out => out[0] === 'insurance' ? null : 'the pin did not return to slot 1 once eligible')
+scenario('the same pin once the module is live', { pins: ['pets', null, null, null], flags: liveFlags },
+  out => out[0] === 'pets' ? null : 'the pin did not return to slot 1 once eligible')
 
 // 3b. HIDDEN beats everything, including a live flag and an explicit override. A shortcut
 //     to a tile the grid does not render is an orphan the user cannot find again.
@@ -365,8 +367,8 @@ scenario('a pin in slot 3 holds position 3', { pins: [null, null, 'esim', null],
 
 // 5. Usage outranks the editorial defaults once it exists, and a pin outranks usage.
 scenario('usage reorders the auto-filled slots',
-  { pins: [], usage: { esim: 90, games: 80, municipal: 70, exchangeRates: 60 }, flags: liveFlags },
-  out => out[0] === 'esim' && out[1] === 'games' ? null : 'usage did not drive the order')
+  { pins: [], usage: { esim: 90, municipal: 80, newcomerEssentials: 70, exchangeRates: 60 }, flags: liveFlags },
+  out => out[0] === 'esim' && out[1] === 'municipal' ? null : 'usage did not drive the order')
 scenario('a pin outranks a heavily-used module',
   { pins: ['municipal', null, null, null], usage: { esim: 90 }, flags: liveFlags },
   out => out[0] === 'municipal' ? null : 'usage beat an explicit pin')

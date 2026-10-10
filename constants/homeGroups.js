@@ -9,7 +9,8 @@
 // in their groups with a "Yakında" badge and open their existing Coming Soon / waitlist
 // screens — that is how a dark module collects demand ("the towing lesson",
 // constants/homeModules.js). Hotels shows while HOTELS_LIVE; grooming and garages stay
-// hidden (HIDDEN_TILES). A module that goes live loses its badge automatically.
+// hidden (HIDDEN_TILES), and since 2026-10-10 so do jobs, transport, insurance and games.
+// A module that goes live loses its badge automatically.
 import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE, LIVE_SCORES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'
 
@@ -49,8 +50,9 @@ const GATES = {
 
 const COMING_SOON = new Set(['jobPostings', 'transport', 'insurance', 'esim'])
 
+// A hidden tile is not live, so without the HIDDEN_TILES check it would come back as "Yakında".
 export function isComingSoon(id, unlocked) {
-  return COMING_SOON.has(id) && !isLive(id, unlocked)
+  return COMING_SOON.has(id) && !HIDDEN_TILES.has(id) && !isLive(id, unlocked)
 }
 
 // `unlocked`: module ids this USER may see while their flag is still false — today only

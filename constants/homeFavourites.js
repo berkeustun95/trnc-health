@@ -33,9 +33,8 @@ export const FAVOURITE_SLOTS = 4
 // take that position automatically on the day it launches — no edit, no follow-up ticket,
 // no "why is this not in the row" three months later.
 //
-// `transport` is exactly that case today: MODULE_FLAGS.transport is false, so the row
-// currently renders explore · events · exchangeRates · newcomerEssentials, and becomes
-// explore · events · transport · exchangeRates the moment transport goes live.
+// `transport` is that case, twice over: dark, and hidden from Home since 2026-10-10, so the
+// row renders events · accommodation · exchangeRates · newcomerEssentials until both end.
 //
 // ─── WHY THESE FOUR (2026-09-05) ────────────────────────────────────────────
 //
@@ -56,7 +55,7 @@ export const DEFAULT_FAVOURITES = [
   // becomes eligible again takes its position back with no edit.
   'explore',
   'events',
-  'transport',          // dark today — see the note above; takes its slot on launch
+  'transport',          // dark AND hidden since 2026-10-10 — skipped until both are undone
   // ⚠ ADDED WHEN explore WAS HIDDEN, AND THE GUARD IS WHY. Hiding explore took the
   //   eligible-default count from 4 to 3, which would have filled one shortcut slot from
   //   GRID ORDER — health, emergency, towing, the coral block this set was chosen to get
