@@ -1,0 +1,89 @@
+# ─── Duyurular: official TRNC announcements → public.announcements ──────────
+#
+# Plan: vault 10-ada/2026-10-10_duyurular-plan.md. Script: scripts/fetch-duyurular.mjs.
+# Dry unless `-f apply=true`:  gh workflow run duyurular-fetch [-f apply=true] [-f only=khk-disa-acik-munhal]
+#
+# ─── NO SCHEDULE YET, ON PURPOSE ────────────────────────────────────────────
+# 20261102_duyurular.sql is not applied. A cron here before it is would fail every run and email
+# every 30 minutes. The schedule ('*/30 * * * *'; each source keeps its own fetch_interval_min)
+# is added in the same commit that follows the apply, after one green `-f apply=true` dispatch.
+#
+# ─── THIS REPO IS PUBLIC, SO THESE LOGS ARE PUBLIC ──────────────────────────
+# The script prints counts and source keys only. Titles, URLs and per-item deadline outcomes go
+# to the report artifact (7-day retention). Page and PDF text is never printed or stored: only
+# a parsed date leaves the process.
+#
+# ─── SECRETS ────────────────────────────────────────────────────────────────
+#   SUPABASE_SERVICE_ROLE_KEY   apply only; writes announcements + announcement_sources health
+#   EXPO_PUBLIC_SUPABASE_URL    project url
+
+name: duyurular-fetch
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write to the database (false = dry run: fetch, parse, report)'
+        type: boolean
+        default: false
+      only:
+        description: 'Comma-separated source keys (empty = all)'
+        type: string
+        default: ''
+      force:
+        description: 'Ignore each source fetch_interval_min'
+        type: boolean
+        default: false
+
+concurrency:
+  group: duyurular-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 45
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ inputs.apply && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      # Root tree for @supabase/supabase-js; the fetcher's own tree (unpdf, pinned) for PDFs.
+      # Both lockfile-driven.
+      - name: Install
+        run: |
+          npm ci
+          npm ci --prefix scripts/duyurular
+
+      - name: Self-test (offline; asserts the runner ICU lowercases Turkish)
+        run: |
+          node scripts/fetch-duyurular.mjs --selftest
+          node scripts/check-prod-write-guard.mjs
+
+      - name: Fetch
+        env:
+          APPLY: ${{ inputs.apply && '--apply' || '' }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          set -- --report=duyurular-report.json
+          [ -n "$APPLY" ] && set -- "$@" "$APPLY"
+          [ -n "$FORCE" ] && set -- "$@" "$FORCE"
+          [ -n "$ONLY" ] && set -- "$@" "--only=$ONLY"
+          node scripts/fetch-duyurular.mjs "$@"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: duyurular-report
+          path: duyurular-report.json
+          retention-days: 7
+          if-no-files-found: ignore
