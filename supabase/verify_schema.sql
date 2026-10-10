@@ -327,6 +327,9 @@ WITH report AS (
                 WHERE n.nspname='public' AND p.proname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
+    ('1103_duty_push_famagusta','duty_push_due'),
+    ('1103_duty_push_famagusta','duty_thursday_closing_local'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','check_in_google'),
     ('1093_checkins_google_places','checkin_guard_person'),
@@ -1034,6 +1037,11 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='search_content'
           AND pg_get_functiondef(p.oid) ILIKE '%job_postings%') ok
+    -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
+    -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
+    UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.duty_thursday_closing_local()')) LIKE '%time ''17:30''%'
+           AND pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamp with time zone)')) LIKE '%Asia/Famagusta%', false)
     UNION ALL SELECT '0724_events_category_widen','events_category_check = final vocab (music+concert)',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_category_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%music%'
@@ -4199,7 +4207,7 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
+-- Errors if pg_cron isn't installed (itself the finding). Expect 8 job rows present.
 -- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
 -- identical to a healthy one from the application's side. purge-moderation-rejections
 -- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
@@ -4220,7 +4228,10 @@ FROM (VALUES
   -- clear of the three purges above it.
   ('1051_app_versions','purge-app-update-events'),
   ('1093_checkins_google_places','purge-google-places-cache'),
-  ('1093_checkins_google_places','google-places-refresh')
+  ('1093_checkins_google_places','google-places-refresh'),
+  -- Replaces duty-notif-mtwf / -thu-sat / -sun (UTC, inline key). Ticks every 30 min; sends
+  -- only when duty_push_due() says the TRNC-local slot is today's send time.
+  ('1103_duty_push_famagusta','duty-push')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
