@@ -8,6 +8,8 @@ import { parseRobots, robotsAllows, canonicalUrl } from './lib/http.mjs'
 import { passesFilter, kindOf, categoryOf } from './lib/classify.mjs'
 import { mainText, pdfLinks } from './lib/page.mjs'
 import { SOURCES } from './sources.mjs'
+import { X509Certificate } from 'node:crypto'
+import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256 } from './lib/ca.mjs'
 import { PARSERS } from './lib/parsers.mjs'
 
 export async function runSelftest() {
@@ -17,6 +19,11 @@ export async function runSelftest() {
     if (!ok) bad++
     console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
   }
+
+  console.log('Extra CA')
+  const cert = new X509Certificate(RAPIDSSL_G1_PEM)
+  t('RapidSSL G1 fingerprint', cert.fingerprint256.replace(/:/g, ''), RAPIDSSL_G1_SHA256)
+  t('…issued by DigiCert Global Root G2', /CN=DigiCert Global Root G2/.test(cert.issuer), true)
 
   console.log('Turkish casefold (the runner ICU must do tr-TR)')
   t('İHALE → ihale', trLower('İHALE'), 'ihale')
