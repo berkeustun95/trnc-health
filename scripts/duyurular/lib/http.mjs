@@ -6,15 +6,14 @@
 //   • Bodies are capped and decoded by their declared charset (some sites are windows-1254).
 
 import tls from 'node:tls'
-import { readFileSync } from 'node:fs'
+import { RAPIDSSL_G1_PEM } from './ca.mjs'
 
 // mtod.mebnet.net and iod.mebnet.net serve their leaf certificate without the intermediate
 // (openssl: "unable to verify the first certificate", 2026-10-10). Browsers and macOS curl fetch
 // it via AIA; Node does not. Adding DigiCert's public RapidSSL TLS RSA CA G1 intermediate
 // (sha256 44:22:E9:63…C6:9B, chains to DigiCert Global Root G2, expires 2027-11-02) completes
 // the chain. Verification stays ON; this never trusts anything the root store would not.
-const EXTRA_CA = [new URL('../ca/rapidssl-tls-rsa-ca-g1.pem', import.meta.url)]
-tls.setDefaultCACertificates([...tls.getCACertificates('default'), ...EXTRA_CA.map(u => readFileSync(u, 'utf8'))])
+tls.setDefaultCACertificates([...tls.getCACertificates('default'), RAPIDSSL_G1_PEM])
 
 export const USER_AGENT = 'ADA-Duyurular/1.0 (+https://getadaapp.com/support)'
 const UA_TOKEN = 'ada-duyurular'
