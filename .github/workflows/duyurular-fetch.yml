@@ -46,7 +46,10 @@ jobs:
       contents: read
     timeout-minutes: 45
     env:
-      SUPABASE_SERVICE_ROLE_KEY: ${{ inputs.apply && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+      # A scheduled run has no inputs (inputs.apply is null), so writing is decided here, once:
+      # schedule = write, dispatch = write only with -f apply=true.
+      WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ (github.event_name == 'schedule' || inputs.apply == true) && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -69,15 +72,22 @@ jobs:
 
       - name: Fetch
         env:
-          APPLY: ${{ inputs.apply && '--apply' || '' }}
-          FORCE: ${{ inputs.force && '--force' || '' }}
-          ONLY: ${{ inputs.only }}
+          FORCE: ${{ inputs.force == true && '--force' || '' }}
+          ONLY: ${{ inputs.only || '' }}
         run: |
+          echo "event=$GITHUB_EVENT_NAME write=$WRITE"
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$WRITE" != "true" ]; then
+            echo "::error::a scheduled run resolved to a dry run; the WRITE gate is broken"; exit 1
+          fi
           set -- --report=duyurular-report.json
-          [ -n "$APPLY" ] && set -- "$@" "$APPLY"
+          [ "$WRITE" = "true" ] && set -- "$@" --apply
           [ -n "$FORCE" ] && set -- "$@" "$FORCE"
           [ -n "$ONLY" ] && set -- "$@" "--only=$ONLY"
           node scripts/fetch-duyurular.mjs "$@"
+
+      - name: Database counts (service role read; counts only)
+        if: env.WRITE == 'true'
+        run: node scripts/fetch-duyurular.mjs --counts
 
       - name: Upload report
         if: always()

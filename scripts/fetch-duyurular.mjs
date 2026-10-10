@@ -24,7 +24,7 @@ import { prodWriteGuard, serviceRoleKey, inCI } from './lib/prod-write-guard.mjs
 const args = process.argv.slice(2)
 const flag = n => args.includes(`--${n}`)
 const opt = n => (args.find(a => a.startsWith(`--${n}=`)) || '').split('=').slice(1).join('=') || null
-const KNOWN = /^--(apply|selftest|force|no-detail|only=.+|report=.+)$/
+const KNOWN = /^--(apply|selftest|counts|force|no-detail|only=.+|report=.+)$/
 const unknown = args.filter(a => !KNOWN.test(a))
 if (unknown.length) { console.error(`Unknown argument(s): ${unknown.join(' ')} — refusing to run.`); process.exit(2) }
 const APPLY = flag('apply'), SELFTEST = flag('selftest')
@@ -39,6 +39,38 @@ const { passesFilter, kindOf, categoryOf, CATEGORY_RANK } = await import('./duyu
 const { extractDeadline } = await import('./duyurular/lib/deadline.mjs')
 const { excerptOf, titleKey, oneLine } = await import('./duyurular/lib/text.mjs')
 const { mainText, metaDescription, pdfLinks, pageTitle, pageDate } = await import('./duyurular/lib/page.mjs')
+
+// --counts: read back what the database holds (service role: is_published=false rows are
+// invisible to every client role, so no other reader can verify a write). Counts only.
+if (flag('counts')) {
+  const { createClient } = await import('@supabase/supabase-js')
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL
+  if (!url) { console.error('EXPO_PUBLIC_SUPABASE_URL is not set.'); process.exit(1) }
+  const ro = createClient(url, serviceRoleKey(), { auth: { persistSession: false } })
+  const { data: srcs, error: e1 } = await ro.from('announcement_sources').select('id, key, publish, consecutive_failures, last_ok_at')
+  if (e1) { console.error('read announcement_sources:', e1.code); process.exit(1) }
+  const rows = []
+  let total = null
+  for (let from = 0; ; from += 1000) {
+    const { data, error, count } = await ro.from('announcements').select('source_id, category, kind, deadline_source, is_published, expires_at', { count: 'exact' })
+      .order('id').range(from, from + 999)
+    if (error) { console.error('read announcements:', error.code); process.exit(1) }
+    total = count; rows.push(...data)
+    if (data.length < 1000) break
+  }
+  if (rows.length !== total) { console.error(`TRUNCATED: received ${rows.length} of ${total} rows`); process.exit(1) }
+  const keyOf = new Map(srcs.map(s => [s.id, s.key]))
+  const tally = f => rows.reduce((m, r) => (m[f(r)] = (m[f(r)] || 0) + 1, m), {})
+  const live = rows.filter(r => new Date(r.expires_at) > new Date())
+  console.log(`announcements: ${total} rows (${live.length} unexpired) · is_published=true: ${rows.filter(r => r.is_published).length} · sources: ${srcs.length}, publish=true: ${srcs.filter(s => s.publish).length}`)
+  console.log('by category:', JSON.stringify(tally(r => r.category)))
+  console.log('by kind:', JSON.stringify(tally(r => r.kind)))
+  console.log('deadline_source:', JSON.stringify(tally(r => r.deadline_source ?? 'none')))
+  console.log('by source:', JSON.stringify(Object.fromEntries(Object.entries(tally(r => keyOf.get(r.source_id))).sort((a, b) => b[1] - a[1]))))
+  const failing = srcs.filter(s => s.consecutive_failures > 0).map(s => `${s.key}(${s.consecutive_failures})`)
+  console.log('sources with failures:', failing.length ? failing.join(', ') : 'none')
+  process.exit(0)
+}
 
 if (SELFTEST) {
   const { runSelftest } = await import('./duyurular/selftest.mjs')
