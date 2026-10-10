@@ -211,7 +211,11 @@ async function runSource(src) {
     if (res.status === 304) { r.status = 'not_modified'; r.etag = row?.etag; r.lastModified = row?.last_modified; return r }
     if (res.status !== 200) throw new Error(`HTTP ${res.status}`)
     r.etag = res.etag || null; r.lastModified = res.lastModified || null
-    const raw = await listingItems(src, row, res)
+    // HTML listings are newest first. Items older than 180 days are never stored, so an item
+    // whose age is only learnt from its page would be re-fetched every run: Değirmenlik lists
+    // 90 tenders and cost 70 page requests per run on 2026-10-10. Read the top of the list only.
+    const all = await listingItems(src, row, res)
+    const raw = src.type === 'html' ? all.slice(0, src.max_items || 30) : all
     r.parsed = raw.length
     // An empty feed is broken; an HTML list with nothing open is not (the parser throws when the
     // page's structure is gone).
