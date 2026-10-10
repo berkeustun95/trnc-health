@@ -105,13 +105,18 @@ async function fetchListing(src, row) {
 
 async function deadlineHunt(item, src, r) {
   // 1. feed / listing text
+  // A structured deadline (TED, DAÜ portal, Evkaf) obeys the same window as a parsed one.
+  if (item.apiDeadline) {
+    const days = (item.apiDeadline - NOW) / DAY
+    return days >= -1 && days <= 180 ? { date: item.apiDeadline, source: 'api', status: 'found' } : { date: null, status: days < 0 ? 'past' : 'too_far' }
+  }
   const fromFeed = extractDeadline(`${item.title}\n${item.description || ''}\n${item.deadlineText || ''}`, { published: item.published, now: NOW })
-  if (fromFeed.date) return { date: fromFeed.date, source: item.apiDeadline ? 'api' : 'feed', status: 'found' }
-  if (item.apiDeadline) return { date: item.apiDeadline, source: 'api', status: 'found' }
+  if (fromFeed.date) return { date: fromFeed.date, source: 'feed', status: 'found' }
   let last = fromFeed
   // A truncated listing title or a missing date can only come from the page itself.
   const needPage = item.truncated || !item.published
-  if (!DETAIL || (item.kind === 'result' && !needPage)) return { date: null, status: last.status }
+  // TED detail pages are a JS app (HTTP 202 to scripts); its deadline comes from the API.
+  if (!DETAIL || src.type === 'ted' || (item.kind === 'result' && !needPage)) return { date: null, status: last.status }
 
   // 2. the item's own page (once)
   const wantPdf = PDF_CATEGORIES.has(item.category)
