@@ -11,6 +11,9 @@
 //     UKÜ kariyer (a static page with one apply link). Çatalköy-Esentepe tenders (the only date
 //     column is unlabelled, items are ZIP downloads, newest item 2026-02-06).
 //   • The four KHK HTML münhal pages are replaced by KHK's hidden EasyDNN category feeds.
+// fetch_interval_min: 30 for every source (Berke 2026-10-11: new items within ~30 min) except
+// meb-term-15 (yearly academic calendars, daily). Listings are one conditional GET each
+// (ETag / If-Modified-Since), serialized per host with its Crawl-delay.
 // crawl_delay_s mirrors the measured robots.txt Crawl-delay; the fetcher also re-reads robots.txt
 // every run and takes the larger value.
 // region: where the notice applies. Universities and national bodies are 'all' unless the
@@ -19,23 +22,23 @@
 const KHK = 'https://khk.gov.ct.tr/AR%C5%9E%C4%B0V/HABERLER/rss/category/3199/'
 const MEB = 'https://www.mebnet.net/taxonomy/term/'
 
-const rss = (o) => ({ type: 'rss', parser: 'rss', filter_mode: 'keywords', region: 'all', crawl_delay_s: 2, fetch_interval_min: 180, rank: 1, ...o })
-const html = (o) => ({ type: 'html', filter_mode: 'keywords', region: 'all', crawl_delay_s: 2, fetch_interval_min: 360, rank: 1, ...o })
+const rss = (o) => ({ type: 'rss', parser: 'rss', filter_mode: 'keywords', region: 'all', crawl_delay_s: 2, fetch_interval_min: 30, rank: 1, ...o })
+const html = (o) => ({ type: 'html', filter_mode: 'keywords', region: 'all', crawl_delay_s: 2, fetch_interval_min: 30, rank: 1, ...o })
 
 export const SOURCES = [
   // ─── Kamu ve sınavlar ────────────────────────────────────────────────────
   rss({ key: 'khk-disa-acik-munhal', name: 'KHK — Dışa açık münhal ilanları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'd%C4%B1%C5%9Fa-a%C3%A7%C4%B1k-m%C3%BCnhal-%C4%B0lanlar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, fetch_interval_min: 30, rank: 3 }),
-  rss({ key: 'khk-yukselme-munhal', name: 'KHK — Yükselme münhal ilanları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'y%C3%BCkselme-m%C3%BCnhal-%C4%B0lanlar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, fetch_interval_min: 60, rank: 3 }),
-  rss({ key: 'khk-yazili-sinav-cagrilari', name: 'KHK — Yazılı sınav çağrıları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'yaz%C4%B1l%C4%B1-s%C4%B1nav-%C3%A7a%C4%9Fr%C4%B1lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, fetch_interval_min: 60, rank: 3 }),
-  rss({ key: 'khk-sozlu-sinav-cagrilari', name: 'KHK — Sözlü sınav çağrıları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 's%C3%B6zl%C3%BC-s%C4%B1nav-%C3%A7a%C4%9Fr%C4%B1lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, fetch_interval_min: 60, rank: 3 }),
-  rss({ key: 'khk-yazili-sinav-sonuclari', name: 'KHK — Yazılı sınav sonuçları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'yaz%C4%B1l%C4%B1-s%C4%B1nav-sonu%C3%A7lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, fetch_interval_min: 120, rank: 3 }),
-  rss({ key: 'khk-sozlu-sinav-sonuclari', name: 'KHK — Sözlü sınav sonuçları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 's%C3%B6zl%C3%BC-s%C4%B1nav-sonu%C3%A7lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, fetch_interval_min: 120, rank: 3 }),
+  rss({ key: 'khk-yukselme-munhal', name: 'KHK — Yükselme münhal ilanları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'y%C3%BCkselme-m%C3%BCnhal-%C4%B0lanlar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, rank: 3 }),
+  rss({ key: 'khk-yazili-sinav-cagrilari', name: 'KHK — Yazılı sınav çağrıları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'yaz%C4%B1l%C4%B1-s%C4%B1nav-%C3%A7a%C4%9Fr%C4%B1lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, rank: 3 }),
+  rss({ key: 'khk-sozlu-sinav-cagrilari', name: 'KHK — Sözlü sınav çağrıları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 's%C3%B6zl%C3%BC-s%C4%B1nav-%C3%A7a%C4%9Fr%C4%B1lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, rank: 3 }),
+  rss({ key: 'khk-yazili-sinav-sonuclari', name: 'KHK — Yazılı sınav sonuçları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 'yaz%C4%B1l%C4%B1-s%C4%B1nav-sonu%C3%A7lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, rank: 3 }),
+  rss({ key: 'khk-sozlu-sinav-sonuclari', name: 'KHK — Sözlü sınav sonuçları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 's%C3%B6zl%C3%BC-s%C4%B1nav-sonu%C3%A7lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, rank: 3 }),
   rss({ key: 'vergi', name: 'Gelir ve Vergi Dairesi', institution: 'Gelir ve Vergi Dairesi', url: 'https://vergi.gov.ct.tr/?q=rss.xml', category: 'kamu', crawl_delay_s: 10, rank: 3 }),
   rss({ key: 'merkez-bankasi', name: 'KKTC Merkez Bankası', institution: 'KKTC Merkez Bankası', url: 'https://www.kktcmerkezbankasi.org/tr/rss.xml', category: 'kamu', rank: 3,
     drop: /dibs|borçlanma senedi|merkez bankası senedi|^\d{1,2} \S+ \d{4}$/ }),
   rss({ key: 'mahkemeler', name: 'KKTC Mahkemeleri — Duyurular', institution: 'KKTC Mahkemeleri', url: 'https://www.mahkemeler.net/?cat=46&feed=rss2', category: 'kamu', rank: 3 }),
   rss({ key: 'saglik-duyurular', name: 'Sağlık Bakanlığı — Duyurular', institution: 'Sağlık Bakanlığı', url: 'https://saglik.gov.ct.tr/DUYURULAR/rss/category/1012/duyurular', category: 'kamu', crawl_delay_s: 5, rank: 3 }),
-  rss({ key: 'ysk', name: 'Yüksek Seçim Kurulu', institution: 'Yüksek Seçim Kurulu', url: 'https://ysk.gov.ct.tr/feed/', category: 'kamu', filter_mode: 'all', fetch_interval_min: 120, rank: 3 }),
+  rss({ key: 'ysk', name: 'Yüksek Seçim Kurulu', institution: 'Yüksek Seçim Kurulu', url: 'https://ysk.gov.ct.tr/feed/', category: 'kamu', filter_mode: 'all', rank: 3 }),
   html({ key: 'polis-duyurular', name: 'Polis Genel Müdürlüğü — Duyurular', institution: 'Polis Genel Müdürlüğü', url: 'https://polis.gov.ct.tr/website/duyurular/1.html', parser: 'polis', category: 'kamu', rank: 3 }),
   html({ key: 'sosyal-sigortalar', name: 'Sosyal Sigortalar Dairesi', institution: 'Sosyal Sigortalar Dairesi', url: 'https://ssd.gov.ct.tr/', parser: 'ssd', category: 'kamu', rank: 3 }),
 
@@ -63,7 +66,7 @@ export const SOURCES = [
 
   // ─── İhaleler ────────────────────────────────────────────────────────────
   { key: 'ted-tcc', name: 'TED — AB Kıbrıs Türk Toplumu Yardım Programı', institution: 'Avrupa Birliği', url: 'https://api.ted.europa.eu/v3/notices/search',
-    type: 'ted', parser: 'ted', category: 'ihale', kind: 'open', region: 'all', filter_mode: 'all', crawl_delay_s: 2, fetch_interval_min: 720, rank: 3 },
+    type: 'ted', parser: 'ted', category: 'ihale', kind: 'open', region: 'all', filter_mode: 'all', crawl_delay_s: 2, fetch_interval_min: 30, rank: 3 },
   rss({ key: 'gazimagusa-ihaleler', name: 'Gazimağusa Belediyesi — İhaleler', institution: 'Gazimağusa Belediyesi', url: 'https://www.gazimagusabelediyesi.org/kat/ihaleler/feed/', category: 'ihale', filter_mode: 'all', region: 'gazimagusa', rank: 2 }),
   rss({ key: 'girne-ihaleler', name: 'Girne Belediyesi — İhaleler', institution: 'Girne Belediyesi', url: 'https://www.girnebelediyesi.com/ihaleler/feed/', category: 'ihale', filter_mode: 'all', region: 'girne', rank: 2 }),
   rss({ key: 'maliye', name: 'Maliye Bakanlığı — Duyurular', institution: 'Maliye Bakanlığı', url: 'https://maliye.gov.ct.tr/tr/duyurular/index.xml', category: 'ihale', rank: 3 }),
@@ -84,7 +87,7 @@ export const SOURCES = [
   html({ key: 'ticaret', name: 'Ticaret Dairesi', institution: 'Ticaret Dairesi', url: 'https://ticaret.gov.ct.tr/HABERLER', parser: 'easydnn', category: 'ihale', crawl_delay_s: 5, rank: 3 }),
 
   // ─── Belediyeler ─────────────────────────────────────────────────────────
-  rss({ key: 'gazimagusa-duyurular', name: 'Gazimağusa Belediyesi — Duyurular', institution: 'Gazimağusa Belediyesi', url: 'https://www.gazimagusabelediyesi.org/kat/duyurular/feed/', category: 'belediye', filter_mode: 'all', region: 'gazimagusa', fetch_interval_min: 60, rank: 2 }),
+  rss({ key: 'gazimagusa-duyurular', name: 'Gazimağusa Belediyesi — Duyurular', institution: 'Gazimağusa Belediyesi', url: 'https://www.gazimagusabelediyesi.org/kat/duyurular/feed/', category: 'belediye', filter_mode: 'all', region: 'gazimagusa', rank: 2 }),
   rss({ key: 'ktbb', name: 'Belediyeler Birliği — Üye haberleri', institution: 'Kıbrıs Türk Belediyeler Birliği', url: 'https://ktbb.org/category/uyelerimizin-haberleri/feed/', category: 'belediye', rank: 2 }),
   rss({ key: 'lefke-belediye', name: 'Lefke Belediyesi', institution: 'Lefke Belediyesi', url: 'https://lefkebelediyesi.com/feed/', category: 'belediye', region: 'lefke', rank: 2 }),
 
