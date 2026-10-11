@@ -42,7 +42,9 @@ export default function DuyurularBanner({ lang, onPress }) {
         <Text style={s.sub} numberOfLines={2}>{t('duyBannerSub', lang)}</Text>
         {!!pill && (
           <View style={s.pill}>
-            <Text style={s.pillText} numberOfLines={1}>{pill}</Text>
+            {/* Measured 2026-10-11 (Inter Bold 12): Turkish needs 161pt and has 150 at 320dp, so
+                the text may shrink to 88% rather than truncate — an ellipsis would cut the number. */}
+            <Text style={s.pillText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.88}>{pill}</Text>
           </View>
         )}
       </View>
@@ -59,7 +61,7 @@ const s = StyleSheet.create({
   text:     { flex: 1, gap: 2 },
   title:    { fontFamily: 'Inter_700Bold', fontSize: 16, lineHeight: 21, color: '#FFFFFF' },
   sub:      { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, color: TEAL_LIGHT },
-  pill:     { alignSelf: 'flex-start', marginTop: 6, backgroundColor: PEACH, borderRadius: 999,
-              paddingHorizontal: 10, paddingVertical: 3 },
+  pill:     { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 6, backgroundColor: PEACH, borderRadius: 999,
+              paddingHorizontal: 8, paddingVertical: 3 },
   pillText: { fontFamily: 'Inter_700Bold', fontSize: 12, lineHeight: 16, color: PEACH_INK },
 })
