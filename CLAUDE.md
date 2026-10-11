@@ -114,6 +114,8 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
   HotelRunner links: `hotelrunner-links -f mode=--apply` (writes `data/kitob/hotelrunner-links.json`, clears unlisted hotels).
 - Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
 - Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
+  `novest-images` also runs on schedule at 05:20 / 15:20 UTC and APPLIES (approved 2026-10-11): add-only,
+  a no-op when nothing is due, red on any failed image. Until it runs, a new listing stays hidden.
 - Apple user deletion: `revoke-apple-token -f user_id=<uuid>` BEFORE deleting the user.
 - Edge functions: `scripts/fn-deploy.sh <name> --go` from this Mac, or `supabase-functions-deploy -f
   function=<name>|all`. verify_jwt comes from `supabase/functions/deploy-config.json` (read from prod);
