@@ -37,6 +37,10 @@ export const MODULE_PHOTO = {
   towing:         require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   garages:        require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   grooming:       require('../../assets/backgrounds/ada-bg-pets.jpg'),
+  // Wikimedia Commons, CC BY 4.0 (TorbeyCharbel, 2025): credited through the Duyurular header's
+  // ℹ︎ button (DUY_PHOTO_CREDIT, constants/duyurular.js). Cropped to 1:2 around the Atatürk
+  // monument and both flags (x 1200–2700 of 4000), resized to 1200×2400.
+  duyurular:      require('../../assets/backgrounds/ada-bg-duyurular.jpg'),
 }
 
 // fullBleed: the photo from the very top, under the status bar — main's Sağlık facility list
