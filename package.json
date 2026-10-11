@@ -65,6 +65,8 @@
     "place": "node scripts/placement-tool.mjs",
     "pharmacies:resource": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/resource-pharmacy-coords.mjs",
     "hotels:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hotels-staleness.mjs",
+    "duyurular:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duyurular-health.mjs",
+    "duyurular:staleness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duyurular-staleness.mjs",
     "novest:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-novest-properties.mjs",
     "novest:images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mirror-novest-images.mjs",
     "novest:verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-novest-import.mjs",

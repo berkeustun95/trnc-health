@@ -3,6 +3,20 @@
 # Plan: vault 10-ada/2026-10-10_duyurular-plan.md. Script: scripts/fetch-duyurular.mjs.
 # Dry unless `-f apply=true`:  gh workflow run duyurular-fetch [-f apply=true] [-f only=khk-disa-acik-munhal]
 #
+# ─── EVERY ~30 MIN: A SELF-CHAINING RUN, WITH CRON AS THE FALLBACK (2026-10-11) ──
+# GitHub's cron fired 09:14, 02:07, 23:26 UTC on 2026-10-10/11 — hours apart, not every 30 min.
+# So each run that is part of the chain (scheduled, or dispatched with chain=true) ends by
+# waiting until ~30 min after it started and dispatching the next run with its own
+# GITHUB_TOKEN (workflow_dispatch is the one event a GITHUB_TOKEN may trigger). No new secret,
+# no database change, and production is still written only from Actions.
+#   • ONE chain: the dispatch step skips when any other run of this workflow is queued or in
+#     progress, so a cron run arriving mid-chain cannot start a second one.
+#   • ONE writer at a time: the concurrency group below (a run waits, it never overlaps), and
+#     official_url UNIQUE + upsert ignoreDuplicates in the database.
+#   • A broken chain (cancelled run, GitHub outage) restarts on the next cron run; daily-health
+#     flags no successful fetch in 2+ hours (scripts/check-duyurular-health.mjs).
+#   • A manual dispatch without chain=true never extends the chain.
+#
 # ─── SCHEDULE ───────────────────────────────────────────────────────────────
 # Added 2026-10-10 after 20261102 was applied (15:32 UTC) and the first apply dispatch was green
 # (run 38064201761: 227 rows, 0 published, 0 failed sources). A scheduled run always writes;
@@ -38,6 +52,10 @@ on:
         description: 'Ignore each source fetch_interval_min'
         type: boolean
         default: false
+      chain:
+        description: 'Part of the 30-min chain: dispatch the next run when done (implies a write)'
+        type: boolean
+        default: false
 
 concurrency:
   group: duyurular-fetch
@@ -48,14 +66,18 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-    timeout-minutes: 45
+      actions: write      # the chain step lists and dispatches runs of THIS workflow
+    timeout-minutes: 60
     env:
       # A scheduled run has no inputs (inputs.apply is null), so writing is decided here, once:
-      # schedule = write, dispatch = write only with -f apply=true.
-      WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ (github.event_name == 'schedule' || inputs.apply == true) && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+      # schedule = write, chain = write, dispatch = write only with -f apply=true.
+      WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true || inputs.chain == true }}
+      CHAIN: ${{ github.event_name == 'schedule' || inputs.chain == true }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ (github.event_name == 'schedule' || inputs.apply == true || inputs.chain == true) && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
     steps:
+      - name: Start time (the chain measures 30 min from here)
+        run: echo "RUN_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
@@ -101,3 +123,22 @@ jobs:
           path: duyurular-report.json
           retention-days: 7
           if-no-files-found: ignore
+
+      # Last step, and it runs after a failed fetch too: one broken site must not stop the chain.
+      # A cancelled run does stop it (that is how a human halts it); cron restarts it.
+      - name: Chain the next run (~30 min after this one started)
+        if: ${{ !cancelled() && env.CHAIN == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          elapsed=$(( $(date +%s) - RUN_START ))
+          wait=$(( 1800 - 90 - elapsed ))       # ~90 s is the next run's queue + checkout + npm ci
+          if [ "$wait" -gt 0 ]; then echo "waiting ${wait}s"; sleep "$wait"; fi
+          others=$(gh run list --workflow duyurular-fetch.yml --limit 20 --json databaseId,status \
+            -q "[.[] | select(.databaseId != ${GITHUB_RUN_ID} and (.status == \"queued\" or .status == \"in_progress\" or .status == \"waiting\" or .status == \"pending\" or .status == \"requested\"))] | length")
+          if [ "${others:-1}" != "0" ]; then
+            echo "another run is queued or running (${others}); it carries the chain — not dispatching"
+            exit 0
+          fi
+          gh workflow run duyurular-fetch.yml --ref "$GITHUB_REF_NAME" -f chain=true
+          echo "dispatched the next run on $GITHUB_REF_NAME"
