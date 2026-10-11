@@ -119,6 +119,10 @@ export async function runSelftest() {
   t('no dropped source came back', keys.filter(k => /eul|arucad|basbakanlik|tatlisu|kttb|ktmmob|meteor|gazimagusa-haberler/.test(k)), [])
   t('no kibrisduyuru anywhere', SOURCES.filter(s => /kibrisduyuru/i.test(s.url)).length, 0)
   const CATS = ['kamu', 'egitim', 'kesinti', 'ihale', 'belediye', 'destek', 'ulasim'], REGS = ['all', 'lefkosa', 'girne', 'gazimagusa', 'guzelyurt', 'iskele', 'lefke']
+  // The config upsert sends one batch; PostgREST rejects it unless every row has the same keys.
+  const COLS = ['key', 'name', 'institution', 'url', 'type', 'parser', 'category', 'region', 'filter_mode', 'fetch_interval_min', 'crawl_delay_s']
+  t('every source defines every config column', SOURCES.filter(s => COLS.some(c => s[c] === undefined || s[c] === null)).map(s => s.key), [])
+  t('intervals are 30 min (yearly calendar: daily) and within the DB CHECK', [...new Set(SOURCES.map(s => s.fetch_interval_min))].sort((a, b) => a - b), [30, 1440])
   t('categories/regions inside the CHECKs', SOURCES.filter(s => !CATS.includes(s.category) || !REGS.includes(s.region)).map(s => s.key), [])
 
   console.log(bad ? `\n✗ ${bad} self-test failure(s).` : '\n✓ self-test clean.')

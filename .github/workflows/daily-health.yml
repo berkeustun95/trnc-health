@@ -54,3 +54,16 @@ jobs:
       - name: notify:health
         if: success() || failure()
         run: npm run -s notify:health
+      # Duyurular (2026-10-11): pipeline alive (fetch < 2 h, no source failing 3+ runs, a new
+      # item < 3 days, banner count readable as anon) and content not stale (≥ 50 visible,
+      # newest < 7 days, anon count = service count). Offline self-tests first.
+      - name: duyurular:health
+        if: success() || failure()
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duyurular-health.mjs --self
+          npm run -s duyurular:health
+      - name: duyurular:staleness
+        if: success() || failure()
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duyurular-staleness.mjs --self
+          npm run -s duyurular:staleness

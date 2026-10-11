@@ -82,6 +82,7 @@ const DAY = 864e5
 const MAX_AGE_DAYS = 180
 const NEAR_DUP_DAYS = 14
 const FAILING_AFTER = 6
+const DUE_EARLY_MIN = 5
 const only = opt('only') ? new Set(opt('only').split(',')) : null
 const DETAIL = !flag('no-detail')
 
@@ -201,8 +202,10 @@ async function readPdf(bytes, item, r) {
 async function runSource(src) {
   const r = blankResult(src)
   const row = state.get(src.key)
+  // Due 5 minutes early: the chained workflow starts a run every ~30 min, and a source on a
+  // 30-min interval fetched 29 min ago must not wait a whole extra cycle.
   if (APPLY && !flag('force') && row?.last_fetch_at &&
-      NOW - new Date(row.last_fetch_at) < src.fetch_interval_min * 60e3) { r.status = 'not_due'; return r }
+      NOW - new Date(row.last_fetch_at) < (src.fetch_interval_min - DUE_EARLY_MIN) * 60e3) { r.status = 'not_due'; return r }
   declareDelay(src.url, src.crawl_delay_s)
   try {
     const res = await fetchListing(src, row)
