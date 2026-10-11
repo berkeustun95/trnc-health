@@ -19,13 +19,24 @@ If any step below is unclear or a guard refuses, STOP and report. Never work aro
 ## Steps
 1. Commit: clear house-style message (what changed, then why). Never amend a pushed commit, never
    `--no-verify`, never force-push.
-2. Push the branch. A fix for main: push to main, then merge main into `feat/voice-input` and push
-   that (1.4.0 must not miss it). If that merge conflicts, abort it and report; never resolve it.
-3. JS-only change → `npm run ota:preview` (Preview first, always). Report the Android and iOS
-   update IDs (the 8-char platform IDs, not the EAS group ID). STOP here and wait.
-4. Production OTA ONLY after Berke confirms the Preview on his device and says go:
-   `npm run ota -- --message "…"`. Never `eas update` directly. Never `FREEZE_OVERRIDE` or
-   `PREVIEW_LINEAGE_OVERRIDE` unless Berke handed it over in this conversation.
+2. Push the fix to main (it always lands on main first). Then merge main into `feat/voice-input`, in
+   the worktree where that branch is checked out (`git worktree list`; today
+   `~/trnc-health-duyurular-14`) and only if its `git status` is clean, and push it. If the merge
+   conflicts, `git merge --abort` and report; never resolve it.
+3. Preview (JS-only change), published on runtime 1.4.0 because Berke's Preview phone runs 1.4.0:
+   - `git worktree add --detach <scratchpad>/preview-14 origin/feat/voice-input`, after the push.
+   - Use THAT branch's node_modules (it includes `expo-speech-recognition`):
+     `ln -s ~/trnc-health-duyurular-14/node_modules node_modules`, and `cp ~/trnc-health/.env .env`.
+   - Confirm the runtime BEFORE publishing:
+     `APP_VARIANT=preview CI=1 npx expo config --json | node -e 'const c=JSON.parse(require("fs").readFileSync(0));console.log(c.version, JSON.stringify(c.runtimeVersion), c.android.package)'`
+     must print `1.4.0 {"policy":"appVersion"} com.berkeustun95.ada.preview`. Anything else: STOP, report.
+   - `cd <worktree> && git rev-parse HEAD && npm run ota:preview`. Report the Android and iOS update
+     IDs for runtime 1.4.0 (the 8-char platform IDs, not the EAS group ID). Remove the worktree.
+   - STOP here and wait.
+4. ⚠ Never run `npm run ota` without Berke's explicit go in this conversation, given after he has
+   checked the Preview on his device. Then: `npm run ota -- --message "…"`. Never `eas update`
+   directly. Never `FREEZE_OVERRIDE` or `PREVIEW_LINEAGE_OVERRIDE` unless Berke handed it over in
+   this conversation.
 5. `web/` changes: `npm run web:deploy` after Berke's go, never `npx wrangler deploy`.
 6. Native changes (app.config.js, native deps, permissions): do not build. Report that a native
    build is needed.
