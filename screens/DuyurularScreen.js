@@ -13,11 +13,11 @@ import { CARD_BG } from '../components/ui/ModuleScreen'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   DUY_CATEGORY, DUY_DISTRICTS, DUY_COLUMNS, DUY_PAGE, daysLeft, isClosingSoon, matchesQuery, matchesDistrict, formatDuyDate,
-  visibleCategories, DUY_PHOTO_CREDIT,
+  visibleCategories, DUY_PHOTO_CREDIT, DUY_PHOTO_CREDIT_B,
 } from '../constants/duyurular'
 import DuyuruDetailScreen from './DuyuruDetailScreen'
 import HeroCreditSheet from '../components/home/HeroCreditSheet'
-import { DUYURULAR_PHOTO } from '../constants/redesign'
+import { DUYURULAR_PHOTO, DUYURULAR_PHOTO_AB } from '../constants/redesign'
 
 // ─── Duyurular: official announcements list ─────────────────────────────────
 // Rows come from public.announcements; RLS returns only published, unexpired rows, so this
@@ -54,6 +54,18 @@ function SearchField({ value, onChange, lang }) {
         </TouchableOpacity>
       )}
     </View>
+  )
+}
+
+// PREVIEW-ONLY: swaps the background between photo A and candidate B (DUYURULAR_PHOTO_AB).
+function PhotoAbChip({ which, onToggle }) {
+  return (
+    <TouchableOpacity style={s.ab} onPress={onToggle} activeOpacity={press.small} hitSlop={8}
+      accessibilityRole="button" accessibilityLabel={`Photo ${which.toUpperCase()}, tap for ${which === 'a' ? 'B' : 'A'}`}>
+      <Text style={[s.abText, which === 'a' && s.abOn]}>A</Text>
+      <Text style={s.abText}> / </Text>
+      <Text style={[s.abText, which === 'b' && s.abOn]}>B</Text>
+    </TouchableOpacity>
   )
 }
 
@@ -129,6 +141,8 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
   const [query, setQuery]       = useState('')
   const [opened, setOpened]     = useState(null)
   const [creditOpen, setCreditOpen] = useState(false)
+  const [photo, setPhoto] = useState('a')
+  const showB = DUYURULAR_PHOTO_AB && photo === 'b'
   const listMem = useScrollMemory('duy:list')
   useEffect(() => () => forgetScroll('duy:'), [])
 
@@ -178,11 +192,12 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
 
   const filtersOn = !!(activeCategory || district || query)
   return (
-    <ModuleScreen topic={DUYURULAR_PHOTO ? 'duyurular' : undefined}>
+    <ModuleScreen topic={DUYURULAR_PHOTO ? (showB ? 'duyurularB' : 'duyurular') : undefined}>
       <SafeAreaView style={s.safe} edges={['top']}>
         {/* The photo and its credit button share one condition: the photo never shows without it. */}
         <ScreenHeader onBack={onBack} title={t('menuDuyurular', lang)}
           subtitle={!loading && !error ? tCount('duyCount', filtered.length, lang) : undefined} lang={lang}
+          accessory={DUYURULAR_PHOTO_AB ? <PhotoAbChip which={photo} onToggle={() => setPhoto(p => (p === 'a' ? 'b' : 'a'))} /> : null}
           actions={DUYURULAR_PHOTO ? [{ icon: 'information-circle-outline', onPress: () => setCreditOpen(true), accessibilityLabel: t('heroCreditTitle', lang) }] : []} />
         <View style={s.searchRow}>
           <SearchField value={query} onChange={setQuery} lang={lang} />
@@ -236,7 +251,7 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
         )}
       </SafeAreaView>
       {DUYURULAR_PHOTO && (
-        <HeroCreditSheet visible={creditOpen} credit={DUY_PHOTO_CREDIT} lang={lang} onClose={() => setCreditOpen(false)} />
+        <HeroCreditSheet visible={creditOpen} credit={showB ? DUY_PHOTO_CREDIT_B : DUY_PHOTO_CREDIT} lang={lang} onClose={() => setCreditOpen(false)} />
       )}
     </ModuleScreen>
   )
@@ -244,6 +259,10 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
 
 const s = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: 'transparent' },
+  ab:           { flexDirection: 'row', alignItems: 'center', minHeight: 36, paddingHorizontal: 12, borderRadius: radii.pill,
+                  backgroundColor: 'rgba(255,255,255,0.25)', marginRight: 4 },
+  abText:       { fontFamily: 'Inter_500Medium', fontSize: 14, color: 'rgba(255,255,255,0.7)' },
+  abOn:         { fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   searchRow:    { paddingHorizontal: 16, paddingTop: 4, flexShrink: 0 },
   search:       { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: radii.pill,
                   backgroundColor: CARD_BG, paddingHorizontal: 14, ...elevation.card },

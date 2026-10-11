@@ -41,6 +41,9 @@ export const MODULE_PHOTO = {
   // ℹ︎ button (DUY_PHOTO_CREDIT, constants/duyurular.js). Cropped to 1:2 around the Atatürk
   // monument and both flags (x 1200–2700 of 4000), resized to 1200×2400.
   duyurular:      require('../../assets/backgrounds/ada-bg-duyurular.jpg'),
+  // PREVIEW-ONLY candidate B (Kyrenia Gate, Commons, ToprakM, CC BY 4.0), shown only through the
+  // A/B chip (DUYURULAR_PHOTO_AB). Removed with the chip when Berke picks (2026-10-11).
+  duyurularB:     require('../../assets/backgrounds/ada-bg-duyurular-b.jpg'),
 }
 
 // fullBleed: the photo from the very top, under the status bar — main's Sağlık facility list
