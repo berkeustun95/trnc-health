@@ -1,4 +1,14 @@
 #!/bin/sh
+# Vault / journal guard (2026-10-11). This repo is PUBLIC. Blocks a push that would publish
+# Berke's dev journal (daily-updates.md) or any Obsidian vault note — by name, by vault folder, or
+# as a byte-identical copy under another name — in ANY commit the push sends, including a stash's
+# untracked-files parent (how the journal reached GitHub inside a rescue branch). It reads the
+# refs being pushed from stdin, so it must stay FIRST: nothing above it may consume stdin.
+node scripts/check-push-no-vault-files.mjs || {
+  echo "  push blocked: vault notes and the dev journal never go to this public repo."
+  exit 1
+}
+
 # Dark-launch flag guard. Blocks a push that would ship a gated module.
 #
 # NOTE THE LIMIT, it matters: this fires on `git push` ONLY. It does NOT fire on
