@@ -18,7 +18,7 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { REDESIGN } from '../constants/redesign'
+import { REDESIGN, DUYURULAR } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'
@@ -46,6 +46,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, EventBanner, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
+import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
 import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
@@ -214,6 +215,7 @@ export default function HomeScreen({
   onShowExploreBeach,
   onShowExplore,
   onShowTransport,
+  onShowDuyurular,
   onShowInsurance,
   onShowGrooming,
   onShowGarages,
@@ -962,6 +964,14 @@ export default function HomeScreen({
                 <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
               </View>
             </View>
+
+            {/* Duyurular: no tile, a banner (Berke 2026-10-11). Nothing at all for production users
+                until the flag flips; dev and ADA Preview show it (constants/redesign.js DUYURULAR). */}
+            {DUYURULAR && (
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <DuyurularBanner lang={lang} onPress={onShowDuyurular} />
+              </View>
+            )}
 
             <View style={{ marginTop: WIDGET_GAP }}>
               <EventBanner item={stripItem} loading={stripLoading} lang={lang}

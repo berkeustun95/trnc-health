@@ -26,3 +26,12 @@ export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DE
 // google-places is deployed; ADA Preview tests check-ins. Production cannot see it (preflight (c)).
 const CHECKINS_PREVIEW = true
 export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CHECKINS_PREVIEW)
+
+// Duyurular (20261102) before go-live: dev bundles and ADA Preview open the real screens; the
+// flag stays off, so production shows Coming Soon (preflight (c) keeps a production publish off
+// the Preview config). The Home tile keeps its "Yakında" badge on Preview too, so a Preview pass
+// shows the tile exactly as production will AND the screens behind it (Berke, 2026-10-10).
+// The list is empty until rows are published (RLS: is_published AND expires_at > now()).
+// Set to false when this branch merges to main if ADA Preview must stop showing it.
+const DUYURULAR_PREVIEW = true
+export const DUYURULAR = MODULE_FLAGS.duyurular || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && DUYURULAR_PREVIEW)
