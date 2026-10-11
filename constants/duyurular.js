@@ -48,6 +48,15 @@ export const DUY_PHOTO_CREDIT = {
   source:     'commons',
 }
 
+// PREVIEW-ONLY candidate B's credit (removed with the A/B chip). Commons API, 2026-10-11.
+export const DUY_PHOTO_CREDIT_B = {
+  credit:     'ToprakM',
+  license:    'CC BY 4.0',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0',
+  sourceUrl:  'https://commons.wikimedia.org/wiki/File:Kyrenia_Gate_at_North_Nicosia.jpg',
+  source:     'commons',
+}
+
 export const DUY_COLUMNS = 'id, title, excerpt, official_url, institution, category, region, kind, published_at, deadline_at'
 export const DUY_PAGE = 500
 

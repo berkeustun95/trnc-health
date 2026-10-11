@@ -38,4 +38,9 @@ const DUYURULAR_PREVIEW = true
 // only until Berke confirms it on his phone (2026-10-11); production keeps the plain backdrop.
 // At confirmation this becomes true for everyone, in the same release as the empty-state fix.
 export const DUYURULAR_PHOTO = (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
+// The A/B chip that swaps photo A and candidate B on the Duyurular list, so Berke can compare on
+// his phone without another OTA. Same guard as the banner was: dev / ADA Preview only, never a
+// production build. The chip, this constant, MODULE_PHOTO.duyurularB and its asset are all
+// REMOVED in the release that ships the chosen photo.
+export const DUYURULAR_PHOTO_AB = (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
 export const DUYURULAR = MODULE_FLAGS.duyurular || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && DUYURULAR_PREVIEW)
