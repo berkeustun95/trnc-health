@@ -32,7 +32,7 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
@@ -375,15 +375,6 @@ function dutyUntilFor(rows, region) {
   })()
   return pick ? String(pick).slice(0, 5) : null
 }
-
-const WELCOME_VIDEO_LIVE = false
-
-// Garages / Auto Services dark-launch. Controls only the Home TILE's visibility;
-// the module screen itself is gated by MODULE_FLAGS.garages (Coming Soon). false
-// hides the tile from normal users so a tap can't dead-end in Coming Soon; admins
-// and existing garage owners still see it (garagesTileVisible) for preview. Flip
-// to true only in lockstep with MODULE_FLAGS.garages when the module launches.
-const GARAGES_LIVE = false
 
 // One repeatable drawer row. Defined at module level so it never remounts with
 // the parent. Each item: { key, iconSet, icon, labelKey, onPress, danger? }.
