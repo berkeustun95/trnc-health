@@ -319,6 +319,13 @@ DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edg
 - Watch: `gh workflow run supabase-readonly -f file=supabase/readonly/checkins_launch_watch.sql` (calls vs caps,
   check-ins, pins, notices, submissions). Function errors: Dashboard → Edge Functions → google-places → Logs.
 
+## Team workflow (`.claude/agents/`)
+Every feature or bug request goes to **principal-engineer** first. Flow: Principal → senior-app-engineer /
+senior-backend-engineer → qa-tester → (FAIL: back to the senior, repeat until PASS) → release-engineer.
+Principal never ships its own unreviewed code; release-engineer never runs without a QA PASS.
+Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
+before every production OTA, web deploy, flag flips, version bumps. One question per message.
+
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
 Some sessions have no advisor tool; when absent, skip this step.
