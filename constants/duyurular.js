@@ -24,7 +24,8 @@ export const DUY_CATEGORY = Object.fromEntries(DUY_CATEGORIES.map(c => [c.key, c
 export const MIN_ITEMS_FOR_CATEGORY = 3
 
 // DB region keys (announcements_region_check) → the app's district keys and labels.
-// 'all' (nationwide) is not a district: it shows under "Tümü" only.
+// 'all' = nationwide: not a district of its own, it shows under EVERY district (Berke 2026-10-11:
+// picking Girne = Girne's items + every item with no district).
 export const DUY_REGION_TO_DISTRICT = {
   lefkosa: 'nicosia', girne: 'kyrenia', gazimagusa: 'famagusta', guzelyurt: 'morphou', iskele: 'iskele', lefke: 'lefke',
 }
@@ -45,6 +46,14 @@ const DAY = 864e5
 export function daysLeft(deadlineIso, now = new Date()) {
   const day = d => Math.floor((d.getTime() + 3 * 3600e3) / DAY)
   return day(new Date(deadlineIso)) - day(now)
+}
+
+// The same window as a server query: from now to the end of the TRNC day CLOSING_SOON_DAYS
+// ahead (Home banner pill = published open items with deadline_at inside it).
+export function closingSoonRange(now = new Date()) {
+  const trncDay = Math.floor((now.getTime() + 3 * 3600e3) / DAY)
+  const end = new Date((trncDay + CLOSING_SOON_DAYS + 1) * DAY - 3 * 3600e3 - 1000)
+  return { from: now.toISOString(), to: end.toISOString() }
 }
 
 export function isClosingSoon(item, now = new Date()) {
@@ -76,6 +85,10 @@ export function formatDuyDate(iso, lang) {
     } catch { /* composed form below */ }
   }
   return `${d.getUTCDate()} ${monthNames(lang)[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
+
+export function matchesDistrict(item, district) {
+  return !district || item.region === district || item.region === 'all'
 }
 
 export function visibleCategories(items) {

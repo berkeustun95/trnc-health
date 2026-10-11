@@ -1,7 +1,7 @@
 // Pure logic behind the Duyurular screens (constants/duyurular.js): the ≥3-items category rule
 // (Berke 2026-10-10), TRNC day boundaries for "Son günler", and the search fold.
 //   node scripts/test-duyurular-ui.mjs
-import { visibleCategories, daysLeft, isClosingSoon, matchesQuery, MIN_ITEMS_FOR_CATEGORY } from '../constants/duyurular.js'
+import { visibleCategories, daysLeft, isClosingSoon, matchesQuery, matchesDistrict, closingSoonRange, MIN_ITEMS_FOR_CATEGORY } from '../constants/duyurular.js'
 
 let bad = 0
 const t = (name, got, want) => {
@@ -26,6 +26,19 @@ t('7 days → closing soon', isClosingSoon(open('2026-10-17T20:59:59Z'), now), t
 t('8 days → not yet', isClosingSoon(open('2026-10-18T20:59:59Z'), now), false)
 t('past → no', isClosingSoon(open('2026-10-09T20:59:59Z'), now), false)
 t('a result never closes', isClosingSoon({ kind: 'result', deadline_at: '2026-10-12T20:59:59Z' }, now), false)
+
+const rows = [{ id: 1, region: 'girne' }, { id: 2, region: 'all' }, { id: 3, region: 'lefkosa' }, { id: 4, region: 'gazimagusa' }]
+const pick = d => rows.filter(r => matchesDistrict(r, d)).map(r => r.id)
+t('district Girne = Girne + nationwide', pick('girne'), [1, 2])
+t('district Lefkoşa = Lefkoşa + nationwide', pick('lefkosa'), [2, 3])
+t('district with no own items still shows nationwide', pick('lefke'), [2])
+t('"Tümü" (null) = everything', pick(null), [1, 2, 3, 4])
+
+// The banner's server query and the strip's isClosingSoon must agree on the window's edge.
+const rng = closingSoonRange(now)
+t('banner window starts now', rng.from, now.toISOString())
+t('banner window ends at 23:59:59 TRNC, 7 days on', rng.to, '2026-10-17T20:59:59.000Z')
+t('the strip includes that last second', isClosingSoon(open(rng.to), now), true)
 
 const it = { title: 'GELİR VE VERGİ DAİRESİ MÜNHAL DUYURUSU', institution: 'Kamu Hizmeti Komisyonu' }
 t('search: lowercase Turkish matches all-caps İ', matchesQuery(it, 'gelir münhal'), true)

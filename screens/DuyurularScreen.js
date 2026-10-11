@@ -12,7 +12,7 @@ import {
 import { CARD_BG } from '../components/ui/ModuleScreen'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
-  DUY_CATEGORY, DUY_DISTRICTS, DUY_COLUMNS, DUY_PAGE, daysLeft, isClosingSoon, matchesQuery, formatDuyDate,
+  DUY_CATEGORY, DUY_DISTRICTS, DUY_COLUMNS, DUY_PAGE, daysLeft, isClosingSoon, matchesQuery, matchesDistrict, formatDuyDate,
   visibleCategories,
 } from '../constants/duyurular'
 import DuyuruDetailScreen from './DuyuruDetailScreen'
@@ -151,7 +151,7 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
 
   const filtered = useMemo(() => items.filter(it =>
     (!activeCategory || it.category === activeCategory) &&
-    (!district || it.region === district) &&
+    matchesDistrict(it, district) &&
     matchesQuery(it, query)
   ), [items, activeCategory, district, query])
 

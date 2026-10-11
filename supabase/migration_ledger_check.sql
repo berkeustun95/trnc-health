@@ -219,7 +219,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261101_institutions_asbu_campus_name.sql', '323e3fa260fb202c97b8323eb80cccce6d2105b76cc3387bb5d2f5300931a741'),
   ('20261102_duyurular.sql', '6eaee854a4fc1df4066d86690cdd35790e1197ef1a3fd89ba104d6a79ec989ba'),
   ('20261103_duty_push_famagusta.sql', 'ac4aa7094e11073202c5c610faf04976282b68836439a00a4343fe440ba4acb0'),
-  ('20261104_duyurular_waitlist_notify.sql', '7374e8691b509e1bede840764f7ef7e95b880da90edbd171f9c605a719917b2f')
+  ('20261104_duyurular_waitlist_notify.sql', 'a02447a7cb8eb91565c97383ecf07eeedddd6684ea4ef5bd5aaa67fdb5b6742a')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

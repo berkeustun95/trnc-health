@@ -11,11 +11,33 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 // Title, institution, category, dates, a short excerpt and the official link. The body is
 // never stored or shown: applying, bidding and paying happen only on the institution's side.
 
-function deadlineValue(item, lang) {
-  const date = formatDuyDate(item.deadline_at, lang)
+// The deadline card: the date and how long is left, red-tinted in the last 3 days. A KHK item
+// without a parsed deadline gets the same card saying where the date is.
+function DeadlineCard({ item, lang, inText }) {
+  if (inText) {
+    return (
+      <View style={[s.dl, { backgroundColor: CAT.city.bg }]}>
+        <Ionicons name="document-text-outline" size={22} color={CAT.city.ink} />
+        <View style={{ flex: 1 }}>
+          <Text style={[s.dlTitle, { color: CAT.city.ink }]}>{t('duyDeadlineInText', lang)}</Text>
+          <Text style={s.dlSub}>{t('duyDeadlineCheckSource', lang)}</Text>
+        </View>
+      </View>
+    )
+  }
   const d = daysLeft(item.deadline_at)
-  if (d < 0) return date
-  return `${date} · ${d === 0 ? t('duyLastDay', lang) : tCount('duyDaysLeft', d, lang)}`
+  const urgent = d >= 0 && d <= 3
+  const c = urgent ? CAT.health : CAT.city
+  return (
+    <View style={[s.dl, { backgroundColor: c.bg }]}>
+      <Ionicons name="time-outline" size={22} color={c.ink} />
+      <View style={{ flex: 1 }}>
+        <Text style={s.dlLabel}>{t('duyDeadline', lang)}</Text>
+        <Text style={[s.dlTitle, { color: c.ink }]}>{formatDuyDate(item.deadline_at, lang)}</Text>
+        {d >= 0 && <Text style={s.dlSub}>{d === 0 ? t('duyLastDay', lang) : tCount('duyDaysLeft', d, lang)}</Text>}
+      </View>
+    </View>
+  )
 }
 
 export default function DuyuruDetailScreen({ item, lang, onBack }) {
@@ -48,23 +70,16 @@ export default function DuyuruDetailScreen({ item, lang, onBack }) {
         </View>
       )}
 
+      {(!!item.deadline_at || deadlineInText) && <DeadlineCard item={item} lang={lang} inText={deadlineInText} />}
+
       <View style={s.rows}>
         <InfoRow icon="calendar-outline" label={t('duyPublished', lang)} value={formatDuyDate(item.published_at, lang)} />
-        {!!item.deadline_at && (
-          <InfoRow icon="time-outline" label={t('duyDeadline', lang)} value={deadlineValue(item, lang)} />
-        )}
         <InfoRow icon="location-outline" label={t('ddDistrict', lang)} value={region} divider={false} />
       </View>
 
       {!!item.excerpt && <Text style={s.excerpt}>{item.excerpt}</Text>}
 
       <View style={s.ctaBlock}>
-        {deadlineInText && (
-          <View style={s.inText}>
-            <Ionicons name="information-circle-outline" size={16} color={CAT.city.ink} />
-            <Text style={s.inTextText}>{t('duyDeadlineInText', lang)}</Text>
-          </View>
-        )}
         <Button title={t('duyGoToSource', lang)} icon="open-outline" onPress={openSource} />
         {openFailed && <InlineAlert message={t('duyOpenFailed', lang)} />}
       </View>
@@ -80,8 +95,9 @@ const s = StyleSheet.create({
   rows:         { marginTop: 16 },
   excerpt:      { ...type.body, color: colors.textPrimary, marginTop: 16 },
   ctaBlock:     { marginTop: 20, gap: 10 },
-  inText:       { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: CAT.city.bg,
-                  borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  inTextText:   { ...type.small, fontFamily: 'Inter_600SemiBold', color: CAT.city.ink, flexShrink: 1 },
+  dl:           { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radii.card, padding: 14, marginTop: 16 },
+  dlLabel:      { ...type.meta, color: colors.textSecondary },
+  dlTitle:      { ...type.rowTitle },
+  dlSub:        { ...type.small, color: colors.textSecondary, marginTop: 2 },
   disclaimer:   { marginTop: 20 },
 })

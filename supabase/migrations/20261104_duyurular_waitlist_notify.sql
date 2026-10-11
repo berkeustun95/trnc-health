@@ -191,7 +191,7 @@ AS $function$
         ('checkins','English','Check-ins'),
         ('checkins','Turkish','Buradayım'),
 
-        ('duyurular','English','Notices'),
+        ('duyurular','English','Announcements'),
         ('duyurular','Turkish','Duyurular'),
         ('duyurular','Arabic','الإعلانات'),
         ('duyurular','Russian','Объявления'),
@@ -216,7 +216,7 @@ AS $function$
         ('studentHub','Student Hub'),
         ('towing','Towing & Roadside'),
         ('checkins','Check-ins'),
-        ('duyurular','Notices')
+        ('duyurular','Announcements')
       ) AS g(mod, nm) WHERE g.mod = p_module)
     )
   );
@@ -310,7 +310,7 @@ BEGIN
   -- Nothing but the additions changed.
   IF md5(replace(replace(v_txt, $x$,
 
-        ('duyurular','English','Notices'),
+        ('duyurular','English','Announcements'),
         ('duyurular','Turkish','Duyurular'),
         ('duyurular','Arabic','الإعلانات'),
         ('duyurular','Russian','Объявления'),
@@ -319,7 +319,7 @@ BEGIN
         ('duyurular','Spanish','Anuncios'),
         ('duyurular','German','Mitteilungen'),
         ('duyurular','Persian','اطلاعیه‌ها')$x$, ''), $x$,
-        ('duyurular','Notices')$x$, '')) IS DISTINCT FROM '4b3508cd2db62485ef8e3c2bb0650ff0' THEN
+        ('duyurular','Announcements')$x$, '')) IS DISTINCT FROM '4b3508cd2db62485ef8e3c2bb0650ff0' THEN
     RAISE EXCEPTION 'module_notif_text differs from the live body by more than the duyurular rows';
   END IF;
   IF md5(replace(v_ntf, ',''duyurular'')', ')')) IS DISTINCT FROM 'a120a838b6dbd480ae07ebfa39884016' THEN
@@ -332,7 +332,7 @@ BEGIN
   IF public.module_notif_text('body', 'duyurular', 'German') NOT LIKE '%Mitteilungen%' THEN
     RAISE EXCEPTION 'German body: %', public.module_notif_text('body', 'duyurular', 'German');
   END IF;
-  IF public.module_notif_text('title', 'duyurular', 'Japanese') IS DISTINCT FROM 'New on ADA: Notices' THEN
+  IF public.module_notif_text('title', 'duyurular', 'Japanese') IS DISTINCT FROM 'New on ADA: Announcements' THEN
     RAISE EXCEPTION 'fallback title: %', public.module_notif_text('title', 'duyurular', 'Japanese');
   END IF;
   IF public.module_notif_text('title', 'checkins', 'Turkish') IS DISTINCT FROM 'ADA''da yeni: Buradayım' THEN
@@ -357,7 +357,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261104_duyurular_waitlist_notify.sql', '7374e8691b509e1bede840764f7ef7e95b880da90edbd171f9c605a719917b2f')
+VALUES ('20261104_duyurular_waitlist_notify.sql', 'a02447a7cb8eb91565c97383ecf07eeedddd6684ea4ef5bd5aaa67fdb5b6742a')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
