@@ -38,6 +38,16 @@ export const CLOSING_SOON_DAYS = 7
 // Berke 2026-10-10 option A), so a KHK item without a deadline says where it is.
 export const KHK_INSTITUTION = 'Kamu Hizmeti Komisyonu'
 
+// The list's background photo credit (shown whenever the photo is: components/ui/ModuleScreen.js
+// MODULE_PHOTO.duyurular). Read from the Commons API (extmetadata) on 2026-10-11.
+export const DUY_PHOTO_CREDIT = {
+  credit:     'TorbeyCharbel',
+  license:    'CC BY 4.0',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0',
+  sourceUrl:  'https://commons.wikimedia.org/wiki/File:Ataturk_Meydan,_Turk_Lefkosa.jpg',
+  source:     'commons',
+}
+
 export const DUY_COLUMNS = 'id, title, excerpt, official_url, institution, category, region, kind, published_at, deadline_at'
 export const DUY_PAGE = 500
 

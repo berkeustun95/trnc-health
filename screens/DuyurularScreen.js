@@ -13,9 +13,11 @@ import { CARD_BG } from '../components/ui/ModuleScreen'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   DUY_CATEGORY, DUY_DISTRICTS, DUY_COLUMNS, DUY_PAGE, daysLeft, isClosingSoon, matchesQuery, matchesDistrict, formatDuyDate,
-  visibleCategories,
+  visibleCategories, DUY_PHOTO_CREDIT,
 } from '../constants/duyurular'
 import DuyuruDetailScreen from './DuyuruDetailScreen'
+import HeroCreditSheet from '../components/home/HeroCreditSheet'
+import { DUYURULAR_PHOTO } from '../constants/redesign'
 
 // ─── Duyurular: official announcements list ─────────────────────────────────
 // Rows come from public.announcements; RLS returns only published, unexpired rows, so this
@@ -126,6 +128,7 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
   const [sort, setSort]         = useState('new')
   const [query, setQuery]       = useState('')
   const [opened, setOpened]     = useState(null)
+  const [creditOpen, setCreditOpen] = useState(false)
   const listMem = useScrollMemory('duy:list')
   useEffect(() => () => forgetScroll('duy:'), [])
 
@@ -175,10 +178,12 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
 
   const filtersOn = !!(activeCategory || district || query)
   return (
-    <ModuleScreen topic="duyurular">
+    <ModuleScreen topic={DUYURULAR_PHOTO ? 'duyurular' : undefined}>
       <SafeAreaView style={s.safe} edges={['top']}>
+        {/* The photo and its credit button share one condition: the photo never shows without it. */}
         <ScreenHeader onBack={onBack} title={t('menuDuyurular', lang)}
-          subtitle={!loading && !error ? tCount('duyCount', filtered.length, lang) : undefined} lang={lang} />
+          subtitle={!loading && !error ? tCount('duyCount', filtered.length, lang) : undefined} lang={lang}
+          actions={DUYURULAR_PHOTO ? [{ icon: 'information-circle-outline', onPress: () => setCreditOpen(true), accessibilityLabel: t('heroCreditTitle', lang) }] : []} />
         <View style={s.searchRow}>
           <SearchField value={query} onChange={setQuery} lang={lang} />
         </View>
@@ -217,16 +222,22 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             ListHeaderComponent={<ListHeader lang={lang} closingSoon={closingSoon} onOpen={setOpened} showIntro={!filtersOn} />}
-            ListEmptyComponent={
+            ListEmptyComponent={filtersOn ? (
               <EmptyState icon="megaphone-outline" category="city"
-                title={t(filtersOn ? 'duyEmptyTitle' : 'duyNoneYetTitle', lang)}
-                message={t(filtersOn ? 'duyEmptySub' : 'duyNoneYetSub', lang)}
-                action={filtersOn ? { label: t('duyClearFilters', lang), onPress: () => { setCategory(null); setDistrict(null); setQuery('') } } : null} />
-            }
+                title={t('duyEmptyTitle', lang)} message={t('duyEmptySub', lang)}
+                action={{ label: t('duyClearFilters', lang), onPress: () => { setCategory(null); setDistrict(null); setQuery('') } }} />
+            ) : (
+              // Unfiltered and empty is never legitimate (160 live rows at go-live; daily-health
+              // floor 50), so it renders as an ERROR with a retry, not as "nothing yet" (CLAUDE.md).
+              <ErrorState message={t('duyLoadFailedEmpty', lang)} onRetry={load} lang={lang} />
+            )}
             renderItem={({ item }) => <DuyuruCard item={item} lang={lang} onPress={() => setOpened(item)} />}
           />
         )}
       </SafeAreaView>
+      {DUYURULAR_PHOTO && (
+        <HeroCreditSheet visible={creditOpen} credit={DUY_PHOTO_CREDIT} lang={lang} onClose={() => setCreditOpen(false)} />
+      )}
     </ModuleScreen>
   )
 }
