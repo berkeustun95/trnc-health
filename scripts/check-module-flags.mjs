@@ -157,6 +157,9 @@ const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
+  // Both lived as local constants in App.js until 2026-10-11, outside this guard.
+  GARAGES_LIVE:          false,
+  WELCOME_VIDEO_LIVE:    false,
   PROFILE_GATE_LIVE:     true,   // live 2026-09-02
   // Heading text in the profile wizard. Neither value is a launch — false ships the
   // headingless form, true ships the headed one — but it is compared on device by

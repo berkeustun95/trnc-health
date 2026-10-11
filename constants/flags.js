@@ -21,6 +21,19 @@ export const EXPLORE_FEATURED_LIVE = false
 // in. Flip to true once enough garages have published prices. Mirrors FEATURED_LIVE.
 export const PRICE_COMPARE_LIVE = false
 
+// Garages / Auto Services dark-launch. Controls only the Home TILE's visibility;
+// the module screen itself is gated by MODULE_FLAGS.garages (Coming Soon). false
+// hides the tile from normal users so a tap can't dead-end in Coming Soon; admins
+// and existing garage owners still see it (garagesTileVisible) for preview. Flip
+// to true only in lockstep with MODULE_FLAGS.garages when the module launches.
+// Lived in App.js until 2026-10-11, where check-module-flags.mjs could not see it.
+export const GARAGES_LIVE = false
+
+// Drawer "Welcome video" row. false = the row is not drawn; it has never launched and its
+// onPress is still a no-op. Not a MODULE_FLAGS key: a drawer row has no waitlist. Lived in
+// App.js until 2026-10-11, where check-module-flags.mjs could not see it.
+export const WELCOME_VIDEO_LIVE = false
+
 // Explore map on the bottom-nav "map" tab. false = the tab keeps the health-only
 // MapScreen and its "Harita" label; true = it becomes ExploreMapScreen, all ADA content
 // on one clustered map, labelled "Keşfet".
