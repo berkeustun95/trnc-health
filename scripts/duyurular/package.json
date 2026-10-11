@@ -1,0 +1,9 @@
+{
+  "name": "ada-duyurular-fetcher",
+  "private": true,
+  "description": "CI-only dependencies of scripts/fetch-duyurular.mjs. Installed by the duyurular-fetch workflow with npm ci --prefix; never part of the app bundle (nothing under scripts/ is imported by the app).",
+  "type": "module",
+  "dependencies": {
+    "unpdf": "1.8.1"
+  }
+}

@@ -44,10 +44,12 @@ serve(async () => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  // TRNC is UTC+3 — use UTC date shifted by 3h so "today" is correct at 8pm TRNC
-  const now = new Date()
-  const trncNow = new Date(now.getTime() + 3 * 60 * 60 * 1000)
-  const today = trncNow.toISOString().slice(0, 10)
+  // TRNC local date. Asia/Famagusta, not a fixed offset: TRNC is UTC+3 in summer, UTC+2 in winter
+  // (and not Europe/Istanbul, which stays UTC+3). en-CA formats as YYYY-MM-DD.
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Famagusta' }).format(new Date())
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) {
+    return new Response(JSON.stringify({ error: `unexpected TRNC date format: ${today}` }), { status: 500 })
+  }
 
   const { data: duties, error: dutyError } = await supabase
     .from('duty_list')
