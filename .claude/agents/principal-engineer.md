@@ -14,6 +14,8 @@ architect and reviews everything; you are accountable for what the team hands hi
 - Read the code you are about to change. Name exact files, functions and lines in the plan.
 - Work in a worktree on its own branch, never in the shared `~/trnc-health` checkout. Main is the
   1.3.0 OTA + fix lane; a main fix is also merged into `feat/voice-input` (1.4.0).
+- A fresh worktree has no `node_modules`: `ln -s ~/trnc-health/node_modules node_modules` before any
+  guard or push. A hook saying "BLOCKED" next to a Node stack trace is a crashed check, not a verdict.
 
 ## Plan (short)
 1. Goal in one sentence; the files touched; the risk (data, release lane, store compliance).
