@@ -4274,7 +4274,7 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 8 job rows present.
+-- Errors if pg_cron isn't installed (itself the finding). Expect 10 job rows present.
 -- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
 -- identical to a healthy one from the application's side. purge-moderation-rejections
 -- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
@@ -4298,7 +4298,11 @@ FROM (VALUES
   ('1093_checkins_google_places','google-places-refresh'),
   -- Replaces duty-notif-mtwf / -thu-sat / -sun (UTC, inline key). Ticks every 30 min; sends
   -- only when duty_push_due() says the TRNC-local slot is today's send time.
-  ('1103_duty_push_famagusta','duty-push')
+  ('1103_duty_push_famagusta','duty-push'),
+  -- Hand-made from sync-novest/rotate-cron-to-vault.sql; re-created by 1106 with a 60 s pg_net
+  -- timeout (the run takes ~12 s; the 5 s default logged every run as a timeout).
+  ('1106_sync_novest_cron_timeout','sync-novest-morning'),
+  ('1106_sync_novest_cron_timeout','sync-novest-evening')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.

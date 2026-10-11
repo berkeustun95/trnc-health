@@ -1,3 +1,5 @@
+-- ⚠ SUPERSEDED: the live jobs are owned by supabase/migrations/20261106_sync_novest_cron_timeout.sql
+-- (same schedules, Vault key, timeout_milliseconds := 60000). This file is history.
 -- ─── sync-novest cron ────────────────────────────────────────────────────────
 --
 -- Second scheduled Edge Function in ADA, after send-duty-notification. Same mechanism:
