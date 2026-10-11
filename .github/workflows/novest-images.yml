@@ -1,7 +1,14 @@
 # ─── Novest images: mirror + re-encode (sharp) ───────────────────────────────
 #
 # The half sync-novest cannot do (sharp is native Node, the edge function is Deno).
-# CI-only (scripts/lib/prod-write-guard.mjs). Default is --dry.
+# CI-only (scripts/lib/prod-write-guard.mjs). A manual run defaults to --dry.
+#
+# SCHEDULED, AND THE SCHEDULED RUN APPLIES (approved by Berke 2026-10-11). sync-novest
+# (pg_cron 05:00 / 15:00 UTC) imports new listings, but a listing with no property_images
+# row is hidden from users (props_hide_photoless_novest, 20261068). While this was
+# manual-only, 8 listings published 6–8 Oct sat hidden until 11 Oct. Safe unattended:
+# inserts only, never deletes, resumable, a no-op when nothing is due. Any failed image
+# exits non-zero, so GitHub emails.
 #
 #   gh workflow run novest-images                              # dry
 #   gh workflow run novest-images -f apply=true                # mirror everything due
@@ -10,6 +17,9 @@
 name: novest-images
 
 on:
+  schedule:
+    # 20 min after each sync-novest run (05:00 / 15:00 UTC). GitHub may start it late.
+    - cron: '20 5,15 * * *'
   workflow_dispatch:
     inputs:
       apply:
@@ -48,6 +58,6 @@ jobs:
       - name: Mirror
         run: |
           args=()
-          [ "$IN_APPLY" = "true" ] || args+=(--dry)
+          [ "$IN_APPLY" = "true" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ] || args+=(--dry)
           [ -z "$IN_LIMIT" ] || args+=(--limit "$IN_LIMIT")
           node scripts/mirror-novest-images.mjs "${args[@]}"

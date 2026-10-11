@@ -53,7 +53,7 @@ const EXPECTED_MODULES = {
   explore:       true,   // live 2026-08-26 — Explore module + map tab
   towing:        true,   // live
   checkins:      true,   // live 2026-10-08 — check-ins + Google places (20261092/20261093)
-  duyurular:     false,  // dark — official announcements; rows unpublished (20261102/20261104)
+  duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //
@@ -145,6 +145,12 @@ const WAITLIST_BLAST_DONE = new Set([
   //   checks reality, and pets is why — four people sat un-notified for sixteen days
   //   with every check in this repo green.
   'studentHub',
+  // ─── duyurular ────────────────────────────────────────────────────────────
+  // 0 owed as of 2026-10-11: the list read 0 of 0 BEFORE go-live (readonly run 38127886568,
+  // waitlist_total 0, notified 0, last stamp null), so it is an unused list, not a burnt one.
+  // Normal users never had an entry to its Coming Soon screen (the Şehir tile only ever shipped
+  // to ADA Preview), so nothing was sent and nothing is owed.
+  'duyurular',
 ])
 
 const EXPECTED_SCALARS = {

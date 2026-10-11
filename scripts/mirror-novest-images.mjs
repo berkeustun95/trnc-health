@@ -209,7 +209,8 @@ console.log(`\n── plan ──`)
 console.log(`  total references   ${String(jobs.length).padStart(4)}`)
 console.log(`  already mirrored   ${String(jobs.length - pending.length - missingMedia.length).padStart(4)}   (skipped — resumable)`)
 console.log(`  to mirror          ${String(pending.length).padStart(4)}`)
-if (missingMedia.length) console.log(`  media 404/absent   ${String(missingMedia.length).padStart(4)}   ${missingMedia.slice(0, 10).join(', ')}`)
+// Not returned by /media: deleted, or private on their side (401 rest_forbidden, e.g. novest-20111).
+if (missingMedia.length) console.log(`  media not served   ${String(missingMedia.length).padStart(4)}   ${missingMedia.slice(0, 10).join(', ')}`)
 
 if (dry) { console.log('\n(dry) nothing written.'); process.exit(0) }
 
@@ -295,3 +296,5 @@ if (failedJobs.length) {
   for (const f of failedJobs.slice(0, 15)) console.log(`    ${f}`)
 }
 console.log(`\n── done ──\n  ${uploaded} image(s) mirrored this run\n`)
+// Non-zero so a scheduled run with failures goes red and emails; the rest are already written.
+if (failedJobs.length) process.exit(1)
