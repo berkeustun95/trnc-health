@@ -135,11 +135,12 @@ export const MODULE_FLAGS = {
   // the one-off position check and Google. No position is ever stored on a check-in row.
   // Off = the place-page button opens ComingSoonScreen and takes waitlist signups again.
   checkins:     true,
-  // Duyurular — official TRNC announcements (20261102 + 20261104). DARK: Coming Soon + waitlist.
-  // ⚠ The flag does NOT publish anything. Rows stay invisible until
-  //   `UPDATE announcement_sources SET publish = true` + `UPDATE announcements SET is_published = true`
-  //   (SOP step 3) — a separate switch, so a device check can run with the flag flipped locally.
-  duyurular:    false,
+  // Duyurular — official TRNC announcements. LIVE 2026-10-11 (Berke, after the 1.4.0 Preview
+  // device pass 01a12a39). Home entry = the banner under duty + emergency (no tile); rows were
+  // published by 20261105 and the fetcher publishes new ones itself. Not in search_content (v1).
+  // ⚠ The flag does NOT publish or unpublish rows; the data switch is announcement_sources.publish.
+  //   Off = no banner, and the screen falls back to ComingSoonScreen.
+  duyurular:    true,
 }
 
 // Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.
