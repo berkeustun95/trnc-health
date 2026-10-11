@@ -13,8 +13,7 @@ import { useOnPhoto } from './onPhoto'
 // Inside a ModuleScreen (module photo, option B) the header goes white on the header scrim, with a
 // round white 44pt back button. It also owns the STATUS BAR for its screen: light icons on a photo,
 // dark on the canvas — the last-mounted StatusBar wins, so every screen states its own.
-// accessory: one optional element before the icon actions (a text chip an icon cannot express).
-export default function ScreenHeader({ title, subtitle, onBack, lang, actions = [], accessory = null, inset = false, style, tone }) {
+export default function ScreenHeader({ title, subtitle, onBack, lang, actions = [], inset = false, style, tone }) {
   const onPhoto = useOnPhoto()
   const light = tone === 'light' || onPhoto
   const insets = useSafeAreaInsets()
@@ -29,7 +28,6 @@ export default function ScreenHeader({ title, subtitle, onBack, lang, actions = 
         {!!title && <Text style={[s.title, light && s.light]} numberOfLines={1} accessibilityRole="header">{title}</Text>}
         {!!subtitle && <Text style={[s.subtitle, light && s.light]} numberOfLines={1}>{subtitle}</Text>}
       </View>
-      {accessory}
       {actions.slice(0, 2).map(a => onPhoto
         ? <IconButton key={a.icon} {...a} variant="frosted" />
         : <IconButton key={a.icon} {...a} color={light ? '#FFFFFF' : a.color} />)}

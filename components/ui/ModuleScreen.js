@@ -37,13 +37,11 @@ export const MODULE_PHOTO = {
   towing:         require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   garages:        require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   grooming:       require('../../assets/backgrounds/ada-bg-pets.jpg'),
-  // Wikimedia Commons, CC BY 4.0 (TorbeyCharbel, 2025): credited through the Duyurular header's
-  // ℹ︎ button (DUY_PHOTO_CREDIT, constants/duyurular.js). Cropped to 1:2 around the Atatürk
-  // monument and both flags (x 1200–2700 of 4000), resized to 1200×2400.
+  // Kyrenia Gate, North Nicosia (Wikimedia Commons, ToprakM, 2024, CC BY 4.0), chosen by Berke
+  // 2026-10-11 over the Atatürk monument after an on-device A/B. Credited through the Duyurular
+  // header's ℹ︎ button (DUY_PHOTO_CREDIT, constants/duyurular.js). Left-anchored 1:2 crop
+  // (x 0–4080 of 6120) so the gate stays whole on a phone, resized to 1200×2400.
   duyurular:      require('../../assets/backgrounds/ada-bg-duyurular.jpg'),
-  // PREVIEW-ONLY candidate B (Kyrenia Gate, Commons, ToprakM, CC BY 4.0), shown only through the
-  // A/B chip (DUYURULAR_PHOTO_AB). Removed with the chip when Berke picks (2026-10-11).
-  duyurularB:     require('../../assets/backgrounds/ada-bg-duyurular-b.jpg'),
 }
 
 // fullBleed: the photo from the very top, under the status bar — main's Sağlık facility list
