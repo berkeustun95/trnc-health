@@ -31,6 +31,7 @@ concurrency: { group: supabase-migrate, cancel-in-progress: false }
 jobs:
   migrate:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 15
     permissions:
       contents: read

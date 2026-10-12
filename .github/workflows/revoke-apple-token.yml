@@ -22,6 +22,7 @@ on:
 jobs:
   run:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 5
     permissions:
       contents: read
