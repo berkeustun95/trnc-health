@@ -52,7 +52,9 @@ You cannot push `main` or `feat/voice-input` (ruleset) and you hold no Expo toke
    clean (on a conflict: stop and report).
 3. `sudo -n /usr/local/sbin/ada-publish preview agent/<slug>-14 "<message>"`; report the Android/iOS IDs it prints.
 4. `sudo -n /usr/local/sbin/ada-pr agent/<slug> main "<title>" < body` and the same for `agent/<slug>-14` →
-   `feat/voice-input`. STOP. Berke checks the Preview and merges.
+   `feat/voice-input`. BOTH PRs, always, even when step 3 refused (report the refusal): a fix PR to main
+   without its `feat/voice-input` PR leaves 1.4.0 without the fix. Never push `feat/voice-input`. STOP.
+   Berke checks the Preview and merges.
 Never delete either branch: the production OTA's lineage check fetches the Preview's commit. Production OTA is
 not yours on the server: Berke asks Hermes, and the wrapper waits for his GO code.
 
