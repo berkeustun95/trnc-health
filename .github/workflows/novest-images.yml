@@ -36,6 +36,7 @@ concurrency: { group: prod-novest, cancel-in-progress: false }
 jobs:
   run:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 45
     permissions:
       contents: read

@@ -1,0 +1,128 @@
+#!/bin/bash
+# ─── ada-publish: the ONLY way the Hermes server publishes an OTA ────────────────────────────
+#
+#   sudo -n ada-publish preview agent/<slug>-14 "<message>"         # runtime 1.4.0 Preview
+#   sudo -n ada-publish preview-check agent/<slug>-14                 # every Preview check, no publish, no token
+#   sudo -n ada-publish production main|feat/voice-input "<message>" # waits for Berke's GO
+#
+# Runs as root (sudoers lets `hermes` call it, nothing else). The work runs as `publisher`, the
+# only account that ever receives EXPO_TOKEN, from a fresh worktree of a commit already on
+# GitHub — never from the agent's checkout or node_modules.
+#
+# Preview refuses unless agent/<slug>-14 is a CLEAN merge of a feat/voice-input commit and an
+# agent branch, contains origin/main, and the agent's own commits touch none of the files that
+# run at bundle/publish time (PROTECTED_RE): a Developer-role Expo token cannot be limited to
+# Preview, so the code that executes while it is present must be code Berke merged.
+# Production builds only main / feat/voice-input (ruleset: Berke merges) and needs his GO.
+set -euo pipefail
+umask 077
+
+REPO=berkeustun95/trnc-health
+PUB=publisher
+PHOME=/var/lib/ada-publisher
+MIRROR=$PHOME/repo.git
+LOG=/var/log/ada-publish.log
+PROTECTED_RE='^(app\.config\.js|app\.json|eas\.json|[^/]*\.config\.(js|cjs|mjs|ts)|package\.json|package-lock\.json|\.npmrc|\.env.*|release-freeze\.json|scripts/|\.githooks/|\.github/|patches/|plugins/)'
+source /usr/local/lib/ada/ada-gate.sh
+
+say() { echo "$*" | tee -a "$LOG"; }
+die() { echo "REFUSED: $*" | tee -a "$LOG" >&2; exit 1; }
+as_pub() { runuser -u "$PUB" -- env -i HOME="$PHOME" PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 npm_config_cache="$PHOME/.npm" "$@"; }
+
+# Runs a command as publisher with EXPO_TOKEN, passed through a 0400 file the child deletes — never argv.
+as_pub_token() {
+  local tokfile
+  tokfile=$(mktemp "$PHOME/tmp/tok.XXXXXX")
+  { printf 'export '; grep '^EXPO_TOKEN=' /etc/ada/publish.env; } > "$tokfile"
+  chown "$PUB:$PUB" "$tokfile"; chmod 400 "$tokfile"
+  as_pub bash -c '. "$1"; rm -f "$1"; shift; exec "$@"' _ "$tokfile" "$@"
+}
+
+valid_msg() { [[ ${#1} -ge 3 && ${#1} -le 200 && "$1" != *[$'\x01'-$'\x1f']* ]] || die "message must be 3–200 printable characters"; }
+
+sync_mirror() {
+  [[ -d "$MIRROR" ]] || as_pub git clone -q --bare "https://github.com/$REPO.git" "$MIRROR"
+  as_pub git -C "$MIRROR" fetch -q --prune origin '+refs/heads/*:refs/heads/*'
+}
+g() { as_pub git -C "$MIRROR" "$@"; }
+
+WT=""
+cleanup() { [[ -n "$WT" && -d "$WT" ]] && { g worktree remove --force "$WT" >/dev/null 2>&1 || rm -rf "$WT"; g worktree prune; }; }
+trap cleanup EXIT
+
+prepare_worktree() { # $1 sha — fresh worktree, .env, own node_modules
+  WT=$PHOME/work/$(date +%Y%m%d-%H%M%S)-${1:0:7}
+  g worktree add -q --detach "$WT" "$1"
+  install -o "$PUB" -g "$PUB" -m 600 /etc/ada/app.env "$WT/.env"
+  say "npm ci in $WT …"
+  as_pub bash -c 'cd "$1" && npm ci --no-audit --no-fund --loglevel=error >/dev/null' _ "$WT"
+}
+
+config_line() { # $1 = APP_VARIANT ('' for production)
+  as_pub bash -c 'cd "$1" && APP_VARIANT="$2" CI=1 npx expo config --json 2>/dev/null' _ "$WT" "$1" \
+    | node -e 'const c=JSON.parse(require("fs").readFileSync(0));console.log(c.version, JSON.stringify(c.runtimeVersion), c.android.package)'
+}
+
+update_ids() { grep -E '(Android|iOS) update ID' | sed -E 's/[[:space:]]+/ /g'; }
+
+cmd_preview() {
+  local ref=$1 msg=$2 check_only=${3:-}
+  [[ "$ref" =~ ^agent/[a-z0-9][a-z0-9._-]{0,60}-14$ ]] || die "preview ref must be agent/<slug>-14, got '$ref'"
+  valid_msg "$msg"
+  sync_mirror
+  local sha p1 p2 vi main merged files
+  sha=$(g rev-parse --verify -q "refs/heads/$ref^{commit}") || die "$ref is not on GitHub"
+  vi=$(g rev-parse refs/heads/feat/voice-input); main=$(g rev-parse refs/heads/main)
+  read -r p1 p2 extra <<<"$(g rev-list --parents -n1 "$sha" | cut -d' ' -f2-)"
+  [[ -n "${p2:-}" && -z "${extra:-}" ]] || die "$ref must be a two-parent merge (feat/voice-input + agent branch)"
+  g merge-base --is-ancestor "$p1" "$vi" || die "first parent ${p1:0:7} is not a feat/voice-input commit"
+  g merge-base --is-ancestor "$main" "$sha" || die "$ref does not contain origin/main ${main:0:7} — rebase the agent branch on main"
+  merged=$(g merge-tree --write-tree "$p1" "$p2") || die "merge of ${p1:0:7} and ${p2:0:7} conflicts"
+  [[ "$merged" == "$(g rev-parse "$sha^{tree}")" ]] || die "$ref is not a clean automatic merge (its tree differs from merging its parents)"
+  [[ -z "$(g rev-list --merges "$p2" --not "$main" "$vi")" ]] || die "the agent branch contains merge commits — rebase it on main"
+  files=$(g log --no-merges --name-only --format= "$p2" --not "$main" "$vi" | sort -u)
+  [[ -n "$files" ]] || die "the agent branch has no commits beyond main"
+  if grep -E "$PROTECTED_RE" <<<"$files" >/dev/null; then
+    die "the agent's commits touch publish-time files (Berke must merge these, not Preview them):
+$(grep -E "$PROTECTED_RE" <<<"$files" | sed 's/^/  /')"
+  fi
+  say "preview: $ref @ ${sha:0:7} = merge(feat/voice-input ${p1:0:7}, agent ${p2:0:7}); agent files: $(wc -l <<<"$files")"
+  prepare_worktree "$sha"
+  local cfg; cfg=$(config_line preview)
+  [[ "$cfg" == '1.4.0 {"policy":"appVersion"} com.berkeustun95.ada.preview' ]] || die "Preview must target runtime 1.4.0, resolved: $cfg"
+  say "runtime: $cfg"
+  if [[ -n "$check_only" ]]; then say "preview-check PASSED for $ref @ ${sha:0:7} — nothing published"; return 0; fi
+  as_pub_token bash -c 'cd "$1" && npm run ota:preview -- --message "$2" --non-interactive' _ "$WT" "$msg" 2>&1 | tee -a "$LOG" | update_ids
+  say "preview published from ${sha:0:7} ($ref). Keep $ref and its agent branch on GitHub until the production OTA."
+}
+
+cmd_production() {
+  local lane=$1 msg=$2
+  [[ "$lane" == main || "$lane" == feat/voice-input ]] || die "production lane must be main or feat/voice-input"
+  valid_msg "$msg"
+  sync_mirror
+  local sha subject cfg
+  sha=$(g rev-parse "refs/heads/$lane")
+  subject=$(g log -1 --format=%s "$sha")
+  prepare_worktree "$sha"
+  cfg=$(config_line "")
+  [[ "$cfg" == *'{"policy":"appVersion"} com.berkeustun95.ada' ]] || die "production config resolved to: $cfg"
+  gate_require_go "ADA PRODUCTION OTA requested
+lane: $lane @ ${sha:0:7}
+runtime: ${cfg%% *}
+last commit: $subject
+message: $msg" || die "no GO from Berke"
+  as_pub_token bash -c 'cd "$1" && npm run ota -- --message "$2" --non-interactive' _ "$WT" "$msg" 2>&1 | tee -a "$LOG" | update_ids
+  say "production published from $lane @ ${sha:0:7}"
+}
+
+exec 9>/run/ada-publish.lock
+flock -n 9 || die "another publish is running"
+install -d -o "$PUB" -g "$PUB" -m 700 "$PHOME/work" "$PHOME/tmp"
+say "── $(date -u +%FT%TZ) ada-publish $* (caller: ${SUDO_USER:-root})"
+case "${1:-}" in
+  preview-check) [[ $# -eq 2 ]] || die "usage: ada-publish preview-check agent/<slug>-14"; cmd_preview "$2" "preview-check of $2" check ;;
+  preview)    [[ $# -eq 3 ]] || die "usage: ada-publish preview agent/<slug>-14 \"<message>\""; cmd_preview "$2" "$3" ;;
+  production) [[ $# -eq 3 ]] || die "usage: ada-publish production main|feat/voice-input \"<message>\""; cmd_production "$2" "$3" ;;
+  *) die "usage: ada-publish preview|production …" ;;
+esac

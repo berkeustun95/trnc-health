@@ -25,6 +25,7 @@ concurrency: { group: push-test, cancel-in-progress: false }
 jobs:
   push:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 3
     permissions:
       contents: read

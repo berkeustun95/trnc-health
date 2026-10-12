@@ -28,6 +28,7 @@ concurrency: { group: supabase-functions, cancel-in-progress: false }
 jobs:
   deploy:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 20
     permissions:
       contents: read

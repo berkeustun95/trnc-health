@@ -5,6 +5,9 @@
 # hex chars of sha256(secret) and its length. Locally: printf %s "$KEY" | shasum -a 256 | cut -c1-16
 #
 #   gh workflow run key-fingerprint -f secret=GOOGLE_PLACES_API_KEY
+#
+# Also the before/after check when a secret moves between repository and environment scope
+# (2026-10-12: the five production secrets moved into the `production` environment).
 
 name: key-fingerprint
 
@@ -12,17 +15,22 @@ on:
   workflow_dispatch:
     inputs:
       secret:
-        description: 'Repository secret to fingerprint'
+        description: 'Secret to fingerprint (resolved through the production environment)'
         type: choice
-        options: ['GOOGLE_PLACES_API_KEY']
+        options: ['GOOGLE_PLACES_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ACCESS_TOKEN', 'ORS_API_KEY', 'GISEKIBRIS_FEED_URL']
 
 jobs:
   fingerprint:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 2
     permissions: {}
     env:
       GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+      GISEKIBRIS_FEED_URL: ${{ secrets.GISEKIBRIS_FEED_URL }}
       IN_NAME: ${{ inputs.secret }}
     steps:
       - name: Fingerprint

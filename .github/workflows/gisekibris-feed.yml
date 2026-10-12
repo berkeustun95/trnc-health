@@ -65,6 +65,7 @@ jobs:
     # workflow_dispatch on a branch first: what can break is `npm ci` rebuilding
     # sharp's native binary, and Node 24 from setup-node on the new image.
     runs-on: ubuntu-24.04
+    environment: production
     # Setting this block zeroes every scope it does not list, so contents: read is
     # what keeps checkout working. issues: write is for the unmapped-category step
     # only; the repo default token is read-only.
@@ -242,6 +243,7 @@ jobs:
   weekly-heartbeat:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04   # pinned with sync — see the note there
+    environment: production
     timeout-minutes: 10
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

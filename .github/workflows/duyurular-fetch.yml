@@ -64,6 +64,7 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-24.04
+    environment: production
     permissions:
       contents: read
       actions: write      # the chain step lists and dispatches runs of THIS workflow

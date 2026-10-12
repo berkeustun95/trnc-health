@@ -1,0 +1,41 @@
+#!/bin/bash
+# ─── ada-migrate: dispatch supabase-migrate from the Hermes server ───────────────────────────
+#
+#   sudo -n ada-migrate dry   <full name>.sql    # waits, prints the dry run's result
+#   sudo -n ada-migrate apply <full name>.sql    # dispatches; the apply job then WAITS for Berke's
+#                                                 # approval in GitHub (environment production-db)
+#
+# The GitHub token (Actions + Pull requests on this repo only) is root-only in
+# /etc/ada/github.env and reaches gh through the environment, never argv. Always --ref main:
+# the workflow that runs is the one Berke merged, never an agent branch's copy.
+set -euo pipefail
+umask 077
+REPO=berkeustun95/trnc-health
+die() { echo "REFUSED: $*" >&2; exit 1; }
+
+mode=${1:-}; file=${2:-}
+[[ $# -eq 2 && ( "$mode" == dry || "$mode" == apply ) ]] || die "usage: ada-migrate dry|apply <full name>.sql"
+[[ "$file" =~ ^[0-9]+_[a-z0-9_]+\.sql$ ]] || die "not a migration file name: '$file'"
+GH_TOKEN=$(sed -n 's/^GITHUB_DISPATCH_TOKEN=//p' /etc/ada/github.env 2>/dev/null || true)
+[[ -n "$GH_TOKEN" ]] || die "/etc/ada/github.env has no GITHUB_DISPATCH_TOKEN"
+export GH_TOKEN GH_PROMPT_DISABLED=1
+
+before=$(gh run list -R "$REPO" -w supabase-migrate -L 1 --json databaseId -q '.[0].databaseId // 0')
+args=(-f "file=$file"); [[ "$mode" == apply ]] && args+=(-f apply=true)
+gh workflow run supabase-migrate -R "$REPO" --ref main "${args[@]}" >/dev/null
+for _ in $(seq 1 20); do
+  id=$(gh run list -R "$REPO" -w supabase-migrate -L 1 --json databaseId -q '.[0].databaseId // 0')
+  [[ "$id" != "$before" ]] && break; sleep 3
+done
+[[ "$id" != "$before" ]] || die "dispatched, but no new run appeared — check GitHub Actions"
+url="https://github.com/$REPO/actions/runs/$id"
+
+if [[ "$mode" == apply ]]; then
+  echo "apply of $file dispatched: $url"
+  echo "It runs the dry job first, then WAITS for Berke to approve 'production-db' in GitHub."
+  exit 0
+fi
+gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 && ok=1 || ok=0
+gh run view "$id" -R "$REPO" --log 2>/dev/null | sed -n 's/^dry\t[^\t]*\t[^ ]* //p' | grep -vE '^\s*$' | tail -60
+echo "dry run of $file: $([[ $ok == 1 ]] && echo PASSED || echo FAILED) — $url"
+[[ $ok == 1 ]]

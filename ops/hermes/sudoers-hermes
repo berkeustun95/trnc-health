@@ -1,0 +1,4 @@
+# /etc/sudoers.d/50-hermes — the agent user may run exactly these root-owned wrappers, nothing else.
+# Each wrapper validates its own arguments; secrets stay in root-only files under /etc/ada.
+Defaults:hermes env_reset, !setenv
+hermes ALL=(root) NOPASSWD: /usr/local/sbin/ada-publish, /usr/local/sbin/ada-migrate, /usr/local/sbin/ada-pr

@@ -31,6 +31,7 @@ concurrency: { group: prod-hotels, cancel-in-progress: false }
 jobs:
   run:
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 20
     permissions:
       contents: write
