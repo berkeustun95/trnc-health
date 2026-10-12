@@ -42,7 +42,9 @@ valid_msg() { [[ ${#1} -ge 3 && ${#1} -le 200 && "$1" != *[$'\x01'-$'\x1f']* ]] 
 
 sync_mirror() {
   [[ -d "$MIRROR" ]] || as_pub git clone -q --bare "https://github.com/$REPO.git" "$MIRROR"
-  as_pub git -C "$MIRROR" fetch -q --prune origin '+refs/heads/*:refs/heads/*'
+  # refs/remotes/origin/* too: the repo's guards resolve origin/main and origin/feat/voice-input, and a
+  # bare clone has neither (2026-10-12: Preview refused "HEAD LACKS origin/main" on a branch that had it).
+  as_pub git -C "$MIRROR" fetch -q --prune origin '+refs/heads/*:refs/heads/*' '+refs/heads/*:refs/remotes/origin/*'
 }
 g() { as_pub git -C "$MIRROR" "$@"; }
 
@@ -64,6 +66,25 @@ config_line() { # $1 = APP_VARIANT ('' for production)
 }
 
 update_ids() { grep -E '(Android|iOS) update ID' | sed -E 's/[[:space:]]+/ /g'; }
+redact() { sed -E 's/(EXPO_TOKEN=|expo_)[A-Za-z0-9_-]+/\1<redacted>/g'; }
+
+# npm run <script> as publisher with the token. Full output → $LOG only; the caller gets the update
+# IDs, or on failure the guard/eas lines that say why (it used to exit 1 with no text).
+publish_run() { # $1 = npm script, rest = args after --
+  local script=$1 out rc=0 why ids; shift
+  out=$(mktemp "$PHOME/tmp/out.XXXXXX")
+  as_pub_token bash -c 'cd "$1" && shift && exec npm run "$@"' _ "$WT" "$script" -- "$@" >"$out" 2>&1 || rc=$?
+  redact <"$out" >>"$LOG"
+  if (( rc )); then
+    why=$(grep -E '✗|│|REFUSED|BLOCKED|[Ee]rror|refused' "$out" | redact | tail -n 12 || true)
+    rm -f "$out"
+    die "npm run $script exited $rc:
+${why:-  (no reason line in the output; full log: $LOG on the server)}"
+  fi
+  ids=$(update_ids <"$out" || true); rm -f "$out"
+  [[ -n "$ids" ]] || die "npm run $script exited 0 but printed no update IDs; full log: $LOG on the server"
+  echo "$ids"
+}
 
 cmd_preview() {
   local ref=$1 msg=$2 check_only=${3:-}
@@ -92,7 +113,7 @@ $(grep -E "$PROTECTED_RE" <<<"$files" | sed 's/^/  /')"
   [[ "$cfg" == '1.4.0 {"policy":"appVersion"} com.berkeustun95.ada.preview' ]] || die "Preview must target runtime 1.4.0, resolved: $cfg"
   say "runtime: $cfg"
   if [[ -n "$check_only" ]]; then say "preview-check PASSED for $ref @ ${sha:0:7} — nothing published"; return 0; fi
-  as_pub_token bash -c 'cd "$1" && npm run ota:preview -- --message "$2" --non-interactive' _ "$WT" "$msg" 2>&1 | tee -a "$LOG" | update_ids
+  publish_run ota:preview --message "$msg" --non-interactive
   say "preview published from ${sha:0:7} ($ref). Keep $ref and its agent branch on GitHub until the production OTA."
 }
 
@@ -112,7 +133,7 @@ lane: $lane @ ${sha:0:7}
 runtime: ${cfg%% *}
 last commit: $subject
 message: $msg" || die "no GO from Berke"
-  as_pub_token bash -c 'cd "$1" && npm run ota -- --message "$2" --non-interactive' _ "$WT" "$msg" 2>&1 | tee -a "$LOG" | update_ids
+  publish_run ota --message "$msg" --non-interactive
   say "production published from $lane @ ${sha:0:7}"
 }
 
