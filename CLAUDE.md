@@ -325,7 +325,9 @@ DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edg
 
 ## Team workflow (`.claude/agents/`)
 Every feature or bug request goes to **principal-engineer** first. Flow: Principal → senior-app-engineer /
-senior-backend-engineer → qa-tester → (FAIL: back to the senior, repeat until PASS) → release-engineer.
+senior-backend-engineer / data-content-engineer → security-code-reviewer + translation-reviewer (every branch)
++ ui-ux-designer (any UI change) → qa-tester → (FAIL: back to the senior, repeat until PASS) → release-engineer.
+The three reviewers are read-only.
 Principal never ships its own unreviewed code; release-engineer never runs without a QA PASS.
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
