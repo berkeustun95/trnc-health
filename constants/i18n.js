@@ -7243,7 +7243,7 @@ const translations = {
     dormSvcElectricity: 'Электричество',
     dormSvcElectricityValue: 'По карте',
     dormSvcDining: 'Пункты питания',
-    dormShuttleFree: 'Бесплатный university-трансфер',
+    dormShuttleFree: 'Бесплатный университетский трансфер',
     dormShuttlePaid: 'Платный городской трансфер',
     dormShuttleProvidedBy: 'Предоставляет',
     dormShuttleWeekday: 'Будни',
