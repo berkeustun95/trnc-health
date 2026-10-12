@@ -1,0 +1,22 @@
+#!/bin/bash
+# ─── ada-pr: open a pull request from an agent branch (the agent cannot merge it) ────────────
+#
+#   sudo -n ada-pr agent/<slug> main|feat/voice-input "<title>" < body.md
+#
+# Same root-only token as ada-migrate. Merging stays Berke's: the ruleset requires a PR on
+# main / feat/voice-input / release/**, and this token has no Contents write.
+set -euo pipefail
+umask 077
+REPO=berkeustun95/trnc-health
+die() { echo "REFUSED: $*" >&2; exit 1; }
+
+head=${1:-}; base=${2:-}; title=${3:-}
+[[ $# -eq 3 ]] || die "usage: ada-pr agent/<slug> main|feat/voice-input \"<title>\" < body"
+[[ "$head" =~ ^agent/[a-z0-9][a-z0-9._-]{0,63}$ ]] || die "head must be an agent/* branch"
+[[ "$base" == main || "$base" == feat/voice-input ]] || die "base must be main or feat/voice-input"
+[[ ${#title} -ge 5 && ${#title} -le 120 && "$title" != *[$'\x01'-$'\x1f']* ]] || die "title must be 5–120 printable characters"
+body=$(head -c 20000)
+GH_TOKEN=$(sed -n 's/^GITHUB_DISPATCH_TOKEN=//p' /etc/ada/github.env 2>/dev/null || true)
+[[ -n "$GH_TOKEN" ]] || die "/etc/ada/github.env has no GITHUB_DISPATCH_TOKEN"
+export GH_TOKEN GH_PROMPT_DISABLED=1
+gh pr create -R "$REPO" --head "$head" --base "$base" --title "$title" --body "$body"

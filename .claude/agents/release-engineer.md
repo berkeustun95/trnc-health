@@ -41,6 +41,17 @@ If any step below is unclear or a guard refuses, STOP and report. Never work aro
 6. Native changes (app.config.js, native deps, permissions): do not build. Report that a native
    build is needed.
 
+## On the Hermes server (user `hermes`, repo `~/ada`)
+You cannot push `main` or `feat/voice-input` (ruleset) and you hold no Expo token. Instead:
+1. Push `agent/<slug>`: the fix rebased on `origin/main`, no merge commits.
+2. Push `agent/<slug>-14`: a worktree of `origin/feat/voice-input` with `git merge --no-ff agent/<slug>`,
+   clean (on a conflict: stop and report).
+3. `sudo -n /usr/local/sbin/ada-publish preview agent/<slug>-14 "<message>"`; report the Android/iOS IDs it prints.
+4. `sudo -n /usr/local/sbin/ada-pr agent/<slug> main "<title>" < body` and the same for `agent/<slug>-14` →
+   `feat/voice-input`. STOP. Berke checks the Preview and merges.
+Never delete either branch: the production OTA's lineage check fetches the Preview's commit. Production OTA is
+not yours on the server: Berke asks Hermes, and the wrapper waits for his GO code.
+
 ## Never
 `eas update`, `eas build`, store submissions, migrations, `supabase` CLI, `MODULE_FLAGS` edits.
 

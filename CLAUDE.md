@@ -37,8 +37,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
 - ⚠ **Production DATA is written only from GitHub Actions** (see "Production operations"). The service
-  key, Places/geocoding key and ORS key live only as repo secrets — never on this Mac, never in the
-  Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
+  key, Places/geocoding key and ORS key live only in the GitHub `production` environment (deployable from
+  `main` only; since 2026-10-12) — never repo-level, never on this Mac, never in the Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
   writer = new `workflow_dispatch` workflow, dry by default.
 - ⚠ **Supabase CLI on this Mac (Berke, 2026-10-07; replaces the 2026-10-01 "never `supabase login`").**
   Long-term login in the Keychain ("Supabase CLI"), token scoped to trnc-health only: Project Settings
@@ -107,7 +107,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   a missing `support.html` silently 404s. `git push` does not publish `web/` (`docs/` is GitHub Pages).
 
 ## Production operations (`gh workflow run <name>`, then `gh run watch`)
-Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secrets are repo secrets only.
+Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; its secrets come from the `production`
+environment, so it runs only from `main` (a job on any other branch is refused). A job that needs one of them
+adds `environment: production`. Check a secret's identity with `key-fingerprint` (sha256 prefix, never the value).
 - Gişe Kıbrıs sync: `gisekibris-feed` (also daily 04:15 UTC). Health: its Content health step.
 - Hotels: `hotels-import -f file=data/kitob/<f>.csv -f list_date=YYYY-MM-DD`, `hotels-window -f mode=--apply|--rollback`,
   geocoding `hotels-geocode -f limit=N` (Places calls are billed; an apply commits google-pins.csv back).
@@ -123,7 +125,8 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
   secrets …` or `supabase-function-secrets -f name=<NAME>` (from the repo secret of that name).
 - Health: `daily-health` (05:00 UTC daily: hotels, novest health, novest photos (fails > 10% of live
   listings photo-less), notify). A red run emails. `npm run novest:verify` is post-import only, by hand in CI.
-- Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`.
+- Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`, which
+  WAITS until Berke approves the `production-db` environment in GitHub (Actions → the run → Review deployments).
   Stamp first (`node scripts/migration-ledger.mjs --stamp <file>`; `--verify` checks it). Never `db push`:
   prod has no CLI ledger and 13 prefixes repeat. Details: supabase/CLAUDE.md.
 
@@ -325,6 +328,18 @@ senior-backend-engineer → qa-tester → (FAIL: back to the senior, repeat unti
 Principal never ships its own unreviewed code; release-engineer never runs without a QA PASS.
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
+
+**Branch ruleset `protect-release-lanes`** (2026-10-12): `main`, `feat/voice-input`, `release/**` need a pull
+request, no force-push, no deletion; only Berke's admin role bypasses (a Mac push prints "Bypassed rule
+violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal repo it counts as admin and bypasses.
+
+**Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
+team runs there as user `hermes` as GitHub `ada-hermes-bot` (Write): it pushes only `agent/*` branches, cannot
+read any production credential, and acts through three root-owned wrappers (`sudo -n /usr/local/sbin/…`):
+`ada-publish preview agent/<slug>-14 "<msg>"` (1.4.0 Preview; refuses agent commits touching config,
+`package*.json`, `scripts/`, `.githooks/`, `.github/`), `ada-migrate dry <file>`, `ada-pr agent/<slug> <base> "<title>"`.
+Production OTA (`ada-publish production`) and migration apply are denied to Claude Code by managed policy;
+Berke asks Hermes for them, and production then waits for his `GO <code>` reply to the separate gate bot.
 
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.

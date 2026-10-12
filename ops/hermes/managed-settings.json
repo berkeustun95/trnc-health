@@ -1,0 +1,42 @@
+{
+  "apiKeyHelper": "cat /home/hermes/.config/ada/anthropic.key",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "Read", "Edit", "Write", "Glob", "Grep", "Agent", "TodoWrite",
+      "Bash"
+    ],
+    "deny": [
+      "Read(/etc/ada/**)",
+      "Read(/var/lib/ada-publisher/**)",
+      "Bash(npm run ota)",
+      "Bash(npm run ota *)",
+      "Bash(*eas update*)",
+      "Bash(*eas build*)",
+      "Bash(*eas submit*)",
+      "Bash(*eas-cli*)",
+      "Bash(*wrangler*)",
+      "Bash(*fastlane*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git push *--force-with-lease*)",
+      "Bash(git push --delete *)",
+      "Bash(git push * --delete *)",
+      "Bash(git push * -d *)",
+      "Bash(git branch -D *)",
+      "Bash(git branch -d *)",
+      "Bash(git branch --delete *)",
+      "Bash(git worktree remove*)",
+      "Bash(git worktree prune*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean *)",
+      "Bash(*supabase *)",
+      "Bash(gh *)",
+      "Bash(*ada-publish production*)",
+      "Bash(*ada-migrate apply*)"
+    ]
+  }
+}
