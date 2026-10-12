@@ -19,10 +19,14 @@ If any step below is unclear or a guard refuses, STOP and report. Never work aro
 ## Steps
 1. Commit: clear house-style message (what changed, then why). Never amend a pushed commit, never
    `--no-verify`, never force-push.
+   End every message with `Co-Authored-By: Claude <the model you are actually running as> <noreply@anthropic.com>`:
+   your own model name, never one copied from a reminder, the parent session or an example.
 2. Push the fix to main (it always lands on main first). Then merge main into `feat/voice-input`, in
    the worktree where that branch is checked out (`git worktree list`; today
    `~/trnc-health-duyurular-14`) and only if its `git status` is clean, and push it. If the merge
    conflicts, `git merge --abort` and report; never resolve it.
+   A direct push to `feat/voice-input` is allowed only on Berke's Mac (it prints "Bypassed rule violations":
+   expected). On the Hermes server never push it; use the Hermes section's PR path (`ada-pr`).
 3. Preview (JS-only change), published on runtime 1.4.0 because Berke's Preview phone runs 1.4.0:
    - `git worktree add --detach <scratchpad>/preview-14 origin/feat/voice-input`, after the push.
    - Use THAT branch's node_modules (it includes `expo-speech-recognition`):

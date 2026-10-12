@@ -22,7 +22,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   2026-10-09). `feat/voice-input` holds 1.4.0 (version bump, `expo-speech-recognition`, RECORD_AUDIO, `VOICE_INPUT`
   on); its store builds are made from that branch. Main stays the 1.3.0 OTA + fix lane: a 1.4.0 main would send every
   `npm run ota` to a runtime nobody has yet. **Merge every new main fix into `feat/voice-input`** so 1.4.0 doesn't
-  miss it. Merge `feat/voice-input` → main the day 1.4.0 is live in both stores. Vault `2026-10-08_ask-oli-voice-input.md`.
+  miss it — a direct push to it (admin bypass of `protect-release-lanes`) only from Berke's Mac; on the Hermes server
+  always a PR (`ada-pr`). Merge `feat/voice-input` → main the day 1.4.0 is live in both stores. Vault `2026-10-08_ask-oli-voice-input.md`.
   **The 1.4.0 store binaries (Android versionCode 25, iOS build 14) are built from `bdb674f` and do NOT contain the
   Oteller tile / "Yurt · Emlak" (`feat/hotels-tile`, live on 1.3.0 by OTA `b28930ca`).** It reaches 1.4.0 only by a
   runtime 1.4.0 production OTA from `feat/voice-input` (Preview → Berke's device check → OTA), ideally published

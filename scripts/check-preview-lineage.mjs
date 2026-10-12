@@ -13,6 +13,11 @@
 // when every non-merge commit under it is in HEAD (860b89a / 0fcb597 on release/redesign-1, whose
 // duty commits reached main through feat/redesign). Those are printed, never silent.
 //
+// A Preview on a NEWER runtime (1.4.x while main is 1.3.x; [major, minor] compared as integers) is
+// checked too, but the next lane's own work is excused: commits on NEXT_LANE's first-parent line
+// (e.g. the version bump) are subtracted by SHA. Work that reached the lane only through a merge's
+// second parent (a fix branch) is NOT excused, so it must be on main too. Counts are always printed.
+//
 // Unknown is a refusal: EAS unreachable, a group with no commit, or a commit this clone cannot
 // find after one fetch. A Preview deliberately dropped by Berke passes only with
 // PREVIEW_LINEAGE_OVERRIDE=1, which he hands over; the missing commits are printed either way.
@@ -24,6 +29,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
+const NEXT_LANE = 'origin/feat/voice-input' // the 1.4.0 lane; its first-parent line is the lane's own work (version bump etc.)
 const PAGE = 50
 const MAX_PAGES = 20
 const run = promisify(execFile)
@@ -47,7 +53,10 @@ ${bar}\n`)
 const version = (readFileSync(resolve(ROOT, 'app.config.js'), 'utf8').match(/^\s*version:\s*'([^']+)'/m) || [])[1]
 if (!version) refuse(['cannot read the app version from app.config.js — lineage unknown.'])
 const series = version.split('.').slice(0, 2).join('.')
-const inSeries = rv => typeof rv === 'string' && rv.split('.').slice(0, 2).join('.') === series
+const mm = rv => typeof rv === 'string' ? rv.split('.').slice(0, 2).map(Number) : [NaN, NaN]
+const [vMaj, vMin] = mm(version)
+const inSeries = rv => { const [a, b] = mm(rv); return a === vMaj && b === vMin }
+const isNewer = rv => { const [a, b] = mm(rv); return a > vMaj || (a === vMaj && b > vMin) }
 
 let groups
 try {
@@ -61,7 +70,7 @@ try {
   }
   if (new Set(all.map(g => g.group)).size !== all.length) refuse([`EAS paging returned a group twice (${all.length} rows) — the pages overlap, so the list cannot be trusted.`])
   console.log(`\nPreview lineage: read ${all.length} Preview update group(s) in ${Math.ceil((all.length + 1) / PAGE)} page(s)`)
-  groups = all.filter(g => inSeries(g.runtimeVersion))
+  groups = all.filter(g => inSeries(g.runtimeVersion) || isNewer(g.runtimeVersion))
 } catch (e) {
   refuse([`could not list Preview updates from EAS (${String(e.message).split('\n')[0]}) — lineage unknown.`])
 }
@@ -81,6 +90,13 @@ const missingWork = c => git('rev-list', '--no-merges', c, '--not', 'HEAD').spli
 const known = c => { try { git('cat-file', '-e', `${c}^{commit}`); return true } catch { return false } }
 if (views.some(v => v.commit && !known(v.commit))) { try { git('fetch', '-q', 'origin') } catch { /* reported as unknown below */ } }
 
+let laneSet = new Set()
+if (views.some(v => isNewer(v.g.runtimeVersion))) {
+  try { git('fetch', '-q', 'origin', 'feat/voice-input') } catch { /* reported as unknown below */ }
+  try { laneSet = new Set(git('rev-list', '--first-parent', NEXT_LANE).split('\n').filter(Boolean)) }
+  catch { refuse([`${NEXT_LANE} does not resolve in this clone — Previews on a newer runtime cannot be checked, lineage unknown.`]) }
+}
+
 const head = git('rev-parse', '--short', 'HEAD')
 const missing = [], viaMerge = []
 for (const v of views) {
@@ -90,12 +106,18 @@ for (const v of views) {
   else if (!known(v.commit)) missing.push(`? ${v.commit.slice(0, 7)} ${label}\n      commit not in this clone, even after a fetch`)
   else if (!isAncestor(v.commit)) {
     const work = missingWork(v.commit)
-    if (work.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      ${work.length} commit(s) not in HEAD, e.g. ${work.slice(0, 3).map(c => c.slice(0, 7)).join(' ')}`)
+    if (isNewer(v.g.runtimeVersion)) {
+      const left = work.filter(c => !laneSet.has(c))
+      console.log(`  ${v.g.group.slice(0, 8)} ${v.g.runtimeVersion}: ${work.length} commit(s) not in HEAD, ${work.length - left.length} on ${NEXT_LANE} first-parent (excluded), ${left.length} missing`)
+      if (left.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      group ${v.g.group}, runtime ${v.g.runtimeVersion}: ${left.length} commit(s) neither in HEAD nor on ${NEXT_LANE} first-parent:\n` + left.map(c => `        ${git('log', '-1', '--format=%h %s', c)}`).join('\n'))
+    } else if (work.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      ${work.length} commit(s) not in HEAD, e.g. ${work.slice(0, 3).map(c => c.slice(0, 7)).join(' ')}`)
     else viaMerge.push(`· ${v.commit.slice(0, 7)} ${label}`)
   }
 }
 
-console.log(`\nPreview lineage: ${views.length} Preview update(s) on ${series}.x checked against HEAD ${head}`)
+const nNew = views.filter(v => isNewer(v.g.runtimeVersion)).length
+const scope = `${views.length - nNew} on ${series}.x and ${nNew} on newer runtimes`
+console.log(`\nPreview lineage: ${scope} checked against HEAD ${head}`)
 if (viaMerge.length) console.log(`  merge commit not in HEAD, but every commit under it is:\n    ${viaMerge.join('\n    ')}`)
-if (missing.length) refuse([`${missing.length} of ${views.length} Preview update(s) on ${series}.x are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
-console.log(`  ✓ every ${series}.x Preview commit is contained in HEAD\n`)
+if (missing.length) refuse([`${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
+console.log(`  ✓ every checked Preview commit is contained in HEAD (newer runtimes: or on ${NEXT_LANE} first-parent)\n`)
