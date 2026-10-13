@@ -64,7 +64,8 @@ export default function RedesignHero({
   space = null, onOpenSpacePicker,   // app spaces: the chosen space's control (null = today's hero)
 }) {
   const insets = useSafeAreaInsets()
-  const chipCap = useWindowDimensions().width < 350 ? CHIP_CAP_NARROW : CHIP_CAP
+  const narrow = useWindowDimensions().width < 350
+  const chipCap = narrow ? CHIP_CAP_NARROW : CHIP_CAP
   const [creditOpen, setCreditOpen] = useState(false)
   const { source, placeId, credit, isGeneric, landmark } = resolveHero(region)
   const district = region && REGION_LABEL_KEY[region]
@@ -110,7 +111,7 @@ export default function RedesignHero({
           <TouchableOpacity style={[s.chip, s.spaceChip]} onPress={onOpenSpacePicker} activeOpacity={0.8}
             hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }} accessibilityRole="button"
             accessibilityLabel={`${t(SPACE_LABEL_KEY[space], lang)}, ${t('spaceSwitchA11y', lang)}`}>
-            <Ionicons name={SPACE_ICON[space]} size={WX_ICON} color="#FFFFFF" />
+            {!narrow && <Ionicons name={SPACE_ICON[space]} size={WX_ICON} color="#FFFFFF" />}
             <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={chipCap}>{t(SPACE_LABEL_KEY[space], lang)}</Text>
             <Ionicons name="swap-horizontal" size={WX_ICON} color="#FFFFFF" />
           </TouchableOpacity>
@@ -177,5 +178,5 @@ const s = StyleSheet.create({
   chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 0 },
   chipLandmark: { fontFamily: 'Inter_500Medium', flexShrink: 1 },
   wxChip:   { flexShrink: 0, paddingHorizontal: WX_PAD, gap: 4 },
-  spaceChip:{ flexShrink: 1, marginHorizontal: 10, paddingHorizontal: WX_PAD, gap: 6 },
+  spaceChip:{ flexShrink: 1, marginHorizontal: 8, paddingHorizontal: WX_PAD, gap: 6 },
 })

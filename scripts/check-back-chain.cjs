@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +6 on 2026-10-13 for app spaces (space Home -> picker, search first, Profile tab, picker, flag off, admin). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +8 on 2026-10-13 for app spaces (back keys on spaceHomeShownRef, set in the selector) (space Home -> picker, search first, Profile tab, picker, flag off, admin). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -74,6 +74,14 @@ const cases4=[
  ['S10 Towing detail over Garages -> closes detail only', {...base, showGarages:true, showTowing:true}, {towingBackRef:()=>true, garagesBackRef:()=>{throw new Error('garages asked')}}, r=>r.calls===''],
  ['S10 Towing detail standalone -> closes detail only', {...base, showTowing:true}, {towingBackRef:()=>true}, r=>r.calls===''],
  ['Beaches layer -> module step', {...base, showExploreBeach:true}, {exploreBackRef:()=>true}, r=>r.calls===''],
+ ['SPACES space Home -> picker (state only)', {...base, HOME_SPACES_LIVE:true, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:true}, r=>r.r===true && r.calls==='setActiveSpace(null)'],
+ ['SPACES space Home, search open -> search closes first, space stays', {...base, activeSpace:'explore'}, {homeBackRef:()=>true, spaceHomeShownRef:true}, r=>r.r===true && r.calls===''],
+ ['SPACES space + Profile tab -> Home tab, not the picker', {...base, activeSpace:'city', activeTab:'profile'}, {profileGuardRef:{back:()=>false}, spaceHomeShownRef:false}, r=>r.calls.includes('setActiveTab("home")') && !r.calls.includes('setActiveSpace')],
+ ['SPACES picker up (no space) -> root exit', {...base, activeSpace:null}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && r.calls===''],
+ ['SPACES flag off, stale space -> root exit as today', {...base, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && r.calls===''],
+ ['SPACES admin with a stored space -> root exit', {...base, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && r.calls===''],
+ ['SPACES profile gate + stored space -> back not swallowed', {...base, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && !r.calls.includes('setActiveSpace')],
+ ['SPACES provider + implied space -> back not swallowed', {...base, activeSpace:'city', profile:{role:'provider'}}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && !r.calls.includes('setActiveSpace')],
 ]
 const cases=[
  ['Pets vet overlay open -> closes facility only', {...base, showPets:true, petsSubScreen:'vetdirectory', selectedFacility:{id:1}}, null,null, r=>r.calls==='setSelectedFacility(null)'],
@@ -91,12 +99,6 @@ const cases=[
  ['Duty -> closeDutyList (clears region)', {...base, showDutyList:true}, null,null, r=>r.calls==='closeDutyList()'],
  ['Notifs -> closeNotifs (marks read)', {...base, showNotifs:true}, null,null, r=>r.calls==='closeNotifs()'],
  ['Beach -> closeExploreBeach', {...base, showExploreBeach:true}, null,null, r=>r.calls==='closeExploreBeach()'],
- ['SPACES space Home -> picker (state only)', {...base, HOME_SPACES_LIVE:true, activeSpace:'health'}, ()=>false, null, r=>r.r===true && r.calls==='setActiveSpace(null)'],
- ['SPACES space Home, search open -> search closes first, space stays', {...base, HOME_SPACES_LIVE:true, activeSpace:'explore'}, ()=>true, null, r=>r.r===true && r.calls===''],
- ['SPACES space + Profile tab -> Home tab, not the picker', {...base, HOME_SPACES_LIVE:true, activeSpace:'city', activeTab:'profile'}, null, {back:()=>false}, r=>r.calls.includes('setActiveTab("home")') && !r.calls.includes('setActiveSpace')],
- ['SPACES picker up (no space) -> root exit', {...base, HOME_SPACES_LIVE:true, activeSpace:null}, ()=>false, null, r=>r.r===false && r.calls===''],
- ['SPACES flag off, stale space -> root exit as today', {...base, HOME_SPACES_LIVE:false, activeSpace:'health'}, ()=>false, null, r=>r.r===false && r.calls===''],
- ['SPACES admin with a stored space -> root exit', {...base, HOME_SPACES_LIVE:true, activeSpace:'health', profile:{role:'admin'}}, ()=>false, null, r=>r.r===false && r.calls===''],
  ['Module open while home hook would fire: module wins', {...base, showEvents:true}, ()=>{throw new Error('home hook called')}, null, r=>r.calls==='closeEvents()'],
 ]
 let bad=0

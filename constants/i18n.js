@@ -7922,7 +7922,7 @@ const translations = {
     hrGroupHome: "Σπίτι & ζωή",
     hrGroupCity: "Πόλη & μετακίνηση",
     spaceHealth: "Φαρμακεία & Έκτακτα",
-    spacePickerTitle: "Τι θέλεις να κάνεις;",
+    spacePickerTitle: "Τι θέλετε να κάνετε;",
     spaceSwitchA11y: "Αλλαγή χώρου",
 
     // Live-strip notice card. See the en block.

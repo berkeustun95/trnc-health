@@ -963,8 +963,16 @@ export default function HomeScreen({
               </View>
             )}
 
-            {/* Duty + emergency are Health content: inside any other space the row is not rendered
-                (the tour's tiles step then measures null and is skipped, like any absent ref). */}
+            {/* Duty + emergency are Health content: inside any other space the duty tile goes and the
+                emergency tile stays alone (emergency access in every space); that row carries no tour
+                ref, so the tour's tiles step measures null and is skipped, like any absent ref. */}
+            {space && space !== 'health' && (
+              <View style={s.rWidgets}>
+                <View style={s.rCol}>
+                  <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
+                </View>
+              </View>
+            )}
             {(!space || space === 'health') && (
               <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
                 <View style={s.rCol}>
@@ -1003,7 +1011,7 @@ export default function HomeScreen({
               </>
             )}
 
-            <SectionHeader title={t('hrAllServices', lang)} />
+            {!space && <SectionHeader title={t('hrAllServices', lang)} />}
             <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} only={space} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live

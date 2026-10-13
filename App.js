@@ -980,9 +980,10 @@ export default function App() {
   useEffect(() => {
     if (!HOME_SPACES_LIVE) return
     // An unreadable, unknown or stale value (a group whose modules all went dark) is "none".
+    const epoch = spaceEpochRef.current
     AsyncStorage.getItem('@ada_space')
-      .then(v => setActiveSpace(prev => typeof prev === 'string' ? prev : spaceIds().includes(v) ? v : (pushSpaceRef.current ?? null)))
-      .catch(() => setActiveSpace(prev => typeof prev === 'string' ? prev : (pushSpaceRef.current ?? null)))
+      .then(v => epoch !== spaceEpochRef.current ? undefined : setActiveSpace(prev => typeof prev === 'string' ? prev : spaceIds().includes(v) ? v : (pushSpaceRef.current ?? null)))
+      .catch(() => { if (epoch === spaceEpochRef.current) setActiveSpace(prev => typeof prev === 'string' ? prev : (pushSpaceRef.current ?? null)) })
   }, [])
 
   // A push target that lives in a space implies that space — only when none is chosen, in STATE
@@ -991,8 +992,14 @@ export default function App() {
   // (undefined) the implied space waits in pushSpaceRef and is used only if nothing valid is
   // stored. Safe in the mount-time push handlers: it touches only a ref and a setter.
   const pushSpaceRef = useRef(null)
+  // Customers and guests only: a provider's push must not leave a space behind. profileRoleRef
+  // (isAdmin is declared below the effects); null = profile not loaded yet = not excluded.
+  const profileRoleRef = useRef(null)
+  profileRoleRef.current = profile?.role ?? null
+  const spaceHomeShownRef = useRef(false)
   const impliedSpace = moduleId => {
     if (!HOME_SPACES_LIVE) return
+    if (profileRoleRef.current && profileRoleRef.current !== 'customer') return
     const k = categoryOf(moduleId)
     if (!spaceIds().includes(k)) return
     pushSpaceRef.current = k
@@ -1013,6 +1020,8 @@ export default function App() {
   const activeSpaceRef = useRef(activeSpace)
   activeSpaceRef.current = activeSpace
   const homeFirstRunOwedRef = useRef(false)
+  // Bumped on SIGNED_OUT: a '@ada_space' read that resolves after a sign-out is stale and ignored.
+  const spaceEpochRef = useRef(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -1025,7 +1034,7 @@ export default function App() {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
         // The next login picks a space again.
-        if (HOME_SPACES_LIVE) { setActiveSpace(null); AsyncStorage.removeItem('@ada_space').catch(() => {}) }
+        if (HOME_SPACES_LIVE) { spaceEpochRef.current += 1; homeFirstRunOwedRef.current = false; pushSpaceRef.current = null; setActiveSpace(null); AsyncStorage.removeItem('@ada_space').catch(() => {}) }
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
@@ -1160,13 +1169,14 @@ export default function App() {
       if (activeTab === 'profile' && profileGuardRef.current?.back()) return true
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       // App spaces: back on a space's Home returns to the picker (state only; the stored space stays).
-      // profile?.role, not isAdmin: that const is declared further down, below this effect's deps.
-      if (HOME_SPACES_LIVE && profile?.role !== 'admin' && typeof activeSpace === 'string') { setActiveSpace(null); return true }
+      // spaceHomeShownRef (set in the selector) = "a space Home is on screen", not just a stored space:
+      // on the profile-gate wizard or a provider dashboard back must keep its old behaviour.
+      if (spaceHomeShownRef.current) { setActiveSpace(null); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, activeSpace, profile?.role])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, activeSpace])
 
   useEffect(() => {
     Promise.all([
@@ -2569,7 +2579,7 @@ export default function App() {
     // No space chosen: full-screen picker on the Home tab only (a 'profile' push shows Profile
     // in the tab shell; Home tab / back returns here), no tab shell. inTabShell stays false, so the coach
     // marks, policy notice, city prompts and Oli wait until a space is chosen.
-    content = <SpacePickerScreen lang={lang} onChoose={chooseSpace} />
+    content = <SpacePickerScreen lang={lang} onChoose={chooseSpace} onEmergency={() => setShowEmergencyModal(true)} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -2984,6 +2994,10 @@ export default function App() {
   // re-ask on a later cold start (bounded to daily by shouldAskHomeCity). It must
   // never silently fall through to "visitor".
   const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
+
+  // "A space Home is on screen": assigned on every render, after `content` and inTabShell are decided,
+  // so the back handler never swallows back on the profile-gate wizard, a provider dashboard or the picker.
+  spaceHomeShownRef.current = HOME_SPACES_LIVE && inTabShell && activeTab === 'home' && !isAdmin && typeof activeSpace === 'string'
 
   return (
     <SafeAreaProvider>

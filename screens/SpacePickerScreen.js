@@ -25,7 +25,7 @@ function SpaceTile({ id, lang, onPress }) {
   )
 }
 
-export default function SpacePickerScreen({ lang, onChoose }) {
+export default function SpacePickerScreen({ lang, onChoose, onEmergency }) {
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
   const compact = height < 640   // small phones: tighter gaps so four tiles still fit without scrolling
@@ -37,6 +37,14 @@ export default function SpacePickerScreen({ lang, onChoose }) {
       <View style={[s.list, { gap: compact ? 10 : 14 }]}>
         {spaceIds().map(id => <SpaceTile key={id} id={id} lang={lang} onPress={onChoose} />)}
       </View>
+      {/* Emergency numbers stay one tap away from the picker (same sheet as Home's tile). */}
+      {!!onEmergency && (
+        <TouchableOpacity style={s.emergency} onPress={onEmergency} activeOpacity={press.card}
+          accessibilityRole="button" accessibilityLabel={t('menuEmergency', lang)}>
+          <Ionicons name="call" size={20} color={CATEGORY.health.ink} />
+          <Text style={s.emergencyText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP}>{t('menuEmergency', lang)}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   )
 }
@@ -48,4 +56,7 @@ const s = StyleSheet.create({
   tile:  { flex: 1, maxHeight: 150, minHeight: 84, flexDirection: 'row', alignItems: 'center', gap: 16,
            backgroundColor: colors.card, borderRadius: radii.card, paddingHorizontal: 18 },
   label: { flex: 1, ...type.sectionHeading, color: colors.textPrimary },
+  emergency:     { flexShrink: 0, marginTop: 14, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                   backgroundColor: 'transparent', borderRadius: radii.card, borderWidth: 1.5, borderColor: CATEGORY.health.ink, paddingHorizontal: 16 },
+  emergencyText: { ...type.rowTitle, color: CATEGORY.health.ink, flexShrink: 1 },
 })
