@@ -7,8 +7,27 @@
 #                              prints the team's final message, then every report file the job wrote
 #                              to ~/ada/reports (run it with background=true). The gateway cannot read
 #                              /home/adateam, so this output is its only copy of the full report.
+#                              The report sections are also sent to Berke on Telegram directly with
+#                              `hermes send` (no LLM in between: the 2026-10-13 test showed the gateway's
+#                              model rewrites the report it relays, 1.4k chars in, 798 out).
 set -euo pipefail
 TEAM=adateam
+if [[ "$(id -un)" != "$TEAM" && "${1:-}" == run ]]; then
+  # Gateway side (user hermes): the job runs as adateam; its full-report sections go out verbatim.
+  # The recipient is the gateway's single allowed Telegram user, never a value from the job.
+  log=$(mktemp); trap 'rm -f "$log"' EXIT
+  rc=0; sudo -n -u "$TEAM" /usr/local/bin/ada-team "$@" | tee "$log" || rc=$?
+  if grep -q '^===== full report: ' "$log"; then
+    to=$(sed -n 's/^TELEGRAM_ALLOWED_USERS=\([0-9][0-9]*\)$/\1/p' /home/hermes/.hermes/.env 2>/dev/null)
+    if [[ "$to" =~ ^[0-9]+$ ]] && sed -n '/^===== full report: /,$p' "$log" \
+         | /home/hermes/.local/bin/hermes send --to "telegram:$to" --quiet --file - >/dev/null 2>&1; then
+      echo "(full report sent to Berke on Telegram directly)"
+    else
+      echo "(full report NOT sent directly: relay it in full)"
+    fi
+  fi
+  exit "$rc"
+fi
 [[ "$(id -un)" == "$TEAM" ]] || exec sudo -n -u "$TEAM" /usr/local/bin/ada-team "$@"
 export HOME=/home/$TEAM PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/bin
 cd "$HOME"
