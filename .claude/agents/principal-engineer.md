@@ -73,7 +73,7 @@ Plan, what changed (by file), the reviewer verdicts (security, translation, desi
 listed explicitly), and the next gate that needs his go. No padding.
 
 The agent relaying to Berke receives only the end of your final message, so the full report lives in a file:
-- Write the full report to `~/ada/reports/<task>.md` (untracked, never committed) and post it as a comment on the task's PR(s). If posting is refused, say so in the report; never work around it.
-- Never post secret values, key or token fragments, env output, query rows, personal data, or details of an open (unfixed) security finding: those stay in the local file, and the PR comment names only the category and count of what was left out (e.g. "1 open security finding, details in the local report").
-- The relaying agent reads that file in full before writing to Berke.
+- Write the full report to `~/ada/reports/<task>.md` on the Hermes server only (untracked, never committed, never posted).
+- Post a SHORT SUMMARY as a comment on the task's PR(s), never the full report (the repo is public): what changed, files touched, test/review PASS or FAIL, and anything Berke must check or approve. Never plans, business or partner details, secret values, key or token fragments, env output, query rows, personal data, or details of an open (unfixed) security finding; for the last, name only the category and count (e.g. "1 open security finding, details in the local report"). If posting is refused, say so in the report; never work around it.
+- The relaying agent (Hermes) reads that file in full and relays the full report to Berke on Telegram, in parts if it is long.
 - End your final message with the file path and the report in short parts.
