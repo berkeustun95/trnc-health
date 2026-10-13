@@ -3566,10 +3566,11 @@ WITH report AS (
                AND has_table_privilege('anon', to_regclass('public.driving_school_branches'), 'SELECT')
                AND has_table_privilege('authenticated', to_regclass('public.driving_school_branches'), 'SELECT')
                AND has_table_privilege('service_role', to_regclass('public.driving_school_branches'), 'SELECT,INSERT,UPDATE,DELETE'), false)
-    -- (4) The contact_events MODULE vocabulary, owned here since 1059's 13-module token was retired
-    --     in this commit ("one count, one owner"). An exact SET (contains both ways): a count would
-    --     pass with a module swapped out. A new module changes this array in the same commit.
-    UNION ALL SELECT '1108_driving_schools','contact_events module vocabulary is exactly the 14-module set (incl. ehliyet)',
+    -- ── EHLIYET-CONTACT-EVENTS:BEGIN (20261109_contact_events_ehliyet.sql; optional, see its drop recipe) ──
+    -- The contact_events MODULE vocabulary once 20261109 is applied: an exact SET (contains both
+    -- ways), 13 + ehliyet. Red until the file applies. The 1059 13-module token below is
+    -- superseded by this one only when the ledger records 20261109 (one count, one owner).
+    UNION ALL SELECT '1109_contact_events_ehliyet','contact_events module vocabulary is exactly the 14-module set (incl. ehliyet)',
       COALESCE((SELECT array_agg(DISTINCT m[1])
          FROM pg_constraint c,
               LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
@@ -3582,6 +3583,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check') <@
         ARRAY['accommodation','ehliyet','events','explore','garages','grooming','homeServices',
               'hotels','insurance','jobs','pets','studentHub','towing','transport'], false)
+    -- ── EHLIYET-CONTACT-EVENTS:END ──
     -- ── 1104: Duyurular in the waitlist notify path ──────────────────────────────
     -- CREATE OR REPLACE only: no named object. Both bodies must name the module, and the RPC
     -- must still be closed to anon (positive control: the admin guard text is still there).
@@ -3808,9 +3810,17 @@ WITH report AS (
     --     unconditional body passes D while making updated_at meaningless.
     UNION ALL SELECT '1059_hotels','hotels_touch_updated_at is conditional (ignores last_seen_at)',
       COALESCE(pg_get_functiondef(to_regprocedure('public.hotels_touch_updated_at()')) LIKE '%- ''last_seen_at''%', false)
-    -- (5) ⚠ RETIRED by 20261108 (Ehliyet): "contact_events module vocabulary is exactly the 13-module
-    --     set (incl. hotels)". The module vocabulary is now owned by the 1108_driving_schools
-    --     14-module token (one count, one owner); this one would have gone red the moment 1108 applied.
+    -- (5) The contact_events MODULE vocabulary, owned here since 0910's count was retired.
+    --     An exact SET: a count of 13 would pass with a module swapped out. A new module
+    --     changes this array in the same commit, and that edit is the review moment.
+    UNION ALL SELECT '1059_hotels','contact_events module vocabulary is exactly the 13-module set (incl. hotels)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','events','explore','garages','grooming','homeServices',
+                                 'hotels','insurance','jobs','pets','studentHub','towing','transport']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261109_contact_events_ehliyet.sql') -- EHLIYET-CONTACT-EVENTS:supersede (one count, one owner: the 1109 token owns the set once the ledger records it)
     -- ── 1060: hotel geocode provenance ─────────────────────────────────────────
     -- (1) THE TWO-WAY RULE. Coordinates exist exactly when a source does (and a timestamp with
     --     it). The half that matters most is source-without-coordinates being REFUSED: it is what

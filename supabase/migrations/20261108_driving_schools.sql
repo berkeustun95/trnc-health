@@ -20,11 +20,6 @@
 -- ─── ACTIVATION (separate from MODULE_FLAGS.ehliyet) ────────────────────────
 --   UPDATE public.driving_schools SET is_active = true WHERE id = '<id>';
 --
--- ─── contact_events ─────────────────────────────────────────────────────────
--- module = 'ehliyet' is permitted so the app can log 'call' and 'website' taps for a school.
--- The CHECK is rebuilt from the LIVE definition (pre-state asserted equal to the 13-module set
--- 20261059 left, post-state asserted equal to that set + 'ehliyet'). The action CHECK is untouched.
---
 -- ─── phones validation, no helper function ──────────────────────────────────
 -- A CHECK cannot hold a subquery, so per-element validation would need an IMMUTABLE helper
 -- function (a new object to register, own and drop). Instead the array is joined with a newline
@@ -131,39 +126,6 @@ VALUES ('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'nicosia', 0),
        ('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'morphou', 1)
 ON CONFLICT (school_id, region) DO NOTHING;
 
--- ─── contact_events: permit module = 'ehliyet' ──────────────────────────────
--- Pre-state: the live CHECK must be exactly the 13-module set 20261059 left. Rebuilt from the
--- live list (old + 'ehliyet'), then post-state asserted.
-DO $$
-DECLARE
-  v_def  text;
-  v_old  text[];
-  v_new  text[];
-  v_want_old constant text[] := ARRAY['accommodation','events','explore','garages','grooming','homeServices',
-                                      'hotels','insurance','jobs','pets','studentHub','towing','transport'];
-BEGIN
-  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
-   WHERE conrelid = 'public.contact_events'::regclass AND conname = 'contact_events_module_check';
-  SELECT array_agg(DISTINCT m[1]) INTO v_old
-    FROM regexp_matches(coalesce(v_def, ''), '''([a-zA-Z]+)''::text', 'g') AS m;
-  IF v_old IS NULL OR NOT (v_old @> v_want_old AND v_old <@ v_want_old) THEN
-    RAISE EXCEPTION 'contact_events_module_check drifted from the 13-module set (20261059). live def=%', coalesce(v_def, '<missing>');
-  END IF;
-
-  EXECUTE 'ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_module_check';
-  EXECUTE format('ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_module_check CHECK (module IN (%s))',
-                 (SELECT string_agg(quote_literal(x), ',' ORDER BY x) FROM unnest(v_old || 'ehliyet'::text) AS x));
-
-  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
-   WHERE conrelid = 'public.contact_events'::regclass AND conname = 'contact_events_module_check';
-  SELECT array_agg(DISTINCT m[1]) INTO v_new
-    FROM regexp_matches(coalesce(v_def, ''), '''([a-zA-Z]+)''::text', 'g') AS m;
-  IF v_new IS NULL OR NOT (v_new @> (v_want_old || 'ehliyet'::text) AND v_new <@ (v_want_old || 'ehliyet'::text)) THEN
-    RAISE EXCEPTION 'contact_events_module_check post-state is not old + ehliyet. def=%', coalesce(v_def, '<missing>');
-  END IF;
-  RAISE NOTICE 'contact_events_module_check now: %', v_def;
-END $$;
-
 -- ─── Assertions (inside the transaction; a failure rolls the file back) ─────
 DO $$
 DECLARE
@@ -191,8 +153,6 @@ DECLARE
   v_bad_region text := 'not run';
   v_bad_coords text := 'not run';
   v_bad_insta  text := 'not run';
-  v_ce_ok      text := 'not run';
-  v_ce_bad     text := 'not run';
 BEGIN
   -- The FULL policy set on both tables, printed: presence of mine never proves absence of others.
   SELECT count(*) FILTER (WHERE tablename = 'driving_schools'),
@@ -311,18 +271,6 @@ BEGIN
     EXCEPTION WHEN check_violation THEN v_bad_insta := 'refused';
     END;
 
-    -- contact_events accepts the new module (positive) and still refuses a made-up one (control).
-    BEGIN
-      INSERT INTO public.contact_events (module, entity_id, action) VALUES ('ehliyet', v_probe_on, 'call');
-      v_ce_ok := 'accepted';
-    EXCEPTION WHEN check_violation THEN v_ce_ok := 'REFUSED';
-    END;
-    BEGIN
-      INSERT INTO public.contact_events (module, entity_id, action) VALUES ('zzmodule', v_probe_on, 'call');
-      v_ce_bad := 'ACCEPTED';
-    EXCEPTION WHEN check_violation THEN v_ce_bad := 'refused';
-    END;
-
     RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM IS DISTINCT FROM 'ZZ_PROBE_ROLLBACK' THEN RAISE; END IF;
@@ -342,8 +290,6 @@ BEGIN
   IF v_bad_region IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'CONTROL FAILED: unknown region was %', v_bad_region; END IF;
   IF v_bad_coords IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'CONTROL FAILED: lat without lng was %', v_bad_coords; END IF;
   IF v_bad_insta  IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'CONTROL FAILED: http instagram url was %', v_bad_insta; END IF;
-  IF v_ce_ok      IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'contact_events module ehliyet was %', v_ce_ok; END IF;
-  IF v_ce_bad     IS DISTINCT FROM 'refused'  THEN RAISE EXCEPTION 'CONTROL FAILED: unknown contact_events module was %', v_ce_bad; END IF;
   IF EXISTS (SELECT 1 FROM public.driving_schools WHERE name LIKE 'zz %') THEN
     RAISE EXCEPTION 'probe rows survived the rollback';
   END IF;
@@ -362,7 +308,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261108_driving_schools.sql', 'bac9692fc3dfdf76ef56cb1d0c28400db1fe3068d4abb94e5168d3adc2fbec02')
+VALUES ('20261108_driving_schools.sql', '45e0518a0deaf8e1d0b81172de9d306272e2642eb8219eae6342b15e853d54ad')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -374,9 +320,5 @@ NOTIFY pgrst, 'reload schema';
 -- ─── Verification after applying (read-only, run alone) ─────────────────────
 --   Run supabase/verify_schema.sql QUERY 1: every 1108_driving_schools row must read OK.
 --
--- ─── Rollback (only if the module is abandoned, and only with no 'ehliyet' taps logged) ──
+-- ─── Rollback (only if the module is abandoned) ──
 --   DROP TABLE IF EXISTS public.driving_school_branches, public.driving_schools;
---   ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_module_check;
---   ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_module_check
---     CHECK (module IN ('homeServices','grooming','garages','transport','insurance','pets',
---                       'events','jobs','accommodation','studentHub','explore','towing','hotels'));
