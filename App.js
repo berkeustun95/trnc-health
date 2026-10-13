@@ -106,7 +106,7 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import SpacePickerScreen from './screens/SpacePickerScreen'
-import { spaceIds } from './constants/homeGroups'
+import { spaceIds, categoryOf } from './constants/homeGroups'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
@@ -981,9 +981,23 @@ export default function App() {
     if (!HOME_SPACES_LIVE) return
     // An unreadable, unknown or stale value (a group whose modules all went dark) is "none".
     AsyncStorage.getItem('@ada_space')
-      .then(v => setActiveSpace(spaceIds().includes(v) ? v : null))
-      .catch(() => setActiveSpace(null))
+      .then(v => setActiveSpace(prev => typeof prev === 'string' ? prev : spaceIds().includes(v) ? v : (pushSpaceRef.current ?? null)))
+      .catch(() => setActiveSpace(prev => typeof prev === 'string' ? prev : (pushSpaceRef.current ?? null)))
   }, [])
+
+  // A push target that lives in a space implies that space — only when none is chosen, in STATE
+  // only ('@ada_space' is written by an explicit pick alone), so closing the target lands on
+  // that space's Home, not the picker. The stored choice wins: while it is still loading
+  // (undefined) the implied space waits in pushSpaceRef and is used only if nothing valid is
+  // stored. Safe in the mount-time push handlers: it touches only a ref and a setter.
+  const pushSpaceRef = useRef(null)
+  const impliedSpace = moduleId => {
+    if (!HOME_SPACES_LIVE) return
+    const k = categoryOf(moduleId)
+    if (!spaceIds().includes(k)) return
+    pushSpaceRef.current = k
+    setActiveSpace(prev => prev === null ? k : prev)
+  }
 
   const chooseSpace = key => {
     setActiveSpace(key)
@@ -1425,6 +1439,7 @@ export default function App() {
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') {
+        impliedSpace('duty')
         setShowDutyList(true)
       } else if (screen === 'profile') {
         setActiveTab('profile')
@@ -1436,6 +1451,7 @@ export default function App() {
         //   is dark on this build the notification is from a feature this bundle does not
         //   have — opening the hub would show a placeholder and read as the tap breaking.
         //   Doing nothing leaves the user where they were, which is honest.
+        impliedSpace('studentHub')
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
       }
@@ -1451,13 +1467,14 @@ export default function App() {
       if (!response) return
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
-      if (screen === 'duty') setShowDutyList(true)
+      if (screen === 'duty') { impliedSpace('duty'); setShowDutyList(true) }
       // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
       //   case for a message notification — the app is not usually already open when one
       //   arrives — and without this branch that tap landed on Home with no explanation.
       //   The warm listener above and this one must stay in step; they are two paths to
       //   the same destination and only one of them was ever exercised.
       else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        impliedSpace('studentHub')
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
       }
@@ -2545,11 +2562,12 @@ export default function App() {
     // just closes the preview rather than routing into a tab that does not exist here.
     content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
       isGuest={false} onGoToProfile={() => setAdminPreview(null)} />
-  } else if (HOME_SPACES_LIVE && !isAdmin && activeSpace === undefined) {
+  } else if (HOME_SPACES_LIVE && !isAdmin && activeTab === 'home' && activeSpace === undefined) {
     // Stored space not read yet: wait, so the picker never flashes. inTabShell stays false.
     content = <View style={styles.center} />
-  } else if (HOME_SPACES_LIVE && !isAdmin && activeSpace === null) {
-    // No space chosen: full-screen picker, no tab shell. inTabShell stays false, so the coach
+  } else if (HOME_SPACES_LIVE && !isAdmin && activeTab === 'home' && activeSpace === null) {
+    // No space chosen: full-screen picker on the Home tab only (a 'profile' push shows Profile
+    // in the tab shell; Home tab / back returns here), no tab shell. inTabShell stays false, so the coach
     // marks, policy notice, city prompts and Oli wait until a space is chosen.
     content = <SpacePickerScreen lang={lang} onChoose={chooseSpace} />
   } else {
