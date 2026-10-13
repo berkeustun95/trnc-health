@@ -12,7 +12,7 @@ import { partnerAsset } from '../constants/partnerAssets'
 import {
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, PREVIEW_DRIVING_SCHOOLS,
   usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
-  hasEmail, mailtoUrl, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
+  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
 } from '../constants/ehliyet'
 import { logContactEvent } from '../utils/logContactEvent'
 import { ScreenHeader, ErrorState, CardSkeleton } from '../components/ui'
@@ -104,7 +104,7 @@ function SchoolCard({ school, lang, featured, onAction }) {
           onPress={() => onAction(school, 'email', mailtoUrl(school))}
           accessibilityRole="link" accessibilityLabel={`${t('ehliyetEmailLabel', lang)}: ${school.email}`}>
           <Ionicons name="mail-outline" size={16} color={EHLIYET_DARK} />
-          <Text style={s.emailText}>{school.email}</Text>
+          <Text style={s.emailText}>{emailDisplay(school.email)}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -185,6 +185,6 @@ const s = StyleSheet.create({
 
   addressRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 44, paddingTop: 12 },
   addressText: { ...type.small, color: EHLIYET_DARK, flex: 1, textDecorationLine: 'underline' },
-  emailRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 6 },
+  emailRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 6 },
   emailText:   { ...type.small, color: EHLIYET_DARK, flexShrink: 1, textDecorationLine: 'underline' },
 })

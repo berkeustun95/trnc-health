@@ -67,6 +67,8 @@ export const hasFacebook = (school) => /^https:\/\/\S+$/.test(school?.facebook_u
 // E-mail link hides when null or malformed (the DB CHECK is looser than a tap target should be).
 export const hasEmail = (school) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(school?.email || '')
 export const mailtoUrl = (school) => `mailto:${school.email}`
+// Display only: a zero-width space after '@' gives the row a break point so a long address wraps as "local@" / "domain" instead of mid-word.
+export const emailDisplay = (email) => (email || '').replace('@', '@\u200B')
 
 export const licenceClasses = (school) => (school?.licence_classes || []).filter(Boolean)
 

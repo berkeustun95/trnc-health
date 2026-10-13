@@ -4,7 +4,7 @@
 //   node scripts/test-ehliyet-ui.mjs
 import {
   PREVIEW_DRIVING_SCHOOLS, usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
-  hasEmail, mailtoUrl, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
+  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, EHLIYET_LOGS_CONTACTS,
 } from '../constants/ehliyet.js'
 import { REGIONS } from '../constants/regions.js'
@@ -83,8 +83,8 @@ t('the CHECK literals were really parsed', dbActions.length >= 10, true)
 // ── Button labels fit at 320dp, font scale 1.0 (Inter 600SemiBold, rowTitle 15px). ──
 // Real advances from the bundled TTF (cmap format 4 + hmtx). No kerning: errs wide. Arabic / Persian sum
 // ISOLATED forms (wider than the joined text), so those figures are upper bounds.
-const font = (() => {
-  const buf = readFileSync(resolve(here, 'node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf'))
+const loadFont = (file) => {
+  const buf = readFileSync(resolve(here, 'node_modules/@expo-google-fonts/inter', file))
   const tables = {}
   for (let i = 0; i < buf.readUInt16BE(4); i++) { const o = 12 + i * 16; tables[buf.toString('ascii', o, o + 4)] = buf.readUInt32BE(o + 8) }
   const upm = buf.readUInt16BE(tables.head + 18), nH = buf.readUInt16BE(tables.hhea + 34)
@@ -107,7 +107,8 @@ const font = (() => {
     return 0
   }
   return (str, px) => [...str].reduce((w, ch) => w + buf.readUInt16BE(tables.hmtx + Math.min(gid(ch.codePointAt(0)), nH - 1) * 4) / upm * px, 0)
-})()
+}
+const font = loadFont('600SemiBold/Inter_600SemiBold.ttf')
 // Layout constants mirror EhliyetScreen styles (content padding 16, card padding 18, action paddingHorizontal 12,
 // icon 18, gap 8, outlined border 1.5 x2). Stacked full-width buttons, so the box is the card's inner width.
 const SCREEN_W = 320, PAGE = 16, CARD_PAD = 18, BTN_PAD = 12, ICON = 18, ICON_GAP = 8, BORDER = 1.5, LABEL_PX = 15
@@ -122,6 +123,19 @@ for (const [key, outlined] of BUTTON_KEYS) {
 }
 t('every button label fits its 320dp button at scale 1.0, all 9 languages', fitProblems(tr), [])
 t('red-first: an overlong label is caught', fitProblems((k, l) => (k === 'ehliyetCall' && l === 'Turkish' ? 'Okul müdürlüğünü hemen arayın' : tr(k, l))).length, 1)
+
+// ── Email row: Inter 400 13px, 230px of text at 320dp (row 320-32-36=252, icon 16 + gap 6), font scale up to 1.3. ──
+const font400 = loadFont('400Regular/Inter_400Regular.ttf')
+const EMAIL_BOX = 230, EMAIL_PX = 13, EMAIL_SCALE = 1.3
+const emailShown = emailDisplay(seed.email)
+t('emailDisplay inserts exactly one U+200B, right after the @', [emailShown.split('\u200B').length - 1, emailShown], [1, 'seyhunbikmazsoforokulu@\u200Bgmail.com'])
+t('emailDisplay removes nothing: stripping U+200B gives the raw address', emailShown.replace('\u200B', ''), seed.email)
+t('mailto: and the raw address carry no U+200B', [mailtoUrl(seed).includes('\u200B'), seed.email.includes('\u200B')], [false, false])
+const longestSegment = (str) => Math.max(...str.split('\u200B').map(seg => font400(seg, EMAIL_PX * EMAIL_SCALE)))
+const seg = longestSegment(emailShown)
+console.log(`  · email longest segment ${seg.toFixed(1)}px at ${EMAIL_PX}px x ${EMAIL_SCALE}, box ${EMAIL_BOX}px; whole address ${font400(seed.email, EMAIL_PX).toFixed(1)}px at 1.0, ${longestSegment(seed.email).toFixed(1)}px at ${EMAIL_SCALE}`)
+t('email: longest unbreakable segment fits 230px at 13px x 1.3', seg <= EMAIL_BOX, true)
+t('red-first: the whole address as one segment does NOT fit at 1.3', longestSegment(seed.email) <= EMAIL_BOX, false)
 
 // ── Seed <-> fixture drift. Raw values print on failure. ──
 const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', SEED_SQL), 'utf8')
