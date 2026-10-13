@@ -4195,6 +4195,11 @@ WITH report AS (
             IS NOT DISTINCT FROM 'Ankara Sosyal Bilimler Üniversitesi KKTC Yerleşkesi'
           AND NOT EXISTS (SELECT 1 FROM public.institutions x JOIN public.institutions o ON lower(o.name) = lower(x.name)
                            WHERE (to_jsonb(x) ->> 'country') = 'XN' AND (to_jsonb(o) ->> 'country') IS DISTINCT FROM 'XN'))
+    -- 1107 is an UPDATE: on 2026-10-13 Lefkoşa's roster names TUNA in UMUT ÖKSÜZ's place.
+    UNION ALL SELECT '20261107_duty_2026_10_13_lefkosa_tuna','duty_list 2026-10-13: TUNA ECZANESİ in Lefkoşa, no UMUT ÖKSÜZ ECZANESİ, once 1107 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261107_duty_2026_10_13_lefkosa_tuna.sql')
+      OR ((SELECT count(*) FROM public.duty_list WHERE duty_date = '2026-10-13' AND region = 'Lefkoşa' AND name = 'TUNA ECZANESİ') = 1
+          AND NOT EXISTS (SELECT 1 FROM public.duty_list WHERE duty_date = '2026-10-13' AND name = 'UMUT ÖKSÜZ ECZANESİ'))
   ) z
 
   UNION ALL
