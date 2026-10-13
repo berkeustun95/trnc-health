@@ -104,5 +104,40 @@ const cases=[
 let bad=0
 for (const [n,st,refs,ok] of cases4){ let r; try{ r=run(st,null,null,refs) }catch(e){ r={r:'THREW '+e.message,calls:''} } const pass=ok(r); if(!pass)bad++; console.log((pass?'PASS ':'FAIL ')+n+'  -> '+r.r+' | '+r.calls) }
 for (const [n,st,h,p,ok] of cases){ let r; try{ r=run(st,h,p) }catch(e){ r={r:'THREW '+e.message,calls:''} } const pass=ok(r); if(!pass)bad++; console.log((pass?'PASS ':'FAIL ')+n+'  -> '+r.r+' | '+r.calls) }
-console.log(bad?`back chain: ${bad} of ${cases4.length+cases.length} FAILED`:`back chain: OK (${cases4.length+cases.length}/${cases4.length+cases.length})`)
+
+// ─── App spaces: the selector line the back handler keys on ────────────────────────────────
+// The SPACES cases above hand the handler `spaceHomeShownRef` as a given; nothing there proves the
+// selector ever sets it correctly. Extract the assignment from App.js itself and run its truth table
+// (a source-level check: the expression is evaluated, not re-typed here), then pin the selector
+// ORDER that keeps the picker away from admins, providers and a not-yet-loaded profile.
+{
+  const A="spaceHomeShownRef.current = "
+  const occ=src.split(A).length-1
+  const at=src.indexOf(A)
+  const expr = at===-1 ? '' : src.slice(at+A.length, src.indexOf('\n', at)).trim()
+  let ok=true; const why=[]
+  if(occ!==1){ ok=false; why.push(`expected exactly 1 assignment of spaceHomeShownRef.current, found ${occ}`) }
+  else {
+    let f; try{ f=new Function('HOME_SPACES_LIVE','inTabShell','activeTab','isAdmin','activeSpace',`return (${expr})`) }catch(e){ ok=false; why.push('expression does not parse: '+expr) }
+    if(f){
+      const trues=[]
+      for(const flag of [false,true]) for(const shell of [false,true]) for(const tab of ['home','profile']) for(const adm of [false,true]) for(const sp of [undefined,null,'health','city']){
+        if(!!f(flag,shell,tab,adm,sp)) trues.push(JSON.stringify({flag,shell,tab,adm,sp}))
+      }
+      // PERFECT system: true for exactly flag on + tab shell + Home tab + not admin + a chosen (string) space.
+      const want=['health','city'].map(sp=>JSON.stringify({flag:true,shell:true,tab:'home',adm:false,sp}))
+      if(JSON.stringify(trues)!==JSON.stringify(want)){ ok=false; why.push(`truth table: got ${trues.length} true row(s) ${trues.join(' ')} ; expected ${want.join(' ')}`) }
+      console.log(`INFO spaceHomeShownRef := ${expr}  (${trues.length} true row(s) of 64)`)
+    }
+  }
+  // Selector order: admin, provider and the profile-loading wait all come BEFORE the picker branch.
+  const pick=src.indexOf("HOME_SPACES_LIVE && !isAdmin && activeTab === 'home' && activeSpace === null")
+  for(const [name,needle] of [['profile-loading wait',"} else if (loading || !profile) {"],['profile gate',"} else if (gateActive) {"],['admin dashboard',"} else if (profile.role === 'admin' && !adminPreview) {"],['provider dashboard',"} else if (profile.role === 'provider') {"]]){
+    const k=src.indexOf(needle)
+    if(pick===-1||k===-1||k>pick){ ok=false; why.push(`selector order: ${name} (index ${k}) must precede the picker branch (index ${pick})`) }
+  }
+  if(!ok) bad++
+  console.log((ok?'PASS ':'FAIL ')+'SPACES selector sets spaceHomeShownRef only for flag+shell+Home+non-admin+chosen space; picker after admin/provider/gate  -> '+(ok?'ok':why.join(' ; ')))
+}
+console.log(bad?`back chain: ${bad} FAILED (of ${cases4.length+cases.length} cases + selector check)`:`back chain: OK (${cases4.length+cases.length}/${cases4.length+cases.length} cases + selector check)`)
 if(bad) process.exit(1)
