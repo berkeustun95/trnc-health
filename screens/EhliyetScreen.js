@@ -33,7 +33,7 @@ function ActionButton({ icon, label, onPress, bg, fg, outlined }) {
       accessibilityRole="button" accessibilityLabel={label}
     >
       <Ionicons name={icon} size={18} color={fg} />
-      <Text style={[s.actionText, { color: fg }]} numberOfLines={1}>{label}</Text>
+      <Text style={[s.actionText, { color: fg }]}>{label}</Text>
     </TouchableOpacity>
   )
 }
@@ -171,11 +171,11 @@ const s = StyleSheet.create({
   chip:        { backgroundColor: '#E8EDF8', borderRadius: radii.pill, paddingHorizontal: 12, paddingVertical: 6 },
   chipText:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: EHLIYET_DARK },
 
-  actions:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
-  action:        { flexGrow: 1, flexBasis: 100, minHeight: 48, borderRadius: radii.md, flexDirection: 'row',
+  actions:       { gap: 10, marginTop: 18 },
+  action:        { alignSelf: 'stretch', minHeight: 48, borderRadius: radii.md, flexDirection: 'row',
                    alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
   actionOutlined: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: EHLIYET_DARK },
-  actionText:    { ...type.rowTitle },
+  actionText:    { ...type.rowTitle, flexShrink: 1, textAlign: 'center' },
 
   sheetBody: { paddingTop: 4, paddingBottom: 8 },
   phoneRow:  { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 14,
