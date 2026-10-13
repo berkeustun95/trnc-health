@@ -4,7 +4,9 @@
 # write the gateway's files, the claude binary or this script.
 #   ada-team status            current main / feat/voice-input commits + the agents
 #   ada-team run "<request>"   hands the request to Claude Code's principal-engineer in ~/ada;
-#                              prints the team's final report (run it with background=true)
+#                              prints the team's final message, then every report file the job wrote
+#                              to ~/ada/reports (run it with background=true). The gateway cannot read
+#                              /home/adateam, so this output is its only copy of the full report.
 set -euo pipefail
 TEAM=adateam
 [[ "$(id -un)" == "$TEAM" ]] || exec sudo -n -u "$TEAM" /usr/local/bin/ada-team "$@"
@@ -22,7 +24,7 @@ case "${1:-}" in
   run)
     shift; req="$*"
     [[ ${#req} -ge 3 ]] || { echo "usage: ada-team run \"<request>\""; exit 2; }
-    id=$(date +%Y%m%d-%H%M%S); out=$JOBS/$id.md
+    id=$(date +%Y%m%d-%H%M%S); out=$JOBS/$id.md; report=$REPO/reports/job-$id.md
     git -C "$REPO" fetch -q origin
     # The team runs on the agents Berke merged: edits to .claude/agents happen in a worktree on agent/*.
     drift=$( { git -C "$REPO" diff --name-only HEAD -- .claude/agents
@@ -39,10 +41,16 @@ case "${1:-}" in
     [[ -z "$drift" ]] || echo "(reset .claude/agents to origin/main before this run; discarded: $drift)" >> "$out"
     cd "$REPO"
     timeout 3h /usr/local/bin/claude -p --agent principal-engineer --permission-mode dontAsk --output-format text \
-"Request from Berke via Telegram (job $id). You are on the Hermes server: follow the 'Hermes server' section of CLAUDE.md and release-engineer's 'On the Hermes server' flow (agent/* branches, wrappers, no production). If you need a decision from Berke, stop and end your report with ONE question.
+"Request from Berke via Telegram (job $id). You are on the Hermes server: follow the 'Hermes server' section of CLAUDE.md and release-engineer's 'On the Hermes server' flow (agent/* branches, wrappers, no production). If you need a decision from Berke, stop and end your report with ONE question. Write your full report to $report.
 
 $req" >> "$out" 2> "$JOBS/$id.err" || echo "(team run exited with code $? — see $JOBS/$id.err)" >> "$out"
     echo "job $id"; cat "$out"
+    # -newer the .request file: written just before the run, so only this job's reports qualify.
+    found=0
+    while IFS= read -r -d '' f; do
+      found=1; printf '\n===== full report: reports/%s =====\n' "${f##*/}"; cat "$f"
+    done < <(find "$REPO/reports" -maxdepth 1 -type f -name '*.md' -newer "$JOBS/$id.request" -print0 2>/dev/null | sort -z)
+    [[ $found == 1 ]] || printf '\n(no report file written to %s/reports during job %s)\n' "$REPO" "$id"
     ;;
   *) echo "usage: ada-team status | ada-team run \"<request>\""; exit 2 ;;
 esac
