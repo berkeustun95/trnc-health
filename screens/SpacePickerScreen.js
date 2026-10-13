@@ -1,62 +1,82 @@
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
+import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { colors, category as CATEGORY, type, radii, elevation, press } from '../constants/theme'
+import { colors, type, radii, press } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { spaceIds, SPACE_ICON, SPACE_LABEL_KEY } from '../constants/homeGroups'
-import { CategoryIcon } from '../components/ui'
+import { spaceIds, SPACE_SCENE, SPACE_LABEL_KEY } from '../constants/homeGroups'
+import { Button } from '../components/ui'
+import { PHOTO_TEAL, CONTENT_MAX_W } from '../components/ui/PhotoFade'
+import { bandCap } from '../components/ui/OliBand'
 
 // ─── App spaces: the full-screen picker (HOME_SPACES_LIVE) ───────────────────
-// One big tile per LIVE home group, in the group's own category colour (the same one favourites
-// and search use). Health gets its own neutral label (`spaceHealth`) — the Home panel title
-// says "Health", which the store listing may not. No tab bar, no Oli: App.js renders this in
-// place of the tab shell until a space is chosen.
-const CAP = 1.2   // large system text: grow at most 1.2×, the tile has room for that
+// A 2x2 grid of equal glass tiles on the onboarding teal (PHOTO_TEAL), one per LIVE home group, each
+// with its mascot scene and a white label. Tiles fill the screen height; no scrolling. Health gets
+// its own neutral label (`spaceHealth`): the Home panel title says "Health", which the store listing
+// may not. No tab bar: App.js renders this in place of the tab shell until a space is chosen.
+const PAD = 20
 
-function SpaceTile({ id, lang, onPress }) {
+function SpaceTile({ id, lang, width, cap, onPress }) {
   const label = t(SPACE_LABEL_KEY[id], lang)
   return (
-    <TouchableOpacity style={[s.tile, elevation.card]} onPress={() => onPress(id)} activeOpacity={press.card}
+    <TouchableOpacity style={[s.tile, { width }]} onPress={() => onPress(id)} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={label}>
-      <CategoryIcon icon={SPACE_ICON[id]} category={id} size={64} />
-      <Text style={s.label} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP}>{label}</Text>
-      <Ionicons name="chevron-forward" size={22} color={CATEGORY[id].ink} />
+      <View style={s.inner}>
+        <Image source={SPACE_SCENE[id]} style={s.img} resizeMode="contain" accessible={false} accessibilityIgnoresInvertColors />
+        <View style={s.labelWrap}>
+          <Text style={s.label} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>{label}</Text>
+        </View>
+      </View>
     </TouchableOpacity>
   )
 }
 
 export default function SpacePickerScreen({ lang, onChoose, onEmergency }) {
   const insets = useSafeAreaInsets()
-  const { height } = useWindowDimensions()
-  const compact = height < 640   // small phones: tighter gaps so four tiles still fit without scrolling
+  const { width, height } = useWindowDimensions()
+  const compact = height < 640   // small phones: tighter gaps so the grid keeps its room
+  const gap = compact ? 10 : 12
+  const cap = bandCap(width)
+  const tileW = (Math.min(width, CONTENT_MAX_W) - PAD * 2 - gap) / 2
+  const ids = spaceIds()
+  const rows = []
+  for (let i = 0; i < ids.length; i += 2) rows.push(ids.slice(i, i + 2))
   return (
-    <View style={[s.root, { paddingTop: insets.top + (compact ? 16 : 32), paddingBottom: insets.bottom + 16 }]}>
-      <Text style={s.title} accessibilityRole="header" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP}>
-        {t('spacePickerTitle', lang)}
-      </Text>
-      <View style={[s.list, { gap: compact ? 10 : 14 }]}>
-        {spaceIds().map(id => <SpaceTile key={id} id={id} lang={lang} onPress={onChoose} />)}
+    <View style={s.root}>
+      <StatusBar style="light" />
+      <View style={[s.col, { paddingTop: insets.top + (compact ? 12 : 24) }]}>
+        <Text style={[s.title, { marginBottom: compact ? 16 : 20 }]} accessibilityRole="header" numberOfLines={2}
+          adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>
+          {t('spacePickerTitle', lang)}
+        </Text>
+        <View style={[s.grid, { gap }]}>
+          {rows.map((row, i) => (
+            <View key={i} style={[s.row, { gap }]}>
+              {row.map(id => <SpaceTile key={id} id={id} lang={lang} width={tileW} cap={cap} onPress={onChoose} />)}
+            </View>
+          ))}
+        </View>
+        {/* Emergency numbers stay one tap away from the picker (same sheet as Home's tile). */}
+        {!!onEmergency && (
+          <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+            <Button size="lg" variant="inverse" icon="call" title={t('menuEmergency', lang)} onPress={onEmergency} fullWidth />
+          </View>
+        )}
       </View>
-      {/* Emergency numbers stay one tap away from the picker (same sheet as Home's tile). */}
-      {!!onEmergency && (
-        <TouchableOpacity style={s.emergency} onPress={onEmergency} activeOpacity={press.card}
-          accessibilityRole="button" accessibilityLabel={t('menuEmergency', lang)}>
-          <Ionicons name="call" size={20} color={CATEGORY.health.ink} />
-          <Text style={s.emergencyText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP}>{t('menuEmergency', lang)}</Text>
-        </TouchableOpacity>
-      )}
     </View>
   )
 }
 
 const s = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: colors.canvas, paddingHorizontal: 20 },
-  title: { ...type.pageTitle, color: colors.textPrimary, marginBottom: 20, flexShrink: 0 },
-  list:  { flex: 1 },
-  tile:  { flex: 1, maxHeight: 150, minHeight: 84, flexDirection: 'row', alignItems: 'center', gap: 16,
-           backgroundColor: colors.card, borderRadius: radii.card, paddingHorizontal: 18 },
-  label: { flex: 1, ...type.sectionHeading, color: colors.textPrimary },
-  emergency:     { flexShrink: 0, marginTop: 14, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                   backgroundColor: 'transparent', borderRadius: radii.card, borderWidth: 1.5, borderColor: CATEGORY.health.ink, paddingHorizontal: 16 },
-  emergencyText: { ...type.rowTitle, color: CATEGORY.health.ink, flexShrink: 1 },
+  root:  { flex: 1, backgroundColor: PHOTO_TEAL },
+  col:   { flex: 1, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center', paddingHorizontal: PAD },
+  title: { ...type.heroHeadline, color: colors.onPrimary, textAlign: 'center', flexShrink: 0 },
+  grid:  { flex: 1 },
+  row:   { flex: 1, flexDirection: 'row', justifyContent: 'center' },
+  tile:  { backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+           borderRadius: radii.card, padding: 12, alignItems: 'center' },
+  inner: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  img:   { width: '100%', aspectRatio: 1.1, maxHeight: 150, flexShrink: 1, minHeight: 0 },
+  labelWrap: { flexShrink: 0, minHeight: 40, justifyContent: 'center', marginTop: 8 },
+  label: { ...type.rowTitle, color: colors.onPrimary, textAlign: 'center' },
+  footer: { flexShrink: 0, paddingTop: 12 },
 })
