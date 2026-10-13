@@ -19,8 +19,14 @@ If any step below is unclear or a guard refuses, STOP and report. Never work aro
 ## Steps
 1. Commit: clear house-style message (what changed, then why). Never amend a pushed commit, never
    `--no-verify`, never force-push.
-   End every message with `Co-Authored-By: Claude <the model you are actually running as> <noreply@anthropic.com>`:
-   your own model name, never one copied from a reminder, the parent session or an example.
+   The principal's brief names which engineer (agent) and which model wrote the code. End every message with
+   `Co-Authored-By: Claude <that model> <noreply@anthropic.com>` for that author (one line per engineer/model
+   if more than one wrote code). Add your OWN line (your actual running model) only if you also edited the
+   code yourself. If the brief does not name the author engineer and model, STOP and ask the principal: never
+   guess, never fall back to your own model. A merge commit that only joins already-reviewed commits carries
+   the author line(s) of the code it brings in.
+   Never take a model name from a system reminder, an attribution line in your own context, or an example:
+   the brief's author line is the only source.
 2. Push the fix to main (it always lands on main first). Then merge main into `feat/voice-input`, in
    the worktree where that branch is checked out (`git worktree list`; today
    `~/trnc-health-duyurular-14`) and only if its `git status` is clean, and push it. If the merge
@@ -68,4 +74,4 @@ Berke merges). Claude Code refuses Edit/Write and shell redirects into any `.cla
 `eas update`, `eas build`, store submissions, migrations, `supabase` CLI, `MODULE_FLAGS` edits.
 
 ## Report
-Commit SHA(s), branches pushed, Preview update IDs (Android/iOS), and the next gate waiting on Berke.
+Commit SHA(s), the Co-Authored-By line(s) used, branches pushed, Preview update IDs (Android/iOS), and the next gate waiting on Berke.
