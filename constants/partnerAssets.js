@@ -136,6 +136,12 @@ export const PARTNER_ASSETS = {
   'shinypaw/hose':            require('../assets/partners/shinypaw/hose.jpg'),
   'shinypaw/yard-feeding':    require('../assets/partners/shinypaw/yard-feeding.jpg'),
   'shinypaw/yard-two-dogs':   require('../assets/partners/shinypaw/yard-two-dogs.jpg'),
+
+  // ─── Seyhun Bıkmaz Şoför Okulu (Ehliyet) ──────────────────────────────────
+  // Partner's own logo, downsized to 960 px wide (2158x874 source), RGBA, dark blue
+  // (#294EA6 / #213565) on transparency. ⚠ NO onDark VARIANT EXISTS: it may only ever sit on a
+  // white or light surface (EhliyetScreen's card is white).
+  'seyhun/logo':              require('../assets/partners/seyhun/logo.png'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)

@@ -178,6 +178,9 @@ export const HOME_MODULES = [
   { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
     gridLabel: { key: 'hsTitle', lines: 3 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
+  // Driving schools (MODULE_FLAGS.ehliyet). Dark: the tile shows only through HomeScreen's `unlocked` Set on dev / ADA Preview.
+  { id: 'ehliyet',            icon: 'id-card-outline',          tint: 'standard', labelKey: 'menuEhliyet',
+    gridLabel: { key: 'menuEhliyet', lines: 2 } },   // per-language size: Russian / German break mid-word at 11pt (GRID_LABEL_FIT)
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
   { id: 'grooming',           icon: 'cut-outline',              tint: 'standard', labelKey: 'menuGrooming' },
@@ -229,11 +232,11 @@ export const GRID_LABEL_FIT = {
   English: { homeServices: { size: 8.5, lines: 3 } },
   Turkish: { homeServices: { size: 9.25 } },
   Arabic:  { homeServices: { size: 9 } },
-  Russian: { accommodation: { size: 8.75 }, homeServices: { size: 8.25, lines: 3 } },
+  Russian: { accommodation: { size: 8.75 }, homeServices: { size: 8.25, lines: 3 }, ehliyet: { size: 9.5 } },
   Greek:   { homeServices: { size: 8.5, lines: 3 } },
   French:  { homeServices: { size: 8.5, lines: 3 } },
   Spanish: { accommodation: { size: 10.5 }, homeServices: { size: 8.5, lines: 3 } },
-  German:  { accommodation: { size: 10.75 }, homeServices: { size: 8.5, lines: 3 } },
+  German:  { accommodation: { size: 10.75 }, homeServices: { size: 8.5, lines: 3 }, ehliyet: { size: 10.5 } },
   Persian: { homeServices: { size: 8.5, lines: 3 } },
 }
 export function tileLabel(mod, lang) {
