@@ -1,0 +1,43 @@
+#!/bin/bash
+# Hermes → ADA agent team bridge. Installed root-owned at /usr/local/bin/ada-team (the gateway's PATH
+# lists it before ~/bin), so the team, running as hermes, cannot edit away the agents reset below.
+#   ada-team status            current main / feat/voice-input commits + the agents
+#   ada-team run "<request>"   hands the request to Claude Code's principal-engineer in ~/ada;
+#                              prints the team's final report (run it with background=true)
+set -euo pipefail
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin"
+REPO=$HOME/ada; JOBS=$HOME/ada-jobs
+case "${1:-}" in
+  status)
+    git -C "$REPO" fetch -q origin
+    echo "main:             $(git -C "$REPO" log -1 --format='%h %s (%cr)' origin/main)"
+    echo "feat/voice-input: $(git -C "$REPO" log -1 --format='%h %s (%cr)' origin/feat/voice-input)"
+    echo "agents (origin/main .claude/agents):"
+    git -C "$REPO" ls-tree --name-only origin/main .claude/agents/ | sed 's#.*/##; s#\.md$##; s#^#  - #'
+    ;;
+  run)
+    shift; req="$*"
+    [[ ${#req} -ge 3 ]] || { echo "usage: ada-team run \"<request>\""; exit 2; }
+    id=$(date +%Y%m%d-%H%M%S); out=$JOBS/$id.md
+    git -C "$REPO" fetch -q origin
+    # The team runs on the agents Berke merged: edits to .claude/agents happen in a worktree on agent/*.
+    drift=$( { git -C "$REPO" diff --name-only origin/main -- .claude/agents
+               git -C "$REPO" ls-files --others -- .claude/agents; } | sort -u | tr '\n' ' ')
+    git -C "$REPO" restore --source=origin/main --staged --worktree -- .claude/agents
+    git -C "$REPO" clean -fdxq -- .claude/agents
+    if [[ -n "$(git -C "$REPO" diff --name-only origin/main -- .claude/agents)$(git -C "$REPO" status --porcelain -- .claude/agents)" ]]; then
+      echo "REFUSED: .claude/agents in $REPO still differs from origin/main after the reset"; exit 1
+    fi
+    [[ -z "$(git -C "$REPO" status --porcelain --untracked-files=no)" ]] && git -C "$REPO" checkout -q main && git -C "$REPO" merge -q --ff-only origin/main || true
+    echo "$req" > "$JOBS/$id.request"
+    : > "$out"
+    [[ -z "$drift" ]] || echo "(reset .claude/agents to origin/main before this run; discarded: $drift)" >> "$out"
+    cd "$REPO"
+    timeout 3h claude -p --agent principal-engineer --permission-mode dontAsk --output-format text \
+"Request from Berke via Telegram (job $id). You are on the Hermes server: follow the 'Hermes server' section of CLAUDE.md and release-engineer's 'On the Hermes server' flow (agent/* branches, wrappers, no production). If you need a decision from Berke, stop and end your report with ONE question.
+
+$req" >> "$out" 2> "$JOBS/$id.err" || echo "(team run exited with code $? — see $JOBS/$id.err)" >> "$out"
+    echo "job $id"; cat "$out"
+    ;;
+  *) echo "usage: ada-team status | ada-team run \"<request>\""; exit 2 ;;
+esac
