@@ -24,6 +24,7 @@ import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
+import { haptic } from './components/ui/haptics'
 import { supabase, isGuest } from './lib/supabase'
 import { fetchNotifications } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
@@ -106,7 +107,7 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import SpacePickerScreen from './screens/SpacePickerScreen'
-import { spaceIds, categoryOf } from './constants/homeGroups'
+import { spaceIds, categoryOf, SPACE_ALL } from './constants/homeGroups'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
@@ -517,6 +518,8 @@ export default function App() {
   // picker shows), a group key = the chosen space. The three states keep the picker from flashing
   // on a cold start that has a stored space. With the flag off it stays undefined and is never read.
   const [activeSpace, setActiveSpace] = useState(undefined)
+  // The space (or 'all') the user left for the picker; the picker marks it and back returns to it.
+  const [lastSpace, setLastSpace] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   // Redesign: can the OS still ask? false = permanently denied → the screens offer "Ayarları aç";
@@ -981,8 +984,15 @@ export default function App() {
     if (!HOME_SPACES_LIVE) return
     // An unreadable, unknown or stale value (a group whose modules all went dark) is "none".
     const epoch = spaceEpochRef.current
-    AsyncStorage.getItem('@ada_space')
-      .then(v => epoch !== spaceEpochRef.current ? undefined : setActiveSpace(prev => typeof prev === 'string' ? prev : spaceIds().includes(v) ? v : (pushSpaceRef.current ?? null)))
+    // Order: a valid stored space, else full Home when it was chosen on THIS app version
+    // ('@ada_space_all' = the version), else none (the picker).
+    Promise.all([AsyncStorage.getItem('@ada_space'), AsyncStorage.getItem('@ada_space_all')])
+      .then(([v, all]) => {
+        if (epoch !== spaceEpochRef.current) return
+        const stored = spaceIds().includes(v) ? v : (all && all === Constants.expoConfig?.version ? SPACE_ALL : null)
+        if (stored) { lastSpaceRef.current = stored; setLastSpace(stored) }
+        setActiveSpace(prev => typeof prev === 'string' ? prev : (stored ?? pushSpaceRef.current ?? null))
+      })
       .catch(() => { if (epoch === spaceEpochRef.current) setActiveSpace(prev => typeof prev === 'string' ? prev : (pushSpaceRef.current ?? null)) })
   }, [])
 
@@ -997,6 +1007,8 @@ export default function App() {
   const profileRoleRef = useRef(null)
   profileRoleRef.current = profile?.role ?? null
   const spaceHomeShownRef = useRef(false)
+  const spacePickerShownRef = useRef(false)   // "the picker is on screen" (set in the selector, like the ref above)
+  const lastSpaceRef = useRef(null)           // lastSpace for the back handler, set in the same step
   const impliedSpace = moduleId => {
     if (!HOME_SPACES_LIVE) return
     if (profileRoleRef.current && profileRoleRef.current !== 'customer') return
@@ -1007,13 +1019,31 @@ export default function App() {
   }
 
   const chooseSpace = key => {
+    haptic()
+    forgetScroll('home:hub')
     setActiveSpace(key)
     AsyncStorage.setItem('@ada_space', key).catch(() => {})
+    AsyncStorage.removeItem('@ada_space_all').catch(() => {})
+  }
+  // "Tümünü göster": full Home for this app version. The sentinel is never written to '@ada_space'
+  // (that key would keep winning on the next start), so a stored space is dropped and the version
+  // goes to '@ada_space_all': the picker comes back once per app version.
+  const chooseAllSpaces = () => {
+    haptic()
+    forgetScroll('home:hub')
+    setActiveSpace(SPACE_ALL)
+    AsyncStorage.removeItem('@ada_space').catch(() => {})
+    if (Constants.expoConfig?.version) AsyncStorage.setItem('@ada_space_all', Constants.expoConfig.version).catch(() => {})
   }
   // Space Home → the picker. STATE ONLY: '@ada_space' stays, so a kill + reopen still lands in
   // the last space (sign-out is what clears it). Home's remembered scroll belongs to the space
   // it was in, so it is dropped.
-  const openSpacePicker = () => { forgetScroll('home:hub'); setActiveSpace(null) }
+  const openSpacePicker = () => {
+    forgetScroll('home:hub')
+    const cur = activeSpaceRef.current
+    if (typeof cur === 'string') { lastSpaceRef.current = cur; setLastSpace(cur) }
+    setActiveSpace(null)
+  }
   // The first-run tour and the home-city question need Home on screen (they measure its refs),
   // so with spaces on they wait for a chosen space. The ref carries "still owed" across the
   // picker; activeSpaceRef lets the session effect's async callback read the CURRENT value.
@@ -1034,7 +1064,7 @@ export default function App() {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
         // The next login picks a space again.
-        if (HOME_SPACES_LIVE) { spaceEpochRef.current += 1; homeFirstRunOwedRef.current = false; pushSpaceRef.current = null; setActiveSpace(null); AsyncStorage.removeItem('@ada_space').catch(() => {}) }
+        if (HOME_SPACES_LIVE) { spaceEpochRef.current += 1; homeFirstRunOwedRef.current = false; pushSpaceRef.current = null; setActiveSpace(null); lastSpaceRef.current = null; setLastSpace(null); AsyncStorage.removeItem('@ada_space').catch(() => {}); AsyncStorage.removeItem('@ada_space_all').catch(() => {}) }
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
@@ -1171,7 +1201,10 @@ export default function App() {
       // App spaces: back on a space's Home returns to the picker (state only; the stored space stays).
       // spaceHomeShownRef (set in the selector) = "a space Home is on screen", not just a stored space:
       // on the profile-gate wizard or a provider dashboard back must keep its old behaviour.
-      if (spaceHomeShownRef.current) { setActiveSpace(null); return true }
+      // Same path as the hero pill (forgets Home's scroll, remembers the space left).
+      if (spaceHomeShownRef.current) { openSpacePicker(); return true }
+      // Back on the picker returns to the space (or full Home) it was opened from; with none, as before.
+      if (spacePickerShownRef.current && lastSpaceRef.current) { setActiveSpace(lastSpaceRef.current); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
@@ -1758,6 +1791,7 @@ export default function App() {
   // IS "no pushed screen open" — derived from the chain itself rather than by
   // restating its ~25 flags, which would drift the moment a module is added.
   let inTabShell = false
+  let spacePickerOn = false   // the picker branch below was the one chosen
 
   // Admins bypass the marketplace module gate to preview a "Coming soon" module.
   // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
@@ -2579,7 +2613,9 @@ export default function App() {
     // No space chosen: full-screen picker on the Home tab only (a 'profile' push shows Profile
     // in the tab shell; Home tab / back returns here), no tab shell. inTabShell stays false, so the coach
     // marks, policy notice, city prompts and Oli wait until a space is chosen.
-    content = <SpacePickerScreen lang={lang} onChoose={chooseSpace} onEmergency={() => setShowEmergencyModal(true)} />
+    spacePickerOn = true
+    content = <SpacePickerScreen lang={lang} current={lastSpace} onChoose={chooseSpace} onShowAll={chooseAllSpaces}
+      onProfile={() => setActiveTab('profile')} onEmergency={() => setShowEmergencyModal(true)} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -2700,7 +2736,8 @@ export default function App() {
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
             liveScoresTester={liveScoresTester}
-            space={HOME_SPACES_LIVE && !isAdmin && typeof activeSpace === 'string' ? activeSpace : null}
+            space={HOME_SPACES_LIVE && !isAdmin && typeof activeSpace === 'string' && activeSpace !== SPACE_ALL ? activeSpace : null}
+            spaceAll={HOME_SPACES_LIVE && !isAdmin && activeSpace === SPACE_ALL}
             onOpenSpacePicker={openSpacePicker}
           />
         )}
@@ -2998,6 +3035,7 @@ export default function App() {
   // "A space Home is on screen": assigned on every render, after `content` and inTabShell are decided,
   // so the back handler never swallows back on the profile-gate wizard, a provider dashboard or the picker.
   spaceHomeShownRef.current = HOME_SPACES_LIVE && inTabShell && activeTab === 'home' && !isAdmin && typeof activeSpace === 'string'
+  spacePickerShownRef.current = HOME_SPACES_LIVE && spacePickerOn && !isAdmin && activeTab === 'home' && activeSpace === null
 
   return (
     <SafeAreaProvider>

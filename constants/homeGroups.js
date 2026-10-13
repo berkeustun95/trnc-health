@@ -103,7 +103,7 @@ export function spaceIds(unlocked) { return liveGroups(unlocked).map(g => g.key)
 
 // One source for the picker tile and the in-space top-bar control. Health has its own neutral
 // label (`spaceHealth`): the panel title says "Health", which the store listing may not.
-export const SPACE_ICON = { health: 'medkit-outline', explore: 'compass-outline', homeLife: 'home-outline', city: 'business-outline' }
+export const SPACE_ICON = { health: 'medkit-outline', explore: 'compass-outline', homeLife: 'home-outline', city: 'business-outline', all: 'apps-outline' }
 // Mascot art for the picker tiles. City has no transport/town art; the arriving-with-a-suitcase scene
 // stands in (it is also the accommodation module's art) until a city scene exists. assets/mascots/* are
 // not all transparent; check alpha before using one on teal.
@@ -113,7 +113,10 @@ export const SPACE_SCENE = {
   homeLife: require('../assets/oli-scenes/services.png'),
   city: require('../assets/oli-scenes/accommodation.png'),
 }
-export const SPACE_LABEL_KEY = { health: 'spaceHealth', explore: 'hrGroupExplore', homeLife: 'hrGroupHome', city: 'hrGroupCity' }
+export const SPACE_LABEL_KEY = { health: 'spaceHealth', explore: 'hrGroupExplore', homeLife: 'hrGroupHome', city: 'hrGroupCity', all: 'hrAllServices' }
+// The full-Home mode's activeSpace sentinel: never a group key, never in spaceIds(), never stored in
+// '@ada_space'. It only borrows an icon and label above for the hero's switch pill.
+export const SPACE_ALL = 'all'
 
 // Inside a space, which live-strip items belong to it. Keyed on the resolver's `kind`
 // (utils/homeStripResolver.js): event (incl. the generic events card) and place are Explore

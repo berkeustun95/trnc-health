@@ -61,7 +61,7 @@ export const heroHeight = insetTop => Math.max(HERO_TOTAL, insetTop + HERO_MIN_B
 export default function RedesignHero({
   region, lang, hasUnread, hideActions, onShowNotifs, onOpenMenu, hamburgerRef, onOpenPlace,
   weatherData, onOpenWeather, weatherRef,
-  space = null, onOpenSpacePicker,   // app spaces: the chosen space's control (null = today's hero)
+  space = null, onOpenSpacePicker,   // app spaces: the chosen space's control (null = today's hero; 'all' = full Home)
 }) {
   const insets = useSafeAreaInsets()
   const narrow = useWindowDimensions().width < 350

@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +8 on 2026-10-13 for app spaces (back keys on spaceHomeShownRef, set in the selector) (space Home -> picker, search first, Profile tab, picker, flag off, admin). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +8 on 2026-10-13 for app spaces (back keys on spaceHomeShownRef, set in the selector) (space Home -> picker, search first, Profile tab, picker, flag off, admin). +4 on 2026-10-13 for the picker remembering its last space (back on the picker returns to it, spacePickerShownRef + lastSpaceRef; full Home 'all' backs to the picker like a space; a not-shown picker ref is never swallowed). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -30,7 +30,7 @@ function run(state, home=null, prof=null, refs={}){
     if(k==='profileGuardRef') return {current: prof}
     if(k==='oliCloseRef') return {current: ()=>calls.push('oliClose')}
     if(k==='sessionRef') return {current: {user:{id:'u'}}}
-    if(typeof k==='string' && (/^(set|close|petsSubBack)/.test(k))) return (...a)=>calls.push(k+'('+a.map(x=>JSON.stringify(x)).join(',')+')')
+    if(typeof k==='string' && (/^(set|close|petsSubBack|openSpacePicker)/.test(k))) return (...a)=>calls.push(k+'('+a.map(x=>JSON.stringify(x)).join(',')+')')
     if(k==='closePetHotel') return ()=>calls.push('closePetHotel')
     if(typeof k==='string' && k.endsWith('Ref')) return {current:null}
     return undefined }})
@@ -74,10 +74,14 @@ const cases4=[
  ['S10 Towing detail over Garages -> closes detail only', {...base, showGarages:true, showTowing:true}, {towingBackRef:()=>true, garagesBackRef:()=>{throw new Error('garages asked')}}, r=>r.calls===''],
  ['S10 Towing detail standalone -> closes detail only', {...base, showTowing:true}, {towingBackRef:()=>true}, r=>r.calls===''],
  ['Beaches layer -> module step', {...base, showExploreBeach:true}, {exploreBackRef:()=>true}, r=>r.calls===''],
- ['SPACES space Home -> picker (state only)', {...base, HOME_SPACES_LIVE:true, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:true}, r=>r.r===true && r.calls==='setActiveSpace(null)'],
+ ['SPACES space Home -> picker (state only)', {...base, HOME_SPACES_LIVE:true, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:true}, r=>r.r===true && r.calls==='openSpacePicker()'],
  ['SPACES space Home, search open -> search closes first, space stays', {...base, activeSpace:'explore'}, {homeBackRef:()=>true, spaceHomeShownRef:true}, r=>r.r===true && r.calls===''],
  ['SPACES space + Profile tab -> Home tab, not the picker', {...base, activeSpace:'city', activeTab:'profile'}, {profileGuardRef:{back:()=>false}, spaceHomeShownRef:false}, r=>r.calls.includes('setActiveTab("home")') && !r.calls.includes('setActiveSpace')],
- ['SPACES picker up (no space) -> root exit', {...base, activeSpace:null}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && r.calls===''],
+ ['SPACES full Home (all) -> picker, same path as a space', {...base, activeSpace:'all'}, {homeBackRef:()=>false, spaceHomeShownRef:true}, r=>r.r===true && r.calls==='openSpacePicker()'],
+ ['SPACES picker up + a last space -> back to that space', {...base, activeSpace:null}, {homeBackRef:()=>false, spaceHomeShownRef:false, spacePickerShownRef:true, lastSpaceRef:'health'}, r=>r.r===true && r.calls==='setActiveSpace("health")'],
+ ['SPACES picker up + last was full Home -> back to all', {...base, activeSpace:null}, {homeBackRef:()=>false, spaceHomeShownRef:false, spacePickerShownRef:true, lastSpaceRef:'all'}, r=>r.r===true && r.calls==='setActiveSpace("all")'],
+ ['SPACES picker up, no last space -> root exit as today', {...base, activeSpace:null}, {homeBackRef:()=>false, spaceHomeShownRef:false, spacePickerShownRef:true, lastSpaceRef:null}, r=>r.r===false && r.calls===''],
+ ['SPACES last space but picker NOT shown (gate/provider/admin) -> not swallowed', {...base, activeSpace:null}, {homeBackRef:()=>false, spaceHomeShownRef:false, spacePickerShownRef:false, lastSpaceRef:'health'}, r=>r.r===false && !r.calls.includes('setActiveSpace')],
  ['SPACES flag off, stale space -> root exit as today', {...base, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && r.calls===''],
  ['SPACES admin with a stored space -> root exit', {...base, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && r.calls===''],
  ['SPACES profile gate + stored space -> back not swallowed', {...base, activeSpace:'health'}, {homeBackRef:()=>false, spaceHomeShownRef:false}, r=>r.r===false && !r.calls.includes('setActiveSpace')],
@@ -121,13 +125,14 @@ for (const [n,st,h,p,ok] of cases){ let r; try{ r=run(st,h,p) }catch(e){ r={r:'T
     let f; try{ f=new Function('HOME_SPACES_LIVE','inTabShell','activeTab','isAdmin','activeSpace',`return (${expr})`) }catch(e){ ok=false; why.push('expression does not parse: '+expr) }
     if(f){
       const trues=[]
-      for(const flag of [false,true]) for(const shell of [false,true]) for(const tab of ['home','profile']) for(const adm of [false,true]) for(const sp of [undefined,null,'health','city']){
+      for(const flag of [false,true]) for(const shell of [false,true]) for(const tab of ['home','profile']) for(const adm of [false,true]) for(const sp of [undefined,null,'health','city','all']){
         if(!!f(flag,shell,tab,adm,sp)) trues.push(JSON.stringify({flag,shell,tab,adm,sp}))
       }
-      // PERFECT system: true for exactly flag on + tab shell + Home tab + not admin + a chosen (string) space.
-      const want=['health','city'].map(sp=>JSON.stringify({flag:true,shell:true,tab:'home',adm:false,sp}))
+      // PERFECT system: true for exactly flag on + tab shell + Home tab + not admin + a chosen (string) space,
+      // full Home ('all', the sentinel) included.
+      const want=['health','city','all'].map(sp=>JSON.stringify({flag:true,shell:true,tab:'home',adm:false,sp}))
       if(JSON.stringify(trues)!==JSON.stringify(want)){ ok=false; why.push(`truth table: got ${trues.length} true row(s) ${trues.join(' ')} ; expected ${want.join(' ')}`) }
-      console.log(`INFO spaceHomeShownRef := ${expr}  (${trues.length} true row(s) of 64)`)
+      console.log(`INFO spaceHomeShownRef := ${expr}  (${trues.length} true row(s))`)
     }
   }
   // Selector order: admin, provider and the profile-loading wait all come BEFORE the picker branch.
@@ -138,6 +143,35 @@ for (const [n,st,h,p,ok] of cases){ let r; try{ r=run(st,h,p) }catch(e){ r={r:'T
   }
   if(!ok) bad++
   console.log((ok?'PASS ':'FAIL ')+'SPACES selector sets spaceHomeShownRef only for flag+shell+Home+non-admin+chosen space; picker after admin/provider/gate  -> '+(ok?'ok':why.join(' ; ')))
+}
+// spacePickerShownRef: the picker-is-up flag behind "back returns to the last space". `spacePickerOn` is
+// set by the picker branch alone, so (a) the assignment's truth table, and (b) exactly one
+// `spacePickerOn = true`, inside that branch, which tests activeSpace === null on the Home tab.
+{
+  const A="spacePickerShownRef.current = "
+  const occ=src.split(A).length-1
+  const at=src.indexOf(A)
+  const expr = at===-1 ? '' : src.slice(at+A.length, src.indexOf('\n', at)).trim()
+  let ok=true; const why=[]
+  if(occ!==1){ ok=false; why.push(`expected exactly 1 assignment of spacePickerShownRef.current, found ${occ}`) }
+  else {
+    let f; try{ f=new Function('HOME_SPACES_LIVE','spacePickerOn','activeTab','isAdmin','activeSpace',`return (${expr})`) }catch(e){ ok=false; why.push('expression does not parse: '+expr) }
+    if(f){
+      const trues=[]
+      for(const flag of [false,true]) for(const on of [false,true]) for(const tab of ['home','profile']) for(const adm of [false,true]) for(const sp of [undefined,null,'health','all']){
+        if(!!f(flag,on,tab,adm,sp)) trues.push(JSON.stringify({flag,on,tab,adm,sp}))
+      }
+      const want=[JSON.stringify({flag:true,on:true,tab:'home',adm:false,sp:null})]
+      if(JSON.stringify(trues)!==JSON.stringify(want)){ ok=false; why.push(`truth table: got ${trues.length} true row(s) ${trues.join(' ')} ; expected ${want.join(' ')}`) }
+      console.log(`INFO spacePickerShownRef := ${expr}  (${trues.length} true row(s))`)
+    }
+  }
+  const SET='spacePickerOn = true'
+  const setAt=src.indexOf(SET), pickAt=src.indexOf("HOME_SPACES_LIVE && !isAdmin && activeTab === 'home' && activeSpace === null")
+  const nextBranch=src.indexOf('} else {', pickAt)
+  if(src.split(SET).length-1!==1 || pickAt===-1 || setAt<pickAt || setAt>nextBranch){ ok=false; why.push(`'${SET}' must appear once, inside the picker branch (set ${setAt}, picker ${pickAt}, branch end ${nextBranch})`) }
+  if(!ok) bad++
+  console.log((ok?'PASS ':'FAIL ')+'SPACES selector sets spacePickerShownRef only when the picker branch won (flag+Home+non-admin+null space)  -> '+(ok?'ok':why.join(' ; ')))
 }
 console.log(bad?`back chain: ${bad} FAILED (of ${cases4.length+cases.length} cases + selector check)`:`back chain: OK (${cases4.length+cases.length}/${cases4.length+cases.length} cases + selector check)`)
 if(bad) process.exit(1)

@@ -252,6 +252,7 @@ export default function HomeScreen({
   // A group key ('health' | 'explore' | 'homeLife' | 'city') narrows the redesigned hub to that
   // space; null (the default, and what App passes while the flag is off) is today's Home exactly.
   space = null,
+  spaceAll = false,       // full-Home mode: today's Home, but the hero keeps the switch pill
   onOpenSpacePicker,      // the hero's space control: back to the picker
 }) {
   const tabFootprint = useTabBarFootprint()
@@ -954,7 +955,7 @@ export default function HomeScreen({
             onShowNotifs={onShowNotifs} onOpenMenu={onOpenMenu} hamburgerRef={hamburgerRef}
             onOpenPlace={openPlaceById} weatherData={weatherData} onOpenWeather={() => setWeatherOpen(true)}
             weatherRef={weatherRef}
-            space={space} onOpenSpacePicker={onOpenSpacePicker} />
+            space={space || (spaceAll ? 'all' : null)} onOpenSpacePicker={onOpenSpacePicker} />
 
           <View style={s.rBelow}>
             {!hideHeaderActions && (
