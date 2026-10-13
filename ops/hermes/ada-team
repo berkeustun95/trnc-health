@@ -24,7 +24,11 @@ if [[ "$(id -un)" != "$TEAM" && "${1:-}" == run ]]; then
     | perl -CSD -pe 's/(MEDIA)(?=\s*:)/$1\x{2060}/gi; s/\[(?=\[)/[\x{2060}/g' | tee "$log" || rc=$?
   if grep -q '^===== full report: ' "$log"; then
     to=$(sed -n 's/^TELEGRAM_ALLOWED_USERS=\([0-9][0-9]*\)$/\1/p' /home/hermes/.hermes/.env 2>/dev/null)
+    # Telegram turns bare file names into links (CLAUDE.md -> a .md domain), so file names outside
+    # code spans and fences go in `code`; the words are unchanged and URLs are left alone.
     if [[ "$to" =~ ^[0-9]+$ ]] && sed -n '/^===== full report: /,$p' "$log" \
+         | perl -CSD -ne 'if (/^\s*```/) { $f = !$f; print; next } if ($f) { print; next }
+             print join "", map { /^`/ ? $_ : s{(?<![\w./~:\x{2060}-])([\w./~-]*[\w-]\.(?:md|mdx|sh|py|js|mjs|cjs|ts|tsx|jsx|json|sql|ya?ml|toml|txt|csv|log|html|css|xml|plist|rb|kt|swift|gradle|lock))(?![\w])}{`$1`}gr } split /(`+[^`]*`+)/' \
          | /home/hermes/.local/bin/hermes send --to "telegram:$to" --quiet --file - >/dev/null 2>&1; then
       echo "(full report sent to Berke on Telegram directly)"
     else
