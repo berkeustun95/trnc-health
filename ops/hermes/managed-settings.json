@@ -1,5 +1,8 @@
 {
-  "apiKeyHelper": "cat /home/hermes/.config/ada/anthropic.key",
+  "apiKeyHelper": "cat /home/adateam/.config/ada/anthropic.key",
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  },
   "permissions": {
     "defaultMode": "dontAsk",
     "disableBypassPermissionsMode": "disable",
@@ -10,9 +13,8 @@
     "deny": [
       "Read(//etc/ada/**)",
       "Read(//var/lib/ada-publisher/**)",
-      "Edit(//home/hermes/ada/.claude/agents/**)",
-      "Edit(//home/hermes/.claude/agents/**)",
-      "Edit(//home/hermes/bin/**)",
+      "Edit(//home/adateam/ada/.claude/agents/**)",
+      "Edit(//home/adateam/.claude/agents/**)",
       "Bash(npm run ota)",
       "Bash(npm run ota *)",
       "Bash(*eas update*)",
