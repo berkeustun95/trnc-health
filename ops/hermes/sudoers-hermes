@@ -1,4 +1,10 @@
-# /etc/sudoers.d/50-hermes — the agent user may run exactly these root-owned wrappers, nothing else.
+# /etc/sudoers.d/50-hermes — each user may run exactly these root-owned commands, nothing else.
 # Each wrapper validates its own arguments; secrets stay in root-only files under /etc/ada.
+# hermes  = the Telegram gateway: production OTA (waits for Berke's GO), migration apply, and the team.
+# adateam = the agent team (Claude Code): Preview, dry runs and agent/* PRs only. production / apply
+#           are not reachable from this user at all, whatever the managed policy says.
 Defaults:hermes env_reset, !setenv
-hermes ALL=(root) NOPASSWD: /usr/local/sbin/ada-publish, /usr/local/sbin/ada-migrate, /usr/local/sbin/ada-pr
+Defaults:adateam env_reset, !setenv
+hermes ALL=(root) NOPASSWD: /usr/local/sbin/ada-publish, /usr/local/sbin/ada-migrate
+hermes ALL=(adateam) NOPASSWD: /usr/local/bin/ada-team
+adateam ALL=(root) NOPASSWD: /usr/local/sbin/ada-publish preview *, /usr/local/sbin/ada-publish preview-check *, /usr/local/sbin/ada-migrate dry *, /usr/local/sbin/ada-pr

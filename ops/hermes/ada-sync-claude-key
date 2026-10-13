@@ -1,0 +1,10 @@
+#!/bin/bash
+# Copies ANTHROPIC_API_KEY from root-only /etc/ada/hermes.env into the team-owned file that
+# Claude Code's apiKeyHelper reads (Hermes strips the variable from the processes it starts).
+# The team runs as `adateam`, not as the gateway user `hermes`.
+set -euo pipefail; umask 077
+k=$(sed -n 's/^ANTHROPIC_API_KEY=//p' /etc/ada/hermes.env)
+[[ -n "$k" ]] || { echo "no ANTHROPIC_API_KEY in /etc/ada/hermes.env" >&2; exit 1; }
+install -d -o adateam -g adateam -m 700 /home/adateam/.config /home/adateam/.config/ada
+printf '%s' "$k" > /home/adateam/.config/ada/anthropic.key
+chown adateam:adateam /home/adateam/.config/ada/anthropic.key; chmod 600 /home/adateam/.config/ada/anthropic.key

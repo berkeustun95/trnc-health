@@ -45,7 +45,7 @@ If any step below is unclear or a guard refuses, STOP and report. Never work aro
 6. Native changes (app.config.js, native deps, permissions): do not build. Report that a native
    build is needed.
 
-## On the Hermes server (user `hermes`, repo `~/ada`)
+## On the Hermes server (user `adateam`, repo `~/ada` = `/home/adateam/ada`)
 You cannot push `main` or `feat/voice-input` (ruleset) and you hold no Expo token. Instead:
 1. Push `agent/<slug>`: the fix rebased on `origin/main`, no merge commits.
 2. Push `agent/<slug>-14`: a worktree of `origin/feat/voice-input` with `git merge --no-ff agent/<slug>`,
