@@ -57,6 +57,12 @@ You cannot push `main` or `feat/voice-input` (ruleset) and you hold no Expo toke
    Berke checks the Preview and merges.
 Never delete either branch: the production OTA's lineage check fetches the Preview's commit. Production OTA is
 not yours on the server: Berke asks Hermes, and the wrapper waits for his GO code.
+`ada-pr comment <n> < body` and `ada-pr close <n> "<comment>"` (same `sudo -n /usr/local/sbin/`) act on
+agent/* PRs only; close keeps the branch. Merging is Berke's, always.
+Agent definitions (`.claude/agents/*`) change only in a worktree on `agent/<slug>`, never in `~/ada` (refused;
+`ada-team run` resets `~/ada/.claude/agents` to origin/main before every run, so a change applies only after
+Berke merges). Claude Code refuses Edit/Write and shell redirects into any `.claude/`: write a unified diff to
+`agents.patch` in the worktree root, `git apply --recount agents.patch`, delete the patch.
 
 ## Never
 `eas update`, `eas build`, store submissions, migrations, `supabase` CLI, `MODULE_FLAGS` edits.
