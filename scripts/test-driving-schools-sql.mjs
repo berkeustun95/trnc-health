@@ -56,6 +56,23 @@ await run('USING (true) on schools', mutant('using', `USING (is_active);`, `USIN
 await run('is_active DEFAULT true', mutant('default', `is_active     boolean     NOT NULL DEFAULT false`, `is_active     boolean     NOT NULL DEFAULT true`))
 await run('branches policy without school check', mutant('brpol', `USING (EXISTS (SELECT 1 FROM public.driving_schools s WHERE s.id = driving_school_branches.school_id AND s.is_active));`, `USING (true);`))
 await run('later phone elements need no plus sign', mutant('phones', `(\\\\n\\\\+[0-9]`, `(\\\\n[0-9+]`))
+await run('facebook_url accepts http', mutant('fb', `facebook_url ~ '^https://(www\\.)?facebook`, `facebook_url ~ '^https?://(www\\.)?facebook`))
+await run('facebook_url start anchor lost (any host)', mutant('fbhost', `facebook_url ~ '^https://(www\\.)?facebook`, `facebook_url ~ 'https://(www\\.)?facebook`))
+await run('email shape unchecked', mutant('email', `email ~* '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'`, `email ~* '.*'`))
+await run('email length unchecked', mutant('emlen', `length(email) <= 254`, `length(email) <= 2540`))
+await run('licence class vocabulary widened (Z)', mutant('lcv', `<@ ARRAY['A','B','C','D','E','F','G','H','H1','H2','J','K']::text[]`, `<@ ARRAY['A','B','C','D','E','F','G','H','H1','H2','J','K','Z']::text[]`))
+await run('licence classes may repeat', mutant('lcdup', `AND array_to_string(licence_classes, ',') !~ '(^|,)([^,]+),(.*,)?\\2(,|$)'`, ``))
+// No NULL-element mutant: array_position(...) IS NULL is defence in depth. On PG 18 `ARRAY['B',NULL] <@ ARRAY[...]`
+// is already false, so removing the clause is not refused (measured 2026-10-13); the NULL probe still guards the behaviour.
+await run('licence classes may be multi-dimensional (ndims + array_position dropped; <@ flattens)', mutant('lcmd', `AND COALESCE(array_ndims(licence_classes), 1) = 1
+         AND array_position(licence_classes, NULL) IS NULL`, ``))
+await run('branch address length unbounded', mutant('addr', `BETWEEN 5 AND 200`, `BETWEEN 0 AND 20000`))
+await run('geocode_source admits google_places', mutant('gsrc', `geocode_source IN ('osm')`, `geocode_source IN ('osm','google_places')`))
+await run('provenance: coordinates without a source allowed', mutant('provA', `CHECK ((lat IS NULL) = (geocode_source IS NULL));`, `CHECK (geocode_source IS NULL OR lat IS NOT NULL);`))
+await run('provenance: a source without coordinates allowed', mutant('provB', `CHECK ((lat IS NULL) = (geocode_source IS NULL));`, `CHECK (lat IS NULL OR geocode_source IS NOT NULL);`))
+await run('seed: licence classes out of order', mutant('seedord', `'H','H1','H2','J','K'], true, 0, false)`, `'H','H2','H1','J','K'], true, 0, false)`))
+await run('seed: three phones again', mutant('seedph', `ARRAY['+90 533 887 39 99'], '+90 533 887 39 99',`, `ARRAY['+90 533 887 39 99','+90 533 854 39 99'], '+90 533 887 39 99',`))
+await run('seed: Güzelyurt given an address', mutant('seedmor', `('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'morphou', NULL,`, `('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'morphou', 'Zz Sokak 1, Güzelyurt',`))
 
 if (bad) { console.log(`\n${bad} FAILED`); process.exit(1) }
 console.log('\nall green')
