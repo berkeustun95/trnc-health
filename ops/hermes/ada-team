@@ -15,8 +15,13 @@ TEAM=adateam
 if [[ "$(id -un)" != "$TEAM" && "${1:-}" == run ]]; then
   # Gateway side (user hermes): the job runs as adateam; its full-report sections go out verbatim.
   # The recipient is the gateway's single allowed Telegram user, never a value from the job.
+  # Job text is untrusted: Hermes uploads any `MEDIA:<path>` it sees AS hermes (a report line naming
+  # ~/.hermes/.env would send the bot token) and obeys [[as_document]]/[[audio_as_voice]]. A WORD
+  # JOINER (U+2060, invisible) after MEDIA and between [[ breaks both, for hermes send AND for the
+  # gateway's model, which runs the same extraction on its replies.
   log=$(mktemp); trap 'rm -f "$log"' EXIT
-  rc=0; sudo -n -u "$TEAM" /usr/local/bin/ada-team "$@" | tee "$log" || rc=$?
+  rc=0; sudo -n -u "$TEAM" /usr/local/bin/ada-team "$@" \
+    | perl -CSD -pe 's/(MEDIA)(?=\s*:)/$1\x{2060}/gi; s/\[(?=\[)/[\x{2060}/g' | tee "$log" || rc=$?
   if grep -q '^===== full report: ' "$log"; then
     to=$(sed -n 's/^TELEGRAM_ALLOWED_USERS=\([0-9][0-9]*\)$/\1/p' /home/hermes/.hermes/.env 2>/dev/null)
     if [[ "$to" =~ ^[0-9]+$ ]] && sed -n '/^===== full report: /,$p' "$log" \
