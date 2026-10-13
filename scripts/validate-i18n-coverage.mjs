@@ -360,6 +360,7 @@ const SAME_AS_ENGLISH = {
   // Ehliyet action labels: product names, shown untranslated in every locale.
   'ehliyetInstagram': { Turkish: 'Instagram is a brand name', Arabic: 'Instagram is a brand name', Russian: 'Instagram is a brand name', Greek: 'Instagram is a brand name', French: 'Instagram is a brand name', Spanish: 'Instagram is a brand name', German: 'Instagram is a brand name', Persian: 'Instagram is a brand name' },
   'ehliyetWhatsApp': { Turkish: 'WhatsApp is a brand name', Arabic: 'WhatsApp is a brand name', Russian: 'WhatsApp is a brand name', Greek: 'WhatsApp is a brand name', French: 'WhatsApp is a brand name', Spanish: 'WhatsApp is a brand name', German: 'WhatsApp is a brand name', Persian: 'WhatsApp is a brand name' },
+  'ehliyetFacebook': { Turkish: 'Facebook is a brand name', Arabic: 'Facebook is a brand name', Russian: 'Facebook is a brand name', Greek: 'Facebook is a brand name', French: 'Facebook is a brand name', Spanish: 'Facebook is a brand name', German: 'Facebook is a brand name', Persian: 'Facebook is a brand name' },
   // Check-ins (20261092): "check-in" is the loanword these languages use for it (Foursquare/Swarm,
   // Facebook all ship it untranslated in fr/es/de); every sentence around it is translated.
   'checkinTab':           { French: 'Check-ins is the French loanword', Spanish: 'Check-ins is the Spanish loanword', German: 'Check-ins is the German loanword' },

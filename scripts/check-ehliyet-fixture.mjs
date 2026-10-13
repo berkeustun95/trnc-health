@@ -63,24 +63,30 @@ const parseTuples = (body) => {
   return tuples
 }
 
-// Anchored on the seed headers only (the verification block inserts probe rows with other column lists).
-const SCHOOL_RE = /INSERT INTO public\.driving_schools\s*\(\s*id,\s*name,\s*logo_key,\s*phones,\s*whatsapp,\s*instagram_url,\s*featured,\s*sort_order,\s*is_active\s*\)\s*VALUES([\s\S]*?)ON CONFLICT/g
-const BRANCH_RE = /INSERT INTO public\.driving_school_branches\s*\(\s*school_id,\s*region,\s*sort_order\s*\)\s*VALUES([\s\S]*?)ON CONFLICT/g
+// Anchored on the seed column lists only (the verification block inserts probe rows with other column lists).
+// Whitespace, including line breaks, inside the column list is free.
+const cols = (list) => list.split(',').map(c => c.trim())
+const SCHOOL_COLS = cols('id, name, logo_key, phones, whatsapp, instagram_url, facebook_url, email, licence_classes, featured, sort_order, is_active')
+const BRANCH_COLS = cols('school_id, region, address, lat, lng, geocode_source, sort_order')
+const insertRe = (table, columns) =>
+  new RegExp(`INSERT INTO public\\.${table}\\s*\\(\\s*${columns.join('\\s*,\\s*')}\\s*\\)\\s*VALUES([\\s\\S]*?)ON CONFLICT`, 'g')
+const SCHOOL_RE = insertRe('driving_schools', SCHOOL_COLS)
+const BRANCH_RE = insertRe('driving_school_branches', BRANCH_COLS)
+const byCols = (columns, row) => {
+  if (row.length !== columns.length) throw new Error(`seed row has ${row.length} values for ${columns.length} columns`)
+  return Object.fromEntries(columns.map((c, i) => [c, row[i]]))
+}
 
 export const parseSeed = (sql) => {
   const schools = [...sql.matchAll(SCHOOL_RE)]
   if (schools.length !== 1) throw new Error(`want exactly 1 driving_schools seed INSERT, found ${schools.length}`)
   const rows = parseTuples(schools[0][1])
   if (rows.length !== 1) throw new Error(`want exactly 1 seed school row, found ${rows.length}`)
-  const [id, name, logo_key, phones, whatsapp, instagram_url, featured, sort_order, is_active] = rows[0]
   const branches = [...sql.matchAll(BRANCH_RE)]
   if (branches.length !== 1) throw new Error(`want exactly 1 driving_school_branches seed INSERT, found ${branches.length}`)
   const brows = parseTuples(branches[0][1])
   if (brows.length < 1) throw new Error('seed branch INSERT has no rows')
-  return {
-    school: { id, name, logo_key, phones, whatsapp, instagram_url, featured, sort_order, is_active },
-    branches: brows.map(([school_id, region, sort_order]) => ({ school_id, region, sort_order })),
-  }
+  return { school: byCols(SCHOOL_COLS, rows[0]), branches: brows.map(r => byCols(BRANCH_COLS, r)) }
 }
 
 // Returns a list of human-readable differences (empty = no drift). Throws if the seed cannot be parsed.
@@ -90,13 +96,14 @@ export const diffFixture = (sql, fixture) => {
   const cmp = (label, seedVal, fixVal) => {
     if (JSON.stringify(seedVal) !== JSON.stringify(fixVal)) out.push(`${label}: seed ${JSON.stringify(seedVal)} vs fixture ${JSON.stringify(fixVal)}`)
   }
-  for (const k of ['id', 'name', 'logo_key', 'phones', 'whatsapp', 'instagram_url', 'featured', 'sort_order']) cmp(k, school[k], fixture[k])
+  // Array columns (phones, licence_classes) compare in stored order: the chips render in that order.
+  for (const k of SCHOOL_COLS.filter(c => c !== 'is_active')) cmp(k, school[k], fixture[k])
   // The one deliberate difference: the seed is inactive, the fixture is readable on purpose.
   cmp('is_active (seed false, fixture true by design)', [school.is_active, fixture.is_active], [false, true])
   for (const b of branches) if (b.school_id !== school.id) out.push(`branch school_id ${b.school_id} is not the seed school id ${school.id}`)
   const fixB = [...(fixture.driving_school_branches || [])].sort((a, b) => a.sort_order - b.sort_order)
-  cmp('branches (region, sort_order)', branches.map(b => [b.region, b.sort_order]), fixB.map(b => [b.region, b.sort_order]))
-  for (const b of fixB) if (b.lat !== null || b.lng !== null) out.push(`fixture branch ${b.region} has coordinates; the seed sets none`)
+  const BC = BRANCH_COLS.filter(c => c !== 'school_id')
+  cmp(`branches (${BC.join(', ')})`, branches.map(b => BC.map(c => b[c])), fixB.map(b => BC.map(c => b[c] ?? null)))
   return out
 }
 
