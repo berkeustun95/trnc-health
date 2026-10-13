@@ -337,15 +337,17 @@ request, no force-push, no deletion; only Berke's admin role bypasses (a Mac pus
 violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal repo it counts as admin and bypasses.
 
 **Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
-team runs there as user `hermes` as GitHub `ada-hermes-bot` (Write): it pushes only `agent/*` branches, cannot
-read any production credential, and acts through three root-owned wrappers (`sudo -n /usr/local/sbin/…`):
+team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
+write; `ops/hermes/team-user-setup.sh`) as GitHub `ada-hermes-bot` (Write): it pushes only `agent/*` branches, cannot
+read any production credential, and acts through three root-owned wrappers (`sudo -n /usr/local/sbin/…`; sudoers
+allows the team only `ada-publish preview|preview-check`, `ada-migrate dry` and `ada-pr`):
 `ada-publish preview agent/<slug>-14 "<msg>"` (1.4.0 Preview; refuses agent commits touching config,
 `package*.json`, `scripts/`, `.githooks/`, `.github/`), `ada-migrate dry <file>`, `ada-pr agent/<slug> <base> "<title>"` (also
-`ada-pr comment|close <n>`, agent/* PRs only, never merge). `ada-team` is root-owned in `/usr/local/bin` (the gateway's
-PATH puts it before `~/bin`) and resets `~/ada/.claude/agents` to origin/main before every run: agent-definition
+`ada-pr comment|close <n>`, agent/* PRs only, never merge). `ada-team` (root-owned, `/usr/local/bin`) re-runs itself as
+`adateam` with the root-owned `/usr/local/bin/claude` (auto-update off; upgrading = a root install) and resets `~/ada/.claude/agents` to origin/main before every run: agent-definition
 changes go through an `agent/*` PR and apply after Berke merges. Managed-policy paths need `//` for absolute
 (`Read(/etc/…)` is relative to the settings file and matched nothing until 2026-10-13); `Edit(path)` covers Write.
-Production OTA (`ada-publish production`) and migration apply are denied to Claude Code by managed policy;
+Production OTA (`ada-publish production`) and migration apply are outside the team's sudoers (and managed policy);
 Berke asks Hermes for them, and production then waits for his `GO <code>` reply to the separate gate bot.
 
 ## Advisor
