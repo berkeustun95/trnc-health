@@ -34,6 +34,12 @@ bundler error, not a missing image. That is why the entries ship commented out.
 If the photos are `.png`, change the extension in `constants/partnerAssets.js` — one
 file, one place. `constants/partners.js` never names a file.
 
+## Seyhun Bıkmaz Şoför Okulu (Ehliyet) — 1 file
+
+    seyhun/logo.png                          960x389   transparent, dark blue mark (#294EA6 / #213565)
+
+No onDark variant: only ever on a white or light surface.
+
 ## No text in the images
 
 Every label — Öncesi / Sonrası and the six sequence steps — is rendered from

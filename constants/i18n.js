@@ -1991,6 +1991,9 @@ const translations = {
     ddDistrict: "District",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Announcements",
+    menuEhliyet: "Driving Licence",
+    ehliyetCall: "Call", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Call the school", ehliyetBranches: "Branches",
     duyIntroTitle: "Official announcements in one place",
     duyIntroSub: "Exams, job openings, scholarships, tenders and municipal notices, gathered from the institutions' own websites. Go to the official source for details and to apply.",
     duyCatKamu: "Public sector & exams",
@@ -4026,6 +4029,9 @@ const translations = {
     ddDistrict: "İlçe",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Duyurular",
+    menuEhliyet: "Ehliyet",
+    ehliyetCall: "Ara", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Okulu ara", ehliyetBranches: "Şubeler",
     duyIntroTitle: "Resmî duyurular tek yerde",
     duyIntroSub: "Sınavlar, münhaller, burslar, ihaleler ve belediye duyuruları kurumların kendi sitelerinden derlenir. Ayrıntılar ve başvuru için resmî kaynağa git.",
     duyCatKamu: "Kamu ve sınavlar",
@@ -5836,6 +5842,9 @@ const translations = {
     ddDistrict: "المنطقة",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "الإعلانات",
+    menuEhliyet: "رخصة القيادة",
+    ehliyetCall: "اتصال", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "اتصل بالمدرسة", ehliyetBranches: "الفروع",
     duyIntroTitle: "الإعلانات الرسمية في مكان واحد",
     duyIntroSub: "الامتحانات والوظائف الشاغرة والمنح والمناقصات وإعلانات البلديات، مجمّعة من المواقع الرسمية للمؤسسات. للتفاصيل والتقديم انتقل إلى المصدر الرسمي.",
     duyCatKamu: "القطاع العام والامتحانات",
@@ -7657,6 +7666,9 @@ const translations = {
     ddDistrict: "Район",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Объявления",
+    menuEhliyet: "Водительские права",
+    ehliyetCall: "Позвонить", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Позвонить в автошколу", ehliyetBranches: "Филиалы",
     duyIntroTitle: "Официальные объявления в одном месте",
     duyIntroSub: "Экзамены, вакансии, стипендии, тендеры и объявления муниципалитетов с официальных сайтов учреждений. Подробности и подача заявки — на официальном источнике.",
     duyCatKamu: "Госсектор и экзамены",
@@ -9472,6 +9484,9 @@ const translations = {
     ddDistrict: "Περιοχή",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Ανακοινώσεις",
+    menuEhliyet: "Δίπλωμα οδήγησης",
+    ehliyetCall: "Κλήση", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Κλήση στη σχολή", ehliyetBranches: "Υποκαταστήματα",
     duyIntroTitle: "Επίσημες ανακοινώσεις σε ένα μέρος",
     duyIntroSub: "Εξετάσεις, θέσεις εργασίας, υποτροφίες, διαγωνισμοί και ανακοινώσεις δήμων, από τους επίσημους ιστότοπους των φορέων. Για λεπτομέρειες και αίτηση, μεταβείτε στην επίσημη πηγή.",
     duyCatKamu: "Δημόσιο & εξετάσεις",
@@ -11285,6 +11300,9 @@ const translations = {
     ddDistrict: "District",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Annonces",
+    menuEhliyet: "Permis de conduire",
+    ehliyetCall: "Appeler", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Appeler l'auto-école", ehliyetBranches: "Agences",
     duyIntroTitle: "Les annonces officielles au même endroit",
     duyIntroSub: "Examens, postes vacants, bourses, appels d'offres et avis municipaux, repris des sites officiels des institutions. Consultez la source officielle pour les détails et pour postuler.",
     duyCatKamu: "Secteur public et examens",
@@ -13095,6 +13113,9 @@ const translations = {
     ddDistrict: "Distrito",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Anuncios",
+    menuEhliyet: "Carné de conducir",
+    ehliyetCall: "Llamar", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Llamar a la autoescuela", ehliyetBranches: "Sucursales",
     duyIntroTitle: "Anuncios oficiales en un solo lugar",
     duyIntroSub: "Exámenes, vacantes, becas, licitaciones y avisos municipales, tomados de las webs oficiales de las instituciones. Consulta la fuente oficial para ver los detalles y presentar tu solicitud.",
     duyCatKamu: "Sector público y exámenes",
@@ -14905,6 +14926,9 @@ const translations = {
     ddDistrict: "Bezirk",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "Mitteilungen",
+    menuEhliyet: "Führerschein",
+    ehliyetCall: "Anrufen", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "Fahrschule anrufen", ehliyetBranches: "Standorte",
     duyIntroTitle: "Amtliche Mitteilungen an einem Ort",
     duyIntroSub: "Prüfungen, Stellenausschreibungen, Stipendien, Ausschreibungen und Gemeindemitteilungen, gesammelt von den offiziellen Websites der Einrichtungen. Details und Bewerbung über die offizielle Quelle.",
     duyCatKamu: "Öffentlicher Dienst & Prüfungen",
@@ -16711,6 +16735,9 @@ const translations = {
     ddDistrict: "منطقه",
     // ─── Duyurular (official announcements) ───
     menuDuyurular: "اطلاعیه‌ها",
+    menuEhliyet: "گواهینامه رانندگی",
+    ehliyetCall: "تماس", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
+    ehliyetCallTitle: "تماس با آموزشگاه", ehliyetBranches: "شعبه‌ها",
     duyIntroTitle: "اطلاعیه‌های رسمی در یک جا",
     duyIntroSub: "آزمون‌ها، فرصت‌های شغلی، بورسیه‌ها، مناقصه‌ها و اطلاعیه‌های شهرداری، گردآوری‌شده از وب‌سایت‌های رسمی نهادها. برای جزئیات و ثبت‌نام به منبع رسمی بروید.",
     duyCatKamu: "بخش دولتی و آزمون‌ها",

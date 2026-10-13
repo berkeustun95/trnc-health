@@ -154,6 +154,10 @@ export const MODULE_FLAGS = {
   // ⚠ The flag does NOT publish or unpublish rows; the data switch is announcement_sources.publish.
   //   Off = no banner, and the screen falls back to ComingSoonScreen.
   duyurular:    true,
+  // Ehliyet — driving schools (first partner: Seyhun Bıkmaz Şoför Okulu). DARK, no waitlist and no
+  // Coming Soon screen: production shows no tile. Dev and ADA Preview open the screen through
+  // EHLIYET (constants/redesign.js) on a local fixture until driving_schools is applied and the row active.
+  ehliyet:      false,
 }
 
 // Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.

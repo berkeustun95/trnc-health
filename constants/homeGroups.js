@@ -37,6 +37,8 @@ const GATES = {
   pets:          () => MODULE_FLAGS.pets !== false,
   studentHub:    () => MODULE_FLAGS.studentHub !== false,
   towing:        () => MODULE_FLAGS.towing !== false,
+  // === true, not !== false: a dark module's gate fails closed. Dev / Preview unlock it in HomeScreen.
+  ehliyet:       () => MODULE_FLAGS.ehliyet === true,
   hotels:        () => HOTELS_LIVE === true,
   liveScores:    () => LIVE_SCORES_LIVE === true,
   // eSIM is the face of Connectivity: while CONNECTIVITY_LIVE is false it only shows the
@@ -73,7 +75,7 @@ export const HOME_GROUPS = [
   { key: 'homeLife', titleKey: 'hrGroupHome',    ids: ['accommodation', 'homeServices', 'pets', 'insurance',
                                                         'studentHub' /* ★ */] },
   { key: 'city',     titleKey: 'hrGroupCity',    ids: ['transport', 'esim', 'municipal',
-                                                        'towing' /* ★ */, 'exchangeRates' /* ★ */,
+                                                        'towing' /* ★ */, 'ehliyet', 'exchangeRates' /* ★ */,
                                                         'newcomerEssentials' /* ★ */, 'jobPostings'] },
 ]
 

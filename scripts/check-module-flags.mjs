@@ -22,7 +22,7 @@
 // the guard working; do not "fix" it by loosening the baseline unless you are genuinely
 // launching.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -54,6 +54,7 @@ const EXPECTED_MODULES = {
   towing:        true,   // live
   checkins:      true,   // live 2026-10-08 — check-ins + Google places (20261092/20261093)
   duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
+  ehliyet:       false,  // dark — driving schools; no waitlist, tile hidden until the flip
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //
@@ -374,7 +375,27 @@ try {
   const fbHead = sql.lastIndexOf('(SELECT nm FROM (VALUES', fbTail)
   const names = new Set([...sql.slice(fbHead, fbTail).matchAll(/\('([a-zA-Z]+)',/g)].map(m => m[1]))
 
+  // Modules with no Coming Soon screen and no waitlist: nobody can sign up, so nothing is ever
+  // notified and the notify path needs no entry. ehliyet (2026-10-13): dark until a flag flip.
+  // Remove the entry if it ever gets a waitlist.
+  const NO_WAITLIST = new Set(['ehliyet'])
+  // The exemption must not mask a real gap: an exempt key has to be a known module, must never
+  // reach ComingSoonScreen (that screen takes waitlist signups), and must not be COMING_SOON.
+  const csFiles = ['App.js', ...readdirSync(resolve(ROOT, 'screens')).filter(f => f.endsWith('.js')).map(f => `screens/${f}`)]
+  const homeGroupsSrc = readFileSync(resolve(ROOT, 'constants/homeGroups.js'), 'utf8')
+  const comingSoon = homeGroupsSrc.match(/const\s+COMING_SOON\s*=\s*new\s+Set\(\[([^\]]*)\]/)
+  if (!comingSoon) problems.push('NO_WAITLIST: could not find COMING_SOON in constants/homeGroups.js')
+  for (const k of NO_WAITLIST) {
+    if (!(k in EXPECTED_MODULES)) problems.push(`NO_WAITLIST exempts "${k}", which is not in EXPECTED_MODULES`)
+    for (const f of csFiles) {
+      const m = readFileSync(resolve(ROOT, f), 'utf8').match(new RegExp(`moduleKey=["'{]+${k}["'}]`))
+      if (m) problems.push(`NO_WAITLIST exempts "${k}" but ${f} renders ComingSoonScreen with ${m[0]} — it takes waitlist signups, so drop the exemption and add the notify entries`)
+    }
+    const cs = comingSoon && [...comingSoon[1].matchAll(/'([A-Za-z0-9_]+)'/g)].map(x => x[1])
+    if (cs && cs.includes(k)) problems.push(`NO_WAITLIST exempts "${k}" but constants/homeGroups.js COMING_SOON contains '${k}'`)
+  }
   for (const k of Object.keys(actualModules)) {
+    if (NO_WAITLIST.has(k)) continue
     if (!whitelist.has(k)) problems.push(`MODULE_FLAGS.${k} is missing from the notify_module_waitlist whitelist in ${NOTIFY_SQL} — signups for it could never be notified`)
     if (!names.has(k))     problems.push(`MODULE_FLAGS.${k} has no English display name in module_notif_text (${NOTIFY_SQL}) — a blast would abort on notifications.title NOT NULL`)
   }
