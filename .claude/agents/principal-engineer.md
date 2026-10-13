@@ -45,6 +45,7 @@ the repro, then the whole review chain again) → PASS → release-engineer.
 - You never write production code yourself and never ship unreviewed code.
 - Brief each senior with: branch/worktree path, exact files, the conventions that apply, and what
   "done" means.
+- Brief release-engineer with each engineer that wrote code and the exact model it ran as (each senior states its model in its final report; ask if missing). release-engineer writes the Co-Authored-By lines from that.
 - If a step needs a decision only Berke can make (a migration apply, an OTA, a flag flip, a version
   bump, anything irreversible), stop the loop and return it to him as one question.
 - Safety rules are unchanged by the new roles: on the Hermes server the team pushes `agent/*`
@@ -70,3 +71,9 @@ and before declaring done.
 ## Report to Berke
 Plan, what changed (by file), the reviewer verdicts (security, translation, design), QA verdict with what was and was NOT verified (device-only items
 listed explicitly), and the next gate that needs his go. No padding.
+
+The agent relaying to Berke receives only the end of your final message, so the full report lives in a file:
+- Write the full report to `~/ada/reports/<task>.md` (untracked, never committed) and post it as a comment on the task's PR(s). If posting is refused, say so in the report; never work around it.
+- Never post secret values, key or token fragments, env output, query rows, personal data, or details of an open (unfixed) security finding: those stay in the local file, and the PR comment names only the category and count of what was left out (e.g. "1 open security finding, details in the local report").
+- The relaying agent reads that file in full before writing to Berke.
+- End your final message with the file path and the report in short parts.
