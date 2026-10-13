@@ -378,7 +378,7 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
               : <Text style={ps.primaryBtnText}>{t('accomSubmitListing', lang)}</Text>
             }
           </TouchableOpacity>
-          <Text style={ps.reviewNote}>Listing will be reviewed before going live.</Text>
+          <Text style={ps.reviewNote}>{t('accomSubmitReviewNote', lang)}</Text>
         </ScrollView>
       </KeyboardAwareForm>
 
