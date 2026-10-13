@@ -186,6 +186,7 @@ const translations = {
     hrGroupCity: "City & getting around",
     spaceHealth: "Pharmacy & Emergency",
     spacePickerTitle: "What would you like to do?",
+    spaceSwitchA11y: "Switch space",
 
     // The what's-new notice card in the live strip (20261043). TITLE ONLY — the
     // strip's cards lost their subtitles, so the band holds 2 lines at 14pt in a
@@ -2249,6 +2250,7 @@ const translations = {
     hrGroupCity: "Şehir ve Ulaşım",
     spaceHealth: "Eczane & Acil",
     spacePickerTitle: "Ne yapmak istersin?",
+    spaceSwitchA11y: "Alan değiştir",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: "ADA'da neler yeni?",
@@ -4283,6 +4285,7 @@ const translations = {
     hrGroupCity: "المدينة والتنقل",
     spaceHealth: "الصيدلية والطوارئ",
     spacePickerTitle: "ماذا تريد أن تفعل؟",
+    spaceSwitchA11y: "تغيير القسم",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'ما الجديد في ADA؟',
@@ -6097,6 +6100,7 @@ const translations = {
     hrGroupCity: "Город и транспорт",
     spaceHealth: "Аптеки и экстренные службы",
     spacePickerTitle: "Что хотите сделать?",
+    spaceSwitchA11y: "Сменить раздел",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Что нового в ADA',
@@ -7919,6 +7923,7 @@ const translations = {
     hrGroupCity: "Πόλη & μετακίνηση",
     spaceHealth: "Φαρμακεία & Έκτακτα",
     spacePickerTitle: "Τι θέλεις να κάνεις;",
+    spaceSwitchA11y: "Αλλαγή χώρου",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Τι νέο στο ADA',
@@ -9727,6 +9732,7 @@ const translations = {
     hrGroupCity: "Ville & déplacements",
     spaceHealth: "Pharmacie & urgences",
     spacePickerTitle: "Que voulez-vous faire ?",
+    spaceSwitchA11y: "Changer d'espace",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Quoi de neuf',
@@ -11539,6 +11545,7 @@ const translations = {
     hrGroupCity: "Ciudad y transporte",
     spaceHealth: "Farmacia y urgencias",
     spacePickerTitle: "¿Qué quieres hacer?",
+    spaceSwitchA11y: "Cambiar de espacio",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Novedades en ADA',
@@ -13348,6 +13355,7 @@ const translations = {
     hrGroupCity: "Stadt & Unterwegs",
     spaceHealth: "Apotheke & Notruf",
     spacePickerTitle: "Was möchtest du tun?",
+    spaceSwitchA11y: "Bereich wechseln",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Neu in ADA',
@@ -15157,6 +15165,7 @@ const translations = {
     hrGroupCity: "شهر و رفت‌وآمد",
     spaceHealth: "داروخانه و اورژانس",
     spacePickerTitle: "چه کاری می‌خواهید انجام دهید؟",
+    spaceSwitchA11y: "تغییر بخش",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'تازه‌های ADA',

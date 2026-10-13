@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type } from '../../../constants/theme'
+import { SPACE_ICON, SPACE_LABEL_KEY } from '../../../constants/homeGroups'
 import { t } from '../../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../../constants/regions'
 import { resolveHero } from '../../../constants/homeHero'
@@ -60,6 +61,7 @@ export const heroHeight = insetTop => Math.max(HERO_TOTAL, insetTop + HERO_MIN_B
 export default function RedesignHero({
   region, lang, hasUnread, hideActions, onShowNotifs, onOpenMenu, hamburgerRef, onOpenPlace,
   weatherData, onOpenWeather, weatherRef,
+  space = null, onOpenSpacePicker,   // app spaces: the chosen space's control (null = today's hero)
 }) {
   const insets = useSafeAreaInsets()
   const chipCap = useWindowDimensions().width < 350 ? CHIP_CAP_NARROW : CHIP_CAP
@@ -102,6 +104,17 @@ export default function RedesignHero({
 
       <View style={[s.topRow, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <Image source={LOGO} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
+        {!!space && !!onOpenSpacePicker && (
+          // Same frosted pill as the chips below (HERO_PILL_ALPHA, so check-hero-contrast covers it).
+          // The label ellipsizes; the icons never shrink.
+          <TouchableOpacity style={[s.chip, s.spaceChip]} onPress={onOpenSpacePicker} activeOpacity={0.8}
+            hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }} accessibilityRole="button"
+            accessibilityLabel={`${t(SPACE_LABEL_KEY[space], lang)}, ${t('spaceSwitchA11y', lang)}`}>
+            <Ionicons name={SPACE_ICON[space]} size={WX_ICON} color="#FFFFFF" />
+            <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={chipCap}>{t(SPACE_LABEL_KEY[space], lang)}</Text>
+            <Ionicons name="swap-horizontal" size={WX_ICON} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
         {!hideActions && (
           <View style={s.actions}>
             <IconButton icon="notifications-outline" variant="frosted" onPress={onShowNotifs}
@@ -164,4 +177,5 @@ const s = StyleSheet.create({
   chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 0 },
   chipLandmark: { fontFamily: 'Inter_500Medium', flexShrink: 1 },
   wxChip:   { flexShrink: 0, paddingHorizontal: WX_PAD, gap: 4 },
+  spaceChip:{ flexShrink: 1, marginHorizontal: 10, paddingHorizontal: WX_PAD, gap: 6 },
 })

@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category as CATEGORY, type, radii, elevation, press } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { spaceIds } from '../constants/homeGroups'
+import { spaceIds, SPACE_ICON, SPACE_LABEL_KEY } from '../constants/homeGroups'
 import { CategoryIcon } from '../components/ui'
 
 // ─── App spaces: the full-screen picker (HOME_SPACES_LIVE) ───────────────────
@@ -11,16 +11,14 @@ import { CategoryIcon } from '../components/ui'
 // and search use). Health gets its own neutral label (`spaceHealth`) — the Home panel title
 // says "Health", which the store listing may not. No tab bar, no Oli: App.js renders this in
 // place of the tab shell until a space is chosen.
-const ICON = { health: 'medkit-outline', explore: 'compass-outline', homeLife: 'home-outline', city: 'business-outline' }
-const LABEL = { health: 'spaceHealth', explore: 'hrGroupExplore', homeLife: 'hrGroupHome', city: 'hrGroupCity' }
 const CAP = 1.2   // large system text: grow at most 1.2×, the tile has room for that
 
 function SpaceTile({ id, lang, onPress }) {
-  const label = t(LABEL[id], lang)
+  const label = t(SPACE_LABEL_KEY[id], lang)
   return (
     <TouchableOpacity style={[s.tile, elevation.card]} onPress={() => onPress(id)} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={label}>
-      <CategoryIcon icon={ICON[id]} category={id} size={64} />
+      <CategoryIcon icon={SPACE_ICON[id]} category={id} size={64} />
       <Text style={s.label} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP}>{label}</Text>
       <Ionicons name="chevron-forward" size={22} color={CATEGORY[id].ink} />
     </TouchableOpacity>

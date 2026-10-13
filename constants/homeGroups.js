@@ -101,6 +101,23 @@ export function liveGroups(unlocked) {
 // all dark disappears). The picker and the stored '@ada_space' are both validated against this.
 export function spaceIds(unlocked) { return liveGroups(unlocked).map(g => g.key) }
 
+// One source for the picker tile and the in-space top-bar control. Health has its own neutral
+// label (`spaceHealth`): the panel title says "Health", which the store listing may not.
+export const SPACE_ICON = { health: 'medkit-outline', explore: 'compass-outline', homeLife: 'home-outline', city: 'business-outline' }
+export const SPACE_LABEL_KEY = { health: 'spaceHealth', explore: 'hrGroupExplore', homeLife: 'hrGroupHome', city: 'hrGroupCity' }
+
+// Inside a space, which live-strip items belong to it. Keyed on the resolver's `kind`
+// (utils/homeStripResolver.js): event (incl. the generic events card) and place are Explore
+// content. A promo is a paid slot with no category, so it follows the strip into every space.
+// `notice` is dormant and deliberately absent: unmapped, so it shows in no space.
+const STRIP_KIND_SPACE = { event: 'explore', place: 'explore' }
+export function stripInSpace(item, space) {
+  if (!space) return true
+  if (!item) return false
+  if (item.kind === 'promo') return true
+  return STRIP_KIND_SPACE[item.kind] === space
+}
+
 // Live modules no panel places. Logged once in __DEV__ and read at the gate.
 export function unplacedLiveModules() {
   const placed = new Set(HOME_GROUPS.flatMap(g => g.ids))

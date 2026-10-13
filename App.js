@@ -989,6 +989,16 @@ export default function App() {
     setActiveSpace(key)
     AsyncStorage.setItem('@ada_space', key).catch(() => {})
   }
+  // Space Home → the picker. STATE ONLY: '@ada_space' stays, so a kill + reopen still lands in
+  // the last space (sign-out is what clears it). Home's remembered scroll belongs to the space
+  // it was in, so it is dropped.
+  const openSpacePicker = () => { forgetScroll('home:hub'); setActiveSpace(null) }
+  // The first-run tour and the home-city question need Home on screen (they measure its refs),
+  // so with spaces on they wait for a chosen space. The ref carries "still owed" across the
+  // picker; activeSpaceRef lets the session effect's async callback read the CURRENT value.
+  const activeSpaceRef = useRef(activeSpace)
+  activeSpaceRef.current = activeSpace
+  const homeFirstRunOwedRef = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -1135,11 +1145,14 @@ export default function App() {
       if (activeTab === 'home' && homeBackRef.current?.()) return true
       if (activeTab === 'profile' && profileGuardRef.current?.back()) return true
       if (activeTab !== 'home') { setActiveTab('home'); return true }
+      // App spaces: back on a space's Home returns to the picker (state only; the stored space stays).
+      // profile?.role, not isAdmin: that const is declared further down, below this effect's deps.
+      if (HOME_SPACES_LIVE && profile?.role !== 'admin' && typeof activeSpace === 'string') { setActiveSpace(null); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, activeSpace, profile?.role])
 
   useEffect(() => {
     Promise.all([
@@ -1230,6 +1243,31 @@ export default function App() {
     }
   }
 
+  // The customer's first Home moment: the one-time tour, then the home-city question. Runs once
+  // per session load — straight away, or (HOME_SPACES_LIVE) once a space is chosen.
+  function homeFirstRun() {
+    AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
+      // First run is already spending its attention on the carousel, the
+      // entry screen and the coach marks. The home-city question waits for
+      // the NEXT cold start, where it is the only thing on screen.
+      const coachMarksRunning = !shown
+      if (coachMarksRunning) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
+
+      // This effect runs once per session mount, so this is a cold-start-only
+      // path by construction — a foreground can never surface the question.
+      const st = await loadCityWelcomeState()
+      if (shouldAskHomeCity({ ...st, coachMarksRunning, now: Date.now() }).ask) {
+        markAskShown()
+        setShowHomeCityAsk(true)
+      }
+    })
+  }
+  useEffect(() => {
+    if (!HOME_SPACES_LIVE || typeof activeSpace !== 'string' || !homeFirstRunOwedRef.current) return
+    homeFirstRunOwedRef.current = false
+    homeFirstRun()
+  }, [activeSpace])
+
   useEffect(() => {
     sessionRef.current = session
     menuAnim.setValue(260)
@@ -1273,21 +1311,8 @@ export default function App() {
         if (data?.role === 'provider') {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
-          AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
-            // First run is already spending its attention on the carousel, the
-            // entry screen and the coach marks. The home-city question waits for
-            // the NEXT cold start, where it is the only thing on screen.
-            const coachMarksRunning = !shown
-            if (coachMarksRunning) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
-
-            // This effect runs once per session mount, so this is a cold-start-only
-            // path by construction — a foreground can never surface the question.
-            const st = await loadCityWelcomeState()
-            if (shouldAskHomeCity({ ...st, coachMarksRunning, now: Date.now() }).ask) {
-              markAskShown()
-              setShowHomeCityAsk(true)
-            }
-          })
+          if (HOME_SPACES_LIVE && typeof activeSpaceRef.current !== 'string') homeFirstRunOwedRef.current = true
+          else homeFirstRun()
         }
       })
     setNotifsLoading(true)
@@ -2647,6 +2672,8 @@ export default function App() {
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
             liveScoresTester={liveScoresTester}
+            space={HOME_SPACES_LIVE && !isAdmin && typeof activeSpace === 'string' ? activeSpace : null}
+            onOpenSpacePicker={openSpacePicker}
           />
         )}
 

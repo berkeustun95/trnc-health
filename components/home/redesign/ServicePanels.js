@@ -59,11 +59,12 @@ export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
   )
 }
 
-export default function ServicePanels({ lang, onPress, unlocked }) {
+// `only`: an app space's group key — that one panel (null = all four, today's Home).
+export default function ServicePanels({ lang, onPress, unlocked, only = null }) {
   const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
-      {liveGroups(unlocked).map(g => (
+      {liveGroups(unlocked).filter(g => !only || g.key === only).map(g => (
         <View key={g.key} style={[s.panel, elevation.card]}>
           <View style={s.head}>
             <View style={[s.dot, { backgroundColor: CATEGORY[g.key].ink }]} />
