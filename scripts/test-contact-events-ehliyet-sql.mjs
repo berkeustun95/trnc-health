@@ -43,11 +43,11 @@ const run = async (name, sql, extra) => {
 }
 await run('pre-state drift (towing missing)', SQL, fixture(MODS13.filter(m => m !== 'towing')))
 await run('pre-state drift (extra module)', SQL, fixture([...MODS13, 'zzextra']))
-const anchor = `(SELECT string_agg(quote_literal(x), ',' ORDER BY x) FROM unnest(v_old || 'ehliyet'::text) AS x)`
+const anchor = `'transport','ehliyet'));`
 if (!SQL.includes(anchor)) { bad++; console.log('  ✗ anchor missing') }
 else {
-  await run('CHECK rebuilt without ehliyet', SQL.replace(anchor, `(SELECT string_agg(quote_literal(x), ',' ORDER BY x) FROM unnest(v_old) AS x)`), fixture(MODS13))
-  await run('CHECK dropped (negative control must notice)', SQL.replace(`CHECK (module IN (%s))',\n                 ${anchor});`, `CHECK (true)');`), fixture(MODS13))
+  await run('CHECK re-added without ehliyet', SQL.replace(anchor, `'transport'));`), fixture(MODS13))
+  await run('CHECK dropped (negative control must notice)', SQL.replace(/CHECK \(module IN \([^;]*\)\);/, 'CHECK (true);'), fixture(MODS13))
 }
 
 console.log('Independence + order: 20261108 alone, then 20261108 -> 20261109')

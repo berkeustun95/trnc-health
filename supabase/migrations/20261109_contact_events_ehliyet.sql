@@ -16,7 +16,7 @@
 -- no identifier column), readable only by admin; this file only widens the module vocabulary by
 -- one value so the app can log 'call' and 'website' taps for a driving school.
 --
--- The CHECK is rebuilt from the LIVE definition: pre-state asserted equal to the 13-module set
+-- The CHECK is re-added as a static literal list: pre-state (live def) asserted equal to the 13-module set
 -- 20261059 left, post-state asserted equal to that set + 'ehliyet'. The action CHECK is untouched.
 --
 -- Apply: gh workflow run supabase-migrate -f file=20261109_contact_events_ehliyet.sql (dry), then
@@ -29,16 +29,13 @@ BEGIN;
 
 SET LOCAL lock_timeout = '5s';
 
+-- Pre-state: abort unless the live CHECK is exactly the 13-module set 20261059 left.
 DO $$
 DECLARE
   v_def  text;
   v_old  text[];
-  v_new  text[];
   v_want_old constant text[] := ARRAY['accommodation','events','explore','garages','grooming','homeServices',
                                       'hotels','insurance','jobs','pets','studentHub','towing','transport'];
-  v_probe  uuid := gen_random_uuid();
-  v_ce_ok  text := 'not run';
-  v_ce_bad text := 'not run';
 BEGIN
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
    WHERE conrelid = 'public.contact_events'::regclass AND conname = 'contact_events_module_check';
@@ -47,16 +44,29 @@ BEGIN
   IF v_old IS NULL OR NOT (v_old @> v_want_old AND v_old <@ v_want_old) THEN
     RAISE EXCEPTION 'contact_events_module_check drifted from the 13-module set (20261059). live def=%', coalesce(v_def, '<missing>');
   END IF;
+END $$;
 
-  EXECUTE 'ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_module_check';
-  EXECUTE format('ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_module_check CHECK (module IN (%s))',
-                 (SELECT string_agg(quote_literal(x), ',' ORDER BY x) FROM unnest(v_old || 'ehliyet'::text) AS x));
+-- Static on purpose: scripts/audit-schema-drift.mjs reads CHECK literals from this file.
+ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_module_check;
+ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_module_check
+  CHECK (module IN ('accommodation','events','explore','garages','grooming','homeServices','hotels',
+                    'insurance','jobs','pets','studentHub','towing','transport','ehliyet'));
 
+DO $$
+DECLARE
+  v_def  text;
+  v_new  text[];
+  v_want_new constant text[] := ARRAY['accommodation','events','explore','garages','grooming','homeServices',
+                                      'hotels','insurance','jobs','pets','studentHub','towing','transport','ehliyet'];
+  v_probe  uuid := gen_random_uuid();
+  v_ce_ok  text := 'not run';
+  v_ce_bad text := 'not run';
+BEGIN
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
    WHERE conrelid = 'public.contact_events'::regclass AND conname = 'contact_events_module_check';
   SELECT array_agg(DISTINCT m[1]) INTO v_new
     FROM regexp_matches(coalesce(v_def, ''), '''([a-zA-Z]+)''::text', 'g') AS m;
-  IF v_new IS NULL OR NOT (v_new @> (v_want_old || 'ehliyet'::text) AND v_new <@ (v_want_old || 'ehliyet'::text)) THEN
+  IF v_new IS NULL OR NOT (v_new @> v_want_new AND v_new <@ v_want_new) THEN
     RAISE EXCEPTION 'contact_events_module_check post-state is not old + ehliyet. def=%', coalesce(v_def, '<missing>');
   END IF;
   RAISE NOTICE 'contact_events_module_check now: %', v_def;
@@ -97,7 +107,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261109_contact_events_ehliyet.sql', '79542c4aed0c8613cb88abf3f1e520ff11d9504bd5552893b9f43f4dbdeb6909')
+VALUES ('20261109_contact_events_ehliyet.sql', 'bf2fe35a6feb9c8e7cef2ec9bca3370cca12cdaa9a0ffdee4f430b34d2472d97')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

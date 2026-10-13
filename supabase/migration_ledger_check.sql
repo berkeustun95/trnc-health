@@ -224,7 +224,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261106_sync_novest_cron_timeout.sql', '0f99577fa7fac74d007ab17de2dd92cdaba7523c29bc4f7fea2c1fbcb05124c2'),
   ('20261107_duty_2026_10_13_lefkosa_tuna.sql', 'de091dc9f02856710d1efb775959e7c3602eaca73cb0b63e18cb52a99d555e24'),
   ('20261108_driving_schools.sql', '45e0518a0deaf8e1d0b81172de9d306272e2642eb8219eae6342b15e853d54ad'),
-  ('20261109_contact_events_ehliyet.sql', '79542c4aed0c8613cb88abf3f1e520ff11d9504bd5552893b9f43f4dbdeb6909')
+  ('20261109_contact_events_ehliyet.sql', 'bf2fe35a6feb9c8e7cef2ec9bca3370cca12cdaa9a0ffdee4f430b34d2472d97')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
