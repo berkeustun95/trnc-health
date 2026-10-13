@@ -97,6 +97,10 @@ export function liveGroups(unlocked) {
     .filter(g => g.modules.length > 0)
 }
 
+// App spaces: the keys of the groups that still have a live module (a space whose modules are
+// all dark disappears). The picker and the stored '@ada_space' are both validated against this.
+export function spaceIds(unlocked) { return liveGroups(unlocked).map(g => g.key) }
+
 // Live modules no panel places. Logged once in __DEV__ and read at the gate.
 export function unplacedLiveModules() {
   const placed = new Set(HOME_GROUPS.flatMap(g => g.ids))

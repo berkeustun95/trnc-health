@@ -203,6 +203,13 @@ export const TILE_FONT_MANROPE = false
 //   says so.
 export const HOME_V2_LIVE = true   // live 2026-09-08
 
+// App spaces (agent/app-spaces). true = after first launch and after every login a customer or
+// guest sees a full-screen "space picker" (health / explore / home / city) before Home, and ADA
+// reopens into the last chosen space. false = today's first screen, byte for byte: nothing is
+// read from storage and no picker renders. It REPLACES Home's first screen for every customer,
+// so like HOME_V2_LIVE it is a scalar in scripts/check-module-flags.mjs's EXPECTED_SCALARS.
+export const HOME_SPACES_LIVE = false
+
 // The app-wide redesign (feat/redesign). false = today's app in EVERY release build and
 // OTA, whatever this branch contains. The redesign renders when REDESIGN_LIVE is true, in a
 // dev bundle (__DEV__, Expo Go), or in an ADA Preview build — see constants/redesign.js,

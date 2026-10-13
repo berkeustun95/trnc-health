@@ -32,7 +32,7 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE, HOME_SPACES_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
@@ -105,6 +105,8 @@ import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
+import SpacePickerScreen from './screens/SpacePickerScreen'
+import { spaceIds } from './constants/homeGroups'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
@@ -511,6 +513,10 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)
+  // App spaces (HOME_SPACES_LIVE): undefined = '@ada_space' not read yet, null = none chosen (the
+  // picker shows), a group key = the chosen space. The three states keep the picker from flashing
+  // on a cold start that has a stored space. With the flag off it stays undefined and is never read.
+  const [activeSpace, setActiveSpace] = useState(undefined)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   // Redesign: can the OS still ask? false = permanently denied → the screens offer "Ayarları aç";
@@ -972,6 +978,19 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!HOME_SPACES_LIVE) return
+    // An unreadable, unknown or stale value (a group whose modules all went dark) is "none".
+    AsyncStorage.getItem('@ada_space')
+      .then(v => setActiveSpace(spaceIds().includes(v) ? v : null))
+      .catch(() => setActiveSpace(null))
+  }, [])
+
+  const chooseSpace = key => {
+    setActiveSpace(key)
+    AsyncStorage.setItem('@ada_space', key).catch(() => {})
+  }
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
@@ -981,6 +1000,8 @@ export default function App() {
       if (event === 'SIGNED_OUT') {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
+        // The next login picks a space again.
+        if (HOME_SPACES_LIVE) { setActiveSpace(null); AsyncStorage.removeItem('@ada_space').catch(() => {}) }
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
@@ -2499,6 +2520,13 @@ export default function App() {
     // just closes the preview rather than routing into a tab that does not exist here.
     content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
       isGuest={false} onGoToProfile={() => setAdminPreview(null)} />
+  } else if (HOME_SPACES_LIVE && !isAdmin && activeSpace === undefined) {
+    // Stored space not read yet: wait, so the picker never flashes. inTabShell stays false.
+    content = <View style={styles.center} />
+  } else if (HOME_SPACES_LIVE && !isAdmin && activeSpace === null) {
+    // No space chosen: full-screen picker, no tab shell. inTabShell stays false, so the coach
+    // marks, policy notice, city prompts and Oli wait until a space is chosen.
+    content = <SpacePickerScreen lang={lang} onChoose={chooseSpace} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
