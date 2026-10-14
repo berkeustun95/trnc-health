@@ -30,6 +30,7 @@ export const colors = {
   cardBg:        '#FFFFFF',
   surface:       '#FFFFFF',
   border:        '#E8EDF2',
+  skeletonSweep: 'rgba(255,255,255,0.55)',   // Home lab P: the light band that sweeps over a skeleton's colors.border base
   textPrimary:   '#1A2B33',
   // Was #64748B, which passed AA only on white (4.48 on bg, 4.22 on primaryLight). #55657A
   // measures 5.95 white · 5.48 canvas · 5.27 primaryLight · 5.11 on the lowest category tint.
@@ -251,6 +252,15 @@ export const font = {
   bold:     'Inter_700Bold',
 }
 
+// Home lab P: the display face for a few Home moments. Playfair Display 700 covers Latin (incl.
+// Turkish ğ ş ı İ) and Cyrillic and has NO Greek or Arabic-script glyphs (cmap read from
+// node_modules/@expo-google-fonts/playfair-display/700Bold, 2026-10-14): those languages keep Inter,
+// never a silent per-glyph fallback. Keys are the full English names, as everywhere.
+const PLAYFAIR_LANGS = new Set(['English', 'Turkish', 'Russian', 'French', 'Spanish', 'German'])
+export function fontDisplayFor(lang) {
+  return PLAYFAIR_LANGS.has(lang) ? type.sectionDisplay : undefined   // undefined = today's Inter header
+}
+
 export const type = {
   caption:        { fontSize: 11, lineHeight: 14, fontFamily: font.medium },
   meta:           { fontSize: 12, lineHeight: 16, fontFamily: font.medium },
@@ -258,6 +268,8 @@ export const type = {
   body:           { fontSize: 14, lineHeight: 20, fontFamily: font.regular },
   rowTitle:       { fontSize: 15, lineHeight: 20, fontFamily: font.semibold },
   sheetTitle:     { fontSize: 17, lineHeight: 22, fontFamily: font.bold },
+  // Playfair section header: lineHeight 22 at 17 (device check: Turkish İ/Ğ ascenders must not clip).
+  sectionDisplay: { fontSize: 17, lineHeight: 22, fontFamily: 'PlayfairDisplay_700Bold', color: colors.textPrimary },
   sectionHeading: { fontSize: 18, lineHeight: 24, fontFamily: font.bold },
   detailTitle:    { fontSize: 24, lineHeight: 30, fontFamily: font.bold },
   heroHeadline:   { fontSize: 26, lineHeight: 32, fontFamily: font.bold },

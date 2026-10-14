@@ -611,6 +611,8 @@ export default function App() {
   const [retryCount, setRetryCount] = useState(0)
   const [weatherData, setWeatherData] = useState(null)
   const weatherKeyRef = useRef(null)
+  const weatherFailAtRef = useRef(0)   // ms of the last failed weather fetch (pull-to-refresh backoff)
+  const weatherOkAtRef = useRef(0)   // ms of the last successful weather fetch (Home pull-to-refresh cooldown)
   const [showMenu, setShowMenu] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   // Store-update popup. DECLARED HERE, with the other useState calls, because the content
@@ -1302,9 +1304,9 @@ export default function App() {
     weatherKeyRef.current = key
     try {
       const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
-      if (weatherJson?.current) setWeatherData(weatherJson)
-      else weatherKeyRef.current = null
-    } catch { weatherKeyRef.current = null }
+      if (weatherJson?.current) { setWeatherData(weatherJson); weatherOkAtRef.current = Date.now() }
+      else { weatherKeyRef.current = null; weatherFailAtRef.current = Date.now() }
+    } catch { weatherKeyRef.current = null; weatherFailAtRef.current = Date.now() }
   }
 
   // Which district is this device in, as far as the DEVICE knows.
@@ -2615,6 +2617,12 @@ export default function App() {
               until: dutyUntilFor(dutyToday.rows, liveRegion || profile?.region || deviceRegion),
             }}
             onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
+            onRefreshWeather={() => {   // only ever called by Home's pull-to-refresh (HOME_POLISH_LIVE)
+              if (!userLocation) return undefined
+              if (Date.now() - weatherFailAtRef.current < 60 * 1000) return undefined   // a failed call backs off 60 s, so pulls do not hammer the function
+              if (Date.now() - weatherOkAtRef.current > 5 * 60 * 1000) weatherKeyRef.current = null   // refetch only if stale (> 5 min)
+              return fetchWeather(userLocation)
+            }}
             onOpenExploreTab={() => setActiveTab('map')}
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
