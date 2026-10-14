@@ -4,6 +4,7 @@ import { t } from '../../../constants/i18n'
 import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT, tileLabel } from '../../../constants/homeModules'
 import { liveGroups, categoryOf } from '../../../constants/homeGroups'
 import { CategoryIcon } from '../../ui'
+import PressScale from '../../ui/PressScale'
 
 // ─── WIDTH BUDGET — WHY THE PANEL HAS A 4pt INNER GUTTER ───────────────────
 // The Ev Hizmetleri tile carries the partner-signed phrase "Tadilat · Bakım · Onarım" at
@@ -32,13 +33,14 @@ const NARROW_W = 360
 export function labelCap(width) { return width < NARROW_W ? LABEL_CAP_NARROW : LABEL_CAP }
 const LABEL_BOX = 38
 
-export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
+export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH, polish }) {
   const cap = labelCap(useWindowDimensions().width)
   const fit = tileLabel(mod, lang)
   const lines = fit.lines
   const label = t(fit.key, lang)
+  const Touch = polish ? PressScale : TouchableOpacity   // Home lab P: press scale
   return (
-    <TouchableOpacity style={[s.tile, { width }]} onPress={() => onPress(mod)} activeOpacity={press.small}
+    <Touch style={[s.tile, { width }]} onPress={() => onPress(mod)} activeOpacity={press.small}
       accessibilityRole="button" accessibilityLabel={mod.soon ? `${label}, ${t('hrSoonBadge', lang)}` : label}>
       <View>
         <CategoryIcon icon={mod.icon} category={cat} size={52} />
@@ -55,11 +57,11 @@ export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
           {label}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Touch>
   )
 }
 
-export default function ServicePanels({ lang, onPress, unlocked }) {
+export default function ServicePanels({ lang, onPress, unlocked, polish }) {
   const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
@@ -71,7 +73,7 @@ export default function ServicePanels({ lang, onPress, unlocked }) {
           </View>
           <View style={s.grid}>
             {g.modules.map(mod => (
-              <ServiceTile key={mod.id} mod={mod} cat={g.key} lang={lang} onPress={onPress} />
+              <ServiceTile key={mod.id} mod={mod} cat={g.key} lang={lang} onPress={onPress} polish={polish} />
             ))}
           </View>
         </View>
@@ -81,12 +83,12 @@ export default function ServicePanels({ lang, onPress, unlocked }) {
 }
 
 // Favourites: the same tile, in a single white panel, coloured by each module's category.
-export function FavouritePanel({ ids, modules, lang, onPress }) {
+export function FavouritePanel({ ids, modules, lang, onPress, polish }) {
   return (
     <View style={[s.panel, elevation.card]}>
       <View style={s.grid}>
         {ids.map(id => modules.get(id)).filter(Boolean).map(mod => (
-          <ServiceTile key={mod.id} mod={mod} cat={categoryOf(mod.id)} lang={lang} onPress={onPress} />
+          <ServiceTile key={mod.id} mod={mod} cat={categoryOf(mod.id)} lang={lang} onPress={onPress} polish={polish} />
         ))}
       </View>
     </View>

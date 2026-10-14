@@ -12,7 +12,8 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import MascotIntroCard from '../components/MascotIntroCard'
-import { colors, typeColors, shadow } from '../constants/theme'
+import { colors, typeColors, shadow, fontDisplayFor } from '../constants/theme'
+import FadeUp from '../components/ui/FadeUp'
 import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
@@ -977,6 +978,10 @@ export default function HomeScreen({
     const oliKey = lab.oli ? oliPillKey({ now: new Date(), wxGroup: cur ? weatherGroup(cur.symbol) : null, stripItem }) || undefined : undefined
     // Island Calendar line (Variant C) outranks the context line.
     const pillKey = (lab.calendar && calPillKey(islandDay)) || oliKey
+    // Home lab P (polish): off = every row below renders exactly as before (fadeUp returns the node itself).
+    const polish = lab.polish === true
+    const fadeUp = (name, index, node) => (polish ? <FadeUp name={name} index={index}>{node}</FadeUp> : node)
+    const titleFont = polish ? fontDisplayFor(lang) : undefined
     return (
       <>
         <StatusBar style={overCanvas ? 'dark' : 'light'} />
@@ -1001,41 +1006,53 @@ export default function HomeScreen({
             weatherRef={weatherRef} />
 
           <View style={s.rBelow}>
-            {!hideHeaderActions && (
+            {!hideHeaderActions && fadeUp('oli', 0,
               <View style={{ marginTop: 16 }}>
                 <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef}
                   pillKey={pillKey} cheer={lab.oli ? cheer : undefined} />
               </View>
             )}
 
-            <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
-              <View style={s.rCol}>
-                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
+            {fadeUp('duty', 1,
+              <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
+                <View style={s.rCol}>
+                  <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} polish={polish} />
+                </View>
+                <View style={s.rCol}>
+                  <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} polish={polish} />
+                </View>
               </View>
-              <View style={s.rCol}>
-                <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
-              </View>
-            </View>
+            )}
 
             {/* Duyurular: no tile, a banner (Berke 2026-10-11). Nothing at all for production users
                 until the flag flips; dev and ADA Preview show it (constants/redesign.js DUYURULAR). */}
-            {DUYURULAR && (
+            {DUYURULAR && fadeUp('duyurular', 2,
               <View style={{ marginTop: WIDGET_GAP }}>
                 <DuyurularBanner lang={lang} onPress={onShowDuyurular} />
               </View>
             )}
 
-            <View style={{ marginTop: WIDGET_GAP }}>
-              <EventBanner item={stripItem} loading={stripLoading} lang={lang}
-                onPress={handleStripPress} onDismiss={dismissStripItem} />
-            </View>
+            {fadeUp('event', 3,
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <EventBanner item={stripItem} loading={stripLoading} lang={lang}
+                  onPress={handleStripPress} onDismiss={dismissStripItem} polish={polish} />
+              </View>
+            )}
 
-            <SectionHeader title={t('favSectionTitle', lang)}
-              action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
-            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
+            {fadeUp('fav', 4,
+              <>
+                <SectionHeader title={t('favSectionTitle', lang)} titleFont={titleFont}
+                  action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
+                <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} polish={polish} />
+              </>
+            )}
 
-            <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} />
+            {fadeUp('services', 5,
+              <>
+                <SectionHeader title={t('hrAllServices', lang)} titleFont={titleFont} />
+                <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} polish={polish} />
+              </>
+            )}
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}

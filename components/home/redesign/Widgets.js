@@ -6,7 +6,9 @@ import { t, tCount, LANG_CODES } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
-import { Bone, IconButton, RemoteImage } from '../../ui'
+import { Bone, IconButton, RemoteImage, haptic } from '../../ui'
+import PressScale from '../../ui/PressScale'
+import SweepBone from '../../ui/SweepBone'
 
 // Home v3 tiles: two equal cards, 104pt. Duty is the V2 live-strip card (photo, icon badge
 // top-left, dark band); Acil Numaralar is solid health red. Each band carries its title and
@@ -29,12 +31,14 @@ const tileCap = w => (w < 350 ? TILE_FONT_CAP_NARROW : TILE_FONT_CAP)
 //   duty photo did not draw with a bare StyleSheet.absoluteFill; V2 renders this same drawable
 //   in production with this style. Confirmed on the next Preview device check.
 // On a photo, text sits ONLY on the 0.72 band (white over a pure-white pixel: 9.29:1).
-function Tile({ image, bg, icon, iconColor, title, line, corner, onPress, a11y, innerRef, surface, alert, height }) {
+function Tile({ image, bg, icon, iconColor, title, line, corner, onPress, a11y, innerRef, surface, alert, height, polish }) {
   const onPhoto = !!image && !surface
   const light = onPhoto || !!bg        // white text: on the band, or on the solid red
   const cap = tileCap(useWindowDimensions().width)
+  // Home lab P: press scale + a light haptic before the primary action; off = today's TouchableOpacity as is.
+  const Touch = polish ? PressScale : TouchableOpacity
   return (
-    <TouchableOpacity ref={innerRef} collapsable={false} onPress={onPress} disabled={!onPress}
+    <Touch ref={innerRef} collapsable={false} scaleTo={0.985} onPress={polish && onPress ? () => { haptic(); onPress() } : onPress} disabled={!onPress}
       activeOpacity={press.card} accessibilityRole="button" accessibilityLabel={a11y}
       style={[s.card, { height, backgroundColor: surface || bg || colors.border }, alert && s.alertBorder]}>
       {onPhoto && <Image source={image} style={s.photo} resizeMode="cover" />}
@@ -49,7 +53,7 @@ function Tile({ image, bg, icon, iconColor, title, line, corner, onPress, a11y, 
         </View>
         {typeof line === 'function' ? line(cap) : line}
       </View>
-    </TouchableOpacity>
+    </Touch>
   )
 }
 
@@ -70,7 +74,7 @@ export function dutyTileNeedsRoom(summary) {
   return !!loaded && (!!error || status !== DUTY_FRESH)
 }
 
-export function DutyTile({ summary, lang, onPress, onRetry, height }) {
+export function DutyTile({ summary, lang, onPress, onRetry, height, polish }) {
   const { loaded, error, status, count, until } = summary || {}
   const fresh = status === DUTY_FRESH
   const alert = loaded && !error && !fresh
@@ -97,6 +101,7 @@ export function DutyTile({ summary, lang, onPress, onRetry, height }) {
       line={line}
       onPress={error ? () => { onRetry?.(); onPress?.() } : onPress}
       height={height}
+      polish={polish}
       surface={alert || error ? category.health.bg : null}
       alert={alert || error}
       a11y={[title, short, alert ? t(status === DUTY_PARTIAL ? 'hrDutyPartial' : 'hrDutyUnavailable', lang) : null,
@@ -111,7 +116,7 @@ export function DutyTile({ summary, lang, onPress, onRetry, height }) {
 // digits in every locale. Opens the emergency BottomSheet (the force-update escape too).
 export const EMERGENCY_CORNER = '112 · 155 · 199'
 export const EMERGENCY_BG = category.health.ink
-export function EmergencyTile({ lang, onPress, height }) {
+export function EmergencyTile({ lang, onPress, height, polish }) {
   const cap = tileCap(useWindowDimensions().width)
   const title = t('menuEmergency', lang)
   return (
@@ -122,6 +127,7 @@ export function EmergencyTile({ lang, onPress, height }) {
       title={title}
       onPress={onPress}
       height={height}
+      polish={polish}
       corner={<Text style={s.corner} numberOfLines={1} maxFontSizeMultiplier={cap}>{EMERGENCY_CORNER}</Text>}
       a11y={`${title}: 112, 155, 199`}
     />
@@ -156,10 +162,10 @@ function eventChip(startsAt, lang) {
   return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
 }
 
-export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
+export function EventBanner({ item, loading, lang, onPress, onDismiss, polish }) {
   const kind = item?.kind
   useEffect(() => { if (!loading && kind) rememberStripKind(kind) }, [loading, kind])
-  if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
+  if (loading) return polish ? <SweepBone /> : <Bone width="100%" height={160} borderRadius={radii.widget} />
   if (!item) return null
   const title = item.generic ? t(item.titleKey, lang) : item.title
   const isEvent = item.kind === 'event' && !item.generic
@@ -167,9 +173,10 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
   const time = chip ? chip.text : isEvent && item.subtitle ? item.subtitle : null
   const tag = item.sponsored ? t('stripSponsored', lang) : item.soon ? t('stripStartingSoon', lang) : null
   const fallback = (item.kind === 'notice' && NOTICE_FALLBACK[item.action?.route]) || EVENTS_IMAGE
+  const Touch = polish ? PressScale : TouchableOpacity   // Home lab P
   return (
     <View>
-      <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
+      <Touch scaleTo={0.985} onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
         accessibilityLabel={[title, time, tag].filter(Boolean).join(', ')} style={s.banner}>
         <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
         {!!time && (
@@ -183,7 +190,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
           <Text style={s.bannerTitle} numberOfLines={2}>{title}</Text>
           <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
         </View>
-      </TouchableOpacity>
+      </Touch>
       {item.kind === 'notice' && !!onDismiss && (
         <IconButton icon="close" iconSize={16} variant="frosted" onPress={() => onDismiss(item)}
           accessibilityLabel={t('uiClose', lang)} style={s.dismiss} />
