@@ -120,10 +120,11 @@ ALTER TABLE public.driving_school_branches ADD  CONSTRAINT driving_school_branch
 ALTER TABLE public.driving_school_branches DROP CONSTRAINT IF EXISTS driving_school_branches_address_check;
 ALTER TABLE public.driving_school_branches ADD  CONSTRAINT driving_school_branches_address_check
   CHECK (address IS NULL OR length(btrim(address)) BETWEEN 5 AND 200);
--- OSM only: Google Places pins are an accepted risk for pharmacies and hotels, not here.
+-- osm or partner only: Google Places pins are an accepted risk for pharmacies and hotels, not here.
+-- 'partner' = coordinates the school itself supplied.
 ALTER TABLE public.driving_school_branches DROP CONSTRAINT IF EXISTS driving_school_branches_geocode_source_check;
 ALTER TABLE public.driving_school_branches ADD  CONSTRAINT driving_school_branches_geocode_source_check
-  CHECK (geocode_source IS NULL OR geocode_source IN ('osm'));
+  CHECK (geocode_source IS NULL OR geocode_source IN ('osm','partner'));
 -- Two-way: a pin has a provenance and a provenance has a pin (as hotels_coords_provenance_check).
 ALTER TABLE public.driving_school_branches DROP CONSTRAINT IF EXISTS driving_school_branches_provenance_check;
 ALTER TABLE public.driving_school_branches ADD  CONSTRAINT driving_school_branches_provenance_check
@@ -160,11 +161,11 @@ VALUES ('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'Seyhun Bıkmaz Şoför Okulu', 
         ARRAY['A','B','C','D','E','F','G','H','H1','H2','J','K'], true, 0, false)
 ON CONFLICT (id) DO NOTHING;
 
--- Lefkoşa has a street address; Güzelyurt stays town-only (no address, no pin). Both pin columns
--- and geocode_source are NULL unless an OSM element corroborated the address (see the
--- geocode_source CHECK: OSM only).
+-- Lefkoşa has a street address and a partner-supplied pin (the school's own coordinates, rounded to
+-- 6 decimal places, ~0.1 m; geocode_source 'partner'). Güzelyurt stays town-only: no address, no pin,
+-- lat/lng/geocode_source all NULL.
 INSERT INTO public.driving_school_branches (school_id, region, address, lat, lng, geocode_source, sort_order)
-VALUES ('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'nicosia', 'Şehit Fevait Ali Sokak 4/B, Göçmenköy, Lefkoşa', NULL, NULL, NULL, 0),
+VALUES ('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'nicosia', 'Şehit Fevait Ali Sokak 4/B, Göçmenköy, Lefkoşa', 35.207265, 33.337685, 'partner', 0),
        ('7b1e0c2a-5d4f-4e8b-9a61-3c2f8e0d4b17', 'morphou', NULL, NULL, NULL, NULL, 1)
 ON CONFLICT (school_id, region) DO NOTHING;
 
@@ -210,6 +211,8 @@ DECLARE
   v_bad_provB  text := 'not run';
   v_good_sch   text := 'not run';
   v_good_br    text := 'not run';
+  v_good_pt    text := 'not run';
+  v_bad_bounds text := 'not run';
   v_sd         public.driving_schools%ROWTYPE;
   v_nic        public.driving_school_branches%ROWTYPE;
   v_mor        public.driving_school_branches%ROWTYPE;
@@ -288,8 +291,8 @@ BEGIN
       v_sd.phones, v_sd.whatsapp, v_sd.instagram_url, v_sd.facebook_url, v_sd.email, v_sd.licence_classes;
   END IF;
   IF v_nic.address IS DISTINCT FROM 'Şehit Fevait Ali Sokak 4/B, Göçmenköy, Lefkoşa'
-     OR v_nic.lat IS DISTINCT FROM NULL::double precision OR v_nic.lng IS DISTINCT FROM NULL::double precision
-     OR v_nic.geocode_source IS DISTINCT FROM NULL::text THEN
+     OR v_nic.lat IS DISTINCT FROM 35.207265::double precision OR v_nic.lng IS DISTINCT FROM 33.337685::double precision
+     OR v_nic.geocode_source IS DISTINCT FROM 'partner'::text THEN
     RAISE EXCEPTION 'seed nicosia branch: address=% lat=% lng=% source=%', v_nic.address, v_nic.lat, v_nic.lng, v_nic.geocode_source;
   END IF;
   IF v_mor.address IS NOT NULL OR v_mor.lat IS NOT NULL OR v_mor.lng IS NOT NULL OR v_mor.geocode_source IS NOT NULL THEN
@@ -392,6 +395,19 @@ BEGIN
       v_good_br := 'accepted';
     EXCEPTION WHEN check_violation THEN v_good_br := 'REFUSED';
     END;
+    -- Positive control for the partner source, and a point outside the TRNC box (lat 36.0) is refused.
+    BEGIN
+      INSERT INTO public.driving_school_branches (school_id, region, address, lat, lng, geocode_source)
+        VALUES (v_probe_on, 'karpaz', 'Zz Sokak 2, Karpaz', 35.2, 33.3, 'partner');
+      v_good_pt := 'accepted';
+    EXCEPTION WHEN check_violation THEN v_good_pt := 'REFUSED';
+    END;
+    BEGIN
+      INSERT INTO public.driving_school_branches (school_id, region, lat, lng, geocode_source)
+        VALUES (v_probe_on, 'iskele', 36.0, 33.3, 'partner');
+      v_bad_bounds := 'ACCEPTED';
+    EXCEPTION WHEN check_violation THEN v_bad_bounds := 'refused';
+    END;
     BEGIN
       INSERT INTO public.driving_schools (name, phones, instagram_url) VALUES ('zz badinsta', ARRAY['+90 533 000 00 04'], 'http://instagram.com/x');
       v_bad_insta := 'ACCEPTED';
@@ -480,6 +496,8 @@ BEGIN
   IF v_bad_provA  IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'CONTROL FAILED: coordinates without a source was %', v_bad_provA; END IF;
   IF v_bad_provB  IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'CONTROL FAILED: a source without coordinates was %', v_bad_provB; END IF;
   IF v_good_br    IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'CONTROL FAILED: well-formed OSM-pinned branch was %', v_good_br; END IF;
+  IF v_good_pt    IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'CONTROL FAILED: well-formed partner-pinned branch was %', v_good_pt; END IF;
+  IF v_bad_bounds IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'CONTROL FAILED: point outside the TRNC bounds was %', v_bad_bounds; END IF;
   IF EXISTS (SELECT 1 FROM public.driving_schools WHERE name LIKE 'zz %') THEN
     RAISE EXCEPTION 'probe rows survived the rollback';
   END IF;
@@ -498,7 +516,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261108_driving_schools.sql', '693dc2b4357a2aa1f237f62df106dee279a96901e9837c4eedfbba277c9536ef')
+VALUES ('20261108_driving_schools.sql', 'de7b1e177bece7004239c0d64d2a52c8ea2fad2b6af128d3328e31fad8aad5d9')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

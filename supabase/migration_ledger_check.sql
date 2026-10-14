@@ -223,7 +223,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261105_duyurular_publish.sql', 'b5b491d4e8dacd80e9de2048ecf14b127e3c10e37886a78d415138128d66a583'),
   ('20261106_sync_novest_cron_timeout.sql', '0f99577fa7fac74d007ab17de2dd92cdaba7523c29bc4f7fea2c1fbcb05124c2'),
   ('20261107_duty_2026_10_13_lefkosa_tuna.sql', 'de091dc9f02856710d1efb775959e7c3602eaca73cb0b63e18cb52a99d555e24'),
-  ('20261108_driving_schools.sql', '693dc2b4357a2aa1f237f62df106dee279a96901e9837c4eedfbba277c9536ef'),
+  ('20261108_driving_schools.sql', 'de7b1e177bece7004239c0d64d2a52c8ea2fad2b6af128d3328e31fad8aad5d9'),
   ('20261109_contact_events_ehliyet.sql', 'abf95c2aef0777dc9a88c6fefd1413e71162361dc2c3545bdc78cb1b66039836')
 )
 SELECT * FROM (
