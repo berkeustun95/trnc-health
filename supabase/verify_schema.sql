@@ -40,6 +40,9 @@ WITH report AS (
   SELECT 'A-table' section, e.m migration, e.o object,
          CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
   FROM (VALUES
+    -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
+    ('1108_driving_schools','driving_schools'),
+    ('1108_driving_schools','driving_school_branches'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources'),
     ('1102_duyurular','announcements'),
@@ -127,6 +130,29 @@ WITH report AS (
                 WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
+    ('1108_driving_schools','driving_schools','id'),
+    ('1108_driving_schools','driving_schools','name'),
+    ('1108_driving_schools','driving_schools','logo_key'),
+    ('1108_driving_schools','driving_schools','phones'),
+    ('1108_driving_schools','driving_schools','whatsapp'),
+    ('1108_driving_schools','driving_schools','instagram_url'),
+    ('1108_driving_schools','driving_schools','facebook_url'),
+    ('1108_driving_schools','driving_schools','email'),
+    ('1108_driving_schools','driving_schools','licence_classes'),
+    ('1108_driving_schools','driving_schools','featured'),
+    ('1108_driving_schools','driving_schools','sort_order'),
+    ('1108_driving_schools','driving_schools','is_active'),
+    ('1108_driving_schools','driving_schools','created_at'),
+    ('1108_driving_schools','driving_schools','updated_at'),
+    ('1108_driving_schools','driving_school_branches','id'),
+    ('1108_driving_schools','driving_school_branches','school_id'),
+    ('1108_driving_schools','driving_school_branches','region'),
+    ('1108_driving_schools','driving_school_branches','address'),
+    ('1108_driving_schools','driving_school_branches','lat'),
+    ('1108_driving_schools','driving_school_branches','lng'),
+    ('1108_driving_schools','driving_school_branches','geocode_source'),
+    ('1108_driving_schools','driving_school_branches','sort_order'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -559,6 +585,24 @@ WITH report AS (
     ('1095_institutions_country','institutions_city_country_check'),
     ('1095_institutions_country','institutions_city_name_check'),
     ('1095_institutions_country','institutions_country_name_unique'),
+    -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
+    ('1108_driving_schools','driving_schools_pkey'),
+    ('1108_driving_schools','driving_schools_name_check'),
+    ('1108_driving_schools','driving_schools_logo_key_check'),
+    ('1108_driving_schools','driving_schools_phones_check'),
+    ('1108_driving_schools','driving_schools_whatsapp_check'),
+    ('1108_driving_schools','driving_schools_instagram_url_check'),
+    ('1108_driving_schools','driving_schools_facebook_url_check'),
+    ('1108_driving_schools','driving_schools_email_check'),
+    ('1108_driving_schools','driving_schools_licence_classes_check'),
+    ('1108_driving_schools','driving_school_branches_pkey'),
+    ('1108_driving_schools','driving_school_branches_school_id_fkey'),
+    ('1108_driving_schools','driving_school_branches_school_region_key'),
+    ('1108_driving_schools','driving_school_branches_region_check'),
+    ('1108_driving_schools','driving_school_branches_coords_check'),
+    ('1108_driving_schools','driving_school_branches_address_check'),
+    ('1108_driving_schools','driving_school_branches_geocode_source_check'),
+    ('1108_driving_schools','driving_school_branches_provenance_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -875,6 +919,8 @@ WITH report AS (
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
     ('1095_institutions_country','institutions_country_idx'),
+    -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
+    ('1108_driving_schools','driving_school_branches_school_idx'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcements_list_idx'),
     ('1102_duyurular','announcements_deadline_idx'),
@@ -3499,6 +3545,84 @@ WITH report AS (
       AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
                AND NOT has_table_privilege('authenticated', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
                AND has_table_privilege('service_role', to_regclass('public.announcement_sources'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    -- ── 1108: Ehliyet driving schools ────────────────────────────────────────────
+    -- (1) The pre-launch inversion: a reverted DEFAULT creates no named object and would
+    --     publish a school before activation (SOP step 3).
+    UNION ALL SELECT '1108_driving_schools','driving_schools.is_active DEFAULT false',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='driving_schools' AND column_name='is_active'
+          AND column_default = 'false') = 1
+    -- (1b) licence_classes is NOT NULL DEFAULT '{}' (a reverted DEFAULT creates no named object; the app
+    --      reads the column unguarded). Written from the live rendering of the default.
+    UNION ALL SELECT '1108_driving_schools','driving_schools.licence_classes NOT NULL DEFAULT empty array',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='driving_schools' AND column_name='licence_classes'
+          AND is_nullable = 'NO' AND column_default LIKE '''{}''::text[]%') = 1
+    -- (1c) The branch pin source is osm/partner only and two-way (coordinates exist exactly when a source does),
+    --      asserted from the live definitions: the E-section names cannot see what they permit.
+    UNION ALL SELECT '1108_driving_schools','driving_school_branches: geocode_source is exactly osm/partner and pin <-> source is two-way',
+      COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.driving_school_branches') AND c.conname = 'driving_school_branches_geocode_source_check')
+        IS NOT DISTINCT FROM ARRAY['osm','partner'], false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE 'CHECK (((lat IS NULL) = (geocode_source IS NULL)))%'
+                      FROM pg_constraint c
+                     WHERE c.conrelid = to_regclass('public.driving_school_branches') AND c.conname = 'driving_school_branches_provenance_check'), false)
+    -- (2) driving_schools: exactly one permissive SELECT policy for anon + authenticated on
+    --     is_active; clients hold SELECT only (write privileges none); service_role writes (control).
+    UNION ALL SELECT '1108_driving_schools','driving_schools: 1 SELECT policy (is_active), RLS on, clients SELECT-only, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.driving_schools')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='driving_schools') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='driving_schools'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual = 'is_active')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.driving_schools'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.driving_schools'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND has_table_privilege('anon', to_regclass('public.driving_schools'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.driving_schools'), 'SELECT')
+               AND has_table_privilege('service_role', to_regclass('public.driving_schools'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    -- (3) driving_school_branches: one SELECT policy that asks the parent school's is_active,
+    --     same grant shape.
+    UNION ALL SELECT '1108_driving_schools','driving_school_branches: 1 SELECT policy (parent school active), RLS on, clients SELECT-only, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.driving_school_branches')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='driving_school_branches') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='driving_school_branches'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[]
+        AND qual LIKE '%driving_schools%' AND qual LIKE '%is_active%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.driving_school_branches'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.driving_school_branches'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND has_table_privilege('anon', to_regclass('public.driving_school_branches'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.driving_school_branches'), 'SELECT')
+               AND has_table_privilege('service_role', to_regclass('public.driving_school_branches'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    -- ── EHLIYET-CONTACT-EVENTS:BEGIN (20261109_contact_events_ehliyet.sql; optional, see its drop recipe) ──
+    -- The contact_events MODULE vocabulary once 20261109 is applied: an exact SET (contains both
+    -- ways), 13 + ehliyet. Red until the file applies. The 1059 13-module token below is
+    -- superseded by this one only when the ledger records 20261109 (one count, one owner).
+    UNION ALL SELECT '1109_contact_events_ehliyet','contact_events module vocabulary is exactly the 14-module set (incl. ehliyet)',
+      COALESCE((SELECT array_agg(DISTINCT m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check') @>
+        ARRAY['accommodation','ehliyet','events','explore','garages','grooming','homeServices',
+              'hotels','insurance','jobs','pets','studentHub','towing','transport']
+      AND (SELECT array_agg(DISTINCT m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check') <@
+        ARRAY['accommodation','ehliyet','events','explore','garages','grooming','homeServices',
+              'hotels','insurance','jobs','pets','studentHub','towing','transport'], false)
+    -- The contact_events ACTION vocabulary once 20261109 is applied: an exact SET of ten (the seven
+    -- 20261083 left + instagram, facebook, email), contains both ways. The additive 1014/1046/1056/1083
+    -- tokens ("permits X") stay green in both states; no other token owns the whole action set, so
+    -- there is nothing to supersede. Red until the file applies.
+    UNION ALL SELECT '1109_contact_events_ehliyet','contact_events action vocabulary is exactly the 10-action set (incl. instagram, facebook, email)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
+      IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps',
+                                 'route_complete','website','whatsapp']
+    -- ── EHLIYET-CONTACT-EVENTS:END ──
     -- ── 1104: Duyurular in the waitlist notify path ──────────────────────────────
     -- CREATE OR REPLACE only: no named object. Both bodies must name the module, and the RPC
     -- must still be closed to anon (positive control: the admin guard text is still there).
@@ -3735,6 +3859,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
       IS NOT DISTINCT FROM ARRAY['accommodation','events','explore','garages','grooming','homeServices',
                                  'hotels','insurance','jobs','pets','studentHub','towing','transport']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261109_contact_events_ehliyet.sql') -- EHLIYET-CONTACT-EVENTS:supersede (one count, one owner: the 1109 token owns the set once the ledger records it)
     -- ── 1060: hotel geocode provenance ─────────────────────────────────────────
     -- (1) THE TWO-WAY RULE. Coordinates exist exactly when a source does (and a timestamp with
     --     it). The half that matters most is source-without-coordinates being REFUSED: it is what
