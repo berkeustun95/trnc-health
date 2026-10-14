@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, readableOn, brandInk } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
+import { logContactEvent } from '../utils/logContactEvent'
 import StoreMap from '../components/StoreMap'
 import { packageHandoffUrl, handoffHost, fetchStores, storeDirectionsUrl, mappableStores } from '../lib/connectivity'
 
@@ -121,12 +122,15 @@ export default function ConnectivityPackageScreen({ pkg, operator, lang, onBack 
 
   const onContinue = useCallback(async () => {
     if (!url || opening) return
+    // ADA's own lead count (20261112), logged BEFORE the browser opens, like HotelRunner's 'book'.
+    // entity_id is the package (operator by join); fire-and-forget, cannot throw.
+    logContactEvent('connectivity', pkg?.id || operator?.id, 'website', null, lang)
     setOpening(true)
     setFailed(false)
     const ok = await openHandoff(url, { secondary, onSecondary })
     setOpening(false)
     if (!ok) setFailed(true)
-  }, [url, opening, secondary, onSecondary])
+  }, [url, opening, secondary, onSecondary, pkg?.id, operator?.id, lang])
 
   // tel: is refused by the OS on a tablet with no dialler, and support_phone is a nullable
   // column — either way the button is hidden rather than shown dead.

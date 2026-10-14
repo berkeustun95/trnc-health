@@ -118,11 +118,12 @@ try {
   setTimeout(() => outbox.flush(), 2000)
 } catch (e) { warn(e) }
 
-export function logContactEvent(module, entityId, action, region = null) {
+// lang: the app language (full English name, LANGUAGES key). Only connectivity passes it (20261112).
+export function logContactEvent(module, entityId, action, region = null, lang = null) {
   try {
     // entityId is NOT NULL in the table; a null here would be a rejected round-trip.
     if (!module || !entityId || !action) return
-    outbox.record(module, entityId, action, region)
+    outbox.record(module, entityId, action, region, lang)
   } catch (e) {
     warn(e)
   }

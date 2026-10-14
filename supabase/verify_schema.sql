@@ -345,7 +345,9 @@ WITH report AS (
     -- 1083. HotelRunner booking link. HotelsTab selects it: MISSING = 42703 on the tab.
     ('1083_hotels_hotelrunner','hotels','hotelrunner_url'),
     -- 1087. The thread a message row opens. utils/notificationRoute.js selects it (falls back on 42703).
-    ('1087_notifications_conversation_id','notifications','conversation_id')
+    ('1087_notifications_conversation_id','notifications','conversation_id'),
+    -- 1112. App language on a KKTCELL handoff tap. The outbox sends it only for connectivity taps.
+    ('1112_contact_events_connectivity','contact_events','lang')
 
   ) e(m,t,c)
 
@@ -908,7 +910,9 @@ WITH report AS (
     -- 1083. The H token asserts what it permits.
     ('1083_hotels_hotelrunner','hotels_hotelrunner_url_check'),
     -- 1087. A foreign key, registered here for existence; its ON DELETE action is an H token.
-    ('1087_notifications_conversation_id','notifications_conversation_id_fkey')
+    ('1087_notifications_conversation_id','notifications_conversation_id_fkey'),
+    -- 1112. Its allowed set (nine full language names) is an H token.
+    ('1112_contact_events_connectivity','contact_events_lang_check')
 
   ) e(m,o)
 
@@ -3611,6 +3615,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check') <@
         ARRAY['accommodation','ehliyet','events','explore','garages','grooming','homeServices',
               'hotels','insurance','jobs','pets','studentHub','towing','transport'], false)
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261112_contact_events_connectivity.sql') -- CONNECTIVITY-CONTACT-EVENTS:supersede (one count, one owner: the 1112 token owns the set once the ledger records it)
     -- The contact_events ACTION vocabulary once 20261109 is applied: an exact SET of ten (the seven
     -- 20261083 left + instagram, facebook, email), contains both ways. The additive 1014/1046/1056/1083
     -- tokens ("permits X") stay green in both states; no other token owns the whole action set, so
@@ -3623,6 +3628,33 @@ WITH report AS (
       IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps',
                                  'route_complete','website','whatsapp']
     -- ── EHLIYET-CONTACT-EVENTS:END ──
+    -- ── CONNECTIVITY-CONTACT-EVENTS:BEGIN (20261112_contact_events_connectivity.sql) ──
+    -- KKTCELL handoff taps. Red until the file applies. The module SET is owned here once the ledger
+    -- records 20261112 (the 1109 set token above stands down then: one count, one owner).
+    UNION ALL SELECT '1112_contact_events_connectivity','contact_events module vocabulary is exactly the 15-module set (incl. connectivity)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','connectivity','ehliyet','events','explore','garages','grooming',
+                                 'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+    -- lang: the nine LANGUAGES keys as full English names, never ISO codes (an exact SET).
+    UNION ALL SELECT '1112_contact_events_connectivity','contact_events.lang CHECK is exactly the nine full language names',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_lang_check')
+      IS NOT DISTINCT FROM ARRAY['Arabic','English','French','German','Greek','Persian','Russian','Spanish','Turkish']
+    -- The column is insertable by both client roles; created_at still by neither (positive control).
+    UNION ALL SELECT '1112_contact_events_connectivity','contact_events.lang insertable by anon + authenticated, created_at still not',
+      COALESCE((SELECT has_column_privilege('anon', c.oid, 'lang', 'INSERT')
+                   AND has_column_privilege('authenticated', c.oid, 'lang', 'INSERT')
+                   AND NOT has_column_privilege('anon', c.oid, 'created_at', 'INSERT')
+                   AND NOT has_column_privilege('authenticated', c.oid, 'created_at', 'INSERT')
+                FROM pg_class c WHERE c.oid = to_regclass('public.contact_events')
+                  AND EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_schema='public' AND table_name='contact_events' AND column_name='lang')), false)
+    -- ── CONNECTIVITY-CONTACT-EVENTS:END ──
     -- ── 1104: Duyurular in the waitlist notify path ──────────────────────────────
     -- CREATE OR REPLACE only: no named object. Both bodies must name the module, and the RPC
     -- must still be closed to anon (positive control: the admin guard text is still there).

@@ -22,7 +22,7 @@ export const MAX_EVENTS = 50
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 export function createOutbox({ send, storage, uuid, now = () => Date.now(), warn = () => {} }) {
-  let queue = []                 // [{ id, module, entity_id, action, region, t }] oldest first
+  let queue = []                 // [{ id, module, entity_id, action, region, lang?, t }] oldest first
   let loaded = false
   let loading = null
   let flushing = false
@@ -67,7 +67,10 @@ export function createOutbox({ send, storage, uuid, now = () => Date.now(), warn
     try {
       let outcome
       try {
-        outcome = await send({ id: e.id, module: e.module, entity_id: e.entity_id, action: e.action, region: e.region })
+        const row = { id: e.id, module: e.module, entity_id: e.entity_id, action: e.action, region: e.region }
+        // No lang key unless one was given: a row naming the column fails on a DB without it (20261112).
+        if (e.lang) row.lang = e.lang
+        outcome = await send(row)
       } catch (err) { warn(err); outcome = 'retry' }
       if (outcome === 'delivered' || outcome === 'duplicate' || outcome === 'drop') {
         queue = queue.filter(x => x.id !== e.id)
@@ -80,8 +83,9 @@ export function createOutbox({ send, storage, uuid, now = () => Date.now(), warn
   }
 
   // Synchronous by contract (RULE ONE). Returns the tap's id.
-  function record(module, entityId, action, region = null) {
+  function record(module, entityId, action, region = null, lang = null) {
     const e = { id: uuid(), module, entity_id: entityId, action, region: region || null, t: now() }
+    if (lang) e.lang = lang
     queue.push(e)
     trim()
     Promise.resolve()
