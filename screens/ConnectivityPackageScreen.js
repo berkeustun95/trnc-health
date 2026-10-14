@@ -172,7 +172,7 @@ export default function ConnectivityPackageScreen({ pkg, operator, lang, onBack 
                 <Text style={[s.numText, { color: onPrimary }]}>{i + 1}</Text>
               </View>
               <View style={s.stepBody}>
-                <Text style={s.stepTitle}>{t(step.titleKey, lang)}</Text>
+                <Text style={s.stepTitle}>{t(step.titleKey, lang).replace('{operator}', operatorName)}</Text>
                 <Text style={s.stepText}>
                   {t(step.bodyKey, lang).replace('{operator}', operatorName)}
                 </Text>
