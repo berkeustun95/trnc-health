@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
+import { KINDS } from '../constants/islandCalendar.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = f => readFileSync(resolve(ROOT, f), 'utf8')
@@ -89,7 +90,21 @@ const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.0
 const Y = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
 const rampAlpha = u => (u >= 1 ? 0 : G.BOTTOM_MAX * Math.pow(1 - u, G.RAMP_EXP))
 
+// constants/dayParts.js tables, READ as text (one `key: value` per line; null → null).
+function readTable(name) {
+  const m = new RegExp(`export const ${name} = \\{([^}]*)\\}`).exec(read('constants/dayParts.js'))
+  if (!m) return null
+  const out = {}
+  for (const line of m[1].split('\n')) {
+    const e = /^\s*(\w+):\s*(null|'[^']*')/.exec(line)
+    if (e) out[e[1]] = e[2] === 'null' ? null : e[2].slice(1, -1)
+  }
+  return out
+}
+const parseRgba = s => { const m = /^rgba\((\d+),(\d+),(\d+),([\d.]+)\)$/.exec(s); return m ? { c: [+m[1], +m[2], +m[3]], a: parseFloat(m[4]) } : null }
+
 const problems = []
+let logoContrast = null   // the wordmark's bar is min(today, 3:1) (non-text), reported apart from the 4.5:1 text rows
 let dotsContrast = null   // non-text UI (3:1), reported apart from the 4.5:1 text rows
 const rows = []
 for (const [name, file] of BACKGROUNDS) {
@@ -141,6 +156,109 @@ for (const [name, file] of BACKGROUNDS) {
   // Home v3: the weather chip must wear the SAME pill, or the number above says nothing about it.
   if (!/style=\{\[s\.chip, s\.wxChip\]\}/.test(src)) {
     problems.push('redesign hero: the weather chip is not styled with s.chip — the pill ratio above does not cover it')
+  }
+}
+
+// ── Daylight experiment (Variant A): the hero wash + weather veil ──
+// RedesignHero draws, bottom to top: photo → HERO_WASH → WEATHER_VEIL → TOP ramp → (generic scrim)
+// → BOTTOM ramp → logo / chip pills. Read from constants/dayParts.js, never retyped; every
+// wash × veil combination (day parts × weather groups, incl. none) is iterated.
+//   • the white wordmark (top-left) over the REAL photos, cover-cropped, with the real TOP ramp:
+//     p95 background luminance in the logo box must keep white at >= min(today's ratio, 3:1)
+//     on every photo x device x combo (the bare logo is ~1.2:1 on a bright sky today: it can only improve there);
+//   • the chip pills over a PURE WHITE pixel carrying the combo: ≥ 4.5:1 (a flat colour over
+//     white can never be brighter than white, so this is the bound; it goes red only if the
+//     pill alpha does — printed so the claim is visible, not assumed).
+{
+  const hero = readFileSync(resolve(ROOT, 'components/home/redesign/RedesignHero.js'), 'utf8')
+  const washes = readTable('HERO_WASH'), veils = readTable('WEATHER_VEIL')
+  const calWashes = readTable('CALENDAR_WASH')   // Variant C: replaces the day-part wash on a dated day, veil stays
+  const topMax = parseFloat((/const TOP = rampLayers\(([\d.]+)\)/.exec(hero) || [])[1])
+  const steps = num('components/home/HomeHero.js', 'RAMP_STEPS')
+  const logoWH = /logo:\s*\{\s*width:\s*(\d+),\s*height:\s*(\d+)\s*\}/.exec(hero)
+  const pillA = parseFloat((/export const HERO_PILL_ALPHA\s*=\s*([\d.]+)/.exec(hero) || [])[1])
+  const total = parseFloat((/export const HERO_TOTAL\s*=\s*(\d+)/.exec(hero) || [])[1])
+  const minBody = parseFloat((/export const HERO_MIN_BODY\s*=\s*(\d+)/.exec(hero) || [])[1])
+  if (calWashes) {   // every Island Calendar kind needs a wash and vice versa
+    for (const k of KINDS) if (!(k in calWashes)) problems.push(`calendar: kind "${k}" has no CALENDAR_WASH entry`)
+    for (const k of Object.keys(calWashes)) if (!KINDS.includes(k)) problems.push(`calendar: CALENDAR_WASH.${k} is not a kind in islandCalendar KINDS`)
+  }
+  if (!washes || !veils || !calWashes || !(topMax > 0) || !(steps > 0) || !logoWH || !(pillA > 0) || !(total > 0) || !(minBody > 0)
+      || !/<HeroAtmosphere part=\{part\} wxGroup/.test(hero) || !/s\.logo/.test(hero)) {
+    problems.push('daylight hero: cannot read the wash/veil tables or the hero geometry — measuring nothing')
+  } else {
+    const combos = []
+    for (const [dp, w] of Object.entries(calWashes)) for (const [wx, v] of [['none', null], ...Object.entries(veils)]) {
+      const W_ = w == null ? null : parseRgba(w), V_ = v == null ? null : parseRgba(v)
+      if (!W_ || (v != null && !V_)) { problems.push(`calendar: CALENDAR_WASH.${dp} / WEATHER_VEIL.${wx} is not rgba(r,g,b,a)`); continue }
+      if (W_.a > 0.16) problems.push(`calendar: CALENDAR_WASH.${dp} alpha ${W_.a} is over the 0.16 cap`)
+      const [cr, cg, cb2] = W_.c   // product rule: no national-flag colours (red / white)
+      if ((cr > 180 && cg < 140 && cb2 < 140) || (cr > 240 && cg > 240 && cb2 > 240)) problems.push(`calendar: CALENDAR_WASH.${dp} is red or white (flag colours)`)
+      combos.push({ name: `cal:${dp}+${wx}`, layers: [W_, V_].filter(Boolean) })
+    }
+    for (const [dp, w] of Object.entries(washes)) for (const [wx, v] of [['none', null], ...Object.entries(veils)]) {
+      const W_ = w == null ? null : parseRgba(w), V_ = v == null ? null : parseRgba(v)
+      if ((w != null && !W_) || (v != null && !V_)) problems.push(`daylight: HERO_WASH.${dp} / WEATHER_VEIL.${wx} is not rgba(r,g,b,a)`)
+      if (W_ && W_.a > 0.22) problems.push(`daylight: HERO_WASH.${dp} alpha ${W_.a} is over the 0.22 cap`)
+      if (V_ && V_.a > 0.18) problems.push(`daylight: WEATHER_VEIL.${wx} alpha ${V_.a} is over the 0.18 cap`)
+      combos.push({ name: `${dp}+${wx}`, layers: [W_, V_].filter(Boolean) })
+    }
+    const over = (px, L) => L.reduce((p, { c, a }) => p.map((v, k) => v * (1 - a) + c[k] * a), px)
+    // the real top ramp: per-layer alphas whose product is max·(1-u)^RAMP_EXP, band i is (i+1)/steps of 45% of the hero
+    const exp = G.RAMP_EXP
+    const d = new Array(steps)
+    for (let i = steps - 1; i >= 0; i--) {
+      let below = 1
+      for (let k = i + 1; k < steps; k++) below *= (1 - d[k])
+      d[i] = 1 - (1 - topMax * Math.pow(1 - i / steps, exp)) / below
+    }
+    const [lw, lh] = [+logoWH[1], +logoWH[2]]
+    let base = Infinity, worst = Infinity, wname = '', wat = '', b0 = 0, worstDrop = 0, dropAt = ''
+    const per = {}
+    for (const [name, file] of BACKGROUNDS) {
+      for (const [Wd, inset] of [[360, 24], [393, 47], [412, 59]]) {
+        const Ht = Math.max(total, inset + minBody)
+        const { data } = await sharp(resolve(ROOT, file)).resize(Wd, Ht, { fit: 'cover', position: 'centre' })
+          .removeAlpha().raw().toBuffer({ resolveWithObject: true })
+        for (const cb of [{ name: 'none', layers: [] }, ...combos]) {
+          const lum = []
+          for (let y = inset + 8; y < inset + 8 + lh; y++) {
+            let keep = 1
+            for (let i = 0; i < steps; i++) if (y < (Ht * 0.45 / steps) * (i + 1)) keep *= (1 - d[i])
+            const ga = name === 'generic' ? 0.28 : 0   // generic scrim sits above the top ramp
+            for (let x = 16; x < 16 + lw; x++) {
+              const j = (y * Wd + x) * 3
+              let px = over([data[j], data[j + 1], data[j + 2]], cb.layers)
+              px = px.map(v => v * keep * (1 - ga))
+              lum.push(Y(...px))
+            }
+          }
+          lum.sort((p, q) => p - q)
+          const c = 1.05 / (lum[Math.floor(lum.length * 0.95)] + 0.05)
+          if (cb.name === 'none') { base = Math.min(base, c); b0 = c }
+          else {
+            if (c < Math.min(b0, 3) - 1e-9 && c - Math.min(b0, 3) < worstDrop) { worstDrop = c - Math.min(b0, 3); dropAt = `${cb.name} on ${name} ${Wd}dp inset ${inset}: ${c.toFixed(2)} vs ${b0.toFixed(2)} without` }
+            const dpk = cb.name.split('+')[0]   // day part, or cal:<kind>
+            per[dpk] = Math.min(per[dpk] ?? Infinity, c)
+            if (c < worst) { worst = c; wname = cb.name; wat = `${name} ${Wd}dp inset ${inset}` }
+          }
+        }
+      }
+    }
+    logoContrast = { base, worst, at: `${wname} ${wat}` }
+    console.log('  daylight logo, worst per day-part (all weather veils): ' + Object.entries(per).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · ') + ` — none ${base.toFixed(2)}`)
+    // The wordmark already sits on bright sky (the baseline is NOT 3:1 — it is the status quo), so the
+    // bar per photo x device x combo is min(without-atmosphere, 3:1): a wash may lower a ratio that
+    // stays at 3:1 (non-text) or better, but never push the logo below today's figure or below 3:1.
+    if (dropAt) problems.push(`daylight hero: a wash/veil is too bright for the white wordmark — it takes the logo under min(today, 3:1): ${dropAt}`)
+    let wc = Infinity, wcn = ''
+    for (const cb of combos) {
+      const px = over([255, 255, 255], cb.layers).map(v => v * (1 - pillA))
+      const c = 1.05 / (Y(...px) + 0.05)
+      if (c < wc) { wc = c; wcn = cb.name }
+    }
+    rows.push({ name: 'chip pill + wash/veil', worst: wc, at: wcn })
+    if (wc < FLOOR) problems.push(`daylight hero: chip text over white carrying ${wcn} is ${wc.toFixed(2)}:1, under ${FLOOR}:1`)
   }
 }
 
@@ -203,6 +321,71 @@ for (const [name, file] of BACKGROUNDS) {
     if (worstD < 3) problems.push(`redesign Oli bar: inactive dot is ${worstD.toFixed(2)}:1 against the ground (${atD}), under 3:1`)
     if (worstT < FLOOR) problems.push(`redesign Oli bar: title on the ground is ${worstT.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
     if (worstP < FLOOR) problems.push(`redesign Oli bar: pill text is ${worstP.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
+
+    // ── Daylight experiment: the glow tinted per day part ──
+    // tintColor REPLACES the glow's colour and keeps its alpha (iOS template render, Android SRC_IN
+    // filter). oli-glow.png is pure white at varying alpha, so a tint can only darken the ground.
+    // Each OLI_GLOW_TINT (READ from constants/dayParts.js) is rendered exactly like that at the
+    // three widths; title and pill must clear 4.5:1 AND be no worse than the untinted figures.
+    const tints = readTable('OLI_GLOW_TINT')
+    if (!tints || Object.keys(tints).length !== 4) problems.push('daylight: cannot read OLI_GLOW_TINT from constants/dayParts.js — measuring nothing')
+    else {
+      const glowRaw = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-glow.png')).resize(GS, GS).ensureAlpha().raw().toBuffer()
+      const glowLum = (() => { let m = 0; for (let i = 0; i < glowRaw.length; i += 4) if (glowRaw[i + 3] > 0) m = Math.max(m, Y(glowRaw[i], glowRaw[i + 1], glowRaw[i + 2])); return m })()
+      // Render the card at one width with a given glow PNG; also the mask of TEXT_ZONE pixels the glow
+      // actually covers (alpha > 0). Only those pixels can change with the tint, so only those are measured.
+      const pngOf = async (r, g, b) => {
+        const buf = Buffer.from(glowRaw)
+        if (r != null) for (let i = 0; i < buf.length; i += 4) { buf[i] = r; buf[i + 1] = g; buf[i + 2] = b }
+        return sharp(buf, { raw: { width: GS, height: GS, channels: 4 } }).png().toBuffer()
+      }
+      const renderAt = async (png, Wd) => {
+        const cw = Wd - 32, pad = GS
+        const sized = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-bg.png')).resize(cw, H, { fit: 'fill' }).toBuffer()
+        const bg = await sharp(sized).extend({ top: pad, bottom: pad, left: pad, right: pad, extendWith: 'copy' }).toBuffer()
+        const lit = await sharp(bg).composite([{ input: png, left: Math.round(cw * GX - GS / 2) + pad, top: Math.round(H * GY - GS / 2) + pad }]).png().toBuffer()
+        return sharp(lit).extract({ left: pad, top: pad, width: cw, height: H }).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      }
+      const maskAt = Wd => {
+        const cw = Wd - 32, gl = Math.round(cw * GX - GS / 2), gt = Math.round(H * GY - GS / 2), m = []
+        for (let y = 0; y < H; y++) for (let x = TL; x < Math.ceil(cw * ZONE); x++) {
+          const gx = x - gl, gy = y - gt
+          if (gx >= 0 && gx < GS && gy >= 0 && gy < GS && glowRaw[(gy * GS + gx) * 4 + 3] > 0) m.push([x, y])
+        }
+        return m
+      }
+      const WIDTHS = [320, 360, 393]
+      const masks = Object.fromEntries(WIDTHS.map(Wd => [Wd, maskAt(Wd)]))
+      const covered = WIDTHS.reduce((n, Wd) => n + masks[Wd].length, 0)
+      const plainPng = await pngOf(null)
+      const plain = Object.fromEntries(await Promise.all(WIDTHS.map(async Wd => [Wd, await renderAt(plainPng, Wd)])))
+      if (covered === 0) console.log('  glow never reaches TEXT_ZONE at 320/360/393dp — tint cannot affect text (brightness bound still enforced)')
+      else console.log(`  glow reaches TEXT_ZONE: ${WIDTHS.map(Wd => `${Wd}dp ${masks[Wd].length}px`).join(' · ')} — contrast measured over those pixels only`)
+      for (const [part, hex] of Object.entries(tints)) {
+        const [tr, tg, tb] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+        if (Y(tr, tg, tb) > glowLum + 1e-9) problems.push(`daylight: OLI_GLOW_TINT.${part} ${hex} is brighter than the untinted glow — it could only lower contrast`)
+        const glowPng = await pngOf(tr, tg, tb)
+        let wt = Infinity, wp = Infinity, ut = Infinity, up = Infinity
+        for (const Wd of WIDTHS) {
+          if (!masks[Wd].length) continue
+          const { data, info } = await renderAt(glowPng, Wd)
+          for (const [x, y] of masks[Wd]) {
+            const i = (y * info.width + x) * info.channels
+            const px = [data[i], data[i + 1], data[i + 2]]
+            wt = Math.min(wt, 1.05 / (Y(...px) + 0.05))
+            wp = Math.min(wp, 1.05 / (Y(...px.map(v => 255 * 0.16 + v * 0.84)) + 0.05))
+            const q = plain[Wd].data, qp = [q[i], q[i + 1], q[i + 2]]
+            ut = Math.min(ut, 1.05 / (Y(...qp) + 0.05))
+            up = Math.min(up, 1.05 / (Y(...qp.map(v => 255 * 0.16 + v * 0.84)) + 0.05))
+          }
+        }
+        if (!covered) continue
+        rows.push({ name: `oli glow ${part} title`, worst: wt, at: hex }, { name: `oli glow ${part} pill`, worst: wp, at: hex })
+        if (wt < FLOOR) problems.push(`daylight: OLI_GLOW_TINT.${part} ${hex}: Oli title is ${wt.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
+        if (wp < FLOOR) problems.push(`daylight: OLI_GLOW_TINT.${part} ${hex}: Oli pill text is ${wp.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
+        if (wt < ut - 1e-6 || wp < up - 1e-6) problems.push(`daylight: OLI_GLOW_TINT.${part} ${hex} is worse than the untinted glow on the same pixels (title ${wt.toFixed(2)} vs ${ut.toFixed(2)}, pill ${wp.toFixed(2)} vs ${up.toFixed(2)})`)
+      }
+    }
   }
 }
 
@@ -309,12 +492,13 @@ for (const [name, file] of BACKGROUNDS) {
 
 if (problems.length) {
   console.error('\n  ┌─ HERO CONTRAST CHECK FAILED ───────────────────────────────────┐')
-  for (const p of problems) console.error('  │ ' + p)
+  for (const p of new Set(problems)) console.error('  │ ' + p)
   console.error('  └────────────────────────────────────────────────────────────────┘\n')
   process.exit(1)
 }
-console.log(`hero contrast: OK — white text on all ${rows.length} backgrounds clears ${FLOOR}:1`)
+console.log(`hero contrast: OK — white text on all ${rows.length} text backgrounds clears ${FLOOR}:1`)
 console.log(`  ramp ${G.BOTTOM_MAX}/${G.RAMP_EXP} · generic +${G.GENERIC_SCRIM} flat · text row `
   + `${CONTENT_BOTTOM}pt above the hero's bottom (read from source, not typed here)`)
 console.log('  ' + rows.map(r => `${r.name} ${r.worst.toFixed(2)}`).join(' · '))
+if (logoContrast) console.log(`  logo wordmark (non-text, bar = min(today, 3:1)): no atmosphere ${logoContrast.base.toFixed(2)}:1 · worst wash+veil ${logoContrast.worst.toFixed(2)}:1 (${logoContrast.at}) — not counted above`)
 if (dotsContrast) console.log(`  oli scene dots (non-text, 3:1): inactive ${dotsContrast.worst.toFixed(2)}:1 worst`)

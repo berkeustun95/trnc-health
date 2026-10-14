@@ -213,6 +213,15 @@ export const HOME_V2_LIVE = true   // live 2026-09-08
 // scripts/check-module-flags.mjs's EXPECTED_SCALARS, not a MODULE_FLAGS key.
 export const REDESIGN_LIVE = true   // live from 1.3.0 (release/redesign-1, 2026-10-02); runtime 1.2.0 never receives it
 
+// Dark Home experiment (agent/home-lab): four variants of the redesigned Home, tried one by one
+// on a phone. false = today's Home byte for byte. Scalars in EXPECTED_SCALARS (scripts/
+// check-module-flags.mjs), because a working-tree flip would ship a visual change to every user.
+// Preview in dev only via constants/homeLab.js (EXPO_PUBLIC_DEV_HOME_LAB=1 + the in-app Lab pill).
+export const HOME_DAYLIGHT_LIVE = false        // A "Daylight"
+export const HOME_OLI_COMPANION_LIVE = false   // B "Oli companion"
+export const HOME_CALENDAR_LIVE = false        // C "Island Calendar"
+export const HOME_POLISH_LIVE = false          // P "Polish pack"
+
 // Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
 // the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
 // draws in whichever slots are placed (today: home_footer only, at the foot of the V2 hub).

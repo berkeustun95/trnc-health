@@ -81,6 +81,7 @@ const SUN = [ // [sunrise, sunset] in decimal hours, Jan..Dec
   [6.9, 17.1], [6.7, 17.5], [6.1, 17.9], [6.4, 19.3], [5.9, 19.7], [5.7, 20.0],
   [5.8, 20.0], [6.2, 19.6], [6.6, 18.9], [7.0, 18.3], [6.5, 16.8], [6.8, 16.7],
 ]
+export const sunTimes = month => SUN[month]   // [sunrise, sunset], decimal hours; month 0-11
 export function isNightNow(_weatherData, now = new Date()) {
   const [rise, set] = SUN[now.getMonth()]
   const h = now.getHours() + now.getMinutes() / 60

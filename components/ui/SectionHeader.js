@@ -5,12 +5,12 @@ import { useOnPhoto } from './onPhoto'
 // 18/700, sentence case — replaces the 41 UPPERCASE 11–13pt micro-label styles. An
 // optional text action sits on the right with a 44pt hit area.
 // On a module photo (ModuleScreen) the title and the action sit on dark pills (white 7.3:1 bound).
-export default function SectionHeader({ title, action, onLongPress, style }) {
+export default function SectionHeader({ title, action, onLongPress, style, titleFont }) {
   const onPhoto = useOnPhoto()
   return (
     <View style={[s.row, style]}>
       <View style={onPhoto && s.pill}>
-        <Text style={[s.title, onPhoto && s.onPhoto]} accessibilityRole="header" onLongPress={onLongPress}>{title}</Text>
+        <Text style={[s.title, onPhoto && s.onPhoto, titleFont]} accessibilityRole="header" onLongPress={onLongPress}>{title}</Text>
       </View>
       {!!action && (
         <TouchableOpacity

@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
-  TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator,
+  TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator, RefreshControl, AppState,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
@@ -12,12 +12,16 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import MascotIntroCard from '../components/MascotIntroCard'
-import { colors, typeColors, shadow } from '../constants/theme'
+import { colors, typeColors, shadow, fontDisplayFor } from '../constants/theme'
+import FadeUp from '../components/ui/FadeUp'
 import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import { HOME_LAB_DEV, useHomeLab } from '../constants/homeLab'
+import { oliPillKey } from '../constants/oliContext'
+import { calPillKey } from '../constants/calendarContext'
 import { REDESIGN, DUYURULAR } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -35,12 +39,13 @@ import { resolveFavourites } from '../constants/homeFavourites'
 import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
-  haversineKm, isOpenNow, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
+  haversineKm, isOpenNow, uvLevel, weatherGroup, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
 import LocationOffRow from '../components/LocationOffRow'
 import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
 import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
+import useIslandDay from '../components/home/redesign/useIslandDay'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -244,6 +249,7 @@ export default function HomeScreen({
   // ─── Redesign (feat/redesign) ───────────────────────────────────────────────
   dutySummary = null,     // { loaded, error, status, count, until } from App.js's roster read
   onRetryDuty,
+  onRefreshWeather,       // Oli companion pull-to-refresh only: App.js re-reads the weather (resolves when settled)
   onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
   onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
@@ -279,6 +285,24 @@ export default function HomeScreen({
   // two dismissals in one session must both trigger, and a boolean can only flip once.
   const [stripDismissTick, setStripDismissTick] = useState(0)
   const [stripLoading, setStripLoading] = useState(true)
+
+  // ─── Home lab B, Oli companion (agent/home-lab) — every use below is gated on lab.oli ──────
+  // refreshTick joins the strip effect's deps (constant 0 while off, so no extra fetch on mount);
+  // pillTick re-computes the pill line when the app returns to the foreground (no timer).
+  const lab = useHomeLab()
+  const islandDay = useIslandDay(lab.calendar)   // Home lab C: today's dated-day entry (null when off / ordinary day)
+  const [refreshing, setRefreshing]     = useState(false)
+  const [refreshTick, setRefreshTick]   = useState(0)
+  const [cheer, setCheer]               = useState(0)
+  const [pillTick, setPillTick]         = useState(0)
+  const stripWaitRef = useRef(null)
+  const homeAlive = useRef(true)
+  useEffect(() => { homeAlive.current = true; return () => { homeAlive.current = false } }, [])
+  useEffect(() => {
+    if (!lab.oli) return undefined
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') setPillTick(n => n + 1) })
+    return () => sub.remove()
+  }, [lab.oli])
 
   // ─── Sık kullandıkların ───────────────────────────────────────────────────
   // `favIds` is the RESOLVED row and is written in exactly two places: once when this
@@ -367,9 +391,12 @@ export default function HomeScreen({
     // blank — the card is not hidden, the item is re-resolved without it.
     readStripDismissals()
       .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN }))
-      .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
+      .then(item => {
+        if (alive) { setStripItem(item); setStripLoading(false) }
+        stripWaitRef.current?.()   // settle the pull-to-refresh wait even when superseded (no state set)
+      })
     return () => { alive = false }
-  }, [lang, promosEligible, showFacilityList, stripDismissTick])
+  }, [lang, promosEligible, showFacilityList, stripDismissTick, refreshTick])
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
@@ -923,6 +950,23 @@ export default function HomeScreen({
   // favourites · "Tüm hizmetler". Everything below the hero scrolls under the floating tab
   // bar, so the content pads by its footprint. Coach-mark refs: searchRef → the Oli bar,
   // dutyBannerRef → the tiles row, weatherRef → the weather chip.
+  // Pull-to-refresh (Oli companion): re-run the strip + weather reads and the duty retry, spin at
+  // least ~600 ms and at most ~8 s. Writes nothing anywhere.
+  function onRefreshHome() {
+    if (refreshing) return
+    const wait = ms => new Promise(res => setTimeout(res, ms))
+    setRefreshing(true)
+    setCheer(c => c + 1)
+    setRefreshTick(n => n + 1)
+    const stripP = new Promise(res => { stripWaitRef.current = res })
+    const wxP = Promise.resolve().then(() => onRefreshWeather?.()).catch(() => {})
+    if (dutySummary?.error) onRetryDuty?.()   // never reflow the safety tiles on a normal pull
+    Promise.race([Promise.all([stripP, wxP, wait(600)]), wait(8000)]).then(() => {
+      stripWaitRef.current = null
+      if (homeAlive.current) setRefreshing(false)
+    })
+  }
+
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
@@ -930,10 +974,22 @@ export default function HomeScreen({
     const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
     const cur = weatherData?.current
     const wxPhoto = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
+    // Oli companion: the contextual pill line (null = today's "Ask, search"). Recomputed per render / foreground.
+    const oliKey = lab.oli ? oliPillKey({ now: new Date(), wxGroup: cur ? weatherGroup(cur.symbol) : null, stripItem }) || undefined : undefined
+    // Island Calendar line (Variant C) outranks the context line.
+    const pillKey = (lab.calendar && calPillKey(islandDay)) || oliKey
+    // Home lab P (polish): off = every row below renders exactly as before (fadeUp returns the node itself).
+    const polish = lab.polish === true
+    const fadeUp = (name, index, node) => (polish ? <FadeUp name={name} index={index}>{node}</FadeUp> : node)
+    const titleFont = polish ? fontDisplayFor(lang) : undefined
     return (
       <>
         <StatusBar style={overCanvas ? 'dark' : 'light'} />
         <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          refreshControl={lab.oli
+            ? <RefreshControl refreshing={refreshing} onRefresh={onRefreshHome}
+                tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={insets.top} />
+            : undefined}
           scrollEventThrottle={32}
           onScroll={e => {
             hubMem.onScroll(e)
@@ -950,46 +1006,67 @@ export default function HomeScreen({
             weatherRef={weatherRef} />
 
           <View style={s.rBelow}>
-            {!hideHeaderActions && (
+            {!hideHeaderActions && fadeUp('oli', 0,
               <View style={{ marginTop: 16 }}>
-                <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef} />
+                <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef}
+                  pillKey={pillKey} cheer={lab.oli ? cheer : undefined} />
               </View>
             )}
 
-            <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
-              <View style={s.rCol}>
-                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
+            {fadeUp('duty', 1,
+              <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
+                <View style={s.rCol}>
+                  <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} polish={polish} />
+                </View>
+                <View style={s.rCol}>
+                  <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} polish={polish} />
+                </View>
               </View>
-              <View style={s.rCol}>
-                <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
-              </View>
-            </View>
+            )}
 
             {/* Duyurular: no tile, a banner (Berke 2026-10-11). Nothing at all for production users
                 until the flag flips; dev and ADA Preview show it (constants/redesign.js DUYURULAR). */}
-            {DUYURULAR && (
+            {DUYURULAR && fadeUp('duyurular', 2,
               <View style={{ marginTop: WIDGET_GAP }}>
                 <DuyurularBanner lang={lang} onPress={onShowDuyurular} />
               </View>
             )}
 
-            <View style={{ marginTop: WIDGET_GAP }}>
-              <EventBanner item={stripItem} loading={stripLoading} lang={lang}
-                onPress={handleStripPress} onDismiss={dismissStripItem} />
-            </View>
+            {fadeUp('event', 3,
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <EventBanner item={stripItem} loading={stripLoading} lang={lang}
+                  onPress={handleStripPress} onDismiss={dismissStripItem} polish={polish} />
+              </View>
+            )}
 
-            <SectionHeader title={t('favSectionTitle', lang)}
-              action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
-            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
+            {fadeUp('fav', 4,
+              <>
+                <SectionHeader title={t('favSectionTitle', lang)} titleFont={titleFont}
+                  action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
+                <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} polish={polish} />
+              </>
+            )}
 
-            <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} />
+            {fadeUp('services', 5,
+              <>
+                <SectionHeader title={t('hrAllServices', lang)} titleFont={titleFont} />
+                <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} polish={polish} />
+              </>
+            )}
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}
             <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
+
+        {/* Dev-only variant switcher (agent/home-lab). The literal __DEV__ comes first: Metro folds
+            it in THIS file before collecting dependencies, so a release bundle drops the require
+            (HOME_LAB_DEV read through an import is not folded early enough). */}
+        {__DEV__ && HOME_LAB_DEV && (() => {
+          const HomeLabPicker = require('../components/home/redesign/HomeLabPicker').default
+          return <HomeLabPicker tabFootprint={tabFootprint} />
+        })()}
 
         {/* The solid strip under the status bar once the photo is gone. */}
         {overCanvas && <View pointerEvents="none" style={[s.rStatusStrip, { height: insets.top }]} />}

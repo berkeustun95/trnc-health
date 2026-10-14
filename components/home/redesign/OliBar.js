@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, AppState, AccessibilityInfo, useWindowDimensions } from 'react-native'
+import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { haptic } from '../../ui/haptics'
 import { radii, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
+import useReduceMotion from '../../ui/useReduceMotion'
+import useForeground from '../../ui/useForeground'
+import { useHomeLab } from '../../../constants/homeLab'
+import { OLI_GLOW_TINT } from '../../../constants/dayParts'
+import useDayPart from './useDayPart'
 
 // ─── The Oli bar, "full scene" (Home v3, option B) ───────────────────────────
 // One card; the rotating Oli & Maki scene fills it, the text sits on a deep-teal fade on the
@@ -60,28 +66,16 @@ const SCENES = [
 const BG = require('../../../assets/oli-scenes/oli-bg.png')
 const GLOW = require('../../../assets/oli-scenes/oli-glow.png')
 const HOLD = 4000
+// Oli companion (Home lab B, only when useHomeLab().oli): a calmer carousel and one small gesture per hold.
+const HOLD_IDLE = 6000
+const GESTURE_AT = 2500
+const HOP_PX = 4
+const WIGGLE_DEG = 1.5
+const CHEER_PX = 5
+const EVENTS_SCENE = 3          // SCENES index of events.png
+const QUIET_SCENES = [1, 2]     // health, emergency: no idle gesture (off-tone for safety modules)
 const FADE = 600
 const ZOOM = 1.05
-
-function useReduceMotion() {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    let alive = true
-    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
-    return () => { alive = false; sub?.remove?.() }
-  }, [])
-  return on
-}
-
-function useForeground() {
-  const [fg, setFg] = useState(AppState.currentState === 'active')
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', st => setFg(st === 'active'))
-    return () => sub.remove()
-  }, [])
-  return fg
-}
 
 // Right-anchored in the art zone, feet on the bottom edge, never wider than the zone.
 function frame(src, cardW) {
@@ -89,23 +83,46 @@ function frame(src, cardW) {
   const aspect = width / height
   const maxW = cardW * ART_ZONE - 10
   const h = Math.min(OLI_BAR_H - 6, maxW / aspect)
-  return { position: 'absolute', right: 10, bottom: 0, height: h, width: h * aspect }
+  return { position: 'absolute', right: 10, bottom: 0, height: h, width: h * aspect }   // h = art height (the wiggle pivots at the feet)
 }
 
-export default function OliBar({ lang, onPress, active = true, barRef }) {
+// Literal t('…') calls on purpose: scripts/validate-i18n-coverage.mjs only sees literal keys, and a
+// t(pillKey, lang) would drop hrOliAskSub and the five hrOliCtx* keys out of coverage. Keep in step
+// with OLI_PILL_KEYS (constants/oliContext.js) and CAL_PILL_KEYS (constants/calendarContext.js).
+const PILL_TEXT = {
+  hrOliAskSub: l => t('hrOliAskSub', l),
+  hrOliCtxEventTonight: l => t('hrOliCtxEventTonight', l),
+  hrOliCtxRain: l => t('hrOliCtxRain', l),
+  hrOliCtxMorning: l => t('hrOliCtxMorning', l),
+  hrOliCtxEvening: l => t('hrOliCtxEvening', l),
+  hrOliCtxNight: l => t('hrOliCtxNight', l),
+  hrCalNewYear: l => t('hrCalNewYear', l),
+  hrCalPublicHoliday: l => t('hrCalPublicHoliday', l),
+  hrCalBayram: l => t('hrCalBayram', l),
+}
+
+export default function OliBar({ lang, onPress, active = true, barRef, pillKey, cheer }) {
   const { width: winW } = useWindowDimensions()
   const cardW = winW - PAGE * 2
   const cap = winW < 350 ? OLI_FONT_CAP_NARROW : OLI_FONT_CAP
   const reduce = useReduceMotion()
   const fg = useForeground()
+  const lab = useHomeLab()
+  const part = useDayPart(lab.daylight)
   const running = active && fg && !reduce
-  const [idx, setIdx] = useState(0)
-  const opacity = useRef(SCENES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current
+  const HOLD_MS = lab.oli ? HOLD_IDLE : HOLD
+  // An event tonight on the pill: start on the events scene (only when the companion is on).
+  const startIdx = useRef(lab.oli && pillKey === 'hrOliCtxEventTonight' ? EVENTS_SCENE : 0).current
+  const [idx, setIdx] = useState(startIdx)
+  const opacity = useRef(SCENES.map((_, i) => new Animated.Value(i === startIdx ? 1 : 0))).current
   const scale = useRef(SCENES.map(() => new Animated.Value(1))).current
+  const hop = useRef(new Animated.Value(0)).current    // translateY, shared by the (stacked) art
+  const wig = useRef(new Animated.Value(0)).current    // rotate, in degrees
+  const gestureNo = useRef(0)
 
   useEffect(() => {
     if (!running) return
-    const zoom = Animated.timing(scale[idx], { toValue: ZOOM, duration: HOLD + FADE, useNativeDriver: true })
+    const zoom = Animated.timing(scale[idx], { toValue: ZOOM, duration: HOLD_MS + FADE, useNativeDriver: true })
     zoom.start()
     const timer = setTimeout(() => {
       const next = (idx + 1) % SCENES.length
@@ -114,22 +131,69 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
         Animated.timing(opacity[idx], { toValue: 0, duration: FADE, useNativeDriver: true }),
         Animated.timing(opacity[next], { toValue: 1, duration: FADE, useNativeDriver: true }),
       ]).start(({ finished }) => { if (finished) setIdx(next) })
-    }, HOLD)
+    }, HOLD_MS)
     return () => { clearTimeout(timer); zoom.stop() }
-  }, [running, idx])
+  }, [running, idx, HOLD_MS])
+
+  // Idle life: once per hold, ~2.5 s in, ONE gesture — alternating a hop and a wiggle. `running`
+  // already excludes off-screen, background and Reduce Motion; cleanup stops it mid-flight.
+  useEffect(() => {
+    if (!lab.oli || !running || QUIET_SCENES.includes(idx)) return
+    let anim = null
+    const timer = setTimeout(() => {
+      const hopNow = gestureNo.current++ % 2 === 0
+      anim = hopNow
+        ? Animated.sequence([
+            Animated.timing(hop, { toValue: -HOP_PX, duration: 190, useNativeDriver: true }),
+            Animated.timing(hop, { toValue: 0, duration: 190, useNativeDriver: true }),
+          ])
+        : Animated.sequence([
+            Animated.timing(wig, { toValue: -WIGGLE_DEG, duration: 125, useNativeDriver: true }),
+            Animated.timing(wig, { toValue: WIGGLE_DEG, duration: 250, useNativeDriver: true }),
+            Animated.timing(wig, { toValue: 0, duration: 125, useNativeDriver: true }),
+          ])
+      anim.start()
+    }, GESTURE_AT)
+    return () => { clearTimeout(timer); anim?.stop(); hop.setValue(0); wig.setValue(0) }
+  }, [lab.oli, running, idx])
+
+  // Pull-to-refresh moment: HomeScreen bumps `cheer` (undefined while off). One spring hop + a light
+  // haptic; the haptic is fine under Reduce Motion, the hop is not. Never on mount.
+  const lastCheer = useRef(cheer)
+  useEffect(() => {
+    const prev = lastCheer.current
+    lastCheer.current = cheer
+    // only a real increase from a numeric value (the dev toggle flipping undefined -> 0 is not a refresh)
+    if (!lab.oli || typeof cheer !== 'number' || typeof prev !== 'number' || cheer <= prev) return
+    haptic()
+    if (reduce) return
+    const anim = Animated.sequence([
+      Animated.timing(hop, { toValue: -CHEER_PX, duration: 140, useNativeDriver: true }),
+      Animated.spring(hop, { toValue: 0, friction: 7, tension: 180, overshootClamping: true, useNativeDriver: true }),
+    ])
+    anim.start()
+    return () => { anim.stop(); hop.setValue(0) }
+  }, [cheer])
 
   const title = t('hrOliBarTitle', lang)
-  const pill = t('hrOliAskSub', lang)
+  const pill = (PILL_TEXT[pillKey] || PILL_TEXT.hrOliAskSub)(lang)
   return (
-    <TouchableOpacity ref={barRef} collapsable={false} onPress={onPress} activeOpacity={press.card}
+    <TouchableOpacity ref={barRef} collapsable={false}
+      onPress={lab.oli ? () => { haptic(); onPress?.() } : onPress} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={`${title}. ${pill}`} style={s.card}>
       <Image source={BG} resizeMode="stretch" pointerEvents="none" style={s.fill} />
       <Image source={GLOW} pointerEvents="none" style={[s.glow, {
-        left: cardW * GLOW_CX - GLOW_SIZE / 2, top: OLI_BAR_H * GLOW_CY - GLOW_SIZE / 2 }]} />
-      {SCENES.map((src, i) => (
-        <Animated.Image key={i} source={src} resizeMode="contain" accessibilityIgnoresInvertColors pointerEvents="none"
-          style={[frame(src, cardW), { opacity: opacity[i], transform: [{ scale: scale[i] }] }]} />
-      ))}
+        left: cardW * GLOW_CX - GLOW_SIZE / 2, top: OLI_BAR_H * GLOW_CY - GLOW_SIZE / 2 }]}
+        {...(lab.daylight ? { tintColor: OLI_GLOW_TINT[part] } : null)} />
+      {SCENES.map((src, i) => {
+        const fr = frame(src, cardW)
+        return (
+          <Animated.Image key={i} source={src} resizeMode="contain" accessibilityIgnoresInvertColors pointerEvents="none"
+            style={[fr, { opacity: opacity[i], transform: lab.oli
+            ? [{ translateY: hop }, { translateY: fr.height / 2 }, { rotate: wig.interpolate({ inputRange: [-90, 90], outputRange: ['-90deg', '90deg'] }) }, { translateY: -fr.height / 2 }, { scale: scale[i] }]
+            : [{ scale: scale[i] }] }]} />
+        )
+      })}
 
       <View style={[s.text, { width: `${TEXT_ZONE * 100}%` }]} pointerEvents="none">
         <Text style={s.title} numberOfLines={1} maxFontSizeMultiplier={cap}>{title}</Text>
