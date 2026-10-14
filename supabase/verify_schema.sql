@@ -345,7 +345,9 @@ WITH report AS (
     -- 1083. HotelRunner booking link. HotelsTab selects it: MISSING = 42703 on the tab.
     ('1083_hotels_hotelrunner','hotels','hotelrunner_url'),
     -- 1087. The thread a message row opens. utils/notificationRoute.js selects it (falls back on 42703).
-    ('1087_notifications_conversation_id','notifications','conversation_id')
+    ('1087_notifications_conversation_id','notifications','conversation_id'),
+    -- 1112. App language on a KKTCELL handoff tap. The outbox sends it only for connectivity taps.
+    ('1112_contact_events_connectivity','contact_events','lang')
 
   ) e(m,t,c)
 
@@ -908,7 +910,9 @@ WITH report AS (
     -- 1083. The H token asserts what it permits.
     ('1083_hotels_hotelrunner','hotels_hotelrunner_url_check'),
     -- 1087. A foreign key, registered here for existence; its ON DELETE action is an H token.
-    ('1087_notifications_conversation_id','notifications_conversation_id_fkey')
+    ('1087_notifications_conversation_id','notifications_conversation_id_fkey'),
+    -- 1112. Its allowed set (nine full language names) is an H token.
+    ('1112_contact_events_connectivity','contact_events_lang_check')
 
   ) e(m,o)
 
