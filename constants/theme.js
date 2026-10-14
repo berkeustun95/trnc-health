@@ -252,9 +252,12 @@ export const category = {
 //  - rail vs bgWarm: health 4.43, explore 3.81, homeLife 4.20, city 5.70 (all >= 3:1);
 //    ink vs bgWarm: 7.37 / 7.16 / 7.66 / 9.60.
 //  - White label on a tile at the label position: PHOTO_TEAL + the glass fill (white 0.08) = 9.92:1;
-//    the selected fill (white 0.20) = 6.84:1 (both >= 4.5). The glow sits only inside the mascot box and
-//    the PNG's alpha is 0 at its edge, so it never reaches the label. Worst case if its PEAK alpha
-//    (107/255) did sit under the label, glass fill only: health 4.09, explore 4.63, homeLife 4.29,
+//    the selected fill (white 0.20) = 6.84:1 (both >= 4.5). The in-tile mascot glow sits only inside the
+//    mascot box and the PNG's alpha is 0 at its edge, so it never reaches the label. The faint AMBIENT
+//    layer (SpacePickerScreen, 0.14, city 0.20) is the opposite: under everything, title and labels
+//    included; measured worst case 5.79:1 (white over PHOTO_TEAL + both ambient glows stacked at the PNG's
+//    peak alpha + the selected glass 0.20; 4.69:1 if the PNG alpha were 1.0).
+//    Worst case if the in-tile glow's PEAK alpha (107/255) did sit under the label, glass fill only: health 4.09, explore 4.63, homeLife 4.29,
 //    city 6.69, i.e. a glow must never be moved under the label.
 //  - Colour-vision safety, CIE76 delta-E between the four colours (Machado 2009, severity 1.0; 5 or more
 //    is distinguishable side by side, 20+ is clearly apart). glow, pairwise minimum: normal 57.8,

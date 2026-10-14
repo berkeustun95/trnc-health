@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, AppState, AccessibilityInfo, useWindowDimensions } from 'react-native'
+import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { radii, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
+import useReduceMotion from '../../ui/useReduceMotion'
+import useForeground from '../../ui/useForeground'
 
 // ─── The Oli bar, "full scene" (Home v3, option B) ───────────────────────────
 // One card; the rotating Oli & Maki scene fills it, the text sits on a deep-teal fade on the
@@ -62,26 +64,6 @@ const GLOW = require('../../../assets/oli-scenes/oli-glow.png')
 const HOLD = 4000
 const FADE = 600
 const ZOOM = 1.05
-
-function useReduceMotion() {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    let alive = true
-    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
-    return () => { alive = false; sub?.remove?.() }
-  }, [])
-  return on
-}
-
-function useForeground() {
-  const [fg, setFg] = useState(AppState.currentState === 'active')
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', st => setFg(st === 'active'))
-    return () => sub.remove()
-  }, [])
-  return fg
-}
 
 // Right-anchored in the art zone, feet on the bottom edge, never wider than the zone.
 function frame(src, cardW) {
