@@ -188,6 +188,9 @@ const EXPECTED_SCALARS = {
   // binaries carry the native side (expo-image, nav-bar theme); 1.2.0 never gets a 1.3.0 update.
   // Visual rollback = this AND flags.js back to false, one commit, OTA on 1.3.0.
   REDESIGN_LIVE:         true,
+  // Home polish pack (agent/home-polish-refresh). false: a working-tree flip would ship a visual
+  // change to every user. Previewed on a device by a local, uncommitted flip.
+  HOME_POLISH_LIVE:      false,
   // Tile-label typeface experiment (Inter vs Manrope). Neither value is a launch, but it
   // is compared ON DEVICE by flipping it, and a working-tree flip is exactly what
   // `eas update` bundles. Baselined so the comparison cannot ship by accident.

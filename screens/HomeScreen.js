@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
-  TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator,
+  TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
@@ -12,12 +12,13 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import MascotIntroCard from '../components/MascotIntroCard'
-import { colors, typeColors, shadow } from '../constants/theme'
+import { colors, typeColors, shadow, fontDisplayFor } from '../constants/theme'
+import FadeUp from '../components/ui/FadeUp'
 import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
-import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import { MODULE_FLAGS, HOME_V2_LIVE, HOME_POLISH_LIVE } from '../constants/flags'
 import { REDESIGN, DUYURULAR } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -47,7 +48,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, EventBanner, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
-import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
+import { SectionHeader, useTabBarFootprint, RemoteImage, haptic } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
@@ -244,6 +245,7 @@ export default function HomeScreen({
   // ─── Redesign (feat/redesign) ───────────────────────────────────────────────
   dutySummary = null,     // { loaded, error, status, count, until } from App.js's roster read
   onRetryDuty,
+  onRefreshWeather,       // pull-to-refresh only (HOME_POLISH_LIVE): App.js re-reads the weather, resolves when settled
   onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
   onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
@@ -256,6 +258,7 @@ export default function HomeScreen({
   // threshold is crossed, not on every scroll frame. RN's StatusBar is a stack, so leaving
   // Home unmounts this entry and the app default comes back by itself.
   const [overCanvas, setOverCanvas] = useState(false)
+  const [overGap, setOverGap] = useState(false)   // iOS pull-down: the bounce gap above the hero is canvas, so dark status icons (HOME_POLISH_LIVE only)
   const [oliOnScreen, setOliOnScreen] = useState(true)   // Oli bar carousel pauses when scrolled away
   const [snap] = useState(() => (backRef ? homeState : null))
   const [showFacilityList, setShowFacilityList] = useState(snap?.showFacilityList ?? forceFacilityList)
@@ -279,6 +282,15 @@ export default function HomeScreen({
   // two dismissals in one session must both trigger, and a boolean can only flip once.
   const [stripDismissTick, setStripDismissTick] = useState(0)
   const [stripLoading, setStripLoading] = useState(true)
+
+  // Pull-to-refresh (HOME_POLISH_LIVE). refreshTick joins the strip effect's deps and stays 0 while
+  // the flag is off or nobody pulls, so nothing extra fetches on mount.
+  const [refreshing, setRefreshing]   = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
+  const stripWaitRef = useRef(null)
+  const refreshRef = useRef(false)   // true while a pull runs: the strip keeps its current item instead of flashing the skeleton
+  const homeAlive = useRef(true)
+  useEffect(() => { homeAlive.current = true; return () => { homeAlive.current = false } }, [])
 
   // ─── Sık kullandıkların ───────────────────────────────────────────────────
   // `favIds` is the RESOLVED row and is written in exactly two places: once when this
@@ -360,16 +372,19 @@ export default function HomeScreen({
   useEffect(() => {
     if (!HOME_V2_LIVE || showFacilityList) return
     let alive = true
-    setStripLoading(true)
+    if (!refreshRef.current) setStripLoading(true)   // always true with the flag off: unchanged
     // Dismissals are read on EVERY resolve rather than once per mount: dismissing writes
     // the key and bumps `stripDismissTick`, and the ladder then re-runs and lands on
     // whatever rank comes next. That is what makes the slot fill again instead of going
     // blank — the card is not hidden, the item is re-resolved without it.
     readStripDismissals()
       .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN }))
-      .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
+      .then(item => {
+        if (alive) { setStripItem(item); setStripLoading(false) }
+        stripWaitRef.current?.()   // settle the pull-to-refresh wait even when superseded (no state set)
+      })
     return () => { alive = false }
-  }, [lang, promosEligible, showFacilityList, stripDismissTick])
+  }, [lang, promosEligible, showFacilityList, stripDismissTick, refreshTick])
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
@@ -923,6 +938,25 @@ export default function HomeScreen({
   // favourites · "Tüm hizmetler". Everything below the hero scrolls under the floating tab
   // bar, so the content pads by its footprint. Coach-mark refs: searchRef → the Oli bar,
   // dutyBannerRef → the tiles row, weatherRef → the weather chip.
+  // Pull-to-refresh (HOME_POLISH_LIVE): re-run the strip + weather reads, retry the duty roster only
+  // when it is in error, spin at least ~600 ms and at most ~8 s. Writes nothing anywhere.
+  function onRefreshHome() {
+    if (refreshing) return
+    haptic()   // one light tick when the pull triggers (also under Reduce Motion)
+    const wait = ms => new Promise(res => setTimeout(res, ms))
+    setRefreshing(true)
+    refreshRef.current = true
+    setRefreshTick(n => n + 1)
+    const stripP = new Promise(res => { stripWaitRef.current = res })
+    const wxP = Promise.resolve().then(() => onRefreshWeather?.()).catch(() => {})
+    if (dutySummary?.error) onRetryDuty?.()   // never reflow the safety tiles on a normal pull
+    Promise.race([Promise.all([stripP, wxP, wait(600)]), wait(8000)]).then(() => {
+      stripWaitRef.current = null
+      refreshRef.current = false
+      if (homeAlive.current) setRefreshing(false)
+    })
+  }
+
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
@@ -930,16 +964,25 @@ export default function HomeScreen({
     const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
     const cur = weatherData?.current
     const wxPhoto = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
+    // HOME_POLISH_LIVE off = every row renders exactly as before (fadeUp returns the node itself).
+    const polish = HOME_POLISH_LIVE === true
+    const fadeUp = (name, index, node) => (polish ? <FadeUp name={name} index={index}>{node}</FadeUp> : node)
+    const titleFont = polish ? fontDisplayFor(lang) : undefined
     return (
       <>
-        <StatusBar style={overCanvas ? 'dark' : 'light'} />
+        <StatusBar style={overCanvas || overGap ? 'dark' : 'light'} />
         <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          refreshControl={polish
+            ? <RefreshControl refreshing={refreshing} onRefresh={onRefreshHome}
+                tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={insets.top} />
+            : undefined}
           scrollEventThrottle={32}
           onScroll={e => {
             hubMem.onScroll(e)
             const y = e.nativeEvent.contentOffset.y
             const over = y > heroH - 12
             if (over !== overCanvas) setOverCanvas(over)
+            if (polish) { const gap = y < -8; if (gap !== overGap) setOverGap(gap) }   // y < 0 only happens on the iOS bounce
             const oli = y < heroH + 16 + OLI_BAR_H
             if (oli !== oliOnScreen) setOliOnScreen(oli)
           }}
@@ -950,40 +993,52 @@ export default function HomeScreen({
             weatherRef={weatherRef} />
 
           <View style={s.rBelow}>
-            {!hideHeaderActions && (
+            {!hideHeaderActions && fadeUp('oli', 0,
               <View style={{ marginTop: 16 }}>
                 <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef} />
               </View>
             )}
 
-            <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
-              <View style={s.rCol}>
-                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
+            {fadeUp('duty', 1,
+              <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
+                <View style={s.rCol}>
+                  <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} polish={polish} />
+                </View>
+                <View style={s.rCol}>
+                  <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} polish={polish} />
+                </View>
               </View>
-              <View style={s.rCol}>
-                <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
-              </View>
-            </View>
+            )}
 
             {/* Duyurular: no tile, a banner (Berke 2026-10-11). Nothing at all for production users
                 until the flag flips; dev and ADA Preview show it (constants/redesign.js DUYURULAR). */}
-            {DUYURULAR && (
+            {DUYURULAR && fadeUp('duyurular', 2,
               <View style={{ marginTop: WIDGET_GAP }}>
                 <DuyurularBanner lang={lang} onPress={onShowDuyurular} />
               </View>
             )}
 
-            <View style={{ marginTop: WIDGET_GAP }}>
-              <EventBanner item={stripItem} loading={stripLoading} lang={lang}
-                onPress={handleStripPress} onDismiss={dismissStripItem} />
-            </View>
+            {fadeUp('event', 3,
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <EventBanner item={stripItem} loading={stripLoading} lang={lang}
+                  onPress={handleStripPress} onDismiss={dismissStripItem} polish={polish} />
+              </View>
+            )}
 
-            <SectionHeader title={t('favSectionTitle', lang)}
-              action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
-            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
+            {fadeUp('fav', 4,
+              <>
+                <SectionHeader title={t('favSectionTitle', lang)} titleFont={titleFont}
+                  action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
+                <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} polish={polish} />
+              </>
+            )}
 
-            <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} />
+            {fadeUp('services', 5,
+              <>
+                <SectionHeader title={t('hrAllServices', lang)} titleFont={titleFont} />
+                <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} polish={polish} />
+              </>
+            )}
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}

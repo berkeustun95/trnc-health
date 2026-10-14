@@ -213,6 +213,13 @@ export const HOME_V2_LIVE = true   // live 2026-09-08
 // scripts/check-module-flags.mjs's EXPECTED_SCALARS, not a MODULE_FLAGS key.
 export const REDESIGN_LIVE = true   // live from 1.3.0 (release/redesign-1, 2026-10-02); runtime 1.2.0 never receives it
 
+// Home polish pack (agent/home-polish-refresh): rows below the hero fade up once per session, press
+// scale + a light haptic on the duty/emergency tiles, a branded looping skeleton on the event banner,
+// Playfair section headers (6 languages) and pull-to-refresh on Home. false = today's Home byte for
+// byte. A scalar in EXPECTED_SCALARS (scripts/check-module-flags.mjs), because a working-tree flip
+// would ship a visual change to every user.
+export const HOME_POLISH_LIVE = false
+
 // Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
 // the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
 // draws in whichever slots are placed (today: home_footer only, at the foot of the V2 hub).
