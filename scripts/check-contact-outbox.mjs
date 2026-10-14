@@ -95,5 +95,22 @@ const stored = w => JSON.parse(w.store.get(OUTBOX_KEY) || '[]')
   w.online = true; await ob.flush(); await settle()
   t('cold start: both delivered once', w.server.size === 2 && ob.pending().length === 0, `${w.server.size}/${ob.pending().length}`)
 }
+// 7. lang (20261112): sent when given; when not, the row carries NO lang key at all, so callers that
+//    pass none keep working against a database without the column (PGRST204 would drop the tap).
+//    A tap queued offline keeps its lang across a restart.
+{
+  const w = world(); const ob = make(w)
+  ob.record('connectivity', 'p1', 'website', null, 'Turkish')
+  ob.record('hotels', 'h1', 'book', 'kyrenia'); await settle()
+  const rows = [...w.server.values()]
+  const conn = rows.find(r => r.module === 'connectivity'), hot = rows.find(r => r.module === 'hotels')
+  t('lang: sent when given', conn?.lang === 'Turkish', JSON.stringify(conn))
+  t('lang: no key at all when not given', !!hot && !('lang' in hot), JSON.stringify(hot))
+  const w2 = world({ online: false }); const ob2 = make(w2)
+  ob2.record('connectivity', 'p2', 'website', null, 'German'); await settle()
+  const w3 = world({ stored: stored(w2) }); const ob3 = make(w3)
+  await ob3.flush(); await settle()
+  t('lang: survives the queue across a restart', [...w3.server.values()][0]?.lang === 'German', JSON.stringify([...w3.server.values()]))
+}
 console.log(bad ? `\n  ${bad} failure(s).` : '\n  contact outbox: OK')
 process.exit(bad ? 1 : 0)
