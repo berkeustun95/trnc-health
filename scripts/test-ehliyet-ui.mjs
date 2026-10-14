@@ -4,7 +4,7 @@
 //   node scripts/test-ehliyet-ui.mjs
 import {
   PREVIEW_DRIVING_SCHOOLS, usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
-  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
+  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, mapsUrlForBranch, sortedBranches,
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, EHLIYET_LOGS_CONTACTS,
   SOCIAL_LABEL_PX, SOCIAL_LABEL_WIDTHS, SOCIAL_LAYOUT, socialTextRoom, socialSideBySide,
   EHLIYET_CITY_NAME, branchChipLabels, ADDRESS_SEP, addressParts,
@@ -66,7 +66,17 @@ t('only Lefkoşa has an address (Güzelyurt town-only)', addrs, ['Şehit Fevait 
 t('branch address blank -> no row', [branchAddress({ address: '  ' }), branchAddress({}), branchAddress(null)], ['', '', ''])
 t('maps search URL is a text search (no coordinates), like the hotels Harita button',
   mapsSearchUrl(addrs[0]), 'https://www.google.com/maps/search/?api=1&query=%C5%9Eehit%20Fevait%20Ali%20Sokak%204%2FB%2C%20G%C3%B6%C3%A7menk%C3%B6y%2C%20Lefko%C5%9Fa%2C%20North%20Cyprus')
-t('no seed branch has coordinates (no pin from text)', sortedBranches(seed).every(b => b.lat === null && b.lng === null && b.geocode_source === null), true)
+const [lefkosa, guzelyurt] = sortedBranches(seed)
+t('pinned branch opens Google Maps at the coordinate (6 dp as stored; the 4 dp guard covers only the google-places function)',
+  mapsUrlForBranch(lefkosa), 'https://www.google.com/maps/search/?api=1&query=35.207265,33.337685')
+t('branch without coordinates keeps the text search', mapsUrlForBranch(guzelyurt), mapsSearchUrl(branchAddress(guzelyurt)))
+t('half a pin (lat only) falls back to the text search', mapsUrlForBranch({ ...lefkosa, lng: null }), mapsSearchUrl(branchAddress(lefkosa)))
+t('fixture: Lefkoşa pin is partner-sourced, Güzelyurt has none', [lefkosa.geocode_source, guzelyurt.lat, guzelyurt.lng, guzelyurt.geocode_source], ['partner', null, null, null])
+t('screen calls mapsUrlForBranch and never imports OsmAttribution', [/mapsUrlForBranch\(b\)/.test(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'screens/EhliyetScreen.js'), 'utf8')), /OsmAttribution/.test(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'screens/EhliyetScreen.js'), 'utf8'))], [true, false])
+// Red-first, permanent: a wrong coordinate or an 'osm' source must flip these.
+t('red-first: a wrong coordinate changes the URL', mapsUrlForBranch({ ...lefkosa, lat: 35.207266 }) === mapsUrlForBranch(lefkosa), false)
+t('red-first: source osm is not partner', ({ ...lefkosa, geocode_source: 'osm' }).geocode_source === 'partner', false)
+t('red-first: OsmAttribution import would be seen', /OsmAttribution/.test("import OsmAttribution from '../components/OsmAttribution'"), true)
 
 t('brand colours exact', [EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA], ['#294EA6', '#213565', '#075E54'])
 

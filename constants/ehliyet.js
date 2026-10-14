@@ -32,7 +32,7 @@ export const PREVIEW_DRIVING_SCHOOLS = [
     sort_order: 0,
     is_active: true,
     driving_school_branches: [
-      { region: 'nicosia', address: 'Şehit Fevait Ali Sokak 4/B, Göçmenköy, Lefkoşa', lat: null, lng: null, geocode_source: null, sort_order: 0 },
+      { region: 'nicosia', address: 'Şehit Fevait Ali Sokak 4/B, Göçmenköy, Lefkoşa', lat: 35.207265, lng: 33.337685, geocode_source: 'partner', sort_order: 0 },
       { region: 'morphou', address: null, lat: null, lng: null, geocode_source: null, sort_order: 1 },
     ],
   },
@@ -92,11 +92,19 @@ export const addressParts = (address) => {
 
 export const licenceClasses = (school) => (school?.licence_classes || []).filter(Boolean)
 
-// Branch street address (text only: a branch has no pin unless OSM corroborated one).
+// Branch street address (text only; a pin, when the partner supplied one, is lat/lng).
 export const branchAddress = (branch) => String(branch?.address || '').trim()
 // Same search URL as the hotels' Harita button (components/accommodation/HotelsTab.js): a text search, never a pin.
 export const mapsSearchUrl = (address) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${address}, North Cyprus`)}`
+
+// A branch with lat/lng opens Google Maps AT the stored coordinate (the hotels' https fallback form, documented
+// Maps URL); one without keeps the text search. Not covered by check-google-calls-anonymous (that guard reads only the
+// google-places Edge Function), so the stored 6 dp go through as they are.
+export const mapsUrlForBranch = (branch) =>
+  branch?.lat != null && branch?.lng != null
+    ? `https://www.google.com/maps/search/?api=1&query=${branch.lat},${branch.lng}`
+    : mapsSearchUrl(branchAddress(branch))
 
 // ─── Instagram / Facebook side by side, or stacked ──────────────────────────
 // Both labels are brand words, identical in all 9 languages, so their width is a pure function of

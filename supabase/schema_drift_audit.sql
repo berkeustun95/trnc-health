@@ -983,7 +983,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('conversations_recipient_id_fkey', '', ''),
     ('driving_school_branches_address_check', '200|5', 'address'),
     ('driving_school_branches_coords_check', '32.2|34.5|34.8|35.8', 'lat|lng'),
-    ('driving_school_branches_geocode_source_check', 'osm', 'geocode_source'),
+    ('driving_school_branches_geocode_source_check', 'osm|partner', 'geocode_source'),
     ('driving_school_branches_pkey', '', 'id'),
     ('driving_school_branches_provenance_check', '', 'geocode_source|lat'),
     ('driving_school_branches_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),

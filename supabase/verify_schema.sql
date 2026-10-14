@@ -3558,14 +3558,14 @@ WITH report AS (
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='driving_schools' AND column_name='licence_classes'
           AND is_nullable = 'NO' AND column_default LIKE '''{}''::text[]%') = 1
-    -- (1c) The branch pin is OSM-only and two-way (coordinates exist exactly when a source does),
+    -- (1c) The branch pin source is osm/partner only and two-way (coordinates exist exactly when a source does),
     --      asserted from the live definitions: the E-section names cannot see what they permit.
-    UNION ALL SELECT '1108_driving_schools','driving_school_branches: geocode_source is OSM-only and pin <-> source is two-way',
+    UNION ALL SELECT '1108_driving_schools','driving_school_branches: geocode_source is exactly osm/partner and pin <-> source is two-way',
       COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c,
               LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
         WHERE c.conrelid = to_regclass('public.driving_school_branches') AND c.conname = 'driving_school_branches_geocode_source_check')
-        IS NOT DISTINCT FROM ARRAY['osm'], false)
+        IS NOT DISTINCT FROM ARRAY['osm','partner'], false)
       AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE 'CHECK (((lat IS NULL) = (geocode_source IS NULL)))%'
                       FROM pg_constraint c
                      WHERE c.conrelid = to_regclass('public.driving_school_branches') AND c.conname = 'driving_school_branches_provenance_check'), false)

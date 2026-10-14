@@ -42,7 +42,7 @@ const parseTuples = (body) => {
     if (/^null$/i.test(m[0])) return null
     if (/^true$/i.test(m[0])) return true
     if (/^false$/i.test(m[0])) return false
-    if (/^-?\d+$/.test(m[0])) return Number(m[0])
+    if (/^-?\d+(\.\d+)?$/.test(m[0])) return Number(m[0])
     throw new Error(`unexpected token ${m[0]}`)
   }
   for (;;) {

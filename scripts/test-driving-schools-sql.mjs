@@ -67,7 +67,12 @@ await run('licence classes may repeat', mutant('lcdup', `AND array_to_string(lic
 await run('licence classes may be multi-dimensional (ndims + array_position dropped; <@ flattens)', mutant('lcmd', `AND COALESCE(array_ndims(licence_classes), 1) = 1
          AND array_position(licence_classes, NULL) IS NULL`, ``))
 await run('branch address length unbounded', mutant('addr', `BETWEEN 5 AND 200`, `BETWEEN 0 AND 20000`))
-await run('geocode_source admits google_places', mutant('gsrc', `geocode_source IN ('osm')`, `geocode_source IN ('osm','google_places')`))
+await run('geocode_source admits google_places', mutant('gsrc', `geocode_source IN ('osm','partner')`, `geocode_source IN ('osm','partner','google_places')`))
+await run('partner source not admitted (CHECK back to osm only; the partner seed and probe must fail)', mutant('nopartner', `geocode_source IN ('osm','partner')`, `geocode_source IN ('osm')`))
+await run('coords bounds widened (point at lat 36.0 admitted)', mutant('bounds', `lat BETWEEN 34.5 AND 35.8`, `lat BETWEEN 34.5 AND 36.5`))
+await run('seed labels the Lefkoşa pin osm (CHECK admits it; only the in-file seed assertion refuses)', mutant('seedosm', `35.207265, 33.337685, 'partner', 0)`, `35.207265, 33.337685, 'osm', 0)`))
+await run('seed: Lefkoşa pin dropped', mutant('seednopin', `35.207265, 33.337685, 'partner', 0)`, `NULL, NULL, NULL, 0)`))
+await run('seed: Güzelyurt given a pin', mutant('seedmorpin', `'morphou', NULL, NULL, NULL, NULL, 1)`, `'morphou', NULL, 35.1, 33.3, 'partner', 1)`))
 await run('provenance: coordinates without a source allowed', mutant('provA', `CHECK ((lat IS NULL) = (geocode_source IS NULL));`, `CHECK (geocode_source IS NULL OR lat IS NOT NULL);`))
 await run('provenance: a source without coordinates allowed', mutant('provB', `CHECK ((lat IS NULL) = (geocode_source IS NULL));`, `CHECK (lat IS NULL OR geocode_source IS NOT NULL);`))
 await run('seed: licence classes out of order', mutant('seedord', `'H','H1','H2','J','K'], true, 0, false)`, `'H','H2','H1','J','K'], true, 0, false)`))

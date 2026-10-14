@@ -11,7 +11,7 @@ import { partnerAsset } from '../constants/partnerAssets'
 import {
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, PREVIEW_DRIVING_SCHOOLS,
   usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
-  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
+  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsUrlForBranch, sortedBranches,
   SOCIAL_LABEL_PX, SOCIAL_LAYOUT, socialSideBySide,
   EHLIYET_CITY_NAME, branchChipLabels, ADDRESS_SEP, addressParts,
 } from '../constants/ehliyet'
@@ -99,7 +99,7 @@ function SchoolCard({ school, lang, featured, onAction }) {
           </View>
           {addressed.map(b => (
             <TouchableOpacity key={b.region} style={s.addressRow} activeOpacity={press.card}
-              onPress={() => onAction(school, 'maps', mapsSearchUrl(branchAddress(b)))}
+              onPress={() => onAction(school, 'maps', mapsUrlForBranch(b))}
               accessibilityRole="link" accessibilityLabel={`${t('ehliyetMapLabel', lang)}: ${branchAddress(b)}`}>
               <Ionicons name="location-outline" size={16} color={EHLIYET_DARK} />
               <AddressText address={branchAddress(b)} style={s.addressText} />
