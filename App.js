@@ -24,15 +24,17 @@ import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
+import { haptic, hapticSelect } from './components/ui/haptics'
+import SpaceWash from './components/ui/SpaceWash'
 import { supabase, isGuest } from './lib/supabase'
 import { fetchNotifications } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
-import { colors, typeColors, shadow } from './constants/theme'
+import { colors, typeColors, shadow, worldColors } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE, HOME_SPACES_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
@@ -105,6 +107,8 @@ import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
+import SpacePickerScreen from './screens/SpacePickerScreen'
+import { spaceIds, categoryOf, SPACE_ALL } from './constants/homeGroups'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
@@ -511,6 +515,14 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)
+  // App spaces (HOME_SPACES_LIVE): undefined = '@ada_space' not read yet, null = none chosen (the
+  // picker shows), a group key = the chosen space. The three states keep the picker from flashing
+  // on a cold start that has a stored space. With the flag off it stays undefined and is never read.
+  const [activeSpace, setActiveSpace] = useState(undefined)
+  // The space (or 'all') the user left for the picker; the picker marks it and back returns to it.
+  const [lastSpace, setLastSpace] = useState(null)
+  // The colour bloom between picker and space: { key, origin, color, reduce, epoch } while it runs, else null.
+  const [spaceWash, setSpaceWash] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   // Redesign: can the OS still ask? false = permanently denied → the screens offer "Ayarları aç";
@@ -972,6 +984,91 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!HOME_SPACES_LIVE) return
+    // An unreadable, unknown or stale value (a group whose modules all went dark) is "none".
+    const epoch = spaceEpochRef.current
+    // Order: a valid stored space, else full Home when it was chosen on THIS app version
+    // ('@ada_space_all' = the version), else none (the picker).
+    Promise.all([AsyncStorage.getItem('@ada_space'), AsyncStorage.getItem('@ada_space_all')])
+      .then(([v, all]) => {
+        if (epoch !== spaceEpochRef.current) return
+        const stored = spaceIds().includes(v) ? v : (all && all === Constants.expoConfig?.version ? SPACE_ALL : null)
+        if (stored) { lastSpaceRef.current = stored; setLastSpace(stored) }
+        setActiveSpace(prev => typeof prev === 'string' ? prev : (stored ?? pushSpaceRef.current ?? null))
+      })
+      .catch(() => { if (epoch === spaceEpochRef.current) setActiveSpace(prev => typeof prev === 'string' ? prev : (pushSpaceRef.current ?? null)) })
+  }, [])
+
+  // A push target that lives in a space implies that space — only when none is chosen, in STATE
+  // only ('@ada_space' is written by an explicit pick alone), so closing the target lands on
+  // that space's Home, not the picker. The stored choice wins: while it is still loading
+  // (undefined) the implied space waits in pushSpaceRef and is used only if nothing valid is
+  // stored. Safe in the mount-time push handlers: it touches only a ref and a setter.
+  const pushSpaceRef = useRef(null)
+  // Customers and guests only: a provider's push must not leave a space behind. profileRoleRef
+  // (isAdmin is declared below the effects); null = profile not loaded yet = not excluded.
+  const profileRoleRef = useRef(null)
+  profileRoleRef.current = profile?.role ?? null
+  const spaceHomeShownRef = useRef(false)
+  const spacePickerShownRef = useRef(false)   // "the picker is on screen" (set in the selector, like the ref above)
+  const lastSpaceRef = useRef(null)           // lastSpace for the back handler, set in the same step
+  const impliedSpace = moduleId => {
+    if (!HOME_SPACES_LIVE) return
+    if (profileRoleRef.current && profileRoleRef.current !== 'customer') return
+    const k = categoryOf(moduleId)
+    if (!spaceIds().includes(k)) return
+    pushSpaceRef.current = k
+    setActiveSpace(prev => prev === null ? k : prev)
+  }
+
+  // Picking a space plays the colour wash (components/ui/SpaceWash); the space COMMITS at its peak, when the
+  // picker is fully covered. The light tap already fired on the tile; the selection tick fires at the peak.
+  // `origin` = { x, y, reduce } from the tile (x/y may be missing for an accessibility activation). A second
+  // pick while a wash runs is ignored (the wash also blocks touches). A SIGNED_OUT bumps spaceEpochRef, so a
+  // wash that peaks after a sign-out commits nothing. A hardware back during the ~600 ms may run the picker's
+  // back; the peak commit still wins, which is acceptable for a pick the user just made.
+  const chooseSpace = (key, origin) => {
+    if (spaceWash) return
+    const color = worldColors[key]?.glow
+    if (!color) { commitSpace(key); return }
+    setSpaceWash({ key, origin, color, reduce: origin?.reduce, epoch: spaceEpochRef.current })
+  }
+  const commitSpace = key => {
+    hapticSelect()
+    forgetScroll('home:hub')
+    setActiveSpace(key)
+    AsyncStorage.setItem('@ada_space', key).catch(() => {})
+    AsyncStorage.removeItem('@ada_space_all').catch(() => {})
+  }
+  // "Tümünü göster": full Home for this app version. The sentinel is never written to '@ada_space'
+  // (that key would keep winning on the next start), so a stored space is dropped and the version
+  // goes to '@ada_space_all': the picker comes back once per app version.
+  const chooseAllSpaces = () => {
+    haptic()
+    forgetScroll('home:hub')
+    setActiveSpace(SPACE_ALL)
+    AsyncStorage.removeItem('@ada_space').catch(() => {})
+    if (Constants.expoConfig?.version) AsyncStorage.setItem('@ada_space_all', Constants.expoConfig.version).catch(() => {})
+  }
+  // Space Home → the picker. STATE ONLY: '@ada_space' stays, so a kill + reopen still lands in
+  // the last space (sign-out is what clears it). Home's remembered scroll belongs to the space
+  // it was in, so it is dropped.
+  const openSpacePicker = () => {
+    forgetScroll('home:hub')
+    const cur = activeSpaceRef.current
+    if (typeof cur === 'string') { lastSpaceRef.current = cur; setLastSpace(cur) }
+    setActiveSpace(null)
+  }
+  // The first-run tour and the home-city question need Home on screen (they measure its refs),
+  // so with spaces on they wait for a chosen space. The ref carries "still owed" across the
+  // picker; activeSpaceRef lets the session effect's async callback read the CURRENT value.
+  const activeSpaceRef = useRef(activeSpace)
+  activeSpaceRef.current = activeSpace
+  const homeFirstRunOwedRef = useRef(false)
+  // Bumped on SIGNED_OUT: a '@ada_space' read that resolves after a sign-out is stale and ignored.
+  const spaceEpochRef = useRef(0)
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
@@ -981,6 +1078,8 @@ export default function App() {
       if (event === 'SIGNED_OUT') {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
+        // The next login picks a space again.
+        if (HOME_SPACES_LIVE) { spaceEpochRef.current += 1; homeFirstRunOwedRef.current = false; pushSpaceRef.current = null; setActiveSpace(null); lastSpaceRef.current = null; setLastSpace(null); AsyncStorage.removeItem('@ada_space').catch(() => {}); AsyncStorage.removeItem('@ada_space_all').catch(() => {}) }
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
@@ -1114,11 +1213,18 @@ export default function App() {
       if (activeTab === 'home' && homeBackRef.current?.()) return true
       if (activeTab === 'profile' && profileGuardRef.current?.back()) return true
       if (activeTab !== 'home') { setActiveTab('home'); return true }
+      // App spaces: back on a space's Home returns to the picker (state only; the stored space stays).
+      // spaceHomeShownRef (set in the selector) = "a space Home is on screen", not just a stored space:
+      // on the profile-gate wizard or a provider dashboard back must keep its old behaviour.
+      // Same path as the hero pill (forgets Home's scroll, remembers the space left).
+      if (spaceHomeShownRef.current) { openSpacePicker(); return true }
+      // Back on the picker returns to the space (or full Home) it was opened from; with none, as before.
+      if (spacePickerShownRef.current && lastSpaceRef.current) { setActiveSpace(lastSpaceRef.current); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, activeSpace])
 
   useEffect(() => {
     Promise.all([
@@ -1209,6 +1315,31 @@ export default function App() {
     }
   }
 
+  // The customer's first Home moment: the one-time tour, then the home-city question. Runs once
+  // per session load — straight away, or (HOME_SPACES_LIVE) once a space is chosen.
+  function homeFirstRun() {
+    AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
+      // First run is already spending its attention on the carousel, the
+      // entry screen and the coach marks. The home-city question waits for
+      // the NEXT cold start, where it is the only thing on screen.
+      const coachMarksRunning = !shown
+      if (coachMarksRunning) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
+
+      // This effect runs once per session mount, so this is a cold-start-only
+      // path by construction — a foreground can never surface the question.
+      const st = await loadCityWelcomeState()
+      if (shouldAskHomeCity({ ...st, coachMarksRunning, now: Date.now() }).ask) {
+        markAskShown()
+        setShowHomeCityAsk(true)
+      }
+    })
+  }
+  useEffect(() => {
+    if (!HOME_SPACES_LIVE || typeof activeSpace !== 'string' || !homeFirstRunOwedRef.current) return
+    homeFirstRunOwedRef.current = false
+    homeFirstRun()
+  }, [activeSpace])
+
   useEffect(() => {
     sessionRef.current = session
     menuAnim.setValue(260)
@@ -1252,21 +1383,8 @@ export default function App() {
         if (data?.role === 'provider') {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
-          AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
-            // First run is already spending its attention on the carousel, the
-            // entry screen and the coach marks. The home-city question waits for
-            // the NEXT cold start, where it is the only thing on screen.
-            const coachMarksRunning = !shown
-            if (coachMarksRunning) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
-
-            // This effect runs once per session mount, so this is a cold-start-only
-            // path by construction — a foreground can never surface the question.
-            const st = await loadCityWelcomeState()
-            if (shouldAskHomeCity({ ...st, coachMarksRunning, now: Date.now() }).ask) {
-              markAskShown()
-              setShowHomeCityAsk(true)
-            }
-          })
+          if (HOME_SPACES_LIVE && typeof activeSpaceRef.current !== 'string') homeFirstRunOwedRef.current = true
+          else homeFirstRun()
         }
       })
     setNotifsLoading(true)
@@ -1379,6 +1497,7 @@ export default function App() {
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') {
+        impliedSpace('duty')
         setShowDutyList(true)
       } else if (screen === 'profile') {
         setActiveTab('profile')
@@ -1390,6 +1509,7 @@ export default function App() {
         //   is dark on this build the notification is from a feature this bundle does not
         //   have — opening the hub would show a placeholder and read as the tap breaking.
         //   Doing nothing leaves the user where they were, which is honest.
+        impliedSpace('studentHub')
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
       }
@@ -1405,13 +1525,14 @@ export default function App() {
       if (!response) return
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
-      if (screen === 'duty') setShowDutyList(true)
+      if (screen === 'duty') { impliedSpace('duty'); setShowDutyList(true) }
       // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
       //   case for a message notification — the app is not usually already open when one
       //   arrives — and without this branch that tap landed on Home with no explanation.
       //   The warm listener above and this one must stay in step; they are two paths to
       //   the same destination and only one of them was ever exercised.
       else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        impliedSpace('studentHub')
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
       }
@@ -1685,6 +1806,7 @@ export default function App() {
   // IS "no pushed screen open" — derived from the chain itself rather than by
   // restating its ~25 flags, which would drift the moment a module is added.
   let inTabShell = false
+  let spacePickerOn = false   // the picker branch below was the one chosen
 
   // Admins bypass the marketplace module gate to preview a "Coming soon" module.
   // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
@@ -2499,6 +2621,16 @@ export default function App() {
     // just closes the preview rather than routing into a tab that does not exist here.
     content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
       isGuest={false} onGoToProfile={() => setAdminPreview(null)} />
+  } else if (HOME_SPACES_LIVE && !isAdmin && activeTab === 'home' && activeSpace === undefined) {
+    // Stored space not read yet: wait, so the picker never flashes. inTabShell stays false.
+    content = <View style={styles.center} />
+  } else if (HOME_SPACES_LIVE && !isAdmin && activeTab === 'home' && activeSpace === null) {
+    // No space chosen: full-screen picker on the Home tab only (a 'profile' push shows Profile
+    // in the tab shell; Home tab / back returns here), no tab shell. inTabShell stays false, so the coach
+    // marks, policy notice, city prompts and Oli wait until a space is chosen.
+    spacePickerOn = true
+    content = <SpacePickerScreen lang={lang} current={lastSpace} onChoose={chooseSpace} onShowAll={chooseAllSpaces}
+      onProfile={() => setActiveTab('profile')} onEmergency={() => setShowEmergencyModal(true)} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -2619,6 +2751,9 @@ export default function App() {
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
             liveScoresTester={liveScoresTester}
+            space={HOME_SPACES_LIVE && !isAdmin && typeof activeSpace === 'string' && activeSpace !== SPACE_ALL ? activeSpace : null}
+            spaceAll={HOME_SPACES_LIVE && !isAdmin && activeSpace === SPACE_ALL}
+            onOpenSpacePicker={openSpacePicker}
           />
         )}
 
@@ -2912,11 +3047,22 @@ export default function App() {
   // never silently fall through to "visitor".
   const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
 
+  // "A space Home is on screen": assigned on every render, after `content` and inTabShell are decided,
+  // so the back handler never swallows back on the profile-gate wizard, a provider dashboard or the picker.
+  spaceHomeShownRef.current = HOME_SPACES_LIVE && inTabShell && activeTab === 'home' && !isAdmin && typeof activeSpace === 'string'
+  spacePickerShownRef.current = HOME_SPACES_LIVE && spacePickerOn && !isAdmin && activeTab === 'home' && activeSpace === null
+
   return (
     <SafeAreaProvider>
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
       </View>
+      {/* App spaces colour bloom: above `content`, below the notice / sheets. Final return, like them. */}
+      {spaceWash && (
+        <SpaceWash color={spaceWash.color} origin={spaceWash.origin} reduce={spaceWash.reduce}
+          onPeak={() => { if (spaceWash.epoch === spaceEpochRef.current) commitSpace(spaceWash.key) }}
+          onDone={() => setSpaceWash(null)} />
+      )}
       {/* ⚠ RENDERED HERE, in the final return, never inside `content`. The content selector
           runs BEFORE policyNoticeVisible / dismissPolicyNotice are assigned below it; Hermes
           does not enforce the temporal dead zone, so inside `content` they read UNDEFINED —

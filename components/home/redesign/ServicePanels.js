@@ -59,18 +59,24 @@ export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
   )
 }
 
-export default function ServicePanels({ lang, onPress, unlocked }) {
+// `only`: an app space's group key — that one panel (null = all four, today's Home). Inside a space the
+// hero pill already names it, so the panel head is dropped; and the health space's widget row already
+// shows the duty and emergency tiles, so the panel does not repeat them (HOME_GROUPS stays as is).
+const SPACE_WIDGET_IDS = { health: new Set(['duty', 'emergency']) }
+export default function ServicePanels({ lang, onPress, unlocked, only = null }) {
   const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
-      {liveGroups(unlocked).map(g => (
+      {liveGroups(unlocked).filter(g => !only || g.key === only).map(g => (
         <View key={g.key} style={[s.panel, elevation.card]}>
-          <View style={s.head}>
-            <View style={[s.dot, { backgroundColor: CATEGORY[g.key].ink }]} />
-            <Text style={s.title} accessibilityRole="header" numberOfLines={1} maxFontSizeMultiplier={cap}>{t(g.titleKey, lang)}</Text>
-          </View>
+          {!only && (
+            <View style={s.head}>
+              <View style={[s.dot, { backgroundColor: CATEGORY[g.key].ink }]} />
+              <Text style={s.title} accessibilityRole="header" numberOfLines={1} maxFontSizeMultiplier={cap}>{t(g.titleKey, lang)}</Text>
+            </View>
+          )}
           <View style={s.grid}>
-            {g.modules.map(mod => (
+            {g.modules.filter(mod => !(only && SPACE_WIDGET_IDS[only]?.has(mod.id))).map(mod => (
               <ServiceTile key={mod.id} mod={mod} cat={g.key} lang={lang} onPress={onPress} />
             ))}
           </View>

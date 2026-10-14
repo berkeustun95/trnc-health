@@ -49,7 +49,7 @@ import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/re
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
 import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
-import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
+import { unplacedLiveModules, duplicatePlacements, categoryOf, stripInSpace } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
 import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar, ModuleScreen, OnPhotoLabel } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
@@ -248,6 +248,12 @@ export default function HomeScreen({
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
   onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
   liveScoresTester = false, // a score editor sees the tile before the flag flips (App.js asks is_score_editor)
+  // ─── App spaces (HOME_SPACES_LIVE) ──────────────────────────────────────────
+  // A group key ('health' | 'explore' | 'homeLife' | 'city') narrows the redesigned hub to that
+  // space; null (the default, and what App passes while the flag is off) is today's Home exactly.
+  space = null,
+  spaceAll = false,       // full-Home mode: today's Home, but the hero keeps the switch pill
+  onOpenSpacePicker,      // the hero's space control: back to the picker
 }) {
   const tabFootprint = useTabBarFootprint()
   const insets = useSafeAreaInsets()
@@ -926,6 +932,7 @@ export default function HomeScreen({
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
+    const favShown = space ? favIds.filter(id => categoryOf(id) === space) : favIds
     const heroH = heroHeight(insets.top)
     const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
     const cur = weatherData?.current
@@ -947,7 +954,8 @@ export default function HomeScreen({
           <RedesignHero region={region} lang={lang} hasUnread={hasUnread} hideActions={hideHeaderActions}
             onShowNotifs={onShowNotifs} onOpenMenu={onOpenMenu} hamburgerRef={hamburgerRef}
             onOpenPlace={openPlaceById} weatherData={weatherData} onOpenWeather={() => setWeatherOpen(true)}
-            weatherRef={weatherRef} />
+            weatherRef={weatherRef}
+            space={space || (spaceAll ? 'all' : null)} onOpenSpacePicker={onOpenSpacePicker} />
 
           <View style={s.rBelow}>
             {!hideHeaderActions && (
@@ -956,14 +964,26 @@ export default function HomeScreen({
               </View>
             )}
 
-            <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
-              <View style={s.rCol}>
-                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
+            {/* Duty + emergency are Health content: inside any other space the duty tile goes and the
+                emergency tile stays alone (emergency access in every space); that row carries no tour
+                ref, so the tour's tiles step measures null and is skipped, like any absent ref. */}
+            {space && space !== 'health' && (
+              <View style={s.rWidgets}>
+                <View style={s.rCol}>
+                  <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
+                </View>
               </View>
-              <View style={s.rCol}>
-                <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
+            )}
+            {(!space || space === 'health') && (
+              <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
+                <View style={s.rCol}>
+                  <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
+                </View>
+                <View style={s.rCol}>
+                  <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Duyurular: no tile, a banner (Berke 2026-10-11). Nothing at all for production users
                 until the flag flips; dev and ADA Preview show it (constants/redesign.js DUYURULAR). */}
@@ -973,17 +993,27 @@ export default function HomeScreen({
               </View>
             )}
 
-            <View style={{ marginTop: WIDGET_GAP }}>
-              <EventBanner item={stripItem} loading={stripLoading} lang={lang}
-                onPress={handleStripPress} onDismiss={dismissStripItem} />
-            </View>
+            {/* In a space: only the items that belong to it (stripInSpace); nothing left = no wrapper,
+                no gap. While the ladder is still loading only Explore reserves the skeleton. */}
+            {(!space || (stripLoading ? space === 'explore' : stripInSpace(stripItem, space))) && (
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <EventBanner item={stripItem} loading={stripLoading} lang={lang}
+                  onPress={handleStripPress} onDismiss={dismissStripItem} />
+              </View>
+            )}
 
-            <SectionHeader title={t('favSectionTitle', lang)}
-              action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
-            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
+            {/* Favourites are module ids only (homeFavourites.js): a space keeps those whose module is
+                in its group (categoryOf), and the whole section goes when none are. */}
+            {(!space || favShown.length > 0) && (
+              <>
+                <SectionHeader title={t('favSectionTitle', lang)}
+                  action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
+                <FavouritePanel ids={favShown} modules={byId} lang={lang} onPress={openModule} />
+              </>
+            )}
 
-            <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} />
+            {!space && <SectionHeader title={t('hrAllServices', lang)} />}
+            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} only={space} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}

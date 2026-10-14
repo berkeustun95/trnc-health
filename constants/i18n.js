@@ -184,6 +184,14 @@ const translations = {
     hrGroupExplore: "Explore & fun",
     hrGroupHome: "Home & living",
     hrGroupCity: "City & getting around",
+    spaceHealth: "Pharmacy & Emergency",
+    spacePickerTitle: "What would you like to do?",
+    spacePickerSubtitle: "Pick a space — you can switch any time.",
+    spaceGreetMorning: "Good morning",
+    spaceGreetAfternoon: "Good afternoon",
+    spaceGreetEvening: "Good evening",
+    spaceGreetNight: "Hello",
+    spaceSwitchA11y: "Switch space",
 
     // The what's-new notice card in the live strip (20261043). TITLE ONLY — the
     // strip's cards lost their subtitles, so the band holds 2 lines at 14pt in a
@@ -2245,6 +2253,14 @@ const translations = {
     hrGroupExplore: "Keşfet ve Eğlence",
     hrGroupHome: "Ev ve Yaşam",
     hrGroupCity: "Şehir ve Ulaşım",
+    spaceHealth: "Eczane & Acil",
+    spacePickerTitle: "Ne yapmak istersin?",
+    spacePickerSubtitle: "Bir alan seç — istediğin zaman değiştirebilirsin.",
+    spaceGreetMorning: "Günaydın",
+    spaceGreetAfternoon: "İyi günler",
+    spaceGreetEvening: "İyi akşamlar",
+    spaceGreetNight: "Merhaba",
+    spaceSwitchA11y: "Alan değiştir",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: "ADA'da neler yeni?",
@@ -4277,6 +4293,14 @@ const translations = {
     hrGroupExplore: "استكشاف وترفيه",
     hrGroupHome: "المنزل والحياة",
     hrGroupCity: "المدينة والتنقل",
+    spaceHealth: "الصيدلية والطوارئ",
+    spacePickerTitle: "ماذا تريد أن تفعل؟",
+    spacePickerSubtitle: "اختر قسمًا — يمكنك التبديل في أي وقت.",
+    spaceGreetMorning: "صباح الخير",
+    spaceGreetAfternoon: "طاب يومك",
+    spaceGreetEvening: "مساء الخير",
+    spaceGreetNight: "أهلًا بك",
+    spaceSwitchA11y: "تغيير القسم",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'ما الجديد في ADA؟',
@@ -6089,6 +6113,14 @@ const translations = {
     hrGroupExplore: "Отдых и развлечения",
     hrGroupHome: "Дом и быт",
     hrGroupCity: "Город и транспорт",
+    spaceHealth: "Аптеки и экстренные службы",
+    spacePickerTitle: "Что хотите сделать?",
+    spacePickerSubtitle: "Выберите раздел — его можно сменить в любое время.",
+    spaceGreetMorning: "Доброе утро",
+    spaceGreetAfternoon: "Добрый день",
+    spaceGreetEvening: "Добрый вечер",
+    spaceGreetNight: "Здравствуйте",
+    spaceSwitchA11y: "Сменить раздел",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Что нового в ADA',
@@ -7909,6 +7941,14 @@ const translations = {
     hrGroupExplore: "Εξερεύνηση & διασκέδαση",
     hrGroupHome: "Σπίτι & ζωή",
     hrGroupCity: "Πόλη & μετακίνηση",
+    spaceHealth: "Φαρμακεία & Έκτακτα",
+    spacePickerTitle: "Τι θέλετε να κάνετε;",
+    spacePickerSubtitle: "Επιλέξτε χώρο — μπορείτε να αλλάξετε οποτεδήποτε.",
+    spaceGreetMorning: "Καλημέρα",
+    spaceGreetAfternoon: "Καλησπέρα",
+    spaceGreetEvening: "Καλησπέρα",
+    spaceGreetNight: "Γεια σας",
+    spaceSwitchA11y: "Αλλαγή χώρου",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Τι νέο στο ADA',
@@ -9715,6 +9755,14 @@ const translations = {
     hrGroupExplore: "Découvrir & se divertir",
     hrGroupHome: "Maison & vie",
     hrGroupCity: "Ville & déplacements",
+    spaceHealth: "Pharmacie & urgences",
+    spacePickerTitle: "Que voulez-vous faire ?",
+    spacePickerSubtitle: "Choisissez un espace — changez à tout moment.",
+    spaceGreetMorning: "Bonjour",
+    spaceGreetAfternoon: "Bonjour",
+    spaceGreetEvening: "Bonsoir",
+    spaceGreetNight: "Bonsoir",
+    spaceSwitchA11y: "Changer d'espace",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Quoi de neuf',
@@ -11525,6 +11573,14 @@ const translations = {
     hrGroupExplore: "Explorar y ocio",
     hrGroupHome: "Hogar y vida",
     hrGroupCity: "Ciudad y transporte",
+    spaceHealth: "Farmacia y urgencias",
+    spacePickerTitle: "¿Qué quieres hacer?",
+    spacePickerSubtitle: "Elige un espacio — puedes cambiar cuando quieras.",
+    spaceGreetMorning: "Buenos días",
+    spaceGreetAfternoon: "Buenas tardes",
+    spaceGreetEvening: "Buenas noches",
+    spaceGreetNight: "Buenas noches",
+    spaceSwitchA11y: "Cambiar de espacio",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Novedades en ADA',
@@ -13332,6 +13388,14 @@ const translations = {
     hrGroupExplore: "Entdecken & Freizeit",
     hrGroupHome: "Wohnen & Leben",
     hrGroupCity: "Stadt & Unterwegs",
+    spaceHealth: "Apotheke & Notruf",
+    spacePickerTitle: "Was möchtest du tun?",
+    spacePickerSubtitle: "Wähle einen Bereich — du kannst jederzeit wechseln.",
+    spaceGreetMorning: "Guten Morgen",
+    spaceGreetAfternoon: "Guten Tag",
+    spaceGreetEvening: "Guten Abend",
+    spaceGreetNight: "Hallo",
+    spaceSwitchA11y: "Bereich wechseln",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Neu in ADA',
@@ -15139,6 +15203,14 @@ const translations = {
     hrGroupExplore: "گردش و سرگرمی",
     hrGroupHome: "خانه و زندگی",
     hrGroupCity: "شهر و رفت‌وآمد",
+    spaceHealth: "داروخانه و اورژانس",
+    spacePickerTitle: "چه کاری می‌خواهید انجام دهید؟",
+    spacePickerSubtitle: "یک بخش را انتخاب کنید — هر زمان می‌توانید تغییر دهید.",
+    spaceGreetMorning: "صبح بخیر",
+    spaceGreetAfternoon: "روز بخیر",
+    spaceGreetEvening: "شب بخیر",
+    spaceGreetNight: "سلام",
+    spaceSwitchA11y: "تغییر بخش",
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'تازه‌های ADA',

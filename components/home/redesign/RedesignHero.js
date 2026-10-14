@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, type } from '../../../constants/theme'
+import { colors, type, worldColors } from '../../../constants/theme'
+import { SPACE_ICON, SPACE_LABEL_KEY } from '../../../constants/homeGroups'
 import { t } from '../../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../../constants/regions'
 import { resolveHero } from '../../../constants/homeHero'
@@ -60,9 +61,11 @@ export const heroHeight = insetTop => Math.max(HERO_TOTAL, insetTop + HERO_MIN_B
 export default function RedesignHero({
   region, lang, hasUnread, hideActions, onShowNotifs, onOpenMenu, hamburgerRef, onOpenPlace,
   weatherData, onOpenWeather, weatherRef,
+  space = null, onOpenSpacePicker,   // app spaces: the chosen space's control (null = today's hero; 'all' = full Home)
 }) {
   const insets = useSafeAreaInsets()
-  const chipCap = useWindowDimensions().width < 350 ? CHIP_CAP_NARROW : CHIP_CAP
+  const narrow = useWindowDimensions().width < 350
+  const chipCap = narrow ? CHIP_CAP_NARROW : CHIP_CAP
   const [creditOpen, setCreditOpen] = useState(false)
   const { source, placeId, credit, isGeneric, landmark } = resolveHero(region)
   const district = region && REGION_LABEL_KEY[region]
@@ -75,6 +78,7 @@ export default function RedesignHero({
   const condKey = cur ? weatherLabelKey(cur.symbol) : null
   const cond = condKey ? t(condKey === 'weatherPartlyCloudy' ? 'hrWxPartlyTile' : condKey, lang) : null
   const tappable = !!placeId
+  const accent = space ? worldColors[space]?.glow : null   // a real space only ('all' and null have none)
 
   const body = (
     <View style={StyleSheet.absoluteFill}>
@@ -100,8 +104,25 @@ export default function RedesignHero({
         </TouchableOpacity>
       ) : body}
 
+      {/* Space "light edge": a centred 3dp pill in the space's glow along the hero's bottom;
+          inset 28 = the hero's bottom radius, so it starts where the curve ends.
+          Above the photo and bands, below every chip (they come later). glow, not rail: rail is tuned for light surfaces. */}
+      {!!accent && <View pointerEvents="none" style={[s.edge, { backgroundColor: accent }]} />}
+
       <View style={[s.topRow, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <Image source={LOGO} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
+        {!!space && !!onOpenSpacePicker && (
+          // Same frosted pill as the chips below (HERO_PILL_ALPHA, so check-hero-contrast covers it).
+          // The label ellipsizes; the icons never shrink.
+          <TouchableOpacity style={[s.chip, s.spaceChip]} onPress={onOpenSpacePicker} activeOpacity={0.8}
+            hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }} accessibilityRole="button"
+            accessibilityLabel={`${t(SPACE_LABEL_KEY[space], lang)}, ${t('spaceSwitchA11y', lang)}`}>
+            {!!accent && <View accessible={false} style={[s.dot, { backgroundColor: accent }]} />}
+            {!narrow && <Ionicons name={SPACE_ICON[space]} size={WX_ICON} color="#FFFFFF" />}
+            <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={chipCap}>{t(SPACE_LABEL_KEY[space], lang)}</Text>
+            <Ionicons name="swap-horizontal" size={WX_ICON} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
         {!hideActions && (
           <View style={s.actions}>
             <IconButton icon="notifications-outline" variant="frosted" onPress={onShowNotifs}
@@ -156,6 +177,8 @@ const s = StyleSheet.create({
   topRow:   { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo:     { width: 40, height: 44 },
+  edge:     { position: 'absolute', left: 28, right: 28, bottom: 0, height: 3, borderRadius: 1.5, opacity: 0.9 },
+  dot:      { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
   actions:  { flexDirection: 'row', gap: 8 },
   chipRow:  { position: 'absolute', left: 16, right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: ROW_GAP },
   chip:     { flexDirection: 'row', alignItems: 'center', gap: CHIP_GAP, flexShrink: 1,
@@ -164,4 +187,5 @@ const s = StyleSheet.create({
   chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 0 },
   chipLandmark: { fontFamily: 'Inter_500Medium', flexShrink: 1 },
   wxChip:   { flexShrink: 0, paddingHorizontal: WX_PAD, gap: 4 },
+  spaceChip:{ flexShrink: 1, marginHorizontal: 8, paddingHorizontal: WX_PAD, gap: 6 },
 })

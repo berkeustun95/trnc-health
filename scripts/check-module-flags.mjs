@@ -184,6 +184,7 @@ const EXPECTED_SCALARS = {
   // Putting it in that map would fail this script's own waitlist and notify-path checks
   // against a perfectly correct app.
   HOME_V2_LIVE:          true,   // live 2026-09-08 — first OTA that reaches users
+  HOME_SPACES_LIVE:      false,  // app spaces: picker before Home for every customer; dark until the S1-S3 device pass
   // The app-wide redesign. Live from runtime 1.3.0 (release/redesign-1, 2026-10-02): the new
   // binaries carry the native side (expo-image, nav-bar theme); 1.2.0 never gets a 1.3.0 update.
   // Visual rollback = this AND flags.js back to false, one commit, OTA on 1.3.0.
