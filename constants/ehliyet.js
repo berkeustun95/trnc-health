@@ -77,3 +77,17 @@ export const branchAddress = (branch) => String(branch?.address || '').trim()
 // Same search URL as the hotels' Harita button (components/accommodation/HotelsTab.js): a text search, never a pin.
 export const mapsSearchUrl = (address) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${address}, North Cyprus`)}`
+
+// ─── Instagram / Facebook side by side, or stacked ──────────────────────────
+// Both labels are brand words, identical in all 9 languages, so their width is a pure function of
+// font size x fontScale: no onLayout. Widths are Inter_600SemiBold advances at SOCIAL_LABEL_PX, rounded UP to 0.1;
+// scripts/test-ehliyet-ui.mjs re-derives them from the TTF and fails on drift. Layout numbers mirror EhliyetScreen styles.
+export const SOCIAL_LABEL_PX = 14
+export const SOCIAL_LABEL_WIDTHS = { Instagram: 68.1, Facebook: 66.5 }
+export const SOCIAL_LAYOUT = { page: 16, cardPad: 18, gap: 10, border: 1.5, padX: 8, icon: 18, iconGap: 8 }
+
+export const socialTextRoom = (windowWidth, L = SOCIAL_LAYOUT) =>
+  (windowWidth - L.page * 2 - L.cardPad * 2 - L.gap) / 2 - L.border * 2 - L.padX * 2 - L.icon - L.iconGap
+
+export const socialSideBySide = (windowWidth, fontScale, widths = SOCIAL_LABEL_WIDTHS) =>
+  Math.max(...Object.values(widths)) * fontScale <= socialTextRoom(windowWidth)

@@ -6,6 +6,7 @@ import {
   PREVIEW_DRIVING_SCHOOLS, usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
   hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, EHLIYET_LOGS_CONTACTS,
+  SOCIAL_LABEL_PX, SOCIAL_LABEL_WIDTHS, SOCIAL_LAYOUT, socialTextRoom, socialSideBySide,
 } from '../constants/ehliyet.js'
 import { REGIONS } from '../constants/regions.js'
 import { readFileSync } from 'node:fs'
@@ -123,6 +124,52 @@ for (const [key, outlined] of BUTTON_KEYS) {
 }
 t('every button label fits its 320dp button at scale 1.0, all 9 languages', fitProblems(tr), [])
 t('red-first: an overlong label is caught', fitProblems((k, l) => (k === 'ehliyetCall' && l === 'Turkish' ? 'Okul müdürlüğünü hemen arayın' : tr(k, l))).length, 1)
+
+// ── Instagram + Facebook side by side (14px, half-width) or stacked (15px, full width). ──
+// Brand words: must be identical in all 9 languages, else the pure width function is wrong.
+for (const key of ['ehliyetInstagram', 'ehliyetFacebook']) {
+  const vals = LANGUAGES.map(({ key: l }) => tr(key, l))
+  console.log(`  · ${key}: ${JSON.stringify(vals)}`)
+  t(`${key} is the same word in all 9 languages`, new Set(vals).size, 1)
+}
+const brand = { Instagram: tr('ehliyetInstagram', 'English'), Facebook: tr('ehliyetFacebook', 'English') }
+t('brand words are literally Instagram / Facebook', brand, { Instagram: 'Instagram', Facebook: 'Facebook' })
+const measured = Object.fromEntries(Object.entries(brand).map(([k, w]) => [k, font(w, SOCIAL_LABEL_PX)]))
+console.log(`  · measured @${SOCIAL_LABEL_PX}px ${JSON.stringify(measured)}; stored ${JSON.stringify(SOCIAL_LABEL_WIDTHS)}`)
+t('stored label widths cover the measured TTF widths (never narrower)', Object.keys(measured).filter(k => SOCIAL_LABEL_WIDTHS[k] < measured[k]), [])
+t('stored label widths drift <= 0.1pt above the TTF', Object.keys(measured).filter(k => SOCIAL_LABEL_WIDTHS[k] - measured[k] > 0.1), [])
+t('layout constants mirror the screen styles', [SOCIAL_LAYOUT.page, SOCIAL_LAYOUT.cardPad, SOCIAL_LAYOUT.gap, SOCIAL_LAYOUT.border, SOCIAL_LAYOUT.icon, SOCIAL_LAYOUT.iconGap],
+  [16, 18, 10, 1.5, 18, 8])
+t('screen reads gap / padding from SOCIAL_LAYOUT and size from SOCIAL_LABEL_PX', [/gap: SOCIAL_LAYOUT\.gap/.test(screenSrc), /paddingHorizontal: SOCIAL_LAYOUT\.padX/.test(screenSrc), /fontSize: SOCIAL_LABEL_PX/.test(screenSrc), /minHeight: 44/.test(screenSrc)], [true, true, true, true])
+
+const widest = Math.max(...Object.values(measured))
+const room320 = socialTextRoom(320)
+console.log(`  · 320dp: (320 - 2x${SOCIAL_LAYOUT.page} - 2x${SOCIAL_LAYOUT.cardPad} - gap ${SOCIAL_LAYOUT.gap}) / 2 = ${(320 - 32 - 36 - 10) / 2}; - 2x${SOCIAL_LAYOUT.border} border - 2x${SOCIAL_LAYOUT.padX} pad - ${SOCIAL_LAYOUT.icon} icon - ${SOCIAL_LAYOUT.iconGap} gap = ${room320}pt text room; widest label ${widest.toFixed(2)}pt (stored ${Math.max(...Object.values(SOCIAL_LABEL_WIDTHS))}); spare ${(room320 - widest).toFixed(2)}pt`)
+t('side by side at 320dp has >= 3pt to spare at scale 1.0 (measured width)', room320 - widest >= 3, true)
+t('side by side at (320, 1.0)', socialSideBySide(320, 1.0), true)
+t('side by side at (360, 1.0)', socialSideBySide(360, 1.0), true)
+for (const [w, sc] of [[320, 1.3], [360, 1.3]]) {
+  console.log(`  · (${w}, ${sc}): room ${socialTextRoom(w)}pt vs ${(Math.max(...Object.values(SOCIAL_LABEL_WIDTHS)) * sc).toFixed(1)}pt -> ${socialSideBySide(w, sc) ? 'SIDE BY SIDE' : 'STACKED'}`)
+}
+t('outcome at (320, 1.3) is stacked (arithmetic)', socialSideBySide(320, 1.3), false)
+t('outcome at (360, 1.3) is side by side (arithmetic)', socialSideBySide(360, 1.3), true)
+t('stacked at the extreme (320, 2.0)', socialSideBySide(320, 2.0), false)
+t('red-first: an inflated label width flips the (320, 1.0) decision', socialSideBySide(320, 1.0, { Instagram: 90, Facebook: 66.5 }), false)
+t('red-first: the plant is the only difference (real widths still side by side)', socialSideBySide(320, 1.0, SOCIAL_LABEL_WIDTHS), true)
+
+// Label-fit tables. Full width (stacked): 15px, Ara / WhatsApp solid, Instagram / Facebook outlined. Compact (side by side at 320dp): 14px.
+const compactBox = socialTextRoom(320)
+const compactProblems = (labelOf) => ['ehliyetInstagram', 'ehliyetFacebook'].flatMap(key => LANGUAGES.map(({ key: lang }) => {
+  const label = labelOf(key, lang), w = font(label, SOCIAL_LABEL_PX)
+  return w > compactBox ? `${key}/${lang} "${label}" ${w.toFixed(1)} > ${compactBox}` : null
+}).filter(Boolean))
+for (const key of ['ehliyetInstagram', 'ehliyetFacebook']) {
+  console.log(`  · compact ${key.padEnd(17)} box ${compactBox}pt @${SOCIAL_LABEL_PX}px  ` + LANGUAGES.map(({ key: l }) => `${l.slice(0, 2)} ${font(tr(key, l), SOCIAL_LABEL_PX).toFixed(1)}`).join('  '))
+}
+t('compact labels fit the half-width button at 320dp, all 9 languages', compactProblems(tr), [])
+t('red-first: an overlong compact label is caught', compactProblems((k, l) => (k === 'ehliyetFacebook' && l === 'Turkish' ? 'Facebook sayfamız' : tr(k, l))).length, 1)
+t('logo has role image + school name label; no visible name unless logo missing',
+  [/accessibilityRole="image" accessibilityLabel=\{school\.name\}/.test(screenSrc), /s\.nameFallback/.test(screenSrc), /s\.name\b/.test(screenSrc)], [true, true, false])
 
 // ── Email row: Inter 400 13px, 230px of text at 320dp (row 320-32-36=252, icon 16 + gap 6), font scale up to 1.3. ──
 const font400 = loadFont('400Regular/Inter_400Regular.ttf')

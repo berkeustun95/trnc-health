@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -13,6 +13,7 @@ import {
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, PREVIEW_DRIVING_SCHOOLS,
   usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
   hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
+  SOCIAL_LABEL_PX, SOCIAL_LAYOUT, socialSideBySide,
 } from '../constants/ehliyet'
 import { logContactEvent } from '../utils/logContactEvent'
 import { ScreenHeader, ErrorState, CardSkeleton } from '../components/ui'
@@ -26,31 +27,38 @@ import { ScreenHeader, ErrorState, CardSkeleton } from '../components/ui'
 const FROM_FIXTURE = usesFixture(MODULE_FLAGS.ehliyet, EHLIYET)
 const COLS = 'id, name, logo_key, phones, whatsapp, instagram_url, facebook_url, email, licence_classes, featured, sort_order, driving_school_branches(region, address, lat, lng, geocode_source, sort_order)'
 
-function ActionButton({ icon, label, onPress, bg, fg, outlined }) {
+function ActionButton({ icon, label, onPress, bg, fg, outlined, compact }) {
   return (
     <TouchableOpacity
-      style={[s.action, outlined ? s.actionOutlined : { backgroundColor: bg }]}
+      style={[s.action, outlined ? s.actionOutlined : { backgroundColor: bg }, compact && s.actionCompact]}
       onPress={onPress} activeOpacity={press.small}
       accessibilityRole="button" accessibilityLabel={label}
     >
       <Ionicons name={icon} size={18} color={fg} />
-      <Text style={[s.actionText, { color: fg }]}>{label}</Text>
+      <Text style={[s.actionText, compact && s.actionTextCompact, { color: fg }]}>{label}</Text>
     </TouchableOpacity>
   )
 }
 
 function SchoolCard({ school, lang, featured, onAction }) {
   const logo = partnerAsset(school.logo_key)
+  const { width, fontScale } = useWindowDimensions()
   const branches = sortedBranches(school).filter(b => REGION_LABEL_KEY[b.region])
   const addressed = branches.filter(b => branchAddress(b))
   const classes = licenceClasses(school)
+  const ig = hasInstagram(school), fb = hasFacebook(school)
+  const social = ig && fb && socialSideBySide(width, fontScale)
+  const igButton = <ActionButton icon="logo-instagram" label={t('ehliyetInstagram', lang)} onPress={() => onAction(school, 'instagram', school.instagram_url)} fg={EHLIYET_DARK} outlined compact={social} />
+  const fbButton = <ActionButton icon="logo-facebook" label={t('ehliyetFacebook', lang)} onPress={() => onAction(school, 'facebook', school.facebook_url)} fg={EHLIYET_DARK} outlined compact={social} />
   return (
     <View style={s.card}>
-      {!!logo && (
+      {logo ? (
         <Image source={logo} resizeMode="contain" style={featured ? s.logo : s.logoSmall}
-          accessibilityIgnoresInvertColors accessibilityLabel={school.name} />
+          accessibilityIgnoresInvertColors accessibilityRole="image" accessibilityLabel={school.name} />
+      ) : (
+        // The logo carries the name (it is in the image); a school without one still needs its name on screen.
+        <Text style={s.nameFallback} accessibilityRole="header">{school.name}</Text>
       )}
-      <Text style={s.name} accessibilityRole="header">{school.name}</Text>
 
       {classes.length > 0 && (
         <View style={s.branchBlock}>
@@ -91,11 +99,10 @@ function SchoolCard({ school, lang, featured, onAction }) {
         {hasWhatsApp(school) && (
           <ActionButton icon="logo-whatsapp" label={t('ehliyetWhatsApp', lang)} onPress={() => onAction(school, 'whatsapp', whatsAppUrl(school))} bg={EHLIYET_WA} fg="#FFFFFF" />
         )}
-        {hasInstagram(school) && (
-          <ActionButton icon="logo-instagram" label={t('ehliyetInstagram', lang)} onPress={() => onAction(school, 'instagram', school.instagram_url)} fg={EHLIYET_DARK} outlined />
-        )}
-        {hasFacebook(school) && (
-          <ActionButton icon="logo-facebook" label={t('ehliyetFacebook', lang)} onPress={() => onAction(school, 'facebook', school.facebook_url)} fg={EHLIYET_DARK} outlined />
+        {social ? (
+          <View style={s.socialRow}>{igButton}{fbButton}</View>
+        ) : (
+          <>{ig && igButton}{fb && fbButton}</>
         )}
       </View>
 
@@ -169,7 +176,7 @@ const s = StyleSheet.create({
   card:         { backgroundColor: '#FFFFFF', borderRadius: radii.card, padding: 18, ...elevation.card },
   logo:         { width: '100%', height: 96, marginBottom: 12 },
   logoSmall:    { width: '60%', height: 56, marginBottom: 10 },
-  name:         { ...type.sectionHeading, color: EHLIYET_DARK },
+  nameFallback: { ...type.sectionHeading, color: EHLIYET_DARK },
 
   branchBlock: { marginTop: 14 },
   branchLabel: { ...type.meta, color: colors.textSecondary, marginBottom: 6 },
@@ -182,6 +189,10 @@ const s = StyleSheet.create({
                    alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
   actionOutlined: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: EHLIYET_DARK },
   actionText:    { ...type.rowTitle, flexShrink: 1, textAlign: 'center' },
+  // Instagram + Facebook pair: widths come from socialSideBySide (constants/ehliyet.js); padding and gap mirror SOCIAL_LAYOUT.
+  socialRow:     { flexDirection: 'row', gap: SOCIAL_LAYOUT.gap },
+  actionCompact: { flex: 1, minHeight: 44, paddingHorizontal: SOCIAL_LAYOUT.padX },
+  actionTextCompact: { fontSize: SOCIAL_LABEL_PX },
 
   addressRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 44, paddingTop: 12 },
   addressText: { ...type.small, color: EHLIYET_DARK, flex: 1, textDecorationLine: 'underline' },
