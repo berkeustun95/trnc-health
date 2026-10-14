@@ -55,6 +55,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   Lost Mac → revoke the token (Supabase → Account → Access Tokens).
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
+- ⚠ **`production-db` keeps its required reviewer (Berke) — never remove it** (Berke, 2026-10-14; removal
+  cancelled). It is the ONLY lock on a migration apply that holds against `ada-hermes-bot` (repo WRITE, can
+  dispatch workflows; `main` needs 0 approvals, so it could also merge away an actor check in the workflow)
+  and against local Claude sessions (they run as `berkeustun95` via `gh`). Main-only on `production` stays too.
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
   in `homeStripResolver.js`, `stripNoticeTitle`, `utils/stripDismissals.js`). Don't delete or repurpose it;
   re-enable = one `UPDATE … SET is_active = true`. Same for the `showAgentOnboarding` branch in App.js.
