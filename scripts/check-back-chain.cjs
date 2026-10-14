@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +2 on 2026-10-13 for Ehliyet (call sheet, then module). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -69,8 +69,7 @@ const cases4=[
  ['S10 Transport layer -> module step', {...base, showTransport:true}, {transportBackRef:()=>true}, r=>r.calls===''],
  ['Duyurular detail open -> closes the detail, NOT the module', {...base, showDuyurular:true}, {duyurularBackRef:()=>true}, r=>r.r===true && r.calls===''],
  ['Duyurular list -> closes the module', {...base, showDuyurular:true}, {duyurularBackRef:()=>false}, r=>r.calls==='setShowDuyurular(false)'],
- ['Ehliyet call sheet open -> closes the sheet, NOT the module', {...base, showEhliyet:true}, {ehliyetBackRef:()=>true}, r=>r.r===true && r.calls===''],
- ['Ehliyet no sheet -> closes the module', {...base, showEhliyet:true}, {ehliyetBackRef:()=>false}, r=>r.calls==='setShowEhliyet(false)'],
+ ['Ehliyet -> closes the module', {...base, showEhliyet:true}, {}, r=>r.calls==='setShowEhliyet(false)'],
  ['S10 Insurance layer -> module step', {...base, showInsurance:true}, {insuranceBackRef:()=>true}, r=>r.calls===''],
  ['S10 Grooming onboarding -> module step', {...base, showGrooming:true}, {groomingBackRef:()=>true}, r=>r.calls===''],
  ['S10 Towing detail over Garages -> closes detail only', {...base, showGarages:true, showTowing:true}, {towingBackRef:()=>true, garagesBackRef:()=>{throw new Error('garages asked')}}, r=>r.calls===''],

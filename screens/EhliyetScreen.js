@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -7,14 +7,16 @@ import { t } from '../constants/i18n'
 import { MODULE_FLAGS } from '../constants/flags'
 import { EHLIYET } from '../constants/redesign'
 import { colors, type, radii, elevation, press } from '../constants/theme'
-import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import {
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, PREVIEW_DRIVING_SCHOOLS,
-  usesFixture, shouldLogContact, telUrl, hasWhatsApp, whatsAppUrl, hasInstagram, sortedBranches,
+  usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
+  hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
+  SOCIAL_LABEL_PX, SOCIAL_LAYOUT, socialSideBySide,
+  EHLIYET_CITY_NAME, branchChipLabels, ADDRESS_SEP, addressParts,
 } from '../constants/ehliyet'
 import { logContactEvent } from '../utils/logContactEvent'
-import { ScreenHeader, ErrorState, CardSkeleton, BottomSheet } from '../components/ui'
+import { ScreenHeader, ErrorState, CardSkeleton } from '../components/ui'
 
 // ─── Ehliyet: driving schools ───────────────────────────────────────────────
 // Rows come from public.driving_schools (+ nested driving_school_branches); RLS returns active rows only.
@@ -23,77 +25,119 @@ import { ScreenHeader, ErrorState, CardSkeleton, BottomSheet } from '../componen
 // The partner logo has no onDark variant: it only ever sits on the white card.
 
 const FROM_FIXTURE = usesFixture(MODULE_FLAGS.ehliyet, EHLIYET)
-const COLS = 'id, name, logo_key, phones, whatsapp, instagram_url, featured, sort_order, driving_school_branches(region, lat, lng, sort_order)'
+const COLS = 'id, name, logo_key, phones, whatsapp, instagram_url, facebook_url, email, licence_classes, featured, sort_order, driving_school_branches(region, address, lat, lng, geocode_source, sort_order)'
 
-function ActionButton({ icon, label, onPress, bg, fg, outlined }) {
+function ActionButton({ icon, label, onPress, bg, fg, outlined, compact }) {
   return (
     <TouchableOpacity
-      style={[s.action, outlined ? s.actionOutlined : { backgroundColor: bg }]}
+      style={[s.action, outlined ? s.actionOutlined : { backgroundColor: bg }, compact && s.actionCompact]}
       onPress={onPress} activeOpacity={press.small}
       accessibilityRole="button" accessibilityLabel={label}
     >
       <Ionicons name={icon} size={18} color={fg} />
-      <Text style={[s.actionText, { color: fg }]}>{label}</Text>
+      <Text style={[s.actionText, compact && s.actionTextCompact, { color: fg }]}>{label}</Text>
     </TouchableOpacity>
   )
 }
 
-function SchoolCard({ school, lang, featured, onCall, onInstagram, onWhatsApp }) {
+// Underline stops at the comma: only the space between parts is un-underlined (addressParts).
+function AddressText({ address, style }) {
+  const parts = addressParts(address)
+  return (
+    <Text style={style}>
+      {parts.map((p, i) => (
+        <Text key={i}>
+          <Text style={s.underline}>{p}</Text>
+          {i < parts.length - 1 && <Text style={s.noUnderline}>{ADDRESS_SEP}</Text>}
+        </Text>
+      ))}
+    </Text>
+  )
+}
+
+function SchoolCard({ school, lang, featured, onAction }) {
   const logo = partnerAsset(school.logo_key)
-  const branches = sortedBranches(school).filter(b => REGION_LABEL_KEY[b.region])
+  const { width, fontScale } = useWindowDimensions()
+  const branches = sortedBranches(school).filter(b => EHLIYET_CITY_NAME[b.region])
+  const addressed = branches.filter(b => branchAddress(b))
+  const chipLabels = branchChipLabels(school)
+  const classes = licenceClasses(school)
+  const ig = hasInstagram(school), fb = hasFacebook(school)
+  const social = ig && fb && socialSideBySide(width, fontScale)
+  const igButton = <ActionButton icon="logo-instagram" label={t('ehliyetInstagram', lang)} onPress={() => onAction(school, 'instagram', school.instagram_url)} fg={EHLIYET_DARK} outlined compact={social} />
+  const fbButton = <ActionButton icon="logo-facebook" label={t('ehliyetFacebook', lang)} onPress={() => onAction(school, 'facebook', school.facebook_url)} fg={EHLIYET_DARK} outlined compact={social} />
   return (
     <View style={s.card}>
-      {!!logo && (
+      {logo ? (
         <Image source={logo} resizeMode="contain" style={featured ? s.logo : s.logoSmall}
-          accessibilityIgnoresInvertColors accessibilityLabel={school.name} />
+          accessibilityIgnoresInvertColors accessibilityRole="image" accessibilityLabel={school.name} />
+      ) : (
+        // The logo carries the name (it is in the image); a school without one still needs its name on screen.
+        <Text style={s.nameFallback} accessibilityRole="header">{school.name}</Text>
       )}
-      <Text style={s.name} accessibilityRole="header">{school.name}</Text>
 
-      {branches.length > 0 && (
+      {classes.length > 0 && (
         <View style={s.branchBlock}>
-          <Text style={s.branchLabel}>{t('ehliyetBranches', lang)}</Text>
+          <Text style={s.branchLabel}>{t('ehliyetClasses', lang)}</Text>
           <View style={s.chips}>
-            {branches.map(b => (
-              <View key={b.region} style={s.chip}>
-                <Text style={s.chipText}>{t(REGION_LABEL_KEY[b.region], lang)}</Text>
-              </View>
+            {classes.map(c => (
+              <View key={c} style={s.chip}><Text style={s.chipText}>{c}</Text></View>
             ))}
           </View>
         </View>
       )}
 
+      {branches.length > 0 && (
+        <View style={s.branchBlock}>
+          <Text style={s.branchLabel}>{t('ehliyetBranches', lang)}</Text>
+          <View style={s.chips}>
+            {branches.map((b, i) => (
+              <View key={b.region} style={s.chip}>
+                <Text style={s.chipText}>{chipLabels[i]}</Text>
+              </View>
+            ))}
+          </View>
+          {addressed.map(b => (
+            <TouchableOpacity key={b.region} style={s.addressRow} activeOpacity={press.card}
+              onPress={() => onAction(school, 'maps', mapsSearchUrl(branchAddress(b)))}
+              accessibilityRole="link" accessibilityLabel={`${t('ehliyetMapLabel', lang)}: ${branchAddress(b)}`}>
+              <Ionicons name="location-outline" size={16} color={EHLIYET_DARK} />
+              <AddressText address={branchAddress(b)} style={s.addressText} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       <View style={s.actions}>
-        {(school.phones || []).length > 0 && (
-          <ActionButton icon="call" label={t('ehliyetCall', lang)} onPress={() => onCall(school)} bg={EHLIYET_BRIGHT} fg="#FFFFFF" />
-        )}
-        {hasInstagram(school) && (
-          <ActionButton icon="logo-instagram" label={t('ehliyetInstagram', lang)} onPress={() => onInstagram(school)} fg={EHLIYET_DARK} outlined />
+        {!!primaryPhone(school) && (
+          <ActionButton icon="call" label={t('ehliyetCall', lang)} onPress={() => onAction(school, 'call', telUrl(primaryPhone(school)))} bg={EHLIYET_BRIGHT} fg="#FFFFFF" />
         )}
         {hasWhatsApp(school) && (
-          <ActionButton icon="logo-whatsapp" label={t('ehliyetWhatsApp', lang)} onPress={() => onWhatsApp(school)} bg={EHLIYET_WA} fg="#FFFFFF" />
+          <ActionButton icon="logo-whatsapp" label={t('ehliyetWhatsApp', lang)} onPress={() => onAction(school, 'whatsapp', whatsAppUrl(school))} bg={EHLIYET_WA} fg="#FFFFFF" />
+        )}
+        {social ? (
+          <View style={s.socialRow}>{igButton}{fbButton}</View>
+        ) : (
+          <>{ig && igButton}{fb && fbButton}</>
         )}
       </View>
+
+      {hasEmail(school) && (
+        <TouchableOpacity style={s.emailRow} activeOpacity={press.card}
+          onPress={() => onAction(school, 'email', mailtoUrl(school))}
+          accessibilityRole="link" accessibilityLabel={`${t('ehliyetEmailLabel', lang)}: ${school.email}`}>
+          <Ionicons name="mail-outline" size={16} color={EHLIYET_DARK} />
+          <Text style={s.emailText}>{emailDisplay(school.email)}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   )
 }
 
-function PhoneRow({ phone, onPress }) {
-  return (
-    <TouchableOpacity style={s.phoneRow} onPress={onPress} activeOpacity={press.card}
-      accessibilityRole="link" accessibilityLabel={phone}>
-      <View style={s.phoneIcon}><Ionicons name="call" size={18} color="#FFFFFF" /></View>
-      <Text style={s.phoneText}>{phone}</Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-    </TouchableOpacity>
-  )
-}
-
-export default function EhliyetScreen({ lang, onBack, backRef = null }) {
+export default function EhliyetScreen({ lang, onBack }) {
   const [schools, setSchools] = useState([])
   const [loading, setLoading] = useState(!FROM_FIXTURE)
   const [error, setError]     = useState(false)
-  const [callSchool, setCallSchool] = useState(null)   // kept while the sheet slides out
-  const [callOpen, setCallOpen] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const retry = useCallback(() => { setError(false); setLoading(true); setAttempt(a => a + 1) }, [])
 
@@ -117,19 +161,10 @@ export default function EhliyetScreen({ lang, onBack, backRef = null }) {
     return () => { alive = false }
   }, [attempt])
 
-  // App.js asks this first: true = consumed (the call sheet closed), false = leave the module.
-  useEffect(() => {
-    if (!backRef) return
-    backRef.current = () => { if (callOpen) { setCallOpen(false); return true } return false }
-    return () => { backRef.current = null }
-  })
-
-  const log = (school, action) => { if (shouldLogContact(FROM_FIXTURE)) logContactEvent('ehliyet', school.id, action) }
-  const open = (url) => { Linking.openURL(url).catch(() => {}) }
-  const openCall = (school) => { setCallSchool(school); setCallOpen(true) }
-  const onCallNumber = (phone) => { log(callSchool, 'call'); open(telUrl(phone)) }
-  const onInstagram = (school) => { log(school, 'website'); open(school.instagram_url) }
-  const onWhatsApp = (school) => { log(school, 'whatsapp'); open(whatsAppUrl(school)) }
+  const onAction = (school, action, url) => {
+    if (shouldLogContact(FROM_FIXTURE)) logContactEvent('ehliyet', school.id, action)
+    Linking.openURL(url).catch(() => {})
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -142,16 +177,10 @@ export default function EhliyetScreen({ lang, onBack, backRef = null }) {
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
           {schools.map(sc => (
             <SchoolCard key={sc.id} school={sc} lang={lang} featured={!!sc.featured}
-              onCall={openCall} onInstagram={onInstagram} onWhatsApp={onWhatsApp} />
+              onAction={onAction} />
           ))}
         </ScrollView>
       )}
-
-      <BottomSheet visible={callOpen === true} onClose={() => setCallOpen(false)} title={t('ehliyetCallTitle', lang)} lang={lang}>
-        <View style={s.sheetBody}>
-          {(callSchool?.phones || []).map(p => <PhoneRow key={p} phone={p} onPress={() => onCallNumber(p)} />)}
-        </View>
-      </BottomSheet>
     </SafeAreaView>
   )
 }
@@ -163,7 +192,7 @@ const s = StyleSheet.create({
   card:         { backgroundColor: '#FFFFFF', borderRadius: radii.card, padding: 18, ...elevation.card },
   logo:         { width: '100%', height: 96, marginBottom: 12 },
   logoSmall:    { width: '60%', height: 56, marginBottom: 10 },
-  name:         { ...type.sectionHeading, color: EHLIYET_DARK },
+  nameFallback: { ...type.sectionHeading, color: EHLIYET_DARK },
 
   branchBlock: { marginTop: 14 },
   branchLabel: { ...type.meta, color: colors.textSecondary, marginBottom: 6 },
@@ -176,10 +205,15 @@ const s = StyleSheet.create({
                    alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
   actionOutlined: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: EHLIYET_DARK },
   actionText:    { ...type.rowTitle, flexShrink: 1, textAlign: 'center' },
+  // Instagram + Facebook pair: widths come from socialSideBySide (constants/ehliyet.js); padding and gap mirror SOCIAL_LAYOUT.
+  socialRow:     { flexDirection: 'row', gap: SOCIAL_LAYOUT.gap },
+  actionCompact: { flex: 1, minHeight: 44, paddingHorizontal: SOCIAL_LAYOUT.padX },
+  actionTextCompact: { fontSize: SOCIAL_LABEL_PX },
 
-  sheetBody: { paddingTop: 4, paddingBottom: 8 },
-  phoneRow:  { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 14,
-               borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  phoneIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: EHLIYET_BRIGHT, alignItems: 'center', justifyContent: 'center' },
-  phoneText: { ...type.sheetTitle, color: colors.textPrimary, flex: 1 },
+  addressRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 44, paddingTop: 12 },
+  addressText: { ...type.small, color: EHLIYET_DARK, flex: 1 },
+  underline:   { textDecorationLine: 'underline' },
+  noUnderline: { textDecorationLine: 'none' },
+  emailRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 6 },
+  emailText:   { ...type.small, color: EHLIYET_DARK, flexShrink: 1, textDecorationLine: 'underline' },
 })

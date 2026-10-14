@@ -731,7 +731,6 @@ export default function App() {
   const garagesBackRef = useRef(null)
   const facilityBackRef = useRef(null)
   const towingBackRef = useRef(null)
-  const ehliyetBackRef = useRef(null)
   const liveScoresBackRef = useRef(null)          // LiveScoresScreen: its editor layer
   const liveScoresEditorBackRef = useRef(null)    // admin's editor: fixture/new → list
   const profileGuardRef = useRef(null)
@@ -1085,7 +1084,7 @@ export default function App() {
       if (showGrooming) { if (groomingBackRef.current?.()) return true; setShowGrooming(false); return true }
       // Towing before Garages: Garages opens it on top of itself (slice 10).
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
-      if (showEhliyet) { if (ehliyetBackRef.current?.()) return true; setShowEhliyet(false); return true }
+      if (showEhliyet) { setShowEhliyet(false); return true }
       if (showGarages) { if (garagesBackRef.current?.()) return true; setShowGarages(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
@@ -2474,7 +2473,7 @@ export default function App() {
       : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />
   } else if (showEhliyet && EHLIYET) {
     // Dark module: no ComingSoon fallback (no waitlist). EHLIYET is true only when the flag is live or on dev / ADA Preview.
-    content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} backRef={ehliyetBackRef} />
+    content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.
