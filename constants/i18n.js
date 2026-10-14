@@ -9737,7 +9737,7 @@ const translations = {
     hrGroupCity: "Ville & déplacements",
     spaceHealth: "Pharmacie & urgences",
     spacePickerTitle: "Que voulez-vous faire ?",
-    spacePickerSubtitle: "Choisissez un espace — vous pouvez en changer à tout moment.",
+    spacePickerSubtitle: "Choisissez un espace — changez à tout moment.",
     spaceSwitchA11y: "Changer d'espace",
 
     // Live-strip notice card. See the en block.

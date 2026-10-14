@@ -27,12 +27,14 @@ const GLASS_HIGHLIGHT = 'rgba(255,255,255,0.40)'
 const SUBTITLE_COLOR = 'rgba(255,255,255,0.85)'   // 9.46:1 on PHOTO_TEAL (full white is 12.54:1)
 const PRESS_SCALE = 0.96
 
-function SpaceTile({ id, lang, width, cap, onPress, selected }) {
+function SpaceTile({ id, lang, width, cap, onPress, selected, reduce }) {
   const label = t(SPACE_LABEL_KEY[id], lang)
-  const reduce = useReduceMotion()
   const scale = useRef(new Animated.Value(1)).current
-  // Reduce Motion: no scale animation (the haptic on press stays).
-  const springTo = toValue => { if (!reduce) Animated.spring(scale, { toValue, ...motion.spring, useNativeDriver: true }).start() }
+  // Reduce Motion: no scale animation, and the tile snaps back to 1 (the haptic on press stays).
+  const springTo = toValue => {
+    if (reduce) scale.setValue(1)
+    else Animated.spring(scale, { toValue, ...motion.spring, useNativeDriver: true }).start()
+  }
   return (
     <TouchableOpacity style={[s.tile, selected && s.tileOn, { width, transform: [{ scale }] }]}
       onPress={() => { haptic(); onPress(id) }} onPressIn={() => springTo(PRESS_SCALE)} onPressOut={() => springTo(1)} activeOpacity={press.card}
@@ -58,6 +60,7 @@ function SpaceTile({ id, lang, width, cap, onPress, selected }) {
 // for this app version. `onProfile`: the picker has no tab bar, so this is how a guest reaches Profile.
 export default function SpacePickerScreen({ lang, current = null, onChoose, onShowAll, onProfile, onEmergency }) {
   const insets = useSafeAreaInsets()
+  const reduce = useReduceMotion()
   const { width, height } = useWindowDimensions()
   const compact = height < 640   // small phones: tighter gaps so the grid keeps its room
   const gap = compact ? 10 : 12
@@ -81,12 +84,12 @@ export default function SpacePickerScreen({ lang, current = null, onChoose, onSh
           {t('spacePickerTitle', lang)}
         </Text>
         {showSub && (
-          <Text style={s.subtitle} numberOfLines={2} maxFontSizeMultiplier={cap}>{t('spacePickerSubtitle', lang)}</Text>
+          <Text style={s.subtitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={cap}>{t('spacePickerSubtitle', lang)}</Text>
         )}
         <View style={[s.grid, { gap }]}>
           {rows.map((row, i) => (
             <View key={i} style={[s.row, { gap }]}>
-              {row.map(id => <SpaceTile key={id} id={id} lang={lang} width={tileW} cap={cap} onPress={onChoose} selected={id === current} />)}
+              {row.map(id => <SpaceTile key={id} id={id} lang={lang} width={tileW} cap={cap} onPress={onChoose} selected={id === current} reduce={reduce} />)}
             </View>
           ))}
         </View>
@@ -123,7 +126,7 @@ const s = StyleSheet.create({
   glassOn: { backgroundColor: GLASS_FILL_ON },
   highlight: { position: 'absolute', top: 0, left: radii.widget, right: radii.widget, height: 1, backgroundColor: GLASS_HIGHLIGHT },
   showAll: { flexShrink: 0, minHeight: 44, alignSelf: 'center', paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  showAllOn: { backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 2, borderColor: colors.onPrimary, borderRadius: radii.card },
+  showAllOn: { backgroundColor: GLASS_FILL_ON, borderWidth: 2, borderColor: colors.onPrimary, borderRadius: radii.widget },
   showAllText: { ...type.rowTitle, color: colors.onPrimary, textDecorationLine: 'underline', textAlign: 'center' },
   inner: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   img:   { width: '100%', aspectRatio: 1.1, maxHeight: 150, flexShrink: 1, minHeight: 0 },
