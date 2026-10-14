@@ -18,6 +18,7 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import { HOME_LAB_DEV } from '../constants/homeLab'
 import { REDESIGN, DUYURULAR } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -990,6 +991,14 @@ export default function HomeScreen({
             <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
+
+        {/* Dev-only variant switcher (agent/home-lab). The literal __DEV__ comes first: Metro folds
+            it in THIS file before collecting dependencies, so a release bundle drops the require
+            (HOME_LAB_DEV read through an import is not folded early enough). */}
+        {__DEV__ && HOME_LAB_DEV && (() => {
+          const HomeLabPicker = require('../components/home/redesign/HomeLabPicker').default
+          return <HomeLabPicker tabFootprint={tabFootprint} />
+        })()}
 
         {/* The solid strip under the status bar once the photo is gone. */}
         {overCanvas && <View pointerEvents="none" style={[s.rStatusStrip, { height: insets.top }]} />}
