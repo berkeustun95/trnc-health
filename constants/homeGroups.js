@@ -103,7 +103,7 @@ export function spaceIds(unlocked) { return liveGroups(unlocked).map(g => g.key)
 
 // One source for the picker tile and the in-space top-bar control. Health has its own neutral
 // label (`spaceHealth`): the panel title says "Health", which the store listing may not.
-export const SPACE_ICON = { health: 'medkit-outline', explore: 'compass-outline', homeLife: 'home-outline', city: 'business-outline', all: 'apps-outline' }
+export const SPACE_ICON = { health: 'shield-outline', explore: 'compass-outline', homeLife: 'home-outline', city: 'business-outline', all: 'apps-outline' }
 // Mascot art for the picker tiles. City has no transport/town art; the arriving-with-a-suitcase scene
 // stands in (it is also the accommodation module's art) until a city scene exists. assets/mascots/* are
 // not all transparent; check alpha before using one on teal.

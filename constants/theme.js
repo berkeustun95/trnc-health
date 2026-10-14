@@ -241,15 +241,60 @@ export const category = {
   city:     { bg: '#E7EEFB', ink: '#2F55B5' },   // Şehir & Ulaşım
 }
 
-// Inter only, and only the four registered weights. Every role carries its family, so a
+// App spaces ("worlds"): one hue per space id of constants/homeGroups.js spaceIds(). Deliberately NOT
+// `category` above (that one is the module-identity pastel set; its health is a rose red, which the
+// spaces UI must never use for Health). Directions: health teal-mint (never red, never a success
+// green), explore sand-amber, homeLife soft sky, city dusk violet.
+//   glow  tint of the static glow behind the mascot on PHOTO_TEAL (picker tiles, slice A1)
+//   rail  a bar/stripe/dot colour for bgWarm (#FAFAF8) surfaces (slice A3; non-text, needs >= 3:1)
+//   ink   text/icon colour for bgWarm surfaces (A3)
+// MEASURED (throwaway scripts, not in the repo; sRGB WCAG luminance):
+//  - rail vs bgWarm: health 4.43, explore 3.81, homeLife 4.20, city 5.70 (all >= 3:1);
+//    ink vs bgWarm: 7.37 / 7.16 / 7.66 / 9.60.
+//  - White label on a tile at the label position: PHOTO_TEAL + the glass fill (white 0.08) = 9.92:1;
+//    the selected fill (white 0.20) = 6.84:1 (both >= 4.5). The glow sits only inside the mascot box and
+//    the PNG's alpha is 0 at its edge, so it never reaches the label. Worst case if its PEAK alpha
+//    (107/255) did sit under the label, glass fill only: health 4.09, explore 4.63, homeLife 4.29,
+//    city 6.69, i.e. a glow must never be moved under the label.
+//  - Colour-vision safety, CIE76 delta-E between the four colours (Machado 2009, severity 1.0; 5 or more
+//    is distinguishable side by side, 20+ is clearly apart). glow, pairwise minimum: normal 57.8,
+//    protan 45.1, deutan 38.0 (homeLife/city), tritan 12.5 (health/homeLife). Health vs explore and
+//    health vs city, the pairs that must never collide: glow 45.5 / 91.1 (protan), 54.5 / 76.0 (deutan),
+//    87.2 / 66.2 (tritan); rail 45.3 / 80.4, 58.5 / 70.5, 80.2 / 42.7. rail pairwise minimum: normal
+//    51.8, protan 37.8, deutan 28.3, tritan 9.4 (health/homeLife). The two blue-green pairs are the weak
+//    spot under tritan, so a world is never told apart by colour alone: every tile keeps its own
+//    label and mascot.
+export const worldColors = {
+  health:   { glow: '#4FE3B8', rail: '#12846B', ink: '#0B5E4F' },
+  explore:  { glow: '#F2B04A', rail: '#B86E00', ink: '#7A4A00' },
+  homeLife: { glow: '#7CCBFF', rail: '#1F7FB8', ink: '#13557D' },
+  city:     { glow: '#9A5CF0', rail: '#7B3FD6', ink: '#52239E' },
+}
+
+// Inter for every UI role, and only the four registered weights. Every role carries its family, so a
 // weight can never be set without one (a bare fontWeight renders in the system font on
-// Android — 109 such styles found by the 2026-09 audit).
+// Android — 109 such styles found by the 2026-09 audit). Playfair Display is DISPLAY-ONLY
+// (`fontDisplay` below), never a `type` role.
 export const font = {
   regular:  'Inter_400Regular',
   medium:   'Inter_500Medium',
   semibold: 'Inter_600SemiBold',
   bold:     'Inter_700Bold',
 }
+
+// Display serif for a few big titles (App.js:22-23 imports the two weights, App.js:499 registers them;
+// WelcomeScreen's tagline already uses the regular one). Glyph coverage MEASURED from the shipped TTFs
+// (cmap of PlayfairDisplay_400Regular / _700Bold, identical, 659 code points): Latin incl. Turkish
+// (ş ğ ı İ ç ö ü), French, Spanish (¿ ¡), German and Cyrillic are fully covered; Greek has 3 of 33 test
+// letters, Arabic 0/13 and Persian 0/17. A missing glyph falls back per character to a system font and
+// looks broken, so a screen uses `fontDisplayFor(lang)`, which returns null for those three languages
+// (the caller keeps its Inter type role). Languages are the full English names, as everywhere.
+export const fontDisplay = {
+  bold:    'PlayfairDisplay_700Bold',
+  regular: 'PlayfairDisplay_400Regular',
+}
+const DISPLAY_UNCOVERED_LANGS = ['Greek', 'Arabic', 'Persian']
+export const fontDisplayFor = lang => (DISPLAY_UNCOVERED_LANGS.includes(lang) ? null : fontDisplay)
 
 export const type = {
   caption:        { fontSize: 11, lineHeight: 14, fontFamily: font.medium },

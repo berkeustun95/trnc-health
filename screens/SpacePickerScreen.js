@@ -1,12 +1,15 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
+import { useRef } from 'react'
+import { View, Text, Image, TouchableOpacity, Animated, StyleSheet, useWindowDimensions } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { colors, type, radii, press } from '../constants/theme'
+import { colors, type, radii, press, motion, worldColors, fontDisplayFor } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { spaceIds, SPACE_SCENE, SPACE_LABEL_KEY } from '../constants/homeGroups'
 import { Button, IconButton } from '../components/ui'
 import { PHOTO_TEAL, CONTENT_MAX_W } from '../components/ui/PhotoFade'
 import { bandCap } from '../components/ui/OliBand'
+import { haptic } from '../components/ui/haptics'
+import useReduceMotion from '../components/ui/useReduceMotion'
 
 // ─── App spaces: the full-screen picker (HOME_SPACES_LIVE) ───────────────────
 // A 2x2 grid of equal glass tiles on the onboarding teal (PHOTO_TEAL), one per LIVE home group, each
@@ -15,13 +18,34 @@ import { bandCap } from '../components/ui/OliBand'
 // may not. No tab bar: App.js renders this in place of the tab shell until a space is chosen.
 const PAD = 20
 
+// Glass tile: a light white veil, a hairline border, and a 1px top highlight (inside the rounded clip).
+// Alphas are tuned so white labels keep >= 4.5:1 (measured numbers in constants/theme.js `worldColors`).
+const GLASS_FILL = 'rgba(255,255,255,0.08)'
+const GLASS_FILL_ON = 'rgba(255,255,255,0.20)'   // selected: 6.84:1 for the white label (0.28 was 5.35)
+const GLASS_BORDER = 'rgba(255,255,255,0.22)'
+const GLASS_HIGHLIGHT = 'rgba(255,255,255,0.40)'
+const SUBTITLE_COLOR = 'rgba(255,255,255,0.85)'   // 9.46:1 on PHOTO_TEAL (full white is 12.54:1)
+const PRESS_SCALE = 0.96
+
 function SpaceTile({ id, lang, width, cap, onPress, selected }) {
   const label = t(SPACE_LABEL_KEY[id], lang)
+  const reduce = useReduceMotion()
+  const scale = useRef(new Animated.Value(1)).current
+  // Reduce Motion: no scale animation (the haptic on press stays).
+  const springTo = toValue => { if (!reduce) Animated.spring(scale, { toValue, ...motion.spring, useNativeDriver: true }).start() }
   return (
-    <TouchableOpacity style={[s.tile, selected && s.tileOn, { width }]} onPress={() => onPress(id)} activeOpacity={press.card}
+    <TouchableOpacity style={[s.tile, selected && s.tileOn, { width, transform: [{ scale }] }]}
+      onPress={() => { haptic(); onPress(id) }} onPressIn={() => springTo(PRESS_SCALE)} onPressOut={() => springTo(1)} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!selected }}>
+      <View style={[s.glass, selected && s.glassOn]} pointerEvents="none" />
+      <View style={s.highlight} pointerEvents="none" />
       <View style={s.inner}>
-        <Image source={SPACE_SCENE[id]} style={s.img} resizeMode="contain" accessible={false} accessibilityIgnoresInvertColors />
+        {/* Static glow behind the mascot only (never the label): the white PNG is tinted per space. */}
+        <View style={s.img}>
+          <Image source={require('../assets/oli-scenes/oli-glow.png')} style={[s.fill, { tintColor: worldColors[id].glow }]}
+            resizeMode="contain" accessible={false} pointerEvents="none" accessibilityIgnoresInvertColors />
+          <Image source={SPACE_SCENE[id]} style={s.fill} resizeMode="contain" accessible={false} accessibilityIgnoresInvertColors />
+        </View>
         <View style={s.labelWrap}>
           <Text style={s.label} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>{label}</Text>
         </View>
@@ -38,6 +62,8 @@ export default function SpacePickerScreen({ lang, current = null, onChoose, onSh
   const compact = height < 640   // small phones: tighter gaps so the grid keeps its room
   const gap = compact ? 10 : 12
   const cap = bandCap(width)
+  const display = fontDisplayFor(lang)   // null where Playfair lacks the script (Greek, Arabic, Persian)
+  const showSub = !compact               // small phones keep the room for the grid
   const tileW = (Math.min(width, CONTENT_MAX_W) - PAD * 2 - gap) / 2
   const ids = spaceIds()
   const rows = []
@@ -50,10 +76,13 @@ export default function SpacePickerScreen({ lang, current = null, onChoose, onSh
           <IconButton icon="person-circle-outline" variant="frosted" onPress={onProfile} iconSize={24}
             accessibilityLabel={t('tabProfile', lang)} style={[s.profile, { top: insets.top + (compact ? 2 : 8) }]} />
         )}
-        <Text style={[s.title, { marginBottom: compact ? 16 : 20 }]} accessibilityRole="header" numberOfLines={2}
-          adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>
+        <Text style={[s.title, display && { ...type.display, fontFamily: display.bold }, { marginBottom: showSub ? 8 : 16 }]}
+          accessibilityRole="header" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>
           {t('spacePickerTitle', lang)}
         </Text>
+        {showSub && (
+          <Text style={s.subtitle} numberOfLines={2} maxFontSizeMultiplier={cap}>{t('spacePickerSubtitle', lang)}</Text>
+        )}
         <View style={[s.grid, { gap }]}>
           {rows.map((row, i) => (
             <View key={i} style={[s.row, { gap }]}>
@@ -85,14 +114,20 @@ const s = StyleSheet.create({
   profile: { position: 'absolute', right: PAD, zIndex: 1 },
   grid:  { flex: 1 },
   row:   { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  tile:  { backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
-           borderRadius: radii.card, padding: 12, alignItems: 'center' },
-  tileOn: { backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 2, borderColor: colors.onPrimary, padding: 11 },
+  subtitle: { ...type.body, color: SUBTITLE_COLOR, textAlign: 'center', flexShrink: 0, paddingHorizontal: 24, marginBottom: 20 },
+  // transparent + overflow hidden: the glass fill is its own child, so borderRadius + borderWidth never render opaque on Android.
+  tile:  { backgroundColor: 'transparent', borderWidth: 1, borderColor: GLASS_BORDER, borderRadius: radii.widget,
+           overflow: 'hidden', padding: 12, alignItems: 'center' },
+  tileOn: { borderWidth: 2, borderColor: colors.onPrimary, padding: 11 },
+  glass: { ...StyleSheet.absoluteFillObject, backgroundColor: GLASS_FILL },
+  glassOn: { backgroundColor: GLASS_FILL_ON },
+  highlight: { position: 'absolute', top: 0, left: radii.widget, right: radii.widget, height: 1, backgroundColor: GLASS_HIGHLIGHT },
   showAll: { flexShrink: 0, minHeight: 44, alignSelf: 'center', paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   showAllOn: { backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 2, borderColor: colors.onPrimary, borderRadius: radii.card },
   showAllText: { ...type.rowTitle, color: colors.onPrimary, textDecorationLine: 'underline', textAlign: 'center' },
   inner: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   img:   { width: '100%', aspectRatio: 1.1, maxHeight: 150, flexShrink: 1, minHeight: 0 },
+  fill:  { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   labelWrap: { flexShrink: 0, minHeight: 40, justifyContent: 'center', marginTop: 8 },
   label: { ...type.rowTitle, color: colors.onPrimary, textAlign: 'center' },
   footer: { flexShrink: 0, paddingTop: 12 },

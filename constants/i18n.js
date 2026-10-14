@@ -186,6 +186,7 @@ const translations = {
     hrGroupCity: "City & getting around",
     spaceHealth: "Pharmacy & Emergency",
     spacePickerTitle: "What would you like to do?",
+    spacePickerSubtitle: "Pick a space — you can switch any time.",
     spaceSwitchA11y: "Switch space",
 
     // The what's-new notice card in the live strip (20261043). TITLE ONLY — the
@@ -2250,6 +2251,7 @@ const translations = {
     hrGroupCity: "Şehir ve Ulaşım",
     spaceHealth: "Eczane & Acil",
     spacePickerTitle: "Ne yapmak istersin?",
+    spacePickerSubtitle: "Bir alan seç — istediğin zaman değiştirebilirsin.",
     spaceSwitchA11y: "Alan değiştir",
 
     // Live-strip notice card. See the en block.
@@ -4285,6 +4287,7 @@ const translations = {
     hrGroupCity: "المدينة والتنقل",
     spaceHealth: "الصيدلية والطوارئ",
     spacePickerTitle: "ماذا تريد أن تفعل؟",
+    spacePickerSubtitle: "اختر قسمًا — يمكنك التبديل في أي وقت.",
     spaceSwitchA11y: "تغيير القسم",
 
     // Live-strip notice card. See the en block.
@@ -6100,6 +6103,7 @@ const translations = {
     hrGroupCity: "Город и транспорт",
     spaceHealth: "Аптеки и экстренные службы",
     spacePickerTitle: "Что хотите сделать?",
+    spacePickerSubtitle: "Выберите раздел — его можно сменить в любое время.",
     spaceSwitchA11y: "Сменить раздел",
 
     // Live-strip notice card. See the en block.
@@ -7923,6 +7927,7 @@ const translations = {
     hrGroupCity: "Πόλη & μετακίνηση",
     spaceHealth: "Φαρμακεία & Έκτακτα",
     spacePickerTitle: "Τι θέλετε να κάνετε;",
+    spacePickerSubtitle: "Επιλέξτε χώρο — μπορείτε να αλλάξετε οποτεδήποτε.",
     spaceSwitchA11y: "Αλλαγή χώρου",
 
     // Live-strip notice card. See the en block.
@@ -9732,6 +9737,7 @@ const translations = {
     hrGroupCity: "Ville & déplacements",
     spaceHealth: "Pharmacie & urgences",
     spacePickerTitle: "Que voulez-vous faire ?",
+    spacePickerSubtitle: "Choisissez un espace — vous pouvez en changer à tout moment.",
     spaceSwitchA11y: "Changer d'espace",
 
     // Live-strip notice card. See the en block.
@@ -11545,6 +11551,7 @@ const translations = {
     hrGroupCity: "Ciudad y transporte",
     spaceHealth: "Farmacia y urgencias",
     spacePickerTitle: "¿Qué quieres hacer?",
+    spacePickerSubtitle: "Elige un espacio — puedes cambiar cuando quieras.",
     spaceSwitchA11y: "Cambiar de espacio",
 
     // Live-strip notice card. See the en block.
@@ -13355,6 +13362,7 @@ const translations = {
     hrGroupCity: "Stadt & Unterwegs",
     spaceHealth: "Apotheke & Notruf",
     spacePickerTitle: "Was möchtest du tun?",
+    spacePickerSubtitle: "Wähle einen Bereich — du kannst jederzeit wechseln.",
     spaceSwitchA11y: "Bereich wechseln",
 
     // Live-strip notice card. See the en block.
@@ -15165,6 +15173,7 @@ const translations = {
     hrGroupCity: "شهر و رفت‌وآمد",
     spaceHealth: "داروخانه و اورژانس",
     spacePickerTitle: "چه کاری می‌خواهید انجام دهید؟",
+    spacePickerSubtitle: "یک بخش را انتخاب کنید — هر زمان می‌توانید تغییر دهید.",
     spaceSwitchA11y: "تغییر بخش",
 
     // Live-strip notice card. See the en block.
