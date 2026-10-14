@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo } from 'react'
 import { View, Text, Image, TouchableOpacity, Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { colors, type, radii, press, motion, worldColors, fontDisplayFor } from '../constants/theme'
+import { colors, type, radii, press, motion, worldColors, fontDisplayFor, font } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { spaceIds, SPACE_SCENE, SPACE_LABEL_KEY } from '../constants/homeGroups'
 import { Button, IconButton } from '../components/ui'
@@ -49,6 +49,34 @@ const AMBIENT_SIZE = 1.4         // x screen width
 // assumed PNG alpha of 1.0 the worst case is 4.69:1.
 const AMBIENT_OPACITY = { health: 0.14, explore: 0.14, homeLife: 0.14, city: 0.20 }
 const STEPS = 24                 // keyframes per cycle
+const BOB_DP = 3                 // mascot idle bob (translateY +-), trailing the glow by BOB_LAG of a period
+const BOB_LAG = 0.15
+// Entrance (one native 0 -> 1 value, no loop): the header block fades in, then each tile fades + rises, staggered.
+const HEAD_MS = 240
+const TILE_MS = 220
+const TILE_STAGGER_MS = 60
+const TILE_RISE_DP = 12
+const EASE_OUT = Easing.out(Easing.cubic)
+const EASE_STEPS = 8
+
+// `value` 0 -> 1 mapped over [a, b] with ease-out-cubic, as sampled keyframes: the native driver ignores an
+// interpolation's `easing` function, but it runs plain inputRange/outputRange natively.
+function easedRange(value, a, b, from, to) {
+  const input = [], output = []
+  for (let k = 0; k <= EASE_STEPS; k++) {
+    input.push(a + (b - a) * (k / EASE_STEPS))
+    output.push(from + (to - from) * EASE_OUT(k / EASE_STEPS))
+  }
+  return value.interpolate({ inputRange: input, outputRange: output, extrapolate: 'clamp' })
+}
+
+// Time-of-day greeting key from the device's local hour.
+function greetKey(hour) {
+  if (hour >= 5 && hour < 12) return 'spaceGreetMorning'
+  if (hour >= 12 && hour < 18) return 'spaceGreetAfternoon'
+  if (hour >= 18 && hour < 23) return 'spaceGreetEvening'
+  return 'spaceGreetNight'
+}
 
 // Linear 0->1 loop on the native thread while `running`; stops on pause/unmount. It always restarts from 0:
 // a native loop captures its from-value once and replays from->1 every lap, so resuming mid-cycle (e.g. 0.6)
@@ -99,21 +127,35 @@ function AmbientGlows({ idA, idB, width, running, reduce }) {
   )
 }
 
-function SpaceTile({ id, index, lang, width, cap, onPress, selected, reduce, clock }) {
+function SpaceTile({ id, index, lang, width, cap, onPress, selected, reduce, clock, enter, enterMs }) {
   const label = t(SPACE_LABEL_KEY[id], lang)
   const scale = useRef(new Animated.Value(1)).current
   const glowStyle = useMemo(() => reduce
     ? { opacity: GLOW_FROZEN_OPACITY }
     : { opacity: breathe(clock, ...GLOW_OPACITY, index * BREATH_PHASE), transform: [{ scale: breathe(clock, ...GLOW_SCALE, index * BREATH_PHASE) }] },
   [clock, index, reduce])
+  // Mascot idle bob from the same breath clock, a little behind the glow. Frozen under Reduce Motion.
+  const bobStyle = useMemo(() => reduce ? null
+    : { transform: [{ translateY: breathe(clock, -BOB_DP, BOB_DP, index * BREATH_PHASE + BOB_LAG) }] },
+  [clock, index, reduce])
+  // Entrance: this tile's slice of the shared `enter` value (a wrapper, so it never fights the press scale).
+  const enterStyle = useMemo(() => {
+    const a = (index * TILE_STAGGER_MS) / enterMs, b = (index * TILE_STAGGER_MS + TILE_MS) / enterMs
+    return {
+      opacity: easedRange(enter, a, b, 0, 1),
+      transform: [{ translateY: easedRange(enter, a, b, TILE_RISE_DP, 0) }],
+    }
+  }, [enter, enterMs, index])
   // Reduce Motion: no scale animation, and the tile snaps back to 1 (the haptic on press stays).
   const springTo = toValue => {
     if (reduce) scale.setValue(1)
     else Animated.spring(scale, { toValue, ...motion.spring, useNativeDriver: true }).start()
   }
   return (
-    <TouchableOpacity style={[s.tile, selected && s.tileOn, { width, transform: [{ scale }] }]}
-      onPress={() => { haptic(); onPress(id) }} onPressIn={() => springTo(PRESS_SCALE)} onPressOut={() => springTo(1)} activeOpacity={press.card}
+    <Animated.View style={[{ width }, enterStyle]}>
+    <TouchableOpacity style={[s.tile, selected && s.tileOn, { flex: 1, transform: [{ scale }] }]}
+      // The touch point seeds the colour bloom; an accessibility activation has none (SpaceWash centres it).
+      onPress={e => { haptic(); onPress(id, { x: e?.nativeEvent?.pageX, y: e?.nativeEvent?.pageY, reduce }) }} onPressIn={() => springTo(PRESS_SCALE)} onPressOut={() => springTo(1)} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!selected }}>
       <View style={[s.glass, selected && s.glassOn]} pointerEvents="none" />
       <View style={s.highlight} pointerEvents="none" />
@@ -122,13 +164,14 @@ function SpaceTile({ id, index, lang, width, cap, onPress, selected, reduce, clo
         <View style={s.img}>
           <Animated.Image source={GLOW} style={[s.fill, { tintColor: worldColors[id].glow }, glowStyle]}
             resizeMode="contain" accessible={false} pointerEvents="none" accessibilityIgnoresInvertColors />
-          <Image source={SPACE_SCENE[id]} style={s.fill} resizeMode="contain" accessible={false} accessibilityIgnoresInvertColors />
+          <Animated.Image source={SPACE_SCENE[id]} style={[s.fill, bobStyle]} resizeMode="contain" accessible={false} accessibilityIgnoresInvertColors />
         </View>
         <View style={s.labelWrap}>
           <Text style={s.label} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>{label}</Text>
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   )
 }
 
@@ -148,6 +191,19 @@ export default function SpacePickerScreen({ lang, current = null, onChoose, onSh
   const showSub = !compact               // small phones keep the room for the grid
   const tileW = (Math.min(width, CONTENT_MAX_W) - PAD * 2 - gap) / 2
   const ids = spaceIds()
+  // Entrance: one value over the header + staggered tiles; under Reduce Motion it is simply 1 (final values).
+  const enter = useRef(new Animated.Value(0)).current
+  const enterMs = TILE_MS + TILE_STAGGER_MS * Math.max(ids.length - 1, 0)
+  useEffect(() => {
+    if (reduce) { enter.setValue(1); return }
+    enter.setValue(0)
+    const a = Animated.timing(enter, { toValue: 1, duration: enterMs, easing: Easing.linear, useNativeDriver: true })
+    a.start()
+    return () => a.stop()
+  }, [reduce, enterMs])
+  const headStyle = useMemo(() => ({
+    opacity: easedRange(enter, 0, HEAD_MS / enterMs, 0, 1),
+  }), [enter, enterMs])
   const rows = []
   for (let i = 0; i < ids.length; i += 2) rows.push(ids.slice(i, i + 2))
   const ambA = worldColors[current] ? current : 'health'
@@ -161,6 +217,10 @@ export default function SpacePickerScreen({ lang, current = null, onChoose, onSh
           <IconButton icon="person-circle-outline" variant="frosted" onPress={onProfile} iconSize={24}
             accessibilityLabel={t('tabProfile', lang)} style={[s.profile, { top: insets.top + (compact ? 2 : 8) }]} />
         )}
+        <Animated.View style={[s.head, headStyle]}>
+        {showSub && (
+          <Text style={s.greet} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={cap}>{t(greetKey(new Date().getHours()), lang)}</Text>
+        )}
         <Text style={[s.title, display && { ...type.display, fontFamily: display.bold }, { marginBottom: showSub ? 8 : 16 }]}
           accessibilityRole="header" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={cap}>
           {t('spacePickerTitle', lang)}
@@ -168,10 +228,11 @@ export default function SpacePickerScreen({ lang, current = null, onChoose, onSh
         {showSub && (
           <Text style={s.subtitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={cap}>{t('spacePickerSubtitle', lang)}</Text>
         )}
+        </Animated.View>
         <View style={[s.grid, { gap }]}>
           {rows.map((row, i) => (
             <View key={i} style={[s.row, { gap }]}>
-              {row.map((id, j) => <SpaceTile key={id} id={id} index={i * 2 + j} clock={breath} lang={lang} width={tileW} cap={cap} onPress={onChoose} selected={id === current} reduce={reduce} />)}
+              {row.map((id, j) => <SpaceTile key={id} id={id} index={i * 2 + j} clock={breath} enter={enter} enterMs={enterMs} lang={lang} width={tileW} cap={cap} onPress={onChoose} selected={id === current} reduce={reduce} />)}
             </View>
           ))}
         </View>
@@ -199,6 +260,8 @@ const s = StyleSheet.create({
   profile: { position: 'absolute', right: PAD, zIndex: 1 },
   grid:  { flex: 1 },
   row:   { flex: 1, flexDirection: 'row', justifyContent: 'center' },
+  head:  { flexShrink: 0 },
+  greet: { ...type.meta, fontFamily: font.semibold, color: SUBTITLE_COLOR, textAlign: 'center', marginBottom: 4 },
   subtitle: { ...type.body, color: SUBTITLE_COLOR, textAlign: 'center', flexShrink: 0, paddingHorizontal: 24, marginBottom: 20 },
   // transparent + overflow hidden: the glass fill is its own child, so borderRadius + borderWidth never render opaque on Android.
   tile:  { backgroundColor: 'transparent', borderWidth: 1, borderColor: GLASS_BORDER, borderRadius: radii.widget,

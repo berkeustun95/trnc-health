@@ -4,3 +4,8 @@ import * as Haptics from 'expo-haptics'
 export function haptic() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
 }
+
+// Selection tick: a state change that already happened (a space committed at the colour peak).
+export function hapticSelect() {
+  Haptics.selectionAsync().catch(() => {})
+}

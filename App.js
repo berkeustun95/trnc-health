@@ -24,11 +24,12 @@ import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
-import { haptic } from './components/ui/haptics'
+import { haptic, hapticSelect } from './components/ui/haptics'
+import SpaceWash from './components/ui/SpaceWash'
 import { supabase, isGuest } from './lib/supabase'
 import { fetchNotifications } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
-import { colors, typeColors, shadow } from './constants/theme'
+import { colors, typeColors, shadow, worldColors } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
@@ -520,6 +521,8 @@ export default function App() {
   const [activeSpace, setActiveSpace] = useState(undefined)
   // The space (or 'all') the user left for the picker; the picker marks it and back returns to it.
   const [lastSpace, setLastSpace] = useState(null)
+  // The colour bloom between picker and space: { key, origin, color, reduce, epoch } while it runs, else null.
+  const [spaceWash, setSpaceWash] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   // Redesign: can the OS still ask? false = permanently denied → the screens offer "Ayarları aç";
@@ -1018,8 +1021,20 @@ export default function App() {
     setActiveSpace(prev => prev === null ? k : prev)
   }
 
-  const chooseSpace = key => {
-    haptic()
+  // Picking a space plays the colour wash (components/ui/SpaceWash); the space COMMITS at its peak, when the
+  // picker is fully covered. The light tap already fired on the tile; the selection tick fires at the peak.
+  // `origin` = { x, y, reduce } from the tile (x/y may be missing for an accessibility activation). A second
+  // pick while a wash runs is ignored (the wash also blocks touches). A SIGNED_OUT bumps spaceEpochRef, so a
+  // wash that peaks after a sign-out commits nothing. A hardware back during the ~600 ms may run the picker's
+  // back; the peak commit still wins, which is acceptable for a pick the user just made.
+  const chooseSpace = (key, origin) => {
+    if (spaceWash) return
+    const color = worldColors[key]?.glow
+    if (!color) { commitSpace(key); return }
+    setSpaceWash({ key, origin, color, reduce: origin?.reduce, epoch: spaceEpochRef.current })
+  }
+  const commitSpace = key => {
+    hapticSelect()
     forgetScroll('home:hub')
     setActiveSpace(key)
     AsyncStorage.setItem('@ada_space', key).catch(() => {})
@@ -3042,6 +3057,12 @@ export default function App() {
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
       </View>
+      {/* App spaces colour bloom: above `content`, below the notice / sheets. Final return, like them. */}
+      {spaceWash && (
+        <SpaceWash color={spaceWash.color} origin={spaceWash.origin} reduce={spaceWash.reduce}
+          onPeak={() => { if (spaceWash.epoch === spaceEpochRef.current) commitSpace(spaceWash.key) }}
+          onDone={() => setSpaceWash(null)} />
+      )}
       {/* ⚠ RENDERED HERE, in the final return, never inside `content`. The content selector
           runs BEFORE policyNoticeVisible / dismissPolicyNotice are assigned below it; Hermes
           does not enforce the temporal dead zone, so inside `content` they read UNDEFINED —
