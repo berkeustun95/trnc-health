@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, Image, Animated, Easing, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type } from '../../../constants/theme'
@@ -10,6 +10,10 @@ import { weatherGroup, weatherLabelKey } from '../../../utils/facilityUtils'
 import { IconButton } from '../../ui'
 import HeroCreditSheet from '../HeroCreditSheet'
 import { rampLayers } from '../HomeHero'
+import { useHomeLab } from '../../../constants/homeLab'
+import useReduceMotion from '../../ui/useReduceMotion'
+import HeroAtmosphere from './HeroAtmosphere'
+import useDayPart from './useDayPart'
 
 // The district photograph: ADA wordmark + frosted bell, and one row at the bottom — the
 // district chip with its photo-credit "i" on the left, the weather chip on the right (Home v3:
@@ -55,6 +59,10 @@ const WEATHER_ION = {
   drizzle: 'rainy', rain: 'rainy', snow: 'snow', showers: 'rainy', thunder: 'thunderstorm',
 }
 
+// Daylight: one slow push-in on the photo, once per photo (never looped).
+const DRIFT_TO = 1.04
+const DRIFT_MS = 12000
+
 export const heroHeight = insetTop => Math.max(HERO_TOTAL, insetTop + HERO_MIN_BODY)
 
 export default function RedesignHero({
@@ -76,9 +84,25 @@ export default function RedesignHero({
   const cond = condKey ? t(condKey === 'weatherPartlyCloudy' ? 'hrWxPartlyTile' : condKey, lang) : null
   const tappable = !!placeId
 
+  const lab = useHomeLab()
+  const reduce = useReduceMotion()
+  const part = useDayPart(lab.daylight)
+  const drift = lab.daylight && !reduce
+  const scale = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    if (!drift) return undefined
+    scale.setValue(1)
+    const anim = Animated.timing(scale, { toValue: DRIFT_TO, duration: DRIFT_MS, easing: Easing.out(Easing.quad), useNativeDriver: true })
+    anim.start()
+    return () => anim.stop()
+  }, [drift, source])
+
   const body = (
     <View style={StyleSheet.absoluteFill}>
-      <Image source={source} style={s.photo} resizeMode="cover" fadeDuration={0} />
+      {drift
+        ? <Animated.Image source={source} style={[s.photo, { transform: [{ scale }] }]} resizeMode="cover" fadeDuration={0} />
+        : <Image source={source} style={s.photo} resizeMode="cover" fadeDuration={0} />}
+      {lab.daylight && <HeroAtmosphere part={part} wxGroup={weatherGroup(cur?.symbol)} />}
       {TOP.map((a, i) => (
         <View key={`t${i}`} pointerEvents="none"
           style={[s.band, { top: 0, height: (height * 0.45 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />

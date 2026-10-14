@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, AppState, AccessibilityInfo, useWindowDimensions } from 'react-native'
+import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { radii, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
+import useReduceMotion from '../../ui/useReduceMotion'
+import useForeground from '../../ui/useForeground'
+import { useHomeLab } from '../../../constants/homeLab'
+import { OLI_GLOW_TINT } from '../../../constants/dayParts'
+import useDayPart from './useDayPart'
 
 // ─── The Oli bar, "full scene" (Home v3, option B) ───────────────────────────
 // One card; the rotating Oli & Maki scene fills it, the text sits on a deep-teal fade on the
@@ -63,26 +68,6 @@ const HOLD = 4000
 const FADE = 600
 const ZOOM = 1.05
 
-function useReduceMotion() {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    let alive = true
-    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
-    return () => { alive = false; sub?.remove?.() }
-  }, [])
-  return on
-}
-
-function useForeground() {
-  const [fg, setFg] = useState(AppState.currentState === 'active')
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', st => setFg(st === 'active'))
-    return () => sub.remove()
-  }, [])
-  return fg
-}
-
 // Right-anchored in the art zone, feet on the bottom edge, never wider than the zone.
 function frame(src, cardW) {
   const { width, height } = Image.resolveAssetSource(src)
@@ -98,6 +83,8 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
   const cap = winW < 350 ? OLI_FONT_CAP_NARROW : OLI_FONT_CAP
   const reduce = useReduceMotion()
   const fg = useForeground()
+  const lab = useHomeLab()
+  const part = useDayPart(lab.daylight)
   const running = active && fg && !reduce
   const [idx, setIdx] = useState(0)
   const opacity = useRef(SCENES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current
@@ -125,7 +112,8 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
       accessibilityRole="button" accessibilityLabel={`${title}. ${pill}`} style={s.card}>
       <Image source={BG} resizeMode="stretch" pointerEvents="none" style={s.fill} />
       <Image source={GLOW} pointerEvents="none" style={[s.glow, {
-        left: cardW * GLOW_CX - GLOW_SIZE / 2, top: OLI_BAR_H * GLOW_CY - GLOW_SIZE / 2 }]} />
+        left: cardW * GLOW_CX - GLOW_SIZE / 2, top: OLI_BAR_H * GLOW_CY - GLOW_SIZE / 2 }]}
+        {...(lab.daylight ? { tintColor: OLI_GLOW_TINT[part] } : null)} />
       {SCENES.map((src, i) => (
         <Animated.Image key={i} source={src} resizeMode="contain" accessibilityIgnoresInvertColors pointerEvents="none"
           style={[frame(src, cardW), { opacity: opacity[i], transform: [{ scale: scale[i] }] }]} />
