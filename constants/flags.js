@@ -629,6 +629,7 @@ export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 // for any operator name in any vowel class:
 //     connCtaPrimary  "{operator} ile devam et"
 //     connStep1Body   "Seçiminiz {operator} ile paylaşılır."
+// (Both since reworded for the callback form, 2026-10-14, still with no suffix on {operator}.)
 //
 // So there is no swap-day copy caveat. This is RETIRED, not outstanding.
 //
