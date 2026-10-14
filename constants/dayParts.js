@@ -27,6 +27,15 @@ export const HERO_WASH = {
   night: 'rgba(40,55,130,0.16)',
 }
 
+// Island Calendar (Variant C): a dated day's wash REPLACES the day-part wash (the weather veil stays).
+// Warm light only: never red or white (national-flag colours). alpha ≤ 0.16. Read by check-hero-contrast.
+export const CALENDAR_WASH = {
+  newYear:       'rgba(215,180,95,0.16)',
+  publicHoliday: 'rgba(120,175,195,0.13)',
+  bayram:        'rgba(240,160,50,0.16)',
+  bayramEve:     'rgba(240,160,50,0.11)',
+}
+
 // A weather veil over the photo, above the wash. alpha ≤ 0.18; clear/partly cloudy get none.
 export const WEATHER_VEIL = {
   rain:         'rgba(70,90,115,0.16)',

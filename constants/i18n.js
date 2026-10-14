@@ -146,6 +146,9 @@ const translations = {
     hrOliCtxMorning: "Good morning",
     hrOliCtxEvening: "Good evening",
     hrOliCtxNight: "Late? Ask away",
+    hrCalNewYear: "Happy new year!",
+    hrCalPublicHoliday: "Public holiday",
+    hrCalBayram: "Happy holidays",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Ask Oli",
     hrWelcomeHeadline: "Your guide to life in North Cyprus",
@@ -2212,6 +2215,9 @@ const translations = {
     hrOliCtxMorning: "Günaydın, sor",
     hrOliCtxEvening: "İyi akşamlar",
     hrOliCtxNight: "Geç oldu, sor",
+    hrCalNewYear: "Mutlu yıllar!",
+    hrCalPublicHoliday: "Bugün resmi tatil",
+    hrCalBayram: "İyi bayramlar",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Oli'ye sor",
     hrWelcomeHeadline: "Kuzey Kıbrıs'ta hayatın rehberi",
@@ -4249,6 +4255,9 @@ const translations = {
     hrOliCtxMorning: "صباح الخير",
     hrOliCtxEvening: "مساء الخير",
     hrOliCtxNight: "متأخر؟ اسأل",
+    hrCalNewYear: "عام سعيد!",
+    hrCalPublicHoliday: "عطلة رسمية",
+    hrCalBayram: "عطلة سعيدة",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "اسأل أولي",
     hrWelcomeHeadline: "دليلك للحياة في شمال قبرص",
@@ -6064,6 +6073,9 @@ const translations = {
     hrOliCtxMorning: "Доброе утро",
     hrOliCtxEvening: "Добрый вечер",
     hrOliCtxNight: "Ночь? Спроси",
+    hrCalNewYear: "С Новым годом!",
+    hrCalPublicHoliday: "Выходной день",
+    hrCalBayram: "С праздником!",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Спросите Оли",
     hrWelcomeHeadline: "Ваш гид по жизни на Северном Кипре",
@@ -7891,6 +7903,9 @@ const translations = {
     hrOliCtxMorning: "Καλημέρα",
     hrOliCtxEvening: "Καλησπέρα",
     hrOliCtxNight: "Αργά; Ρώτα",
+    hrCalNewYear: "Καλή χρονιά!",
+    hrCalPublicHoliday: "Σήμερα αργία",
+    hrCalBayram: "Καλές γιορτές",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Ρώτα τον Oli",
     hrWelcomeHeadline: "Ο οδηγός σου για τη ζωή στη Βόρεια Κύπρο",
@@ -9702,6 +9717,9 @@ const translations = {
     hrOliCtxMorning: "Bonjour",
     hrOliCtxEvening: "Bonsoir",
     hrOliCtxNight: "Il est tard ?",
+    hrCalNewYear: "Bonne année !",
+    hrCalPublicHoliday: "Jour férié",
+    hrCalBayram: "Bonnes fêtes !",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Parlez à Oli",
     hrWelcomeHeadline: "Votre guide de la vie à Chypre du Nord",
@@ -11517,6 +11535,9 @@ const translations = {
     hrOliCtxMorning: "Buenos días",
     hrOliCtxEvening: "Buenas tardes",
     hrOliCtxNight: "¿Tarde? Dime",
+    hrCalNewYear: "¡Feliz año!",
+    hrCalPublicHoliday: "Hoy es festivo",
+    hrCalBayram: "¡Felices fiestas!",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Pregunta a Oli",
     hrWelcomeHeadline: "Tu guía para la vida en el norte de Chipre",
@@ -13329,6 +13350,9 @@ const translations = {
     hrOliCtxMorning: "Guten Morgen",
     hrOliCtxEvening: "Guten Abend",
     hrOliCtxNight: "Spät? Frag mich",
+    hrCalNewYear: "Frohes Neues!",
+    hrCalPublicHoliday: "Heute Feiertag",
+    hrCalBayram: "Frohe Feiertage",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Frag Oli",
     hrWelcomeHeadline: "Dein Begleiter für das Leben in Nordzypern",
@@ -15141,6 +15165,9 @@ const translations = {
     hrOliCtxMorning: "صبح بخیر",
     hrOliCtxEvening: "عصر بخیر",
     hrOliCtxNight: "دیروقت؟ بپرس",
+    hrCalNewYear: "سال نو مبارک!",
+    hrCalPublicHoliday: "تعطیل رسمی",
+    hrCalBayram: "تعطیلات خوش",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "از اولی بپرس",
     hrWelcomeHeadline: "راهنمای زندگی در قبرس شمالی",

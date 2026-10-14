@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
+import { KINDS } from '../constants/islandCalendar.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = f => readFileSync(resolve(ROOT, f), 'utf8')
@@ -171,17 +172,30 @@ for (const [name, file] of BACKGROUNDS) {
 {
   const hero = readFileSync(resolve(ROOT, 'components/home/redesign/RedesignHero.js'), 'utf8')
   const washes = readTable('HERO_WASH'), veils = readTable('WEATHER_VEIL')
+  const calWashes = readTable('CALENDAR_WASH')   // Variant C: replaces the day-part wash on a dated day, veil stays
   const topMax = parseFloat((/const TOP = rampLayers\(([\d.]+)\)/.exec(hero) || [])[1])
   const steps = num('components/home/HomeHero.js', 'RAMP_STEPS')
   const logoWH = /logo:\s*\{\s*width:\s*(\d+),\s*height:\s*(\d+)\s*\}/.exec(hero)
   const pillA = parseFloat((/export const HERO_PILL_ALPHA\s*=\s*([\d.]+)/.exec(hero) || [])[1])
   const total = parseFloat((/export const HERO_TOTAL\s*=\s*(\d+)/.exec(hero) || [])[1])
   const minBody = parseFloat((/export const HERO_MIN_BODY\s*=\s*(\d+)/.exec(hero) || [])[1])
-  if (!washes || !veils || !(topMax > 0) || !(steps > 0) || !logoWH || !(pillA > 0) || !(total > 0) || !(minBody > 0)
+  if (calWashes) {   // every Island Calendar kind needs a wash and vice versa
+    for (const k of KINDS) if (!(k in calWashes)) problems.push(`calendar: kind "${k}" has no CALENDAR_WASH entry`)
+    for (const k of Object.keys(calWashes)) if (!KINDS.includes(k)) problems.push(`calendar: CALENDAR_WASH.${k} is not a kind in islandCalendar KINDS`)
+  }
+  if (!washes || !veils || !calWashes || !(topMax > 0) || !(steps > 0) || !logoWH || !(pillA > 0) || !(total > 0) || !(minBody > 0)
       || !/<HeroAtmosphere part=\{part\} wxGroup/.test(hero) || !/s\.logo/.test(hero)) {
     problems.push('daylight hero: cannot read the wash/veil tables or the hero geometry — measuring nothing')
   } else {
     const combos = []
+    for (const [dp, w] of Object.entries(calWashes)) for (const [wx, v] of [['none', null], ...Object.entries(veils)]) {
+      const W_ = w == null ? null : parseRgba(w), V_ = v == null ? null : parseRgba(v)
+      if (!W_ || (v != null && !V_)) { problems.push(`calendar: CALENDAR_WASH.${dp} / WEATHER_VEIL.${wx} is not rgba(r,g,b,a)`); continue }
+      if (W_.a > 0.16) problems.push(`calendar: CALENDAR_WASH.${dp} alpha ${W_.a} is over the 0.16 cap`)
+      const [cr, cg, cb2] = W_.c   // product rule: no national-flag colours (red / white)
+      if ((cr > 180 && cg < 140 && cb2 < 140) || (cr > 240 && cg > 240 && cb2 > 240)) problems.push(`calendar: CALENDAR_WASH.${dp} is red or white (flag colours)`)
+      combos.push({ name: `cal:${dp}+${wx}`, layers: [W_, V_].filter(Boolean) })
+    }
     for (const [dp, w] of Object.entries(washes)) for (const [wx, v] of [['none', null], ...Object.entries(veils)]) {
       const W_ = w == null ? null : parseRgba(w), V_ = v == null ? null : parseRgba(v)
       if ((w != null && !W_) || (v != null && !V_)) problems.push(`daylight: HERO_WASH.${dp} / WEATHER_VEIL.${wx} is not rgba(r,g,b,a)`)
@@ -224,7 +238,7 @@ for (const [name, file] of BACKGROUNDS) {
           if (cb.name === 'none') { base = Math.min(base, c); b0 = c }
           else {
             if (c < Math.min(b0, 3) - 1e-9 && c - Math.min(b0, 3) < worstDrop) { worstDrop = c - Math.min(b0, 3); dropAt = `${cb.name} on ${name} ${Wd}dp inset ${inset}: ${c.toFixed(2)} vs ${b0.toFixed(2)} without` }
-            const dpk = cb.name.split('+')[0]
+            const dpk = cb.name.split('+')[0]   // day part, or cal:<kind>
             per[dpk] = Math.min(per[dpk] ?? Infinity, c)
             if (c < worst) { worst = c; wname = cb.name; wat = `${name} ${Wd}dp inset ${inset}` }
           }

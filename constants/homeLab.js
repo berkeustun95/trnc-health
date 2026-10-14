@@ -14,12 +14,19 @@ import { HOME_DAYLIGHT_LIVE, HOME_OLI_COMPANION_LIVE, HOME_CALENDAR_LIVE, HOME_P
 
 export const HOME_LAB_DEV = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_DEV_HOME_LAB === '1'
 
-let overrides = { daylight: false, oli: false, calendar: false, polish: false }
+let overrides = { daylight: false, oli: false, calendar: false, polish: false, calendarDate: null }
 const listeners = new Set()
 
 export function setHomeLab(key, value) {
   if (!HOME_LAB_DEV || !(key in overrides)) return
   overrides = { ...overrides, [key]: value === true }
+  listeners.forEach(fn => fn(overrides))
+}
+
+// Dev date preview for Variant C: 'YYYY-MM-DD' or null (= today). Same dev-only guard.
+export function setCalendarDate(dateStr) {
+  if (!HOME_LAB_DEV) return
+  overrides = { ...overrides, calendarDate: typeof dateStr === 'string' ? dateStr : null }
   listeners.forEach(fn => fn(overrides))
 }
 
@@ -37,5 +44,6 @@ export function useHomeLab() {
     oli: HOME_OLI_COMPANION_LIVE || (HOME_LAB_DEV && o.oli),
     calendar: HOME_CALENDAR_LIVE || (HOME_LAB_DEV && o.calendar),
     polish: HOME_POLISH_LIVE || (HOME_LAB_DEV && o.polish),
+    calendarDate: HOME_LAB_DEV ? o.calendarDate : null,
   }
 }

@@ -88,7 +88,7 @@ function frame(src, cardW) {
 
 // Literal t('…') calls on purpose: scripts/validate-i18n-coverage.mjs only sees literal keys, and a
 // t(pillKey, lang) would drop hrOliAskSub and the five hrOliCtx* keys out of coverage. Keep in step
-// with OLI_PILL_KEYS (constants/oliContext.js).
+// with OLI_PILL_KEYS (constants/oliContext.js) and CAL_PILL_KEYS (constants/calendarContext.js).
 const PILL_TEXT = {
   hrOliAskSub: l => t('hrOliAskSub', l),
   hrOliCtxEventTonight: l => t('hrOliCtxEventTonight', l),
@@ -96,6 +96,9 @@ const PILL_TEXT = {
   hrOliCtxMorning: l => t('hrOliCtxMorning', l),
   hrOliCtxEvening: l => t('hrOliCtxEvening', l),
   hrOliCtxNight: l => t('hrOliCtxNight', l),
+  hrCalNewYear: l => t('hrCalNewYear', l),
+  hrCalPublicHoliday: l => t('hrCalPublicHoliday', l),
+  hrCalBayram: l => t('hrCalBayram', l),
 }
 
 export default function OliBar({ lang, onPress, active = true, barRef, pillKey, cheer }) {

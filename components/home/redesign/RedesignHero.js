@@ -14,6 +14,7 @@ import { useHomeLab } from '../../../constants/homeLab'
 import useReduceMotion from '../../ui/useReduceMotion'
 import HeroAtmosphere from './HeroAtmosphere'
 import useDayPart from './useDayPart'
+import useIslandDay from './useIslandDay'
 
 // The district photograph: ADA wordmark + frosted bell, and one row at the bottom — the
 // district chip with its photo-credit "i" on the left, the weather chip on the right (Home v3:
@@ -87,6 +88,7 @@ export default function RedesignHero({
   const lab = useHomeLab()
   const reduce = useReduceMotion()
   const part = useDayPart(lab.daylight)
+  const calKind = useIslandDay(lab.calendar)?.kind
   const drift = lab.daylight && !reduce
   const scale = useRef(new Animated.Value(1)).current
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function RedesignHero({
       {drift
         ? <Animated.Image source={source} style={[s.photo, { transform: [{ scale }] }]} resizeMode="cover" fadeDuration={0} />
         : <Image source={source} style={s.photo} resizeMode="cover" fadeDuration={0} />}
-      {lab.daylight && <HeroAtmosphere part={part} wxGroup={weatherGroup(cur?.symbol)} />}
+      {(lab.daylight || calKind) && <HeroAtmosphere part={part} wxGroup={lab.daylight ? weatherGroup(cur?.symbol) : null} calKind={calKind} />}
       {TOP.map((a, i) => (
         <View key={`t${i}`} pointerEvents="none"
           style={[s.band, { top: 0, height: (height * 0.45 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />

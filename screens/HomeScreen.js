@@ -20,6 +20,7 @@ import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
 import { HOME_LAB_DEV, useHomeLab } from '../constants/homeLab'
 import { oliPillKey } from '../constants/oliContext'
+import { calPillKey } from '../constants/calendarContext'
 import { REDESIGN, DUYURULAR } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -43,6 +44,7 @@ import BackButton from '../components/BackButton'
 import LocationOffRow from '../components/LocationOffRow'
 import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
 import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
+import useIslandDay from '../components/home/redesign/useIslandDay'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -287,6 +289,7 @@ export default function HomeScreen({
   // refreshTick joins the strip effect's deps (constant 0 while off, so no extra fetch on mount);
   // pillTick re-computes the pill line when the app returns to the foreground (no timer).
   const lab = useHomeLab()
+  const islandDay = useIslandDay(lab.calendar)   // Home lab C: today's dated-day entry (null when off / ordinary day)
   const [refreshing, setRefreshing]     = useState(false)
   const [refreshTick, setRefreshTick]   = useState(0)
   const [cheer, setCheer]               = useState(0)
@@ -971,7 +974,9 @@ export default function HomeScreen({
     const cur = weatherData?.current
     const wxPhoto = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
     // Oli companion: the contextual pill line (null = today's "Ask, search"). Recomputed per render / foreground.
-    const pillKey = lab.oli ? oliPillKey({ now: new Date(), wxGroup: cur ? weatherGroup(cur.symbol) : null, stripItem }) || undefined : undefined
+    const oliKey = lab.oli ? oliPillKey({ now: new Date(), wxGroup: cur ? weatherGroup(cur.symbol) : null, stripItem }) || undefined : undefined
+    // Island Calendar line (Variant C) outranks the context line.
+    const pillKey = (lab.calendar && calPillKey(islandDay)) || oliKey
     return (
       <>
         <StatusBar style={overCanvas ? 'dark' : 'light'} />

@@ -578,6 +578,10 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const OLI_PILL_KEYS = ((/export const OLI_PILL_KEYS = \[([^\]]*)\]/.exec(read('constants/oliContext.js')) || [])[1] || '')
     .split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
   if (OLI_PILL_KEYS.length < 5) problems.push(`redesign: read only ${OLI_PILL_KEYS.length} Oli pill keys from oliContext.js`)
+  // Island Calendar (Variant C) pill lines, same pill, read from constants/calendarContext.js.
+  const CAL_PILL_KEYS = ((/export const CAL_PILL_KEYS = \[([^\]]*)\]/.exec(read('constants/calendarContext.js')) || [])[1] || '')
+    .split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+  if (CAL_PILL_KEYS.length < 3) problems.push(`redesign: read only ${CAL_PILL_KEYS.length} calendar pill keys from calendarContext.js`)
   const extraKeys = [...read('constants/homeGroups.js').matchAll(/labelKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
   const groupKeys = [...read('constants/homeGroups.js').matchAll(/titleKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
   if (!extraKeys.length || !groupKeys.length) problems.push('redesign: read ZERO keys from constants/homeGroups.js')
@@ -586,7 +590,7 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const { tCount, hasOwnTranslation, LANGUAGES } = await import('../constants/i18n.js')
   // t() falls back to English silently, so a missing key in one language would be measured as English.
   // Every Oli pill key must be defined in EVERY language block.
-  for (const k of OLI_PILL_KEYS) for (const lg of LANGUAGES) {
+  for (const k of [...OLI_PILL_KEYS, ...CAL_PILL_KEYS]) for (const lg of LANGUAGES) {
     if (!hasOwnTranslation(k, lg.key)) problems.push(`redesign: Oli pill key ${k} is missing from the ${lg.key} block of i18n.js`)
   }
   const { REGION_LABEL_KEY } = await import('../constants/regions.js')
@@ -650,7 +654,7 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
     const oCap = W < 350 ? R.oliCapN : R.oliCap
     const zone = (W - R.page * 2) * R.fadeHold - R.textLeft
     rAssess(700, t('hrOliBarTitle', L), 20, oCap, S, zone, `${at} oli:title`, cur, 1)
-    for (const k of ['hrOliAskSub', ...OLI_PILL_KEYS]) {   // the Oli companion's contextual lines (constants/oliContext.js)
+    for (const k of ['hrOliAskSub', ...OLI_PILL_KEYS, ...CAL_PILL_KEYS]) {   // contextual lines (constants/oliContext.js, constants/calendarContext.js)
       rAssess(500, t(k, L), 13, oCap, S, zone - 4 - 14 - R.pillPad * 2 - 2, `${at} oli:pill:${k}`, cur, 1)
     }
     {
