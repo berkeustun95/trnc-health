@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
-  TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator,
+  TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator, RefreshControl, AppState,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
@@ -18,7 +18,8 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { HOME_LAB_DEV } from '../constants/homeLab'
+import { HOME_LAB_DEV, useHomeLab } from '../constants/homeLab'
+import { oliPillKey } from '../constants/oliContext'
 import { REDESIGN, DUYURULAR } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -36,7 +37,7 @@ import { resolveFavourites } from '../constants/homeFavourites'
 import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
-  haversineKm, isOpenNow, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
+  haversineKm, isOpenNow, uvLevel, weatherGroup, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
 import LocationOffRow from '../components/LocationOffRow'
@@ -245,6 +246,7 @@ export default function HomeScreen({
   // ─── Redesign (feat/redesign) ───────────────────────────────────────────────
   dutySummary = null,     // { loaded, error, status, count, until } from App.js's roster read
   onRetryDuty,
+  onRefreshWeather,       // Oli companion pull-to-refresh only: App.js re-reads the weather (resolves when settled)
   onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
   onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
@@ -280,6 +282,23 @@ export default function HomeScreen({
   // two dismissals in one session must both trigger, and a boolean can only flip once.
   const [stripDismissTick, setStripDismissTick] = useState(0)
   const [stripLoading, setStripLoading] = useState(true)
+
+  // ─── Home lab B, Oli companion (agent/home-lab) — every use below is gated on lab.oli ──────
+  // refreshTick joins the strip effect's deps (constant 0 while off, so no extra fetch on mount);
+  // pillTick re-computes the pill line when the app returns to the foreground (no timer).
+  const lab = useHomeLab()
+  const [refreshing, setRefreshing]     = useState(false)
+  const [refreshTick, setRefreshTick]   = useState(0)
+  const [cheer, setCheer]               = useState(0)
+  const [pillTick, setPillTick]         = useState(0)
+  const stripWaitRef = useRef(null)
+  const homeAlive = useRef(true)
+  useEffect(() => { homeAlive.current = true; return () => { homeAlive.current = false } }, [])
+  useEffect(() => {
+    if (!lab.oli) return undefined
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') setPillTick(n => n + 1) })
+    return () => sub.remove()
+  }, [lab.oli])
 
   // ─── Sık kullandıkların ───────────────────────────────────────────────────
   // `favIds` is the RESOLVED row and is written in exactly two places: once when this
@@ -368,9 +387,12 @@ export default function HomeScreen({
     // blank — the card is not hidden, the item is re-resolved without it.
     readStripDismissals()
       .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN }))
-      .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
+      .then(item => {
+        if (alive) { setStripItem(item); setStripLoading(false) }
+        stripWaitRef.current?.()   // settle the pull-to-refresh wait even when superseded (no state set)
+      })
     return () => { alive = false }
-  }, [lang, promosEligible, showFacilityList, stripDismissTick])
+  }, [lang, promosEligible, showFacilityList, stripDismissTick, refreshTick])
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
@@ -924,6 +946,23 @@ export default function HomeScreen({
   // favourites · "Tüm hizmetler". Everything below the hero scrolls under the floating tab
   // bar, so the content pads by its footprint. Coach-mark refs: searchRef → the Oli bar,
   // dutyBannerRef → the tiles row, weatherRef → the weather chip.
+  // Pull-to-refresh (Oli companion): re-run the strip + weather reads and the duty retry, spin at
+  // least ~600 ms and at most ~8 s. Writes nothing anywhere.
+  function onRefreshHome() {
+    if (refreshing) return
+    const wait = ms => new Promise(res => setTimeout(res, ms))
+    setRefreshing(true)
+    setCheer(c => c + 1)
+    setRefreshTick(n => n + 1)
+    const stripP = new Promise(res => { stripWaitRef.current = res })
+    const wxP = Promise.resolve().then(() => onRefreshWeather?.()).catch(() => {})
+    if (dutySummary?.error) onRetryDuty?.()   // never reflow the safety tiles on a normal pull
+    Promise.race([Promise.all([stripP, wxP, wait(600)]), wait(8000)]).then(() => {
+      stripWaitRef.current = null
+      if (homeAlive.current) setRefreshing(false)
+    })
+  }
+
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
@@ -931,10 +970,16 @@ export default function HomeScreen({
     const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
     const cur = weatherData?.current
     const wxPhoto = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
+    // Oli companion: the contextual pill line (null = today's "Ask, search"). Recomputed per render / foreground.
+    const pillKey = lab.oli ? oliPillKey({ now: new Date(), wxGroup: cur ? weatherGroup(cur.symbol) : null, stripItem }) || undefined : undefined
     return (
       <>
         <StatusBar style={overCanvas ? 'dark' : 'light'} />
         <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          refreshControl={lab.oli
+            ? <RefreshControl refreshing={refreshing} onRefresh={onRefreshHome}
+                tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={insets.top} />
+            : undefined}
           scrollEventThrottle={32}
           onScroll={e => {
             hubMem.onScroll(e)
@@ -953,7 +998,8 @@ export default function HomeScreen({
           <View style={s.rBelow}>
             {!hideHeaderActions && (
               <View style={{ marginTop: 16 }}>
-                <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef} />
+                <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef}
+                  pillKey={pillKey} cheer={lab.oli ? cheer : undefined} />
               </View>
             )}
 
