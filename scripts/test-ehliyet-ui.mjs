@@ -7,8 +7,9 @@ import {
   hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, EHLIYET_LOGS_CONTACTS,
   SOCIAL_LABEL_PX, SOCIAL_LABEL_WIDTHS, SOCIAL_LAYOUT, socialTextRoom, socialSideBySide,
+  EHLIYET_CITY_NAME, branchChipLabels, ADDRESS_SEP, addressParts,
 } from '../constants/ehliyet.js'
-import { REGIONS } from '../constants/regions.js'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions.js'
 import { readFileSync } from 'node:fs'
 import { t as tr, LANGUAGES } from '../constants/i18n.js'
 import { resolve, dirname } from 'node:path'
@@ -183,6 +184,39 @@ const seg = longestSegment(emailShown)
 console.log(`  · email longest segment ${seg.toFixed(1)}px at ${EMAIL_PX}px x ${EMAIL_SCALE}, box ${EMAIL_BOX}px; whole address ${font400(seed.email, EMAIL_PX).toFixed(1)}px at 1.0, ${longestSegment(seed.email).toFixed(1)}px at ${EMAIL_SCALE}`)
 t('email: longest unbreakable segment fits 230px at 13px x 1.3', seg <= EMAIL_BOX, true)
 t('red-first: the whole address as one segment does NOT fit at 1.3', longestSegment(seed.email) <= EMAIL_BOX, false)
+
+// ── Round 3 / 1: branch city names are Turkish in every language, never a translation. ──
+t('EHLIYET_CITY_NAME covers every REGIONS key, nothing more', [Object.keys(EHLIYET_CITY_NAME).sort(), REGIONS.every(r => !!EHLIYET_CITY_NAME[r])], [[...REGIONS].sort(), true])
+t('Turkish names', EHLIYET_CITY_NAME, { nicosia: 'Lefkoşa', kyrenia: 'Girne', famagusta: 'Gazimağusa', morphou: 'Güzelyurt', iskele: 'İskele', lefke: 'Lefke', karpaz: 'Karpaz' })
+const FORBIDDEN_LITERALS = ['Morfo', 'Morphou', 'Μόρφου', 'مورفو', 'مورفو', 'Морфу']
+// Every translated Lefkoşa / Güzelyurt (blDistrict*) that differs from the Turkish name is forbidden too.
+const translatedCities = LANGUAGES.flatMap(({ key: l }) => [tr('blDistrictNicosia', l), tr('blDistrictMorphou', l)]).filter(n => n !== 'Lefkoşa' && n !== 'Güzelyurt')
+const FORBIDDEN = [...new Set([...FORBIDDEN_LITERALS, ...translatedCities])]
+const hits = (str) => FORBIDDEN.filter(w => str.includes(w))
+console.log(`  · forbidden city spellings (${FORBIDDEN.length}): ${JSON.stringify(FORBIDDEN)}`)
+const legacyChips = (lang) => sortedBranches(seed).map(b => tr(REGION_LABEL_KEY[b.region], lang))
+const chipsByLang = Object.fromEntries(LANGUAGES.map(({ key: l }) => [l, branchChipLabels(seed)]))
+console.log(`  · Arabic chips now: ${JSON.stringify(chipsByLang.Arabic)}; the old blDistrict path gave ${JSON.stringify(legacyChips('Arabic'))}`)
+t('chip labels are exactly [Lefkoşa, Güzelyurt] in all 9 languages', Object.values(chipsByLang).filter(c => JSON.stringify(c) !== JSON.stringify(['Lefkoşa', 'Güzelyurt'])), [])
+t('screen builds its chips from branchChipLabels / EHLIYET_CITY_NAME, not REGION_LABEL_KEY or blDistrict', [/branchChipLabels\(/.test(screenSrc), /REGION_LABEL_KEY|blDistrict/.test(screenSrc)], [true, false])
+t('screen filters branches with EHLIYET_CITY_NAME', /EHLIYET_CITY_NAME\[b\.region\]/.test(screenSrc), true)
+const constSrc = readFileSync(resolve(here, 'constants/ehliyet.js'), 'utf8')
+t('no Morfo / Morphou / Μόρφου / مورفو / Морфу (or any translated city) in the screen', hits(screenSrc), [])
+t('... nor in constants/ehliyet.js', hits(constSrc), [])
+t('... nor in the fixture', hits(JSON.stringify(PREVIEW_DRIVING_SCHOOLS)), [])
+t('red-first: the old blDistrict path in Arabic IS caught by the check', hits(legacyChips('Arabic').join(' ')).length > 0, true)
+t('red-first: ... and in Greek / Russian', [hits(legacyChips('Greek').join(' ')).length > 0, hits(legacyChips('Russian').join(' ')).length > 0], [true, true])
+
+t('never I18nManager, forceRTL or allowRTL in the screen or constants (CLAUDE.md: RTL is an app-wide decision)', /I18nManager|forceRTL|allowRTL/.test(screenSrc + constSrc), false)
+
+// ── Round 3 / 2: address underline stops at the comma. ──
+const seedAddr = addrs[0]
+t('address parts: comma stays on the underlined part', addressParts(seedAddr), ['Şehit Fevait Ali Sokak 4/B,', 'Göçmenköy,', 'Lefkoşa'])
+t('separator is a single space; joining gives back the raw address', [ADDRESS_SEP, addressParts(seedAddr).join(ADDRESS_SEP) === seedAddr], [' ', true])
+t('address parts: single segment and blank', [addressParts('Lefkoşa'), addressParts('')], [['Lefkoşa'], ['']])
+t('no part ends in a space (no underlined trailing space)', addressParts(seedAddr).filter(p => /\s$/.test(p)), [])
+t('screen underlines the parts, not the whole address Text', [/textDecorationLine: 'none'/.test(screenSrc), /addressText:[^\n]*textDecorationLine: 'underline'/.test(screenSrc)], [true, false])
+t('email: underlined run ends at "@" (break is the zero-width space, no trailing space)', emailShown.split('\u200B').filter(p => /\s$/.test(p)), [])
 
 // ── Seed <-> fixture drift. Raw values print on failure. ──
 const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', SEED_SQL), 'utf8')

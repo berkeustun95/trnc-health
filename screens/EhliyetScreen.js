@@ -7,13 +7,13 @@ import { t } from '../constants/i18n'
 import { MODULE_FLAGS } from '../constants/flags'
 import { EHLIYET } from '../constants/redesign'
 import { colors, type, radii, elevation, press } from '../constants/theme'
-import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import {
   EHLIYET_BRIGHT, EHLIYET_DARK, EHLIYET_WA, PREVIEW_DRIVING_SCHOOLS,
   usesFixture, shouldLogContact, telUrl, primaryPhone, hasWhatsApp, whatsAppUrl, hasInstagram, hasFacebook,
   hasEmail, mailtoUrl, emailDisplay, licenceClasses, branchAddress, mapsSearchUrl, sortedBranches,
   SOCIAL_LABEL_PX, SOCIAL_LAYOUT, socialSideBySide,
+  EHLIYET_CITY_NAME, branchChipLabels, ADDRESS_SEP, addressParts,
 } from '../constants/ehliyet'
 import { logContactEvent } from '../utils/logContactEvent'
 import { ScreenHeader, ErrorState, CardSkeleton } from '../components/ui'
@@ -40,11 +40,27 @@ function ActionButton({ icon, label, onPress, bg, fg, outlined, compact }) {
   )
 }
 
+// Underline stops at the comma: only the space between parts is un-underlined (addressParts).
+function AddressText({ address, style }) {
+  const parts = addressParts(address)
+  return (
+    <Text style={style}>
+      {parts.map((p, i) => (
+        <Text key={i}>
+          <Text style={s.underline}>{p}</Text>
+          {i < parts.length - 1 && <Text style={s.noUnderline}>{ADDRESS_SEP}</Text>}
+        </Text>
+      ))}
+    </Text>
+  )
+}
+
 function SchoolCard({ school, lang, featured, onAction }) {
   const logo = partnerAsset(school.logo_key)
   const { width, fontScale } = useWindowDimensions()
-  const branches = sortedBranches(school).filter(b => REGION_LABEL_KEY[b.region])
+  const branches = sortedBranches(school).filter(b => EHLIYET_CITY_NAME[b.region])
   const addressed = branches.filter(b => branchAddress(b))
+  const chipLabels = branchChipLabels(school)
   const classes = licenceClasses(school)
   const ig = hasInstagram(school), fb = hasFacebook(school)
   const social = ig && fb && socialSideBySide(width, fontScale)
@@ -75,9 +91,9 @@ function SchoolCard({ school, lang, featured, onAction }) {
         <View style={s.branchBlock}>
           <Text style={s.branchLabel}>{t('ehliyetBranches', lang)}</Text>
           <View style={s.chips}>
-            {branches.map(b => (
+            {branches.map((b, i) => (
               <View key={b.region} style={s.chip}>
-                <Text style={s.chipText}>{t(REGION_LABEL_KEY[b.region], lang)}</Text>
+                <Text style={s.chipText}>{chipLabels[i]}</Text>
               </View>
             ))}
           </View>
@@ -86,7 +102,7 @@ function SchoolCard({ school, lang, featured, onAction }) {
               onPress={() => onAction(school, 'maps', mapsSearchUrl(branchAddress(b)))}
               accessibilityRole="link" accessibilityLabel={`${t('ehliyetMapLabel', lang)}: ${branchAddress(b)}`}>
               <Ionicons name="location-outline" size={16} color={EHLIYET_DARK} />
-              <Text style={s.addressText}>{branchAddress(b)}</Text>
+              <AddressText address={branchAddress(b)} style={s.addressText} />
             </TouchableOpacity>
           ))}
         </View>
@@ -195,7 +211,9 @@ const s = StyleSheet.create({
   actionTextCompact: { fontSize: SOCIAL_LABEL_PX },
 
   addressRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 44, paddingTop: 12 },
-  addressText: { ...type.small, color: EHLIYET_DARK, flex: 1, textDecorationLine: 'underline' },
+  addressText: { ...type.small, color: EHLIYET_DARK, flex: 1 },
+  underline:   { textDecorationLine: 'underline' },
+  noUnderline: { textDecorationLine: 'none' },
   emailRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 6 },
   emailText:   { ...type.small, color: EHLIYET_DARK, flexShrink: 1, textDecorationLine: 'underline' },
 })

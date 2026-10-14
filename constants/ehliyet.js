@@ -70,6 +70,26 @@ export const mailtoUrl = (school) => `mailto:${school.email}`
 // Display only: a zero-width space after '@' gives the row a break point so a long address wraps as "local@" / "domain" instead of mid-word.
 export const emailDisplay = (email) => (email || '').replace('@', '@\u200B')
 
+// ─── Branch city names: Turkish in every language ───────────────────────────
+// The partner names its branches with the official Turkish place names; a translated name would
+// misname the branch. Local map on purpose: the shared blDistrict* keys and REGION_LABEL_KEY translate.
+// Covers every REGIONS key (scripts/test-ehliyet-ui.mjs asserts it) so a new branch cannot fall back to a translation.
+export const EHLIYET_CITY_NAME = {
+  nicosia: 'Lefkoşa', kyrenia: 'Girne', famagusta: 'Gazimağusa', morphou: 'Güzelyurt',
+  iskele: 'İskele', lefke: 'Lefke', karpaz: 'Karpaz',
+}
+export const branchChipLabels = (school) =>
+  sortedBranches(school).filter(b => EHLIYET_CITY_NAME[b.region]).map(b => EHLIYET_CITY_NAME[b.region])
+
+// ─── Address with an underline that stops at the comma ──────────────────────
+// Underlined parts keep their comma ("4/B,"); only the separator space between them is un-underlined,
+// so a line break there leaves no underlined trailing space. parts.join(ADDRESS_SEP) === the raw address.
+export const ADDRESS_SEP = ' '
+export const addressParts = (address) => {
+  const raw = String(address || '').split(', ')
+  return raw.map((p, i) => (i < raw.length - 1 ? `${p},` : p))
+}
+
 export const licenceClasses = (school) => (school?.licence_classes || []).filter(Boolean)
 
 // Branch street address (text only: a branch has no pin unless OSM corroborated one).
