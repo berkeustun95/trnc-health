@@ -1,52 +1,119 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, readableOn } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import ConnectivityErrorState from '../components/ConnectivityErrorState'
-import OperatorWordmark from '../components/OperatorWordmark'
-import { fetchOperator } from '../lib/connectivity'
+import { fetchOperator, fetchLinks, openHandoff } from '../lib/connectivity'
+import { logContactEvent } from '../utils/logContactEvent'
 
-// Bağlantı & eSIM — module landing (screen 1 of 3).
+// Bağlantı & eSIM — module landing (Berke, 2026-10-15): a partner card, three tiles and a
+// support bar, each opening a KKTCELL page in the in-app browser.
 //
-// A SINGLE PARTNER HERO AND NOTHING ELSE. No list, no second operator, no "coming soon"
-// rows: KKTCELL is the sole operator in v1 and the whole screen is given to them. The only
-// other element is the warning card, which exists to stop a newcomer buying a generic
-// "Cyprus" eSIM that will not work in the north.
+// ⚠ EVERY BRAND VALUE AND EVERY URL COMES OFF THE DATABASE. Colours, logo and name from the
+//   operator row; the four targets from connectivity_links (20261113), keyed by slug. Only the
+//   artwork and the copy are in the app.
 //
-// ⚠ EVERY BRAND VALUE COMES OFF THE OPERATOR ROW. Colours, logo, name — nothing here is
-//   hardcoded, so a brand correction is one UPDATE and no OTA. brand_confirmed is
-//   deliberately NOT read: it is a go-live gate for the project owner, not user-facing
-//   state, and branching on it would make an unconfirmed brand render differently from a
-//   confirmed one for no reason a user could understand.
-export default function ConnectivityLandingScreen({ lang, onBack, onOpenOperator, onOperatorLoaded }) {
+// ⚠ THE ARTWORK IS A DRAFT. The yellow character (Teknocan) is not KKTCELL's official file;
+//   it must be replaced with their artwork, with their written OK, before go-live.
+//
+// The previous landing linked to the operator / package / stores screens; nothing links to them
+// now. Their code and App.js routes are kept.
+
+const ART = {
+  hero:    require('../assets/partners/kktcell/kktcell-hero.png'),
+  tasi:    require('../assets/partners/kktcell/kktcell-tasi.png'),
+  turist:  require('../assets/partners/kktcell/kktcell-turist.png'),
+  yenihat: require('../assets/partners/kktcell/kktcell-yenihat.png'),
+}
+
+const TILES = [
+  { slug: 'tasi',    titleKey: 'connTileTasiTitle',    subKey: 'connTileTasiSub',    tint: 'secondary' },
+  { slug: 'turist',  titleKey: 'connTileTuristTitle',  subKey: 'connTileTuristSub',  tint: 'primary' },
+  { slug: 'yenihat', titleKey: 'connTileYenihatTitle', subKey: 'connTileYenihatSub', tint: 'secondary' },
+]
+const REQUIRED_SLUGS = ['tasi', 'turist', 'yenihat', 'support']
+
+const GUTTER = 16
+const GAP = 12
+const CARD_PAD = 18
+const HERO_SHARE = 0.44        // of the card's inner width
+const HERO_ASPECT = 700 / 637  // kktcell-hero.png
+
+function withAlpha(hex, a) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''))
+  if (!m) return `rgba(0,0,0,${a})`
+  const n = parseInt(m[1], 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+}
+
+// White square for the partner's logo. logo_url is NULL until KKTCELL sends it; until then (or
+// if the image fails) the square carries a neutral icon in the brand colour, never a broken box.
+function LogoSquare({ operator, brand }) {
+  const [broken, setBroken] = useState(false)
+  useEffect(() => { setBroken(false) }, [operator?.logo_url])
+  const showImage = !!operator?.logo_url && !broken
+  return (
+    <View style={s.logoSquare}>
+      {showImage ? (
+        <Image source={{ uri: operator.logo_url }} style={s.logoImg} resizeMode="contain"
+               onError={() => setBroken(true)} accessibilityLabel={operator?.name ?? ''} />
+      ) : (
+        <Ionicons name="cellular" size={22} color={brand} />
+      )}
+    </View>
+  )
+}
+
+function Tile({ tile, width, lang, operatorName, tint, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[s.tile, { width }]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="link"
+      accessibilityLabel={t(tile.titleKey, lang)}
+    >
+      <View style={[s.tileArt, { backgroundColor: tint }]}>
+        <Image source={ART[tile.slug]} style={s.tileImg} resizeMode="contain" />
+      </View>
+      <Text style={s.tileTitle}>{t(tile.titleKey, lang)}</Text>
+      <Text style={s.tileSub}>{t(tile.subKey, lang).replace('{operator}', operatorName)}</Text>
+    </TouchableOpacity>
+  )
+}
+
+export default function ConnectivityLandingScreen({ lang, onBack, onOperatorLoaded }) {
+  const { width: screenW } = useWindowDimensions()
   const [operator, setOperator] = useState(null)
+  const [links, setLinks]       = useState({})
   const [loading, setLoading]   = useState(true)
   const [retrying, setRetrying] = useState(false)
-  // Kept apart from the zero-rows case even though both render the same thing. See the
-  // note in ConnectivityErrorState: they are one state for the user and two for us.
   const [failed, setFailed]     = useState(false)
+  const [opening, setOpening]   = useState(false)
+  const [openFailed, setOpenFailed] = useState(false)
 
-  // Reported upward so screen 2 can use the row this screen already loaded rather than
-  // querying for it again. Only ever called with a real row — handing up null on a failure
-  // would clear a good operator that screen 2 may already be rendering.
   const load = useCallback(async () => {
-    const { data, error } = await fetchOperator()
-    setFailed(!!error)
-    setOperator(data)
-    if (data) onOperatorLoaded?.(data)
+    const op = await fetchOperator()
+    const ln = op.data ? await fetchLinks(op.data.id) : { data: {}, error: null }
+    return { op, ln }
+  }, [])
+
+  const apply = useCallback(({ op, ln }) => {
+    setFailed(!!op.error || !!ln.error)
+    setOperator(op.data)
+    setLinks(ln.data ?? {})
+    if (op.data) onOperatorLoaded?.(op.data)
   }, [onOperatorLoaded])
 
   useEffect(() => {
     let active = true
     ;(async () => {
-      const { data, error } = await fetchOperator()
+      const res = await load()
       if (!active) return
-      setFailed(!!error)
-      setOperator(data)
-      if (data) onOperatorLoaded?.(data)
+      apply(res)
       setLoading(false)
     })()
     return () => { active = false }
@@ -54,72 +121,99 @@ export default function ConnectivityLandingScreen({ lang, onBack, onOpenOperator
 
   const onRetry = useCallback(async () => {
     setRetrying(true)
-    await load()
+    apply(await load())
     setRetrying(false)
-  }, [load])
+  }, [load, apply])
+
+  const primary     = operator?.brand_primary   || colors.primary
+  const secondary   = operator?.brand_secondary || colors.textPrimary
+  const onPrimary   = readableOn(primary)
+  const onSecondary = readableOn(secondary)
+  const operatorName = operator?.name ?? ''
+
+  // ADA's own lead count: logged BEFORE the browser opens, entity_id = the link row (its slug is
+  // the per-target label by join). Fire-and-forget; cannot throw.
+  const openLink = useCallback(async (slug) => {
+    const link = links[slug]
+    if (!link?.url || opening) return
+    logContactEvent('connectivity', link.id, 'website', null, lang)
+    setOpening(true)
+    setOpenFailed(false)
+    const ok = await openHandoff(link.url, { secondary, onSecondary })
+    setOpening(false)
+    if (!ok) setOpenFailed(true)
+  }, [links, opening, lang, secondary, onSecondary])
 
   function renderBody() {
     if (loading) {
       return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
     }
 
-    // A failed request AND zero rows both land here. Neither table can legitimately be
-    // empty, so an absent operator is a fault, never a calm empty state.
-    if (failed || !operator) {
+    // No operator, a failed read, or a missing target all render the error state: a grid with a
+    // hole is worse than a retry. conn:health guards that none of these reach a user.
+    const complete = REQUIRED_SLUGS.every(sl => links[sl]?.url)
+    if (failed || !operator || !complete) {
       return <ConnectivityErrorState lang={lang} onRetry={onRetry} retrying={retrying} />
     }
 
-    const primary   = operator.brand_primary   || colors.primary
-    const secondary = operator.brand_secondary || colors.textPrimary
-    const onPrimary   = readableOn(primary)
-    const onSecondary = readableOn(secondary)
+    const tileW = Math.floor((screenW - GUTTER * 2 - GAP) / 2)
+    // Copy and art sit side by side, never overlapping: the copy column ends where the art begins,
+    // so a long locale wraps instead of running under the characters.
+    const innerW = screenW - GUTTER * 2 - CARD_PAD * 2
+    const heroW = Math.round(innerW * HERO_SHARE)
+    const heroH = Math.round(heroW / HERO_ASPECT)
+    const tints = { primary: withAlpha(primary, 0.22), secondary: withAlpha(secondary, 0.09) }
 
     return (
       <>
-        <View style={[s.hero, { backgroundColor: secondary }]}>
-          {/* Brand band — brand_primary, carrying the logo and the partner badge. */}
-          <View style={[s.heroTop, { backgroundColor: primary }]}>
-            <OperatorWordmark operator={operator} onBrand={onPrimary} />
-            <View style={[s.badge, { backgroundColor: secondary }]}>
-              <Text style={[s.badgeText, { color: primary }]}>{t('connPartnerBadge', lang)}</Text>
+        <View style={[s.card, { backgroundColor: secondary, minHeight: heroH + CARD_PAD }]}>
+          <View style={{ width: innerW - heroW }}>
+            <View style={s.brandRow}>
+              <LogoSquare operator={operator} brand={secondary} />
+              <Text style={[s.brandName, { color: onSecondary }]} numberOfLines={1}>{operatorName}</Text>
             </View>
-          </View>
-
-          <View style={s.heroBody}>
-            <Text style={[s.heroTitle, { color: onSecondary }]}>{t('connHeroHeadline', lang)}</Text>
-            {/* The spec picks a hand-mixed tint of THIS navy for body copy. Derived from the
-                brand instead, so a future operator with a light brand_secondary still gets
-                readable copy rather than pale blue on pale blue. */}
-            <Text style={[s.heroBodyText, { color: onSecondary, opacity: 0.78 }]}>
-              {t('connHeroBody', lang)}
+            <View style={[s.pill, { backgroundColor: primary }]}>
+              <Text style={[s.pillText, { color: onPrimary }]}>{t('connLandingPill', lang)}</Text>
+            </View>
+            <Text style={[s.cardBody, { color: onSecondary }]}>
+              {t('connLandingBody', lang).replace('{operator}', operatorName)}
             </Text>
-
-            <TouchableOpacity
-              style={[s.heroCta, { backgroundColor: primary }]}
-              onPress={onOpenOperator}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-            >
-              <Text style={[s.heroCtaText, { color: onPrimary }]}>{t('connHeroCta', lang)}</Text>
-              <Ionicons name="arrow-forward" size={17} color={onPrimary} />
-            </TouchableOpacity>
           </View>
+          <Image source={ART.hero} style={[s.hero, { width: heroW, height: heroH }]} resizeMode="contain" />
         </View>
 
-        {/* ⚠ THIS CARD'S COLOURS ARE FIXED AND MUST NOT BE DERIVED FROM THE OPERATOR ROW.
-            Everything else on this screen is the partner's brand; this one card is ADA
-            speaking in ADA's OWN VOICE, warning users about a category of product —
-            including, implicitly, about other operators' eSIMs. A warning that adopted the
-            partner's colours would read as the partner warning you off their competitors,
-            which is a different and much worse message than the one intended.
-            Amber rather than red on purpose: it is guidance that saves money, not a fault.
-            Do not "fix" this to match the brand band. */}
-        <View style={s.warn}>
-          <Text style={s.warnText}>
-            <Text style={s.warnStrong}>{t('connWarnTitle', lang)} </Text>
-            {t('connWarnBody', lang)}
-          </Text>
+        <View style={s.tileRow}>
+          {TILES.slice(0, 2).map(tile => (
+            <Tile key={tile.slug} tile={tile} width={tileW} lang={lang} operatorName={operatorName}
+                  tint={tints[tile.tint]} onPress={() => openLink(tile.slug)} />
+          ))}
         </View>
+        <View style={s.tileCentre}>
+          <Tile tile={TILES[2]} width={tileW} lang={lang} operatorName={operatorName}
+                tint={tints[TILES[2].tint]} onPress={() => openLink(TILES[2].slug)} />
+        </View>
+
+        <TouchableOpacity
+          style={[s.bar, { backgroundColor: secondary }]}
+          onPress={() => openLink('support')}
+          activeOpacity={0.85}
+          accessibilityRole="link"
+          accessibilityLabel={t('connSupportTitle', lang)}
+        >
+          <View style={[s.chat, { backgroundColor: primary }]}>
+            <Ionicons name="chatbubble-ellipses" size={20} color={onPrimary} />
+          </View>
+          <View style={s.barCopy}>
+            <Text style={[s.barTitle, { color: onSecondary }]}>{t('connSupportTitle', lang)}</Text>
+            <Text style={[s.barSub, { color: onSecondary }]}>
+              {t('connSupportSub', lang).replace('{operator}', operatorName)}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={onSecondary} />
+        </TouchableOpacity>
+
+        {opening && <ActivityIndicator style={s.opening} color={secondary} />}
+        {openFailed && <Text style={s.failText}>{t('connOpenFailed', lang)}</Text>}
       </>
     )
   }
@@ -144,26 +238,34 @@ const s = StyleSheet.create({
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
   scroll:        { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 48 },
+  scrollContent: { padding: GUTTER, paddingBottom: 48 },
   center:        { paddingVertical: 40, alignItems: 'center' },
 
-  // overflow:hidden so the brand band's square top corners are clipped by the card radius.
-  hero:          { borderRadius: 18, overflow: 'hidden', ...shadow },
-  heroTop:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  // flexShrink so a longer locale wraps the badge instead of pushing it past the band.
-  // Measured at 320dp the Turkish line is 73.4pt in a 92pt box — comfortable, but the
-  // margin is small enough that an untranslated-yet locale could exceed it, and the
-  // fixed-width logo slot beside it cannot give ground.
-  badge:         { flexShrink: 1, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 10 },
-  badgeText:     { fontSize: 9.5, fontFamily: 'Inter_700Bold', textAlign: 'center', lineHeight: 12 },
+  // overflow:hidden clips the hero art to the card radius; the art is sized from the screen width.
+  card:          { borderRadius: 24, overflow: 'hidden', padding: CARD_PAD, ...shadow },
+  brandRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoSquare:    { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  logoImg:       { width: 36, height: 36 },
+  brandName:     { flexShrink: 1, fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  pill:          { alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11, marginTop: 12 },
+  pillText:      { fontSize: 11.5, fontFamily: 'Inter_700Bold' },
+  cardBody:      { fontSize: 14, fontFamily: 'Inter_600SemiBold', lineHeight: 20, marginTop: 10 },
+  hero:          { position: 'absolute', right: CARD_PAD - 6, bottom: 0 },
 
-  heroBody:      { padding: 16 },
-  heroTitle:     { fontSize: 19, fontFamily: 'Inter_700Bold', lineHeight: 24 },
-  heroBodyText:  { fontSize: 12.5, fontFamily: 'Inter_400Regular', lineHeight: 19, marginTop: 7 },
-  heroCta:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 11, paddingVertical: 13, marginTop: 14 },
-  heroCtaText:   { fontSize: 13.5, fontFamily: 'Inter_700Bold' },
+  tileRow:       { flexDirection: 'row', justifyContent: 'space-between', marginTop: GAP },
+  tileCentre:    { alignItems: 'center', marginTop: GAP },
+  tile:          { backgroundColor: colors.cardBg, borderRadius: 24, padding: 10, paddingBottom: 14, ...shadow },
+  tileArt:       { width: '100%', aspectRatio: 1.25, borderRadius: 18, padding: 8, overflow: 'hidden' },
+  tileImg:       { width: '100%', height: '100%' },
+  tileTitle:     { fontSize: 14.5, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 10, paddingHorizontal: 4 },
+  tileSub:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 16, marginTop: 3, paddingHorizontal: 4 },
 
-  warn:          { marginTop: 12, backgroundColor: '#FFF6E0', borderWidth: 1, borderColor: '#F3DDA4', borderRadius: 12, padding: 12 },
-  warnText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#6B4E00', lineHeight: 18 },
-  warnStrong:    { fontFamily: 'Inter_700Bold' },
+  bar:           { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 16, marginTop: GAP, ...shadow },
+  chat:          { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  barCopy:       { flex: 1 },
+  barTitle:      { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  barSub:        { fontSize: 12.5, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 2, opacity: 0.88 },
+
+  opening:       { marginTop: 14 },
+  failText:      { marginTop: 10, fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center' },
 })
