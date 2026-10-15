@@ -212,6 +212,16 @@ export default function ConnectivityLandingScreen({ lang, onBack, onOperatorLoad
           <Ionicons name="chevron-forward" size={20} color={onSecondary} />
         </TouchableOpacity>
 
+        {/* ADA's own voice, so FIXED colours, never the operator's: in the partner's brand it would
+            read as the partner warning you off competitors. Below the bar, small and flat (no
+            shadow) so it never competes with the tiles. */}
+        <View style={s.warn}>
+          <Text style={s.warnText}>
+            <Text style={s.warnStrong}>{t('connWarnTitle', lang)} </Text>
+            {t('connWarnBody', lang)}
+          </Text>
+        </View>
+
         {opening && <ActivityIndicator style={s.opening} color={secondary} />}
         {openFailed && <Text style={s.failText}>{t('connOpenFailed', lang)}</Text>}
       </>
@@ -265,6 +275,10 @@ const s = StyleSheet.create({
   barCopy:       { flex: 1 },
   barTitle:      { fontSize: 15, fontFamily: 'Inter_700Bold' },
   barSub:        { fontSize: 12.5, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 2, opacity: 0.88 },
+
+  warn:          { marginTop: 18, backgroundColor: '#FFF8E8', borderWidth: 1, borderColor: '#F3E2B8', borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 },
+  warnText:      { fontSize: 11.5, fontFamily: 'Inter_400Regular', color: '#6B4E00', lineHeight: 16 },
+  warnStrong:    { fontFamily: 'Inter_700Bold' },
 
   opening:       { marginTop: 14 },
   failText:      { marginTop: 10, fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center' },
