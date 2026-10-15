@@ -115,6 +115,20 @@ try {
       }
     }
 
+    // The landing (20261113) renders three tiles and a support bar, one connectivity_links row
+    // each. A missing slug would leave a hole, so the landing shows its error state instead:
+    // all four must be active, and each must be https.
+    const LINK_SLUGS = ['tasi', 'turist', 'yenihat', 'support']
+    try {
+      const links = await get(`connectivity_links?select=slug,url&operator_id=eq.${op.id}&is_active=eq.true&order=sort_order.asc`)
+      for (const l of links) console.log(`    link ${l.slug.padEnd(8)} ${l.url}`)
+      const missing = LINK_SLUGS.filter(sl => !links.some(l => l.slug === sl))
+      if (missing.length) problems.push(`${op.name}: landing link(s) missing or inactive: ${missing.join(', ')} — the landing would render its error state.`)
+      for (const l of links) if (!/^https:\/\//.test(l.url ?? '')) problems.push(`${op.name}: link ${l.slug} is not https: ${l.url}`)
+    } catch (e) {
+      problems.push(`${op.name}: could not read connectivity_links (${e.message}) — the landing would render its error state.`)
+    }
+
     if (!op.support_phone) {
       problems.push(`${op.name} has no support_phone — the secondary CTA on screen 3 would be dead.`)
     }
