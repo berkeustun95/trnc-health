@@ -41,6 +41,19 @@ const GAP = 12
 const CARD_PAD = 18
 const HERO_SHARE = 0.44        // of the card's inner width
 const HERO_ASPECT = 700 / 637  // kktcell-hero.png
+// The column never grows past a large phone: on a tablet the card, art and tiles keep their phone
+// proportions, centred, instead of scaling up to a 490 pt hero and 390 pt tiles.
+const MAX_COLUMN = 480
+
+// Every size the layout derives from the window, in one place.
+function landingGeometry(screenW) {
+  const columnW = Math.min(screenW - GUTTER * 2, MAX_COLUMN)
+  const tileW = Math.floor((columnW - GAP) / 2)
+  const innerW = columnW - CARD_PAD * 2
+  const heroW = Math.round(innerW * HERO_SHARE)
+  const heroH = Math.round(heroW / HERO_ASPECT)
+  return { columnW, tileW, innerW, heroW, heroH }
+}
 
 function withAlpha(hex, a) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''))
@@ -156,16 +169,13 @@ export default function ConnectivityLandingScreen({ lang, onBack, onOperatorLoad
       return <ConnectivityErrorState lang={lang} onRetry={onRetry} retrying={retrying} />
     }
 
-    const tileW = Math.floor((screenW - GUTTER * 2 - GAP) / 2)
     // Copy and art sit side by side, never overlapping: the copy column ends where the art begins,
     // so a long locale wraps instead of running under the characters.
-    const innerW = screenW - GUTTER * 2 - CARD_PAD * 2
-    const heroW = Math.round(innerW * HERO_SHARE)
-    const heroH = Math.round(heroW / HERO_ASPECT)
+    const { columnW, tileW, innerW, heroW, heroH } = landingGeometry(screenW)
     const tints = { primary: withAlpha(primary, 0.22), secondary: withAlpha(secondary, 0.09) }
 
     return (
-      <>
+      <View style={{ width: columnW, alignSelf: 'center' }}>
         <View style={[s.card, { backgroundColor: secondary, minHeight: heroH + CARD_PAD }]}>
           <View style={{ width: innerW - heroW }}>
             <View style={s.brandRow}>
@@ -224,7 +234,7 @@ export default function ConnectivityLandingScreen({ lang, onBack, onOperatorLoad
 
         {opening && <ActivityIndicator style={s.opening} color={secondary} />}
         {openFailed && <Text style={s.failText}>{t('connOpenFailed', lang)}</Text>}
-      </>
+      </View>
     )
   }
 
