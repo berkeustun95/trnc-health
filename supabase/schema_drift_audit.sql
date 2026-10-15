@@ -881,7 +881,14 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('driving_school_branches', 'lat', false, NULL, 'double precision'),
     ('driving_school_branches', 'lng', false, NULL, 'double precision'),
     ('driving_school_branches', 'geocode_source', false, NULL, 'text'),
-    ('driving_school_branches', 'sort_order', true, '0', 'integer')
+    ('driving_school_branches', 'sort_order', true, '0', 'integer'),
+    ('connectivity_links', 'id', true, 'gen_random_uuid()', 'uuid'),
+    ('connectivity_links', 'operator_id', true, NULL, 'uuid'),
+    ('connectivity_links', 'slug', true, NULL, 'text'),
+    ('connectivity_links', 'url', true, NULL, 'text'),
+    ('connectivity_links', 'sort_order', true, '0', 'integer'),
+    ('connectivity_links', 'is_active', true, 'false', 'boolean'),
+    ('connectivity_links', 'created_at', true, 'now()', 'timestamp with time zone')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -959,6 +966,11 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('claim_requests_requester_id_fkey', '', 'id|requester_id'),
     ('claim_requests_status_check', 'approved|pending|rejected', 'status'),
     ('claim_requests_verified_by_fkey', '', ''),
+    ('connectivity_links_operator_id_fkey', '', 'id|operator_id'),
+    ('connectivity_links_operator_slug_key', '', 'operator_id|slug'),
+    ('connectivity_links_pkey', '', 'id'),
+    ('connectivity_links_slug_check', 'support|tasi|turist|yenihat', 'slug'),
+    ('connectivity_links_url_check', '^https://', 'url'),
     ('contact_events_action_check', 'book|call|call_secondary|email|facebook|instagram|maps|route_complete|website|whatsapp', 'action'),
     ('contact_events_lang_check', 'Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish', 'lang'),
     ('contact_events_module_check', 'accommodation|connectivity|ehliyet|events|explore|garages|grooming|homeServices|hotels|insurance|jobs|pets|studentHub|towing|transport', 'module'),

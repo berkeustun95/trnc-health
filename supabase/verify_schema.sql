@@ -120,7 +120,9 @@ WITH report AS (
     -- pre-repo (dashboard-era), first given a policy by 20261079: the duty screen's coordinates.
     ('pre-repo','pharmacy_coords'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
-    ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents')
+    ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents'),
+    -- Bağlantı & eSIM landing link targets (1113).
+    ('1113_connectivity_links','connectivity_links')
   ) e(m,o)
 
   UNION ALL
@@ -347,7 +349,15 @@ WITH report AS (
     -- 1087. The thread a message row opens. utils/notificationRoute.js selects it (falls back on 42703).
     ('1087_notifications_conversation_id','notifications','conversation_id'),
     -- 1112. App language on a KKTCELL handoff tap. The outbox sends it only for connectivity taps.
-    ('1112_contact_events_connectivity','contact_events','lang')
+    ('1112_contact_events_connectivity','contact_events','lang'),
+    -- 1113. The new eSIM landing reads every one of these (lib/connectivity.js fetchLinks).
+    ('1113_connectivity_links','connectivity_links','id'),
+    ('1113_connectivity_links','connectivity_links','operator_id'),
+    ('1113_connectivity_links','connectivity_links','slug'),
+    ('1113_connectivity_links','connectivity_links','url'),
+    ('1113_connectivity_links','connectivity_links','sort_order'),
+    ('1113_connectivity_links','connectivity_links','is_active'),
+    ('1113_connectivity_links','connectivity_links','created_at')
 
   ) e(m,t,c)
 
@@ -912,7 +922,13 @@ WITH report AS (
     -- 1087. A foreign key, registered here for existence; its ON DELETE action is an H token.
     ('1087_notifications_conversation_id','notifications_conversation_id_fkey'),
     -- 1112. Its allowed set (nine full language names) is an H token.
-    ('1112_contact_events_connectivity','contact_events_lang_check')
+    ('1112_contact_events_connectivity','contact_events_lang_check'),
+    -- 1113. The slug set and the policy are H tokens.
+    ('1113_connectivity_links','connectivity_links_pkey'),
+    ('1113_connectivity_links','connectivity_links_operator_id_fkey'),
+    ('1113_connectivity_links','connectivity_links_operator_slug_key'),
+    ('1113_connectivity_links','connectivity_links_slug_check'),
+    ('1113_connectivity_links','connectivity_links_url_check')
 
   ) e(m,o)
 
@@ -3655,6 +3671,31 @@ WITH report AS (
                   AND EXISTS (SELECT 1 FROM information_schema.columns
                                WHERE table_schema='public' AND table_name='contact_events' AND column_name='lang')), false)
     -- ── CONNECTIVITY-CONTACT-EVENTS:END ──
+    -- ── 1113: connectivity_links (the eSIM landing's tile + support URLs) ──────────
+    -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1113_connectivity_links','connectivity_links.is_active DEFAULT false',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='connectivity_links' AND column_name='is_active'
+          AND column_default = 'false') = 1
+    -- (2) The slug vocabulary is exactly the four targets the landing renders (an exact SET).
+    UNION ALL SELECT '1113_connectivity_links','connectivity_links slug CHECK is exactly tasi/turist/yenihat/support',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.connectivity_links') AND c.conname = 'connectivity_links_slug_check')
+      IS NOT DISTINCT FROM ARRAY['support','tasi','turist','yenihat']
+    -- (3) Exactly one permissive SELECT policy for anon + authenticated on is_active; clients SELECT-only;
+    --     service_role writes (control).
+    UNION ALL SELECT '1113_connectivity_links','connectivity_links: 1 SELECT policy (is_active), RLS on, clients SELECT-only, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.connectivity_links')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='connectivity_links') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='connectivity_links'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual = 'is_active')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.connectivity_links'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.connectivity_links'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND has_table_privilege('anon', to_regclass('public.connectivity_links'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.connectivity_links'), 'SELECT')
+               AND has_table_privilege('service_role', to_regclass('public.connectivity_links'), 'SELECT,INSERT,UPDATE,DELETE'), false)
     -- ── 1104: Duyurular in the waitlist notify path ──────────────────────────────
     -- CREATE OR REPLACE only: no named object. Both bodies must name the module, and the RPC
     -- must still be closed to anon (positive control: the admin guard text is still there).
