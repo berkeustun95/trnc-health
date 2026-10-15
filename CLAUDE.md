@@ -333,7 +333,9 @@ senior-backend-engineer / data-content-engineer → security-code-reviewer + tra
 + ui-ux-designer (any UI change) → qa-tester → (FAIL: back to the senior, repeat until PASS) → release-engineer.
 The three reviewers are read-only.
 ui-ux-designer preloads `.claude/skills/` ada-style + frontend-design + ada-*-audit; its eyes are
-`scripts/screenshot-android.sh` (Mac emulator `ada_pixel` only; Hermes has no KVM). One screen per polish PR.
+`scripts/screenshot-android.sh` on Berke's Android phone over USB (`--prep` … `--shutdown`); the `ada_pixel`
+emulator is a 1-vCPU fallback on this Intel Mac; Hermes has no KVM. One screen per polish PR. Parked
+backlog: `~/trnc-health/.designer/backlog.md` (local, git-excluded).
 Principal never ships its own unreviewed code; release-engineer never runs without a QA PASS.
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
