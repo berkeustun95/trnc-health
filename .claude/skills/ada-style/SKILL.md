@@ -25,7 +25,10 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 ## 2. Mix v2 Home (HOME_V2_LIVE + REDESIGN_LIVE, both true)
 - Page ground: `colors.canvas` `#F4F6F5`. White cards (`colors.card`) separate from it by
   `elevation.card` only (the two are 1.09:1). Never add a second background surface.
-- Hero photo band on top (`RedesignHero`), then widgets, favourites, then the four service panels.
+- Order (`screens/HomeScreen.js` renderHubRedesign): `RedesignHero` photo band → `OliBar` → widgets
+  (duty / event, `Widgets.js`) → `DuyurularBanner` → favourites → the four `ServicePanels` → bottom ad slot.
+- Fonts: Inter today. `TILE_FONT_MANROPE` (off) and the unmerged Playfair section headers (`HOME_POLISH_LIVE`,
+  off) are dormant experiments; if either ships, update this file in the same PR.
 - Ink: `colors.textPrimary` `#1A2B33`, secondary `colors.textSecondary` `#55657A`, tile labels `colors.tileInk` `#3F4E57`.
 
 ## 3. Home tiles: soft-tinted, labels Medium

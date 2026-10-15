@@ -11,6 +11,8 @@ Berke first (native build, versions pinned to SDK 54). Use RN `Animated` / `Layo
 ## Rules
 - **Animate only to explain a change:** something appeared, moved, opened, was confirmed. No ambient,
   looping or decorative motion; no fade-up on every row (one orchestrated entrance at most per screen).
+  Sanctioned exception: `OliBar`'s crossfade (Berke's Home v3 call; pauses off-screen, in background and
+  under Reduce Motion). Do not flag it; any NEW ambient motion needs Berke's call.
 - **Durations:** `motion.fast` 180 (press, small state changes), `motion.base` 250 (content swap),
   `motion.sheetIn` 280 / `sheetOut` 220 (sheets: exits faster than entries), `motion.spring`
   {bounciness 4, speed 12}. No raw durations.
