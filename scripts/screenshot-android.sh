@@ -4,6 +4,7 @@
 #   scripts/screenshot-android.sh <name>            → .screenshots/<YYYY-MM-DD>/<name>.png, prints the path
 #   scripts/screenshot-android.sh --boot            → start AVD ada_pixel headless-ish, wait for boot, set demo mode
 #   scripts/screenshot-android.sh --tap X Y | --swipe X1 Y1 X2 Y2 | --back | --text "..."
+#   scripts/screenshot-android.sh --shutdown        → stop the emulator (~2.5 GB RAM) when the session is done
 #
 # Mac only: the Hermes server has no emulator (no KVM) and ADA has no react-native-web, so visual
 # checks run here. .screenshots/ is gitignored; never commit screenshots under docs/ (GitHub Pages is public).
@@ -42,11 +43,19 @@ case "${1:-}" in
     "$ADB" reverse tcp:8081 tcp:8081 >/dev/null
     echo "booted: $("$ADB" devices | awk 'NR==2{print $1}')"
     ;;
+  --shutdown)
+    if "$ADB" devices | grep -q '^emulator-'; then
+      "$ADB" emu kill >/dev/null 2>&1 || true
+      for _ in $(seq 1 20); do "$ADB" devices | grep -q '^emulator-' || break; sleep 1; done
+    fi
+    pkill -f "qemu-system.*-avd $AVD" 2>/dev/null || true
+    echo "emulator stopped"
+    ;;
   --tap)   need_device; "$ADB" shell input tap "$2" "$3" ;;
   --swipe) need_device; "$ADB" shell input swipe "$2" "$3" "$4" "$5" "${6:-300}" ;;
   --back)  need_device; "$ADB" shell input keyevent KEYCODE_BACK ;;
   --text)  need_device; "$ADB" shell input text "$(printf '%s' "$2" | sed 's/ /%s/g')" ;;
-  ""|-h|--help) sed -n 2,10p "$0"; exit 0 ;;
+  ""|-h|--help) sed -n 2,11p "$0"; exit 0 ;;
   *)
     need_device
     name="$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-')"

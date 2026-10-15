@@ -82,3 +82,6 @@ deno.lock
 
 # Designer screenshots (scripts/screenshot-android.sh); never commit them
 .screenshots/
+
+# Designer agent parked backlog (local only; repo is public)
+.designer/

@@ -36,6 +36,14 @@ react-native-web, so on the server say "visual check pending: Mac only" and audi
 Test identity: a guest or a real customer account, never an admin (admins never reach Home and change
 sorting). Dark modules only via a LOCAL, uncommitted flag flip you revert before returning.
 Screenshots live in `.screenshots/` (gitignored). Never put them under `docs/` (public GitHub Pages).
+**Always end a session with `scripts/screenshot-android.sh --shutdown`** (and stop the Metro you started):
+the emulator holds ~2.5 GB RAM on a 2-core Mac. Also on any early exit or failure.
+
+## Parked backlog
+`~/trnc-health/.designer/backlog.md` (local, git-excluded: the repo is public; never commit or paste it
+into a PR). Start every audit from it: re-check each item with real screenshots and mark it confirmed
+(with screenshot path), changed or dropped. Fixes stay parked until Berke says go. Its "Pending decisions"
+are never acted on without his explicit go. On the server the file does not exist: say so.
 
 ## Process
 **a) Audit (no code).** Screenshot each screen in its real states (loaded, and where reachable: loading,

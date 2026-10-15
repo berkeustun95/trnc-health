@@ -27,8 +27,9 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
   `elevation.card` only (the two are 1.09:1). Never add a second background surface.
 - Order (`screens/HomeScreen.js` renderHubRedesign): `RedesignHero` photo band → `OliBar` → widgets
   (duty / event, `Widgets.js`) → `DuyurularBanner` → favourites → the four `ServicePanels` → bottom ad slot.
-- Fonts: Inter today. `TILE_FONT_MANROPE` (off) and the unmerged Playfair section headers (`HOME_POLISH_LIVE`,
-  off) are dormant experiments; if either ships, update this file in the same PR.
+- Fonts: Inter only today. `TILE_FONT_MANROPE` (Manrope tile labels) and `HOME_POLISH_LIVE` (Playfair
+  section headers, unmerged `02c68bd`) are OFF-FLAG EXPERIMENTS. If either ships, this file must be
+  updated in the same PR.
 - Ink: `colors.textPrimary` `#1A2B33`, secondary `colors.textSecondary` `#55657A`, tile labels `colors.tileInk` `#3F4E57`.
 
 ## 3. Home tiles: soft-tinted, labels Medium
@@ -57,12 +58,16 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Text straight on the photo is white and must sit on the header scrim or a dark pill (`PILL_ALPHA` 0.55,
   `OnPhotoLabel`, `SectionHeader`). `npm run hero:check` bounds all of these over a pure white pixel.
 
-## 6. No navy anywhere
-- No navy surface, header, bar, button, chip, sheet or gradient in ADA's own frame. Brand colour is the
+## 6. No dark or navy colours
+- No dark or navy colour anywhere in ADA's own frame: no surface, header, bar, button, chip, sheet,
+  icon or gradient. Use existing theme colours only. Brand colour is the
   teal `colors.primary` `#0E7C7B` / `primaryDark` `#0A5E5D`, accent `#FF8552`.
 - `textPrimary` `#1A2B33` is ink, not a surface: allowed as text, never as a fill for large areas.
-- Known: `ModuleScreen` root `#22313A` (dark slate shown only before the photo paints) and
-  `category.city` ink `#2F55B5`. Flag them in an audit; do not change them without Berke's call.
+- PENDING FIX (approved by Berke 2026-10-15, NOT done yet): `ModuleScreen` root `#22313A`
+  (`components/ui/ModuleScreen.js`, the ground shown before the photo paints) and `category.city` ink
+  `#2F55B5` (city panel dot + icons) are to be replaced with EXISTING theme colours. Do it only as its
+  own slice when Berke says go, with before/after screenshots for his approval. Until then: leave them,
+  and do not report them as new findings.
 - Partner brand colours (e.g. KKTCELL navy, kept via `brandInk`) are partner content, see §7.
 
 ## 7. Partner screens: restyle ADA's frame only
@@ -75,6 +80,12 @@ or partners, or partner buttons (labels, colours, targets). Partner surfaces inc
 Anything that changes how a partner LOOKS (even a frame change that crops, recolours or reorders their
 content) → stop and flag it for Berke's approval. A paid placement must still read as distinct from ADA's
 editorial guidance.
+
+## 8. Event page "Bilet al": pending partner decision
+The position of the "Bilet al" (buy ticket) button on the event detail page (`EventDetailScreen` in
+`screens/EventsScreen.js`, today after the description) is a PENDING PARTNER DECISION. Never move,
+pin, restyle its placement or reorder around it without Berke's explicit go. Audits may mention it
+once as "pending Berke", never as a fix.
 
 ## Type, radii, spacing, elevation, motion (theme.js)
 - Fonts: Inter only (`font.regular/medium/semibold/bold`); `check-font-family.mjs` guards it.
