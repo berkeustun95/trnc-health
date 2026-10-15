@@ -54,19 +54,22 @@ case "${1:-}" in
     [[ ${#req} -ge 3 ]] || { echo "usage: ada-team run \"<request>\""; exit 2; }
     id=$(date +%Y%m%d-%H%M%S); out=$JOBS/$id.md; report=$REPO/reports/job-$id.md
     git -C "$REPO" fetch -q origin
-    # The team runs on the agents Berke merged: edits to .claude/agents happen in a worktree on agent/*.
-    drift=$( { git -C "$REPO" diff --name-only HEAD -- .claude/agents
-               git -C "$REPO" ls-files --others -- .claude/agents; } | sort -u | tr '\n' ' ')
-    git -C "$REPO" restore --source=HEAD --staged --worktree -- .claude/agents
-    git -C "$REPO" clean -fdxq -- .claude/agents
+    # The team runs on the agents AND skills Berke merged: edits to either happen in a worktree on agent/*.
+    # Both are forced to origin/main, because an agent's `skills:` preload names skill folders: a stale
+    # .claude/skills (the ff-only below is skipped on a dirty tree) would run a new agent without its skills.
+    TEAM_DIRS=(.claude/agents .claude/skills)
+    drift=$( { git -C "$REPO" diff --name-only HEAD -- "${TEAM_DIRS[@]}"
+               git -C "$REPO" ls-files --others -- "${TEAM_DIRS[@]}"; } | sort -u | tr '\n' ' ')
+    git -C "$REPO" restore --source=HEAD --staged --worktree -- "${TEAM_DIRS[@]}"
+    git -C "$REPO" clean -fdxq -- "${TEAM_DIRS[@]}"
     [[ -z "$(git -C "$REPO" status --porcelain --untracked-files=no)" ]] && git -C "$REPO" checkout -q main && git -C "$REPO" merge -q --ff-only origin/main || true
-    git -C "$REPO" restore --source=origin/main --staged --worktree -- .claude/agents
-    if [[ -n "$(git -C "$REPO" diff --name-only origin/main -- .claude/agents)$(git -C "$REPO" diff --cached --name-only origin/main -- .claude/agents)$(git -C "$REPO" ls-files --others -- .claude/agents)" ]]; then
-      echo "REFUSED: .claude/agents in $REPO still differs from origin/main after the reset"; exit 1
+    git -C "$REPO" restore --source=origin/main --staged --worktree -- "${TEAM_DIRS[@]}"
+    if [[ -n "$(git -C "$REPO" diff --name-only origin/main -- "${TEAM_DIRS[@]}")$(git -C "$REPO" diff --cached --name-only origin/main -- "${TEAM_DIRS[@]}")$(git -C "$REPO" ls-files --others -- "${TEAM_DIRS[@]}")" ]]; then
+      echo "REFUSED: ${TEAM_DIRS[*]} in $REPO still differ from origin/main after the reset"; exit 1
     fi
     echo "$req" > "$JOBS/$id.request"
     : > "$out"
-    [[ -z "$drift" ]] || echo "(reset .claude/agents to origin/main before this run; discarded: $drift)" >> "$out"
+    [[ -z "$drift" ]] || echo "(reset .claude/agents + .claude/skills to origin/main before this run; discarded: $drift)" >> "$out"
     cd "$REPO"
     timeout 3h /usr/local/bin/claude -p --agent principal-engineer --permission-mode dontAsk --output-format text \
 "Request from Berke via Telegram (job $id). You are on the Hermes server: follow the 'Hermes server' section of CLAUDE.md and release-engineer's 'On the Hermes server' flow (agent/* branches, wrappers, no production). If you need a decision from Berke, stop and end your report with ONE question. Write your full report to $report.
