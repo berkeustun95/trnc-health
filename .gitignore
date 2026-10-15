@@ -79,3 +79,9 @@ supabase/.temp/
 deno.lock
 # agent run reports (Hermes / ada-team) — local output, never committed
 /reports/
+
+# Designer screenshots (scripts/screenshot-android.sh); never commit them
+.screenshots/
+
+# Designer agent parked backlog (local only; repo is public)
+.designer/

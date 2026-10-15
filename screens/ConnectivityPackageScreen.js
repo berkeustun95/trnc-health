@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import { logContactEvent } from '../utils/logContactEvent'
 import StoreMap from '../components/StoreMap'
-import { packageHandoffUrl, handoffHost, fetchStores, storeDirectionsUrl, mappableStores } from '../lib/connectivity'
+import { packageHandoffUrl, handoffHost, fetchStores, storeDirectionsUrl, mappableStores, openHandoff } from '../lib/connectivity'
 
 // Bağlantı & eSIM — package detail and application handoff (screen 3 of 3).
 //
@@ -19,60 +19,6 @@ const STEPS = [
   { titleKey: 'connStep2Title', bodyKey: 'connStep2Body' },
   { titleKey: 'connStep3Title', bodyKey: 'connStep3Body' },
 ]
-
-// ─── THE HANDOFF, AND WHY IT IS require()D INSIDE THE HANDLER ───────────────
-//
-// ⚠ THIS `require` MUST STAY INSIDE THE FUNCTION. It is not a style choice and it is not a
-//   lazy-loading optimisation — it is the single thing standing between an ordinary OTA and
-//   a launch crash on every phone that has not taken the native build.
-//
-//   expo-web-browser was added on 2026-09-13 and is a NATIVE module. Its entry point,
-//   expo-web-browser/build/ExpoWebBrowser.js, is two lines:
-//       import { requireNativeModule } from 'expo-modules-core'
-//       export default requireNativeModule('ExpoWebBrowser')
-//   — a top-level call. A static `import` at the head of this file would therefore run
-//   requireNativeModule the moment the BUNDLE IS EVALUATED, which happens at launch, on
-//   every device, whether or not anybody opens this screen. On a production binary built
-//   before that date the module does not exist and it throws.
-//
-//   runtimeVersion.policy is 'appVersion' (app.config.js), which does NOT fence those older
-//   binaries unless the version is bumped, so an `eas update` carrying a static import would
-//   reach them. Inside the handler the worst case is instead a single failed tap on a screen
-//   that CONNECTIVITY_LIVE already makes unreachable — and even that degrades, below, to the
-//   system browser rather than to nothing.
-//
-// ─── AND WHY NOT A WEBVIEW ──────────────────────────────────────────────────
-//
-// openBrowserAsync gives SFSafariViewController on iOS and Custom Tabs on Android. Both show
-// the REAL ADDRESS BAR. The user types passport details on the other side of this tap, so
-// they must be able to see whose site they are on and that it is HTTPS. A WKWebView would
-// render the same page chromeless and indistinguishable from a page ADA had written itself,
-// which is exactly the shape of a credential-harvesting screen. Do not "improve" this by
-// keeping the user in-app.
-async function openHandoff(url, brand) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const WebBrowser = require('expo-web-browser')
-    await WebBrowser.openBrowserAsync(url, {
-      toolbarColor: brand.secondary,          // Android Custom Tabs
-      controlsColor: brand.onSecondary,       // iOS SFSafariViewController tint
-      dismissButtonStyle: 'close',
-      enableBarCollapsing: true,
-    })
-    return true
-  } catch {
-    // The native module is absent (an OTA on an older binary) or the browser could not be
-    // presented. Linking.openURL leaves the app for the system browser: a worse experience —
-    // the user loses the in-app return — but they still reach the page they asked for, and
-    // they still see a real address bar.
-    try {
-      await Linking.openURL(url)
-      return true
-    } catch {
-      return false
-    }
-  }
-}
 
 // One branch. The "Yol tarifi" action is hidden rather than dead when the row carries
 // neither maps_url nor coordinates — an address-only branch is a legitimate row, and a CTA
