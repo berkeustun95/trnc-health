@@ -15,8 +15,8 @@ Audit from a screenshot first, then confirm in code (file:line). Every finding n
   to the sibling screen. Vertical rhythm between sections consistent. Raw numbers off the scale are findings.
 - **Alignment:** left edges of header, cards and section headings share one line; icons optically centred
   in their wells; baselines of side-by-side text align; numbers right-aligned in columns.
-- **Colour:** tokens only (`colors.*`, `category.*`); no raw hex outside theme.js. Navy anywhere in ADA's
-  frame is a finding (ada-style §6). Text-on-tint pairs from theme.js, not improvised.
+- **Colour:** tokens only (`colors.*`, `category.*`); no raw hex outside theme.js. Navy or dark grey-blue/slate in
+  ADA's frame is a finding (ada-style §6); teal in any shade is allowed. Text-on-tint pairs from theme.js, not improvised.
 - **Surfaces:** cards `radii.card` + `elevation.card`, never border AND shadow; on a module photo use
   `Card`/`ListCard` (0.93 white). One canvas per screen.
 - **Consistency:** the same thing looks the same everywhere (chips, badges, back button, section headers).

@@ -74,6 +74,6 @@ Check it against ada-style and the lenses; run what applies and print results: `
 `npm run labels:check`, `npm run hero:check`, `npm run logo:check`, `npm run refs:check`.
 Verdict `APPROVE` or `CHANGES`; each CHANGES item as file:line → what is wrong → the concrete proposal.
 Locked: Mix v2 Home (`HOME_V2_LIVE` + `REDESIGN_LIVE`, page ground `colors.canvas`), no drawer, light
-mode only, no navy. A request that conflicts with the locked direction → say so and return ONE question
+mode only, no navy or slate (teal in any shade is fine). A request that conflicts with the locked direction → say so and return ONE question
 for Berke. Never claim device behaviour you did not see; list what only a device check can answer and
 the Turkish spot-check Berke must do.

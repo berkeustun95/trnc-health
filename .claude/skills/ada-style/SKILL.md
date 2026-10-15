@@ -1,6 +1,6 @@
 ---
 name: ada-style
-description: ADA's locked visual direction and exact design tokens (Mix v2 Home, light mode, tiles, floating pill tab bar, photo-backed module screens, partner-screen rule, no navy). Load before designing, auditing or changing any ADA screen, component or style.
+description: ADA's locked visual direction and exact design tokens (Mix v2 Home, light mode, tiles, floating pill tab bar, photo-backed module screens, partner-screen rule, no navy or slate). Load before designing, auditing or changing any ADA screen, component or style.
 ---
 
 # ADA style: locked decisions
@@ -58,10 +58,13 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Text straight on the photo is white and must sit on the header scrim or a dark pill (`PILL_ALPHA` 0.55,
   `OnPhotoLabel`, `SectionHeader`). `npm run hero:check` bounds all of these over a pure white pixel.
 
-## 6. No dark or navy colours
-- No dark or navy colour anywhere in ADA's own frame: no surface, header, bar, button, chip, sheet,
-  icon or gradient. Use existing theme colours only. Brand colour is the
-  teal `colors.primary` `#0E7C7B` / `primaryDark` `#0A5E5D`, accent `#FF8552`.
+## 6. No navy and no dark grey-blue/slate
+- No navy and no dark grey-blue/slate anywhere in ADA's own frame: no surface, header, bar, button, chip,
+  sheet, icon or gradient. Use existing theme colours only.
+- ADA's TEAL IS ALLOWED IN ANY SHADE, dark teal included (`DuyurularBanner` `#0B4544`, `OliBar` `#084B4A`,
+  `colors.primary` `#0E7C7B`, `primaryDark` `#0A5E5D`, `primaryLight`). Accent `#FF8552`. Do not flag dark teal.
+- Black-alpha scrims and dark pills over photos (`MODULE_TINT`, `HEADER_SCRIM`, `PILL_ALPHA`) are photo
+  treatment, not a colour, and stay.
 - `textPrimary` `#1A2B33` is ink, not a surface: allowed as text, never as a fill for large areas.
 - PENDING FIX (approved by Berke 2026-10-15, NOT done yet): `ModuleScreen` root `#22313A`
   (`components/ui/ModuleScreen.js`, the ground shown before the photo paints) and `category.city` ink
