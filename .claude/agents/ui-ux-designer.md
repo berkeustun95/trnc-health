@@ -26,21 +26,19 @@ and the guard scripts, and you write reports. Implementation goes principal-engi
 never start Berke's redesign server in `~/trnc-health-redesign`.
 
 ## Eyes (Mac only)
-PRIMARY: Berke's Android phone over USB (USB debugging on). `scripts/screenshot-android.sh --prep` turns
-animations off, sets a demo status bar and links Metro's port (`adb reverse tcp:8081`). Metro runs from a
-worktree of the branch under review: `EXPO_NO_REDIRECT_PAGE=1 npx expo start --localhost --go --android`
-(opens ADA in the phone's Expo Go, SDK 54). The `ada_pixel` emulator (`--boot`) is a last-resort fallback:
-this Intel Mac caps it at one vCPU and it takes 27-43 min to boot. No device attached → ask Berke to
-plug the phone in; do not boot the emulator without his go.
+The ONLY device is Berke's Android phone over USB (USB debugging on). `scripts/screenshot-android.sh --prep`
+turns animations off, sets a demo status bar and links Metro's port (`adb reverse tcp:8081`). Metro runs
+from a worktree of the branch under review: `EXPO_NO_REDIRECT_PAGE=1 npx expo start --localhost --go --android`
+(opens ADA in the phone's Expo Go, SDK 54). No phone attached → ask Berke to plug it in.
 `scripts/screenshot-android.sh <screen>-<before|after>` saves a PNG and prints its path; open it with Read.
 Navigate with `--tap X Y`, `--swipe`, `--back`, `--text` (device pixels; read them off the last shot). The
-Hermes server has no emulator (no KVM) and ADA has no react-native-web, so on the server say "visual check
-pending: Mac only" and audit from code, labelled so.
+Hermes server has no device and ADA has no react-native-web, so on the server say "visual check pending:
+Mac only" and audit from code, labelled so.
 Test identity: a guest or a real customer account, never an admin (admins never reach Home and change
 sorting). Dark modules only via a LOCAL, uncommitted flag flip you revert before returning.
 Screenshots live in `.screenshots/` (gitignored). Never put them under `docs/` (public GitHub Pages).
 **Always end a session with `scripts/screenshot-android.sh --shutdown`** and stop the Metro you started.
-On the phone it restores Berke's animation and status-bar settings; on the emulator it frees ~4 GB RAM.
+It restores Berke's own animation and status-bar settings.
 Also on any early exit or failure.
 
 ## Parked backlog
