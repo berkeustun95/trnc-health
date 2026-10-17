@@ -11,6 +11,7 @@ import { SOURCES } from './sources.mjs'
 import { X509Certificate } from 'node:crypto'
 import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256 } from './lib/ca.mjs'
 import { PARSERS } from './lib/parsers.mjs'
+import { errorClass, systemicFailure } from './lib/runhealth.mjs'
 
 export async function runSelftest() {
   let bad = 0
@@ -124,6 +125,25 @@ export async function runSelftest() {
   t('every source defines every config column', SOURCES.filter(s => COLS.some(c => s[c] === undefined || s[c] === null)).map(s => s.key), [])
   t('intervals are 30 min (yearly calendar: daily) and within the DB CHECK', [...new Set(SOURCES.map(s => s.fetch_interval_min))].sort((a, b) => a - b), [30, 1440])
   t('categories/regions inside the CHECKs', SOURCES.filter(s => !CATS.includes(s.category) || !REGS.includes(s.region)).map(s => s.key), [])
+
+  console.log('Run health (2026-10-17: 13 long-dead sources + 5 one-off failures turned a run red)')
+  const fetchFailed = code => Object.assign(new Error('fetch failed'), { cause: Object.assign(new Error('x'), { code }) })
+  t('fetch failed + ECONNRESET → ECONNRESET', errorClass(fetchFailed('ECONNRESET')), 'ECONNRESET')
+  t('fetch failed + cert code → the code', errorClass(fetchFailed('UNABLE_TO_VERIFY_LEAF_SIGNATURE')), 'UNABLE_TO_VERIFY_LEAF_SIGNATURE')
+  t('abort → timeout', errorClass(Object.assign(new Error('This operation was aborted'), { name: 'AbortError' })), 'timeout')
+  t('HTTP 503 → HTTP 503', errorClass(new Error('HTTP 503')), 'HTTP 503')
+  t('a message with a URL is never echoed', errorClass(new Error('page https://x.gov.ct.tr/a: boom')), 'other')
+  const run = (dead, flaky, healthy) => [
+    ...Array.from({ length: dead }, (_, i) => ({ key: `d${i}`, status: 'failed' })),
+    ...Array.from({ length: flaky }, (_, i) => ({ key: `f${i}`, status: 'failed' })),
+    ...Array.from({ length: healthy }, (_, i) => ({ key: `h${i}`, status: 'ok' }))]
+  const prev = k => (k.startsWith('d') ? 186 : 0)
+  t('run 39004347106: 13 dead + 5 flaky of 61 → ok', systemicFailure(run(13, 5, 43), prev, 6).red, false)
+  t('the old rule called that red (18 > 15.25)', 18 > Math.max(3, 61 * 0.25), true)
+  t('13 dead + 13 newly failing of 61 → red', systemicFailure(run(13, 13, 35), prev, 6).red, true)
+  t('3 newly failing of 61 → ok', systemicFailure(run(0, 3, 58), prev, 6).red, false)
+  t('every source dead for hours → red (nothing answered)', systemicFailure(run(61, 0, 0), prev, 6).red, true)
+  t('everything not_due → ok', systemicFailure([{ key: 'h0', status: 'not_due' }], prev, 6).red, false)
 
   console.log(bad ? `\n✗ ${bad} self-test failure(s).` : '\n✓ self-test clean.')
   return bad ? 1 : 0
