@@ -68,6 +68,10 @@ jobs:
     permissions:
       contents: read
       actions: write      # the chain step lists and dispatches runs of THIS workflow
+    # Budget (2026-10-17): setup ~1 min + Fetch ≤ 20 + counts ≤ 3, and the chain step sleeps only
+    # until ~28.5 min after RUN_START (0 s once that has passed), so a job ends by ~30 min and
+    # always well inside 60. A Fetch that hits its own 20-min cap is a failed step, not a
+    # cancelled job, so the chain step still runs; only a job-level timeout would break the chain.
     timeout-minutes: 60
     env:
       # A scheduled run has no inputs (inputs.apply is null), so writing is decided here, once:
@@ -98,6 +102,7 @@ jobs:
           node scripts/check-prod-write-guard.mjs
 
       - name: Fetch
+        timeout-minutes: 20
         env:
           FORCE: ${{ inputs.force == true && '--force' || '' }}
           ONLY: ${{ inputs.only || '' }}
@@ -112,8 +117,10 @@ jobs:
           [ -n "$ONLY" ] && set -- "$@" "--only=$ONLY"
           node scripts/fetch-duyurular.mjs "$@"
 
+      # Runs after a failed fetch too, so a red run still shows whether rows changed.
       - name: Database counts (service role read; counts only)
-        if: env.WRITE == 'true'
+        if: ${{ !cancelled() && env.WRITE == 'true' }}
+        timeout-minutes: 3
         run: node scripts/fetch-duyurular.mjs --counts
 
       - name: Upload report
@@ -129,6 +136,7 @@ jobs:
       # A cancelled run does stop it (that is how a human halts it); cron restarts it.
       - name: Chain the next run (~30 min after this one started)
         if: ${{ !cancelled() && env.CHAIN == 'true' }}
+        timeout-minutes: 32
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
