@@ -4398,6 +4398,12 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261107_duty_2026_10_13_lefkosa_tuna.sql')
       OR ((SELECT count(*) FROM public.duty_list WHERE duty_date = '2026-10-13' AND region = 'Lefkoşa' AND name = 'TUNA ECZANESİ') = 1
           AND NOT EXISTS (SELECT 1 FROM public.duty_list WHERE duty_date = '2026-10-13' AND name = 'UMUT ÖKSÜZ ECZANESİ'))
+    -- 1114 is an UPDATE: on 2026-10-17 Lefkoşa's roster names HÜSEYİN SAKALLI in İSMET's place (KTEB notice 17.10.2026).
+    UNION ALL SELECT '20261114_duty_2026_10_17_lefkosa_sakalli','duty_list 2026-10-17: HÜSEYİN (KERİM) SAKALLI in Lefkoşa, no İSMET ECZANESİ, once 1114 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261114_duty_2026_10_17_lefkosa_sakalli.sql')
+      OR ((SELECT count(*) FROM public.duty_list WHERE duty_date = '2026-10-17' AND region = 'Lefkoşa'
+            AND name IN ('HÜSEYİN SAKALLI ECZANESİ', 'HÜSEYİN KERİM SAKALLI ECZANESİ')) = 1
+          AND NOT EXISTS (SELECT 1 FROM public.duty_list WHERE duty_date = '2026-10-17' AND name = 'İSMET ECZANESİ'))
   ) z
 
   UNION ALL
