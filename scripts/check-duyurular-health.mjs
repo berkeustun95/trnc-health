@@ -30,10 +30,36 @@ export const MAX_FETCH_GAP_H = 2
 export const FAILING_RUNS = 3
 export const MAX_NO_NEW_DAYS = 3
 export const RED_RUN_WINDOW_H = 24
+export const CERT_GROUP_MIN = 3
+
+// 2026-10-17: 13 gov.ct.tr sources failed 190 runs with UNABLE_TO_VERIFY_LEAF_SIGNATURE and this
+// check said only "13 source(s) failing". When CERT_GROUP_MIN+ failing sources share one TLS
+// error class (the fetcher writes `[CLASS] …` into last_error), name it as a certificate change
+// on their common domain. Output carries the class and the domain only (this log is public).
+const CERT_CLASS = /^(UNABLE_TO_VERIFY_LEAF_SIGNATURE|UNABLE_TO_GET_ISSUER_CERT(_LOCALLY)?|SELF_SIGNED_CERT_IN_CHAIN|DEPTH_ZERO_SELF_SIGNED_CERT|CERT_[A-Z_]+|ERR_TLS_CERT_ALTNAME_INVALID)$/
+const commonSuffix = hosts => {
+  const parts = hosts.map(h => h.split('.').reverse())
+  const out = []
+  for (let i = 0; parts.every(p => p[i] !== undefined && p[i] === parts[0][i]); i++) out.push(parts[0][i])
+  return out.length >= 2 ? out.reverse().join('.') : hosts.slice().sort().join(', ')
+}
+export function certGroups(failingRows) {
+  const by = new Map()
+  for (const r of failingRows) {
+    const cls = (/^\[([A-Z0-9_]+)\]/.exec(r.last_error || '') || [])[1]
+    if (!cls || !CERT_CLASS.test(cls)) continue
+    let host = ''
+    try { host = new URL(r.url).host } catch { continue }
+    if (!by.has(cls)) by.set(cls, [])
+    by.get(cls).push(host)
+  }
+  return [...by].filter(([, hosts]) => hosts.length >= CERT_GROUP_MIN)
+    .map(([cls, hosts]) => `certificate change on ${commonSuffix([...new Set(hosts)])}: ${hosts.length} sources fail with ${cls} (fix the chain in scripts/duyurular/lib/ca.mjs; never disable verification)`)
+}
 const H = 36e5, D = 864e5
 
-export function verdict({ lastOk, failing, newest, banner, runs = { red: [] } }, now = Date.now()) {
-  const problems = []
+export function verdict({ lastOk, failing, newest, banner, runs = { red: [] }, certs = [] }, now = Date.now()) {
+  const problems = [...certs]
   if (!lastOk || now - Date.parse(lastOk) > MAX_FETCH_GAP_H * H) problems.push(`no successful fetch in ${MAX_FETCH_GAP_H}+ h (last ${lastOk ?? 'never'})`)
   if (failing.length) problems.push(`${failing.length} source(s) failing ${FAILING_RUNS}+ runs in a row: ${failing.join(', ')}`)
   if (!newest || now - Date.parse(newest) > MAX_NO_NEW_DAYS * D) problems.push(`no new item in ${MAX_NO_NEW_DAYS}+ days (newest ${newest ?? 'none'})`)
@@ -62,6 +88,13 @@ if (process.argv.includes('--self')) {
   t('fetch runs unreadable          ', verdict({ ...ok, runs: { error: 'HTTP 403' } }, now).length, 1)
   t('no token outside CI = skipped  ', verdict({ ...ok, runs: { skipped: true } }, now).length, 0)
   t('everything broken at once      ', verdict({ lastOk: null, failing: ['a(9)'], newest: null, banner: { error: 'x' }, runs: { red: ['1 (failure)'] } }, now).length, 5)
+  const row = (host, cls) => ({ url: `https://${host}/x`, last_error: `[${cls}] fetch failed` })
+  const gov = ['khk', 'saglik', 'rkmmd', 'ticaret'].map(h => row(`${h}.gov.ct.tr`, 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'))
+  t('4 gov.ct.tr leaf-signature → named', certGroups(gov)[0]?.startsWith('certificate change on gov.ct.tr: 4 sources'), true)
+  t('2 sharing a cert error → not grouped', certGroups(gov.slice(0, 2)).length, 0)
+  t('3 timeouts → not a certificate change', certGroups(['a.gov.ct.tr', 'b.gov.ct.tr', 'c.gov.ct.tr'].map(h => row(h, 'timeout'))).length, 0)
+  t('old last_error without a class → ignored', certGroups([1, 2, 3].map(i => ({ url: `https://s${i}.gov.ct.tr/`, last_error: 'fetch failed' }))).length, 0)
+  t('cert group is its own verdict line', verdict({ ...ok, certs: certGroups(gov) }, now).length, 1)
   console.log(bad ? `\nSELF-TEST FAILED (${bad})\n` : '\nself-test clean\n')
   process.exit(bad ? 1 : 0)
 }
@@ -78,7 +111,7 @@ const opts = { auth: { persistSession: false, autoRefreshToken: false } }
 const svc = createClient(url, serviceRoleKey(), opts)
 const anon = createClient(url, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY, opts)
 
-const { data: srcs, error: e1 } = await svc.from('announcement_sources').select('key, last_ok_at, consecutive_failures').eq('active', true)
+const { data: srcs, error: e1 } = await svc.from('announcement_sources').select('key, url, last_ok_at, consecutive_failures, last_error').eq('active', true)
 if (e1) { console.error('read announcement_sources failed:', e1.code, e1.message); process.exit(2) }
 const { data: top, error: e2 } = await svc.from('announcements').select('created_at').order('created_at', { ascending: false }).limit(1)
 if (e2) { console.error('read announcements failed:', e2.code, e2.message); process.exit(2) }
@@ -107,13 +140,15 @@ const lastOk = srcs.map(s => s.last_ok_at).filter(Boolean).sort().at(-1) ?? null
 const failing = srcs.filter(s => s.consecutive_failures >= FAILING_RUNS).map(s => `${s.key}(${s.consecutive_failures})`)
 const newest = top?.[0]?.created_at ?? null
 const banner = e3 || bannerCount == null ? { error: e3 ? `${e3.code} ${e3.message}` : 'no count returned' } : { count: bannerCount }
-const problems = verdict({ lastOk, failing, newest, banner, runs })
+const certs = certGroups(srcs.filter(s => s.consecutive_failures >= FAILING_RUNS))
+const problems = verdict({ lastOk, failing, newest, banner, runs, certs })
 
 const ago = ts => ts ? `${Math.round((Date.now() - Date.parse(ts)) / 6e4)} min ago` : '—'
 console.log('\n── Duyurular pipeline health ──')
 console.log(`  active sources      : ${srcs.length}`)
 console.log(`  last successful fetch: ${lastOk ?? 'never'} (${ago(lastOk)}; limit ${MAX_FETCH_GAP_H} h)`)
 console.log(`  failing ${FAILING_RUNS}+ in a row  : ${failing.length ? failing.join(', ') : 'none'}`)
+if (certs.length) console.log(`  ⚠ ${certs.join('\n  ⚠ ')}`)
 console.log(`  newest item         : ${newest ?? 'none'} (limit ${MAX_NO_NEW_DAYS} days)`)
 console.log(`  banner count (anon) : ${banner.error ? 'UNREADABLE — ' + banner.error : banner.count}`)
 console.log(`  red fetch runs ${RED_RUN_WINDOW_H} h  : ${runs.skipped ? 'not checked (no GITHUB_TOKEN)' : runs.error ? 'UNREADABLE — ' + runs.error : `${runs.red.length} of ${runs.total}${runs.red.length ? ' — ' + runs.red.join(', ') : ''}`}`)
