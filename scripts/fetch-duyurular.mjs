@@ -39,6 +39,7 @@ const { passesFilter, kindOf, categoryOf, CATEGORY_RANK } = await import('./duyu
 const { extractDeadline } = await import('./duyurular/lib/deadline.mjs')
 const { excerptOf, titleKey, oneLine } = await import('./duyurular/lib/text.mjs')
 const { mainText, metaDescription, pdfLinks, pageTitle, pageDate } = await import('./duyurular/lib/page.mjs')
+const { errorClass, systemicFailure } = await import('./duyurular/lib/runhealth.mjs')
 
 // --counts: read back what the database holds (service role: is_published=false rows are
 // invisible to every client role, so no other reader can verify a write). Counts only.
@@ -286,7 +287,8 @@ async function runSource(src) {
     }
   } catch (e) {
     r.status = 'failed'
-    r.errors.unshift(e.message.slice(0, 300))
+    r.error_class = errorClass(e)
+    r.errors.unshift(`[${r.error_class}] ${e.message}`.slice(0, 300))
   }
   return r
 }
@@ -306,7 +308,7 @@ if (APPLY) {
       const payload = r.items.map(({ published_known, deadline_status, expired_on_arrival, ...it }) =>
         ({ ...it, source_id: row.id, is_published: row.publish === true }))
       const ins = await db.from('announcements').upsert(payload, { onConflict: 'official_url', ignoreDuplicates: true })
-      if (ins.error) { r.status = 'failed'; r.errors.unshift(`insert: ${ins.error.code} ${ins.error.message}`.slice(0, 300)) }
+      if (ins.error) { r.status = 'failed'; r.error_class = 'insert'; r.errors.unshift(`insert: ${ins.error.code} ${ins.error.message}`.slice(0, 300)) }
     }
     if (r.status === 'not_due') continue
     const ok = r.status !== 'failed'
@@ -333,10 +335,10 @@ const reportPath = opt('report')
 if (reportPath) writeFileSync(reportPath, JSON.stringify({ totals, results }, null, 2))
 
 console.log(`\nDuyurular ${totals.mode} run — ${totals.sources} sources, ${totals.seconds}s, requests ${JSON.stringify(stats.byKind)}`)
-console.log('key'.padEnd(30), 'status'.padEnd(13), 'http parsed kept  new  dl(f/p/pdf/api)  pdf-blocked')
+console.log('key'.padEnd(30), 'status'.padEnd(13), 'http parsed kept  new  dl(f/p/pdf/api)  pdf-blocked  error')
 for (const r of results) {
   console.log(r.key.padEnd(30), r.status.padEnd(13), String(r.http ?? '-').padStart(4), String(r.parsed).padStart(6), String(r.kept).padStart(4),
-    String(r.new).padStart(4), `  ${r.deadline.feed}/${r.deadline.page}/${r.deadline.pdf}/${r.deadline.api}`.padEnd(17), String(r.pdf.robots_blocked).padStart(6))
+    String(r.new).padStart(4), `  ${r.deadline.feed}/${r.deadline.page}/${r.deadline.pdf}/${r.deadline.api}`.padEnd(17), String(r.pdf.robots_blocked).padStart(6), r.error_class ? `      ${r.error_class}` : '')
 }
 console.log(`\nnew ${totals.new} · with deadline ${totals.with_deadline} ${JSON.stringify(totals.deadline)} · failed sources ${totals.failed}`)
 const failing = results.filter(r => (r.consecutive_failures || 0) >= FAILING_AFTER).map(r => r.key)
@@ -349,5 +351,8 @@ if (inCI() && process.env.GITHUB_STEP_SUMMARY) {
   writeFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n', { flag: 'a' })
 }
 // A systemic failure (network, DB, a shared parser) fails the job so GitHub emails; one broken
-// site does not.
-process.exit(totals.failed > Math.max(3, results.length * 0.25) ? 1 : 0)
+// site does not, and neither do sources already dead FAILING_AFTER+ runs (daily-health reports
+// those). See lib/runhealth.mjs.
+const sys = systemicFailure(results, k => state.get(k)?.consecutive_failures, FAILING_AFTER)
+console.log(`systemic check: ${sys.failed} of ${sys.counted} live source(s) failed (red above ${sys.limit}) → ${sys.red ? 'RED' : 'ok'}`)
+process.exit(sys.red ? 1 : 0)
