@@ -7,7 +7,8 @@ import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { t, LANG_CODES } from '../constants/i18n'
+import { intlTrusted, monthNames } from '../constants/months'
 import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { buildFacilityIndex, buildCoordsIndex, dutyRowCoords } from '../utils/dutyFacilityMatch'
@@ -404,7 +405,15 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   )
 
   const d = new Date()
-  const dateLabel = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  // The app language, not the phone's ([] printed "Sunday, 18 October 2026" on a Turkish UI).
+  // -u-ca-gregory and the intlTrusted fallback: same reasons as formatPetDate (constants/petsContent.js).
+  let dateLabel = `${d.getDate()} ${monthNames(lang)[d.getMonth()]} ${d.getFullYear()}`
+  if (intlTrusted) {
+    try {
+      dateLabel = new Intl.DateTimeFormat(`${LANG_CODES[lang] || 'en'}-u-ca-gregory`,
+        { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+    } catch { /* keep the composed form */ }
+  }
 
   if (REDESIGN) {
     const ktebActions = [
