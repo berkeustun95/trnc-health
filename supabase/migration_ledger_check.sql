@@ -230,7 +230,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261112_contact_events_connectivity.sql', '9037a1c56e4751e007464475f19ae399c7e3436194a4542c72f293dd0926f5b4'),
   ('20261113_connectivity_links.sql', 'de37381f915f517e2289ec3fea9559e5ef48c8a172711cbef6bf4b584d15c199'),
   ('20261114_duty_2026_10_17_lefkosa_sakalli.sql', 'a373c199951546ffcd112ec9a54fc0a5d5bdf6731a4c8e12db4460923d721076'),
-  ('20261115_eatery_partners.sql', '5afbb0f76df516618cd7713f3a07feaba26904a62a79d5491e518d7ea323a110')
+  ('20261115_eatery_partners.sql', '7c8e6c9c7c01b5e2dcbd9efb445f16896de987e342ebc423385dd7b39857121d')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

@@ -642,7 +642,7 @@ BEGIN
   IF v_bucket IS NULL OR v_bucket.public IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'bucket eatery-images is missing or not public';
   END IF;
-  SELECT count(*), string_agg(policyname, ', ' ORDER BY policyname),
+  SELECT count(*), string_agg(policyname, ',' ORDER BY policyname),
          count(*) FILTER (WHERE COALESCE(qual, '') || COALESCE(with_check, '') LIKE '%eatery-images%'),
          coalesce(string_agg(policyname, ',' ORDER BY policyname) FILTER (WHERE permissive = 'PERMISSIVE'
                     AND COALESCE(qual, '') || COALESCE(with_check, '') NOT LIKE '%bucket_id%'), '')
@@ -679,7 +679,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261115_eatery_partners.sql', '5afbb0f76df516618cd7713f3a07feaba26904a62a79d5491e518d7ea323a110')
+VALUES ('20261115_eatery_partners.sql', '7c8e6c9c7c01b5e2dcbd9efb445f16896de987e342ebc423385dd7b39857121d')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
