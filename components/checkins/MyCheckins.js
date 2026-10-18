@@ -11,7 +11,7 @@ import { useGoogleNames, notifyCheckinsChanged } from '../../utils/googlePlaces'
 import GoogleMapsAttribution from './GoogleMapsAttribution'
 import { IconButton, ConfirmDialog, Button } from '../ui'
 import { colors, type } from '../../constants/theme'
-import { t, LANG_CODES } from '../../constants/i18n'
+import { t, LANG_CODES, dateLocale } from '../../constants/i18n'
 
 function placeLabel(row, lang, names) {
   if (row.google_place_id) return names[row.google_place_id] ?? '…'
@@ -87,7 +87,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
             <View style={s.text}>
               <Text style={s.place} numberOfLines={1}>{placeLabel(r, lang, names)}</Text>
               {!!r.google_place_id && <GoogleMapsAttribution />}
-              <Text style={s.date}>{new Date(r.created_at).toLocaleDateString(LANG_CODES[lang] ?? 'en', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+              <Text style={s.date}>{new Date(r.created_at).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
             </View>
             <IconButton icon="trash-outline" color={colors.dangerInk} onPress={() => { setDelError(null); setConfirm(r) }}
               accessibilityLabel={t('checkinDelete', lang)} />

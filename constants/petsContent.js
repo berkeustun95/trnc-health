@@ -16,7 +16,7 @@
 // import-free, for the same reason.
 
 import { monthNames, intlTrusted } from './months.js'
-import { LANG_CODES } from './i18n.js'
+import { dateLocale } from './i18n.js'
 
 // ─── THE VERIFICATION STAMP ─────────────────────────────────────────────────
 //
@@ -140,8 +140,7 @@ export function formatPetDate(date, lang) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
   if (intlTrusted) {
     try {
-      const code = LANG_CODES[lang] || 'en'
-      return new Intl.DateTimeFormat(`${code}-u-ca-gregory`,
+      return new Intl.DateTimeFormat(dateLocale(lang),
         { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
     } catch { /* fall through to the composed form */ }
   }

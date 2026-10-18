@@ -5,7 +5,7 @@ import CoverageMap from '../components/CoverageMap'
 import TowingLogo from '../components/TowingLogo'
 import BackButton from '../components/BackButton'
 import { colors, shadow, radius } from '../constants/theme'
-import { t, LANG_CODES } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import {
   VEHICLE_CLASSES, CAR_SUBTYPES, HEAVY_SUBTYPES, SERVICE_ORDER, serviceLabelKey,
@@ -185,7 +185,7 @@ export default function TowingDetailScreen({ company, lang, region, onBack }) {
               <Text style={r.priceStamp}>
                 {t('towingPriceUpdated', lang)
                   .replace('{date}', new Date(company.price_updated_at)
-                    .toLocaleDateString(LANG_CODES[lang] || 'tr'))}
+                    .toLocaleDateString(dateLocale(lang)))}
               </Text>
             )}
           </RSection>
@@ -313,7 +313,7 @@ export default function TowingDetailScreen({ company, lang, region, onBack }) {
               <Text style={s.priceStamp}>
                 {t('towingPriceUpdated', lang)
                   .replace('{date}', new Date(company.price_updated_at)
-                    .toLocaleDateString(LANG_CODES[lang] || 'tr'))}
+                    .toLocaleDateString(dateLocale(lang)))}
               </Text>
             )}
           </Block>
