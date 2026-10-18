@@ -1,7 +1,7 @@
 import { View, Image, Text, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { type, radii } from '../../constants/theme'
+import { colors, type, radii } from '../../constants/theme'
 import { OnPhotoContext } from './onPhoto'
 
 // Module backgrounds, option B (Berke, 2026-10-01, for ALL modules): the module's own photo
@@ -85,7 +85,7 @@ export function OnPhotoLabel({ children, style, textStyle, numberOfLines = 1, ac
 }
 
 const s = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: '#22313A' },
+  root:     { flex: 1, backgroundColor: colors.primaryDark },
   band:     { position: 'absolute', left: 0, right: 0, width: '100%' },
   photoFrame: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   photo:    { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
