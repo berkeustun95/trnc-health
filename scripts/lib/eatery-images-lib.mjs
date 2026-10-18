@@ -19,7 +19,12 @@ const FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(jpg|jpeg|png|webp)$/i
 //   logo    short side >= 256: the largest logo render is ~96 pt (288 px at 3x); 256 is the floor before it softens.
 //   gallery width      >= 800: below this a full-width card (1170 px) is visibly upscaled.
 //   menu    width      >= 1000: menu text is small print and gets pinch-zoomed; at 800 it is unreadable.
-export const MIN = { logoShortSide: 256, galleryWidth: 800, menuWidth: 1000 }
+//   dish    short side >= 800: a dish shows as a ~200 pt thumbnail in the menu list but opens in a full-screen viewer
+//           on a 1170 px-wide phone; the short side is what survives fit-to-screen without a visible upscale
+//           beyond ~1.5x, whatever the crop (square, 4:3, portrait). Below 800 the viewer is visibly soft.
+export const MIN = { logoShortSide: 256, galleryWidth: 800, menuWidth: 1000, dishShortSide: 800 }
+// Separator of the "Section › Name" dish key (U+203A), used when one name occurs in several sections.
+export const DISH_SEP = ' \u203a '
 
 export const MIME = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
 
@@ -86,17 +91,19 @@ function webp(b) {
 export const sha256 = buf => createHash('sha256').update(buf).digest('hex')
 
 // ─── manifest + files → items ───────────────────────────────────────────────
-// manifest = { logo?: 'logo.png', gallery?: [...], menu?: [...] } (display order).
-// readFile(name) -> Buffer | null (null = missing). Returns { problems: string[], items: [...] }.
+// manifest = { logo?: 'logo.png', gallery?: [...], menu?: [...], dishes?: { '<item name>': 'file.jpg' } }.
+// readFile(name) -> Buffer | null (null = missing). Returns { problems: string[], items: [...], dishes: [...] }.
+// A dish has no object path yet: it needs the menu item id, so matchDishes() resolves it later.
 export function validateLocal(slug, manifest, readFile) {
   const problems = []
   const items = []
+  const dishes = []
   if (typeof slug !== 'string' || !SLUG_RE.test(slug)) problems.push(`slug '${slug}' does not match ${SLUG_RE}`)
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
     problems.push('manifest.json is not a JSON object')
-    return { problems, items }
+    return { problems, items, dishes }
   }
-  for (const k of Object.keys(manifest)) if (!['logo', 'gallery', 'menu'].includes(k)) problems.push(`manifest: unknown key '${k}'`)
+  for (const k of Object.keys(manifest)) if (!['logo', 'gallery', 'menu', 'dishes'].includes(k)) problems.push(`manifest: unknown key '${k}'`)
   const want = []
   if (manifest.logo !== undefined) {
     if (typeof manifest.logo !== 'string') problems.push("manifest.logo must be a file name string")
@@ -108,10 +115,19 @@ export function validateLocal(slug, manifest, readFile) {
     if (!Array.isArray(arr) || arr.some(x => typeof x !== 'string')) { problems.push(`manifest.${kind} must be an array of file name strings`); continue }
     arr.forEach((name, i) => want.push({ kind, n: i + 1, name }))
   }
+  if (manifest.dishes !== undefined) {
+    const d = manifest.dishes
+    if (!d || typeof d !== 'object' || Array.isArray(d)) problems.push('manifest.dishes must be an object of "item name": "file" pairs')
+    else Object.entries(d).forEach(([key, name], i) => {
+      if (typeof name !== 'string') problems.push(`manifest.dishes #${i + 1}: the file must be a file name string`)
+      else if (key.trim() === '') problems.push(`manifest.dishes #${i + 1} '${name}': empty item name key`)
+      else want.push({ kind: 'dish', n: i + 1, name, key: key.trim() })
+    })
+  }
   if (!want.length && !problems.length) problems.push('manifest lists no images')
   const seen = new Map()
   for (const w of want) {
-    const tag = `${w.kind}${w.kind === 'logo' ? '' : '#' + w.n} '${w.name}'`
+    const tag = `${w.kind}${w.kind === 'logo' ? '' : '#' + w.n} '${w.name}'`   // never the dish key: it is an item name and logs are public
     if (!FILE_RE.test(w.name)) { problems.push(`${tag}: file name must be a plain name ending .jpg/.jpeg/.png/.webp (no folders)`); continue }
     if (seen.has(w.name)) { problems.push(`${tag}: listed twice (also ${seen.get(w.name)})`); continue }
     seen.set(w.name, tag)
@@ -129,16 +145,119 @@ export function validateLocal(slug, manifest, readFile) {
     if (w.kind === 'logo' && Math.min(width, height) < MIN.logoShortSide) problems.push(`${tag}: ${width}x${height}, short side must be >= ${MIN.logoShortSide}`)
     if (w.kind === 'gallery' && width < MIN.galleryWidth) problems.push(`${tag}: ${width}x${height}, width must be >= ${MIN.galleryWidth}`)
     if (w.kind === 'menu' && width < MIN.menuWidth) problems.push(`${tag}: ${width}x${height}, width must be >= ${MIN.menuWidth}`)
+    if (w.kind === 'dish') {
+      if (Math.min(width, height) < MIN.dishShortSide) problems.push(`${tag}: ${width}x${height}, short side must be >= ${MIN.dishShortSide}`)
+      dishes.push({ key: w.key, src: w.name, format: s.format, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
+      continue
+    }
     const path = `${slug}/${w.kind === 'logo' ? 'logo' : `${w.kind}-${w.n}`}.${s.format}`
     if (!PATH_RE.test(path)) problems.push(`${tag}: object path '${path}' does not match the database path CHECK`)
     items.push({ kind: w.kind, n: w.n, src: w.name, path, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
   }
-  return { problems, items }
+  return { problems, items, dishes }
+}
+
+// ─── dish → menu item matching ──────────────────────────────────────────────
+// dishes = validateLocal().dishes; menuRows = [{ id, section, name }] of this partner (all of them).
+// A key matches a name EXACTLY (both trimmed). A name that occurs in more than one section is addressed only as
+// "Section › Name". Refused, every one listed: a key matching no item; a name matching several items (the
+// message says whether that is several sections or the same section twice); an item mapped twice. Problems name
+// the FILE and an ordinal, never the item name (the log is public). Returns { problems, resolved }.
+export function matchDishes(slug, dishes, menuRows) {
+  const problems = []
+  const resolved = []
+  const t = x => String(x ?? '').trim()
+  const taken = new Map()
+  for (const d of dishes) {
+    const tag = `dish '${d.src}'`
+    const plain = menuRows.filter(r => t(r.name) === d.key)
+    const qualified = menuRows.filter(r => `${t(r.section)}${DISH_SEP}${t(r.name)}` === d.key)
+    const hit = [...new Map([...plain, ...qualified].map(r => [r.id, r])).values()]
+    if (hit.length === 0) { problems.push(`${tag}: its key matches no menu item of this partner`); continue }
+    if (hit.length > 1) {
+      const sections = new Set(hit.map(r => t(r.section)))
+      problems.push(sections.size > 1
+        ? `${tag}: its key matches ${hit.length} items in ${sections.size} sections, use the "Section${DISH_SEP}Name" form`
+        : `${tag}: its key matches ${hit.length} items in the same section, it cannot be told apart`)
+      continue
+    }
+    const item = hit[0]
+    if (taken.has(item.id)) { problems.push(`${tag}: maps to the same menu item (id ${item.id}) as '${taken.get(item.id)}'`); continue }
+    taken.set(item.id, d.src)
+    const path = `${slug}/dish-${item.id}.${d.format}`
+    if (!PATH_RE.test(path)) { problems.push(`${tag}: object path '${path}' does not match the database path CHECK`); continue }
+    resolved.push({ ...d, itemId: item.id, path, kind: 'dish' })
+  }
+  return { problems, resolved }
+}
+
+// state = { existing: { [path]: {sha256}|null }, itemRows: { [id]: { photo_path, photo_width, photo_height } } }
+// Returns { problems, uploads:[{path,action}], updates:[{id,path,width,height,action:'set'|'keep'}] }.
+// photo_path may be set only when it is null or already this path; a different one needs replace.
+export function planDishes(resolved, state, replace = false) {
+  const problems = [], uploads = [], updates = []
+  for (const d of resolved) {
+    const ex = state.existing?.[d.path]
+    if (!ex) uploads.push({ path: d.path, action: 'upload' })
+    else if (ex.sha256 === d.sha256) uploads.push({ path: d.path, action: 'skip-identical' })
+    else if (replace) uploads.push({ path: d.path, action: 'replace' })
+    else problems.push(`${d.path}: a DIFFERENT file already exists at this path (re-run with replace=true to overwrite)`)
+    const row = state.itemRows?.[d.itemId]
+    if (!row) { problems.push(`${d.path}: menu item ${d.itemId} not found among this partner's rows`); continue }
+    const same = row.photo_path === d.path && row.photo_width === d.width && row.photo_height === d.height
+    if (row.photo_path == null || row.photo_path === d.path) updates.push({ id: d.itemId, path: d.path, width: d.width, height: d.height, action: same ? 'keep' : 'set' })
+    else if (replace) updates.push({ id: d.itemId, path: d.path, width: d.width, height: d.height, action: 'set' })
+    else problems.push(`${d.path}: menu item ${d.itemId} already has photo_path '${row.photo_path}' (re-run with replace=true)`)
+  }
+  return { problems, uploads, updates }
+}
+
+// ─── apply (all writes; the client is passed in so the order is provable offline) ─
+// Order: every object (upload + re-download + sha256 verify), then, only if ALL succeeded, photo rows, logo_path,
+// dish photo_path. One object failure means no row of any kind is written (no row may point at a missing object).
+// ctx = { sb, partnerId, uploads, bytesByPath: Map(path -> {buf,mime,sha256}), inserts, updates, logo, dishUpdates,
+//         replace, out(line), fail(what, error) }. Returns the failure count.
+export async function applyPlan(ctx) {
+  const { sb, partnerId, bytesByPath, out, fail, replace } = ctx
+  let failed = 0
+  const bad = (what, e) => { failed++; fail(what, e) }
+  for (const u of ctx.uploads) {
+    if (u.action === 'skip-identical') continue
+    const it = bytesByPath.get(u.path)
+    const up = await sb.storage.from(BUCKET).upload(u.path, it.buf, { contentType: it.mime, upsert: u.action === 'replace', cacheControl: '3600' })
+    if (up.error) { bad(`upload ${u.path}`, up.error); continue }
+    const dl = await sb.storage.from(BUCKET).download(u.path)
+    if (dl.error || sha256(Buffer.from(await dl.data.arrayBuffer())) !== it.sha256) { bad(`verify ${u.path}`, dl.error ?? 'bytes differ after upload'); continue }
+    out(`uploaded + verified ${u.path}`)
+  }
+  if (failed) return failed
+  for (const r of ctx.inserts) {
+    const ins = await sb.from('eatery_photos').insert({ partner_id: partnerId, ...r })
+    if (ins.error) bad(`insert row ${r.storage_path}`, ins.error); else out(`row inserted ${r.storage_path}`)
+  }
+  for (const r of ctx.updates) {
+    const up = await sb.from('eatery_photos').update({ kind: r.kind, width: r.width, height: r.height, sort_order: r.sort_order }).eq('partner_id', partnerId).eq('storage_path', r.storage_path)
+    if (up.error) bad(`update row ${r.storage_path}`, up.error); else out(`row updated ${r.storage_path}`)
+  }
+  if (ctx.logo.action === 'set') {
+    const up = await sb.from('eatery_partners').update({ logo_path: ctx.logo.path }).eq('id', partnerId)
+    if (up.error) bad('logo_path update', up.error); else out(`logo_path set ${ctx.logo.path}`)
+  }
+  for (const r of ctx.dishUpdates) {
+    if (r.action === 'keep') continue
+    let q = sb.from('eatery_menu_items').update({ photo_path: r.path, photo_width: r.width, photo_height: r.height }).eq('id', r.id).eq('partner_id', partnerId)
+    if (!replace) q = q.or(`photo_path.is.null,photo_path.eq.${r.path}`)
+    const up = await q.select('id')
+    if (up.error) bad(`dish photo_path update item ${r.id}`, up.error)
+    else if (up.data?.length !== 1) bad(`dish photo_path update item ${r.id}`, `${up.data?.length ?? 0} rows changed (expected 1)`)
+    else out(`dish photo_path set item ${r.id}`)
+  }
+  return failed
 }
 
 // ─── readiness: step 1 of the go-live checklist must be complete ────────────
 // partner = eatery_partners row (or null); menuItems = count of its eatery_menu_items.
-export function readiness(partner, menuItems) {
+export function readiness(partner, menuItems, dishCount = 0) {
   if (!partner) return ['no eatery_partners row for this slug (run the data migration first)']
   const out = []
   if (partner.lat == null || partner.lng == null) out.push('lat/lng not set')
@@ -146,6 +265,7 @@ export function readiness(partner, menuItems) {
   if (!partner.menu_verified_on) out.push('menu_verified_on not set')
   if (!(menuItems >= 1 || (partner.menu_url != null && String(partner.menu_url).trim() !== '')))
     out.push('no menu: 0 eatery_menu_items rows and no menu_url')
+  if (dishCount > 0 && !(menuItems >= 1)) out.push(`${dishCount} dish photo(s) in the manifest but 0 eatery_menu_items rows (run the menu data migration first)`)
   return out
 }
 
