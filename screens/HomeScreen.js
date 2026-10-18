@@ -319,7 +319,7 @@ export default function HomeScreen({
   const [favPins, setFavPins]         = useState([])
   const [favUsage, setFavUsage]       = useState({})
   const [favEditOpen, setFavEditOpen] = useState(false)
-  const stripPaused = weatherOpen || favEditOpen || searchOpen   // Home's own overlays: the slider holds still under them
+  const stripPaused = weatherOpen || favEditOpen || searchOpen || overlayOpen === true   // Home's own overlays: the slider holds still under them
 
   // Global hub search
   const [globalQuery, setGlobalQuery]       = useState(snap?.globalQuery ?? '')

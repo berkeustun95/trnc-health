@@ -24,5 +24,7 @@ ok('  ...passing gates: EATERY_GATES', /resolveStripSlides\(\{[^}]*gates: EATERY
 ok('  ...and fetches partners only when EATERY and promosEligible', /EATERY === true && promosEligible === true[\s\S]{0,160}loadEateryPartners\(/.test(home), '')
 ok('HomeScreen renders StripSlider', /<StripSlider\b/.test(home), '')
 ok('the old single-card eateryGate is gone', !/eateryGate/.test(home) && !/eateryGate/.test(rd('utils/homeStripResolver.js')), '')
+{ const h = rd('screens/HomeScreen.js'), m = h.match(/const stripPaused = ([^\n]*)/)
+  ok('App-level sheets pause the slider (overlayOpen reaches stripPaused)', !!m && /overlayOpen/.test(m[1]) && /overlayOpen=\{[^}]*oliSheetOpen/.test(rd('App.js')), m?.[1] ?? '(stripPaused absent)') }
 ok('only the lead records its kind, never a partner slide (remember={index === 0 && !item.eaterySlug})', /remember=\{index === 0 && !item\.eaterySlug\}/.test(rd('components/home/redesign/Widgets.js')), '')
 process.exit(bad?1:0)
