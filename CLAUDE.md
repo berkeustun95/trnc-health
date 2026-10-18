@@ -58,7 +58,17 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **`production-db` keeps its required reviewer (Berke) — never remove it** (Berke, 2026-10-14; removal
   cancelled). It is the ONLY lock on a migration apply that holds against `ada-hermes-bot` (repo WRITE, can
   dispatch workflows; `main` needs 0 approvals, so it could also merge away an actor check in the workflow)
-  and against local Claude sessions (they run as `berkeustun95` via `gh`). Main-only on `production` stays too.
+  and against local Claude sessions. Main-only on `production` stays too. Since 2026-10-18: **Berke is the
+  only approver**, `prevent_self_review` ON, admin bypass OFF — so **production runs are started by Code**
+  (a run Berke starts himself cannot be approved by him). Code never approves a deployment (PreToolUse hook
+  `.claude/hooks/deny-deploy-approval.sh`, also in `~/.claude/settings.json`; keep it).
+- ⚠ **Local Claude sessions act on GitHub as the App `ada-claude-code[bot]`, never as `berkeustun95`**
+  (2026-10-18; App 5372493, installation 172817185, `trnc-health` only). `gh` = wrapper `~/.local/bin/gh`,
+  git over https = credential helper, both minting a 1-hour token from `~/.config/ada-claude-code/` (private
+  key 600, never in the repo); commits authored as the bot via `env` in `~/.claude/settings.json`. Berke is
+  logged out of `gh` on this Mac and has no SSH key on GitHub. A 401/403 means the App lacks a permission —
+  ask Berke; never work around it with his credentials. The App cannot change environments (403 by design).
+  Vault `2026-10-18_claude-code-github-identity.md`.
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
   in `homeStripResolver.js`, `stripNoticeTitle`, `utils/stripDismissals.js`). Don't delete or repurpose it;
   re-enable = one `UPDATE … SET is_active = true`. Same for the `showAgentOnboarding` branch in App.js.
