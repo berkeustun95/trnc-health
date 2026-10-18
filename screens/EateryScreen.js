@@ -2,11 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../lib/supabase'
 import { t } from '../constants/i18n'
-import { CRUNCHY_EXPRESS, EATERY_PREVIEW_DATA } from '../constants/redesign'
+import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { REGION_LABEL_KEY } from '../constants/regions'
-import { EATERY_CATEGORY_KEY, eateryOpenStatus, eateryPartnerVisible } from '../constants/eatery'
+import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
 import { colors, type, space, listBottomPad } from '../constants/theme'
 import { ScreenHeader, ErrorState, Card, CardSkeleton } from '../components/ui'
 import { EateryLogo, PlaceholderTag } from '../components/EateryBits'
@@ -16,11 +15,7 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // Rows come from public.eatery_partners with their menu items and photos embedded; RLS returns
 // active partners only. Built from rows, so restaurant #2 is data only.
 // The table cannot legitimately be empty while the section is live: zero rows is an ERROR STATE.
-// On dev / ADA Preview a partner the database has no row for yet falls back to its placeholder.
-const PREVIEW_PARTNERS = EATERY_PREVIEW_DATA ? require('../constants/eateryPreview').EATERY_PREVIEW_PARTNERS : null
-
-// A partner behind its own dark flag stays out of a live section (CRUNCHY_EXPRESS_LIVE).
-const PARTNER_LIVE = { 'crunchy-express': CRUNCHY_EXPRESS }
+// utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
 const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, ' +
   'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available), ' +
@@ -56,7 +51,9 @@ function PartnerCard({ partner, lang, onPress }) {
   )
 }
 
-export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, onBack }) {
+// openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
+// once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
+export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, onBack, openSlug, onOpenSlugDone }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
@@ -67,22 +64,17 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const { data, error: err } = await supabase
-        .from('eatery_partners')
-        .select(COLS)
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-        .order('name', { ascending: true })
+      const { rows: list, error: err } = await loadEateryPartners(COLS)
       if (!alive) return
       if (err) { setError(true); setLoading(false); return }
-      let list = data ?? []
-      if (PREVIEW_PARTNERS) {
-        for (const p of PREVIEW_PARTNERS) if (!list.some(r => r.slug === p.slug)) list = [...list, p]
-      }
-      list = list.filter(r => eateryPartnerVisible(r, PARTNER_LIVE))
       if (!list.length) { setError(true); setLoading(false); return }
       setRows(list)
       setLoading(false)
+      if (openSlug) {
+        const hit = list.find(r => r.slug === openSlug)
+        if (hit) onOpenPartner(hit)
+        onOpenSlugDone?.(!!hit)
+      }
     })().catch(() => { if (alive) { setError(true); setLoading(false) } })
     return () => { alive = false }
   }, [attempt])
@@ -92,7 +84,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
-      {loading ? (
+      {loading || (!!openSlug && !error) ? (
         <View style={s.content}><CardSkeleton height={96} /></View>
       ) : error ? (
         <ErrorState onRetry={retry} lang={lang} />
