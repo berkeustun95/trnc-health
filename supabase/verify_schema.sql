@@ -43,6 +43,10 @@ WITH report AS (
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_schools'),
     ('1108_driving_schools','driving_school_branches'),
+    -- Yeme-Icme eatery partners (1115): registered ahead of the apply; red until it runs.
+    ('1115_eatery_partners','eatery_partners'),
+    ('1115_eatery_partners','eatery_menu_items'),
+    ('1115_eatery_partners','eatery_photos'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources'),
     ('1102_duyurular','announcements'),
@@ -155,6 +159,45 @@ WITH report AS (
     ('1108_driving_schools','driving_school_branches','lng'),
     ('1108_driving_schools','driving_school_branches','geocode_source'),
     ('1108_driving_schools','driving_school_branches','sort_order'),
+    -- Yeme-Icme eatery partners (1115): registered ahead of the apply; red until it runs.
+    ('1115_eatery_partners','eatery_partners','id'),
+    ('1115_eatery_partners','eatery_partners','slug'),
+    ('1115_eatery_partners','eatery_partners','name'),
+    ('1115_eatery_partners','eatery_partners','category'),
+    ('1115_eatery_partners','eatery_partners','phone'),
+    ('1115_eatery_partners','eatery_partners','whatsapp'),
+    ('1115_eatery_partners','eatery_partners','website_url'),
+    ('1115_eatery_partners','eatery_partners','menu_url'),
+    ('1115_eatery_partners','eatery_partners','maps_url'),
+    ('1115_eatery_partners','eatery_partners','region'),
+    ('1115_eatery_partners','eatery_partners','address'),
+    ('1115_eatery_partners','eatery_partners','lat'),
+    ('1115_eatery_partners','eatery_partners','lng'),
+    ('1115_eatery_partners','eatery_partners','geocode_source'),
+    ('1115_eatery_partners','eatery_partners','opening_hours'),
+    ('1115_eatery_partners','eatery_partners','logo_path'),
+    ('1115_eatery_partners','eatery_partners','menu_verified_on'),
+    ('1115_eatery_partners','eatery_partners','sort_order'),
+    ('1115_eatery_partners','eatery_partners','is_active'),
+    ('1115_eatery_partners','eatery_partners','created_at'),
+    ('1115_eatery_partners','eatery_partners','updated_at'),
+    ('1115_eatery_partners','eatery_menu_items','id'),
+    ('1115_eatery_partners','eatery_menu_items','partner_id'),
+    ('1115_eatery_partners','eatery_menu_items','section'),
+    ('1115_eatery_partners','eatery_menu_items','section_order'),
+    ('1115_eatery_partners','eatery_menu_items','name'),
+    ('1115_eatery_partners','eatery_menu_items','description'),
+    ('1115_eatery_partners','eatery_menu_items','price'),
+    ('1115_eatery_partners','eatery_menu_items','currency'),
+    ('1115_eatery_partners','eatery_menu_items','sort_order'),
+    ('1115_eatery_partners','eatery_menu_items','is_available'),
+    ('1115_eatery_partners','eatery_photos','id'),
+    ('1115_eatery_partners','eatery_photos','partner_id'),
+    ('1115_eatery_partners','eatery_photos','kind'),
+    ('1115_eatery_partners','eatery_photos','storage_path'),
+    ('1115_eatery_partners','eatery_photos','width'),
+    ('1115_eatery_partners','eatery_photos','height'),
+    ('1115_eatery_partners','eatery_photos','sort_order'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -615,6 +658,37 @@ WITH report AS (
     ('1108_driving_schools','driving_school_branches_address_check'),
     ('1108_driving_schools','driving_school_branches_geocode_source_check'),
     ('1108_driving_schools','driving_school_branches_provenance_check'),
+    -- Yeme-Icme eatery partners (1115): registered ahead of the apply; red until it runs.
+    ('1115_eatery_partners','eatery_partners_pkey'),
+    ('1115_eatery_partners','eatery_partners_slug_key'),
+    ('1115_eatery_partners','eatery_partners_slug_check'),
+    ('1115_eatery_partners','eatery_partners_name_check'),
+    ('1115_eatery_partners','eatery_partners_category_check'),
+    ('1115_eatery_partners','eatery_partners_phone_check'),
+    ('1115_eatery_partners','eatery_partners_whatsapp_check'),
+    ('1115_eatery_partners','eatery_partners_website_url_check'),
+    ('1115_eatery_partners','eatery_partners_menu_url_check'),
+    ('1115_eatery_partners','eatery_partners_maps_url_check'),
+    ('1115_eatery_partners','eatery_partners_region_check'),
+    ('1115_eatery_partners','eatery_partners_address_check'),
+    ('1115_eatery_partners','eatery_partners_coords_check'),
+    ('1115_eatery_partners','eatery_partners_geocode_source_check'),
+    ('1115_eatery_partners','eatery_partners_provenance_check'),
+    ('1115_eatery_partners','eatery_partners_opening_hours_check'),
+    ('1115_eatery_partners','eatery_partners_logo_path_check'),
+    ('1115_eatery_partners','eatery_partners_launch_complete_check'),
+    ('1115_eatery_partners','eatery_menu_items_pkey'),
+    ('1115_eatery_partners','eatery_menu_items_partner_id_fkey'),
+    ('1115_eatery_partners','eatery_menu_items_section_check'),
+    ('1115_eatery_partners','eatery_menu_items_name_check'),
+    ('1115_eatery_partners','eatery_menu_items_description_check'),
+    ('1115_eatery_partners','eatery_menu_items_price_check'),
+    ('1115_eatery_partners','eatery_menu_items_currency_check'),
+    ('1115_eatery_partners','eatery_photos_pkey'),
+    ('1115_eatery_partners','eatery_photos_partner_id_fkey'),
+    ('1115_eatery_partners','eatery_photos_kind_check'),
+    ('1115_eatery_partners','eatery_photos_storage_path_check'),
+    ('1115_eatery_partners','eatery_photos_size_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -941,6 +1015,9 @@ WITH report AS (
     ('1095_institutions_country','institutions_country_idx'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_school_branches_school_idx'),
+    -- Yeme-Icme eatery partners (1115): registered ahead of the apply; red until it runs.
+    ('1115_eatery_partners','eatery_menu_items_partner_idx'),
+    ('1115_eatery_partners','eatery_photos_partner_idx'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcements_list_idx'),
     ('1102_duyurular','announcements_deadline_idx'),
@@ -3634,8 +3711,8 @@ WITH report AS (
       OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261112_contact_events_connectivity.sql') -- CONNECTIVITY-CONTACT-EVENTS:supersede (one count, one owner: the 1112 token owns the set once the ledger records it)
     -- The contact_events ACTION vocabulary once 20261109 is applied: an exact SET of ten (the seven
     -- 20261083 left + instagram, facebook, email), contains both ways. The additive 1014/1046/1056/1083
-    -- tokens ("permits X") stay green in both states; no other token owns the whole action set, so
-    -- there is nothing to supersede. Red until the file applies.
+    -- tokens ("permits X") stay green in both states. Red until the file applies. Since 20261115 adds
+    -- 'menu' the 1115 action token owns the whole set once the ledger records it (the :supersede line below).
     UNION ALL SELECT '1109_contact_events_ehliyet','contact_events action vocabulary is exactly the 10-action set (incl. instagram, facebook, email)',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c,
@@ -3643,6 +3720,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
       IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps',
                                  'route_complete','website','whatsapp']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261115_eatery_partners.sql') -- EATERY-CONTACT-EVENTS:supersede (one count, one owner: the 1115 token owns the set once the ledger records it)
     -- ── EHLIYET-CONTACT-EVENTS:END ──
     -- ── CONNECTIVITY-CONTACT-EVENTS:BEGIN (20261112_contact_events_connectivity.sql) ──
     -- KKTCELL handoff taps. Red until the file applies. The module SET is owned here once the ledger
@@ -3654,6 +3732,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
       IS NOT DISTINCT FROM ARRAY['accommodation','connectivity','ehliyet','events','explore','garages','grooming',
                                  'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261115_eatery_partners.sql') -- EATERY-CONTACT-EVENTS:supersede (one count, one owner: the 1115 token owns the set once the ledger records it)
     -- lang: the nine LANGUAGES keys as full English names, never ISO codes (an exact SET).
     UNION ALL SELECT '1112_contact_events_connectivity','contact_events.lang CHECK is exactly the nine full language names',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
@@ -3671,6 +3750,123 @@ WITH report AS (
                   AND EXISTS (SELECT 1 FROM information_schema.columns
                                WHERE table_schema='public' AND table_name='contact_events' AND column_name='lang')), false)
     -- ── CONNECTIVITY-CONTACT-EVENTS:END ──
+    -- ── 1115: Yeme-Icme eatery partners ──────────────────────────────────────────
+    -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object and would publish a partner
+    --     before activation.
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners.is_active DEFAULT false',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='is_active'
+          AND column_default = 'false') = 1
+    UNION ALL SELECT '1115_eatery_partners','eatery_menu_items: currency NOT NULL DEFAULT TRY, is_available NOT NULL DEFAULT true',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='eatery_menu_items' AND is_nullable = 'NO'
+          AND ((column_name = 'currency' AND column_default LIKE '''TRY''%')
+            OR (column_name = 'is_available' AND column_default = 'true'))) = 2
+    -- (2) The launch-completeness CHECK, from the live definition: active needs a pin, a logo and a
+    --     menu verification date. The E-section name cannot see what it permits.
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners_launch_complete_check: active requires lat, logo_path and menu_verified_on',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%NOT is_active%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%lat IS NOT NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%logo_path IS NOT NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%menu_verified_on IS NOT NULL%'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_launch_complete_check'), false)
+    -- (3) The vocabularies, as exact SETS read from the live definitions.
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners category is exactly fast_food/restaurant/cafe/bakery/dessert',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_category_check')
+      IS NOT DISTINCT FROM ARRAY['bakery','cafe','dessert','fast_food','restaurant']
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners region is exactly the seven keys and NULL stays allowed',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_region_check')
+      IS NOT DISTINCT FROM ARRAY['famagusta','iskele','karpaz','kyrenia','lefke','morphou','nicosia']
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%region IS NULL%' FROM pg_constraint c
+                     WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_region_check'), false)
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners: geocode_source is exactly osm/partner and pin <-> source is two-way',
+      COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_geocode_source_check')
+        IS NOT DISTINCT FROM ARRAY['osm','partner'], false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE 'CHECK (((lat IS NULL) = (geocode_source IS NULL)))%'
+                      FROM pg_constraint c
+                     WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_provenance_check'), false)
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners opening_hours is validated by towing_hours_valid',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%towing_hours_valid(opening_hours)%'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_opening_hours_check'), false)
+    UNION ALL SELECT '1115_eatery_partners','eatery_menu_items currency is exactly EUR/GBP/TRY; eatery_photos kind is exactly gallery/menu',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([A-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_currency_check')
+      IS NOT DISTINCT FROM ARRAY['EUR','GBP','TRY']
+      AND (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_photos') AND c.conname = 'eatery_photos_kind_check')
+      IS NOT DISTINCT FROM ARRAY['gallery','menu']
+    -- (4) One permissive SELECT policy per table (the full set per table is counted, so a dashboard
+    --     policy or a write policy turns this red), RLS on, clients SELECT-only, service_role writes.
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners: 1 SELECT policy (is_active), RLS on, clients SELECT-only, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_partners')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual = 'is_active')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.eatery_partners'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.eatery_partners'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND has_table_privilege('anon', to_regclass('public.eatery_partners'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.eatery_partners'), 'SELECT')
+               AND has_table_privilege('service_role', to_regclass('public.eatery_partners'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    UNION ALL SELECT '1115_eatery_partners','eatery_menu_items: 1 SELECT policy (parent partner active), RLS on, clients SELECT-only, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_menu_items')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[]
+        AND qual LIKE '%eatery_partners%' AND qual LIKE '%is_active%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.eatery_menu_items'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND has_table_privilege('anon', to_regclass('public.eatery_menu_items'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'SELECT')
+               AND has_table_privilege('service_role', to_regclass('public.eatery_menu_items'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    UNION ALL SELECT '1115_eatery_partners','eatery_photos: 1 SELECT policy (parent partner active), RLS on, clients SELECT-only, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_photos')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[]
+        AND qual LIKE '%eatery_partners%' AND qual LIKE '%is_active%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.eatery_photos'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.eatery_photos'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND has_table_privilege('anon', to_regclass('public.eatery_photos'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.eatery_photos'), 'SELECT')
+               AND has_table_privilege('service_role', to_regclass('public.eatery_photos'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    -- (5) The bucket: only storage.buckets.public says whether the images render, and zero storage.objects
+    --     policies may name it (a SELECT policy would only enable listing). storage.objects stays at the
+    --     1042 baseline, which keeps owning that count.
+    UNION ALL SELECT '1115_eatery_partners','bucket eatery-images is PUBLIC, 2 MB, jpeg/png/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 2097152 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
+                  FROM storage.buckets WHERE id = 'eatery-images'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%eatery-images%')
+    -- (6) search_content has NO eatery arm: pre-launch content is searchable the moment a row is active.
+    --     Anchored to a code shape (pg_get_functiondef returns comments), paired with the places arm.
+    UNION ALL SELECT '1115_eatery_partners','search_content has no eatery arm (and still has the places arm)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) ILIKE '%FROM places p%'
+               AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM eatery_partners%'
+               AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM public.eatery_partners%'
+               AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%JOIN eatery_partners%'
+               AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%JOIN public.eatery_partners%', false)
+    -- (7) contact_events vocabularies after 1115, exact SETS. These own both sets once the ledger records
+    --     the file; the 1112 module token and the 1109 action token stand down (:supersede lines).
+    UNION ALL SELECT '1115_eatery_partners','contact_events module vocabulary is exactly the 16-module set (incl. eatery)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','connectivity','eatery','ehliyet','events','explore','garages','grooming',
+                                 'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+    UNION ALL SELECT '1115_eatery_partners','contact_events action vocabulary is exactly the 11-action set (incl. menu)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
+      IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps','menu',
+                                 'route_complete','website','whatsapp']
     -- ── 1113: connectivity_links (the eSIM landing's tile + support URLs) ──────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object.
     UNION ALL SELECT '1113_connectivity_links','connectivity_links.is_active DEFAULT false',

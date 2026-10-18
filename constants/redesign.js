@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import { REDESIGN_LIVE, MODULE_FLAGS } from './flags'
+import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE } from './flags'
 
 // The one switch every redesigned surface reads. On when:
 //   • REDESIGN_LIVE is flipped (go-live, both files in one commit — the flag guard), or
@@ -43,3 +43,14 @@ export const DUYURULAR = MODULE_FLAGS.duyurular || (typeof __DEV__ !== 'undefine
 // Set EHLIYET_PREVIEW to false if ADA Preview must stop showing it.
 const EHLIYET_PREVIEW = true
 export const EHLIYET = MODULE_FLAGS.ehliyet || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && EHLIYET_PREVIEW)
+
+// Yeme-İçme (eateries) before go-live: dev bundles and ADA Preview open the section and the
+// Crunchy Express partner; the _LIVE flags stay off, so production shows nothing (preflight (c)
+// keeps a production publish off the Preview config). EATERY_PREVIEW_DATA is the ONLY gate under
+// which constants/eateryPreview.js placeholders may load: dev and Preview builds, never production.
+// scripts/check-eatery-partners.mjs asserts all of this; it does not read these consts from flags.js.
+const EATERY_PREVIEW = true
+export const EATERY = EATERY_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && EATERY_PREVIEW)
+const CRUNCHY_EXPRESS_PREVIEW = true
+export const CRUNCHY_EXPRESS = CRUNCHY_EXPRESS_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CRUNCHY_EXPRESS_PREVIEW)
+export const EATERY_PREVIEW_DATA = (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
