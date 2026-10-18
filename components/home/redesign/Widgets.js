@@ -157,8 +157,9 @@ function eventChip(startsAt, lang) {
   return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
 }
 
-// H1 is Berke's call: false = the Home sponsor card always shows the ADA frame + logo, never the partner photo.
-const SPONSOR_CARD_USES_PHOTO = true
+// Berke 2026-10-18 (option a): the Home sponsor card ALWAYS shows the ADA frame + logo, never a partner photo
+// (no crop of partner content; always reads as distinct from event cards).
+const SPONSOR_CARD_USES_PHOTO = false
 
 export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
   const kind = item?.kind
