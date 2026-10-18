@@ -166,6 +166,7 @@ function petHotelPins(partners) {
 }
 
 // ─── THE EATERY PARTNER PIN — ROWS, NOT CONFIG ──────────────────────────────
+// Folded into the explore:eat_drink chip by buildMapSources (no 'eatery' source key any more).
 // Unlike Shiny Paw, eatery pins come from eatery_partners ROWS (RLS returns active rows only;
 // lat/lng are nullable, geocode_source 'partner' | 'osm'). A row without finite coordinates
 // draws nothing. `eateryLive` defaults to EATERY_LIVE (Node-importable); the screen passes the
@@ -230,13 +231,19 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
     // (active incl. hidden). The map can only ever draw rows that have coordinates, so a
     // group counted on rows it cannot plot would earn a chip that filters to nothing.
     const visible = reachable ? groupVisible(g, pins.length, isAdmin) : LIVE_TILE_GROUPS.includes(g)
-    if (!visible) continue
+    // Eatery partner pins ride the eat_drink chip (one "Yeme & İçme" chip, Berke 2026-10-18). They
+    // never count toward the threshold and never make the PLACES visible: `visible` above decides
+    // places alone, so a partner pin cannot publish dark-module eat_drink places. With the places arm
+    // closed, the chip holds ONLY the partner pins. Each pin keeps its own colour (partners indigo);
+    // the chip dot is the group colour.
+    const partnerPins = g === 'eat_drink' && eateryLive ? eateryPins(eateryPartners, eateryGates) : []
+    if (!visible && partnerPins.length === 0) continue
     sources.push({
       key:      `explore:${g}`,
       labelKey: GROUP_META[g]?.labelKey,
       color:    (GROUP_META[g]?.colorToken || placeColors.landmark).text,
       colorBg:  (GROUP_META[g]?.colorToken || placeColors.landmark).bg,
-      pins,
+      pins:     [...(visible ? pins : []), ...partnerPins],
     })
   }
 
@@ -247,16 +254,6 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
       color:    placeColors.petHotel.text,
       colorBg:  placeColors.petHotel.bg,
       pins:     petHotelPins(petPartners),
-    })
-  }
-
-  if (eateryLive) {
-    sources.push({
-      key:      'eatery',
-      labelKey: 'menuEatery',
-      color:    placeColors.eatery.text,
-      colorBg:  placeColors.eatery.bg,
-      pins:     eateryPins(eateryPartners, eateryGates),
     })
   }
 
