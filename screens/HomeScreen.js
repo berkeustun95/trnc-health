@@ -18,7 +18,10 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { REDESIGN, DUYURULAR, EHLIYET } from '../constants/redesign'
+import { REDESIGN, DUYURULAR, EHLIYET, CRUNCHY_EXPRESS } from '../constants/redesign'
+import { loadEateryPartners } from '../utils/loadEateryPartners'
+import { eateryPhotos } from '../constants/eatery'
+import { eateryImageUrl } from '../components/EateryBits'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'
@@ -226,6 +229,7 @@ export default function HomeScreen({
   onShowTowing,
   onShowEhliyet,
   onShowEatery,
+  onOpenEateryPartner,
   onShowEsim,
   onShowEmergency,
   onShowMunicipal,
@@ -371,10 +375,32 @@ export default function HomeScreen({
     // whatever rank comes next. That is what makes the slot fill again instead of going
     // blank — the card is not hidden, the item is re-resolved without it.
     readStripDismissals()
-      .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN }))
+      .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN, eateryGate: CRUNCHY_EXPRESS }))
       .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
     return () => { alive = false }
   }, [lang, promosEligible, showFacilityList, stripDismissTick])
+
+  // The Yeme-İçme sponsor card takes its picture from the partner row: ONE slim read, only when that
+  // card is the chosen item. The card renders at once (name + subtitle + ADA frame); a failed read just
+  // leaves it that way, and the photo / logo / placeholder tag fill in when the row arrives.
+  const [eateryStrip, setEateryStrip] = useState(null)
+  const eaterySlug = stripItem?.eaterySlug || null
+  useEffect(() => {
+    if (!eaterySlug) return
+    let alive = true
+    loadEateryPartners('slug, name, logo_path, eatery_photos(id, kind, storage_path, width, height, sort_order)')
+      .then(({ rows }) => {
+        const p = rows.find(r => r.slug === eaterySlug)
+        if (!alive || !p) return
+        const photo = eateryPhotos(p, 'gallery').find(x => x.path)
+        setEateryStrip({ slug: eaterySlug, imageUrl: eateryImageUrl(photo?.path), logoUri: eateryImageUrl(p.logo_path), placeholder: !!p.placeholder })
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [eaterySlug])
+  const bannerItem = eaterySlug && eateryStrip?.slug === eaterySlug
+    ? { ...stripItem, imageUrl: eateryStrip.imageUrl, eateryLogoUri: eateryStrip.logoUri, eateryPlaceholder: eateryStrip.placeholder }
+    : stripItem
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
@@ -483,6 +509,8 @@ export default function HomeScreen({
       // declared below this function but hoisting makes it available at call time, which
       // is the same way the 'events' arm above already works.
       case 'route':     moduleHandlers[a.route]?.(); break
+      // The sponsored Yeme-İçme card: opens that partner's page (back returns here in one press, like an event).
+      case 'eatery':    if (a.slug) onOpenEateryPartner?.(a.slug); break
       case 'link':      if (a.url) Linking.openURL(a.url).catch(() => {}); break
     }
   }
@@ -981,7 +1009,7 @@ export default function HomeScreen({
             )}
 
             <View style={{ marginTop: WIDGET_GAP }}>
-              <EventBanner item={stripItem} loading={stripLoading} lang={lang}
+              <EventBanner item={bannerItem} loading={stripLoading} lang={lang}
                 onPress={handleStripPress} onDismiss={dismissStripItem} />
             </View>
 

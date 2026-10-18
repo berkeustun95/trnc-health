@@ -7,6 +7,7 @@ import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
 import { Bone, IconButton, RemoteImage } from '../../ui'
+import { PlaceholderTag } from '../../EateryBits'
 
 // Home v3 tiles: two equal cards, 104pt. Duty is the V2 live-strip card (photo, icon badge
 // top-left, dark band); Acil Numaralar is solid health red. Each band carries its title and
@@ -171,7 +172,17 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
     <View>
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
         accessibilityLabel={[title, time, tag].filter(Boolean).join(', ')} style={s.banner}>
-        <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
+        {item.eaterySlug && !item.imageUrl ? (
+          // A sponsor never borrows the events picture: ADA-theme frame, the partner's logo when it has one.
+          <View style={s.sponsorFrame}>
+            {item.eateryLogoUri
+              ? <RemoteImage source={{ uri: item.eateryLogoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
+              : <Ionicons name={item.icon || 'restaurant-outline'} size={44} color={category.explore.ink} />}
+          </View>
+        ) : (
+          <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
+        )}
+        {!!item.eateryPlaceholder && <PlaceholderTag lang={lang} style={s.placeholderTag} />}
         {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
         <View style={[s.bannerBand, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
@@ -217,6 +228,10 @@ const s = StyleSheet.create({
   alertText:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 1 },
 
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
+  sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: category.explore.bg,
+                  alignItems: 'center', justifyContent: 'center', paddingTop: 52 },
+  sponsorLogo: { width: 120, height: 64 },
+  placeholderTag: { position: 'absolute', left: 10, right: 10, bottom: 10 },
   bannerPhoto: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   timeText:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1 },
   tag:         { marginLeft: 6, backgroundColor: 'rgba(255,255,255,0.22)',
