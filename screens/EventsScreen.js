@@ -16,7 +16,7 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, ellipsizeSlack } from '../constants/theme'
-import { t, tCity, LANG_CODES } from '../constants/i18n'
+import { t, tCity, dateLocale } from '../constants/i18n'
 import { eventRegion } from '../utils/regionFromText'
 import FilterDropdown from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
@@ -178,11 +178,11 @@ function venueCityLabel(location) {
 }
 
 // Long-form card date, e.g. "22 Ağustos 2026". Locale comes from the app language
-// rather than a hardcoded 'en-GB' — the month name is spelled out here, so an
+// (British order for English) — the month name is spelled out here, so an
 // English month on a Turkish screen would read as a bug.
 function formatCardDate(start, lang) {
   if (!start) return ''
-  return new Date(start).toLocaleDateString(LANG_CODES[lang] || 'en',
+  return new Date(start).toLocaleDateString(dateLocale(lang),
     { day: 'numeric', month: 'long', year: 'numeric' })
 }
 

@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
-import { t, LANG_CODES } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import { intlTrusted, monthNames } from '../constants/months'
 import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
@@ -410,7 +410,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   let dateLabel = `${d.getDate()} ${monthNames(lang)[d.getMonth()]} ${d.getFullYear()}`
   if (intlTrusted) {
     try {
-      dateLabel = new Intl.DateTimeFormat(`${LANG_CODES[lang] || 'en'}-u-ca-gregory`,
+      dateLabel = new Intl.DateTimeFormat(`${dateLocale(lang)}-u-ca-gregory`,
         { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
     } catch { /* keep the composed form */ }
   }

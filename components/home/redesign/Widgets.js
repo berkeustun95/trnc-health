@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
-import { t, tCount, LANG_CODES } from '../../../constants/i18n'
+import { t, tCount, dateLocale } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
@@ -150,7 +150,7 @@ function eventChip(startsAt, lang) {
   if (days <= 0) day = d.getHours() >= 17 ? t('stripTonight', lang) : t('dateToday', lang)
   else if (days === 1) day = t('stripTomorrow', lang)
   else {
-    try { day = d.toLocaleDateString(LANG_CODES[lang] || 'en', { weekday: 'short', day: 'numeric', month: 'short' }) }
+    try { day = d.toLocaleDateString(dateLocale(lang), { weekday: 'short', day: 'numeric', month: 'short' }) }
     catch { day = `${d.getDate()}.${d.getMonth() + 1}.` }   // a locale Hermes' Intl lacks
   }
   return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
