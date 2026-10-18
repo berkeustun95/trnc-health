@@ -2,7 +2,7 @@
 // petPartnerSections() mould: emptiness is decided HERE, so a screen renders what it is given and
 // partner #2 is data only. Plain JS, no React, no network.
 import { dateLocale, t } from './i18n.js'
-import { openState } from '../utils/towingHours.js'
+import { cyprusNow, openState } from '../utils/towingHours.js'
 
 export const EATERY_BUCKET = 'eatery-images'
 
@@ -91,10 +91,17 @@ export function formatPrice(price, currency, lang) {
 
 // The open-now line for a card / header: { text, tone: 'ok' | 'warn' }, or null when the partner
 // gave no hours (an absent line says nothing; a guessed "closed" would be a claim).
-export function eateryOpenStatus(p, lang) {
+// A later-day opening names the day ("Kapalı · Pazartesi 09:00"): a bare "Açılış 09:00" reads as
+// later today, which for a restaurant is a wasted trip.
+export function eateryOpenStatus(p, lang, now = new Date()) {
   if (!p?.opening_hours || typeof p.opening_hours !== 'object') return null
-  const st = openState(p)
+  const st = openState(p, now)
   if (st.state === 'open') return { text: t('towingOpenNow', lang), tone: 'ok' }
+  if (st.state === 'opens' && st.days >= 1) {
+    const i = EATERY_DAYS.findIndex(([k]) => k === cyprusNow(now).day)
+    const dayKey = EATERY_DAYS[(i + st.days) % 7][1]
+    return { text: `${t('towingClosed', lang)} · ${t(dayKey, lang)} ${st.at}`, tone: 'neutral' }
+  }
   if (st.state === 'opens') return { text: t('towingOpensAt', lang).replace('{time}', st.at), tone: 'neutral' }
   if (st.unknown) return null
   return { text: t('towingClosedToday', lang), tone: 'warn' }
