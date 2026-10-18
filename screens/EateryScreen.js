@@ -45,7 +45,7 @@ function PartnerCard({ partner, lang, onPress }) {
               </View>
             )}
             {!!open && (
-              <Text style={[s.metaText, open.tone === 'ok' ? s.ok : s.warn]} numberOfLines={1}>{open.text}</Text>
+              <Text style={[s.metaText, open.tone === 'ok' ? s.ok : open.tone === 'warn' ? s.warn : null]} numberOfLines={1}>{open.text}</Text>
             )}
           </View>
         </View>

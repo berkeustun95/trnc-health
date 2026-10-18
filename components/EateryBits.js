@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { t } from '../constants/i18n'
-import { colors, category, type, radii } from '../constants/theme'
+import { colors, category, type, radii, withAlpha } from '../constants/theme'
 import { EATERY_BUCKET } from '../constants/eatery'
 import { RemoteImage } from './ui'
 
@@ -34,10 +34,11 @@ export function PlaceholderFrame({ lang, icon = 'image-outline', style }) {
 }
 
 // The partner's logo, contained (never cropped). No file: a labelled frame.
-export function EateryLogo({ partner, width, height, lang, radius = radii.md }) {
+export function EateryLogo({ partner, width, height, radius = radii.md, decorative = false }) {
   const uri = eateryImageUrl(partner.logo_path)
   return (
-    <View style={[s.logo, { width, height, borderRadius: radius }]}>
+    <View style={[s.logo, { width, height, borderRadius: radius }]}
+      {...(decorative ? { accessible: false, importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       {uri
         ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor={colors.card}
             accessibilityIgnoresInvertColors accessibilityLabel={partner.name} />
@@ -48,12 +49,12 @@ export function EateryLogo({ partner, width, height, lang, radius = radii.md }) 
 
 // Swipeable pages with a dot indicator. path null renders a labelled frame.
 // ratio = width / height of every page; fit 'cover' (gallery) or 'contain' (menu pages).
-export function PhotoPager({ photos, width, ratio, fit, lang }) {
+export function PhotoPager({ photos, width, ratio, fit, lang, radius = radii.card }) {
   const [page, setPage] = useState(0)
   const height = Math.round(width / ratio)
   return (
     <View>
-      <View style={[s.pager, { width, height }]}>
+      <View style={[s.pager, { width, height, borderRadius: radius }]}>
         <FlatList
           horizontal
           pagingEnabled
@@ -95,8 +96,8 @@ const s = StyleSheet.create({
   frameTag: { alignSelf: 'center' },
   logo:     { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, overflow: 'hidden' },
   fill:     { width: '100%', height: '100%' },
-  pager:    { borderRadius: radii.card, overflow: 'hidden', backgroundColor: colors.card },
+  pager:    { overflow: 'hidden', backgroundColor: colors.card },
   dots:     { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
-  dot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.fieldBorder, opacity: 0.45 },
-  dotOn:    { width: 18, backgroundColor: colors.primary, opacity: 1 },
+  dot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: withAlpha(colors.primary, 0.3) },
+  dotOn:    { width: 18, backgroundColor: colors.primary },
 })

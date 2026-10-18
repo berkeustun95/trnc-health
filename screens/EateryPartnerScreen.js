@@ -7,7 +7,7 @@ import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
   eateryOpenStatus, formatPrice,
 } from '../constants/eatery'
-import { colors, type, radii, space, listBottomPad } from '../constants/theme'
+import { colors, font, type, radii, space, listBottomPad } from '../constants/theme'
 import { ScreenHeader, Card, Button } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PhotoPager } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
@@ -30,8 +30,8 @@ function HoursBlock({ week, open, lang }) {
   return (
     <View>
       {!!open && (
-        <View style={[s.chip, open.tone === 'ok' ? s.chipOk : s.chipWarn]}>
-          <Text style={[s.chipText, open.tone === 'ok' ? s.chipOkText : s.chipWarnText]}>{open.text}</Text>
+        <View style={[s.chip, s['chip_' + open.tone]]}>
+          <Text style={[s.chipText, s['chipText_' + open.tone]]}>{open.text}</Text>
         </View>
       )}
       {week.map(d => (
@@ -81,13 +81,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack }) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <ScreenHeader lang={lang} title={partner.name} onBack={onBack} />
+      <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
         <Card>
           <View style={s.head}>
-            <EateryLogo partner={partner} width={72} height={72} lang={lang} />
+            <EateryLogo partner={partner} width={72} height={72} decorative />
             <View style={s.headText}>
-              <Text style={s.name} accessibilityRole="header">{partner.name}</Text>
+              <Text style={s.name}>{partner.name}</Text>
               <Text style={s.sub}>{t(EATERY_CATEGORY_KEY[partner.category] || 'eateryCatRestaurant', lang)}</Text>
               {!!regionKey && (
                 <View style={s.region}>
@@ -100,7 +100,29 @@ export default function EateryPartnerScreen({ partner, lang, onBack }) {
           {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tag} />}
         </Card>
 
-        {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="cover" lang={lang} />}
+        {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
+
+        {hasMenu && (
+          <Card>
+            <Text style={s.h}>{t('eateryMenu', lang)}</Text>
+            {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tagGap} />}
+            {sections.map(sec => (
+              <View key={sec.title} style={s.menuSec}>
+                <Text style={s.secTitle}>{sec.title}</Text>
+                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} />)}
+              </View>
+            ))}
+            {menuPhotos.length > 0 && (
+              <View style={s.menuSec}>
+                <PhotoPager photos={menuPhotos} width={W - 32} ratio={3 / 4} fit="contain" lang={lang} radius={radii.md} />
+              </View>
+            )}
+            {!!menuUrl && (
+              <Button style={s.menuBtn} variant="secondary" icon="restaurant-outline"
+                title={t('eateryViewMenu', lang)} onPress={() => go('menu', menuUrl)} />
+            )}
+          </Card>
+        )}
 
         {(!!week || !!partner.address) && (
           <Card>
@@ -129,27 +151,6 @@ export default function EateryPartnerScreen({ partner, lang, onBack }) {
           </View>
         )}
 
-        {hasMenu && (
-          <Card>
-            <Text style={s.h}>{t('eateryMenu', lang)}</Text>
-            {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tagGap} />}
-            {sections.map(sec => (
-              <View key={sec.title} style={s.menuSec}>
-                <Text style={s.secTitle}>{sec.title}</Text>
-                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} />)}
-              </View>
-            ))}
-            {menuPhotos.length > 0 && (
-              <View style={s.menuSec}>
-                <PhotoPager photos={menuPhotos} width={W - 32} ratio={3 / 4} fit="contain" lang={lang} />
-              </View>
-            )}
-            {!!menuUrl && (
-              <Button style={s.menuBtn} variant="secondary" icon="restaurant-outline"
-                title={t('eateryViewMenu', lang)} onPress={() => go('menu', menuUrl)} />
-            )}
-          </Card>
-        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -170,11 +171,13 @@ const s = StyleSheet.create({
   body:      { ...type.body, color: colors.textPrimary },
   addrGap:   { marginTop: space[20] },
   chip:      { alignSelf: 'flex-start', borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4, marginBottom: space[8] },
-  chipOk:    { backgroundColor: colors.primaryLight },
-  chipWarn:  { backgroundColor: colors.dangerLight },
+  chip_ok:      { backgroundColor: colors.primaryLight },
+  chip_warn:    { backgroundColor: colors.dangerLight },
+  chip_neutral: { backgroundColor: colors.soft },
   chipText:  { ...type.meta },
-  chipOkText:{ color: colors.primaryDark },
-  chipWarnText: { color: colors.dangerInk },
+  chipText_ok:      { color: colors.primaryDark },
+  chipText_warn:    { color: colors.dangerInk },
+  chipText_neutral: { color: colors.textPrimary },
   hourRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[12], minHeight: 28 },
   hourDay:   { ...type.body, color: colors.textSecondary, flexShrink: 1 },
   hourVal:   { ...type.body, color: colors.textPrimary, flexShrink: 0 },
@@ -185,6 +188,6 @@ const s = StyleSheet.create({
   itemText:  { flex: 1 },
   itemName:  { ...type.body, color: colors.textPrimary },
   itemDesc:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
-  itemPrice: { ...type.rowTitle, color: colors.textPrimary, flexShrink: 0 },
+  itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   menuBtn:   { marginTop: space[16] },
 })
