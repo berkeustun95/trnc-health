@@ -4,6 +4,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
 import { LANG_CODES, dateLocale } from '../constants/i18n.js'
+import { CRUNCHY_EXPRESS_LIVE } from '../constants/flags.js'
+import { sponsoredEateryItem } from '../constants/eatery.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
@@ -321,8 +323,8 @@ function genericEventsItem() {
 // card — that property comes from the ladder's existing shape, not from new code.
 // `upcoming` = the redesign Home banner, which has its own ladder (resolveRedesignBanner).
 // The legacy LiveStrip never passes it, so the ladder below is unchanged for production.
-export async function resolveStripItem({ lang, promosEligible = false, now = new Date(), dismissedIds = null, upcoming = false }) {
-  if (upcoming) return resolveRedesignBanner({ lang, promosEligible, now, dismissedIds })
+export async function resolveStripItem({ lang, promosEligible = false, now = new Date(), dismissedIds = null, upcoming = false, eateryGate = CRUNCHY_EXPRESS_LIVE }) {
+  if (upcoming) return resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, eateryGate })
   const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
   const todayIso = isoDay(now)
   let pins = null
@@ -399,7 +401,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
 // ─── THE REDESIGN HOME BANNER — its own ladder (Berke, 2026-10-01) ──────────
 //
 //   0  a pin for TODAY, any kind        home_strip_pin, pin_date = today — the manual override
-//   1  a sponsored promo                the SAME two hard gates as rank 5 above: promosEligible
+//   1  a sponsored promo                (DB promos, then the config Yeme-İçme partner card) the SAME two hard gates as rank 5 above: promosEligible
 //                                       (never a guest, a null DOB or anyone under PROMO_MIN_AGE)
 //                                       and never twice running (STRIP_LAST_KIND_KEY)
 //   2  tonight's event, else the NEXT upcoming event (startsAt kept for the day/time chip)
@@ -413,7 +415,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
 const DEV_TEST_PROMO = null
 // e.g. { kind: 'promo', id: 'dev-test', title_i18n: { tr: 'Test sponsor', en: 'Test sponsor' },
 //        subtitle_i18n: null, image_url: null, link_url: 'https://getadaapp.com', pin_date: null }
-async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }) {
+async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, eateryGate = CRUNCHY_EXPRESS_LIVE }) {
   const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
   const todayIso = isoDay(now)
   let pins = null
@@ -425,10 +427,10 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
     }
   } catch { /* fall through */ }
   if (promosEligible) {
-    try {
-      let lastKind = null
-      try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
-      if (lastKind !== 'promo') {
+    let lastKind = null
+    try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
+    if (lastKind !== 'promo') {
+      try {
         if (!pins) pins = await readPins()
         const dev = typeof __DEV__ !== 'undefined' && __DEV__ && DEV_TEST_PROMO ? [DEV_TEST_PROMO] : []
         const pool = [...dev, ...pins.filter(p => p.kind === 'promo' && !p.pin_date && !isDismissed(p.id))]
@@ -436,8 +438,18 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
           const item = await hydratePin(p, lang)
           if (item) return item
         }
+      } catch { /* fall through to the config promo */ }
+      // The Yeme-İçme partner card: CONFIG promo, same two gates as above (it sits inside them).
+      // POOL RULE: DB promos first, this as the fallback. A DB promo is a booked flight with a
+      // window; an always-on config item ahead of it would starve it, and there is no rotation
+      // state to share rank 1 fairly. It also survives an offline/RLS-failed pins read.
+      // `eateryGate` = CRUNCHY_EXPRESS (the caller passes the real gate; the default is the
+      // production flag so Node and any forgotten caller fail closed).
+      if (eateryGate === true) {
+        const item = sponsoredEateryItem(lang)
+        if (!isDismissed(item.id)) return item
       }
-    } catch { /* fall through */ }
+    }
   }
   try {
     const e = (await readEventsToday(now, lang)) || (await readNextEvent(now, lang))

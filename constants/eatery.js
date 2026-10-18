@@ -24,6 +24,27 @@ export const EATERY_DAYS = [
 // gates = { <slug>: boolean }; a slug with no gate is visible. Shared by the list and the map.
 export const eateryPartnerVisible = (row, gates) => gates?.[row?.slug] !== false
 
+// The "Sponsorlu" card in the Home banner (rank 1 of the redesign ladder, utils/homeStripResolver.js).
+// CONFIG, not a home_strip_pin row: a DB promo carries link_url NOT NULL / route NULL (20261043) so it
+// cannot open an in-app page, and an active row would be live in production. The per-partner gate
+// (CRUNCHY_EXPRESS) decides whether it exists; scripts/check-eatery-partners.mjs checks the slug is seeded.
+export const EATERY_SPONSORED_SLUG = 'crunchy-express'
+export const EATERY_SPONSORED_NAME = 'Crunchy Express'
+
+// A kind 'promo' item the strip already understands (sponsored tag, not-twice-running). `eaterySlug` +
+// action.type 'eatery' are what the Home screen wires to the partner page; imageUrl comes from the
+// partner row there (null here). No id collision with a home_strip_pin uuid.
+export const sponsoredEateryItem = lang => ({
+  kind: 'promo', id: `eatery-${EATERY_SPONSORED_SLUG}`,
+  title: EATERY_SPONSORED_NAME,
+  subtitle: t('eateryStripSub', lang),
+  icon: 'restaurant-outline',
+  imageUrl: null,
+  sponsored: true,
+  eaterySlug: EATERY_SPONSORED_SLUG,
+  action: { type: 'eatery', slug: EATERY_SPONSORED_SLUG },
+})
+
 const filled = v => typeof v === 'string' && v.trim().length > 0
 const https = v => (filled(v) && /^https:\/\/\S+$/.test(v.trim()) ? v.trim() : null)
 
