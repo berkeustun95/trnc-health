@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type, radii, elevation, press } from '../../constants/theme'
@@ -17,11 +17,11 @@ const GAP_BELOW = 12
 // Content fades out instead of cutting sharply at the bar: a solid canvas band from the
 // screen's bottom edge (under the Android nav bar, which is edge-to-edge and draws its own
 // contrast scrim over whatever is behind it — canvas, now, not content) up to the bar's
-// middle, then FADE_H of canvas → transparent. Stepped views: expo-linear-gradient would be a
-// native module. Scroll content pads by the footprint + FADE_H so its last row clears it.
+// middle, then FADE_H of canvas → transparent. A stretched PNG, not stepped views (8 steps drew
+// visible bands over dark event photos) and not expo-linear-gradient (a native module). Scroll
+// content pads by the footprint + FADE_H so its last row clears it.
 export const FADE_H = 32
-const FADE_STEPS = 8
-const CANVAS_RGB = '244,246,245'   // colors.canvas #F4F6F5
+const CANVAS_FADE = require('../../assets/oli-scenes/canvas-fade.png')   // colors.canvas, alpha 0 → 1
 
 // The vertical space the bar occupies above the screen's bottom edge. Screens that must
 // not be covered pad by this; Home scrolls under it and pads its content instead.
@@ -45,11 +45,8 @@ export default function FloatingTabBar({ tabs, activeTab, onTabPress, refs = {},
   return (
     <>
     <View pointerEvents="none" style={[s.fadeWrap, { height: solid + FADE_H }]}>
-      {Array.from({ length: FADE_STEPS }, (_, i) => (
-        <View key={i} style={{ height: FADE_H / FADE_STEPS,
-          backgroundColor: `rgba(${CANVAS_RGB},${((i + 1) / (FADE_STEPS + 1)).toFixed(3)})` }} />
-      ))}
-      <View style={{ height: solid, backgroundColor: `rgb(${CANVAS_RGB})` }} />
+      <Image source={CANVAS_FADE} resizeMode="stretch" style={{ width: '100%', height: FADE_H }} />
+      <View style={{ height: solid, backgroundColor: colors.canvas }} />
     </View>
     <View
       style={[s.bar, elevation.tabBar, { bottom }]}

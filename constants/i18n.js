@@ -8,6 +8,9 @@ export const LANG_CODES = {
   'Spanish': 'es', 'German': 'de', 'Persian': 'fa',
 }
 
+// Locale for formatting DATES: British English ("Sunday, 18 October 2026"), never US order.
+export const dateLocale = lang => (lang === 'English' ? 'en-GB' : LANG_CODES[lang] || 'en-GB')
+
 // The picker list, in NATIVE names — the whole point of a language control is that it is
 // readable by somebody who cannot read the current language, so 'Türkçe' and never
 // 'Turkish'. Order matches LANG_CODES.

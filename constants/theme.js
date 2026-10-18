@@ -233,12 +233,14 @@ export const radius = {
 // the legacy scales are retired in the S6 sweep.
 
 // Module identity, app-wide. Ink on its own bg (computed): health 5.05 · explore 6.04 ·
-// homeLife 5.24 · city 5.84. A partner's brand colour always overrides these.
+// homeLife 5.24 · city 4.82. A partner's brand colour always overrides these.
+// city was blue #E7EEFB / #2F55B5 until 2026-10-15 (no blue or navy in ADA's frame, Berke picked olive):
+// the same values as placeColors.petHotel, copied rather than aliased so a map-pin retune never recolours it.
 export const category = {
   health:   { bg: '#FBEAEC', ink: '#B83246' },
   explore:  { bg: '#F1EAFB', ink: '#6B3FB0' },   // Keşfet & Eğlence
   homeLife: { bg: '#FBF0E0', ink: '#92560C' },   // Ev & Yaşam
-  city:     { bg: '#E7EEFB', ink: '#2F55B5' },   // Şehir & Ulaşım
+  city:     { bg: '#F7FEE7', ink: '#4D7C0F' },   // Şehir & Ulaşım
 }
 
 // Inter only, and only the four registered weights. Every role carries its family, so a

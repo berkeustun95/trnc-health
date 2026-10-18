@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
-import { t, tCount, LANG_CODES } from '../../../constants/i18n'
+import { t, tCount, dateLocale } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
@@ -150,7 +150,7 @@ function eventChip(startsAt, lang) {
   if (days <= 0) day = d.getHours() >= 17 ? t('stripTonight', lang) : t('dateToday', lang)
   else if (days === 1) day = t('stripTomorrow', lang)
   else {
-    try { day = d.toLocaleDateString(LANG_CODES[lang] || 'en', { weekday: 'short', day: 'numeric', month: 'short' }) }
+    try { day = d.toLocaleDateString(dateLocale(lang), { weekday: 'short', day: 'numeric', month: 'short' }) }
     catch { day = `${d.getDate()}.${d.getMonth() + 1}.` }   // a locale Hermes' Intl lacks
   }
   return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
@@ -172,16 +172,24 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
         accessibilityLabel={[title, time, tag].filter(Boolean).join(', ')} style={s.banner}>
         <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
-        {!!time && (
-          <View style={s.timeChip}>
-            <Ionicons name={chip?.future ? 'calendar-outline' : 'time-outline'} size={14} color={colors.textPrimary} />
-            <Text style={s.timeText}>{time}</Text>
+        {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
+            lower part sits under the floating tab bar, so a bottom band hid the title. */}
+        <View style={[s.bannerBand, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
+          {(!!time || !!tag) && (
+            <View style={s.bandMeta}>
+              {!!time && (
+                <>
+                  <Ionicons name={chip?.future ? 'calendar-outline' : 'time-outline'} size={14} color="#FFFFFF" />
+                  <Text style={s.timeText} numberOfLines={1}>{time}</Text>
+                </>
+              )}
+              {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1}>{tag}</Text></View>}
+            </View>
+          )}
+          <View style={s.bandTitleRow}>
+            <Text style={s.bannerTitle} numberOfLines={2}>{title}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </View>
-        )}
-        {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1}>{tag}</Text></View>}
-        <View style={s.bannerBand}>
-          <Text style={s.bannerTitle} numberOfLines={2}>{title}</Text>
-          <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
         </View>
       </TouchableOpacity>
       {item.kind === 'notice' && !!onDismiss && (
@@ -210,16 +218,17 @@ const s = StyleSheet.create({
 
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
   bannerPhoto: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  timeChip:    { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 5,
-                 backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: radii.pill, paddingHorizontal: 10, height: 28 },
-  timeText:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
-  tag:         { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.62)',
-                 borderRadius: radii.pill, paddingHorizontal: 10, height: 26, justifyContent: 'center' },
+  timeText:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1 },
+  tag:         { marginLeft: 6, backgroundColor: 'rgba(255,255,255,0.22)',
+                 borderRadius: radii.pill, paddingHorizontal: 8, height: 20, justifyContent: 'center' },
   tagText:     { ...type.caption, color: '#FFFFFF' },
   // White on rgba(0,0,0,0.72) over a white photo: 9.29:1 (computed). A solid band, so the ratio is a
   // constant rather than a function of which photo loaded.
-  bannerBand:  { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)',
-                 flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  bannerBand:  { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.72)',
+                 gap: 4, paddingHorizontal: 14, paddingVertical: 10 },
+  bannerBandDismiss: { paddingRight: 48 },
+  bandMeta:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  bandTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   bannerTitle: { ...type.rowTitle, color: '#FFFFFF', flex: 1 },
   dismiss:     { position: 'absolute', top: 4, right: 4 },
 })
