@@ -287,7 +287,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
             </View>
             <Text style={r.name} numberOfLines={2}>{title}</Text>
             {sub ? <Text style={r.sub} numberOfLines={1}>{sub}</Text> : null}
-            {open ? <Text style={[r.sub, open.tone === 'ok' ? r.subOk : open.tone === 'warn' ? r.subWarn : null]} numberOfLines={1}>{open.text}</Text> : null}
+            {open ? <Text style={[r.sub, open.tone === 'ok' ? r.subOk : open.tone === 'warn' ? r.subWarn : null]} numberOfLines={2}>{open.text}</Text> : null}
           </View>
           <IconButton icon="close" onPress={onClose} accessibilityLabel={t('uiClose', lang)} color={colors.textSecondary} style={r.close} />
         </View>

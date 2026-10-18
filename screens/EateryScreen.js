@@ -73,7 +73,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       if (openSlug) {
         const hit = list.find(r => r.slug === openSlug)
         if (hit) onOpenPartner(hit)
-        onOpenSlugDone?.()
+        onOpenSlugDone?.(!!hit)
       }
     })().catch(() => { if (alive) { setError(true); setLoading(false) } })
     return () => { alive = false }

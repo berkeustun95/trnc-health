@@ -2490,7 +2490,7 @@ export default function App() {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} partner={eateryPartner} onOpenPartner={setEateryPartner}
       onClosePartner={closeEateryPartner} onBack={() => setShowEatery(false)}
-      openSlug={eateryOpenSlug} onOpenSlugDone={() => setEateryOpenSlug(null)} />
+      openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.
