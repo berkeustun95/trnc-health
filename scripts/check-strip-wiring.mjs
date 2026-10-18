@@ -24,5 +24,5 @@ ok('  ...passing gates: EATERY_GATES', /resolveStripSlides\(\{[^}]*gates: EATERY
 ok('  ...and fetches partners only when EATERY and promosEligible', /EATERY === true && promosEligible === true[\s\S]{0,160}loadEateryPartners\(/.test(home), '')
 ok('HomeScreen renders StripSlider', /<StripSlider\b/.test(home), '')
 ok('the old single-card eateryGate is gone', !/eateryGate/.test(home) && !/eateryGate/.test(rd('utils/homeStripResolver.js')), '')
-ok('only the lead records its kind (partner slides: remember={index === 0})', /remember=\{index === 0\}/.test(rd('components/home/redesign/Widgets.js')), '')
+ok('only the lead records its kind, never a partner slide (remember={index === 0 && !item.eaterySlug})', /remember=\{index === 0 && !item\.eaterySlug\}/.test(rd('components/home/redesign/Widgets.js')), '')
 process.exit(bad?1:0)

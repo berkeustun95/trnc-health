@@ -303,6 +303,9 @@ export function StripSlider({ slides, loading, lang, onPress, onDismiss, paused 
   }, [auto, n, width])
 
   useEffect(() => { if (pageRef.current >= n) goTo(0, false) }, [n])
+  // The list unmounts while loading / single-slide and remounts at offset 0: reset the position
+  // so the dots and the screen-reader value never point at a slide that is not showing.
+  useEffect(() => { if (!multi) { pageRef.current = 0; setPage(0) } }, [multi])
 
   if (!multi) return <EventBanner item={slides[0] ?? null} loading={loading} lang={lang} onPress={onPress} onDismiss={onDismiss} />
 
@@ -334,7 +337,7 @@ export function StripSlider({ slides, loading, lang, onPress, onDismiss, paused 
           keyExtractor={x => String(x.id)}
           renderItem={({ item, index }) => (
             <View style={{ width }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-              <EventBanner item={item} lang={lang} remember={index === 0} onPress={onPress}
+              <EventBanner item={item} lang={lang} remember={index === 0 && !item.eaterySlug} onPress={onPress}
                 onDismiss={index === 0 ? onDismiss : undefined} />
             </View>
           )}
