@@ -651,6 +651,12 @@ export default function App() {
   const [showEhliyet, setShowEhliyet] = useState(false)
   const [showEatery, setShowEatery] = useState(false)
   const [eateryPartner, setEateryPartner] = useState(null)   // the partner row open inside Yeme-İçme
+  // Explore map pin -> partner page. The pin hands a slug (its row has no menu / contacts); EateryScreen
+  // resolves it against the full rows. eateryFromMap makes back leave the module in ONE press, to the map.
+  const [eateryOpenSlug, setEateryOpenSlug] = useState(null)
+  const [eateryFromMap, setEateryFromMap] = useState(false)
+  useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false) } }, [showEatery])
+  const closeEateryPartner = () => { if (eateryFromMap) setShowEatery(false); setEateryPartner(null) }
   const [showStudentHub, setShowStudentHub] = useState(false)
   // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
   // by the screen rather than here, so a tap that arrives before the hub mounts is not lost.
@@ -1089,7 +1095,7 @@ export default function App() {
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showEhliyet) { setShowEhliyet(false); return true }
       // Partner page before the list: back steps partner -> list -> Home.
-      if (eateryPartner) { setEateryPartner(null); return true }
+      if (eateryPartner) { if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
       if (showEatery) { setShowEatery(false); return true }
       if (showGarages) { if (garagesBackRef.current?.()) return true; setShowGarages(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
@@ -1127,7 +1133,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showEatery, eateryPartner, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2483,7 +2489,8 @@ export default function App() {
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} partner={eateryPartner} onOpenPartner={setEateryPartner}
-      onClosePartner={() => setEateryPartner(null)} onBack={() => setShowEatery(false)} />
+      onClosePartner={closeEateryPartner} onBack={() => setShowEatery(false)}
+      openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.
@@ -2675,6 +2682,8 @@ export default function App() {
                 // Same route the pets cards use, flag re-checked there. petHotelFromMap
                 // makes back return here in one press (closePetHotel).
                 onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
+                // EATERY re-checked at the render site; eateryFromMap makes back return here in one press.
+                onSelectEatery={row => { setShowEatery(true); setEateryOpenSlug(row.slug); setEateryFromMap(true) }}
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}
