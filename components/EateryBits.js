@@ -14,11 +14,11 @@ export const eateryImageUrl = path =>
   path ? supabase.storage.from(EATERY_BUCKET).getPublicUrl(path).data.publicUrl : null
 
 // Marks anything built from the Preview fixture. Never shown for a real database row.
-export function PlaceholderTag({ lang, style }) {
+export function PlaceholderTag({ lang, style, lines = 2 }) {
   return (
     <View style={[s.tag, style]}>
       <Ionicons name="construct-outline" size={12} color={colors.tileInk} />
-      <Text style={s.tagText} numberOfLines={2}>{t('eateryPlaceholderTag', lang)}</Text>
+      <Text style={s.tagText} numberOfLines={lines}>{t('eateryPlaceholderTag', lang)}</Text>
     </View>
   )
 }
