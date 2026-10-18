@@ -3,7 +3,7 @@ import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIn
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { colors, readableOn, brandInk, withAlpha } from '../constants/theme'
 import { Ionicons } from '@expo/vector-icons'
-import { t } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import ConnectivityErrorState from '../components/ConnectivityErrorState'
 import OperatorWordmark from '../components/OperatorWordmark'
@@ -266,7 +266,7 @@ export default function ConnectivityOperatorScreen({
           {!!stampDate && (
             <Text style={s.stampText}>
               {t('connStampUpdated', lang)
-                .replace('{date}', stampDate.toLocaleDateString([], { dateStyle: 'medium' }))}
+                .replace('{date}', stampDate.toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' }))}
             </Text>
           )}
         </View>

@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
 import { logContactEvent } from './logContactEvent'
 import { medalNeed, stopsVisitedAt } from '../constants/walkingRoutes'
+import { dateLocale } from '../constants/i18n'
 
 // ─── Route medals: the phone half ───────────────────────────────────────────
 // Server half and the privacy reasoning: supabase/migrations/20261056_route_medals.sql.
@@ -123,7 +124,7 @@ export function useRouteMedal({ enabled, active, route, pos, userId, guest }) {
 
 // 'YYYY-MM-DD' (a TRNC calendar date from the server) → a local Date at midnight. new Date(str)
 // would read it as UTC midnight and show the previous day anywhere west of Greenwich.
-export function medalDate(ymd) {
+export function medalDate(ymd, lang) {
   const [y, m, d] = String(ymd).split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString([], { dateStyle: 'medium' })
+  return new Date(y, m - 1, d).toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' })
 }
