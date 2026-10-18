@@ -203,7 +203,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
         {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
         <View onLayout={e => setBandH(Math.ceil(e.nativeEvent.layout.height))}
-          style={[s.bannerBand, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
+          style={[s.bannerBand, showFrame && s.bannerBandPartner, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
           {(!!time || !!tag) && (
             <View style={s.bandMeta}>
               {!!time && (
@@ -212,7 +212,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
                   <Text style={s.timeText} numberOfLines={1} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{time}</Text>
                 </>
               )}
-              {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{tag}</Text></View>}
+              {!!tag && <View style={[s.tag, showFrame && s.tagOnTeal]}><Text style={s.tagText} numberOfLines={1} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{tag}</Text></View>}
               {!!item.placeholder && <PlaceholderTag lang={lang} lines={1} style={s.placeholderTag} />}
             </View>
           )}
@@ -379,7 +379,7 @@ const s = StyleSheet.create({
   sliderList:  { height: 160, flexGrow: 0 },
   // The pill keeps the dots readable on the lilac frame and on any photo (white on #F1EAFB alone is ~1.2:1).
   dots:        { position: 'absolute', alignSelf: 'center', bottom: 6, flexDirection: 'row', gap: 5,
-                 backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: 4 },
+                 backgroundColor: 'rgba(10,94,93,0.85)', borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: 4 },   // primaryDark @ 0.85: white 5.50 / 0.7-white 3.59 on the lilac, 5.29 / 3.49 on a white photo
   dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.7)' },
   dotOn:       { backgroundColor: '#FFFFFF' },
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
@@ -397,6 +397,10 @@ const s = StyleSheet.create({
   // constant rather than a function of which photo loaded.
   bannerBand:  { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.72)',
                  gap: 4, paddingHorizontal: 14, paddingVertical: 10 },
+  // Partner slides have no photo behind the band: solid ADA dark teal, never black-on-lilac (which
+  // read slate). White on primaryDark 7.58:1; the Sponsorlu pill on it 5.29:1 at 15 % white (computed).
+  bannerBandPartner: { backgroundColor: colors.primaryDark },
+  tagOnTeal:   { backgroundColor: 'rgba(255,255,255,0.15)' },
   bannerBandDismiss: { paddingRight: 48 },
   bandMeta:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
   bandTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
