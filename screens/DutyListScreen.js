@@ -410,7 +410,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   let dateLabel = `${d.getDate()} ${monthNames(lang)[d.getMonth()]} ${d.getFullYear()}`
   if (intlTrusted) {
     try {
-      dateLabel = new Intl.DateTimeFormat(`${dateLocale(lang)}-u-ca-gregory`,
+      dateLabel = new Intl.DateTimeFormat(dateLocale(lang),
         { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
     } catch { /* keep the composed form */ }
   }

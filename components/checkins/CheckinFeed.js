@@ -13,7 +13,7 @@ import GoogleMapsAttribution from './GoogleMapsAttribution'
 import { Button, EmptyState, ErrorState } from '../ui'
 import { CARD_BG } from '../ui/ModuleScreen'
 import { colors, type, radii, press } from '../../constants/theme'
-import { t, tCount, LANG_CODES } from '../../constants/i18n'
+import { t, tCount, LANG_CODES, dateLocale } from '../../constants/i18n'
 
 function placeLabel(row, lang, names) {
   if (row.google_place_id) return names?.[row.google_place_id] ?? '…'
@@ -25,7 +25,7 @@ function placeLabel(row, lang, names) {
 function ago(iso, lang) {
   const { key, n } = agoParts(iso)
   if (key === 'checkinAgoNow') return t('checkinAgoNow', lang)
-  if (key === 'date') return new Date(iso).toLocaleDateString(LANG_CODES[lang] ?? 'en', { day: 'numeric', month: 'short' })
+  if (key === 'date') return new Date(iso).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short' })
   return tCount(key, n, lang)
 }
 
