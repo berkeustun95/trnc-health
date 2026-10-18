@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { areaName } from '../constants/areas'
 import ReviewsScreen from './ReviewsScreen'
@@ -445,7 +445,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                 <View style={sx.reviewTop}>
                   <Text style={sx.stars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
                   <View style={sx.reviewTopRight}>
-                    <Text style={sx.reviewDate}>{new Date(r.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</Text>
+                    <Text style={sx.reviewDate}>{new Date(r.created_at).toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' })}</Text>
                     <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={reloadReviews} onRequireAccount={onRequireAccount} />
                   </View>
                 </View>

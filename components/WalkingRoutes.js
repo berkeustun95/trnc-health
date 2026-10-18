@@ -493,7 +493,7 @@ function MedalOutcome({ route, lang, medal, onKeepMedal }) {
       <View style={{ flex: 1 }}>
         <Text style={w.outcomeTitle}>{t('medalEarnedFor', lang).replace('{city}', city)}</Text>
         <Text style={p.note}>
-          {m.state === 'saved' ? medalDate(m.date)
+          {m.state === 'saved' ? medalDate(m.date, lang)
             : m.state === 'guest' ? t('medalGuestNote', lang)
             : t('medalPendingNote', lang)}
         </Text>

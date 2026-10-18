@@ -81,7 +81,7 @@ export function OwnRouteBadges({ session, lang, sectionStyle, titleStyle, labelS
       <View style={b.grid}>
         {routes.map(r => (
           <Badge key={r.id} route={r} lang={lang} earned={earned.has(r.id)}
-            sub={earned.has(r.id) ? medalDate(earned.get(r.id)) : t('badgeWalkToEarn', lang)} />
+            sub={earned.has(r.id) ? medalDate(earned.get(r.id), lang) : t('badgeWalkToEarn', lang)} />
         ))}
       </View>
       <View style={[rowStyle, { marginTop: 14 }]}>

@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, type, elevation } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
 import { ScreenHeader, ErrorState, EmptyState, CardSkeleton, ModuleScreen } from '../components/ui'
@@ -28,7 +28,7 @@ function StarBar({ count, total, star }) {
 }
 
 function ReviewCard({ item, lang, onBlocked, onRequireAccount }) {
-  const date = new Date(item.created_at).toLocaleDateString([], { dateStyle: 'medium' })
+  const date = new Date(item.created_at).toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' })
   return (
     <View style={s.reviewCard}>
       <View style={s.reviewTop}>
@@ -49,7 +49,7 @@ function ReviewCard({ item, lang, onBlocked, onRequireAccount }) {
 // Redesign card. No "Verified visit" line: since 20261004 a review needs no appointment,
 // so nothing about a visit is verified — the claim was false.
 function ReviewCardRedesign({ item, lang, onBlocked, onRequireAccount }) {
-  const date = new Date(item.created_at).toLocaleDateString([], { dateStyle: 'medium' })
+  const date = new Date(item.created_at).toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' })
   return (
     <View style={r.card}>
       <View style={r.top}>

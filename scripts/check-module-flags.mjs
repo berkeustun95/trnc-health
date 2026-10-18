@@ -278,6 +278,12 @@ const EXPECTED_SCALARS = {
   // Ask Oli voice input. Baselined because a flip turns the microphone on for every user of
   // a build that has the module, and the privacy policy + store Audio answers must be live first.
   VOICE_INPUT:           true,   // 1.4.0 store build (2026-10-09)
+
+  // Yeme-İçme section. A flip opens the eateries Home tile and screens for every user; the
+  // partner rows must be loaded and active first (see the precondition list on the flag).
+  EATERY_LIVE:           false,
+  // Crunchy Express partner. Needs EATERY_LIVE; scripts/check-eatery-partners.mjs enforces that.
+  CRUNCHY_EXPRESS_LIVE:  false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

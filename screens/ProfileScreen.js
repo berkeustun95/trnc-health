@@ -16,7 +16,7 @@ import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, ha
 import { colors, shadow, radius, elevation, type } from '../constants/theme'
 import { Button, useTabBarFootprint } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
-import { t } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
 import { monthNames } from '../constants/months'
@@ -1387,7 +1387,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                         <View style={s.blockedWhoBody}>
                           <Text style={s.blockedName} numberOfLines={1}>{b.display_name}</Text>
                           <Text style={s.blockedLabel}>
-                            {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' }))}
+                            {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' }))}
                           </Text>
                         </View>
                       </View>
@@ -1395,7 +1395,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                       <View style={s.blockedWhoBody}>
                         <Text style={s.blockedName} numberOfLines={2}>{t('blockedReviewerTitle', lang)}</Text>
                         <Text style={s.blockedLabel}>
-                          {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' }))}
+                          {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString(dateLocale(lang), { dateStyle: 'medium' }))}
                         </Text>
                         <Text style={s.blockedHint}>{t('blockedReviewerHint', lang)}</Text>
                       </View>
