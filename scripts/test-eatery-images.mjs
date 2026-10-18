@@ -8,7 +8,7 @@
 // Fixtures are synthetic header buffers (no image library, no network, no files). End-to-end with real
 // files runs on the first dry dispatch of the eatery-images workflow.
 
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -38,6 +38,8 @@ if (process.argv.includes('--mutants')) {
     ['identical file re-uploaded', "ex.sha256 === it.sha256", 'false'],
     ['logo overwrite without replace', "else if (replace) logoPlan", 'else if (true) logoPlan'],
     ['photo row duplicate insert', 'if (!row) inserts.push(want)', 'if (true) inserts.push(want)'],
+    ['symlink check removed', 'st.isSymbolicLink()', 'false'],
+    ['realpath escape check removed', '!real.startsWith(root + sep)', 'false'],
     ['JPEG parser stops at first marker', 'i += 2 + len', 'return { error: "stop" }'],
     ['PNG width read from wrong offset', 'b.readUInt32BE(16)', 'b.readUInt32BE(12)'],
     ['WebP VP8L height wrong', '((bits >>> 14) & 0x3fff) + 1', '((bits >>> 13) & 0x3fff) + 1'],
@@ -145,6 +147,26 @@ check('green menu 1000 wide', run({ menu: ['m.jpg'] }, () => jpeg(1000, 1400)).p
 {
   const r = run({ logo: 'l.png', gallery: ['a.jpg', 'missing.jpg'], menu: ['m.jpg'] }, n => ({ 'l.png': png(100, 100), 'a.jpg': jpeg(400, 400), 'm.jpg': jpeg(900, 900) }[n] ?? null))
   check('every problem is listed, not just the first (4)', r.problems.length === 4, String(r.problems.length))
+}
+
+// ─── safeRead: symlinks and escapes (real files in a temp dir) ───────────────
+{
+  const base = mkdtempSync(join(tmpdir(), 'eatery-sym-'))
+  const dir = join(base, 'partner'); mkdirSync(dir)
+  const outside = join(base, 'secret.txt'); writeFileSync(outside, 'TOPSECRET')
+  writeFileSync(join(dir, 'real.png'), png(512, 512))
+  symlinkSync(outside, join(dir, 'link.png'))
+  symlinkSync(join(dir, 'real.png'), join(dir, 'inner-link.png'))   // even a link that stays inside is refused
+  mkdirSync(join(base, 'other')); writeFileSync(join(base, 'other', 'x.png'), png(512, 512))
+  const r = name => L.safeRead(dir, name)
+  check('positive control: a real file is read', Buffer.isBuffer(r('real.png')) && r('real.png').length === 4000)
+  check('RED symlink to a file outside is refused, not read', r('link.png')?.unsafe === 'is a symlink' && !Buffer.isBuffer(r('link.png')))
+  check('RED symlink inside the folder is refused too', r('inner-link.png')?.unsafe === 'is a symlink')
+  check('missing file is null (not an error object)', r('nope.png') === null)
+  check('RED escape via .. is refused', r('../other/x.png')?.unsafe === 'resolves outside the partner folder')
+  const v = run({ logo: 'link.png' }, r)
+  check('RED validateLocal reports the symlink and reads nothing', has(v.problems, /is a symlink/) && v.items.length === 0)
+  check('positive control through validateLocal', run({ logo: 'real.png' }, r).problems.length === 0)
 }
 
 // ─── readiness ──────────────────────────────────────────────────────────────

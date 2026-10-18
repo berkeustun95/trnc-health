@@ -4,6 +4,8 @@
 // Everything here is a function of its arguments, so every refusal can be proven red offline.
 
 import { createHash } from 'node:crypto'
+import { lstatSync, realpathSync, readFileSync, existsSync } from 'node:fs'
+import { join, sep } from 'node:path'
 
 export const BUCKET = 'eatery-images'
 export const MAX_BYTES = 2 * 1024 * 1024            // bucket file_size_limit (20261115)
@@ -114,6 +116,7 @@ export function validateLocal(slug, manifest, readFile) {
     if (seen.has(w.name)) { problems.push(`${tag}: listed twice (also ${seen.get(w.name)})`); continue }
     seen.set(w.name, tag)
     const buf = readFile(w.name)
+    if (buf && buf.unsafe) { problems.push(`${tag}: refused, ${buf.unsafe}`); continue }
     if (!buf) { problems.push(`${tag}: file not found in data/eatery/${slug}/`); continue }
     if (buf.length > MAX_BYTES) { problems.push(`${tag}: ${buf.length} bytes exceeds the ${MAX_BYTES} byte bucket limit`); continue }
     if (buf.length === 0) { problems.push(`${tag}: empty file`); continue }
@@ -182,4 +185,19 @@ export function plan(items, state, replace = false) {
   const mine = new Set(items.map(i => i.path))
   const orphans = (state.rows || []).map(r => r.storage_path).filter(p => !mine.has(p))
   return { problems, uploads, inserts, updates, logo: logoPlan, orphans }
+}
+
+// ─── file reading that never follows a link out of the partner folder ────────
+// A committed symlink (e.g. to /proc/self/environ) must never be read. Refuses a symlink entry, and any
+// path whose realpath leaves the realpath of the folder, BEFORE opening it. Returns Buffer | null (absent)
+// | { unsafe: reason }. Also used for manifest.json (name 'manifest.json').
+export function safeRead(dir, name) {
+  const p = join(dir, name)
+  let st
+  try { st = lstatSync(p) } catch { return null }
+  if (st.isSymbolicLink()) return { unsafe: 'is a symlink' }
+  if (!st.isFile()) return null
+  const real = realpathSync(p), root = realpathSync(dir)
+  if (!real.startsWith(root + sep)) return { unsafe: 'resolves outside the partner folder' }
+  return readFileSync(p)
 }

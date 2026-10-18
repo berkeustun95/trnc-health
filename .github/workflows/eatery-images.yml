@@ -13,7 +13,9 @@
 # partner rows). With apply=true, `approve` waits in the `production-db` environment until Berke approves
 # it (Actions → the run → Review deployments); only then does `apply` run, from main only, and it
 # re-validates everything. The approve job holds no secret. Public repo: stdout carries counts and keys
-# only; error text goes to the eatery-images-report artifact.
+# only. The eatery-images-report artifact is NOT private: anyone signed in to GitHub can download it and
+# secret masking does not apply to artifacts, so it holds the plan (object paths), problems and short
+# sanitised error codes only, never raw error text.
 
 name: eatery-images
 
@@ -65,6 +67,17 @@ jobs:
           args=(--slug="$IN_SLUG" --report=eatery-images-report.json)
           [ "$IN_REPLACE" != "true" ] || args+=(--replace)
           node scripts/eatery-images.mjs "${args[@]}"
+      - name: Counts summary
+        if: always()
+        run: |
+          [ -f eatery-images-report.json ] || { echo "eatery-images dry: no report (refused before planning)" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('eatery-images-report.json', 'utf8'))
+            const p = r.plan, c = a => p ? p.uploads.filter(u => u.action === a).length : 0
+            console.log(p
+              ? 'eatery-images dry ' + r.slug + ': uploads ' + c('upload') + ' / skips ' + c('skip-identical') + ' / replaces ' + c('replace') + ' / rows ' + p.inserts.length + ' insert + ' + p.updates.length + ' update / logo ' + p.logo.action + ' / problems ' + r.problems.length
+              : 'eatery-images dry ' + r.slug + ': refused, problems ' + r.problems.length)
+          " >> "$GITHUB_STEP_SUMMARY"
       - name: Report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -83,8 +96,14 @@ jobs:
     permissions: {}
     env:
       IN_SLUG: ${{ inputs.slug }}
+      IN_APPLY: ${{ inputs.apply }}
+      IN_REPLACE: ${{ inputs.replace }}
     steps:
-      - run: echo "Image upload for $IN_SLUG approved for production."
+      - name: What is being approved
+        run: |
+          echo "slug=$IN_SLUG apply=$IN_APPLY replace=$IN_REPLACE"
+          if [ "$IN_REPLACE" = "true" ]; then echo "::warning::REPLACE: overwrites public objects / logo_path"; echo "REPLACE: overwrites public objects / logo_path"; fi
+          echo "Image upload for $IN_SLUG approved for production."
 
   apply:
     if: ${{ inputs.apply }}

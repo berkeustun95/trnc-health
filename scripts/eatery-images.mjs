@@ -3,7 +3,7 @@
 //
 //   node scripts/eatery-images.mjs --slug=crunchy-express                   # DRY (default): validate + print the plan
 //   node scripts/eatery-images.mjs --slug=crunchy-express --apply [--replace]
-//   options: --report=path.json  (full plan + error text; a workflow artifact — stdout stays counts and keys)
+//   options: --report=path.json  (plan + sanitised codes only: the artifact is PUBLIC-downloadable on this repo; no raw error text)
 //
 // CI-only for anything that writes (scripts/lib/prod-write-guard.mjs). Workflow: eatery-images, whose apply
 // path waits for Berke's approval in the `production-db` environment. Even a dry run needs the service key
@@ -27,12 +27,12 @@
 //   only if absent; logo_path is set only if null or equal. Order: uploads, verify by re-download, photo rows, logo_path.
 //   Nothing is ever deleted; rows for photos not in the manifest are listed, not touched.
 
-import { readFileSync, existsSync, statSync, writeFileSync } from 'node:fs'
-import { resolve, dirname, join } from 'node:path'
+import { writeFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { BUCKET, SLUG_RE, sha256, validateLocal, readiness, plan } from './lib/eatery-images-lib.mjs'
+import { BUCKET, SLUG_RE, sha256, validateLocal, readiness, plan, safeRead } from './lib/eatery-images-lib.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -43,6 +43,10 @@ const replace = args.includes('--replace')
 const reportPath = opt('report')
 prodWriteGuard({ wouldWrite: apply, workflow: 'eatery-images', dryHint: 'node scripts/eatery-images.mjs --slug=<slug>' })
 
+// The report is an Actions artifact: on this PUBLIC repo anyone signed in to GitHub can download it, and secret
+// masking does not apply to artifacts. So it never holds raw Supabase error text (which could echo a request or
+// header): only the step, the object path and a short sanitised code.
+const why = e => (typeof e === 'string' ? e : `code=${[e?.statusCode, e?.status, e?.code].map(String).find(c => /^[A-Za-z0-9_-]{1,20}$/.test(c) && c !== 'undefined') ?? 'unknown'}`)
 const report = { slug, apply, replace, problems: [], errors: [] }
 const out = (...l) => console.log(...l)
 const finish = code => {
@@ -61,14 +65,12 @@ if (apply && process.env.GITHUB_REF !== 'refs/heads/main') refuse([`apply runs f
 
 // 1. local files
 const dir = resolve(ROOT, 'data/eatery', slug)
-if (!existsSync(join(dir, 'manifest.json'))) refuse([`data/eatery/${slug}/manifest.json not found`])
+const rawManifest = safeRead(dir, 'manifest.json')
+if (!rawManifest) refuse([`data/eatery/${slug}/manifest.json not found`])
+if (rawManifest.unsafe) refuse([`manifest.json refused, ${rawManifest.unsafe}`])
 let manifest
-try { manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) } catch { refuse(['manifest.json is not valid JSON']) }
-const readFile = name => {
-  const p = resolve(dir, name)
-  if (dirname(p) !== dir || !existsSync(p) || !statSync(p).isFile()) return null
-  return readFileSync(p)
-}
+try { manifest = JSON.parse(rawManifest.toString('utf8')) } catch { refuse(['manifest.json is not valid JSON']) }
+const readFile = name => safeRead(dir, name)
 const local = validateLocal(slug, manifest, readFile)
 if (local.problems.length) refuse(local.problems)
 out(`manifest OK: ${local.items.length} image(s) for ${slug}`)
@@ -78,7 +80,7 @@ for (const it of local.items) out(`  ${it.path}  ${it.bytes} bytes  ${it.mime}  
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL
 if (!url) refuse(['EXPO_PUBLIC_SUPABASE_URL is empty'])
 const sb = createClient(url, serviceRoleKey(), { auth: { persistSession: false, autoRefreshToken: false } })
-const bail = (what, error) => { report.errors.push(`${what}: ${error?.message ?? error}`); refuse([`${what} failed (details in the report artifact)`]) }
+const bail = (what, error) => { report.errors.push(`${what}: ${why(error)}`); refuse([`${what} failed (code in the report artifact)`]) }
 
 const pr = await sb.from('eatery_partners')
   .select('id,is_active,lat,lng,address,menu_url,menu_verified_on,logo_path,eatery_menu_items(count)').eq('slug', slug)
@@ -123,7 +125,7 @@ if (!apply) { out('DRY: no write of any kind was made.'); finish(0) }
 
 // 4. apply
 let failed = 0
-const fail = (what, error) => { failed++; report.errors.push(`${what}: ${error?.message ?? error}`); console.error(`FAILED ${what} (details in the report artifact)`) }
+const fail = (what, error) => { failed++; report.errors.push(`${what}: ${why(error)}`); console.error(`FAILED ${what} (code in the report artifact)`) }
 const byPath = new Map(local.items.map(i => [i.path, i]))
 for (const u of pl.uploads) {
   if (u.action === 'skip-identical') continue
