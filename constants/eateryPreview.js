@@ -1,8 +1,8 @@
 // Yeme-İçme placeholders — Crunchy Express in the DB row shape (eatery_partners + embedded
-// eatery_menu_items / eatery_photos). Read ONLY through the guarded require in EateryScreen
+// eatery_menu_items / eatery_photos). Read ONLY through the guarded require in utils/loadEateryPartners.js
 // (scripts/check-eatery-partners.mjs rule (c)), and only while EATERY_PREVIEW_DATA is true and
 // the database returned no row for the slug. Metro still bundles this file into production, so
-// EVERY value here is obviously fake: no real phone, address, URL or price. The screens label
+// EVERY value here is obviously fake: no real phone, address, URL or price (lat/lng is a placeholder point, see below). The screens label
 // anything built from it with eateryPlaceholderTag, and never log a contact tap for it.
 // The real file (logo, photos, menu, hours, contacts) replaces all of it as data, not code.
 
@@ -22,8 +22,10 @@ export const EATERY_PREVIEW_PARTNERS = [
     maps_url: 'https://example.com/map',
     region: null,
     address: '0 Example Street, Example Town',
-    lat: null,
-    lng: null,
+    // Preview-only placeholder point in central Lefkoşa so the map pin has somewhere to stand; a real row carries its own.
+    lat: 35.1925,
+    lng: 33.3620,
+    geocode_source: 'partner',
     opening_hours: { mon: DAY, tue: DAY, wed: DAY, thu: DAY, fri: DAY, sat: DAY, sun: DAY },
     logo_path: null,
     menu_verified_on: null,

@@ -13,7 +13,7 @@
 // so it ships over OTA and needs no rebuild.
 
 import { StatusBar } from 'expo-status-bar'
-import { REDESIGN, CHECKINS } from '../constants/redesign'
+import { REDESIGN, CHECKINS, EATERY } from '../constants/redesign'
 import { MAP_PROVIDER, NO_POI_STYLE, GOOGLE_MAP_OK } from '../utils/googleMap'
 import { loadGooglePins, onCheckinsChanged } from '../utils/googlePlaces'
 import GooglePlaceSheet from '../components/checkins/GooglePlaceSheet'
@@ -47,6 +47,9 @@ import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 import OsmAttribution from '../components/OsmAttribution'
+import { EateryLogo, PlaceholderTag } from '../components/EateryBits'
+import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
+import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import { CHIP_CAP, CHIP_CAP_NARROW } from '../components/home/redesign/RedesignHero'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
@@ -209,7 +212,7 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
   )
 }
 
-// Three pin kinds, three row shapes. A pet hotel pin carries a CONFIG entry
+// Four pin kinds, four row shapes. A pet hotel pin carries a CONFIG entry
 // (constants/petPartners.js), not a places row: its photo is a bundled asset rather than a
 // URL, it has no `category`, and its region is `district`. Read as a place, it would render
 // a broken image, an undefined badge and a blank subtitle.
@@ -227,6 +230,19 @@ function pinCardContent(pin, lang) {
     title: row.name,
     badge: t('petHotelDogBoarding', lang),
     sub:   REGION_LABEL_KEY[row.district] ? t(REGION_LABEL_KEY[row.district], lang) : null,
+  }
+  if (pin.kind === 'eatery') {
+    // Partner data (eatery_partners), never a Google place name. The logo is drawn by EateryLogo.
+    const open = eateryOpenStatus(row, lang)
+    return {
+      image: null,
+      title: row.name,
+      badge: t('menuEatery', lang),
+      sub:   [t(EATERY_CATEGORY_KEY[row.category] || 'eateryCatRestaurant', lang),
+              REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : null].filter(Boolean).join(' · '),
+      open,
+      placeholder: !!row.placeholder,
+    }
   }
   const photo = row.cover_image_url || row.photos?.[0]
   return {
@@ -250,7 +266,8 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
 
   const tc = { bg: pin.colorBg, text: pin.color }
 
-  const { image, title, badge, sub } = pinCardContent(pin, lang)
+  const { image, title, badge, sub, open, placeholder } = pinCardContent(pin, lang)
+  const isEatery = pin.kind === 'eatery'
 
   if (REDESIGN) {
     const icon = isHealth ? (TYPE_ION[row.type] || 'medical-outline')
@@ -259,7 +276,9 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
     return (
       <View style={[r.card, bottom != null && { bottom }]}>
         <View style={r.cardRow}>
-          {image
+          {isEatery
+            ? <EateryLogo partner={row} width={56} height={56} lang={lang} decorative />
+            : image
             ? <RemoteImage source={image} style={r.thumb} resizeMode={isHealth ? 'contain' : 'cover'} accessibilityIgnoresInvertColors />
             : <CategoryIcon icon={icon} category={isHealth ? 'health' : 'explore'} size={56} />}
           <View style={{ flex: 1, gap: 2 }}>
@@ -268,9 +287,11 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
             </View>
             <Text style={r.name} numberOfLines={2}>{title}</Text>
             {sub ? <Text style={r.sub} numberOfLines={1}>{sub}</Text> : null}
+            {open ? <Text style={[r.sub, open.tone === 'ok' ? r.subOk : open.tone === 'warn' ? r.subWarn : null]} numberOfLines={1}>{open.text}</Text> : null}
           </View>
           <IconButton icon="close" onPress={onClose} accessibilityLabel={t('uiClose', lang)} color={colors.textSecondary} style={r.close} />
         </View>
+        {placeholder ? <PlaceholderTag lang={lang} /> : null}
         <Button title={t('viewProfile', lang)} onPress={onViewProfile} fullWidth />
       </View>
     )
@@ -279,7 +300,9 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
   return (
     <View style={s.card}>
       <View style={s.cardRow}>
-        {image
+        {isEatery
+          ? <EateryLogo partner={row} width={52} height={52} lang={lang} decorative />
+          : image
           ? <Image source={image} style={s.thumb} resizeMode={isHealth ? 'contain' : 'cover'} />
           : <View style={[s.thumb, s.thumbFallback, { backgroundColor: tc.bg }]}>
               <Text style={{ fontSize: 20 }}>{isHealth ? (TYPE_EMOJI[row.type] || '🏥') : '📍'}</Text>
@@ -291,11 +314,13 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
           </View>
           <Text style={s.name} numberOfLines={1}>{title}</Text>
           {sub ? <Text style={s.sub} numberOfLines={1}>{sub}</Text> : null}
+          {open ? <Text style={s.sub} numberOfLines={1}>{open.text}</Text> : null}
         </View>
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
+      {placeholder ? <PlaceholderTag lang={lang} style={{ marginTop: 8 }} /> : null}
       <TouchableOpacity style={s.viewBtn} onPress={onViewProfile} activeOpacity={0.85}>
         <Text style={s.viewBtnText}>{t('viewProfile', lang)}</Text>
         <Ionicons name="chevron-forward" size={14} color="#fff" />
@@ -320,6 +345,8 @@ export default function ExploreMapScreen({
   // Opens PetHotelPartnerScreen. A pet hotel pin exists only while PET_HOTEL_LIVE is true
   // (constants/mapSources.js), and App.js's route re-checks the flag.
   onSelectPetHotel,
+  // Opens EateryPartnerScreen (App.js). An eatery pin exists only while EATERY is true; App.js re-checks it.
+  onSelectEatery,
   // ─── THE DIRECTORY'S SECOND ENTRANCE ──────────────────────────────────────
   // Until 2026-09-11 the browsable places directory had exactly ONE non-admin entrance:
   // the `explore` tile on Home. This tab showed the same content as a map and offered no
@@ -358,6 +385,7 @@ export default function ExploreMapScreen({
   const pendingWalk    = useRef(snap?.walkNext ?? null)
 
   const [places, setPlaces]   = useState([])
+  const [eateryRows, setEateryRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
   // Empty set = "All". See selectedPins(): All is the UNION OF VISIBLE SOURCES, never a
@@ -465,6 +493,17 @@ export default function ExploreMapScreen({
     })()
     return () => { active = false }
   }, [isAdmin, review])
+
+  // Eatery pins: only the columns the pin and its card need (no menu / contact columns; the partner
+  // page loads those itself). A failed read draws no eatery pin and touches nothing else.
+  useEffect(() => {
+    if (!EATERY) return
+    let active = true
+    loadEateryPartners('id, slug, name, category, region, lat, lng, logo_path, opening_hours')
+      .then(({ rows }) => { if (active) setEateryRows(rows) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   // Five rows, fetched only when the layer is on — with EXPLORE_ROUTES_LIVE false and no
   // review mode this effect never queries. is_active is filtered HERE as well as by RLS,
@@ -615,8 +654,9 @@ export default function ExploreMapScreen({
   }, [routes, fitTo])
 
   const sources = useMemo(
-    () => buildMapSources({ facilities, places, dutyFacilityId, isAdmin }),
-    [facilities, places, dutyFacilityId, isAdmin]
+    () => buildMapSources({ facilities, places, dutyFacilityId, isAdmin,
+      eateryLive: EATERY, eateryPartners: eateryRows, eateryGates: EATERY_GATES }),
+    [facilities, places, dutyFacilityId, isAdmin, eateryRows]
   )
 
   // Applicability is computed over ALL pins, not the current selection, so the Open-now
@@ -861,6 +901,7 @@ export default function ExploreMapScreen({
             setSelected(null)
             if (pin.kind === 'place') { handOff(() => onSelectPlace?.(pin.row), pin.id); return }
             if (pin.kind === 'pethotel') { handOff(() => onSelectPetHotel?.(pin.row), pin.id); return }
+            if (pin.kind === 'eatery') { handOff(() => onSelectEatery?.(pin.row), pin.id); return }
             // Health keeps the claimed / unclaimed split the tab has always had: an
             // unclaimed facility has no provider and opens the unclaimed sheet instead.
             if (pin.row.provider_id) handOff(() => onSelectFacility?.(pin.row), pin.id)
@@ -907,6 +948,8 @@ const r = StyleSheet.create({
   badgeText: { ...type.caption, fontFamily: 'Inter_700Bold' },
   name:      { ...type.rowTitle, color: colors.textPrimary },
   sub:       { ...type.small, color: colors.textSecondary },
+  subOk:     { color: colors.primaryDark },
+  subWarn:   { color: colors.dangerInk },
   close:     { marginTop: -10, marginRight: -10 },
   segment:   { backgroundColor: colors.cardBg, borderRadius: radii.pill, ...elevation.floating },
   segItem:   { borderRadius: radii.pill },

@@ -43,6 +43,8 @@
 //     ✗ flag off: All draws no eatery pin → 1           ✗ default eateryLive follows EATERY_LIVE → 1
 //   eateryPins() coordinate filter removed
 //     ✗ exactly one eatery pin → ["eatery:e1","eatery:e2"]   ✗ rows without coords only: no chip → true
+//   eateryPins() partner-gate filter removed (2026-10-18, slice 2b)
+//     ✗ gate false: no pin for that slug even with eateryLive true → 1   ✗ gate false: no eatery chip → true
 //   placeColors.eatery set to #7C3AED (violet), then #0EA5E9 (sky)
 //     ✗ hue 262: health:pharmacy (0.0 deg)
 //     ✗ hue 199: health:clinic (19.2), explore:nature/eat_drink/active/services (2.6)
@@ -62,7 +64,7 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
-import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
 import { colors, typeColors, placeColors } from '../constants/theme.js'
 import { PET_PARTNERS } from '../constants/petPartners.js'
 import { eateryPartnerVisible } from '../constants/eatery.js'
@@ -377,7 +379,8 @@ const EATERY_ROWS = [
   { id: 'e3', slug: 'nan-coords', lat: NaN, lng: 33.38, geocode_source: 'partner' },   // typeof 'number' but not finite
 ]
 const eaBuild = (eateryLive, extra = {}) => buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null,
-  isAdmin: false, petHotelLive: false, eateryLive, eateryPartners: EATERY_ROWS, ...extra })
+  isAdmin: false, petHotelLive: false, eateryLive, eateryPartners: EATERY_ROWS,
+  eateryGates: { 'crunchy-express': true }, ...extra })
 const eaPins = sources => sources.flatMap(s => s.pins).filter(p => p.kind === 'eatery')
 const eaDark = eaBuild(false)
 const eaLive = eaBuild(true)
@@ -397,7 +400,18 @@ check('flag on, explore DARK: heritage still absent, pin present',
   [eaBuild(true, { exploreLive: false }).filter(s => s.key === 'explore:heritage').length, eaPins(eaBuild(true, { exploreLive: false })).length], [0, 1])
 check('default eateryLive follows EATERY_LIVE',
   eaPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true, petHotelLive: false, eateryPartners: EATERY_ROWS })).length,
-  EATERY_LIVE ? 1 : 0)
+  EATERY_LIVE && CRUNCHY_EXPRESS_LIVE ? 1 : 0)
+// The partner gate lives INSIDE the source (security review): a dark partner draws no pin even with eateryLive true.
+check('gate false: no pin for that slug even with eateryLive true',
+  eaPins(eaBuild(true, { eateryGates: { 'crunchy-express': false } })).length, 0)
+check('gate false: no eatery chip when it was the only pinnable row',
+  eaBuild(true, { eateryGates: { 'crunchy-express': false } }).some(s => s.key === 'eatery'), false)
+check('gate true: the slug draws its pin', eaPins(eaBuild(true, { eateryGates: { 'crunchy-express': true } })).map(p => p.id), ['eatery:e1'])
+check('gate for another slug does not hide this one',
+  eaPins(eaBuild(true, { eateryGates: { other: false } })).map(p => p.id), ['eatery:e1'])
+check('default gates follow CRUNCHY_EXPRESS_LIVE (eateryLive true, no gates passed)',
+  eaPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, petHotelLive: false,
+    eateryLive: true, eateryPartners: EATERY_ROWS })).length, CRUNCHY_EXPRESS_LIVE ? 1 : 0)
 check('eateryPartnerVisible: a dark partner gate hides, no gate shows',
   [eateryPartnerVisible({ slug: 'crunchy-express' }, { 'crunchy-express': false }),
    eateryPartnerVisible({ slug: 'crunchy-express' }, { 'crunchy-express': true }),
