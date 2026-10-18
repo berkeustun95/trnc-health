@@ -38,6 +38,16 @@
 //   placeColors.petHotel set to the old lifestyle orange #C2410C, then to violet #6D28D9
 //     ✗ hue 17: duty pharmacy (0 deg), hospital (25), heritage (18)
 //     ✗ hue 263: health:pharmacy (1 deg)
+//   eatery source gated on `true` instead of eateryLive (2026-10-18)
+//     ✗ flag off: zero eatery pins even with rows → 1   ✗ flag off: no eatery chip → true
+//     ✗ flag off: All draws no eatery pin → 1           ✗ default eateryLive follows EATERY_LIVE → 1
+//   eateryPins() coordinate filter removed
+//     ✗ exactly one eatery pin → ["eatery:e1","eatery:e2"]   ✗ rows without coords only: no chip → true
+//   eateryPins() partner-gate filter removed (2026-10-18, slice 2b)
+//     ✗ gate false: no pin for that slug even with eateryLive true → 1   ✗ gate false: no eatery chip → true
+//   placeColors.eatery set to #7C3AED (violet), then #0EA5E9 (sky)
+//     ✗ hue 262: health:pharmacy (0.0 deg)
+//     ✗ hue 199: health:clinic (19.2), explore:nature/eat_drink/active/services (2.6)
 //
 // WORTH KNOWING: the gate break left FIVE of the eight dark-state checks green, "beaches
 // stay live" among them. A suite that asserted only the happy path would have shipped the
@@ -54,9 +64,10 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
-import { MODULE_FLAGS, PET_HOTEL_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
-import { colors, typeColors } from '../constants/theme.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
+import { colors, typeColors, placeColors } from '../constants/theme.js'
 import { PET_PARTNERS } from '../constants/petPartners.js'
+import { eateryPartnerVisible } from '../constants/eatery.js'
 import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey, stubsFor } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
@@ -127,7 +138,7 @@ function summarise(sources) {
 console.log(`\nMODULE_FLAGS.explore is currently ${MODULE_FLAGS.explore} (live since 2026-08-26)`)
 
 console.log('\nexplore DARK (simulated — the pre-launch world, still asserted)')
-const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false })
+const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false, eateryLive: false })
 const darkCounts = summarise(dark)
 
 check('sources are exactly clinic, hospital, nature', Object.keys(darkCounts),
@@ -143,7 +154,7 @@ check('fetch narrows to the nature categories', mapFetchCategories(false, false)
 console.log('\nexplore REACHABLE (the live world since 2026-08-26)')
 // isAdmin forces the outer gate open regardless of the flag, so this arm asserts the
 // same thing before and after launch.
-const live = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true, petHotelLive: false })
+const live = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true, petHotelLive: false, eateryLive: false })
 const liveCounts = summarise(live)
 
 check('heritage appears with all 38', liveCounts['explore:heritage'], 38)
@@ -184,7 +195,7 @@ const HOURS_FIXTURE = buildMapSources({
   places: PLACES.filter(p => p.category === 'beach'),
   dutyFacilityId: null,
   isAdmin: false,
-  petHotelLive: false,
+  petHotelLive: false, eateryLive: false,
 })
 const hoursPins = selectedPins(HOURS_FIXTURE, new Set())
 check('applicable once one facility has parseable hours', openNowApplicable(hoursPins), true)
@@ -292,12 +303,12 @@ try {
 }
 
 console.log('\nduty pharmacy')
-const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false, petHotelLive: false })
+const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false, petHotelLive: false, eateryLive: false })
 check('duty pin is unreachable until pharmacies are geocoded',
   duty.flatMap(s => s.pins).filter(p => p.isDuty).length, 0)
 
 // ─── PET HOTEL PIN: ITS OWN GATE, INDEPENDENT OF EXPLORE ────────────────────
-// Every call above pins petHotelLive: false, so their totals (11 / 49) describe the
+// Every call above pins petHotelLive: false, eateryLive: false, so their totals (11 / 49) describe the
 // Explore world alone and do not move by one the day PET_HOTEL_LIVE flips. The three
 // worlds below state the flag explicitly. The third one matters most: with the flag on and
 // Explore dark, the pin must appear AND heritage must still be absent — proof that the
@@ -306,16 +317,16 @@ console.log('\npet hotel partner pin')
 const phKey = 'pethotel'
 const phPins = sources => sources.flatMap(s => s.pins).filter(p => p.kind === 'pethotel')
 const phOff = [
-  buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true,  petHotelLive: false }),
-  buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false }),
+  buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true,  petHotelLive: false, eateryLive: false }),
+  buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false, eateryLive: false }),
 ]
 check('flag off: zero pet hotel pins, explore live or dark', phOff.map(w => phPins(w).length), [0, 0])
 check('flag off: no pethotel chip', phOff.map(w => w.some(s => s.key === phKey)), [false, false])
 check('flag off: All (the default path) draws no pet hotel pin',
   phOff.map(w => selectedPins(w, new Set()).filter(p => p.kind === 'pethotel').length), [0, 0])
 
-const phOnLive = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: true,  petHotelLive: true })
-const phOnDark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: true })
+const phOnLive = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: true,  petHotelLive: true, eateryLive: false })
+const phOnDark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: true, eateryLive: false })
 const cfg = PET_PARTNERS.filter(p => p.coords).map(p => [p.coords.latitude, p.coords.longitude])
 check('config carries exactly one partner with coords', cfg.length, 1)
 check('flag on, explore live: exactly one pet hotel pin', phPins(phOnLive).length, 1)
@@ -353,11 +364,64 @@ const phColor = phOnLive.find(s => s.key === phKey)?.color
 // this guards. Built from the same tables mapSources.js colours pins with.
 const rivals = [['duty pharmacy', colors.accent],
   ...HEALTH_TYPES.map(t => [`health:${t}`, (typeColors[t] || typeColors.clinic).text]),
-  ...Object.entries(GROUP_META).map(([g, m]) => [`explore:${g}`, m.colorToken.text])]
+  ...Object.entries(GROUP_META).map(([g, m]) => [`explore:${g}`, m.colorToken.text]),
+  ['eatery', placeColors.eatery.text]]
 const tooClose = rivals.filter(([, c]) => !phColor || hueGap(phColor, c) < 30)
   .map(([k, c]) => `${k} ${c} (${phColor ? hueGap(phColor, c).toFixed(0) : '?'} deg)`)
 check(`pet hotel pin hue ${phColor ? hueOf(phColor).toFixed(0) : '?'} is >= 30 deg from all ${rivals.length} other pins`, tooClose, [])
 check('pethotel chip label resolves in English', t('petHotelDogBoarding', 'English') !== 'petHotelDogBoarding', true)
+
+// ─── EATERY PARTNER PIN: ROWS FROM eatery_partners, ITS OWN GATE ─────────────
+console.log('\neatery partner pin')
+const EATERY_ROWS = [
+  { id: 'e1', slug: 'crunchy-express', lat: 35.1856, lng: 33.3823, geocode_source: 'partner' },
+  { id: 'e2', slug: 'no-coords', lat: null, lng: null, geocode_source: null },
+  { id: 'e3', slug: 'nan-coords', lat: NaN, lng: 33.38, geocode_source: 'partner' },   // typeof 'number' but not finite
+]
+const eaBuild = (eateryLive, extra = {}) => buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null,
+  isAdmin: false, petHotelLive: false, eateryLive, eateryPartners: EATERY_ROWS,
+  eateryGates: { 'crunchy-express': true }, ...extra })
+const eaPins = sources => sources.flatMap(s => s.pins).filter(p => p.kind === 'eatery')
+const eaDark = eaBuild(false)
+const eaLive = eaBuild(true)
+check('flag off: zero eatery pins even with rows', eaPins(eaDark).length, 0)
+check('flag off: no eatery chip', eaDark.some(s => s.key === 'eatery'), false)
+check('flag off: All (the default path) draws no eatery pin', selectedPins(eaDark, new Set()).filter(p => p.kind === 'eatery').length, 0)
+check('flag on: exactly one eatery pin (the row with coords)', eaPins(eaLive).map(p => p.id), ['eatery:e1'])
+check('flag on: exactly one eatery chip, labelled menuEatery',
+  eaLive.filter(s => s.key === 'eatery').map(s => s.labelKey), ['menuEatery'])
+check('flag on: the pin is the row coordinate, verbatim', eaPins(eaLive).map(p => [p.lat, p.lng]), [[35.1856, 33.3823]])
+check('flag on: the pin falls inside the default map region', eaPins(eaLive).map(inBox), [true])
+check('flag on: All includes it', selectedPins(eaLive, new Set()).filter(p => p.kind === 'eatery').length, 1)
+check('flag on, no rows: no eatery chip', eaBuild(true, { eateryPartners: [] }).some(s => s.key === 'eatery'), false)
+check('flag on, rows without coords only: no eatery chip',
+  eaBuild(true, { eateryPartners: [EATERY_ROWS[1]] }).some(s => s.key === 'eatery'), false)
+check('flag on, explore DARK: heritage still absent, pin present',
+  [eaBuild(true, { exploreLive: false }).filter(s => s.key === 'explore:heritage').length, eaPins(eaBuild(true, { exploreLive: false })).length], [0, 1])
+check('default eateryLive follows EATERY_LIVE',
+  eaPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true, petHotelLive: false, eateryPartners: EATERY_ROWS })).length,
+  EATERY_LIVE && CRUNCHY_EXPRESS_LIVE ? 1 : 0)
+// The partner gate lives INSIDE the source (security review): a dark partner draws no pin even with eateryLive true.
+check('gate false: no pin for that slug even with eateryLive true',
+  eaPins(eaBuild(true, { eateryGates: { 'crunchy-express': false } })).length, 0)
+check('gate false: no eatery chip when it was the only pinnable row',
+  eaBuild(true, { eateryGates: { 'crunchy-express': false } }).some(s => s.key === 'eatery'), false)
+check('gate true: the slug draws its pin', eaPins(eaBuild(true, { eateryGates: { 'crunchy-express': true } })).map(p => p.id), ['eatery:e1'])
+check('gate for another slug does not hide this one',
+  eaPins(eaBuild(true, { eateryGates: { other: false } })).map(p => p.id), ['eatery:e1'])
+check('default gates follow CRUNCHY_EXPRESS_LIVE (eateryLive true, no gates passed)',
+  eaPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, petHotelLive: false,
+    eateryLive: true, eateryPartners: EATERY_ROWS })).length, CRUNCHY_EXPRESS_LIVE ? 1 : 0)
+check('eateryPartnerVisible: a dark partner gate hides, no gate shows',
+  [eateryPartnerVisible({ slug: 'crunchy-express' }, { 'crunchy-express': false }),
+   eateryPartnerVisible({ slug: 'crunchy-express' }, { 'crunchy-express': true }),
+   eateryPartnerVisible({ slug: 'other' }, { 'crunchy-express': false })], [false, true, true])
+const eaColor = eaLive.find(s => s.key === 'eatery')?.color
+const eaRivals = [...rivals.filter(([k]) => k !== 'eatery'), ['pet hotel', placeColors.petHotel.text]]
+const eaClose = eaRivals.filter(([, c]) => !eaColor || hueGap(eaColor, c) < 30)
+  .map(([k, c]) => `${k} ${c} (${eaColor ? hueGap(eaColor, c).toFixed(1) : '?'} deg)`)
+check(`eatery pin hue ${eaColor ? hueOf(eaColor).toFixed(0) : '?'} is >= 30 deg from all ${eaRivals.length} other pins`, eaClose, [])
+check('menuEatery chip label resolves in English', t('menuEatery', 'English') !== 'menuEatery', true)
 
 // ─── Walking routes (Visit NCY) — a LAYER, gated on its own flag ─────────────
 //
@@ -493,7 +557,7 @@ if (process.argv.includes('--live')) {
   // gated subset. Measuring the dark set would size the viewport to 11 pins and re-cut
   // Karpaz the day the flag flips — which is exactly the mistake this check exists for.
   const livePins = selectedPins(
-    buildMapSources({ facilities, places, dutyFacilityId: null, isAdmin: true, petHotelLive: true }), new Set())
+    buildMapSources({ facilities, places, dutyFacilityId: null, isAdmin: true, petHotelLive: true, eateryLive: false }), new Set())
   const outside = livePins.filter(p => !inBox({ lng: p.lng, lat: p.lat }))
   console.log(`\nLIVE — ${livePins.length} pinnable rows fetched`)
   for (const p of outside) {
