@@ -6,7 +6,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { t, dateLocale } from '../constants/i18n'
 import HoursPicker from '../components/HoursPicker'
 import MapPinPicker from '../components/MapPinPicker'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
@@ -504,7 +504,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                     <View key={req.id} style={styles.historyRow}>
                       <View style={[styles.historyDot, { backgroundColor: color }]} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.historyStatus}>{isApproved ? 'Approved' : 'Rejected'} · {new Date(req.created_at).toLocaleDateString()}</Text>
+                        <Text style={styles.historyStatus}>{isApproved ? 'Approved' : 'Rejected'} · {new Date(req.created_at).toLocaleDateString(dateLocale(lang))}</Text>
                         <Text style={styles.historyFields} numberOfLines={1}>{fields.join(', ')}</Text>
                         {!isApproved && req.rejection_reason ? (
                           <Text style={styles.historyReason}>"{req.rejection_reason}"</Text>

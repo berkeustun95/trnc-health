@@ -175,7 +175,8 @@ function eventWhen(startDate, lang) {
   const d = new Date(startDate)
   if (Number.isNaN(d.getTime())) return ''
   try {
-    return d.toLocaleTimeString(dateLocale(lang), { hour: '2-digit', minute: '2-digit' })
+    // h23 in every language: ar and el default to 12-hour ("08:05 م"). Not hour12:false, which some engines render as 24:05.
+    return d.toLocaleTimeString(dateLocale(lang), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   } catch {
     // A locale Hermes' Intl does not carry must not cost the card its subtitle.
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
