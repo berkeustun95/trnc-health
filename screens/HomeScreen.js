@@ -18,10 +18,8 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { REDESIGN, DUYURULAR, EHLIYET, CRUNCHY_EXPRESS } from '../constants/redesign'
-import { loadEateryPartners } from '../utils/loadEateryPartners'
-import { eateryPhotos } from '../constants/eatery'
-import { eateryImageUrl } from '../components/EateryBits'
+import { REDESIGN, DUYURULAR, EHLIYET, EATERY } from '../constants/redesign'
+import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'
@@ -32,7 +30,9 @@ import FavouritesRow from '../components/home/FavouritesRow'
 import FavouritesEditSheet from '../components/home/FavouritesEditSheet'
 import HomeListBottomSlot from '../components/ads/HomeListBottomSlot'
 import { HOME_MODULES } from '../constants/homeModules'
-import { resolveStripItem } from '../utils/homeStripResolver'
+import { resolveStripItem, resolveStripSlides } from '../utils/homeStripResolver'
+import { nextStripRotation } from '../utils/stripSlides'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { readStripDismissals, addStripDismissal } from '../utils/stripDismissals'
 import { resolveFavourites } from '../constants/homeFavourites'
 import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
@@ -47,7 +47,7 @@ import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { DutyTile, EmergencyTile, EventBanner, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
+import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
 import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
@@ -168,6 +168,26 @@ const TESTER_UNLOCK = new Set(['liveScores'])
 const EHLIYET_UNLOCK = new Set(['ehliyet'])
 const TESTER_EHLIYET_UNLOCK = new Set(['liveScores', 'ehliyet'])
 
+// Fair rotation of the eatery slides: one stored integer (AsyncStorage), read once per app session so the order
+// does not reshuffle on a dismissal or a Home remount, and advanced once so the NEXT launch leads with the next
+// partner. Any storage failure counts as rotation 0.
+const STRIP_ROTATION_KEY = 'ada.stripRotation'
+let rotationRead = null
+function sessionRotation() {
+  if (!rotationRead) {
+    rotationRead = AsyncStorage.getItem(STRIP_ROTATION_KEY)
+      .then(v => { const n = parseInt(v, 10); return Number.isInteger(n) && n >= 0 ? n : 0 })
+      .catch(() => 0)
+  }
+  return rotationRead
+}
+let rotationStored = false
+function storeNextRotation(rotation, partnerCount) {
+  if (rotationStored) return
+  rotationStored = true
+  AsyncStorage.setItem(STRIP_ROTATION_KEY, String(nextStripRotation(rotation, partnerCount))).catch(() => {})
+}
+
 export default function HomeScreen({
   // ─── Profile-gate props (Slice 2). All three DEFAULT to today's behaviour, so the
   //     normal render path is byte-identical and this screen has one code path, not two.
@@ -284,6 +304,7 @@ export default function HomeScreen({
   // The live strip. `stripLoading` starts TRUE so the first paint is the fixed-height
   // skeleton rather than a collapsed row that grows when the resolver returns.
   const [stripItem, setStripItem]       = useState(null)
+  const [stripSlides, setStripSlides]   = useState([])   // redesign slider: slide 1 = the ladder's lead, 2..n = eatery partners
   // Bumped by a dismissal so the resolve effect re-runs. A counter rather than a boolean:
   // two dismissals in one session must both trigger, and a boolean can only flip once.
   const [stripDismissTick, setStripDismissTick] = useState(0)
@@ -297,6 +318,7 @@ export default function HomeScreen({
   const [favPins, setFavPins]         = useState([])
   const [favUsage, setFavUsage]       = useState({})
   const [favEditOpen, setFavEditOpen] = useState(false)
+  const stripPaused = weatherOpen || favEditOpen || searchOpen   // Home's own overlays: the slider holds still under them
 
   // Global hub search
   const [globalQuery, setGlobalQuery]       = useState(snap?.globalQuery ?? '')
@@ -375,32 +397,26 @@ export default function HomeScreen({
     // whatever rank comes next. That is what makes the slot fill again instead of going
     // blank — the card is not hidden, the item is re-resolved without it.
     readStripDismissals()
-      .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN, eateryGate: CRUNCHY_EXPRESS }))
-      .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
+      .then(async dismissedIds => {
+        if (!REDESIGN) return { item: await resolveStripItem({ lang, promosEligible, dismissedIds }) }
+        // Partners are read ONLY for an eligible user on a build that has Yeme-İçme (EATERY): slim columns, never photos.
+        let partners = []
+        if (EATERY === true && promosEligible === true) {
+          try { partners = (await loadEateryPartners('slug, name, logo_path, sort_order')).rows } catch { partners = [] }
+        }
+        const rotation = await sessionRotation()
+        const slides = await resolveStripSlides({ lang, promosEligible, dismissedIds, partners, gates: EATERY_GATES, rotation })
+        const count = slides.filter(x => x.eaterySlug).length
+        if (count > 0) storeNextRotation(rotation, count)
+        return { slides }
+      })
+      .then(r => {
+        if (!alive) return
+        if (r.slides) { setStripSlides(r.slides); setStripItem(r.slides[0] ?? null) } else setStripItem(r.item)
+        setStripLoading(false)
+      })
     return () => { alive = false }
   }, [lang, promosEligible, showFacilityList, stripDismissTick])
-
-  // The Yeme-İçme sponsor card takes its picture from the partner row: ONE slim read, only when that
-  // card is the chosen item. The card renders at once (name + subtitle + ADA frame); a failed read just
-  // leaves it that way, and the photo / logo / placeholder tag fill in when the row arrives.
-  const [eateryStrip, setEateryStrip] = useState(null)
-  const eaterySlug = stripItem?.eaterySlug || null
-  useEffect(() => {
-    if (!eaterySlug) return
-    let alive = true
-    loadEateryPartners('slug, name, logo_path, eatery_photos(id, kind, storage_path, width, height, sort_order)')
-      .then(({ rows }) => {
-        const p = rows.find(r => r.slug === eaterySlug)
-        if (!alive || !p) return
-        const photo = eateryPhotos(p, 'gallery').find(x => x.path)
-        setEateryStrip({ slug: eaterySlug, imageUrl: eateryImageUrl(photo?.path), logoUri: eateryImageUrl(p.logo_path), placeholder: !!p.placeholder })
-      })
-      .catch(() => {})
-    return () => { alive = false }
-  }, [eaterySlug])
-  const bannerItem = eaterySlug && eateryStrip?.slug === eaterySlug
-    ? { ...stripItem, imageUrl: eateryStrip.imageUrl, eateryLogoUri: eateryStrip.logoUri, eateryPlaceholder: eateryStrip.placeholder }
-    : stripItem
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
@@ -1009,7 +1025,7 @@ export default function HomeScreen({
             )}
 
             <View style={{ marginTop: WIDGET_GAP }}>
-              <EventBanner item={bannerItem} loading={stripLoading} lang={lang}
+              <StripSlider slides={stripSlides} loading={stripLoading} lang={lang} paused={stripPaused}
                 onPress={handleStripPress} onDismiss={dismissStripItem} />
             </View>
 

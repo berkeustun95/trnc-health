@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions, FlatList, AccessibilityInfo, AppState } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
 import { t, tCount, dateLocale } from '../../../constants/i18n'
@@ -7,7 +7,7 @@ import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
 import { Bone, IconButton, RemoteImage } from '../../ui'
-import { PlaceholderTag } from '../../EateryBits'
+import { PlaceholderTag, eateryImageUrl } from '../../EateryBits'
 
 // Home v3 tiles: two equal cards, 104pt. Duty is the V2 live-strip card (photo, icon badge
 // top-left, dark band); Acil Numaralar is solid health red. Each band carries its title and
@@ -157,41 +157,48 @@ function eventChip(startsAt, lang) {
   return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
 }
 
-// Berke 2026-10-18 (option a): the Home sponsor card ALWAYS shows the ADA frame + logo, never a partner photo
-// (no crop of partner content; always reads as distinct from event cards).
-const SPONSOR_CARD_USES_PHOTO = false
-
-export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
-  const kind = item?.kind
-  const [failedPhoto, setFailedPhoto] = useState(null)
-  const [bandH, setBandH] = useState(0)
-  useEffect(() => { if (!loading && kind) rememberStripKind(kind) }, [loading, kind])
-  if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
-  if (!item) return null
+// `remember` = the lead only: "never twice running" is about the ladder's pick, so a partner slide
+// (kind 'promo') must not record itself and suppress a DB promo next launch.
+function bannerParts(item, lang) {
   const title = item.generic ? t(item.titleKey, lang) : item.title
   const isEvent = item.kind === 'event' && !item.generic
   const chip = isEvent && item.startsAt ? eventChip(item.startsAt, lang) : null
   const time = chip ? chip.text : isEvent && item.subtitle ? item.subtitle : null
   const sponsorSub = item.eaterySlug && item.subtitle ? item.subtitle : null
-  const photoUri = item.eaterySlug && !SPONSOR_CARD_USES_PHOTO ? null : item.imageUrl
-  const showFrame = !!item.eaterySlug && (!photoUri || failedPhoto === photoUri)
   const tag = item.sponsored ? t('stripSponsored', lang) : item.soon ? t('stripStartingSoon', lang) : null
+  return { title, chip, time, sponsorSub, tag }
+}
+// Screen-reader label. A partner slide reads "Sponsorlu, Crunchy Express, Menüye göz at"; slide 1 as before.
+function bannerLabel(item, lang) {
+  const { title, time, sponsorSub, tag } = bannerParts(item, lang)
+  return (item.eaterySlug ? [tag, title, sponsorSub] : [title, sponsorSub, time, tag]).filter(Boolean).join(', ')
+}
+
+export function EventBanner({ item, loading, lang, onPress, onDismiss, remember = true }) {
+  const kind = item?.kind
+  const [bandH, setBandH] = useState(0)
+  useEffect(() => { if (remember && !loading && kind) rememberStripKind(kind) }, [remember, loading, kind])
+  if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
+  if (!item) return null
+  const { title, chip, time, sponsorSub, tag } = bannerParts(item, lang)
+  // A partner slide is never a photo: the ADA frame + the contained logo (no crop of partner content).
+  const showFrame = !!item.eaterySlug
+  const logoUri = item.logoPath ? eateryImageUrl(item.logoPath) : null
   const fallback = (item.kind === 'notice' && NOTICE_FALLBACK[item.action?.route]) || EVENTS_IMAGE
   return (
     <View>
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
-        accessibilityLabel={[title, sponsorSub, time, tag].filter(Boolean).join(', ')} style={s.banner}>
+        accessibilityLabel={bannerLabel(item, lang)} style={s.banner}>
         {showFrame ? (
           // A sponsor never borrows the events picture: ADA-theme frame (also the fallback for a photo
           // that fails to load). Padded by the MEASURED band height, so the logo can never meet the band.
           <View style={[s.sponsorFrame, { paddingTop: bandH + 6 }]}>
-            {item.eateryLogoUri
-              ? <RemoteImage source={{ uri: item.eateryLogoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
+            {logoUri
+              ? <RemoteImage source={{ uri: logoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
               : <Ionicons name={item.icon || 'restaurant-outline'} size={40} color={category.explore.ink} />}
           </View>
         ) : (
-          <RemoteImage source={photoUri ? { uri: photoUri } : fallback} style={s.bannerPhoto} resizeMode="cover"
-            onError={item.eaterySlug ? () => setFailedPhoto(photoUri) : undefined} />
+          <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
         )}
         {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
@@ -206,7 +213,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
                 </>
               )}
               {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1}>{tag}</Text></View>}
-              {!!item.eateryPlaceholder && <PlaceholderTag lang={lang} lines={1} style={s.placeholderTag} />}
+              {!!item.placeholder && <PlaceholderTag lang={lang} lines={1} style={s.placeholderTag} />}
             </View>
           )}
           <View style={s.bandTitleRow}>
@@ -220,6 +227,131 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
         <IconButton icon="close" iconSize={16} variant="frosted" onPress={() => onDismiss(item)}
           accessibilityLabel={t('uiClose', lang)} style={s.dismiss} />
       )}
+    </View>
+  )
+}
+
+// ─── The Bugün ADA'da slider ────────────────────────────────────────────────
+// slide 1 = the ladder's lead (the card as ever), 2..n = eatery partners. ONE slide renders the plain
+// static card (no pager, dots or timer). Auto-advance stops for the rest of the session after the first
+// touch: module-level, so it survives re-renders and Home remounts but resets on app restart.
+const SLIDE_MS = 5000
+let userTookOver = false
+
+function useReduceMotion() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
+    return () => { alive = false; sub?.remove?.() }
+  }, [])
+  return on
+}
+
+function useScreenReader() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AccessibilityInfo.isScreenReaderEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
+    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', setOn)
+    return () => { alive = false; sub?.remove?.() }
+  }, [])
+  return on
+}
+
+function useForeground() {
+  const [fg, setFg] = useState(AppState.currentState === 'active')
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', st => setFg(st === 'active'))
+    return () => sub?.remove?.()
+  }, [])
+  return fg
+}
+
+// `paused`: Home's own overlays (weather / favourites sheet / search). Home unmounts when another tab or
+// module screen opens (App.js renders it only for activeTab === 'home' and replaces `content` for modules),
+// so mounted = visible and no navigation signal is needed.
+export function StripSlider({ slides, loading, lang, onPress, onDismiss, paused = false }) {
+  const [width, setWidth] = useState(0)
+  const [page, setPage] = useState(0)
+  const listRef = useRef(null)
+  const pageRef = useRef(0)
+  const reduceMotion = useReduceMotion()
+  const screenReader = useScreenReader()
+  const foreground = useForeground()
+  const n = slides.length
+  const multi = !loading && n > 1
+  const animated = !reduceMotion
+
+  const goTo = (i, anim) => {
+    const next = Math.max(0, Math.min(n - 1, i))
+    pageRef.current = next
+    setPage(next)
+    listRef.current?.scrollToOffset({ offset: next * width, animated: anim })
+  }
+
+  const auto = multi && width > 0 && animated && !screenReader && foreground && !paused
+  useEffect(() => {
+    if (!auto || userTookOver) return
+    const id = setInterval(() => {
+      if (userTookOver) { clearInterval(id); return }
+      goTo((pageRef.current + 1) % n, true)
+    }, SLIDE_MS)
+    return () => clearInterval(id)
+  }, [auto, n, width])
+
+  useEffect(() => { if (pageRef.current >= n) goTo(0, false) }, [n])
+
+  if (!multi) return <EventBanner item={slides[0] ?? null} loading={loading} lang={lang} onPress={onPress} onDismiss={onDismiss} />
+
+  const cur = slides[Math.min(page, n - 1)]
+  const label = bannerLabel(cur, lang)
+  const takeOver = () => { userTookOver = true }
+  const onAction = e => {
+    const a = e.nativeEvent.actionName
+    takeOver()
+    if (a === 'increment') goTo(page + 1, animated)
+    else if (a === 'decrement') goTo(page - 1, animated)
+    else if (a === 'activate') onPress?.(cur)
+    else if (a === 'dismiss') onDismiss?.(cur)
+  }
+  const actions = [{ name: 'increment' }, { name: 'decrement' }, { name: 'activate' }]
+  if (page === 0 && cur.kind === 'notice' && onDismiss) actions.push({ name: 'dismiss', label: t('uiClose', lang) })
+
+  return (
+    <View style={s.slider} onLayout={e => setWidth(Math.round(e.nativeEvent.layout.width))}
+      onTouchStart={takeOver}
+      accessible accessibilityRole="adjustable" accessibilityLabel={label}
+      accessibilityValue={{ text: t('stripSlideOf', lang).replace('{n}', page + 1).replace('{total}', n) }}
+      accessibilityActions={actions} onAccessibilityAction={onAction} onAccessibilityTap={() => onPress?.(cur)}>
+      {width > 0 && (
+        <FlatList
+          ref={listRef}
+          horizontal
+          pagingEnabled
+          data={slides}
+          keyExtractor={x => String(x.id)}
+          renderItem={({ item, index }) => (
+            <View style={{ width }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              <EventBanner item={item} lang={lang} remember={index === 0} onPress={onPress}
+                onDismiss={index === 0 ? onDismiss : undefined} />
+            </View>
+          )}
+          getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+          showsHorizontalScrollIndicator={false}
+          onScrollBeginDrag={takeOver}
+          onScroll={e => {
+            const i = Math.round(e.nativeEvent.contentOffset.x / width)
+            if (i !== pageRef.current && i >= 0 && i < n) { pageRef.current = i; setPage(i) }
+          }}
+          scrollEventThrottle={32}
+          style={s.sliderList}
+        />
+      )}
+      <View style={s.dots} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {slides.map((x, i) => <View key={x.id} style={[s.dot, i === page && s.dotOn]} />)}
+      </View>
     </View>
   )
 }
@@ -240,9 +372,14 @@ const s = StyleSheet.create({
   darkText:    { color: colors.textPrimary },
   alertText:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 1 },
 
+  slider:      { height: 160, borderRadius: radii.widget, overflow: 'hidden' },
+  sliderList:  { height: 160, flexGrow: 0 },
+  dots:        { position: 'absolute', left: 0, right: 0, bottom: 6, flexDirection: 'row', justifyContent: 'center', gap: 5 },
+  dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotOn:       { backgroundColor: '#FFFFFF' },
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
   sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: category.explore.bg,
-                  alignItems: 'center', justifyContent: 'center', paddingBottom: 8 },
+                  alignItems: 'center', justifyContent: 'center', paddingBottom: 18 },
   sponsorLogo: { width: 140, flex: 1 },
   sponsorSub:  { ...type.meta, color: '#FFFFFF' },
   placeholderTag: { marginLeft: 6, flexShrink: 1 },
