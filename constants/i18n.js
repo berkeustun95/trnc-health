@@ -13253,7 +13253,7 @@ const translations = {
     menuEhliyet: "Carné de conducir",
     ehliyetCall: "Llamar", ehliyetInstagram: "Instagram", ehliyetWhatsApp: "WhatsApp",
     menuEatery: "Comer & Beber",
-    eateryStripSub: "Ver el menú",
+    eateryStripSub: "Ver la carta",
     eateryCatFastFood: "Comida rápida",
     eateryCatRestaurant: "Restaurante",
     eateryCatCafe: "Cafetería",
