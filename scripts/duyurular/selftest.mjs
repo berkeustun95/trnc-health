@@ -9,7 +9,8 @@ import { passesFilter, kindOf, categoryOf } from './lib/classify.mjs'
 import { mainText, pdfLinks } from './lib/page.mjs'
 import { SOURCES } from './sources.mjs'
 import { X509Certificate } from 'node:crypto'
-import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256 } from './lib/ca.mjs'
+import tls from 'node:tls'
+import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256, LE_YR1_PEM, LE_YR1_SHA256, ISRG_ROOT_YR_BY_X1_PEM, ISRG_ROOT_YR_BY_X1_SHA256 } from './lib/ca.mjs'
 import { PARSERS } from './lib/parsers.mjs'
 import { errorClass, systemicFailure } from './lib/runhealth.mjs'
 
@@ -25,6 +26,13 @@ export async function runSelftest() {
   const cert = new X509Certificate(RAPIDSSL_G1_PEM)
   t('RapidSSL G1 fingerprint', cert.fingerprint256.replace(/:/g, ''), RAPIDSSL_G1_SHA256)
   t('…issued by DigiCert Global Root G2', /CN=DigiCert Global Root G2/.test(cert.issuer), true)
+  const yr1 = new X509Certificate(LE_YR1_PEM)
+  t('Let\'s Encrypt YR1 fingerprint', yr1.fingerprint256.replace(/:/g, ''), LE_YR1_SHA256)
+  t('…issued by ISRG Root YR', /CN=Root YR/.test(yr1.issuer), true)
+  const yr = new X509Certificate(ISRG_ROOT_YR_BY_X1_PEM)
+  t('ISRG Root YR (by X1) fingerprint', yr.fingerprint256.replace(/:/g, ''), ISRG_ROOT_YR_BY_X1_SHA256)
+  t('…issued by ISRG Root X1', /CN=ISRG Root X1/.test(yr.issuer), true)
+  t('…and signed by it', yr.verify(new X509Certificate(tls.getCACertificates('default').find(p => /CN=ISRG Root X1/.test(new X509Certificate(p).subject))).publicKey), true)
 
   console.log('Turkish casefold (the runner ICU must do tr-TR)')
   t('İHALE → ihale', trLower('İHALE'), 'ihale')
