@@ -3,7 +3,7 @@
 // Extension-explicit imports so plain Node can exercise this without Metro.
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
-import { LANG_CODES } from '../constants/i18n.js'
+import { LANG_CODES, dateLocale } from '../constants/i18n.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
@@ -174,9 +174,8 @@ function eventWhen(startDate, lang) {
   if (!startDate) return ''
   const d = new Date(startDate)
   if (Number.isNaN(d.getTime())) return ''
-  const code = LANG_CODES[lang] || 'en'
   try {
-    return d.toLocaleTimeString(code, { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleTimeString(dateLocale(lang), { hour: '2-digit', minute: '2-digit' })
   } catch {
     // A locale Hermes' Intl does not carry must not cost the card its subtitle.
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`

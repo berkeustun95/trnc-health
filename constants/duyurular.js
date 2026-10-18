@@ -3,7 +3,7 @@
 // Plan: vault 10-ada/2026-10-10_duyurular-plan.md.
 
 import { REGION_LABEL_KEY } from './regions.js'
-import { LANG_CODES } from './i18n.js'
+import { dateLocale } from './i18n.js'
 import { intlTrusted, monthNames } from './months.js'
 import { searchMatch } from '../utils/searchFold.js'
 
@@ -90,7 +90,7 @@ export function formatDuyDate(iso, lang) {
   if (Number.isNaN(d.getTime())) return ''
   if (intlTrusted) {
     try {
-      return new Intl.DateTimeFormat(`${LANG_CODES[lang] || 'en'}-u-ca-gregory`,
+      return new Intl.DateTimeFormat(dateLocale(lang),
         { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)
     } catch { /* composed form below */ }
   }
