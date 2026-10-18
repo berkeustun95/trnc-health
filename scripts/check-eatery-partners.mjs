@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // ─── Eatery (Yeme-İçme) partner guard ───────────────────────────────────────
 //
-//   --strict-staleness: menu_verified_on older than 30 days FAILS (daily-health); default = warning only
+//   --daily: daily-health mode. IGNORES the flags and every other check: reads all eatery_partners rows the ANON key
+//     can see (RLS = exactly the ACTIVE ones, so inactive partners are ignored by construction) and fails if any
+//     has menu_verified_on missing, invalid, in the future or older than 30 days. Zero active partners = OK.
+//     No env/network/HTTP success = fail closed. Needs EXPO_PUBLIC_SUPABASE_URL + _ANON_KEY (no service key).
+//   --strict-staleness: menu_verified_on older than 30 days FAILS in the full DB half; default = warning only
 //   npm run eatery:check               full: offline half + DB half (only when a flag is true)
 //   node scripts/check-eatery-partners.mjs --offline    offline half only (pre-push; no .env, no network)
 //
@@ -23,6 +27,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const OFFLINE = process.argv.includes('--offline')
 // daily-health calls this: a stale menu is a hard failure there, a warning in the ota chain (a hotfix OTA must not be blocked by it)
 const STRICT = process.argv.includes('--strict-staleness')
+const DAILY = process.argv.includes('--daily')
 const MENU_MAX_AGE_DAYS = 30
 const problems = []
 const warnings = []
@@ -209,6 +214,64 @@ async function rest(base, key, path) {
   if (!res.ok) return { error: `HTTP ${res.status} ${body?.code ?? ''} ${body?.message ?? (typeof body === 'string' ? body : '')}`.trim() }
   return { body, range: res.headers.get('content-range') }
 }
+
+// ─── --daily: active partners must have a fresh menu ────────────────────────
+// Pure: rows = [{ slug, menu_verified_on }] as the anon key sees them. Returns one line per offender.
+function dailyProblems(rows, todayISO) {
+  const out = []
+  for (const r of rows) {
+    const d = r.menu_verified_on
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d))) { out.push(`${r.slug}: menu_verified_on missing or invalid (${d})`); continue }
+    const age = Math.round((Date.parse(todayISO) - Date.parse(d)) / 86400000)
+    if (age < 0) out.push(`${r.slug}: menu_verified_on ${d} is in the future`)
+    else if (age > MENU_MAX_AGE_DAYS) out.push(`${r.slug}: menu verified ${d}, ${age} days ago (max ${MENU_MAX_AGE_DAYS})`)
+  }
+  return out
+}
+async function dailyMain() {
+  console.log(`eatery guard — mode: daily (active partners, menu freshness <= ${MENU_MAX_AGE_DAYS} days)`)
+  const today = new Date().toISOString().slice(0, 10)
+  const ago = n => new Date(Date.parse(today) - n * 86400000).toISOString().slice(0, 10)
+  mustFail('daily 31d stale', dailyProblems([{ slug: 'x', menu_verified_on: ago(31) }], today))
+  mustPass('daily 30d fine', dailyProblems([{ slug: 'x', menu_verified_on: ago(30) }], today))
+  mustFail('daily missing date', dailyProblems([{ slug: 'x', menu_verified_on: null }], today))
+  mustFail('daily garbage date', dailyProblems([{ slug: 'x', menu_verified_on: 'soon' }], today))
+  mustFail('daily future date', dailyProblems([{ slug: 'x', menu_verified_on: ago(-1) }], today))
+  mustPass('daily no rows', dailyProblems([], today))
+  const E = loadEnv()
+  const base = E.EXPO_PUBLIC_SUPABASE_URL, key = E.EXPO_PUBLIC_SUPABASE_ANON_KEY
+  for (const [n, v] of [['EXPO_PUBLIC_SUPABASE_URL', base], ['EXPO_PUBLIC_SUPABASE_ANON_KEY', key]])
+    if (!v) problems.push(`${n} not found (environment or .env) — failing closed`)
+  let rows = []
+  if (base && key) {
+    const r = await rest(base, key, 'eatery_partners?select=slug,menu_verified_on&order=slug')
+    if (r.error) problems.push(`eatery_partners query failed: ${r.error}`)
+    else if (!Array.isArray(r.body)) problems.push('eatery_partners query returned a non-array body — failing closed')
+    else {
+      const total = Number((r.range || '').split('/')[1])
+      if (Number.isNaN(total)) problems.push(`content-range unreadable (${r.range}) — cannot prove nothing was truncated`)
+      else if (total !== r.body.length) problems.push(`truncated: count ${total} vs ${r.body.length} rows received`)
+      else rows = r.body
+    }
+  }
+  if (!problems.length) {
+    if (!rows.length) console.log('0 active partners visible to anon — nothing to check (OK; inactive partners are not returned by RLS)')
+    for (const r of rows) {
+      const age = r.menu_verified_on ? Math.round((Date.parse(today) - Date.parse(r.menu_verified_on)) / 86400000) : 'n/a'
+      console.log(`active partner ${r.slug}: menu_verified_on ${r.menu_verified_on ?? 'missing'} (${age} days)`)
+    }
+    for (const p of dailyProblems(rows, today)) problems.push(p)
+  }
+  console.log(`summary: ${rows.length} active partner(s) checked, ${controls} controls, mode daily`)
+  if (problems.length) {
+    console.error(`\n✗ eatery daily: ${problems.length} problem(s)`)
+    for (const p of problems) console.error(`  - ${p}`)
+    process.exit(1)
+  }
+  console.log('✓ eatery daily OK')
+  process.exit(0)
+}
+if (DAILY) await dailyMain()
 
 // ═══ RUN ═══════════════════════════════════════════════════════════════════
 console.log(`eatery guard — mode: ${OFFLINE ? 'offline' : 'full'}${STRICT ? ' +strict-staleness' : ''}`)
