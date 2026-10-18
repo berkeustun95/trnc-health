@@ -671,13 +671,18 @@ export default function ExploreMapScreen({
     [sources, selectedKeys, openNow, canOpenNow, dutyWindows]
   )
 
+  // Pin sources load at different times (facilities are a prop; places and eatery rows are
+  // fetched), so the pending pin is kept until ITS source has arrived, not cleared on the
+  // first non-empty render. A pin the user picks in the meantime wins.
   useEffect(() => {
     const id = pendingPinId.current
     if (!id || pins.length === 0) return
-    pendingPinId.current = null
     const pin = pins.find(x => x.id === id)
-    if (pin) setSelected(pin)
+    if (pin) { pendingPinId.current = null; setSelected(pin) }
   }, [pins])
+  useEffect(() => {
+    if (selected && pendingPinId.current && selected.id !== pendingPinId.current) pendingPinId.current = null
+  }, [selected])
 
   // Every handoff off this map goes through here, so every one of them comes back to it.
   const handOff = useCallback((go, pinId = null) => {
