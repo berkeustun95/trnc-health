@@ -25,7 +25,7 @@
 
 // Extensions are explicit so plain Node (scripts/validate-map-sources.mjs) can import this
 // module and exercise the real gate against the real constants. Metro resolves both forms.
-import { MODULE_FLAGS, PET_HOTEL_LIVE } from './flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE } from './flags.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
 import { parseIsOpen, isOpenNow } from '../utils/facilityUtils.js'
 import { typeColors, placeColors } from './theme.js'
@@ -164,10 +164,35 @@ function petHotelPins(partners) {
     }))
 }
 
+// ─── THE EATERY PARTNER PIN — ROWS, NOT CONFIG ──────────────────────────────
+// Unlike Shiny Paw, eatery pins come from eatery_partners ROWS (RLS returns active rows only;
+// lat/lng are nullable, geocode_source 'partner' | 'osm'). A row without finite coordinates
+// draws nothing. `eateryLive` defaults to EATERY_LIVE (Node-importable); the screen passes the
+// real EATERY gate. A partner behind its own flag (CRUNCHY_EXPRESS) is the caller's job: filter
+// `eateryPartners` with eateryPartnerVisible() before passing it in.
+// placeColors.eatery (indigo, hue 232) — see its note in theme.js.
+function eateryPins(partners) {
+  return (partners || [])
+    .filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number'
+      && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    .map(p => ({
+      id:      `eatery:${p.id}`,
+      kind:    'eatery',
+      row:     p,
+      lat:     p.lat,
+      lng:     p.lng,
+      color:   placeColors.eatery.text,
+      colorBg: placeColors.eatery.bg,
+      isDuty:  false,
+    }))
+}
+
 export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = false,
                                  exploreLive = MODULE_FLAGS.explore,
                                  petHotelLive = PET_HOTEL_LIVE,
-                                 petPartners = PET_PARTNERS }) {
+                                 petPartners = PET_PARTNERS,
+                                 eateryLive = EATERY_LIVE,
+                                 eateryPartners = [] }) {
   const health = healthPins(facilities, dutyFacilityId)
   const sources = HEALTH_TYPES.map(type => ({
     key:      `health:${type}`,
@@ -219,6 +244,16 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
       color:    placeColors.petHotel.text,
       colorBg:  placeColors.petHotel.bg,
       pins:     petHotelPins(petPartners),
+    })
+  }
+
+  if (eateryLive) {
+    sources.push({
+      key:      'eatery',
+      labelKey: 'menuEatery',
+      color:    placeColors.eatery.text,
+      colorBg:  placeColors.eatery.bg,
+      pins:     eateryPins(eateryPartners),
     })
   }
 
