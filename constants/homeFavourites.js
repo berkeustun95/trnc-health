@@ -5,7 +5,7 @@
 // cityWelcome split applied again, and it exists in that shape so the degradation rules
 // below can be tested by a script rather than by tapping a phone.
 import { HOME_MODULES, HIDDEN_TILES, LABEL_MIN_PX } from './homeModules.js'
-import { MODULE_FLAGS, HOTELS_LIVE } from './flags.js'
+import { MODULE_FLAGS, HOTELS_LIVE, EATERY_LIVE } from './flags.js'
 
 export const FAVOURITE_SLOTS = 4
 
@@ -107,7 +107,8 @@ export const UNGATED_MODULES = new Set([
 // Hotels is gated by HOTELS_LIVE, a launch constant with no waitlist, so it is NOT a
 // MODULE_FLAGS key (see HIDDEN_TILES in homeModules.js for why a key must not be minted).
 // It joins the flag set here, the one place eligibility reads flags from.
-export const FAVOURITE_FLAGS = { ...MODULE_FLAGS, hotels: HOTELS_LIVE }
+// Eatery (Yeme-İçme) likewise: EATERY_LIVE only, so a Preview-only tile is never auto-promoted into the row.
+export const FAVOURITE_FLAGS = { ...MODULE_FLAGS, hotels: HOTELS_LIVE, eatery: EATERY_LIVE }
 
 const MODULE_IDS    = HOME_MODULES.map(m => m.id)
 const MODULE_INDEX  = new Map(MODULE_IDS.map((id, i) => [id, i]))
