@@ -659,3 +659,17 @@ export const CONNECTIVITY_LIVE = false
 // Needs the 1.2.0 binary: the native modules behind both buttons are absent from every
 // build before it, and runtimeVersion 1.2.0 is what keeps this JS off those installs.
 export const SOCIAL_AUTH_LIVE = true
+
+// Yeme-İçme (Eateries) section. false = no Home tile and no way in. NOT a MODULE_FLAGS key: no
+// waitlist to collect and no notify path — the HOTELS_LIVE reasoning. Dev bundles and ADA Preview
+// open it through EATERY in constants/redesign.js. Do not flip until, in order:
+//   1. 20261115 (eatery_partners) applied and verify_schema green.
+//   2. Crunchy Express data loaded and activated (go-live SOP steps 1-3).
+//   3. Turkish device pass with this flipped LOCALLY.
+//   4. Both files in ONE commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs).
+//   5. `npm run eatery:check` green.
+export const EATERY_LIVE = false
+
+// Crunchy Express — the first eatery partner inside Yeme-İçme (PET_HOTEL_LIVE precedent).
+// Requires EATERY_LIVE: a live partner in a dark section is a guard failure (eatery:check).
+export const CRUNCHY_EXPRESS_LIVE = false

@@ -20,6 +20,13 @@ node scripts/check-module-flags.mjs || {
   exit 1
 }
 
+# Eatery partner guard, offline half: flag pairing, eateryPreview import rule, redesign.js gates.
+# No network and no .env here; the DB half runs by hand (npm run eatery:check) and in npm run ota.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partners.mjs --offline || {
+  echo "  push blocked: eatery partner guard — see above." >&2
+  exit 1
+}
+
 # Secret guard. Blocks a push that would publish a service_role key, a Supabase secret
 # key, or a connection string with a password. Added after a live service_role JWT was
 # pasted into supabase/functions/sync-novest/schedule.sql while substituting the cron
