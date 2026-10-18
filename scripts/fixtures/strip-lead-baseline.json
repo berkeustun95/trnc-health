@@ -1,0 +1,1766 @@
+[
+ {
+  "rows": [],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-promo-1",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-promo-1",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "promo",
+   "id": "db-today",
+   "title": "Paid sponsor",
+   "subtitle": "",
+   "icon": "megaphone-outline",
+   "imageUrl": null,
+   "sponsored": true,
+   "action": {
+    "type": "link",
+    "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": null,
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "promo",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "promo",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "event",
+  "promosEligible": true,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": "throw",
+  "lastKind": "event",
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ }
+]
