@@ -652,7 +652,8 @@ export default function App() {
   const [showEatery, setShowEatery] = useState(false)
   const [eateryPartner, setEateryPartner] = useState(null)   // the partner row open inside Yeme-İçme
   // Explore map pin -> partner page. The pin hands a slug (its row has no menu / contacts); EateryScreen
-  // resolves it against the full rows. eateryFromMap makes back leave the module in ONE press, to the map.
+  // resolves it against the full rows. eateryFromMap (map pin OR the Home strip card) makes back leave the module in ONE press,
+  // to where the user came from; same shape as eventFromHome for an event opened from the Home banner.
   const [eateryOpenSlug, setEateryOpenSlug] = useState(null)
   const [eateryFromMap, setEateryFromMap] = useState(false)
   useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false) } }, [showEatery])
@@ -2601,6 +2602,7 @@ export default function App() {
             onShowTowing={() => setShowTowing(true)}
             onShowEhliyet={() => setShowEhliyet(true)}
             onShowEatery={() => setShowEatery(true)}
+            onOpenEateryPartner={slug => { setShowEatery(true); setEateryOpenSlug(slug); setEateryFromMap(true) }}
             garagesTileVisible={GARAGES_LIVE || profile?.role === 'admin' || ownsGarage}
             onShowStudentHub={() => setShowStudentHub(true)}
             onShowEsim={() => setShowEsim(true)}

@@ -443,8 +443,8 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, 
       // POOL RULE: DB promos first, this as the fallback. A DB promo is a booked flight with a
       // window; an always-on config item ahead of it would starve it, and there is no rotation
       // state to share rank 1 fairly. It also survives an offline/RLS-failed pins read.
-      // `eateryGate` = CRUNCHY_EXPRESS (the caller passes the real gate; the default is the
-      // production flag so Node and any forgotten caller fail closed).
+      // `eateryGate` = CRUNCHY_EXPRESS (HomeScreen passes CRUNCHY_EXPRESS: true on dev / Preview,
+      // CRUNCHY_EXPRESS_LIVE in production; the default is the production flag so Node and any forgotten caller fail closed).
       if (eateryGate === true) {
         const item = sponsoredEateryItem(lang)
         if (!isDismissed(item.id)) return item
