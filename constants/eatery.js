@@ -20,6 +20,10 @@ export const EATERY_DAYS = [
   ['fri', 'towingDayFri'], ['sat', 'towingDaySat'], ['sun', 'towingDaySun'],
 ]
 
+// A partner behind its own dark flag stays out of a live section (CRUNCHY_EXPRESS_LIVE).
+// gates = { <slug>: boolean }; a slug with no gate is visible. Shared by the list and the map.
+export const eateryPartnerVisible = (row, gates) => gates?.[row?.slug] !== false
+
 const filled = v => typeof v === 'string' && v.trim().length > 0
 const https = v => (filled(v) && /^https:\/\/\S+$/.test(v.trim()) ? v.trim() : null)
 

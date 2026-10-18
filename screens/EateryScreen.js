@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { t } from '../constants/i18n'
 import { CRUNCHY_EXPRESS, EATERY_PREVIEW_DATA } from '../constants/redesign'
 import { REGION_LABEL_KEY } from '../constants/regions'
-import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
+import { EATERY_CATEGORY_KEY, eateryOpenStatus, eateryPartnerVisible } from '../constants/eatery'
 import { colors, type, space, listBottomPad } from '../constants/theme'
 import { ScreenHeader, ErrorState, Card, CardSkeleton } from '../components/ui'
 import { EateryLogo, PlaceholderTag } from '../components/EateryBits'
@@ -79,7 +79,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       if (PREVIEW_PARTNERS) {
         for (const p of PREVIEW_PARTNERS) if (!list.some(r => r.slug === p.slug)) list = [...list, p]
       }
-      list = list.filter(r => PARTNER_LIVE[r.slug] !== false)
+      list = list.filter(r => eateryPartnerVisible(r, PARTNER_LIVE))
       if (!list.length) { setError(true); setLoading(false); return }
       setRows(list)
       setLoading(false)
