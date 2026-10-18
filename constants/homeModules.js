@@ -61,8 +61,9 @@
 // • Beaches. Folded into `explore` — the V1 tile opened ExploreScreen with
 //   initialCategory="beach", i.e. the same screen the explore tile opens. Beaches
 //   survives as an Explore group, not as a Home tile.
-// • eat_drink. A taxonomy row inside Explore (constants/exploreCategories.js), never a
-//   module of its own.
+// • eat_drink. A taxonomy row inside Explore (constants/exploreCategories.js) — the free places
+//   directory. Now the partner section is its own module, 'eatery' (Yeme-İçme,
+//   below, EATERY_LIVE); the two do not share rows or screens.
 
 // ─── HIDDEN_TILES — GRID VISIBILITY, DELIBERATELY NOT A MODULE FLAG ─────────
 //
@@ -153,6 +154,9 @@ export const HOME_MODULES = [
   // Gated by HOTELS_LIVE, which is not a MODULE_FLAGS key (constants/homeGroups.js GATES,
   // constants/homeFavourites.js FAVOURITE_FLAGS). Placed in the Keşfet ve Eğlence panel.
   { id: 'hotels',             icon: 'bed-outline',              tint: 'standard', labelKey: 'accomTabHotels' },
+  // Yeme-İçme (eatery partners). Gated by EATERY (constants/redesign.js: EATERY_LIVE, dev, ADA Preview) in
+  // constants/homeGroups.js GATES, and by EATERY_LIVE in FAVOURITE_FLAGS. Placed in the Keşfet ve Eğlence panel.
+  { id: 'eatery',             icon: 'restaurant-outline',       tint: 'standard', labelKey: 'menuEatery' },
   { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },   // V2 vocabulary — screens/HomeScreen.js's V1 copy says 'lifestyle'; both are correct
   { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
 

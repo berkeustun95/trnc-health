@@ -13,6 +13,7 @@
 // A module that goes live loses its badge automatically.
 import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE, LIVE_SCORES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'
+import { EATERY } from './redesign'
 
 // Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes
 // and live scores have no grid tile in V2 (so the pre-redesign ModuleGrid, which
@@ -40,6 +41,8 @@ const GATES = {
   // === true, not !== false: a dark module's gate fails closed. Dev / Preview unlock it in HomeScreen.
   ehliyet:       () => MODULE_FLAGS.ehliyet === true,
   hotels:        () => HOTELS_LIVE === true,
+  // EATERY is EATERY_LIVE || dev || ADA Preview (constants/redesign.js): the tile shows there before the flag flips.
+  eatery:        () => EATERY === true,
   liveScores:    () => LIVE_SCORES_LIVE === true,
   // eSIM is the face of Connectivity: while CONNECTIVITY_LIVE is false it only shows the
   // waitlist screen, and the brief says hidden connectivity must not show.
@@ -71,7 +74,7 @@ export function isLive(id, unlocked) {
 // reported at the gate rather than taken from the brief.
 export const HOME_GROUPS = [
   { key: 'health',   titleKey: 'hrGroupHealth',  ids: ['duty', 'health', 'emergency'] },
-  { key: 'explore',  titleKey: 'hrGroupExplore', ids: ['exploreTab', 'events', 'liveScores', 'walkingRoutes', 'hotels', 'games'] },
+  { key: 'explore',  titleKey: 'hrGroupExplore', ids: ['exploreTab', 'events', 'liveScores', 'walkingRoutes', 'hotels', 'eatery', 'games'] },
   { key: 'homeLife', titleKey: 'hrGroupHome',    ids: ['accommodation', 'homeServices', 'pets', 'insurance',
                                                         'studentHub' /* ★ */] },
   { key: 'city',     titleKey: 'hrGroupCity',    ids: ['transport', 'esim', 'municipal',
