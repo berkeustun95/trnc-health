@@ -45,6 +45,14 @@
 //     ✗ exactly one eatery pin → ["eatery:e1","eatery:e2"]   ✗ rows without coords only: no chip → true
 //   eateryPins() partner-gate filter removed (2026-10-18, slice 2b)
 //     ✗ gate false: no pin for that slug even with eateryLive true → 1   ✗ gate false: no eatery chip → true
+//   eatery partners folded into explore:eat_drink (Option B, 2026-10-18); old separate-chip break notes above are history
+//   partner pins made the whole eat_drink group "visible" (places leak)
+//     ✗ 3 places: chip = partner only → 4 pins   ✗ explore DARK + 12 cafes: partner only → 13 pins   ✗ no eat_drink place pin → 12
+//   chip required visible places   ✗ 1 partner + 0 places: chip exists → []   (plus 13 dependants)
+//   partner pins counted toward the 8 threshold   ✗ 7 places: partner only → 8 pins
+//   eateryLive ignored   ✗ flag off: zero eatery pins → 1   ✗ no eat_drink chip → false
+//   partner gate ignored   ✗ gate false: no pin → 1   ✗ gate false + 8 places: places only → 1
+//   partner pin coloured with the group colour   ✗ own colour → ["#0369A1"]   ✗ hue 201 vs nature/active/services (0.0 deg)
 //   placeColors.eatery set to #7C3AED (violet), then #0EA5E9 (sky)
 //     ✗ hue 262: health:pharmacy (0.0 deg)
 //     ✗ hue 199: health:clinic (19.2), explore:nature/eat_drink/active/services (2.6)
@@ -381,31 +389,55 @@ const EATERY_ROWS = [
 const eaBuild = (eateryLive, extra = {}) => buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null,
   isAdmin: false, petHotelLive: false, eateryLive, eateryPartners: EATERY_ROWS,
   eateryGates: { 'crunchy-express': true }, ...extra })
+// Partner pins fold into the ONE explore:eat_drink chip (Option B, 2026-10-18): no 'eatery' source key.
 const eaPins = sources => sources.flatMap(s => s.pins).filter(p => p.kind === 'eatery')
+const EAT = 'explore:eat_drink'
+const eatChip = sources => sources.find(s => s.key === EAT)
+const eatIds = sources => (eatChip(sources)?.pins || []).map(p => p.id)
+const cafes = n => Array.from({ length: n }, (_, i) => ({
+  id: `cafe-${i}`, category: 'cafe', status: 'active', region: 'girne', latitude: 35.33 + i * 0.01, longitude: 33.32 + i * 0.01 }))
 const eaDark = eaBuild(false)
 const eaLive = eaBuild(true)
-check('flag off: zero eatery pins even with rows', eaPins(eaDark).length, 0)
-check('flag off: no eatery chip', eaDark.some(s => s.key === 'eatery'), false)
+check('no source keyed "eatery" exists in either world', [eaDark, eaLive].map(x => x.some(s => s.key === 'eatery')), [false, false])
+check('flag off: zero eatery pins in ANY chip even with rows', eaPins(eaDark).length, 0)
+check('flag off: no eat_drink chip (0 places, unchanged)', eatChip(eaDark) === undefined, true)
+check('flag off, 3 places: still no eat_drink chip', eatChip(eaBuild(false, { places: [...PLACES, ...cafes(3)] })) === undefined, true)
 check('flag off: All (the default path) draws no eatery pin', selectedPins(eaDark, new Set()).filter(p => p.kind === 'eatery').length, 0)
 check('flag on: exactly one eatery pin (the row with coords)', eaPins(eaLive).map(p => p.id), ['eatery:e1'])
-check('flag on: exactly one eatery chip, labelled menuEatery',
-  eaLive.filter(s => s.key === 'eatery').map(s => s.labelKey), ['menuEatery'])
+check('flag on + 1 partner + 0 places: eat_drink chip exists with exactly the partner pin', eatIds(eaLive), ['eatery:e1'])
+check('flag on: that chip is labelled exploreGroupEatDrink', eatChip(eaLive)?.labelKey, 'exploreGroupEatDrink')
+check('flag on: the partner pin is indigo (own colour)', eatChip(eaLive)?.pins.map(p => p.color), [placeColors.eatery.text])
+check('flag on: the chip dot is the group colour, not indigo', eatChip(eaLive)?.color, GROUP_META.eat_drink.colorToken.text)
+check('flag on + 3 places (below threshold): chip = partner pin only, places hidden',
+  eatIds(eaBuild(true, { places: [...PLACES, ...cafes(3)] })), ['eatery:e1'])
+const eaFull = eaBuild(true, { places: [...PLACES, ...cafes(8)] })
+check('flag on + 8 places: chip = 8 places + the partner pin', [eatChip(eaFull)?.pins.length, eatIds(eaFull).filter(id => id.startsWith('eatery:'))], [9, ['eatery:e1']])
+check('flag on + 8 places: each pin keeps its own colour',
+  [...new Set(eatChip(eaFull)?.pins.map(p => `${p.kind}:${p.color}`))].sort(),
+  [`eatery:${placeColors.eatery.text}`, `place:${GROUP_META.eat_drink.colorToken.text}`])
+check('flag on + 7 places: the 8 threshold ignores partner pins (chip = partner only)',
+  eatIds(eaBuild(true, { places: [...PLACES, ...cafes(7)] })), ['eatery:e1'])
+// THE LEAK GUARD: a partner pin makes the chip exist, but must not make the eat_drink PLACES visible while Explore is dark.
+const eaDarkExplore = eaBuild(true, { exploreLive: false, places: [...PLACES, ...cafes(12)] })
+check('explore DARK + flag on + 12 cafe rows: chip = partner pin only, NO places', eatIds(eaDarkExplore), ['eatery:e1'])
+check('explore DARK + flag on: no eat_drink place pin anywhere', eaDarkExplore.flatMap(s => s.pins).filter(p => p.group === 'eat_drink').length, 0)
+check('explore DARK + flag on: heritage still absent', eaDarkExplore.filter(s => s.key === 'explore:heritage').length, 0)
 check('flag on: the pin is the row coordinate, verbatim', eaPins(eaLive).map(p => [p.lat, p.lng]), [[35.1856, 33.3823]])
 check('flag on: the pin falls inside the default map region', eaPins(eaLive).map(inBox), [true])
 check('flag on: All includes it', selectedPins(eaLive, new Set()).filter(p => p.kind === 'eatery').length, 1)
-check('flag on, no rows: no eatery chip', eaBuild(true, { eateryPartners: [] }).some(s => s.key === 'eatery'), false)
-check('flag on, rows without coords only: no eatery chip',
-  eaBuild(true, { eateryPartners: [EATERY_ROWS[1]] }).some(s => s.key === 'eatery'), false)
-check('flag on, explore DARK: heritage still absent, pin present',
-  [eaBuild(true, { exploreLive: false }).filter(s => s.key === 'explore:heritage').length, eaPins(eaBuild(true, { exploreLive: false })).length], [0, 1])
+check('flag on: ticking only the eat_drink chip selects it', selectedPins(eaLive, new Set([EAT])).map(p => p.id), ['eatery:e1'])
+check('flag on, no rows: no eat_drink chip', eatChip(eaBuild(true, { eateryPartners: [] })) === undefined, true)
+check('flag on, rows without coords only: no eat_drink chip', eatChip(eaBuild(true, { eateryPartners: [EATERY_ROWS[1]] })) === undefined, true)
 check('default eateryLive follows EATERY_LIVE',
   eaPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true, petHotelLive: false, eateryPartners: EATERY_ROWS })).length,
   EATERY_LIVE && CRUNCHY_EXPRESS_LIVE ? 1 : 0)
 // The partner gate lives INSIDE the source (security review): a dark partner draws no pin even with eateryLive true.
 check('gate false: no pin for that slug even with eateryLive true',
   eaPins(eaBuild(true, { eateryGates: { 'crunchy-express': false } })).length, 0)
-check('gate false: no eatery chip when it was the only pinnable row',
-  eaBuild(true, { eateryGates: { 'crunchy-express': false } }).some(s => s.key === 'eatery'), false)
+check('gate false: no eat_drink chip when the partner was the only pinnable row',
+  eatChip(eaBuild(true, { eateryGates: { 'crunchy-express': false } })) === undefined, true)
+check('gate false + 8 places: chip is places only, no partner pin',
+  eatChip(eaBuild(true, { eateryGates: { 'crunchy-express': false }, places: [...PLACES, ...cafes(8)] }))?.pins.map(p => p.kind) .filter(k => k === 'eatery').length, 0)
 check('gate true: the slug draws its pin', eaPins(eaBuild(true, { eateryGates: { 'crunchy-express': true } })).map(p => p.id), ['eatery:e1'])
 check('gate for another slug does not hide this one',
   eaPins(eaBuild(true, { eateryGates: { other: false } })).map(p => p.id), ['eatery:e1'])
@@ -416,12 +448,13 @@ check('eateryPartnerVisible: a dark partner gate hides, no gate shows',
   [eateryPartnerVisible({ slug: 'crunchy-express' }, { 'crunchy-express': false }),
    eateryPartnerVisible({ slug: 'crunchy-express' }, { 'crunchy-express': true }),
    eateryPartnerVisible({ slug: 'other' }, { 'crunchy-express': false })], [false, true, true])
-const eaColor = eaLive.find(s => s.key === 'eatery')?.color
+// Hue rule on the PIN colour (indigo), read off the built pin, against every other pin colour.
+const eaColor = eaPins(eaLive)[0]?.color
 const eaRivals = [...rivals.filter(([k]) => k !== 'eatery'), ['pet hotel', placeColors.petHotel.text]]
 const eaClose = eaRivals.filter(([, c]) => !eaColor || hueGap(eaColor, c) < 30)
   .map(([k, c]) => `${k} ${c} (${eaColor ? hueGap(eaColor, c).toFixed(1) : '?'} deg)`)
 check(`eatery pin hue ${eaColor ? hueOf(eaColor).toFixed(0) : '?'} is >= 30 deg from all ${eaRivals.length} other pins`, eaClose, [])
-check('menuEatery chip label resolves in English', t('menuEatery', 'English') !== 'menuEatery', true)
+check('menuEatery label resolves in English', t('menuEatery', 'English') !== 'menuEatery', true)
 
 // ─── Walking routes (Visit NCY) — a LAYER, gated on its own flag ─────────────
 //
