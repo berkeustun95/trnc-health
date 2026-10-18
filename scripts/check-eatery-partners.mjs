@@ -9,7 +9,7 @@
 //   and baselined in check-module-flags.mjs with the same value; (b) the redesign.js gate
 //   expressions have their canonical shape (EATERY_PREVIEW_DATA = dev || Preview build, nothing
 //   else); (c) constants/eateryPreview.js placeholders are reachable only through a require()
-//   guarded by EATERY_PREVIEW_DATA; (d) a sponsored slug, once it exists, is a seeded slug.
+//   guarded by EATERY_PREVIEW_DATA; (d) every EATERY_GATES key is a seeded slug.
 // DB (full mode, a flag true only): the live partner is visible to anon, active, complete and its
 //   menu is verified within MENU_MAX_AGE_DAYS. Fails closed on a missing key or any HTTP error.
 //
@@ -141,7 +141,10 @@ function listSource() {
 }
 
 // ─── (d) sponsored slug ─────────────────────────────────────────────────────
-function seededSlugs(sql) {
+// Only top-level seeds count: the migration's verification DO blocks insert throwaway probe rows
+// (zz-on, zz-off, …) that are rolled back, and must never satisfy the gate-slug check.
+function seededSlugs(rawSql) {
+  const sql = rawSql.replace(/\bDO\s+(\$[A-Za-z_]*\$)[\s\S]*?\1\s*;/gi, '')
   const slugs = []
   for (const ins of sql.matchAll(/insert\s+into\s+(?:public\.)?eatery_partners\s*\(([^)]*)\)\s*values/gi)) {
     const cols = ins[1].split(',').map(c => c.trim().toLowerCase())
@@ -164,8 +167,8 @@ function seededSlugs(sql) {
 }
 function slugProblems(slug, seeded) {
   const out = []
-  if (!/^[a-z0-9-]+$/.test(slug)) out.push(`EATERY_SPONSORED_SLUG '${slug}' does not match ^[a-z0-9-]+$`)
-  if (!seeded.includes(slug)) out.push(`EATERY_SPONSORED_SLUG '${slug}' is not a seeded slug in the eatery migration (seeded: ${seeded.join(', ') || 'none'})`)
+  if (!/^[a-z0-9-]+$/.test(slug)) out.push(`gate slug '${slug}' does not match ^[a-z0-9-]+$`)
+  if (!seeded.includes(slug)) out.push(`gate slug '${slug}' is not a seeded slug in the eatery migration (seeded: ${seeded.join(', ') || 'none'})`)
   return out
 }
 
@@ -256,6 +259,12 @@ const SQL_SAMPLE = "INSERT INTO public.eatery_partners (slug, name, notes)\nVALU
   mustPass('slug known', slugProblems('crunchy-express', s))
   mustFail('slug unknown', slugProblems('nope', s))
   mustFail('slug bad charset', slugProblems('Crunchy_Express', ['Crunchy_Express']))
+  const withProbe = SQL_SAMPLE + "DO $$\nBEGIN\n  INSERT INTO public.eatery_partners (slug, name) VALUES ('zz-probe', 'P');\nEND $$;\n"
+  const sp = seededSlugs(withProbe)
+  controls++; if (sp.includes('zz-probe')) problems.push(`CONTROL seed parser: a DO-block probe slug counted as seeded: [${sp}]`)
+  mustFail('slug only in a DO-block probe', slugProblems('zz-on', seededSlugs(withProbe.replace('zz-probe', 'zz-on'))))
+  const tagged = seededSlugs(SQL_SAMPLE + "DO $body$\nBEGIN\n  INSERT INTO public.eatery_partners (slug, name) VALUES ('zz-tagged', 'P');\nEND $body$;\n")
+  controls++; if (tagged.includes('zz-tagged') || !tagged.includes('crunchy-express')) problems.push(`CONTROL seed parser: tagged DO-block probe handling wrong: [${tagged}]`)
 }
 const TODAY = new Date().toISOString().slice(0, 10)
 const daysAgo = n => new Date(Date.parse(TODAY) - n * 86400000).toISOString().slice(0, 10)
@@ -307,20 +316,20 @@ console.log(`flags: EATERY_LIVE=${flags.EATERY_LIVE} CRUNCHY_EXPRESS_LIVE=${flag
   console.log(`eateryPreview rule: scanned ${files.length} source files, ${importers.length} importers${importers.length ? ': ' + importers.join(', ') : ''}`)
 }
 
-// (d)
+// (d) The strip slider is data-driven (utils/stripSlides.js): no sponsored slug is hard-coded any more, so what is
+// left to pin is the one place a slug IS written down, the EATERY_GATES keys. A gate for a slug nobody seeded
+// would silently gate nothing.
 {
-  let slug = null
-  const cdir = resolve(ROOT, 'constants')
-  for (const f of readdirSync(cdir).filter(f => f.endsWith('.js'))) {
-    const m = stripComments(readFileSync(join(cdir, f), 'utf8')).match(/export\s+const\s+EATERY_SPONSORED_SLUG\s*=\s*(['"])([^'"]*)\1/)
-    if (m) { slug = m[2]; break }
-  }
-  if (slug === null) console.log('n/a: EATERY_SPONSORED_SLUG not present (slice 3)')
+  const src = stripComments(read('utils/loadEateryPartners.js'))
+  const m = src.match(/export\s+const\s+EATERY_GATES\s*=\s*\{([^}]*)\}/)
+  if (!m) { problems.push('utils/loadEateryPartners.js: EATERY_GATES not found'); }
   else {
+    const keys = [...m[1].matchAll(/(?:^|,)\s*(['"]?)([A-Za-z0-9_-]+)\1\s*:/g)].map(x => x[2])
     const mdir = resolve(ROOT, 'supabase/migrations')
     const seeded = readdirSync(mdir).filter(f => /eatery/i.test(f) && f.endsWith('.sql')).flatMap(f => seededSlugs(readFileSync(join(mdir, f), 'utf8')))
-    console.log(`EATERY_SPONSORED_SLUG='${slug}'; seeded slugs: ${seeded.join(', ') || 'none'}`)
-    assert(slugProblems(slug, seeded), 'sponsored slug')
+    console.log(`EATERY_GATES keys: ${keys.join(', ') || 'none'}; seeded slugs: ${seeded.join(', ') || 'none'}`)
+    assert(keys.length ? [] : ['EATERY_GATES has no keys (parse failure or gates removed)'], 'gate keys present')
+    assert(keys.flatMap(k => slugProblems(k, seeded)), 'gate slugs seeded')
   }
 }
 
