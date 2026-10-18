@@ -33,6 +33,7 @@ const problems = []
 let fontReport = 'fonts: not checked'
 let favReport  = 'favourites: not checked'
 let mascotReport = 'mascot: not checked'
+let bannerReport = 'strip banner: not checked'
 const read = p => readFileSync(resolve(ROOT, p), 'utf8')
 const num  = (src, name) => {
   const m = src.match(new RegExp(`(?:export )?const ${name}\\s*=\\s*(-?[\\d.]+)`))
@@ -150,6 +151,21 @@ if (unread.length) {
   mascotReport = `mascot: box ${MASCOT_BOX}, ink ${(MASCOT_BOX * 0.456).toFixed(0)}x${artH.toFixed(0)}pt, `
     + `feet ${MASCOT_INSET}pt above the card's bottom, head ${(CARD_H - inkTop).toFixed(1)}pt below its top `
     + `(${OLI_OVERHANG === 0 ? 'inside the banner' : `${inkAbove.toFixed(0)}pt above it`}), card ${CARD_H}pt`
+}
+
+// ─── B2. The strip banner stays 160 tall ────────────────────────────────────
+// The "Bugün ADA'da" slider reuses the banner frame for every slide, and the loading Bone mirrors it.
+// A slide taller or shorter than the skeleton makes the whole Home jump when the strip resolves.
+{
+  const widgets = read('components/home/redesign/Widgets.js')
+  const banner = widgets.match(/^\s{2}banner:\s*\{([^}]*)\}/m)
+  const h = banner && banner[1].match(/\bheight:\s*(\d+)/)
+  const bone = widgets.match(/<Bone width="100%" height=\{(\d+)\} borderRadius=\{radii\.widget\}/)
+  if (!h) problems.push('Widgets.js: no `banner` style with a numeric height found')
+  else if (Number(h[1]) !== 160) problems.push(`Widgets.js banner height is ${h[1]}, expected 160 (the strip slider frame)`)
+  if (!bone) problems.push('Widgets.js: the banner loading Bone was not found')
+  else if (h && Number(bone[1]) !== Number(h[1])) problems.push(`Widgets.js: the loading Bone is ${bone[1]} tall but the banner is ${h[1]}`)
+  bannerReport = `strip banner: height ${h ? h[1] : '?'}, loading Bone ${bone ? bone[1] : '?'}`
 }
 
 // ─── C. Every font family used here must be REGISTERED in App.js ────────────
@@ -409,4 +425,5 @@ console.log(favReport)
 // the mascot moved inside the card it printed "-12pt above a 88pt card", a negative
 // distance above something, which is the shape of a report that has outlived its geometry.
 console.log(mascotReport)
+console.log(bannerReport)
 console.log('home geometry: OK')

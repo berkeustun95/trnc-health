@@ -4,6 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
 import { LANG_CODES, dateLocale } from '../constants/i18n.js'
+import { assembleStripSlides } from './stripSlides.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
@@ -396,10 +397,12 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
   return genericEventsItem()
 }
 
+// This ladder is slide 1 (the "lead") of the Home strip slider. Slides 2..n are the eatery partners,
+// assembled by utils/stripSlides.js — they never enter this ladder.
 // ─── THE REDESIGN HOME BANNER — its own ladder (Berke, 2026-10-01) ──────────
 //
 //   0  a pin for TODAY, any kind        home_strip_pin, pin_date = today — the manual override
-//   1  a sponsored promo                the SAME two hard gates as rank 5 above: promosEligible
+//   1  a sponsored promo                (DB promos only; eatery partners are their own slides, utils/stripSlides.js) the SAME two hard gates as rank 5 above: promosEligible
 //                                       (never a guest, a null DOB or anyone under PROMO_MIN_AGE)
 //                                       and never twice running (STRIP_LAST_KIND_KEY)
 //   2  tonight's event, else the NEXT upcoming event (startsAt kept for the day/time chip)
@@ -425,10 +428,10 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
     }
   } catch { /* fall through */ }
   if (promosEligible) {
-    try {
-      let lastKind = null
-      try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
-      if (lastKind !== 'promo') {
+    let lastKind = null
+    try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
+    if (lastKind !== 'promo') {
+      try {
         if (!pins) pins = await readPins()
         const dev = typeof __DEV__ !== 'undefined' && __DEV__ && DEV_TEST_PROMO ? [DEV_TEST_PROMO] : []
         const pool = [...dev, ...pins.filter(p => p.kind === 'promo' && !p.pin_date && !isDismissed(p.id))]
@@ -436,8 +439,8 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
           const item = await hydratePin(p, lang)
           if (item) return item
         }
-      }
-    } catch { /* fall through */ }
+      } catch { /* fall through */ }
+    }
   }
   try {
     const e = (await readEventsToday(now, lang)) || (await readNextEvent(now, lang))
@@ -455,6 +458,13 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
     if (p) return p
   } catch { /* fall through */ }
   return genericEventsItem()
+}
+
+// The slider: slide 1 = the ladder above, slides 2..n = eatery partners (pure part: utils/stripSlides.js).
+// `partners` are loadEateryPartners rows, `gates` = EATERY_GATES, `rotation` the stored integer.
+export async function resolveStripSlides({ lang, promosEligible = false, now = new Date(), dismissedIds = null, partners = [], gates = {}, rotation = 0 }) {
+  const lead = await resolveRedesignBanner({ lang, promosEligible, now, dismissedIds })
+  return assembleStripSlides({ lead, partners, promosEligible, gates, rotation, lang })
 }
 
 // Called by the card once it has actually rendered something, so "what was shown last" is
