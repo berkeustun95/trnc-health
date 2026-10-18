@@ -249,6 +249,7 @@ export default function HomeScreen({
   onShowTowing,
   onShowEhliyet,
   onShowEatery,
+  overlayOpen = false,   // App-level sheets over Home (Oli, language, about, tutorial, city ask): the strip slider holds still
   onOpenEateryPartner,
   onShowEsim,
   onShowEmergency,

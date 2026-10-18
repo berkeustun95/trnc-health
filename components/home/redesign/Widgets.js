@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions, FlatList, AccessibilityInfo, AppState } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, category, type, radii, press } from '../../../constants/theme'
+import { colors, category, type, radii, press, space } from '../../../constants/theme'
 import { t, tCount, dateLocale } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
@@ -209,18 +209,18 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
               {!!time && (
                 <>
                   <Ionicons name={chip?.future ? 'calendar-outline' : 'time-outline'} size={14} color="#FFFFFF" />
-                  <Text style={s.timeText} numberOfLines={1}>{time}</Text>
+                  <Text style={s.timeText} numberOfLines={1} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{time}</Text>
                 </>
               )}
-              {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1}>{tag}</Text></View>}
+              {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{tag}</Text></View>}
               {!!item.placeholder && <PlaceholderTag lang={lang} lines={1} style={s.placeholderTag} />}
             </View>
           )}
           <View style={s.bandTitleRow}>
-            <Text style={s.bannerTitle} numberOfLines={2}>{title}</Text>
+            <Text style={s.bannerTitle} numberOfLines={showFrame ? 1 : 2} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{title}</Text>
             <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </View>
-          {!!sponsorSub && <Text style={s.sponsorSub} numberOfLines={1}>{sponsorSub}</Text>}
+          {!!sponsorSub && <Text style={s.sponsorSub} numberOfLines={1} maxFontSizeMultiplier={1.2}>{sponsorSub}</Text>}
         </View>
       </TouchableOpacity>
       {item.kind === 'notice' && !!onDismiss && (
@@ -296,7 +296,8 @@ export function StripSlider({ slides, loading, lang, onPress, onDismiss, paused 
     if (!auto || userTookOver) return
     const id = setInterval(() => {
       if (userTookOver) { clearInterval(id); return }
-      goTo((pageRef.current + 1) % n, true)
+      const next = (pageRef.current + 1) % n
+      goTo(next, next !== 0)   // last -> first is a cut, not a rewind sweep across every slide
     }, SLIDE_MS)
     return () => clearInterval(id)
   }, [auto, n, width])
@@ -321,9 +322,8 @@ export function StripSlider({ slides, loading, lang, onPress, onDismiss, paused 
 
   return (
     <View style={s.slider} onLayout={e => setWidth(Math.round(e.nativeEvent.layout.width))}
-      onTouchStart={takeOver}
       accessible accessibilityRole="adjustable" accessibilityLabel={label}
-      accessibilityValue={{ text: t('stripSlideOf', lang).replace('{n}', page + 1).replace('{total}', n) }}
+      accessibilityValue={{ text: `${t('stripSlideOf', lang).replace('{n}', page + 1).replace('{total}', n)}, ${cur.title}` }}
       accessibilityActions={actions} onAccessibilityAction={onAction} onAccessibilityTap={() => onPress?.(cur)}>
       {width > 0 && (
         <FlatList
@@ -372,15 +372,17 @@ const s = StyleSheet.create({
   darkText:    { color: colors.textPrimary },
   alertText:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 1 },
 
-  slider:      { height: 160, borderRadius: radii.widget, overflow: 'hidden' },
+  slider:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
   sliderList:  { height: 160, flexGrow: 0 },
-  dots:        { position: 'absolute', left: 0, right: 0, bottom: 6, flexDirection: 'row', justifyContent: 'center', gap: 5 },
-  dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
+  // The pill keeps the dots readable on the lilac frame and on any photo (white on #F1EAFB alone is ~1.2:1).
+  dots:        { position: 'absolute', alignSelf: 'center', bottom: 6, flexDirection: 'row', gap: 5,
+                 backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: 4 },
+  dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.7)' },
   dotOn:       { backgroundColor: '#FFFFFF' },
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
   sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: category.explore.bg,
                   alignItems: 'center', justifyContent: 'center', paddingBottom: 18 },
-  sponsorLogo: { width: 140, flex: 1 },
+  sponsorLogo: { width: 140, flex: 1, minHeight: 40 },
   sponsorSub:  { ...type.meta, color: '#FFFFFF' },
   placeholderTag: { marginLeft: 6, flexShrink: 1 },
   bannerPhoto: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },

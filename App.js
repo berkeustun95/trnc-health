@@ -2602,6 +2602,7 @@ export default function App() {
             onShowTowing={() => setShowTowing(true)}
             onShowEhliyet={() => setShowEhliyet(true)}
             onShowEatery={() => setShowEatery(true)}
+            overlayOpen={oliSheetOpen || showLangModal || showAboutSheet || showCoachMarks || showHomeCityAsk}
             onOpenEateryPartner={slug => { setShowEatery(true); setEateryOpenSlug(slug); setEateryFromMap(true) }}
             garagesTileVisible={GARAGES_LIVE || profile?.role === 'admin' || ownsGarage}
             onShowStudentHub={() => setShowStudentHub(true)}
