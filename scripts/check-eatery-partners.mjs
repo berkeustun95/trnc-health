@@ -141,7 +141,10 @@ function listSource() {
 }
 
 // ─── (d) sponsored slug ─────────────────────────────────────────────────────
-function seededSlugs(sql) {
+// Only top-level seeds count: the migration's verification DO blocks insert throwaway probe rows
+// (zz-on, zz-off, …) that are rolled back, and must never satisfy the sponsored-slug check.
+function seededSlugs(rawSql) {
+  const sql = rawSql.replace(/\bDO\s+\$\$[\s\S]*?\$\$\s*;/gi, '')
   const slugs = []
   for (const ins of sql.matchAll(/insert\s+into\s+(?:public\.)?eatery_partners\s*\(([^)]*)\)\s*values/gi)) {
     const cols = ins[1].split(',').map(c => c.trim().toLowerCase())
@@ -256,6 +259,10 @@ const SQL_SAMPLE = "INSERT INTO public.eatery_partners (slug, name, notes)\nVALU
   mustPass('slug known', slugProblems('crunchy-express', s))
   mustFail('slug unknown', slugProblems('nope', s))
   mustFail('slug bad charset', slugProblems('Crunchy_Express', ['Crunchy_Express']))
+  const withProbe = SQL_SAMPLE + "DO $$\nBEGIN\n  INSERT INTO public.eatery_partners (slug, name) VALUES ('zz-probe', 'P');\nEND $$;\n"
+  const sp = seededSlugs(withProbe)
+  controls++; if (sp.includes('zz-probe')) problems.push(`CONTROL seed parser: a DO-block probe slug counted as seeded: [${sp}]`)
+  mustFail('slug only in a DO-block probe', slugProblems('zz-on', seededSlugs(withProbe.replace('zz-probe', 'zz-on'))))
 }
 const TODAY = new Date().toISOString().slice(0, 10)
 const daysAgo = n => new Date(Date.parse(TODAY) - n * 86400000).toISOString().slice(0, 10)
