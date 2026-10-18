@@ -144,7 +144,7 @@ function listSource() {
 // Only top-level seeds count: the migration's verification DO blocks insert throwaway probe rows
 // (zz-on, zz-off, …) that are rolled back, and must never satisfy the sponsored-slug check.
 function seededSlugs(rawSql) {
-  const sql = rawSql.replace(/\bDO\s+\$\$[\s\S]*?\$\$\s*;/gi, '')
+  const sql = rawSql.replace(/\bDO\s+(\$[A-Za-z_]*\$)[\s\S]*?\1\s*;/gi, '')
   const slugs = []
   for (const ins of sql.matchAll(/insert\s+into\s+(?:public\.)?eatery_partners\s*\(([^)]*)\)\s*values/gi)) {
     const cols = ins[1].split(',').map(c => c.trim().toLowerCase())
@@ -263,6 +263,8 @@ const SQL_SAMPLE = "INSERT INTO public.eatery_partners (slug, name, notes)\nVALU
   const sp = seededSlugs(withProbe)
   controls++; if (sp.includes('zz-probe')) problems.push(`CONTROL seed parser: a DO-block probe slug counted as seeded: [${sp}]`)
   mustFail('slug only in a DO-block probe', slugProblems('zz-on', seededSlugs(withProbe.replace('zz-probe', 'zz-on'))))
+  const tagged = seededSlugs(SQL_SAMPLE + "DO $body$\nBEGIN\n  INSERT INTO public.eatery_partners (slug, name) VALUES ('zz-tagged', 'P');\nEND $body$;\n")
+  controls++; if (tagged.includes('zz-tagged') || !tagged.includes('crunchy-express')) problems.push(`CONTROL seed parser: tagged DO-block probe handling wrong: [${tagged}]`)
 }
 const TODAY = new Date().toISOString().slice(0, 10)
 const daysAgo = n => new Date(Date.parse(TODAY) - n * 86400000).toISOString().slice(0, 10)
