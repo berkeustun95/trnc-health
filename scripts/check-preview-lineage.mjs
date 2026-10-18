@@ -12,6 +12,9 @@
 // The unit is the WORK, not the merge commit: a Preview built from a release-branch merge passes
 // when every non-merge commit under it is in HEAD (860b89a / 0fcb597 on release/redesign-1, whose
 // duty commits reached main through feat/redesign). Those are printed, never silent.
+// A commit whose IDENTICAL PATCH is already in HEAD under another SHA (git patch-id) is excused too: 2026-10-18, a duty swap and three Hermes commits sat on
+// the 1.4.0 lane as separate commits of changes main already had, and merging those SHAs would
+// have dragged the 1.4.0 lane into main. Excused commits are printed, never silent.
 //
 // A Preview on a NEWER runtime (1.4.x while main is 1.3.x; [major, minor] compared as integers) is
 // checked too, but the next lane's own work is excused: commits on NEXT_LANE's first-parent line
@@ -86,7 +89,28 @@ const views = await Promise.all(groups.map(async g => {
 }))
 
 const isAncestor = c => { try { git('merge-base', '--is-ancestor', c, 'HEAD'); return true } catch { return false } }
-const missingWork = c => git('rev-list', '--no-merges', c, '--not', 'HEAD').split('\n').filter(Boolean)
+// Non-merge commits under c that HEAD lacks, split into genuinely missing work and commits whose
+// identical patch HEAD's history already has (git patch-id --stable over every non-merge commit in
+// HEAD, ~4 s). Not rev-list --cherry-pick: a lane commit that already contains main's copy never
+// pairs with it. A commit with no diff has no patch-id and stays missing (fails closed).
+const lines = out => out.split('\n').filter(Boolean)
+const pipe = cmd => execFileSync('sh', ['-c', cmd], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28 })
+let headPatchIds = null
+const patchVerdict = new Map()
+const inHeadByPatch = c => {
+  if (patchVerdict.has(c)) return patchVerdict.get(c)
+  headPatchIds ??= new Set(lines(pipe("git log --no-merges -p --format='commit %H' HEAD | git patch-id --stable")).map(l => l.split(' ')[0]))
+  const id = pipe(`git show ${c} | git patch-id --stable`).split(' ')[0]
+  const ok = Boolean(id) && headPatchIds.has(id)
+  patchVerdict.set(c, ok)
+  return ok
+}
+const missingWork = c => {
+  const all = lines(git('rev-list', '--no-merges', c, '--not', 'HEAD'))
+  const samePatch = all.filter(inHeadByPatch)
+  return { work: all.filter(x => !samePatch.includes(x)), samePatch }
+}
+const excused = new Map()
 const known = c => { try { git('cat-file', '-e', `${c}^{commit}`); return true } catch { return false } }
 if (views.some(v => v.commit && !known(v.commit))) { try { git('fetch', '-q', 'origin') } catch { /* reported as unknown below */ } }
 
@@ -105,10 +129,11 @@ for (const v of views) {
   else if (!v.commit) missing.push(`? ${label}\n      records no git commit`)
   else if (!known(v.commit)) missing.push(`? ${v.commit.slice(0, 7)} ${label}\n      commit not in this clone, even after a fetch`)
   else if (!isAncestor(v.commit)) {
-    const work = missingWork(v.commit)
+    const { work, samePatch } = missingWork(v.commit)
+    for (const c of samePatch) excused.set(c, git('log', '-1', '--format=%h %s', c))
     if (isNewer(v.g.runtimeVersion)) {
       const left = work.filter(c => !laneSet.has(c))
-      console.log(`  ${v.g.group.slice(0, 8)} ${v.g.runtimeVersion}: ${work.length} commit(s) not in HEAD, ${work.length - left.length} on ${NEXT_LANE} first-parent (excluded), ${left.length} missing`)
+      console.log(`  ${v.g.group.slice(0, 8)} ${v.g.runtimeVersion}: ${work.length + samePatch.length} commit(s) not in HEAD, ${samePatch.length} same patch in HEAD (excluded), ${work.length - left.length} on ${NEXT_LANE} first-parent (excluded), ${left.length} missing`)
       if (left.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      group ${v.g.group}, runtime ${v.g.runtimeVersion}: ${left.length} commit(s) neither in HEAD nor on ${NEXT_LANE} first-parent:\n` + left.map(c => `        ${git('log', '-1', '--format=%h %s', c)}`).join('\n'))
     } else if (work.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      ${work.length} commit(s) not in HEAD, e.g. ${work.slice(0, 3).map(c => c.slice(0, 7)).join(' ')}`)
     else viaMerge.push(`· ${v.commit.slice(0, 7)} ${label}`)
@@ -118,6 +143,7 @@ for (const v of views) {
 const nNew = views.filter(v => isNewer(v.g.runtimeVersion)).length
 const scope = `${views.length - nNew} on ${series}.x and ${nNew} on newer runtimes`
 console.log(`\nPreview lineage: ${scope} checked against HEAD ${head}`)
+if (excused.size) console.log(`  same patch already in HEAD under another SHA (excused):\n    ${[...excused.values()].join('\n    ')}`)
 if (viaMerge.length) console.log(`  merge commit not in HEAD, but every commit under it is:\n    ${viaMerge.join('\n    ')}`)
 if (missing.length) refuse([`${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
 console.log(`  ✓ every checked Preview commit is contained in HEAD (newer runtimes: or on ${NEXT_LANE} first-parent)\n`)
