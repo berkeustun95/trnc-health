@@ -89,6 +89,11 @@ export const placeColors = {
   // duty-pharmacy accent (hue 18) above all. validate-map-sources.mjs asserts >= 30 degrees
   // from every source. Text on bg is 4.82:1.
   petHotel: { bg: '#F7FEE7', text: '#4D7C0F' },
+  // Eatery partner pin (constants/mapSources.js). Indigo, hue 232: the ONLY hue at least 30 deg
+  // from all 11 other pins (nearest: pharmacy 262 at 30.1, beach 201 at 30.7). Android's default
+  // marker keeps only the HUE of pinColor, so no navy/slate. validate-map-sources.mjs asserts
+  // >= 30 degrees from every source. Text on bg is 5.36:1.
+  eatery: { bg: '#EEF0FD', text: '#4054D6' },
   // Google place pin (check-ins, 20261093). Hue 298, the widest free gap: 36 deg from the
   // pharmacy pin (262), 37 from grooming (335) — Android markers keep only the hue.
   googlePlace: { bg: '#FAE8FF', text: '#A01DA5' },
