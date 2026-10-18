@@ -262,6 +262,8 @@ const SURFACES = [
   'components/FilterDropdown.js',
   // Events, added with its dropdowns (its filter labels are now read through them).
   'screens/EventsScreen.js',
+  // Ehliyet (driving schools), added with the screen so a blank action label fails here.
+  'screens/EhliyetScreen.js',
   // ─── Redesign (feat/redesign). Added with the redesigned Home so the guard sees its keys;
   // before this the 24 new keys were checked only by hand. homeGroups carries labelKey /
   // titleKey maps; the ui components carry the shared uiRetry / uiClose / uiLoadFailed.
@@ -355,6 +357,10 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // Ehliyet action labels: product names, shown untranslated in every locale.
+  'ehliyetInstagram': { Turkish: 'Instagram is a brand name', Arabic: 'Instagram is a brand name', Russian: 'Instagram is a brand name', Greek: 'Instagram is a brand name', French: 'Instagram is a brand name', Spanish: 'Instagram is a brand name', German: 'Instagram is a brand name', Persian: 'Instagram is a brand name' },
+  'ehliyetWhatsApp': { Turkish: 'WhatsApp is a brand name', Arabic: 'WhatsApp is a brand name', Russian: 'WhatsApp is a brand name', Greek: 'WhatsApp is a brand name', French: 'WhatsApp is a brand name', Spanish: 'WhatsApp is a brand name', German: 'WhatsApp is a brand name', Persian: 'WhatsApp is a brand name' },
+  'ehliyetFacebook': { Turkish: 'Facebook is a brand name', Arabic: 'Facebook is a brand name', Russian: 'Facebook is a brand name', Greek: 'Facebook is a brand name', French: 'Facebook is a brand name', Spanish: 'Facebook is a brand name', German: 'Facebook is a brand name', Persian: 'Facebook is a brand name' },
   // Check-ins (20261092): "check-in" is the loanword these languages use for it (Foursquare/Swarm,
   // Facebook all ship it untranslated in fr/es/de); every sentence around it is translated.
   'checkinTab':           { French: 'Check-ins is the French loanword', Spanish: 'Check-ins is the Spanish loanword', German: 'Check-ins is the German loanword' },
@@ -694,7 +700,10 @@ let regulatoryExempted = 0
 for (const key of KEYS) {
   const en = t(key, 'English')
   if (en === key) { problems.push(`${key}: not present in English at all — every locale falls back to the raw key`); continue }
+  if (!en.trim()) { problems.push(`${key}: English value is empty`); continue }
   for (const lang of LANGS) {
+    // t() uses ??, so "" is returned as-is and is never "identical to English": check it first.
+    if (!String(t(key, lang)).trim()) { problems.push(`${key} / ${lang} is an EMPTY string — it renders as a blank label`); continue }
     if (t(key, lang) !== en) continue
     if (PETS_REGULATORY_EXEMPT.has(key)) { regulatoryExempted++; continue }
     const reason = SAME_AS_ENGLISH[key]?.[lang]

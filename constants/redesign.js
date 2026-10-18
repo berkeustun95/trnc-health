@@ -35,3 +35,11 @@ export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined'
 // Set to false when this branch merges to main if ADA Preview must stop showing it.
 const DUYURULAR_PREVIEW = true
 export const DUYURULAR = MODULE_FLAGS.duyurular || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && DUYURULAR_PREVIEW)
+
+// Ehliyet before go-live: dev bundles and ADA Preview open the real screen; the flag stays off, so
+// production shows no tile and no screen (no Coming Soon, no waitlist; preflight (c) keeps a
+// production publish off the Preview config). The seed row is inactive and the tables are not
+// applied yet, so RLS returns nothing: the screen reads a fixture there (constants/ehliyet.js).
+// Set EHLIYET_PREVIEW to false if ADA Preview must stop showing it.
+const EHLIYET_PREVIEW = true
+export const EHLIYET = MODULE_FLAGS.ehliyet || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && EHLIYET_PREVIEW)

@@ -251,5 +251,5 @@ export const MIN_ALWAYS_ELIGIBLE = [...UNGATED_MODULES].filter(id => !HIDDEN_TIL
 export const SLOT_LABEL_PX = 10
 export const SLOT_LABEL_MIN_PX = LABEL_MIN_PX
 export const SLOT_LABEL_FIT = {
-  Russian: { accommodation: 8.5 },
+  Russian: { accommodation: 8.5, ehliyet: 9 },
 }
