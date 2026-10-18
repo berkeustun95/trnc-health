@@ -1,9 +1,8 @@
 // The Home strip slider: slide 1 = the ladder (lead), slides 2..n = one per eatery partner.
-//   node scripts/test-strip-slides.mjs
+//   node scripts/test-strip-slides.mjs            (--regen: rewrite the lead snapshot, a REVIEWED act, see below)
 // Runs the REAL resolver + assembler; only lib/supabase.js and AsyncStorage are stubbed (loader hook below).
 import { register } from 'node:module'
-import { readFileSync, writeFileSync, rmSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,6 +24,7 @@ export async function load(url, ctx, next) {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const { resolveStripSlides, resolveStripItem } = await import('../utils/homeStripResolver.js')
 const { assembleStripSlides, nextStripRotation } = await import('../utils/stripSlides.js')
+const { promosAllowed } = await import('../constants/homeStrip.js')
 
 let bad = 0
 const t = (name, got, want) => {
@@ -42,43 +42,54 @@ function stubDb(rows) {
   globalThis.__sbTable = tbl => (tbl === 'home_strip_pin' ? pinChain : emptyChain())
 }
 
-// ─── the baseline: main's resolver as it was at 91be473 (before the slider), eatery gate OFF ──────────────
-// Written next to the real one so its relative imports resolve, patched only where the slider removed an
-// export, and deleted again. If this commit is not in the clone the check fails: an unchecked lead is not a pass.
-const BASE_REF = '91be473'
-const baseFile = resolve(ROOT, 'utils/__baseline_resolver.tmp.js')
-let baseSrc
-try { baseSrc = execFileSync('git', ['show', `${BASE_REF}:utils/homeStripResolver.js`], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) }
-catch (e) { console.log(`FAIL: cannot read ${BASE_REF}:utils/homeStripResolver.js from git (${e.message.split('\n')[0]}) — the byte-for-byte lead comparison cannot run`); process.exit(1) }
-const stubImport = "import { sponsoredEateryItem } from '../constants/eatery.js'"
-if (!baseSrc.includes(stubImport)) { console.log('FAIL: baseline import anchor not found'); process.exit(1) }
-writeFileSync(baseFile, baseSrc.replace(stubImport, 'const sponsoredEateryItem = () => { throw new Error("baseline eatery card reached") }'))
-let baseline
-try { baseline = await import('../utils/__baseline_resolver.tmp.js') } finally { rmSync(baseFile, { force: true }) }
-
+// ─── the lead snapshot ──────────────────────────────────────────────────────────────────────────────────
+// scripts/fixtures/strip-lead-baseline.json = the ladder's output (slide 1) over SCENARIOS. It was generated
+// once from main's resolver at 91be473 (before the slider) with the eatery card off.
+// ⚠ `--regen` rewrites it from the CURRENT resolver. Regen is a REVIEWED act for an intentional ladder change
+//   (read the fixture diff in the PR); it is never a way to make a red test pass.
+const SNAP = resolve(ROOT, 'scripts/fixtures/strip-lead-baseline.json')
 const SCENARIOS = []
 for (const rows of [[], [dbPromo], [todayPin], [dbPromo, todayPin], 'throw'])
   for (const lastKind of [null, 'promo', 'event'])
     for (const promosEligible of [true, false])
-      for (const dismissed of [null, new Set(['db-promo-1'])])
+      for (const dismissed of [null, ['db-promo-1']])
         SCENARIOS.push({ rows, lastKind, promosEligible, dismissed })
+const optsOf = sc => ({ lang: 'Turkish', now: NOW, upcoming: true, promosEligible: sc.promosEligible, dismissedIds: sc.dismissed && new Set(sc.dismissed) })
+const arm = sc => { globalThis.__lastKind = sc.lastKind; stubDb(sc.rows) }
 
-console.log(`lead == main's ladder with the eatery card removed (${SCENARIOS.length} scenarios, baseline ${BASE_REF})`)
-let leadDiffs = 0, leadCompared = 0
-for (const sc of SCENARIOS) {
-  globalThis.__lastKind = sc.lastKind; stubDb(sc.rows)
-  const o = { lang: 'Turkish', now: NOW, upcoming: true, promosEligible: sc.promosEligible, dismissedIds: sc.dismissed }
-  const want = JSON.stringify(await baseline.resolveStripItem({ ...o, eateryGate: false }))
-  const got = JSON.stringify((await resolveStripSlides({ ...o, partners: [], gates: {}, rotation: 0 }))[0])
-  const viaItem = JSON.stringify(await resolveStripItem(o))
-  leadCompared++
-  if (got !== want || viaItem !== want) { leadDiffs++; console.log(`  ✗ ${JSON.stringify({ ...sc, dismissed: sc.dismissed && [...sc.dismissed] })}\n     base ${want}\n     new  ${got}`) }
+if (process.argv.includes('--regen')) {
+  const out = []
+  for (const sc of SCENARIOS) { arm(sc); out.push({ ...sc, lead: await resolveStripItem(optsOf(sc)) }) }
+  mkdirSync(dirname(SNAP), { recursive: true })
+  writeFileSync(SNAP, JSON.stringify(out, null, 1) + '\n')
+  console.log(`regenerated ${SNAP} (${out.length} scenarios) from the CURRENT resolver — review the diff`)
+  process.exit(0)
 }
-t('lead differs from baseline in 0 scenarios', leadDiffs, 0)
-t('scenarios actually compared', leadCompared, SCENARIOS.length)
-t('the matrix exercises a promo, a today pin and the generic card',
-  [...new Set(await Promise.all([[dbPromo], [todayPin], []].map(async rows => { globalThis.__lastKind = null; stubDb(rows); return (await resolveStripSlides({ lang: 'Turkish', now: NOW, promosEligible: true, partners: [], gates: {}, rotation: 0 }))[0].id })))],
-  ['db-promo-1', 'db-today', 'generic'])
+
+let snap
+try { snap = JSON.parse(readFileSync(SNAP, 'utf8')) } catch (e) { console.log(`FAIL: cannot read ${SNAP} (${e.message})`); process.exit(1) }
+console.log(`lead == the committed snapshot of main's ladder with the eatery card removed (${SCENARIOS.length} scenarios)`)
+t(`snapshot has one entry per scenario with the same inputs (${snap.length}/${SCENARIOS.length})`, JSON.stringify(snap.map(({ lead, ...inp }) => inp)) === JSON.stringify(SCENARIOS), true)
+let leadDiffs = 0
+for (const [i, sc] of SCENARIOS.entries()) {
+  arm(sc)
+  const want = JSON.stringify(snap[i]?.lead)
+  const got = JSON.stringify((await resolveStripSlides({ ...optsOf(sc), partners: [], gates: {}, rotation: 0 }))[0])
+  arm(sc)
+  const viaItem = JSON.stringify(await resolveStripItem(optsOf(sc)))
+  if (got !== want || viaItem !== want) { leadDiffs++; console.log(`  ✗ ${JSON.stringify(sc)}\n     snap ${want}\n     new  ${got}`) }
+}
+t('lead differs from the snapshot in 0 scenarios', leadDiffs, 0)
+t('the snapshot exercises a promo, a today pin and the generic card', [...new Set(snap.map(e => e.lead.id))].sort(), ['db-promo-1', 'db-today', 'generic'])
+
+console.log('promo gate (promosAllowed feeds promosEligible; Play mixed-audience rule)')
+const elig = p => promosAllowed(p, NOW)
+t('guest -> not eligible', elig({ isGuest: true, dateOfBirth: '1990-01-01' }), false)
+t('null DOB -> not eligible', elig({ isGuest: false, dateOfBirth: null }), false)
+t('under 18 -> not eligible', elig({ isGuest: false, dateOfBirth: '2012-01-01' }), false)
+t('adult -> eligible', elig({ isGuest: false, dateOfBirth: '1990-01-01' }), true)
+t('day before the 18th birthday -> not eligible', elig({ isGuest: false, dateOfBirth: '2008-10-19' }), false)
+t('the 18th birthday itself -> eligible', elig({ isGuest: false, dateOfBirth: '2008-10-18' }), true)
 
 const P = (slug, name, extra = {}) => ({ slug, name, sort_order: 0, logo_path: `${slug}/logo.png`, ...extra })
 const A = P('a-cafe', 'Alpha'), B = P('b-bar', 'Bravo', { placeholder: true }), C = P('c-bake', 'Charlie')
