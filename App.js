@@ -33,7 +33,7 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
-import { REDESIGN, CHECKINS, DUYURULAR } from './constants/redesign'
+import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
@@ -79,6 +79,7 @@ import InsuranceScreen from './screens/InsuranceScreen'
 import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
 import TowingScreen from './screens/TowingScreen'
+import EhliyetScreen from './screens/EhliyetScreen'
 import EsimScreen from './screens/EsimScreen'
 import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
 import ConnectivityOperatorScreen from './screens/ConnectivityOperatorScreen'
@@ -646,6 +647,7 @@ export default function App() {
   const [showGrooming, setShowGrooming] = useState(false)
   const [showGarages, setShowGarages] = useState(false)
   const [showTowing, setShowTowing] = useState(false)
+  const [showEhliyet, setShowEhliyet] = useState(false)
   const [showStudentHub, setShowStudentHub] = useState(false)
   // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
   // by the screen rather than here, so a tap that arrives before the hub mounts is not lost.
@@ -1082,6 +1084,7 @@ export default function App() {
       if (showGrooming) { if (groomingBackRef.current?.()) return true; setShowGrooming(false); return true }
       // Towing before Garages: Garages opens it on top of itself (slice 10).
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
+      if (showEhliyet) { setShowEhliyet(false); return true }
       if (showGarages) { if (garagesBackRef.current?.()) return true; setShowGarages(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
@@ -1118,7 +1121,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2468,6 +2471,9 @@ export default function App() {
     content = (MODULE_FLAGS.towing || isAdmin)
       ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />
+  } else if (showEhliyet && EHLIYET) {
+    // Dark module: no ComingSoon fallback (no waitlist). EHLIYET is true only when the flag is live or on dev / ADA Preview.
+    content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.
@@ -2576,6 +2582,7 @@ export default function App() {
             onShowGrooming={() => setShowGrooming(true)}
             onShowGarages={() => setShowGarages(true)}
             onShowTowing={() => setShowTowing(true)}
+            onShowEhliyet={() => setShowEhliyet(true)}
             garagesTileVisible={GARAGES_LIVE || profile?.role === 'admin' || ownsGarage}
             onShowStudentHub={() => setShowStudentHub(true)}
             onShowEsim={() => setShowEsim(true)}
@@ -2818,7 +2825,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -2847,7 +2854,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)

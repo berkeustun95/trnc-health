@@ -18,7 +18,7 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { REDESIGN, DUYURULAR } from '../constants/redesign'
+import { REDESIGN, DUYURULAR, EHLIYET } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'
@@ -161,6 +161,9 @@ let homeState = null
 
 // The one module a score editor may see before LIVE_SCORES_LIVE flips. Module scope: one Set, not one per render.
 const TESTER_UNLOCK = new Set(['liveScores'])
+// Ehliyet is dark (MODULE_FLAGS.ehliyet): dev and ADA Preview see its tile through the same Set (constants/redesign.js EHLIYET).
+const EHLIYET_UNLOCK = new Set(['ehliyet'])
+const TESTER_EHLIYET_UNLOCK = new Set(['liveScores', 'ehliyet'])
 
 export default function HomeScreen({
   // ─── Profile-gate props (Slice 2). All three DEFAULT to today's behaviour, so the
@@ -221,6 +224,7 @@ export default function HomeScreen({
   onShowGarages,
   garagesTileVisible,
   onShowTowing,
+  onShowEhliyet,
   onShowEsim,
   onShowEmergency,
   onShowMunicipal,
@@ -561,6 +565,7 @@ export default function HomeScreen({
     grooming:           onShowGrooming,
     garages:            onShowGarages,
     towing:             onShowTowing,
+    ehliyet:            onShowEhliyet,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
     studentHub:         onShowStudentHub,
@@ -983,7 +988,7 @@ export default function HomeScreen({
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
 
             <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} />
+            <ServicePanels lang={lang} onPress={openModule} unlocked={EHLIYET ? (liveScoresTester ? TESTER_EHLIYET_UNLOCK : EHLIYET_UNLOCK) : (liveScoresTester ? TESTER_UNLOCK : undefined)} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}
