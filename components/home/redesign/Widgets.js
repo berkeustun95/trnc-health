@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
@@ -157,8 +157,13 @@ function eventChip(startsAt, lang) {
   return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
 }
 
+// H1 is Berke's call: false = the Home sponsor card always shows the ADA frame + logo, never the partner photo.
+const SPONSOR_CARD_USES_PHOTO = true
+
 export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
   const kind = item?.kind
+  const [failedPhoto, setFailedPhoto] = useState(null)
+  const [bandH, setBandH] = useState(0)
   useEffect(() => { if (!loading && kind) rememberStripKind(kind) }, [loading, kind])
   if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
   if (!item) return null
@@ -166,26 +171,31 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
   const isEvent = item.kind === 'event' && !item.generic
   const chip = isEvent && item.startsAt ? eventChip(item.startsAt, lang) : null
   const time = chip ? chip.text : isEvent && item.subtitle ? item.subtitle : null
+  const sponsorSub = item.eaterySlug && item.subtitle ? item.subtitle : null
+  const photoUri = item.eaterySlug && !SPONSOR_CARD_USES_PHOTO ? null : item.imageUrl
+  const showFrame = !!item.eaterySlug && (!photoUri || failedPhoto === photoUri)
   const tag = item.sponsored ? t('stripSponsored', lang) : item.soon ? t('stripStartingSoon', lang) : null
   const fallback = (item.kind === 'notice' && NOTICE_FALLBACK[item.action?.route]) || EVENTS_IMAGE
   return (
     <View>
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
-        accessibilityLabel={[title, time, tag].filter(Boolean).join(', ')} style={s.banner}>
-        {item.eaterySlug && !item.imageUrl ? (
-          // A sponsor never borrows the events picture: ADA-theme frame, the partner's logo when it has one.
-          <View style={s.sponsorFrame}>
+        accessibilityLabel={[title, sponsorSub, time, tag].filter(Boolean).join(', ')} style={s.banner}>
+        {showFrame ? (
+          // A sponsor never borrows the events picture: ADA-theme frame (also the fallback for a photo
+          // that fails to load). Padded by the MEASURED band height, so the logo can never meet the band.
+          <View style={[s.sponsorFrame, { paddingTop: bandH + 6 }]}>
             {item.eateryLogoUri
               ? <RemoteImage source={{ uri: item.eateryLogoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
-              : <Ionicons name={item.icon || 'restaurant-outline'} size={44} color={category.explore.ink} />}
+              : <Ionicons name={item.icon || 'restaurant-outline'} size={40} color={category.explore.ink} />}
           </View>
         ) : (
-          <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
+          <RemoteImage source={photoUri ? { uri: photoUri } : fallback} style={s.bannerPhoto} resizeMode="cover"
+            onError={item.eaterySlug ? () => setFailedPhoto(photoUri) : undefined} />
         )}
-        {!!item.eateryPlaceholder && <PlaceholderTag lang={lang} style={s.placeholderTag} />}
         {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
-        <View style={[s.bannerBand, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
+        <View onLayout={e => setBandH(Math.ceil(e.nativeEvent.layout.height))}
+          style={[s.bannerBand, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
           {(!!time || !!tag) && (
             <View style={s.bandMeta}>
               {!!time && (
@@ -195,12 +205,14 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
                 </>
               )}
               {!!tag && <View style={s.tag}><Text style={s.tagText} numberOfLines={1}>{tag}</Text></View>}
+              {!!item.eateryPlaceholder && <PlaceholderTag lang={lang} lines={1} style={s.placeholderTag} />}
             </View>
           )}
           <View style={s.bandTitleRow}>
             <Text style={s.bannerTitle} numberOfLines={2}>{title}</Text>
             <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </View>
+          {!!sponsorSub && <Text style={s.sponsorSub} numberOfLines={1}>{sponsorSub}</Text>}
         </View>
       </TouchableOpacity>
       {item.kind === 'notice' && !!onDismiss && (
@@ -229,9 +241,10 @@ const s = StyleSheet.create({
 
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
   sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: category.explore.bg,
-                  alignItems: 'center', justifyContent: 'center', paddingTop: 52 },
-  sponsorLogo: { width: 120, height: 64 },
-  placeholderTag: { position: 'absolute', left: 10, right: 10, bottom: 10 },
+                  alignItems: 'center', justifyContent: 'center', paddingBottom: 8 },
+  sponsorLogo: { width: 140, flex: 1 },
+  sponsorSub:  { ...type.meta, color: '#FFFFFF' },
+  placeholderTag: { marginLeft: 6, flexShrink: 1 },
   bannerPhoto: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   timeText:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1 },
   tag:         { marginLeft: 6, backgroundColor: 'rgba(255,255,255,0.22)',
