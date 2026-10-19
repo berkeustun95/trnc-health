@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       actions: read       # duyurular:health reads duyurular-fetch's own runs (question 5)
+      checks: read        # …and the latest run's annotations: "chain completed via AIA" notices (info only)
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
