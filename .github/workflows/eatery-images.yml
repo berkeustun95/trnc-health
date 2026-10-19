@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
       replace:
-        description: 'Allow overwriting a DIFFERENT file at an existing path / changing logo_path'
+        description: 'Allow overwriting a DIFFERENT file at an existing path / changing logo_path / a dish photo_path'
         type: boolean
         default: false
 
@@ -75,7 +75,7 @@ jobs:
             const r = JSON.parse(require('fs').readFileSync('eatery-images-report.json', 'utf8'))
             const p = r.plan, c = a => p ? p.uploads.filter(u => u.action === a).length : 0
             console.log(p
-              ? 'eatery-images dry ' + r.slug + ': uploads ' + c('upload') + ' / skips ' + c('skip-identical') + ' / replaces ' + c('replace') + ' / rows ' + p.inserts.length + ' insert + ' + p.updates.length + ' update / logo ' + p.logo.action + ' / problems ' + r.problems.length
+              ? 'eatery-images dry ' + r.slug + ': uploads ' + c('upload') + ' / skips ' + c('skip-identical') + ' / replaces ' + c('replace') + ' / rows ' + p.inserts.length + ' insert + ' + p.updates.length + ' update / logo ' + p.logo.action + ' / dish rows set ' + (p.dishes || []).filter(d => d.row === 'set').length + ' keep ' + (p.dishes || []).filter(d => d.row === 'keep').length + ' / problems ' + r.problems.length
               : 'eatery-images dry ' + r.slug + ': refused, problems ' + r.problems.length)
           " >> "$GITHUB_STEP_SUMMARY"
       - name: Report
