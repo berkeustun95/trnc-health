@@ -12,7 +12,7 @@ import { X509Certificate } from 'node:crypto'
 import tls from 'node:tls'
 import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256, LE_YR1_PEM, LE_YR1_SHA256, ISRG_ROOT_YR_BY_X1_PEM, ISRG_ROOT_YR_BY_X1_SHA256 } from './lib/ca.mjs'
 import { PARSERS } from './lib/parsers.mjs'
-import { errorClass, systemicFailure } from './lib/runhealth.mjs'
+import { errorClass, systemicFailure, withTimeoutRetry, isCertError } from './lib/runhealth.mjs'
 
 export async function runSelftest() {
   let bad = 0
@@ -152,6 +152,22 @@ export async function runSelftest() {
   t('3 newly failing of 61 → ok', systemicFailure(run(0, 3, 58), prev, 6).red, false)
   t('every source dead for hours → red (nothing answered)', systemicFailure(run(61, 0, 0), prev, 6).red, true)
   t('everything not_due → ok', systemicFailure([{ key: 'h0', status: 'not_due' }], prev, 6).red, false)
+
+  console.log('Timeout retry (2026-10-19: 27 sources timed out in one 85 s blip)')
+  const fail = cls => ({ status: 'failed', error_class: cls, kept: 0 })
+  const retryRun = async (...outcomes) => {
+    let calls = 0, pauses = 0
+    const r = await withTimeoutRetry(async () => ({ ...outcomes[Math.min(calls++, outcomes.length - 1)] }), async () => { pauses++ })
+    return { status: r.status, retried: !!r.retried, calls, pauses }
+  }
+  t('timeout, then ok → recovered after one pause', await retryRun(fail('timeout'), { status: 'ok', kept: 3 }), { status: 'ok', retried: true, calls: 2, pauses: 1 })
+  t('timeout twice → failed, exactly one retry', await retryRun(fail('timeout'), fail('timeout'), { status: 'ok' }), { status: 'failed', retried: true, calls: 2, pauses: 1 })
+  t('certificate error → no retry', await retryRun(fail('UNABLE_TO_VERIFY_LEAF_SIGNATURE'), { status: 'ok' }), { status: 'failed', retried: false, calls: 1, pauses: 0 })
+  t('HTTP 503 → no retry', await retryRun(fail('HTTP 503'), { status: 'ok' }), { status: 'failed', retried: false, calls: 1, pauses: 0 })
+  t('timeout after items were claimed → no retry', await retryRun({ ...fail('timeout'), kept: 4 }, { status: 'ok' }), { status: 'failed', retried: false, calls: 1, pauses: 0 })
+  t('ok → one call', await retryRun({ status: 'ok' }), { status: 'ok', retried: false, calls: 1, pauses: 0 })
+  t('request retry skips a cert error', isCertError(fetchFailed('UNABLE_TO_VERIFY_LEAF_SIGNATURE')), true)
+  t('…but not a reset', isCertError(fetchFailed('ECONNRESET')), false)
 
   console.log(bad ? `\n✗ ${bad} self-test failure(s).` : '\n✓ self-test clean.')
   return bad ? 1 : 0
