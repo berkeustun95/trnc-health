@@ -13,9 +13,10 @@ import { RemoteImage } from './ui'
 export const eateryImageUrl = path =>
   path ? supabase.storage.from(EATERY_BUCKET).getPublicUrl(path).data.publicUrl : null
 
-// Marks anything built from the Preview fixture. Never shown for a real database row.
-export function PlaceholderTag({ lang, style, lines = 2, short = false }) {
-  const full = t('eateryPlaceholderTag', lang)
+// Marks anything built from the Preview fixture (default label), or a real but inactive row only the previewer can read
+// (labelKey 'eateryUnpublishedTag'). Never shown for a live row.
+export function PlaceholderTag({ lang, style, lines = 2, short = false, labelKey = 'eateryPlaceholderTag' }) {
+  const full = t(labelKey, lang)
   if (short) {
     // First word only ("ÖRNEK"): the thumbnail is a fixed 64pt, so the label is fixed-size and shrinks to fit, never clipped mid-word.
     const word = full.split(' — ')[0].split(' ')[0]

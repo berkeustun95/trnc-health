@@ -214,6 +214,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
               )}
               {!!tag && <View style={[s.tag, showFrame && s.tagOnTeal]}><Text style={s.tagText} numberOfLines={1} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{tag}</Text></View>}
               {!!item.placeholder && <PlaceholderTag lang={lang} lines={1} style={s.placeholderTag} />}
+              {!!item.unpublished && <PlaceholderTag lang={lang} lines={1} labelKey="eateryUnpublishedTag" style={s.placeholderTag} />}
             </View>
           )}
           <View style={s.bandTitleRow}>

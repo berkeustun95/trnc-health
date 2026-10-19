@@ -17,7 +17,7 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // The table cannot legitimately be empty while the section is live: zero rows is an ERROR STATE.
 // utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
-const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, ' +
+const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, ' +
   'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height), ' +
   'eatery_photos(id, kind, storage_path, width, height, sort_order)'
 
@@ -47,6 +47,7 @@ function PartnerCard({ partner, lang, onPress }) {
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
       </View>
       {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tag} />}
+      {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
     </Card>
   )
 }
