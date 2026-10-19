@@ -52,12 +52,15 @@ const THUMB = 64
 // calls onFail and the row drops back to text-only. A Preview fixture dish draws the labelled frame.
 function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
   const uri = eateryImageUrl(item.photoPath)
+  const [loaded, setLoaded] = useState(false)
+  const ready = !uri || loaded   // opens only once the image is on screen: the viewer never starts on an unloaded file
   return (
-    <Pressable style={({ pressed }) => [s.thumb, pressed && { opacity: press.small }]} onPress={onOpen}
-      accessibilityRole="button" accessibilityLabel={t('eateryDishPhotoOpen', lang).replace('{name}', name)}>
+    <Pressable style={({ pressed }) => [s.thumb, pressed && { opacity: press.small }]} onPress={ready ? onOpen : undefined}
+      accessibilityRole="button" accessibilityState={{ disabled: !ready }}
+      accessibilityLabel={t('eateryDishPhotoOpen', lang).replace('{name}', () => name)}>
       {uri
         ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor={colors.soft}
-            onError={onFail} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
+            onLoad={() => setLoaded(true)} onError={onFail} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
         : <PlaceholderFrame lang={lang} compact style={s.fill} />}
     </Pressable>
   )
@@ -65,13 +68,12 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-function MenuItemRow({ item, lang, reduce, onOpenPhoto }) {
-  const [failed, setFailed] = useState(false)
+function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   return (
     <View style={s.itemRow}>
-      {hasPhoto && <DishThumb item={item} name={item.name} lang={lang} reduce={reduce} onOpen={() => onOpenPhoto(item)} onFail={() => setFailed(true)} />}
+      {hasPhoto && <DishThumb item={item} name={item.name} lang={lang} reduce={reduce} onOpen={() => onOpenPhoto(item)} onFail={() => onFail(item.id)} />}
       <View style={s.itemText}>
         <Text style={s.itemName}>{item.name}</Text>
         {!!item.description && <Text style={s.itemDesc}>{item.description}</Text>}
@@ -93,7 +95,7 @@ function useReduceMotion() {
   return on
 }
 
-function DishPhotoViewer({ item, lang, reduce, onClose }) {
+function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const uri = item ? eateryImageUrl(item.photoPath) : null
@@ -113,7 +115,7 @@ function DishPhotoViewer({ item, lang, reduce, onClose }) {
           </View>
           <View style={s.viewerImg}>
             {uri
-              ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor="transparent" transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
+              ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor="transparent" onError={() => { onFail(item.id); onClose() }} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
               : <PlaceholderFrame lang={lang} style={{ width: winW - 32, aspectRatio: item.aspect || 4 / 3, borderRadius: radii.card }} />}
           </View>
           <View style={s.caption}>
@@ -128,6 +130,8 @@ function DishPhotoViewer({ item, lang, reduce, onClose }) {
 
 export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null }) {
   const [viewing, setViewing] = useState(null)
+  const [failedDishes, setFailedDishes] = useState({})
+  const failDish = id => setFailedDishes(f => ({ ...f, [id]: true }))
   const reduce = useReduceMotion()
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
@@ -190,7 +194,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
             {sections.map(sec => (
               <View key={sec.title} style={s.menuSec}>
                 <Text style={s.secTitle}>{sec.title}</Text>
-                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} onOpenPhoto={setViewing} />)}
+                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing} />)}
               </View>
             ))}
             {menuPhotos.length > 0 && (
@@ -233,7 +237,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         )}
 
       </ScrollView>
-      <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onClose={() => setViewing(null)} />
+      <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>
   )
 }
