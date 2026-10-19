@@ -7,7 +7,8 @@
 
 import tls from 'node:tls'
 import { RAPIDSSL_G1_PEM, LE_YR1_PEM, ISRG_ROOT_YR_BY_X1_PEM } from './ca.mjs'
-import { isCertError } from './runhealth.mjs'
+import { isCertError, isMissingIssuer } from './runhealth.mjs'
+import { completeChainFor } from './aia.mjs'
 
 // mtod.mebnet.net and iod.mebnet.net serve their leaf certificate without the intermediate
 // (openssl: "unable to verify the first certificate", 2026-10-10). Browsers and macOS curl fetch
@@ -16,6 +17,7 @@ import { isCertError } from './runhealth.mjs'
 // the chain. The *.gov.ct.tr hosts did the same with Let's Encrypt YR1 (2026-10-18): YR1 plus
 // ISRG Root YR cross-signed by ISRG Root X1 (details in ca.mjs). Verification stays ON; every
 // added chain ends at a root already in the store, so nothing is trusted that it would not trust.
+// These are the fast path; an issuer they lack is fetched via AIA once per host (lib/aia.mjs).
 tls.setDefaultCACertificates([...tls.getCACertificates('default'), RAPIDSSL_G1_PEM, LE_YR1_PEM, ISRG_ROOT_YR_BY_X1_PEM])
 
 export const USER_AGENT = 'ADA-Duyurular/1.0 (+https://getadaapp.com/support)'
@@ -143,8 +145,12 @@ export async function politeFetch(url, { kind = 'listing', etag, lastModified, p
       let res
       try { res = await rawFetch(url, headers, pdf ? MAX_PDF : MAX_HTML) }
       catch (e) {
-        if (/too large/.test(e.message) || isCertError(e)) throw e
-        await sleep(h.delayS * 1000)
+        if (/too large/.test(e.message)) throw e
+        // On AIA failure the ORIGINAL error is rethrown: its class is what daily-health groups
+        // into "certificate change on <domain>".
+        if (isMissingIssuer(e)) { if (!(await completeChainFor(host.split(':')[0]))) throw e }
+        else if (isCertError(e)) throw e
+        else await sleep(h.delayS * 1000)
         res = await rawFetch(url, headers, pdf ? MAX_PDF : MAX_HTML)
       }
       if (json && res.status === 200) res.json = JSON.parse(res.text)
