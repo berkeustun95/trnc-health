@@ -3914,9 +3914,9 @@ WITH report AS (
                           AND p.menu_verified_on IS NOT NULL
                           AND EXISTS (SELECT 1 FROM public.eatery_menu_items i WHERE i.partner_id = p.id)
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
-    UNION ALL SELECT '20261118_crunchy_express_maps_url','crunchy-express maps_url is an https Google Maps link, once 1118 is applied',
+    UNION ALL SELECT '20261118_crunchy_express_maps_url','crunchy-express maps_url = Google Maps directions to its pin 35.179003,33.357450, once 1118 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261118_crunchy_express_maps_url.sql')
-      OR COALESCE((SELECT p.maps_url LIKE 'https://www.google.com/maps/%' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+      OR COALESCE((SELECT p.maps_url IS NOT DISTINCT FROM 'https://www.google.com/maps/dir/?api=1&destination=35.179003,33.357450' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
     -- ── 1113: connectivity_links (the eSIM landing's tile + support URLs) ──────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object.
     UNION ALL SELECT '1113_connectivity_links','connectivity_links.is_active DEFAULT false',
