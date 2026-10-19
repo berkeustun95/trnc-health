@@ -261,7 +261,9 @@ BEGIN
     -- under test is the only thing that can fire and no case inherits another's state.
     FOR c IN SELECT * FROM (VALUES
       ('path with ../',            'photo_path = ''../x.png''',                    'photo_path = ''zz-on/dish-2.jpg'''),
-      ('uppercase path',           'photo_path = ''zz-on/Dish.JPG''',              'photo_path = ''zz-on/dish-2.jpg'''),
+      ('uppercase folder',         'photo_path = ''Zz-on/dish-2.jpg''',            'photo_path = ''zz-on/dish-2.jpg'''),
+      ('uppercase stem, lowercase extension', 'photo_path = ''zz-on/Dish.jpg''',   'photo_path = ''zz-on/dish-2.jpg'''),
+      ('uppercase extension',      'photo_path = ''zz-on/dish-2.JPG''',            'photo_path = ''zz-on/dish-2.jpg'''),
       ('path with a scheme',       'photo_path = ''https://x.example/a.jpg''',     'photo_path = ''zz-on/dish-2.webp'''),
       ('path with a bad extension','photo_path = ''zz-on/dish-2.gif''',           'photo_path = ''zz-on/dish-2.png'''),
       ('size without a path',      'photo_width = 100, photo_height = 80',         'photo_path = ''zz-on/dish-2.jpg'', photo_width = 100, photo_height = 80'),
@@ -337,7 +339,7 @@ BEGIN
   IF v_anon_u IS DISTINCT FROM 'denied' OR v_auth_u IS DISTINCT FROM 'denied' THEN
     RAISE EXCEPTION 'UPDATE photo_path: anon % / authenticated % (want denied x2)', v_anon_u, v_auth_u; END IF;
   IF v_fail <> '' THEN RAISE EXCEPTION 'constraint cases failed (% run):%', v_cases_run, v_fail; END IF;
-  IF v_cases_run IS DISTINCT FROM 10 THEN RAISE EXCEPTION 'constraint case loop ran % cases (want 10)', v_cases_run; END IF;
+  IF v_cases_run IS DISTINCT FROM 12 THEN RAISE EXCEPTION 'constraint case loop ran % cases (want 12)', v_cases_run; END IF;
   IF v_path_only IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'CONTROL FAILED: a path without a size was %', v_path_only; END IF;
   IF v_clear_path IS DISTINCT FROM 'refused' THEN RAISE EXCEPTION 'clearing photo_path while a size remains was %', v_clear_path; END IF;
   IF v_clear_all IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'CONTROL FAILED: clearing path and size together was %', v_clear_all; END IF;
@@ -382,7 +384,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261116_eatery_dish_photos.sql', 'c4759792506faf4b1988551e8cb2af701792f81ee09f9d3427df57f63a9f26fa')
+VALUES ('20261116_eatery_dish_photos.sql', '55aabb1b3544d33d54b0fe6bfcbe73ed945bd322fed6319f2b393a5caf5fd360')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

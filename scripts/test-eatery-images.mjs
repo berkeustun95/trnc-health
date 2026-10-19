@@ -50,7 +50,7 @@ if (process.argv.includes('--mutants')) {
     ['dish match: unknown key accepted', 'if (hit.length === 0) {', 'if (false) {'],
     ['dish match: ambiguous name accepted', 'if (hit.length > 1) {', 'if (false) {'],
     ['dish match: item mapped twice accepted', 'if (taken.has(item.id))', 'if (false)'],
-    ['dish match: Section > Name form dropped', '`${t(r.section)}${DISH_SEP}${t(r.name)}` === d.key', 'false'],
+    ['dish match: Section > Name form dropped', '`${t(r.section)}${DISH_SEP}${t(r.name)}` === key', 'false'],
     ['dish path wrong prefix', '`${slug}/dish-${item.id}.${d.format}`', '`${slug}/dishes-${item.id}.${d.format}`'],
     ['dish readiness: items not required', 'if (dishCount > 0 && !(menuItems >= 1))', 'if (false)'],
     ['dish plan: different object overwrites silently', "else if (replace) uploads.push({ path: d.path, action: 'replace' })", "else if (true) uploads.push({ path: d.path, action: 'replace' })"],
@@ -58,6 +58,12 @@ if (process.argv.includes('--mutants')) {
     ['dish plan: identical object re-uploaded', "ex.sha256 === d.sha256", 'false'],
     ['apply: rows written despite a failed upload', 'if (failed) return failed', 'if (false) return failed'],
     ['apply: dish update not guarded null-or-equal', 'if (!replace) q = q.or(', 'if (false) q = q.or('],
+    ['apply: dish update loses partner_id scope', ".eq('id', r.id).eq('partner_id', partnerId)", ".eq('id', r.id)"],
+    ['apply: dish guard string changed', 'photo_path.is.null,photo_path.eq.${r.path}', 'photo_path.is.null'],
+    ['dish match: stored name not trimmed', "menuRows.filter(r => t(r.name) === key)", "menuRows.filter(r => String(r.name) === key)"],
+    ['dish match: no NFC normalisation', "const key = d.key.normalize('NFC')", 'const key = d.key'],
+    ['dish match: stored side no NFC', "String(x ?? '').normalize('NFC').trim()", "String(x ?? '').trim()"],
+    ['dish match: ASCII > hint dropped', "key.includes(' > ')", 'false'],
     ['apply: dish update 0 rows not noticed', 'up.data?.length !== 1', 'false'],
   ]
   let bad = 0
@@ -237,6 +243,8 @@ const ROWS = [
   { id: 15, section: 'Sauces', name: 'Garlic Sauce' },
   { id: 16, section: 'Sauces', name: 'Twin' },
   { id: 17, section: 'Sauces', name: 'Twin' },
+  { id: 18, section: 'Soups ', name: 'Plain  ' },
+  { id: 19, section: 'Soups', name: '\u00c7orba' },
 ]
 const dv = dishes => run({ dishes }, drd)
 const dm = dishes => { const v = dv(dishes); return { v, m: L.matchDishes('crunchy-express', v.dishes, ROWS) } }
@@ -271,6 +279,12 @@ check('RED unknown section in qualified form', has(dm({ ['Nope' + SEP + 'Fries']
 check('RED one item mapped twice (plain + qualified)', has(dm({ Fries: 'fries.png', ['Sides' + SEP + 'Fries']: 'burger.jpg' }).m.problems, /same menu item \(id 12\)/))
 check('RED matching lists every problem', dm({ A: 'burger.jpg', B: 'fries.png', Special: 'wrap.jpg' }).m.problems.length === 3)
 check('RED matching problems never echo the item name', !has(dm({ Nonexistent: 'burger.jpg', Special: 'wrap.jpg' }).m.problems, /Nonexistent|Special/))
+check('match: stored name with trailing spaces matches the trimmed key', dm({ Plain: 'burger.jpg' }).m.resolved[0]?.itemId === 18)
+check('match: stored section with trailing space matches the qualified key', dm({ ['Soups' + SEP + 'Plain']: 'burger.jpg' }).m.resolved[0]?.itemId === 18)
+check('match: NFD-typed key matches the NFC row', dm({ ['C\u0327orba'.normalize('NFD')]: 'burger.jpg' }).m.resolved[0]?.itemId === 19)
+check('match: NFD stored name matches an NFC key', L.matchDishes('crunchy-express', dv({ '\u00c7orba': 'burger.jpg' }).dishes, [{ id: 5, section: 'S', name: 'C\u0327orba' }]).resolved[0]?.itemId === 5)
+check('RED ASCII > between section and name: refusal says to use U+203A', has(dm({ 'Sides > Fries': 'fries.png' }).m.problems, /U\+203A/))
+check('no ASCII > hint when the key has none', !has(dm({ Nonexistent: 'burger.jpg' }).m.problems, /U\+203A/))
 check('RED matching against zero menu rows', L.matchDishes('crunchy-express', dv({ Fries: 'fries.png' }).dishes, []).problems.length === 1)
 
 check('readiness: dishes need menu ITEMS, menu_url is not enough', has(L.readiness({ ...P, menu_url: 'https://x.example/m' }, 0, 2), /0 eatery_menu_items rows/))
@@ -307,7 +321,7 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
       }) },
       from: table => ({
         insert: async () => { calls.push(['insert', table]); return { error: null } },
-        update: vals => { const rec = ['update', table, vals]; calls.push(rec); const q = { eq: () => q, or: f => { rec.push(f); return q }, select: async () => ({ data: Array(rowsChanged).fill({ id: 1 }), error: null }), then: res => res({ error: null }) }; return q },
+        update: vals => { const rec = ['update', table, vals]; calls.push(rec); rec.eqs = []; rec.ors = []; const q = { eq: (c, v) => { rec.eqs.push([c, v]); return q }, or: f => { rec.ors.push(f); return q }, select: async () => ({ data: Array(rowsChanged).fill({ id: 1 }), error: null }), then: res => res({ error: null }) }; return q },
       }),
     }
     return sb
@@ -319,7 +333,8 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   const writes = sb => sb.calls.filter(c => c[0] === 'insert' || c[0] === 'update')
   { const sb = mkSb(); const f = await L.applyPlan(base(sb)); const w = writes(sb)
     check('apply: all green -> 0 failures, rows + logo + 2 dish updates written', f === 0 && w.filter(c => c[1] === 'eatery_menu_items').length === 2 && w.some(c => c[1] === 'eatery_photos') && w.some(c => c[1] === 'eatery_partners'), JSON.stringify(w.map(c => c.slice(0, 2))))
-    check('apply: dish update sets photo_path/width/height guarded by null-or-equal', (() => { const c = w.find(x => x[1] === 'eatery_menu_items'); return c[2].photo_path === r[0].path && c[2].photo_width === r[0].width && /photo_path\.is\.null/.test(c[3]) })())
+    check('apply: dish update sets photo_path/width/height guarded by null-or-equal', (() => { const c = w.find(x => x[1] === 'eatery_menu_items'); return c[2].photo_path === r[0].path && c[2].photo_width === r[0].width && c.ors.length === 1 && c.ors[0] === `photo_path.is.null,photo_path.eq.${r[0].path}` })())
+    check('apply: every dish update is scoped by partner_id AND item id', (() => { const u = w.filter(x => x[1] === 'eatery_menu_items'); return u.length === 2 && u.every((c, i) => c.eqs.some(e => e[0] === 'partner_id' && e[1] === 'p') && c.eqs.some(e => e[0] === 'id' && e[1] === p0.updates[i].id)) })())
     check('apply: every upload comes before every row write', sb.calls.findLastIndex(c => c[0] === 'upload') < sb.calls.findIndex(c => c[0] === 'insert' || c[0] === 'update'))
   }
   { const sb = mkSb({ failUpload: r[1].path }); const f = await L.applyPlan(base(sb))
@@ -329,7 +344,7 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
     check('RED atomic: bytes differing after upload writes NO row', f === 1 && writes(sb).length === 0)
   }
   { const sb = mkSb(); const f = await L.applyPlan({ ...base(sb), replace: true })
-    check('apply with replace: no null-or-equal guard on the dish update', f === 0 && writes(sb).filter(c => c[1] === 'eatery_menu_items').every(c => c.length === 3))
+    check('apply with replace: no null-or-equal guard on the dish update', f === 0 && writes(sb).filter(c => c[1] === 'eatery_menu_items').every(c => c.ors.length === 0))
   }
   { const sb = mkSb({ rowsChanged: 0 }); const f = await L.applyPlan(base(sb))
     check('RED a dish update that changed 0 rows is a failure', f === 2)

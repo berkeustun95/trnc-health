@@ -166,14 +166,15 @@ export function validateLocal(slug, manifest, readFile) {
 export function matchDishes(slug, dishes, menuRows) {
   const problems = []
   const resolved = []
-  const t = x => String(x ?? '').trim()
+  const t = x => String(x ?? '').normalize('NFC').trim()
   const taken = new Map()
   for (const d of dishes) {
     const tag = `dish '${d.src}'`
-    const plain = menuRows.filter(r => t(r.name) === d.key)
-    const qualified = menuRows.filter(r => `${t(r.section)}${DISH_SEP}${t(r.name)}` === d.key)
+    const key = d.key.normalize('NFC')
+    const plain = menuRows.filter(r => t(r.name) === key)
+    const qualified = menuRows.filter(r => `${t(r.section)}${DISH_SEP}${t(r.name)}` === key)
     const hit = [...new Map([...plain, ...qualified].map(r => [r.id, r])).values()]
-    if (hit.length === 0) { problems.push(`${tag}: its key matches no menu item of this partner`); continue }
+    if (hit.length === 0) { problems.push(`${tag}: its key matches no menu item of this partner${key.includes(' > ') ? `; use the \u203a character (U+203A) between section and name, not '>'` : ''}`); continue }
     if (hit.length > 1) {
       const sections = new Set(hit.map(r => t(r.section)))
       problems.push(sections.size > 1
