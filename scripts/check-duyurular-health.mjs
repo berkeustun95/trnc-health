@@ -87,6 +87,12 @@ export function verdict({ lastOk, failing, newest, banner, runs = { red: [] }, c
   return problems
 }
 
+// Info, never a problem: the fetcher completed a chain via AIA (lib/aia.mjs) and says so with a
+// ::notice annotation. The fix worked; the nudge is to embed that intermediate in ca.mjs so the
+// next run takes the fast path. Read from the LATEST completed fetch run only.
+export const AIA_TITLE = 'chain completed via AIA'
+export const aiaInfo = annotations => annotations.filter(a => a.annotation_level === 'notice' && a.title === AIA_TITLE).map(a => a.message)
+
 if (process.argv.includes('--self')) {
   const now = Date.parse('2026-10-11T12:00:00Z')
   const ok = { lastOk: '2026-10-11T11:40:00Z', failing: [], newest: '2026-10-10T08:00:00Z', banner: { count: 7 } }
@@ -123,6 +129,9 @@ if (process.argv.includes('--self')) {
   t('3 timeouts → not a certificate change', certGroups(['a.gov.ct.tr', 'b.gov.ct.tr', 'c.gov.ct.tr'].map(h => row(h, 'timeout'))).length, 0)
   t('old last_error without a class → ignored', certGroups([1, 2, 3].map(i => ({ url: `https://s${i}.gov.ct.tr/`, last_error: 'fetch failed' }))).length, 0)
   t('cert group is its own verdict line', verdict({ ...ok, certs: certGroups(gov) }, now).length, 1)
+  const notes = [{ annotation_level: 'notice', title: AIA_TITLE, message: 'khk.gov.ct.tr → YR2' }, { annotation_level: 'warning', title: AIA_TITLE, message: 'x' }, { annotation_level: 'notice', title: 'other', message: 'y' }]
+  t('AIA notice → one info line      ', aiaInfo(notes).join('|'), 'khk.gov.ct.tr → YR2')
+  t('AIA info is not a problem       ', verdict(ok, now).length, 0)
   console.log(bad ? `\nSELF-TEST FAILED (${bad})\n` : '\nself-test clean\n')
   process.exit(bad ? 1 : 0)
 }
@@ -165,6 +174,22 @@ async function fetchRuns() {
 }
 const runs = await fetchRuns()
 
+async function fetchAiaNotes(runId) {
+  const gh = path => fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}${path}`,
+    { headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } })
+  const jr = await gh(`/actions/runs/${runId}/jobs`)
+  if (!jr.ok) return { error: `jobs HTTP ${jr.status}` }
+  const lines = []
+  for (const job of (await jr.json()).jobs || []) {
+    const ar = await gh(`/check-runs/${job.id}/annotations?per_page=100`)
+    if (!ar.ok) return { error: `annotations HTTP ${ar.status}` }
+    lines.push(...aiaInfo(await ar.json()))
+  }
+  return { lines, runId }
+}
+const latestRun = runs.seq?.find(r => r.conclusion === 'success' || r.conclusion === 'failure')
+const aia = latestRun ? await fetchAiaNotes(latestRun.id).catch(e => ({ error: e.message })) : null
+
 const lastOk = srcs.map(s => s.last_ok_at).filter(Boolean).sort().at(-1) ?? null
 const failing = srcs.filter(s => s.consecutive_failures >= FAILING_RUNS).map(s => `${s.key}(${s.consecutive_failures})`)
 const newest = top?.[0]?.created_at ?? null
@@ -183,5 +208,7 @@ console.log(`  banner count (anon) : ${banner.error ? 'UNREADABLE — ' + banner
 const rv = runs.seq ? runVerdict(runs.seq) : null
 console.log(`  red fetch runs ${RED_RUN_WINDOW_H} h  : ${runs.skipped ? 'not checked (no GITHUB_TOKEN)' : runs.error ? 'UNREADABLE — ' + runs.error : `${rv.red.length} of ${runs.total}${rv.red.length ? ' — ' + rv.red.map(r => `${r.id} (${r.conclusion})`).join(', ') : ''}; latest ${runs.seq[0] ? `${runs.seq[0].id} (${runs.seq[0].conclusion})` : 'none'}`}`)
 if (rv?.warning) console.log(`  ⚠ warning: ${rv.warning}`)
+if (aia?.error) console.log(`  ℹ AIA notes unreadable (${aia.error}); info only`)
+for (const l of aia?.lines || []) console.log(`  ℹ chain completed via AIA: ${l} (run ${aia.runId}); embed that intermediate in scripts/duyurular/lib/ca.mjs for the fast path`)
 console.log(`  verdict             : ${problems.length ? 'FAIL\n    - ' + problems.join('\n    - ') : 'ok'}\n`)
 process.exit(problems.length ? 1 : 0)

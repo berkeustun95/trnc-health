@@ -12,7 +12,9 @@ import { X509Certificate } from 'node:crypto'
 import tls from 'node:tls'
 import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256, LE_YR1_PEM, LE_YR1_SHA256, ISRG_ROOT_YR_BY_X1_PEM, ISRG_ROOT_YR_BY_X1_SHA256 } from './lib/ca.mjs'
 import { PARSERS } from './lib/parsers.mjs'
-import { errorClass, systemicFailure, withTimeoutRetry, isCertError } from './lib/runhealth.mjs'
+import { errorClass, systemicFailure, withTimeoutRetry, isCertError, isMissingIssuer } from './lib/runhealth.mjs'
+import { buildChain, fetchIssuer, caIssuerUrls } from './lib/aia.mjs'
+import { GOV_CT_TR_LEAF, ISRG_ROOT_YR_SELF, FORGED_YR1, TEST_ROOT, TEST_NONCA_INTER, TEST_LEAF } from './aia-fixtures.mjs'
 
 export async function runSelftest() {
   let bad = 0
@@ -168,6 +170,44 @@ export async function runSelftest() {
   t('ok → one call', await retryRun({ status: 'ok' }), { status: 'ok', retried: false, calls: 1, pauses: 0 })
   t('request retry skips a cert error', isCertError(fetchFailed('UNABLE_TO_VERIFY_LEAF_SIGNATURE')), true)
   t('…but not a reset', isCertError(fetchFailed('ECONNRESET')), false)
+
+  console.log('AIA chain completion (2026-10-13: gov.ct.tr served a YR1 leaf without its chain)')
+  const X = p => new X509Certificate(p)
+  const leaf = X(GOV_CT_TR_LEAF), gyr1 = X(LE_YR1_PEM), gyrX1 = X(ISRG_ROOT_YR_BY_X1_PEM), rapid = X(RAPIDSSL_G1_PEM), yrSelf = X(ISRG_ROOT_YR_SELF)
+  const anchors = tls.getCACertificates('bundled').map(X)
+  const at = new Date('2026-10-19T12:00:00Z')
+  const served = map => { const got = []; return { got, download: async url => { got.push(url); if (!map[url]) throw new Error('AIA HTTP 404'); return map[url] } } }
+  const chainOf = async (map, opts = {}) => {
+    const s = served(map)
+    try { const r = await buildChain(leaf, { anchors, download: s.download, now: at, ...opts }); return { cns: r.chain.map(c => c.subject.split('\n').pop()), issuer: r.issuer, downloads: s.got.length } }
+    catch (e) { return { error: e.message, downloads: s.got.length } }
+  }
+  const LE = { 'http://yr1.i.lencr.org/': gyr1, 'http://yr.i.lencr.org/': gyrX1 }
+  t('the leaf names its issuer', caIssuerUrls(leaf), ['http://yr1.i.lencr.org/'])
+  t('missing intermediates → completed by download, ends at ISRG X1', await chainOf(LE), { cns: ['CN=YR1', 'CN=Root YR'], issuer: 'YR1', downloads: 2 })
+  t('embedded certs are candidates → no download', await chainOf({}, { extras: [gyr1, gyrX1] }), { cns: ['CN=YR1', 'CN=Root YR'], issuer: 'YR1', downloads: 0 })
+  t('downloaded chain ends at a root Node does not ship → rejected', await chainOf({ ...LE, 'http://yr.i.lencr.org/': yrSelf }), { error: 'AIA untrusted root', downloads: 2 })
+  t('downloaded cert is not the issuer → rejected', await chainOf({ 'http://yr1.i.lencr.org/': rapid }), { error: 'AIA not the issuer', downloads: 1 })
+  t('forged YR1 (right name and key id, wrong key) → rejected', await chainOf({ 'http://yr1.i.lencr.org/': X(FORGED_YR1) }), { error: 'AIA not the issuer', downloads: 1 })
+  const nonCa = async () => { try { await buildChain(X(TEST_LEAF), { anchors: [X(TEST_ROOT)], download: async () => X(TEST_NONCA_INTER), now: at }); return 'accepted' } catch (e) { return e.message } }
+  t('a valid signer that is not a CA → rejected', await nonCa(), 'AIA not the issuer')
+  t('downloaded issuer expired → rejected', await chainOf(LE, { now: new Date('2029-01-01T00:00:00Z') }), { error: 'AIA issuer expired', downloads: 1 })
+  t('a failing AIA URL → clean error', await chainOf({}), { error: 'AIA HTTP 404', downloads: 1 })
+  t('depth is capped', await chainOf(LE, { maxDepth: 1 }), { error: 'AIA chain too long', downloads: 1 })
+  let calls = 0
+  const fake = make => async (url, { signal }) => { calls++; return make(signal) }
+  const body = (bytes, status = 200) => ({ ok: status === 200, status, headers: new Map(), arrayBuffer: async () => bytes })
+  const issuerErr = async (url, make, o = {}) => { calls = 0; try { await fetchIssuer(url, { fetchImpl: fake(make), ...o }); return 'accepted' } catch (e) { return `${e.message} (calls ${calls})` } }
+  t('ldap:// is never requested', await issuerErr('ldap://ldap.example/cn=ca', () => body(gyr1.raw)), 'AIA scheme ldap (calls 0)')
+  t('file:// is never requested', await issuerErr('file:///etc/passwd', () => body(gyr1.raw)), 'AIA scheme file (calls 0)')
+  t('not a URL', await issuerErr('yr1.i.lencr.org', () => body(gyr1.raw)), 'AIA bad url (calls 0)')
+  t('a hanging server times out', await issuerErr('http://slow.example/', s => new Promise((_, rej) => s.addEventListener('abort', () => rej(Object.assign(new Error('aborted'), { name: 'AbortError' })))), { timeoutMs: 50 }), 'AIA timeout (calls 1)')
+  t('a 200 KB body is refused', await issuerErr('http://big.example/', () => body(new Uint8Array(200 * 1024))), 'AIA too large (calls 1)')
+  t('garbage is not a certificate', await issuerErr('http://junk.example/', () => body(Buffer.from('<html>hello</html>'))), 'AIA not a certificate (calls 1)')
+  t('HTTP 404 → clean error', await issuerErr('http://gone.example/', () => body(Buffer.alloc(0), 404)), 'AIA HTTP 404 (calls 1)')
+  t('DER from a real AIA URL parses', await issuerErr('http://yr1.i.lencr.org/', () => body(gyr1.raw)), 'accepted')
+  t('AIA runs for a missing issuer', isMissingIssuer(fetchFailed('UNABLE_TO_VERIFY_LEAF_SIGNATURE')), true)
+  t('…not for an expired certificate', isMissingIssuer(fetchFailed('CERT_HAS_EXPIRED')), false)
 
   console.log(bad ? `\n✗ ${bad} self-test failure(s).` : '\n✓ self-test clean.')
   return bad ? 1 : 0
