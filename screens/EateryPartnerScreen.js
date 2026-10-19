@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { StatusBar } from 'expo-status-bar'
 import { View, Text, ScrollView, Linking, Modal, Pressable, AccessibilityInfo, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,7 +9,7 @@ import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
   eateryOpenStatus, formatPrice,
 } from '../constants/eatery'
-import { colors, font, type, radii, space, listBottomPad, withAlpha } from '../constants/theme'
+import { colors, font, type, radii, space, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
@@ -49,14 +50,14 @@ const THUMB = 64
 
 // A dish photo is partner content: shown as sent (contain), never cropped. A file that fails to load
 // calls onFail and the row drops back to text-only. A Preview fixture dish draws the labelled frame.
-function DishThumb({ item, name, lang, onOpen, onFail }) {
+function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
   const uri = eateryImageUrl(item.photoPath)
   return (
-    <Pressable style={({ pressed }) => [s.thumb, pressed && { opacity: 0.8 }]} onPress={onOpen}
+    <Pressable style={({ pressed }) => [s.thumb, pressed && { opacity: press.small }]} onPress={onOpen}
       accessibilityRole="button" accessibilityLabel={t('eateryDishPhotoOpen', lang).replace('{name}', name)}>
       {uri
         ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor={colors.soft}
-            onError={onFail} accessibilityIgnoresInvertColors />
+            onError={onFail} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
         : <PlaceholderFrame lang={lang} compact style={s.fill} />}
     </Pressable>
   )
@@ -64,13 +65,13 @@ function DishThumb({ item, name, lang, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-function MenuItemRow({ item, lang, onOpenPhoto }) {
+function MenuItemRow({ item, lang, reduce, onOpenPhoto }) {
   const [failed, setFailed] = useState(false)
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   return (
-    <View style={[s.itemRow, hasPhoto && s.itemRowPhoto]}>
-      {hasPhoto && <DishThumb item={item} name={item.name} lang={lang} onOpen={() => onOpenPhoto(item)} onFail={() => setFailed(true)} />}
+    <View style={s.itemRow}>
+      {hasPhoto && <DishThumb item={item} name={item.name} lang={lang} reduce={reduce} onOpen={() => onOpenPhoto(item)} onFail={() => setFailed(true)} />}
       <View style={s.itemText}>
         <Text style={s.itemName}>{item.name}</Text>
         {!!item.description && <Text style={s.itemDesc}>{item.description}</Text>}
@@ -92,8 +93,7 @@ function useReduceMotion() {
   return on
 }
 
-function DishPhotoViewer({ item, lang, onClose }) {
-  const reduce = useReduceMotion()
+function DishPhotoViewer({ item, lang, reduce, onClose }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const uri = item ? eateryImageUrl(item.photoPath) : null
@@ -102,7 +102,9 @@ function DishPhotoViewer({ item, lang, onClose }) {
     <Modal visible={!!item === true} transparent animationType={reduce ? 'none' : 'fade'} onRequestClose={onClose}
       statusBarTranslucent supportedOrientations={['portrait']}>
       {!!item && (
-        <View style={[s.viewer, { paddingTop: insets.top + space[8], paddingBottom: insets.bottom + space[16] }]}>
+        <Pressable style={[s.viewer, { paddingTop: insets.top + space[8], paddingBottom: insets.bottom + space[16] }]}
+          onPress={onClose} accessible={false}>
+          <StatusBar style="light" />
           <View style={s.viewerBar}>
             <Pressable style={s.closeBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}>
               <Ionicons name="close" size={20} color={colors.onPrimary} />
@@ -111,14 +113,14 @@ function DishPhotoViewer({ item, lang, onClose }) {
           </View>
           <View style={s.viewerImg}>
             {uri
-              ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor="transparent" accessibilityIgnoresInvertColors />
+              ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor="transparent" transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
               : <PlaceholderFrame lang={lang} style={{ width: winW - 32, aspectRatio: item.aspect || 4 / 3, borderRadius: radii.card }} />}
           </View>
           <View style={s.caption}>
             <Text style={s.capName}>{item.name}</Text>
             {!!price && <Text style={s.capPrice}>{price}</Text>}
           </View>
-        </View>
+        </Pressable>
       )}
     </Modal>
   )
@@ -126,6 +128,7 @@ function DishPhotoViewer({ item, lang, onClose }) {
 
 export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null }) {
   const [viewing, setViewing] = useState(null)
+  const reduce = useReduceMotion()
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const W = winW - 32
@@ -187,7 +190,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
             {sections.map(sec => (
               <View key={sec.title} style={s.menuSec}>
                 <Text style={s.secTitle}>{sec.title}</Text>
-                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} onOpenPhoto={setViewing} />)}
+                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} onOpenPhoto={setViewing} />)}
               </View>
             ))}
             {menuPhotos.length > 0 && (
@@ -230,7 +233,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         )}
 
       </ScrollView>
-      <DishPhotoViewer item={viewing} lang={lang} onClose={() => setViewing(null)} />
+      <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onClose={() => setViewing(null)} />
     </SafeAreaView>
   )
 }
@@ -270,8 +273,8 @@ const s = StyleSheet.create({
   itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   menuBtn:   { marginTop: space[16] },
   fill:      { width: '100%', height: '100%' },
-  itemRowPhoto: { alignItems: 'center' },
   thumb:     { width: THUMB, height: THUMB, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+  // Neutral black scrim = photo treatment (ada-style §6), not a brand colour: never tint partner food photos.
   viewer:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)' },
   viewerBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: space[16], flexShrink: 0 },
   closeBtn:  { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], paddingHorizontal: space[16], borderRadius: radii.pill, backgroundColor: withAlpha(colors.onPrimary, 0.18) },
