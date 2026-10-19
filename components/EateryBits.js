@@ -14,21 +14,31 @@ export const eateryImageUrl = path =>
   path ? supabase.storage.from(EATERY_BUCKET).getPublicUrl(path).data.publicUrl : null
 
 // Marks anything built from the Preview fixture. Never shown for a real database row.
-export function PlaceholderTag({ lang, style, lines = 2 }) {
+export function PlaceholderTag({ lang, style, lines = 2, short = false }) {
+  const full = t('eateryPlaceholderTag', lang)
+  if (short) {
+    // First word only ("ÖRNEK"): the thumbnail is a fixed 64pt, so the label is fixed-size and shrinks to fit, never clipped mid-word.
+    const word = full.split(' — ')[0].split(' ')[0]
+    return (
+      <View style={[s.tag, style]} accessibilityLabel={full}>
+        <Text style={s.tagText} numberOfLines={1} allowFontScaling={false} adjustsFontSizeToFit minimumFontScale={0.6}>{word}</Text>
+      </View>
+    )
+  }
   return (
     <View style={[s.tag, style]}>
       <Ionicons name="construct-outline" size={12} color={colors.tileInk} />
-      <Text style={s.tagText} numberOfLines={lines}>{t('eateryPlaceholderTag', lang)}</Text>
+      <Text style={s.tagText} numberOfLines={lines}>{full}</Text>
     </View>
   )
 }
 
 // An ADA-theme frame standing in for a file that has not arrived: never a stock image.
-export function PlaceholderFrame({ lang, icon = 'image-outline', style }) {
+export function PlaceholderFrame({ lang, icon = 'image-outline', style, compact = false }) {
   return (
-    <View style={[s.frame, style]}>
-      <Ionicons name={icon} size={30} color={category.explore.ink} />
-      <PlaceholderTag lang={lang} style={s.frameTag} />
+    <View style={[s.frame, compact && s.frameCompact, style]}>
+      <Ionicons name={icon} size={compact ? 18 : 30} color={category.explore.ink} />
+      <PlaceholderTag lang={lang} short={compact} style={[s.frameTag, compact && s.tagCompact]} />
     </View>
   )
 }
@@ -93,6 +103,8 @@ const s = StyleSheet.create({
               borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4 },
   tagText:  { ...type.caption, color: colors.tileInk, flexShrink: 1 },
   frame:    { alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: category.explore.bg, padding: 12 },
+  frameCompact: { gap: 2, padding: 2 },
+  tagCompact: { paddingHorizontal: 4, paddingVertical: 2, gap: 2 },
   frameTag: { alignSelf: 'center' },
   logo:     { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, overflow: 'hidden' },
   fill:     { width: '100%', height: '100%' },
