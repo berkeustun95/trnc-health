@@ -174,7 +174,9 @@ export async function runSelftest() {
   console.log('AIA chain completion (2026-10-13: gov.ct.tr served a YR1 leaf without its chain)')
   const X = p => new X509Certificate(p)
   const leaf = X(GOV_CT_TR_LEAF), gyr1 = X(LE_YR1_PEM), gyrX1 = X(ISRG_ROOT_YR_BY_X1_PEM), rapid = X(RAPIDSSL_G1_PEM), yrSelf = X(ISRG_ROOT_YR_SELF)
-  const anchors = tls.getCACertificates('bundled').map(X)
+  // Root YR is taken out explicitly: the day a Node release ships it, these cases must still
+  // assert "a root that is NOT an anchor is refused", not go red and stop every fetch run.
+  const anchors = tls.getCACertificates('bundled').map(X).filter(a => a.fingerprint256 !== yrSelf.fingerprint256)
   const at = new Date('2026-10-19T12:00:00Z')
   const served = map => { const got = []; return { got, download: async url => { got.push(url); if (!map[url]) throw new Error('AIA HTTP 404'); return map[url] } } }
   const chainOf = async (map, opts = {}) => {

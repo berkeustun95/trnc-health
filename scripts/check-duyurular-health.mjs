@@ -209,6 +209,7 @@ const rv = runs.seq ? runVerdict(runs.seq) : null
 console.log(`  red fetch runs ${RED_RUN_WINDOW_H} h  : ${runs.skipped ? 'not checked (no GITHUB_TOKEN)' : runs.error ? 'UNREADABLE — ' + runs.error : `${rv.red.length} of ${runs.total}${rv.red.length ? ' — ' + rv.red.map(r => `${r.id} (${r.conclusion})`).join(', ') : ''}; latest ${runs.seq[0] ? `${runs.seq[0].id} (${runs.seq[0].conclusion})` : 'none'}`}`)
 if (rv?.warning) console.log(`  ⚠ warning: ${rv.warning}`)
 if (aia?.error) console.log(`  ℹ AIA notes unreadable (${aia.error}); info only`)
+if (aia?.lines && !aia.lines.length) console.log(`  AIA notes (run ${aia.runId}): none`)
 for (const l of aia?.lines || []) console.log(`  ℹ chain completed via AIA: ${l} (run ${aia.runId}); embed that intermediate in scripts/duyurular/lib/ca.mjs for the fast path`)
 console.log(`  verdict             : ${problems.length ? 'FAIL\n    - ' + problems.join('\n    - ') : 'ok'}\n`)
 process.exit(problems.length ? 1 : 0)
