@@ -24,6 +24,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { closingSoonRange } from '../constants/duyurular.js'
+import { CERT_CLASS } from './duyurular/lib/runhealth.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const MAX_FETCH_GAP_H = 2
@@ -36,7 +37,6 @@ export const CERT_GROUP_MIN = 3
 // check said only "13 source(s) failing". When CERT_GROUP_MIN+ failing sources share one TLS
 // error class (the fetcher writes `[CLASS] …` into last_error), name it as a certificate change
 // on their common domain. Output carries the class and the domain only (this log is public).
-const CERT_CLASS = /^(UNABLE_TO_VERIFY_LEAF_SIGNATURE|UNABLE_TO_GET_ISSUER_CERT(_LOCALLY)?|SELF_SIGNED_CERT_IN_CHAIN|DEPTH_ZERO_SELF_SIGNED_CERT|CERT_[A-Z_]+|ERR_TLS_CERT_ALTNAME_INVALID)$/
 const commonSuffix = hosts => {
   const parts = hosts.map(h => h.split('.').reverse())
   const out = []
@@ -58,6 +58,24 @@ export function certGroups(failingRows) {
 }
 const H = 36e5, D = 864e5
 
+// Question 5, red fetch runs (Berke 2026-10-19). Red when the LATEST completed run is red, or when
+// 2+ runs in a row are red; one isolated red run is a warning. Run 39203331829 (27 sources timed
+// out in 85 s, clean runs either side) kept the old "any red in 24 h" rule red for a whole day.
+// `seq` is newest first; a run that is neither green nor red (cancelled, skipped) says nothing
+// and is left out, so red · cancelled · red still counts as two in a row.
+const RED_CONCLUSIONS = ['failure', 'timed_out', 'startup_failure']
+export function runVerdict(seq = []) {
+  const judged = seq.filter(r => r.conclusion === 'success' || RED_CONCLUSIONS.includes(r.conclusion))
+  const isRed = r => RED_CONCLUSIONS.includes(r.conclusion)
+  const label = r => `${r.id} (${r.conclusion})`
+  const red = judged.filter(isRed)
+  if (judged[0] && isRed(judged[0])) return { problem: `latest duyurular-fetch run is red: ${label(judged[0])}`, red }
+  const streak = judged.findIndex((r, i) => i > 0 && isRed(r) && isRed(judged[i - 1]))
+  if (streak > 0) return { problem: `2+ duyurular-fetch runs red in a row: ${label(judged[streak])}, ${label(judged[streak - 1])}`, red }
+  if (red.length) return { warning: `${red.length} isolated red duyurular-fetch run(s) in ${RED_RUN_WINDOW_H} h, latest green: ${red.map(label).join(', ')}`, red }
+  return { red }
+}
+
 export function verdict({ lastOk, failing, newest, banner, runs = { red: [] }, certs = [] }, now = Date.now()) {
   const problems = [...certs]
   if (!lastOk || now - Date.parse(lastOk) > MAX_FETCH_GAP_H * H) problems.push(`no successful fetch in ${MAX_FETCH_GAP_H}+ h (last ${lastOk ?? 'never'})`)
@@ -65,7 +83,7 @@ export function verdict({ lastOk, failing, newest, banner, runs = { red: [] }, c
   if (!newest || now - Date.parse(newest) > MAX_NO_NEW_DAYS * D) problems.push(`no new item in ${MAX_NO_NEW_DAYS}+ days (newest ${newest ?? 'none'})`)
   if (banner.error) problems.push(`banner count unreadable as anon: ${banner.error}`)
   if (runs.error) problems.push(`duyurular-fetch runs unreadable: ${runs.error}`)
-  else if (runs.red?.length) problems.push(`${runs.red.length} red duyurular-fetch run(s) in ${RED_RUN_WINDOW_H} h: ${runs.red.join(', ')}`)
+  else if (runs.seq) { const p = runVerdict(runs.seq).problem; if (p) problems.push(p) }
   return problems
 }
 
@@ -84,10 +102,20 @@ if (process.argv.includes('--self')) {
   t('newest item 3d1h old           ', verdict({ ...ok, newest: '2026-10-08T11:00:00Z' }, now).length, 1)
   t('banner read error              ', verdict({ ...ok, banner: { error: '42501' } }, now).length, 1)
   t('banner count 0 is NOT an error ', verdict({ ...ok, banner: { count: 0 } }, now).length, 0)
-  t('one red fetch run in 24 h      ', verdict({ ...ok, runs: { red: ['39004347106 (failure)'] } }, now).length, 1)
+  const g = id => ({ id, conclusion: 'success' }), x = id => ({ id, conclusion: 'failure' })
+  const blip = [g(39205900740), x(39203331829), g(39201006186)]
+  t('one isolated red run → not red ', verdict({ ...ok, runs: { seq: blip } }, now).length, 0)
+  t('…but it is a warning           ', runVerdict(blip).warning?.startsWith('1 isolated red'), true)
+  t('two red in a row → red         ', verdict({ ...ok, runs: { seq: [g(4), x(3), x(2), g(1)] } }, now).length, 1)
+  t('red · cancelled · red → red    ', verdict({ ...ok, runs: { seq: [g(4), x(3), { id: 9, conclusion: 'cancelled' }, x(2)] } }, now).length, 1)
+  t('latest run red → red           ', verdict({ ...ok, runs: { seq: [x(2), g(1)] } }, now).length, 1)
+  t('latest red AND 2 in a row → 1 line', verdict({ ...ok, runs: { seq: [x(3), x(2), g(1)] } }, now).length, 1)
+  t('two reds apart, latest green → not red', verdict({ ...ok, runs: { seq: [g(5), x(4), g(3), x(2), g(1)] } }, now).length, 0)
+  t('timed_out counts as red        ', verdict({ ...ok, runs: { seq: [{ id: 2, conclusion: 'timed_out' }] } }, now).length, 1)
+  t('latest cancelled, before it red → red', verdict({ ...ok, runs: { seq: [{ id: 3, conclusion: 'cancelled' }, x(2), g(1)] } }, now).length, 1)
   t('fetch runs unreadable          ', verdict({ ...ok, runs: { error: 'HTTP 403' } }, now).length, 1)
   t('no token outside CI = skipped  ', verdict({ ...ok, runs: { skipped: true } }, now).length, 0)
-  t('everything broken at once      ', verdict({ lastOk: null, failing: ['a(9)'], newest: null, banner: { error: 'x' }, runs: { red: ['1 (failure)'] } }, now).length, 5)
+  t('everything broken at once      ', verdict({ lastOk: null, failing: ['a(9)'], newest: null, banner: { error: 'x' }, runs: { seq: [x(1)] } }, now).length, 5)
   const row = (host, cls) => ({ url: `https://${host}/x`, last_error: `[${cls}] fetch failed` })
   const gov = ['khk', 'saglik', 'rkmmd', 'ticaret'].map(h => row(`${h}.gov.ct.tr`, 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'))
   t('4 gov.ct.tr leaf-signature → named', certGroups(gov)[0]?.startsWith('certificate change on gov.ct.tr: 4 sources'), true)
@@ -131,8 +159,9 @@ async function fetchRuns() {
   const body = await res.json()
   const list = body.workflow_runs || []
   if (body.total_count !== list.length) return { error: `TRUNCATED: ${list.length} of ${body.total_count} runs` }
-  const red = list.filter(r => ['failure', 'timed_out', 'startup_failure'].includes(r.conclusion)).map(r => `${r.id} (${r.conclusion})`)
-  return { red, total: list.length }
+  const seq = list.map(r => ({ id: r.id, conclusion: r.conclusion, created_at: r.created_at }))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  return { seq, total: list.length }
 }
 const runs = await fetchRuns()
 
@@ -151,6 +180,8 @@ console.log(`  failing ${FAILING_RUNS}+ in a row  : ${failing.length ? failing.j
 if (certs.length) console.log(`  ⚠ ${certs.join('\n  ⚠ ')}`)
 console.log(`  newest item         : ${newest ?? 'none'} (limit ${MAX_NO_NEW_DAYS} days)`)
 console.log(`  banner count (anon) : ${banner.error ? 'UNREADABLE — ' + banner.error : banner.count}`)
-console.log(`  red fetch runs ${RED_RUN_WINDOW_H} h  : ${runs.skipped ? 'not checked (no GITHUB_TOKEN)' : runs.error ? 'UNREADABLE — ' + runs.error : `${runs.red.length} of ${runs.total}${runs.red.length ? ' — ' + runs.red.join(', ') : ''}`}`)
+const rv = runs.seq ? runVerdict(runs.seq) : null
+console.log(`  red fetch runs ${RED_RUN_WINDOW_H} h  : ${runs.skipped ? 'not checked (no GITHUB_TOKEN)' : runs.error ? 'UNREADABLE — ' + runs.error : `${rv.red.length} of ${runs.total}${rv.red.length ? ' — ' + rv.red.map(r => `${r.id} (${r.conclusion})`).join(', ') : ''}; latest ${runs.seq[0] ? `${runs.seq[0].id} (${runs.seq[0].conclusion})` : 'none'}`}`)
+if (rv?.warning) console.log(`  ⚠ warning: ${rv.warning}`)
 console.log(`  verdict             : ${problems.length ? 'FAIL\n    - ' + problems.join('\n    - ') : 'ok'}\n`)
 process.exit(problems.length ? 1 : 0)

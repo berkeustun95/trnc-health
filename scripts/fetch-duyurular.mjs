@@ -39,7 +39,7 @@ const { passesFilter, kindOf, categoryOf, CATEGORY_RANK } = await import('./duyu
 const { extractDeadline } = await import('./duyurular/lib/deadline.mjs')
 const { excerptOf, titleKey, oneLine } = await import('./duyurular/lib/text.mjs')
 const { mainText, metaDescription, pdfLinks, pageTitle, pageDate } = await import('./duyurular/lib/page.mjs')
-const { errorClass, systemicFailure } = await import('./duyurular/lib/runhealth.mjs')
+const { errorClass, systemicFailure, withTimeoutRetry, TIMEOUT_RETRY_PAUSE_S } = await import('./duyurular/lib/runhealth.mjs')
 
 // --counts: read back what the database holds (service role: is_published=false rows are
 // invisible to every client role, so no other reader can verify a write). Counts only.
@@ -200,7 +200,9 @@ async function readPdf(bytes, item, r) {
   return d.date ? { date: d.date, source: 'pdf', status: 'found' } : { date: null, status: d.status }
 }
 
-async function runSource(src) {
+const runSource = src => withTimeoutRetry(() => attemptSource(src), () => new Promise(res => setTimeout(res, TIMEOUT_RETRY_PAUSE_S * 1000)))
+
+async function attemptSource(src) {
   const r = blankResult(src)
   const row = state.get(src.key)
   // Due 5 minutes early: the chained workflow starts a run every ~30 min, and a source on a
@@ -343,6 +345,8 @@ for (const r of results) {
 console.log(`\nnew ${totals.new} · with deadline ${totals.with_deadline} ${JSON.stringify(totals.deadline)} · failed sources ${totals.failed}`)
 const failing = results.filter(r => (r.consecutive_failures || 0) >= FAILING_AFTER).map(r => r.key)
 if (failing.length) console.log(`FAILING (≥${FAILING_AFTER} consecutive): ${failing.join(', ')}`)
+const retried = results.filter(r => r.retried)
+if (retried.length) console.log(`retried after a timeout: ${retried.length}, recovered ${retried.filter(r => r.status !== 'failed').length}${retried.some(r => r.status === 'failed') ? ` · still failed: ${retried.filter(r => r.status === 'failed').map(r => r.key).join(', ')}` : ''}`)
 if (inCI() && process.env.GITHUB_STEP_SUMMARY) {
   const lines = [`### Duyurular ${totals.mode} — ${totals.new} new, ${totals.with_deadline} with a deadline, ${totals.failed} failed source(s)`, '',
     '| source | status | parsed | new | deadlines f/p/pdf/api |', '|---|---|---|---|---|',
