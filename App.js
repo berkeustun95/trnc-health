@@ -763,6 +763,7 @@ export default function App() {
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
   const handledColdStartRef = useRef(false)
+  const prevUidRef = useRef(undefined)
 
   function openMenu() {
     setShowMenu(true)
@@ -978,7 +979,10 @@ export default function App() {
   useEffect(() => {
     if (!__DEV__) {
       Updates.checkForUpdateAsync().then(({ isAvailable }) => {
-        if (isAvailable) Updates.fetchUpdateAsync().then(() => Updates.reloadAsync())
+        // Download only; it applies on the next cold start. A reload here restarted the JS
+        // ~2 s after launch and threw away wherever the user already was — a duty push opened
+        // Nöbetçi Eczane, then the reload dropped it on Home.
+        if (isAvailable) Updates.fetchUpdateAsync()
       }).catch(() => {})
     }
   }, [])
@@ -1227,9 +1231,15 @@ export default function App() {
 
   useEffect(() => {
     sessionRef.current = session
-    menuAnim.setValue(260)
-    setShowMenu(false)
-    setShowNotifs(false)
+    // Reset the UI only when the USER changes. Every TOKEN_REFRESHED is a new session object,
+    // and the refresh that follows foregrounding closed Notifications under the user.
+    const uid = session?.user?.id ?? null
+    if (uid !== prevUidRef.current) {
+      prevUidRef.current = uid
+      menuAnim.setValue(260)
+      setShowMenu(false)
+      setShowNotifs(false)
+    }
     if (!session) {
       setProfile(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
@@ -1431,6 +1441,8 @@ export default function App() {
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
       }
+      else if (screen === 'profile') setActiveTab('profile')
+      else if (screen === 'notifications') setShowNotifs(true)
     })
   }, [session])
 
