@@ -3908,6 +3908,12 @@ WITH report AS (
                AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'photo_path', 'INSERT,UPDATE,REFERENCES')
                AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'photo_path', 'INSERT,UPDATE,REFERENCES')
                AND has_column_privilege('service_role', to_regclass('public.eatery_menu_items'), 'photo_path', 'SELECT,INSERT,UPDATE'), false)
+    UNION ALL SELECT '20261117_crunchy_express_data','crunchy-express has a partner pin, an address, menu_verified_on and >= 1 menu item, once 1117 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261117_crunchy_express_data.sql')
+      OR COALESCE((SELECT p.lat IS NOT NULL AND p.geocode_source IS NOT DISTINCT FROM 'partner' AND p.address IS NOT NULL
+                          AND p.menu_verified_on IS NOT NULL
+                          AND EXISTS (SELECT 1 FROM public.eatery_menu_items i WHERE i.partner_id = p.id)
+                     FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
     -- ── 1113: connectivity_links (the eSIM landing's tile + support URLs) ──────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object.
     UNION ALL SELECT '1113_connectivity_links','connectivity_links.is_active DEFAULT false',
