@@ -7,6 +7,7 @@
 
 import tls from 'node:tls'
 import { RAPIDSSL_G1_PEM, LE_YR1_PEM, ISRG_ROOT_YR_BY_X1_PEM } from './ca.mjs'
+import { isCertError } from './runhealth.mjs'
 
 // mtod.mebnet.net and iod.mebnet.net serve their leaf certificate without the intermediate
 // (openssl: "unable to verify the first certificate", 2026-10-10). Browsers and macOS curl fetch
@@ -142,7 +143,7 @@ export async function politeFetch(url, { kind = 'listing', etag, lastModified, p
       let res
       try { res = await rawFetch(url, headers, pdf ? MAX_PDF : MAX_HTML) }
       catch (e) {
-        if (/too large/.test(e.message)) throw e
+        if (/too large/.test(e.message) || isCertError(e)) throw e
         await sleep(h.delayS * 1000)
         res = await rawFetch(url, headers, pdf ? MAX_PDF : MAX_HTML)
       }
