@@ -18,7 +18,7 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
 const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, ' +
-  'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available), ' +
+  'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height), ' +
   'eatery_photos(id, kind, storage_path, width, height, sort_order)'
 
 function PartnerCard({ partner, lang, onPress }) {
@@ -53,7 +53,7 @@ function PartnerCard({ partner, lang, onPress }) {
 
 // openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
 // once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
-export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, onBack, openSlug, onOpenSlugDone }) {
+export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
@@ -79,7 +79,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
     return () => { alive = false }
   }, [attempt])
 
-  if (partner) return <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} />
+  if (partner) return <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} backRef={partnerBackRef} />
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
