@@ -736,6 +736,7 @@ export default function App() {
   const jobsBackRef = useRef(null)
   const transportBackRef = useRef(null)
   const duyurularBackRef = useRef(null)
+  const eateryPartnerBackRef = useRef(null)
   const insuranceBackRef = useRef(null)
   const groomingBackRef = useRef(null)
   const garagesBackRef = useRef(null)
@@ -1096,7 +1097,7 @@ export default function App() {
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showEhliyet) { setShowEhliyet(false); return true }
       // Partner page before the list: back steps partner -> list -> Home.
-      if (eateryPartner) { if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
+      if (eateryPartner) { if (eateryPartnerBackRef.current?.()) return true; if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
       if (showEatery) { setShowEatery(false); return true }
       if (showGarages) { if (garagesBackRef.current?.()) return true; setShowGarages(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
@@ -2490,7 +2491,7 @@ export default function App() {
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} partner={eateryPartner} onOpenPartner={setEateryPartner}
-      onClosePartner={closeEateryPartner} onBack={() => setShowEatery(false)}
+      onClosePartner={closeEateryPartner} partnerBackRef={eateryPartnerBackRef} onBack={() => setShowEatery(false)}
       openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render

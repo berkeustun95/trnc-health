@@ -24,11 +24,11 @@ export function PlaceholderTag({ lang, style, lines = 2 }) {
 }
 
 // An ADA-theme frame standing in for a file that has not arrived: never a stock image.
-export function PlaceholderFrame({ lang, icon = 'image-outline', style }) {
+export function PlaceholderFrame({ lang, icon = 'image-outline', style, compact = false }) {
   return (
-    <View style={[s.frame, style]}>
-      <Ionicons name={icon} size={30} color={category.explore.ink} />
-      <PlaceholderTag lang={lang} style={s.frameTag} />
+    <View style={[s.frame, compact && s.frameCompact, style]}>
+      <Ionicons name={icon} size={compact ? 18 : 30} color={category.explore.ink} />
+      <PlaceholderTag lang={lang} style={[s.frameTag, compact && s.tagCompact]} />
     </View>
   )
 }
@@ -93,6 +93,8 @@ const s = StyleSheet.create({
               borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4 },
   tagText:  { ...type.caption, color: colors.tileInk, flexShrink: 1 },
   frame:    { alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: category.explore.bg, padding: 12 },
+  frameCompact: { gap: 2, padding: 2 },
+  tagCompact: { paddingHorizontal: 4, paddingVertical: 2, gap: 2 },
   frameTag: { alignSelf: 'center' },
   logo:     { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, overflow: 'hidden' },
   fill:     { width: '100%', height: '100%' },
