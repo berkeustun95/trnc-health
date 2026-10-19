@@ -198,6 +198,10 @@ WITH report AS (
     ('1115_eatery_partners','eatery_photos','width'),
     ('1115_eatery_partners','eatery_photos','height'),
     ('1115_eatery_partners','eatery_photos','sort_order'),
+    -- Yeme-Icme dish photos (1116): registered ahead of the apply; red until it runs.
+    ('1116_eatery_dish_photos','eatery_menu_items','photo_path'),
+    ('1116_eatery_dish_photos','eatery_menu_items','photo_width'),
+    ('1116_eatery_dish_photos','eatery_menu_items','photo_height'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -689,6 +693,11 @@ WITH report AS (
     ('1115_eatery_partners','eatery_photos_kind_check'),
     ('1115_eatery_partners','eatery_photos_storage_path_check'),
     ('1115_eatery_partners','eatery_photos_size_check'),
+    -- Yeme-Icme dish photos (1116): registered ahead of the apply; red until it runs.
+    ('1116_eatery_dish_photos','eatery_menu_items_photo_path_check'),
+    ('1116_eatery_dish_photos','eatery_menu_items_photo_size_check'),
+    ('1116_eatery_dish_photos','eatery_menu_items_photo_size_needs_path_check'),
+    ('1116_eatery_dish_photos','eatery_photos_partner_path_key'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -3867,6 +3876,38 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
       IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps','menu',
                                  'route_complete','website','whatsapp']
+    -- ── 1116: Yeme-Icme dish photos ───────────────────────────────────────────────
+    -- Tokens written from the PG 18 harness rendering (scripts/test-eatery-dish-photos-sql.mjs); prod is an
+    -- older major and may render the regex literal / parentheses differently, so they match fragments, never a
+    -- whole definition. RLS is UNCHANGED by 1116: the three 1115 policy tokens above stay the owners of the
+    -- policy sets; these add the new columns' read path and the CHECK/UNIQUE meanings.
+    UNION ALL SELECT '1116_eatery_dish_photos','eatery_menu_items_photo_path_check: NULL or a bucket path with an image extension',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%photo_path IS NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%jpg|jpeg|png|webp%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%[a-z0-9-]+%'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_photo_path_check'), false)
+    UNION ALL SELECT '1116_eatery_dish_photos','eatery_menu_items_photo_size_check: width and height set together, both > 0',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%photo_width IS NULL) = (photo_height IS NULL)%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%photo_width > 0%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%photo_height > 0%'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_photo_size_check'), false)
+    UNION ALL SELECT '1116_eatery_dish_photos','eatery_menu_items_photo_size_needs_path_check: no size without a photo',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%photo_width IS NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%photo_path IS NOT NULL%'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_photo_size_needs_path_check'), false)
+    UNION ALL SELECT '1116_eatery_dish_photos','eatery_photos_partner_path_key is UNIQUE (partner_id, storage_path)',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) = 'UNIQUE (partner_id, storage_path)'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_photos') AND c.conname = 'eatery_photos_partner_path_key'), false)
+    UNION ALL SELECT '1116_eatery_dish_photos','eatery_menu_items photo columns: text/int/int, nullable, no default; clients SELECT the columns and cannot write them',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='eatery_menu_items' AND is_nullable = 'YES' AND column_default IS NULL
+          AND ((column_name = 'photo_path' AND data_type = 'text')
+            OR (column_name IN ('photo_width','photo_height') AND data_type = 'integer'))) = 3
+      AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'photo_path', 'SELECT')
+               AND has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'photo_path', 'SELECT')
+               AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'photo_path', 'INSERT,UPDATE,REFERENCES')
+               AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'photo_path', 'INSERT,UPDATE,REFERENCES')
+               AND has_column_privilege('service_role', to_regclass('public.eatery_menu_items'), 'photo_path', 'SELECT,INSERT,UPDATE'), false)
     -- ── 1113: connectivity_links (the eSIM landing's tile + support URLs) ──────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object.
     UNION ALL SELECT '1113_connectivity_links','connectivity_links.is_active DEFAULT false',
