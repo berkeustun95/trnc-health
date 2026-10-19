@@ -158,9 +158,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   })
 
   // The tap is logged on the line BEFORE the link opens (utils/logContactEvent: it never throws);
-  // a placeholder partner has no real id and logs nothing.
+  // a placeholder partner has no real id and an inactive (previewer-only) row is not live: both log nothing.
   const go = (action, url) => {
-    if (!partner.placeholder) logContactEvent('eatery', partner.id, action)
+    if (!partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
     Linking.openURL(url).catch(() => {})
   }
 
@@ -183,6 +183,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
             </View>
           </View>
           {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tag} />}
+          {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>
 
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}

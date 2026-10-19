@@ -17,6 +17,7 @@ export const partnerSlide = (row, lang) => ({
   eaterySlug: row.slug,
   logoPath: row.logo_path ?? null,
   placeholder: !!row.placeholder,
+  ...(row.is_active === false ? { unpublished: true } : null),
   action: { type: 'eatery', slug: row.slug },
 })
 
