@@ -1,4 +1,6 @@
-import { View, Text, ScrollView, Linking, StyleSheet, useWindowDimensions } from 'react-native'
+import { useState, useEffect } from 'react'
+import { StatusBar } from 'expo-status-bar'
+import { View, Text, ScrollView, Linking, Modal, Pressable, AccessibilityInfo, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -7,9 +9,9 @@ import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
   eateryOpenStatus, formatPrice,
 } from '../constants/eatery'
-import { colors, font, type, radii, space, listBottomPad } from '../constants/theme'
-import { ScreenHeader, Card, Button } from '../components/ui'
-import { EateryLogo, PlaceholderTag, PhotoPager } from '../components/EateryBits'
+import { colors, font, type, radii, space, listBottomPad, withAlpha, press } from '../constants/theme'
+import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
+import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 
 // ─── Yeme-İçme: one partner, in full ────────────────────────────────────────
@@ -44,10 +46,34 @@ function HoursBlock({ week, open, lang }) {
   )
 }
 
-function MenuItemRow({ item, lang }) {
+const THUMB = 64
+
+// A dish photo is partner content: shown as sent (contain), never cropped. A file that fails to load
+// calls onFail and the row drops back to text-only. A Preview fixture dish draws the labelled frame.
+function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
+  const uri = eateryImageUrl(item.photoPath)
+  const [loaded, setLoaded] = useState(false)
+  const ready = !uri || loaded   // opens only once the image is on screen: the viewer never starts on an unloaded file
+  return (
+    <Pressable style={({ pressed }) => [s.thumb, pressed && { opacity: press.small }]} onPress={ready ? onOpen : undefined}
+      accessibilityRole="button" accessibilityState={{ disabled: !ready }}
+      accessibilityLabel={t('eateryDishPhotoOpen', lang).replace('{name}', () => name)}>
+      {uri
+        ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor={colors.soft}
+            onLoad={() => setLoaded(true)} onError={onFail} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
+        : <PlaceholderFrame lang={lang} compact style={s.fill} />}
+    </Pressable>
+  )
+}
+
+// Name and price keep their places in every row (name left, price on the right edge); a row with a
+// photo only gains a leading thumbnail, a row without one is exactly the text-only row.
+function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto }) {
   const price = formatPrice(item.price, item.currency, lang)
+  const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   return (
     <View style={s.itemRow}>
+      {hasPhoto && <DishThumb item={item} name={item.name} lang={lang} reduce={reduce} onOpen={() => onOpenPhoto(item)} onFail={() => onFail(item.id)} />}
       <View style={s.itemText}>
         <Text style={s.itemName}>{item.name}</Text>
         {!!item.description && <Text style={s.itemDesc}>{item.description}</Text>}
@@ -57,7 +83,56 @@ function MenuItemRow({ item, lang }) {
   )
 }
 
-export default function EateryPartnerScreen({ partner, lang, onBack }) {
+// Fade only; none at all when the system asks for reduced motion.
+function useReduceMotion() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
+    return () => { alive = false; sub?.remove?.() }
+  }, [])
+  return on
+}
+
+function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
+  const insets = useSafeAreaInsets()
+  const { width: winW } = useWindowDimensions()
+  const uri = item ? eateryImageUrl(item.photoPath) : null
+  const price = item ? formatPrice(item.price, item.currency, lang) : ''
+  return (
+    <Modal visible={!!item === true} transparent animationType={reduce ? 'none' : 'fade'} onRequestClose={onClose}
+      statusBarTranslucent supportedOrientations={['portrait']}>
+      {!!item && (
+        <Pressable style={[s.viewer, { paddingTop: insets.top + space[8], paddingBottom: insets.bottom + space[16] }]}
+          onPress={onClose} accessible={false}>
+          <StatusBar style="light" />
+          <View style={s.viewerBar}>
+            <Pressable style={s.closeBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}>
+              <Ionicons name="close" size={20} color={colors.onPrimary} />
+              <Text style={s.closeText}>{t('uiClose', lang)}</Text>
+            </Pressable>
+          </View>
+          <View style={s.viewerImg}>
+            {uri
+              ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor="transparent" onError={() => { onFail(item.id); onClose() }} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
+              : <PlaceholderFrame lang={lang} style={{ width: winW - 32, aspectRatio: item.aspect || 4 / 3, borderRadius: radii.card }} />}
+          </View>
+          <View style={s.caption}>
+            <Text style={s.capName}>{item.name}</Text>
+            {!!price && <Text style={s.capPrice}>{price}</Text>}
+          </View>
+        </Pressable>
+      )}
+    </Modal>
+  )
+}
+
+export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null }) {
+  const [viewing, setViewing] = useState(null)
+  const [failedDishes, setFailedDishes] = useState({})
+  const failDish = id => setFailedDishes(f => ({ ...f, [id]: true }))
+  const reduce = useReduceMotion()
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const W = winW - 32
@@ -71,6 +146,16 @@ export default function EateryPartnerScreen({ partner, lang, onBack }) {
   const open = eateryOpenStatus(partner, lang)
   const regionKey = REGION_LABEL_KEY[partner.region]
   const hasMenu = sections.length > 0 || menuPhotos.length > 0 || !!menuUrl
+
+  // App's single back handler asks here first (the dish photo viewer is a layer above the partner page).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (viewing) { setViewing(null); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
 
   // The tap is logged on the line BEFORE the link opens (utils/logContactEvent: it never throws);
   // a placeholder partner has no real id and logs nothing.
@@ -109,7 +194,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack }) {
             {sections.map(sec => (
               <View key={sec.title} style={s.menuSec}>
                 <Text style={s.secTitle}>{sec.title}</Text>
-                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} />)}
+                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing} />)}
               </View>
             ))}
             {menuPhotos.length > 0 && (
@@ -152,6 +237,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack }) {
         )}
 
       </ScrollView>
+      <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>
   )
 }
@@ -190,4 +276,15 @@ const s = StyleSheet.create({
   itemDesc:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
   itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   menuBtn:   { marginTop: space[16] },
+  fill:      { width: '100%', height: '100%' },
+  thumb:     { width: THUMB, height: THUMB, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+  // Neutral black scrim = photo treatment (ada-style §6), not a brand colour: never tint partner food photos.
+  viewer:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)' },
+  viewerBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: space[16], flexShrink: 0 },
+  closeBtn:  { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], paddingHorizontal: space[16], borderRadius: radii.pill, backgroundColor: withAlpha(colors.onPrimary, 0.18) },
+  closeText: { ...type.body, fontFamily: font.semibold, color: colors.onPrimary },
+  viewerImg: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: space[12], paddingHorizontal: space[8] },
+  caption:   { paddingHorizontal: space[20], gap: space[4], alignItems: 'center', flexShrink: 0 },
+  capName:   { ...type.rowTitle, color: colors.onPrimary, textAlign: 'center' },
+  capPrice:  { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.onPrimary },
 })

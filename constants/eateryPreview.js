@@ -32,11 +32,11 @@ export const EATERY_PREVIEW_PARTNERS = [
     sort_order: 0,
     is_active: true,
     eatery_menu_items: [
-      { id: -1, section: 'Sample section A', section_order: 0, name: 'Sample item 1', description: null, price: 100, currency: 'TRY', sort_order: 0, is_available: true },
-      { id: -2, section: 'Sample section A', section_order: 0, name: 'Sample item 2', description: null, price: 150, currency: 'TRY', sort_order: 1, is_available: true },
+      { id: -1, section: 'Sample section A', section_order: 0, name: 'Sample item 1', description: null, photo_placeholder: true, price: 100, currency: 'TRY', sort_order: 0, is_available: true },
+      { id: -2, section: 'Sample section A', section_order: 0, name: 'Sample item 2', description: null, photo_placeholder: true, price: 150, currency: 'TRY', sort_order: 1, is_available: true },
       { id: -3, section: 'Sample section A', section_order: 0, name: 'Sample item 3', description: null, price: 200, currency: 'TRY', sort_order: 2, is_available: true },
       { id: -4, section: 'Sample section B', section_order: 1, name: 'Sample item 4', description: null, price: 50, currency: 'TRY', sort_order: 0, is_available: true },
-      { id: -5, section: 'Sample section B', section_order: 1, name: 'Sample item 5', description: null, price: 75, currency: 'TRY', sort_order: 1, is_available: true },
+      { id: -5, section: 'Sample section B', section_order: 1, name: 'Sample item 5', description: null, photo_placeholder: true, price: 75, currency: 'TRY', sort_order: 1, is_available: true },
       { id: -6, section: 'Sample section B', section_order: 1, name: 'Sample item 6', description: null, price: 120, currency: 'TRY', sort_order: 2, is_available: true },
     ],
     // storage_path null = no file yet: the screen draws a labelled ADA frame instead of an image.

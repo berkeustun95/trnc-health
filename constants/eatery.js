@@ -44,6 +44,14 @@ export function eateryContacts(p) {
 
 export const eateryMenuUrl = p => https(p?.menu_url)
 
+// photoPath: the stored file (null = none); photoPlaceholder: Preview fixture only, a labelled frame instead of a file.
+const withDishPhoto = i => ({
+  ...i,
+  photoPath: filled(i.photo_path) ? i.photo_path : null,
+  photoPlaceholder: i.photo_placeholder === true,
+  aspect: i.photo_width > 0 && i.photo_height > 0 ? i.photo_width / i.photo_height : null,
+})
+
 // Available items grouped by section, in section_order then sort_order (id breaks ties).
 export function eateryMenuSections(p) {
   const items = (p?.eatery_menu_items || []).filter(i => i && i.is_available !== false && filled(i.name))
@@ -57,7 +65,7 @@ export function eateryMenuSections(p) {
   const cmp = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.id ?? 0) - (b.id ?? 0)
   return [...by.values()]
     .sort((a, b) => a.order - b.order)   // Array.sort is stable: ties keep first-seen (DB) order, never alphabetised
-    .map(g => ({ title: g.title, items: g.items.sort(cmp) }))
+    .map(g => ({ title: g.title, items: g.items.sort(cmp).map(withDishPhoto) }))
 }
 
 // Photos of one kind ('gallery' | 'menu'), in order. path null = a placeholder slot (no file yet).
