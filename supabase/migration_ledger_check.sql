@@ -234,7 +234,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261116_eatery_dish_photos.sql', '55aabb1b3544d33d54b0fe6bfcbe73ed945bd322fed6319f2b393a5caf5fd360'),
   ('20261117_crunchy_express_data.sql', 'c083e0f66ff944eefb66d60ee03fab4cac7832d01649dd695782fc0afb1dbdbc'),
   ('20261118_crunchy_express_maps_url.sql', '97b0160100f49aaa5af6797d2ab5db2fbd5ce2d693e2da7b47cd1795028eaecb'),
-  ('20261119_eatery_preview_read.sql', '0e74330c7dfcd06bc781ed4589fc3a0a180781ef53c164aed4e30c9119d181b5')
+  ('20261119_eatery_preview_read.sql', '463952d69f779262ecbaed821256525b1c499208b1651b15ba16ab6f91d78367')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

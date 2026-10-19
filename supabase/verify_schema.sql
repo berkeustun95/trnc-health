@@ -3933,7 +3933,7 @@ WITH report AS (
         AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['authenticated']::text[]
         AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%' AND with_check IS NULL)
     UNION ALL SELECT '1119_eatery_preview_read','is_previewer(): STABLE, INVOKER, only 412cad91…, EXECUTE authenticated yes / anon no',
-      COALESCE((SELECT p.provolatile = 's' AND NOT p.prosecdef AND pg_get_functiondef(p.oid) LIKE '%412cad91-2e3b-41b9-8186-175dfb8afa35%'
+      COALESCE((SELECT p.provolatile = 's' AND NOT p.prosecdef AND p.prosrc LIKE '%412cad91-2e3b-41b9-8186-175dfb8afa35%'
                 FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_previewer()')), false)
       AND COALESCE((SELECT bool_or(a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'authenticated') AND a.privilege_type = 'EXECUTE')
                        AND NOT bool_or(a.grantee IN (0, (SELECT oid FROM pg_roles WHERE rolname = 'anon')) AND a.privilege_type = 'EXECUTE')

@@ -110,12 +110,12 @@ DECLARE
   v_sc_def text;
   v_on uuid; v_off uuid;
   r record;
-  v_p int; v_i int; v_ph int; v_on_seen int; v_cr_p int; v_cr_i int; v_cr_ph int; v_off_f int;
+  v_p int; v_i int; v_ph int; v_on_seen int; v_on_i int; v_on_ph int; v_cr_p int; v_cr_i int; v_cr_ph int; v_off_f int;
   v_w text;
   v_owner_i int; v_owner_ph int;
 BEGIN
   -- Function shape and grants.
-  SELECT p.provolatile, p.prosecdef, pg_get_functiondef(p.oid) AS def INTO v_fn
+  SELECT p.provolatile, p.prosecdef, p.prosrc AS def INTO v_fn
     FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_previewer()');
   IF v_fn.provolatile IS DISTINCT FROM 's' OR v_fn.prosecdef IS DISTINCT FROM false
      OR v_fn.def NOT LIKE '%412cad91-2e3b-41b9-8186-175dfb8afa35%' THEN
@@ -180,15 +180,17 @@ BEGIN
       SELECT count(*) INTO v_i FROM public.eatery_menu_items WHERE partner_id IN (c_crunch, v_off);
       SELECT count(*) INTO v_ph FROM public.eatery_photos WHERE partner_id = v_off;
       SELECT count(*) INTO v_on_seen FROM public.eatery_partners WHERE id = v_on;
+      SELECT count(*) INTO v_on_i FROM public.eatery_menu_items WHERE partner_id = v_on;
+      SELECT count(*) INTO v_on_ph FROM public.eatery_photos WHERE partner_id = v_on;
       RESET ROLE;
       PERFORM set_config('request.jwt.claims', '', true);
       IF v_p <> 0 OR v_i <> 0 OR v_ph <> 0 THEN
         RAISE EXCEPTION '% sees inactive rows: partners % items % photos %', r.who, v_p, v_i, v_ph;
       END IF;
-      IF v_on_seen <> 1 THEN
-        RAISE EXCEPTION 'CONTROL FAILED: % cannot see the ACTIVE probe partner (%)', r.who, v_on_seen;
+      IF v_on_seen <> 1 OR v_on_i <> 1 OR v_on_ph <> 1 THEN
+        RAISE EXCEPTION 'CONTROL FAILED: % cannot see the ACTIVE probe partner/item/photo (%/%/%)', r.who, v_on_seen, v_on_i, v_on_ph;
       END IF;
-      v_report := v_report || E'\n  ' || r.who || ': inactive 0/0/0, active probe 1';
+      v_report := v_report || E'\n  ' || r.who || ': inactive 0/0/0, active probe 1/1/1';
     END LOOP;
 
     -- Previewer: Crunchy in full, zz-off's photo, writes denied.
@@ -237,7 +239,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261119_eatery_preview_read.sql', '0e74330c7dfcd06bc781ed4589fc3a0a180781ef53c164aed4e30c9119d181b5')
+VALUES ('20261119_eatery_preview_read.sql', '463952d69f779262ecbaed821256525b1c499208b1651b15ba16ab6f91d78367')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
