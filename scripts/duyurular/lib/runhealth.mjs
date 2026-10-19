@@ -15,6 +15,10 @@ export function errorClass(e) {
 // never retried; daily-health groups them as a certificate change (check-duyurular-health.mjs).
 export const CERT_CLASS = /^(UNABLE_TO_VERIFY_LEAF_SIGNATURE|UNABLE_TO_GET_ISSUER_CERT(_LOCALLY)?|SELF_SIGNED_CERT_IN_CHAIN|DEPTH_ZERO_SELF_SIGNED_CERT|CERT_[A-Z_]+|ERR_TLS_CERT_ALTNAME_INVALID)$/
 export const isCertError = e => CERT_CLASS.test(errorClass(e))
+// The subset an AIA download can fix: the issuer is missing, nothing is wrong with what was sent.
+// Expired, self-signed and name-mismatch errors stay immediate failures.
+export const MISSING_ISSUER = /^(UNABLE_TO_VERIFY_LEAF_SIGNATURE|UNABLE_TO_GET_ISSUER_CERT(_LOCALLY)?)$/
+export const isMissingIssuer = e => MISSING_ISSUER.test(errorClass(e))
 
 // One retry, after a pause, for a source that TIMED OUT before it registered any item. Run
 // 39203331829 (2026-10-19 05:13) had 27 of 61 sources time out inside 85 s while the runs either

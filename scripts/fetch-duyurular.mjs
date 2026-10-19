@@ -33,6 +33,7 @@ prodWriteGuard({ wouldWrite: APPLY && !SELFTEST, workflow: 'duyurular-fetch', dr
 
 const { SOURCES, PDF_CATEGORIES } = await import('./duyurular/sources.mjs')
 const { politeFetch, declareDelay, canonicalUrl, stats } = await import('./duyurular/lib/http.mjs')
+const { aiaEvents } = await import('./duyurular/lib/aia.mjs')
 const { parseFeed, looksLikeFeed } = await import('./duyurular/lib/rss.mjs')
 const { PARSERS } = await import('./duyurular/lib/parsers.mjs')
 const { passesFilter, kindOf, categoryOf, CATEGORY_RANK } = await import('./duyurular/lib/classify.mjs')
@@ -345,6 +346,13 @@ for (const r of results) {
 console.log(`\nnew ${totals.new} · with deadline ${totals.with_deadline} ${JSON.stringify(totals.deadline)} · failed sources ${totals.failed}`)
 const failing = results.filter(r => (r.consecutive_failures || 0) >= FAILING_AFTER).map(r => r.key)
 if (failing.length) console.log(`FAILING (≥${FAILING_AFTER} consecutive): ${failing.join(', ')}`)
+// AIA: daily-health reads the ::notice annotations of the latest run and prints them as info.
+for (const ev of aiaEvents) {
+  if (ev.ok) {
+    console.log(`chain completed via AIA: ${ev.host} → ${ev.issuer}`)
+    if (inCI()) console.log(`::notice title=chain completed via AIA::${ev.host} → ${ev.issuer}`)
+  } else console.log(`AIA could not complete the chain: ${ev.host} (${ev.reason})`)
+}
 const retried = results.filter(r => r.retried)
 if (retried.length) console.log(`retried after a timeout: ${retried.length}, recovered ${retried.filter(r => r.status !== 'failed').length}${retried.some(r => r.status === 'failed') ? ` · still failed: ${retried.filter(r => r.status === 'failed').map(r => r.key).join(', ')}` : ''}`)
 if (inCI() && process.env.GITHUB_STEP_SUMMARY) {
