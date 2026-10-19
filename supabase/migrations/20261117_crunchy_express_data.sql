@@ -417,7 +417,7 @@ BEGIN
     SELECT c_id, m.section, m.section_order, m.name, m.description, m.price, 'TRY', m.sort_order
       FROM jsonb_to_recordset(v_menu) AS m(section text, section_order int, name text, description text, price numeric, sort_order int);
   ELSE
-    SELECT count(*) INTO v_same
+    SELECT count(DISTINCT i.id) INTO v_same
       FROM jsonb_to_recordset(v_menu) AS m(section text, section_order int, name text, description text, price numeric, sort_order int)
       JOIN public.eatery_menu_items i
         ON i.partner_id = c_id AND i.section = m.section AND i.section_order = m.section_order AND i.name = m.name
@@ -474,7 +474,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261117_crunchy_express_data.sql', 'f022261b417d94d5d3dc22f31bbbc994c01ee9c35aad01303e4ad0420997b45a')
+VALUES ('20261117_crunchy_express_data.sql', 'c083e0f66ff944eefb66d60ee03fab4cac7832d01649dd695782fc0afb1dbdbc')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -485,6 +485,7 @@ RESET ROLE;
 --   Run supabase/verify_schema.sql QUERY 1: the 20261117_crunchy_express_data row must read OK.
 --
 -- ─── Rollback (only if this data is abandoned; the partner row stays) ──
+--   ⚠ Deleting the items also drops any dish photo_path set by eatery-images after this file (objects stay in the bucket).
 --   DELETE FROM public.eatery_menu_items WHERE partner_id = 'bb9dad05-6bb0-4c1c-90fb-cb0a4ad68434';
 --   UPDATE public.eatery_partners SET address = NULL, region = NULL, phone = NULL, whatsapp = NULL,
 --     opening_hours = NULL, menu_verified_on = NULL, lat = NULL, lng = NULL, geocode_source = NULL WHERE id = 'bb9dad05-6bb0-4c1c-90fb-cb0a4ad68434' AND is_active = false;
