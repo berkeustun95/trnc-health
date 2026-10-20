@@ -37,9 +37,11 @@ const NOW = new Date('2026-10-18T12:00:00')
 const dbPromo = { id: 'db-promo-1', kind: 'promo', title_i18n: { en: 'Paid sponsor' }, subtitle_i18n: null, image_url: null, link_url: 'https://x.example', pin_date: null }
 const todayPin = { ...dbPromo, id: 'db-today', pin_date: '2026-10-18' }
 const emptyChain = () => { const p = new Proxy(function () {}, { get: (_, k) => (k === 'then' ? r => r({ data: [], error: null }) : () => p), apply: () => p }); return p }
+const eventRow = { id: 'ev-1', title: 'Konser', images: [], source_image_url: null, start_date: '2026-10-18T19:00:00' }
+const rowChain = row => { const p = new Proxy(function () {}, { get: (_, k) => (k === 'then' ? r => r({ data: row, error: null }) : k === 'maybeSingle' ? async () => ({ data: row, error: null }) : () => p), apply: () => p }); return p }
 function stubDb(rows) {
   const pinChain = { select: () => ({ eq: async () => (rows === 'throw' ? { data: null, error: new Error('offline') } : { data: rows, error: null }) }) }
-  globalThis.__sbTable = tbl => (tbl === 'home_strip_pin' ? pinChain : emptyChain())
+  globalThis.__sbTable = tbl => (tbl === 'home_strip_pin' ? pinChain : tbl === 'events' && globalThis.__eventRow ? rowChain(globalThis.__eventRow) : emptyChain())
 }
 
 // ─── the lead snapshot ──────────────────────────────────────────────────────────────────────────────────
@@ -110,6 +112,14 @@ console.log('pin for today: a PAID pin keeps the 18+ gate, an editorial pin show
     t(`${path}: paid pin today + non-boolean eligibility -> NOT shown (fail closed)`, (await lead([todayPin], 'yes')) !== 'db-today', true)
     t(`${path}: editorial pin today + ineligible -> shown`, await lead([noticeToday], false), 'notice-today')
     t(`${path}: paid + editorial pins today, ineligible -> the editorial one`, await lead([todayPin, noticeToday], false), 'notice-today')
+    {
+      const evPin = { id: 'ev-pin', kind: 'event', target_id: 'ev-1', title_i18n: null, subtitle_i18n: null, image_url: null, link_url: null, pin_date: '2026-10-18' }
+      globalThis.__eventRow = eventRow
+      t(`${path}: event pin today, no sponsor + ineligible -> shown, unlabelled`, await (async () => { globalThis.__lastKind = null; stubDb([evPin]); const x = await resolveStripItem({ lang: 'Turkish', now: NOW, upcoming, promosEligible: false }); return [x?.kind, x?.sponsored] })(), ['event', false])
+      t(`${path}: event pin today WITH sponsor_name + ineligible -> NOT shown`, (await lead([{ ...evPin, sponsor_name: 'Acme' }], false)) !== 'ev-1', true)
+      t(`${path}: event pin today WITH sponsor_name + eligible -> shown, labelled`, await (async () => { globalThis.__lastKind = null; stubDb([{ ...evPin, sponsor_name: 'Acme' }]); const x = await resolveStripItem({ lang: 'Turkish', now: NOW, upcoming, promosEligible: true }); return [x?.id, x?.sponsored] })(), ['ev-1', true])
+      globalThis.__eventRow = null
+    }
   }
 }
 console.log('assembly')
