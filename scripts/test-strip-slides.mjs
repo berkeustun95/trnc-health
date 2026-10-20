@@ -99,6 +99,19 @@ const run = async (o = {}) => {
 }
 const ids = s => s.map(x => x.id)
 
+console.log('pin for today: a PAID pin keeps the 18+ gate, an editorial pin shows to everyone (2026-10-20)')
+{
+  const noticeToday = { id: 'notice-today', kind: 'notice', route: 'events', title_i18n: null, subtitle_i18n: null, image_url: null, link_url: null, pin_date: '2026-10-18' }
+  for (const upcoming of [true, false]) {
+    const lead = async (rows, promosEligible) => { globalThis.__lastKind = null; stubDb(rows); return (await resolveStripItem({ lang: 'Turkish', now: NOW, upcoming, promosEligible }))?.id }
+    const path = upcoming ? 'slider lead' : 'legacy card'
+    t(`${path}: paid pin today + ineligible -> NOT shown`, (await lead([todayPin], false)) !== 'db-today', true)
+    t(`${path}: paid pin today + eligible -> shown`, await lead([todayPin], true), 'db-today')
+    t(`${path}: paid pin today + non-boolean eligibility -> NOT shown (fail closed)`, (await lead([todayPin], 'yes')) !== 'db-today', true)
+    t(`${path}: editorial pin today + ineligible -> shown`, await lead([noticeToday], false), 'notice-today')
+    t(`${path}: paid + editorial pins today, ineligible -> the editorial one`, await lead([todayPin, noticeToday], false), 'notice-today')
+  }
+}
 console.log('assembly')
 t('ineligible + partners -> [lead] only', ids(await run({ promosEligible: false, partners: [A, B] })), ['generic'])
 t('eligible + 0 partners -> [lead]', ids(await run()), ['generic'])

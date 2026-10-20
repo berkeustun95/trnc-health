@@ -98,6 +98,12 @@ async function readPins() {
     (!r.ends_at   || new Date(r.ends_at).getTime()   >= now))
 }
 
+// A pin for today overrides the ladder, but a PAID pin (hydrated as sponsored: true — today the promo kind) keeps
+// the same 18+ gate as every other paid promo: guests, no-DOB and under-18 accounts skip it and the ladder goes on.
+// Editorial pins (event, place, notice) stay visible to everyone. Fail closed: only promosEligible === true opens it.
+// (Security review 2026-10-20: the today loops returned a sponsored pin before the promosEligible check.)
+export const pinVisible = (item, promosEligible) => item.sponsored !== true || promosEligible === true
+
 async function hydratePin(pin, lang) {
   if (pin.kind === 'promo') {
     return {
@@ -334,7 +340,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     const todays = pins.filter(p => p.pin_date === todayIso && !isDismissed(p.id))
     for (const p of todays) {
       const item = await hydratePin(p, lang)
-      if (item) return item
+      if (item && pinVisible(item, promosEligible)) return item
     }
   } catch { /* table absent, offline, or RLS — fall through */ }
 
@@ -424,7 +430,7 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
     pins = await readPins()
     for (const p of pins.filter(p => p.pin_date === todayIso && !isDismissed(p.id))) {
       const item = await hydratePin(p, lang)
-      if (item) return item
+      if (item && pinVisible(item, promosEligible)) return item
     }
   } catch { /* fall through */ }
   if (promosEligible) {
