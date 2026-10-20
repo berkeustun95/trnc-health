@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Animated, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -58,27 +58,21 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
   )
 }
 
-// How far the keyboard covers the bottom of `ref`'s view: the full keyboard height, or less when the window already
-// shrank by itself.
-function useKeyboardOverlap(ref) {
-  const [h, setH] = useState(0)
+// The keyboard's top edge in screen coordinates (null while it is closed). The lift is NOT taken from the reported
+// height: BasketPage measures where its footer really ends against this edge (device-tested: the reported height
+// and the window's own partial resize disagree).
+function useKeyboardTop() {
+  const [top, setTop] = useState(null)
   useEffect(() => {
     const ios = Platform.OS === 'ios'
     const show = Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidShow', e => {
       const { height, screenY } = e.endCoordinates
-      const full = Math.max(0, Math.round(height))
-      if (!ref.current?.measureInWindow || !(screenY > 0)) { setH(full); return }
-      // Window and screen coordinates differ by the system bars, so the measured overlap only tells WHETHER the window
-      // shrank by itself (well under the keyboard height); otherwise the keyboard's full height is the lift (device-tested).
-      ref.current.measureInWindow((_x, y, _w, vh) => {
-        const overlap = Math.max(0, Math.round(y + vh - screenY))
-        setH(overlap < full * 0.5 ? overlap : full)
-      })
+      setTop(screenY > 0 ? Math.round(screenY) : Math.round(Dimensions.get('screen').height - height))
     })
-    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setH(0))
+    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setTop(null))
     return () => { show.remove(); hide.remove() }
-  }, [ref])
-  return h
+  }, [])
+  return top
 }
 
 // A dish photo is partner content, shown as sent (contain) in the menu's white frame. Always a 56 box so names
@@ -119,8 +113,14 @@ function BasketLine({ line, onQty, formatMoney, lang }) {
 export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
-  const rootRef = useRef(null)
-  const kb = useKeyboardOverlap(rootRef)
+  const kbTop = useKeyboardTop()
+  const footerRef = useRef(null)
+  const [lift, setLift] = useState(0)
+  const measureFooter = useCallback(() => {
+    if (kbTop == null) { setLift(0); return }
+    footerRef.current?.measureInWindow((_x, y, _w, h) => setLift(Math.max(0, Math.round(y + h - kbTop))))
+  }, [kbTop])
+  useEffect(() => { measureFooter(); const id = setTimeout(measureFooter, 250); return () => clearTimeout(id) }, [measureFooter])
   const slide = useRef(new Animated.Value(reduce ? 0 : winW)).current
   const scrollRef = useRef(null)
   const first = useRef(true)
@@ -134,11 +134,11 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic), useNativeDriver: true }).start(done)
   }, [open])
   useEffect(() => {
-    if (kb > 0) { const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: !reduce }), 60); return () => clearTimeout(id) }
-  }, [kb, reduce])
+    if (kbTop != null) { const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: !reduce }), 60); return () => clearTimeout(id) }
+  }, [kbTop, reduce])
   const empty = lines.length === 0
   return (
-    <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+    <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
       <SafeAreaView style={st.page} edges={['top']}>
         <ScreenHeader lang={lang} title={t('eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
@@ -176,7 +176,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
           )}
         </ScrollView>
         {!empty && (
-          <View style={[st.footer, { paddingBottom: (kb > 0 ? kb : insets.bottom) + space[12] }]}>
+          <View ref={footerRef} collapsable={false} onLayout={measureFooter} style={[st.footer, { paddingBottom: (kbTop != null ? lift : insets.bottom) + space[12] }]}>
             <View style={st.totalRow}>
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
