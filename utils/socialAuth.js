@@ -86,6 +86,7 @@ export async function signInWithGoogle({ consent } = {}) {
 
 export async function signInWithApple({ consent } = {}) {
   let saved = false
+  lastSocialError = null
   try {
     const Apple = require('expo-apple-authentication')
     const Crypto = require('expo-crypto')
@@ -97,7 +98,7 @@ export async function signInWithApple({ consent } = {}) {
       requestedScopes: [Apple.AppleAuthenticationScope.FULL_NAME, Apple.AppleAuthenticationScope.EMAIL],
       nonce: hashedNonce,
     })
-    if (!cred.identityToken) return 'socialSignInFailed'
+    if (!cred.identityToken) { lastSocialError = 'apple: no identityToken'; return 'socialSignInFailed' }
     if (consent) {
       // credential.email arrives on the first authorisation only; the token carries it always,
       // including a private-relay address, which is what Supabase stores.
