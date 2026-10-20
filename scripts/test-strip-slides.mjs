@@ -122,7 +122,19 @@ t('duplicate slug rows -> one slide', ids(await run({ partners: [A, A] })).slice
 t('rotation is relative to the visible partners (gated one does not count)', ids(await run({ partners: [A, B, C], gates: { 'a-cafe': false }, rotation: 1 })).slice(1), ['eatery-c-bake', 'eatery-b-bar'])
 console.log('slide shape')
 const [, sa, sb] = await run({ partners: [A, B] })
-t('partner slide (editorial: no sponsored flag)', sa, { kind: 'promo', id: 'eatery-a-cafe', title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
+t('partner slide (editorial: no sponsored flag)', sa, { kind: 'promo', id: 'eatery-a-cafe', title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', heroPath: null, placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
+{
+  const hero = async items => (await run({ partners: [{ ...A, eatery_menu_items: items }] }))[1].heroPath
+  t('heroPath: first photo by section_order, sort_order, id', await hero([
+    { id: 9, section_order: 1, sort_order: 0, photo_path: 's1/z.jpg' }, { id: 5, section_order: 0, sort_order: 2, photo_path: 'b.jpg' },
+    { id: 4, section_order: 0, sort_order: 1, photo_path: 'a.jpg' }, { id: 3, section_order: 0, sort_order: 1, photo_path: 'a0.jpg' }]), 'a0.jpg')
+  t('heroPath: items without photo_path are ignored (even if first)', await hero([
+    { id: 1, section_order: 0, sort_order: 0, photo_path: null }, { id: 2, section_order: 0, sort_order: 1, photo_path: '' }, { id: 3, section_order: 0, sort_order: 2, photo_path: 'c.jpg' }]), 'c.jpg')
+  t('heroPath: an unavailable dish (is_available false) is never the hero', await hero([
+    { id: 1, section_order: 0, sort_order: 0, photo_path: 'hidden.jpg', is_available: false },
+    { id: 2, section_order: 0, sort_order: 1, photo_path: 'shown.jpg', is_available: true }]), 'shown.jpg')
+  t('heroPath: null when no item has a photo / no items / not selected', [await hero([{ id: 1, photo_path: null }]), await hero([]), await hero(undefined)], [null, null, null])
+}
 t('placeholder flag carried', [sa.placeholder, sb.placeholder], [false, true])
 t('no photo on a partner slide', [sa.imageUrl, sb.imageUrl], [undefined, undefined])
 {
