@@ -400,10 +400,11 @@ export default function HomeScreen({
     readStripDismissals()
       .then(async dismissedIds => {
         if (!REDESIGN) return { item: await resolveStripItem({ lang, promosEligible, dismissedIds }) }
-        // Partners are read ONLY for an eligible user on a build that has Yeme-İçme (EATERY): slim columns, never photos.
+        // Partner slides are editorial: read for EVERY user on a build that has Yeme-İçme (EATERY); slim columns, never
+        // photos. adult_only is selected so an adult partner keeps the 18+ gate in assembleStripSlides (fail closed).
         let partners = []
-        if (EATERY === true && promosEligible === true) {
-          try { partners = (await loadEateryPartners('slug, name, logo_path, sort_order')).rows } catch { partners = [] }
+        if (EATERY === true) {
+          try { partners = (await loadEateryPartners('slug, name, logo_path, sort_order, adult_only')).rows } catch { partners = [] }
         }
         const rotation = await sessionRotation()
         const slides = await resolveStripSlides({ lang, promosEligible, dismissedIds, partners, gates: EATERY_GATES, rotation })
