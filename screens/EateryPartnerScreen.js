@@ -94,7 +94,7 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeig
   useEffect(() => {
     const tab = tabRefs.current[active]
     const inner = scrollRef.current?.getInnerViewRef?.()
-    if (!tab || !inner) return
+    if (!tab || !inner || active === 0 || tabsViewW.current === 0) return
     tab.measureLayout(inner, (x, _y, w) => {
       scrollRef.current?.scrollTo({ x: Math.max(0, x + w / 2 - tabsViewW.current / 2), animated: !reduce })
     }, () => {})
@@ -105,7 +105,7 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeig
         onLayout={e => { tabsViewW.current = e.nativeEvent.layout.width }} contentContainerStyle={s.tabsContent}>
         {titles.map((title, i) => (
           <Pressable key={title} ref={r => { tabRefs.current[i] = r }} onPress={() => onSelect(i)}
-            style={[s.tab, i === active && s.tabOn]} accessibilityRole="tab" accessibilityLabel={title}
+            style={({ pressed }) => [s.tab, i === active && s.tabOn, pressed && { opacity: press.small }]} accessibilityRole="tab" accessibilityLabel={title}
             accessibilityState={{ selected: i === active }}>
             <Text style={[s.tabText, i === active && s.tabTextOn]}>{title}</Text>
           </Pressable>
@@ -199,13 +199,21 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       r.measureLayout(inner, (_x, y) => { tops.current[i] = y; res() }, () => res())
     }))).then(resolve)
   }), [])
-  useEffect(() => () => clearTimeout(lockTimer.current), [])
+  const measureTimer = useRef(null)
+  const scheduleMeasure = useCallback(() => {
+    clearTimeout(measureTimer.current)
+    measureTimer.current = setTimeout(measureTops, 50)
+  }, [measureTops])
+  useEffect(() => () => { clearTimeout(lockTimer.current); clearTimeout(measureTimer.current) }, [])
 
+  const releaseLock = useCallback(() => { lockRef.current = false }, [])
   const onScroll = useCallback(e => {
     if (lockRef.current) return
-    const edge = e.nativeEvent.contentOffset.y + tabsH.current + TAB_SCROLL_OFFSET
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
+    const edge = contentOffset.y + tabsH.current + TAB_SCROLL_OFFSET
     let idx = 0
     for (let i = 0; i < tops.current.length; i++) if (tops.current[i] != null && tops.current[i] <= edge) idx = i
+    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 2 && tops.current.length) idx = tops.current.length - 1
     if (idx !== activeRef.current) { activeRef.current = idx; setActiveSec(idx) }
   }, [])
 
@@ -217,7 +225,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     setActiveSec(i)
     scrollRef.current?.scrollTo({ y: Math.max(0, tops.current[i] - tabsH.current), animated: !reduce })
     clearTimeout(lockTimer.current)
-    lockTimer.current = setTimeout(() => { lockRef.current = false }, reduce ? 80 : 700)
+    lockTimer.current = setTimeout(() => { lockRef.current = false }, reduce ? 80 : 1200)
   }, [measureTops, reduce])
   const setTabsH = useCallback(h => { tabsH.current = h }, [])
   const sectionTitles = useMemo(() => sections.map(sec => sec.title), [sections])
@@ -244,7 +252,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
       <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
         stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showTabs ? onScroll : undefined} scrollEventThrottle={16}
-        onContentSizeChange={showTabs ? measureTops : undefined}>
+        onContentSizeChange={showTabs ? scheduleMeasure : undefined}
+        onMomentumScrollEnd={showTabs ? releaseLock : undefined} onScrollEndDrag={showTabs ? releaseLock : undefined}>
         <Card>
           <View style={s.head}>
             <EateryLogo partner={partner} width={72} height={72} decorative />
@@ -272,7 +281,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
             <Text style={s.h}>{t('eateryMenu', lang)}</Text>
             {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tagGap} />}
             {sections.map((sec, si) => (
-              <View key={sec.title} ref={r => { secRefs.current[si] = r }} collapsable={false} onLayout={showTabs ? measureTops : undefined}
+              <View key={sec.title} ref={r => { secRefs.current[si] = r }} collapsable={false} onLayout={showTabs ? scheduleMeasure : undefined}
                 style={[s.menuSec, si > 0 && s.menuSecNext]}>
                 <Text style={s.secTitle} accessibilityRole="header">
                   {sec.title}
@@ -353,15 +362,15 @@ const s = StyleSheet.create({
   hourVal:   { ...type.body, color: colors.textPrimary, flexShrink: 0 },
   actions:   { gap: space[8] },
   menuSec:   { marginTop: space[12] },
-  menuSecNext: { marginTop: space[20], paddingTop: space[20], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  secTitle:  { ...type.sectionHeading, color: colors.primaryDark, marginBottom: space[4] },
-  secCount:  { color: colors.textSecondary },
+  menuSecNext: { marginTop: space[20] },
+  secTitle:  { ...type.sectionHeading, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.sm, paddingVertical: space[8], paddingHorizontal: space[12], marginBottom: space[4] },
+  secCount:  { fontFamily: font.regular, color: colors.textSecondary },
   tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   tabsContent: { paddingHorizontal: 16 },
   tab:       { minHeight: 44, paddingHorizontal: space[12], justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
   tabOn:     { borderBottomColor: colors.primary },
-  tabText:   { ...type.body, color: colors.textSecondary },
-  tabTextOn: { fontFamily: font.semibold, color: colors.primary },
+  tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondary },
+  tabTextOn: { color: colors.primary },
   itemRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[12], paddingVertical: space[8] },
   itemText:  { flex: 1 },
   itemName:  { ...type.body, color: colors.textPrimary },
