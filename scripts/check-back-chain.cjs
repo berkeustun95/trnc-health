@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases (+2 for Yeme-İçme) from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery order sheet (rides eateryPartnerBackRef). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -73,6 +73,8 @@ const cases4=[
  ['Eatery partner opened from the map pin -> leaves the module AND the partner (one press, back on the map)', {...base, showEatery:true, eateryPartner:{id:1}, eateryFromMap:true}, {}, r=>r.r===true && r.calls==='setShowEatery(false) setEateryPartner(null)'],
  ['Eatery dish photo viewer open -> closes the viewer only, NOT the partner', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryPartnerBackRef:()=>true}, r=>r.r===true && r.calls===''],
  ['Eatery dish photo viewer open over a map-opened partner -> viewer only, module stays', {...base, showEatery:true, eateryPartner:{id:1}, eateryFromMap:true}, {eateryPartnerBackRef:()=>true}, r=>r.r===true && r.calls===''],
+ ['Eatery order sheet open -> closes the sheet only (it rides eateryPartnerBackRef like the photo viewer), NOT the partner', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryPartnerBackRef:()=>true}, r=>r.r===true && r.calls===''],
+ ['Eatery order sheet open over a map-opened partner -> sheet only, module and partner stay', {...base, showEatery:true, eateryPartner:{id:1}, eateryFromMap:true}, {eateryPartnerBackRef:()=>true}, r=>r.r===true && r.calls===''],
  ['Eatery list -> closes the module', {...base, showEatery:true}, {}, r=>r.r===true && r.calls==='setShowEatery(false)'],
  ['Ehliyet -> closes the module', {...base, showEhliyet:true}, {}, r=>r.calls==='setShowEhliyet(false)'],
  ['S10 Insurance layer -> module step', {...base, showInsurance:true}, {insuranceBackRef:()=>true}, r=>r.calls===''],
