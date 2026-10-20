@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase'
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '../constants/auth'
 import { savePendingConsent, clearPendingConsent } from './pendingConsent'
 
+// The last social sign-in failure in plain technical form ("google 10", "supabase 400: …"), for the
+// Preview-only line under "Giriş yapılamadı" (SocialSignInButtons). Never shown in production builds.
+let lastSocialError = null
+export const socialErrorDetail = () => lastSocialError
+const detailOf = (who, e) => `${who} ${e?.status ?? e?.code ?? '?'}${e?.message ? `: ${String(e.message).slice(0, 120)}` : ''}`
+
 // Native Google + Apple sign-in, ending in a Supabase session via signInWithIdToken.
 //
 // ─── EVERY NATIVE MODULE HERE IS require()d INSIDE A FUNCTION ───────────────
@@ -48,6 +54,7 @@ export async function appleAvailableAsync() {
 export async function signInWithGoogle({ consent } = {}) {
   let m
   let saved = false
+  lastSocialError = null
   try {
     m = googleSignin()
     if (Platform.OS === 'android') {
@@ -56,16 +63,18 @@ export async function signInWithGoogle({ consent } = {}) {
     const res = await m.GoogleSignin.signIn()
     if (!m.isSuccessResponse(res)) return null
     const { idToken, user } = res.data
-    if (!idToken) return 'socialSignInFailed'
+    if (!idToken) { lastSocialError = 'google: no idToken'; return 'socialSignInFailed' }
     if (consent && user?.email) {
       await savePendingConsent({ email: user.email, ...consent })
       saved = true
     }
     const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken })
     if (!error) return null
+    lastSocialError = detailOf('supabase', error)
   } catch (e) {
     const codes = m?.statusCodes ?? {}
     if (e?.code && (e.code === codes.SIGN_IN_CANCELLED || e.code === codes.IN_PROGRESS)) return null
+    lastSocialError = detailOf('google', e)
     if (saved) await clearPendingConsent()
     return e?.code && e.code === codes.PLAY_SERVICES_NOT_AVAILABLE
       ? 'socialPlayServicesMissing'
@@ -77,6 +86,7 @@ export async function signInWithGoogle({ consent } = {}) {
 
 export async function signInWithApple({ consent } = {}) {
   let saved = false
+  lastSocialError = null
   try {
     const Apple = require('expo-apple-authentication')
     const Crypto = require('expo-crypto')
@@ -88,7 +98,7 @@ export async function signInWithApple({ consent } = {}) {
       requestedScopes: [Apple.AppleAuthenticationScope.FULL_NAME, Apple.AppleAuthenticationScope.EMAIL],
       nonce: hashedNonce,
     })
-    if (!cred.identityToken) return 'socialSignInFailed'
+    if (!cred.identityToken) { lastSocialError = 'apple: no identityToken'; return 'socialSignInFailed' }
     if (consent) {
       // credential.email arrives on the first authorisation only; the token carries it always,
       // including a private-relay address, which is what Supabase stores.
@@ -101,6 +111,7 @@ export async function signInWithApple({ consent } = {}) {
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'apple', token: cred.identityToken, nonce: rawNonce,
     })
+    if (error) lastSocialError = detailOf('supabase', error)
     if (!error) {
       await saveAppleName(data?.user, cred.fullName)
       storeAppleToken(cred.authorizationCode)
@@ -108,6 +119,7 @@ export async function signInWithApple({ consent } = {}) {
     }
   } catch (e) {
     if (e?.code === 'ERR_REQUEST_CANCELED') return null
+    lastSocialError = detailOf('apple', e)
   }
   if (saved) await clearPendingConsent()
   return 'socialSignInFailed'
