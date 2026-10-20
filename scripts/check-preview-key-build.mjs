@@ -9,16 +9,18 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const NAME = 'EXPO_PUBLIC_ADA_PREVIEW_KEY'
+const NAMES = ['EXPO_PUBLIC_ADA_PREVIEW_KEY', 'EXPO_PUBLIC_ADA_TEST_WHATSAPP']
 const preview = process.env.APP_VARIANT === 'preview'
-const seen = []
-if (process.env[NAME]) seen.push('build environment')
-for (const f of ['.env.production.local', '.env.local', '.env.production', '.env']) {
-  const p = resolve(ROOT, f)
-  if (existsSync(p) && new RegExp(`^\\s*(?:export\\s+)?${NAME}\\s*=`, 'm').test(readFileSync(p, 'utf8'))) seen.push(f)
+for (const NAME of NAMES) {
+  const seen = []
+  if (process.env[NAME]) seen.push('build environment')
+  for (const f of ['.env.production.local', '.env.local', '.env.production', '.env']) {
+    const p = resolve(ROOT, f)
+    if (existsSync(p) && new RegExp(`^\\s*(?:export\\s+)?${NAME}\\s*=`, 'm').test(readFileSync(p, 'utf8'))) seen.push(f)
+  }
+  if (!preview && seen.length) {
+    console.error(`✗ preview key guard: ${NAME} is visible to a NON-Preview build (${seen.join(', ')}) — it would be inlined into the binary. Remove it from that EAS environment / file.`)
+    process.exit(1)
+  }
 }
-if (!preview && seen.length) {
-  console.error(`✗ preview key guard: ${NAME} is visible to a NON-Preview build (${seen.join(', ')}) — it would be inlined into the binary. Remove it from that EAS environment / file.`)
-  process.exit(1)
-}
-console.log(`✓ preview key guard: ${preview ? 'Preview build (key allowed)' : 'not a Preview build, key absent'}`)
+console.log(`✓ preview key guard: ${preview ? 'Preview build (key and test number allowed)' : 'not a Preview build, key and test number absent'}`)
