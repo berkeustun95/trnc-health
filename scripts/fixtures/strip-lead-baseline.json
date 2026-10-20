@@ -705,16 +705,16 @@
   "promosEligible": false,
   "dismissed": null,
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -738,16 +738,16 @@
    "db-promo-1"
   ],
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -833,16 +833,16 @@
   "promosEligible": false,
   "dismissed": null,
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -866,16 +866,16 @@
    "db-promo-1"
   ],
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -961,16 +961,16 @@
   "promosEligible": false,
   "dismissed": null,
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -994,16 +994,16 @@
    "db-promo-1"
   ],
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -1034,92 +1034,6 @@
   ],
   "lastKind": null,
   "promosEligible": true,
-  "dismissed": null,
-  "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
-   "imageUrl": null,
-   "sponsored": true,
-   "action": {
-    "type": "link",
-    "url": "https://x.example"
-   }
-  }
- },
- {
-  "rows": [
-   {
-    "id": "db-promo-1",
-    "kind": "promo",
-    "title_i18n": {
-     "en": "Paid sponsor"
-    },
-    "subtitle_i18n": null,
-    "image_url": null,
-    "link_url": "https://x.example",
-    "pin_date": null
-   },
-   {
-    "id": "db-today",
-    "kind": "promo",
-    "title_i18n": {
-     "en": "Paid sponsor"
-    },
-    "subtitle_i18n": null,
-    "image_url": null,
-    "link_url": "https://x.example",
-    "pin_date": "2026-10-18"
-   }
-  ],
-  "lastKind": null,
-  "promosEligible": true,
-  "dismissed": [
-   "db-promo-1"
-  ],
-  "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
-   "imageUrl": null,
-   "sponsored": true,
-   "action": {
-    "type": "link",
-    "url": "https://x.example"
-   }
-  }
- },
- {
-  "rows": [
-   {
-    "id": "db-promo-1",
-    "kind": "promo",
-    "title_i18n": {
-     "en": "Paid sponsor"
-    },
-    "subtitle_i18n": null,
-    "image_url": null,
-    "link_url": "https://x.example",
-    "pin_date": null
-   },
-   {
-    "id": "db-today",
-    "kind": "promo",
-    "title_i18n": {
-     "en": "Paid sponsor"
-    },
-    "subtitle_i18n": null,
-    "image_url": null,
-    "link_url": "https://x.example",
-    "pin_date": "2026-10-18"
-   }
-  ],
-  "lastKind": null,
-  "promosEligible": false,
   "dismissed": null,
   "lead": {
    "kind": "promo",
@@ -1161,7 +1075,7 @@
    }
   ],
   "lastKind": null,
-  "promosEligible": false,
+  "promosEligible": true,
   "dismissed": [
    "db-promo-1"
   ],
@@ -1176,6 +1090,92 @@
    "action": {
     "type": "link",
     "url": "https://x.example"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": null,
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
+   }
+  }
+ },
+ {
+  "rows": [
+   {
+    "id": "db-promo-1",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": null
+   },
+   {
+    "id": "db-today",
+    "kind": "promo",
+    "title_i18n": {
+     "en": "Paid sponsor"
+    },
+    "subtitle_i18n": null,
+    "image_url": null,
+    "link_url": "https://x.example",
+    "pin_date": "2026-10-18"
+   }
+  ],
+  "lastKind": null,
+  "promosEligible": false,
+  "dismissed": [
+   "db-promo-1"
+  ],
+  "lead": {
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
+   "imageUrl": null,
+   "sponsored": false,
+   "action": {
+    "type": "events"
    }
   }
  },
@@ -1294,16 +1294,16 @@
   "promosEligible": false,
   "dismissed": null,
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -1338,16 +1338,16 @@
    "db-promo-1"
   ],
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -1466,16 +1466,16 @@
   "promosEligible": false,
   "dismissed": null,
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },
@@ -1510,16 +1510,16 @@
    "db-promo-1"
   ],
   "lead": {
-   "kind": "promo",
-   "id": "db-today",
-   "title": "Paid sponsor",
-   "subtitle": "",
-   "icon": "megaphone-outline",
+   "kind": "event",
+   "id": "generic",
+   "generic": true,
+   "titleKey": "stripEventsTitle",
+   "subtitleKey": "stripEventsSub",
+   "icon": "calendar-outline",
    "imageUrl": null,
-   "sponsored": true,
+   "sponsored": false,
    "action": {
-    "type": "link",
-    "url": "https://x.example"
+    "type": "events"
    }
   }
  },

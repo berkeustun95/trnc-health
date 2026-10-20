@@ -77,8 +77,8 @@ const firstImage = v => (Array.isArray(v) ? v.find(Boolean) : v) || null
 
 // ─── RANK 1 + 5 — home_strip_pin ────────────────────────────────────────────
 // One table, two jobs, and they are told apart by pin_date rather than by kind:
-// a row pinned to TODAY wins outright whatever it is (including a paid takeover), and a
-// promo with no pin_date sits in the standing rank-5 pool. A promo can therefore be
+// a row pinned to TODAY overrides the ladder (a PAID one — a promo, or any pin naming a sponsor — only for a
+// promo-eligible user, pinVisible()), and a promo with no pin_date sits in the standing rank-5 pool. A promo can therefore be
 // bought as either without a second table.
 //
 // This fetches EVERY active in-window row and does no date filtering of its own: both
@@ -97,6 +97,12 @@ async function readPins() {
     (!r.starts_at || new Date(r.starts_at).getTime() <= now) &&
     (!r.ends_at   || new Date(r.ends_at).getTime()   >= now))
 }
+
+// A pin for today overrides the ladder, but a PAID pin (hydrated as sponsored: true — today the promo kind) keeps
+// the same 18+ gate as every other paid promo: guests, no-DOB and under-18 accounts skip it and the ladder goes on.
+// Editorial pins (event, place, notice) stay visible to everyone. Fail closed: only promosEligible === true opens it.
+// (Security review 2026-10-20: the today loops returned a sponsored pin before the promosEligible check.)
+export const pinVisible = (item, promosEligible) => item.sponsored !== true || promosEligible === true
 
 async function hydratePin(pin, lang) {
   if (pin.kind === 'promo') {
@@ -124,7 +130,8 @@ async function hydratePin(pin, lang) {
       subtitle: i18nText(pin.subtitle_i18n, lang) || eventWhen(data.start_date, lang),
       icon: 'calendar-outline',
       imageUrl: pin.image_url || firstImage(data.images) || data.source_image_url || null,
-      sponsored: false,
+      // A pin that names a sponsor is paid, whatever it points at: labelled, and gated by pinVisible().
+      sponsored: !!pin.sponsor_name,
       action: { type: 'events', id: data.id },
     }
   }
@@ -162,7 +169,7 @@ async function hydratePin(pin, lang) {
       subtitle: i18nText(pin.subtitle_i18n, lang),
       icon: 'location-outline',
       imageUrl: pin.image_url || data.cover_image_url || firstImage(data.photos) || null,
-      sponsored: false,
+      sponsored: !!pin.sponsor_name,
       action: { type: 'place', id: data.id },
     }
   }
@@ -334,7 +341,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     const todays = pins.filter(p => p.pin_date === todayIso && !isDismissed(p.id))
     for (const p of todays) {
       const item = await hydratePin(p, lang)
-      if (item) return item
+      if (item && pinVisible(item, promosEligible)) return item
     }
   } catch { /* table absent, offline, or RLS — fall through */ }
 
@@ -401,7 +408,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
 // assembled by utils/stripSlides.js — they never enter this ladder.
 // ─── THE REDESIGN HOME BANNER — its own ladder (Berke, 2026-10-01) ──────────
 //
-//   0  a pin for TODAY, any kind        home_strip_pin, pin_date = today — the manual override
+//   0  a pin for TODAY, any kind        home_strip_pin, pin_date = today — the manual override; a paid pin only if promosEligible
 //   1  a sponsored promo                (DB promos only; eatery partners are their own slides, utils/stripSlides.js) the SAME two hard gates as rank 5 above: promosEligible
 //                                       (never a guest, a null DOB or anyone under PROMO_MIN_AGE)
 //                                       and never twice running (STRIP_LAST_KIND_KEY)
@@ -424,7 +431,7 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
     pins = await readPins()
     for (const p of pins.filter(p => p.pin_date === todayIso && !isDismissed(p.id))) {
       const item = await hydratePin(p, lang)
-      if (item) return item
+      if (item && pinVisible(item, promosEligible)) return item
     }
   } catch { /* fall through */ }
   if (promosEligible) {
