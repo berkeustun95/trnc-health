@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { googleAvailable, appleAvailableAsync, signInWithGoogle, signInWithApple } from '../utils/socialAuth'
+import { googleAvailable, appleAvailableAsync, signInWithGoogle, signInWithApple, socialErrorDetail } from '../utils/socialAuth'
+import { EATERY_PREVIEW_DATA as PREVIEW_DIAGNOSTICS } from '../constants/redesign'
 
 // Sign in with Apple + Google, above the email form on both AuthScreen tabs.
 //
@@ -61,6 +62,8 @@ export default function SocialSignInButtons({ lang, consent }) {
   // Shown HERE, under the button that failed — not in the email form's error slot below the
   // password field, where it would read as a problem with the password.
   const [errorKey, setErrorKey] = useState(null)
+  // Dev / ADA Preview only: the real failure under the message, so a sign-in problem is never guessed at.
+  const [errorDetail, setErrorDetail] = useState(null)
   const google = googleAvailable()
 
   useEffect(() => {
@@ -76,10 +79,12 @@ export default function SocialSignInButtons({ lang, consent }) {
     if (busy) return
     setBusy(which)
     setErrorKey(null)
+    setErrorDetail(null)
     const key = await signIn({ consent })
     // On success SIGNED_IN has already swapped this screen out from under us.
     setBusy(null)
     setErrorKey(key)
+    setErrorDetail(key && PREVIEW_DIAGNOSTICS ? socialErrorDetail() : null)
   }
 
   return (
@@ -94,6 +99,7 @@ export default function SocialSignInButtons({ lang, consent }) {
         />
       )}
       {!!errorKey && <Text style={s.error}>{t(errorKey, lang)}</Text>}
+      {!!errorDetail && <Text style={s.errorDetail} selectable>{errorDetail}</Text>}
       <View style={s.orRow}>
         <View style={s.orLine} />
         <Text style={s.orText}>{t('socialOr', lang)}</Text>
@@ -113,6 +119,7 @@ const s = StyleSheet.create({
   googleText: { fontFamily: 'Roboto_500Medium', fontSize: 17, color: '#1F1F1F', flexShrink: 1 },
   dim:        { opacity: 0.5 },
   error:      { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, textAlign: 'center' },
+  errorDetail:{ fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontSize: 11, textAlign: 'center' },
   orRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6, marginBottom: 12 },
   orLine:     { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.textSecondary, opacity: 0.4 },
   orText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
