@@ -910,6 +910,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('eatery_partners', 'is_active', true, 'false', 'boolean'),
     ('eatery_partners', 'created_at', true, 'now()', 'timestamp with time zone'),
     ('eatery_partners', 'updated_at', true, 'now()', 'timestamp with time zone'),
+    ('eatery_partners', 'adult_only', true, 'false', 'boolean'),
     ('eatery_menu_items', 'id', false, NULL, 'bigint'),
     ('eatery_menu_items', 'partner_id', true, NULL, 'uuid'),
     ('eatery_menu_items', 'section', true, NULL, 'text'),

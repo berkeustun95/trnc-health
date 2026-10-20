@@ -59,7 +59,7 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
       accessibilityRole="button" accessibilityState={{ disabled: !ready }}
       accessibilityLabel={t('eateryDishPhotoOpen', lang).replace('{name}', () => name)}>
       {uri
-        ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor={colors.soft}
+        ? <RemoteImage source={{ uri }} resizeMode="contain" style={s.fill} placeholderColor={colors.card}
             onLoad={() => setLoaded(true)} onError={onFail} transition={reduce ? 0 : 200} accessibilityIgnoresInvertColors />
         : <PlaceholderFrame lang={lang} compact style={s.fill} />}
     </Pressable>
@@ -158,9 +158,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   })
 
   // The tap is logged on the line BEFORE the link opens (utils/logContactEvent: it never throws);
-  // a placeholder partner has no real id and logs nothing.
+  // a placeholder partner has no real id and an inactive (previewer-only) row is not live: both log nothing.
   const go = (action, url) => {
-    if (!partner.placeholder) logContactEvent('eatery', partner.id, action)
+    if (!partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
     Linking.openURL(url).catch(() => {})
   }
 
@@ -183,6 +183,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
             </View>
           </View>
           {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tag} />}
+          {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>
 
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
@@ -277,7 +278,7 @@ const s = StyleSheet.create({
   itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   menuBtn:   { marginTop: space[16] },
   fill:      { width: '100%', height: '100%' },
-  thumb:     { width: THUMB, height: THUMB, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+  thumb:     { width: THUMB, height: THUMB, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   // Neutral black scrim = photo treatment (ada-style §6), not a brand colour: never tint partner food photos.
   viewer:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)' },
   viewerBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: space[16], flexShrink: 0 },

@@ -13,7 +13,10 @@
 //   and baselined in check-module-flags.mjs with the same value; (b) the redesign.js gate
 //   expressions have their canonical shape (EATERY_PREVIEW_DATA = dev || Preview build, nothing
 //   else); (c) constants/eateryPreview.js placeholders are reachable only through a require()
-//   guarded by EATERY_PREVIEW_DATA; (d) every EATERY_GATES key is a seeded slug.
+//   guarded by EATERY_PREVIEW_DATA; (d) every EATERY_GATES key is a seeded slug; (e) production keeps
+//   the is_active filter: the loader drops `.eq('is_active', true)` ONLY under !EATERY_PREVIEW_DATA, and it
+//   is the only app reader of the eatery tables (20261119 lets the previewer account read inactive rows, so
+//   in production the client filter is the only thing keeping them out of every build).
 // DB (full mode, a flag true only): the live partner is visible to anon, active, complete and its
 //   menu is verified within MENU_MAX_AGE_DAYS. Fails closed on a missing key or any HTTP error.
 //
@@ -143,6 +146,31 @@ function listSource() {
   }
   SCAN.forEach(walk)
   return files
+}
+
+// ─── (e) production is_active filter + single reader ───────────────────────
+const FILTER = "if (!EATERY_PREVIEW_DATA) q = q.eq('is_active', true)"
+function loaderFilterProblems(text) {
+  const src = norm(stripComments(text))
+  const out = []
+  const reads = src.split(".from('eatery_partners')").length - 1
+  if (reads !== 1) out.push(`expected exactly 1 .from('eatery_partners') in the loader, found ${reads}`)
+  const at = src.indexOf(FILTER)
+  if (at < 0 || src.indexOf(FILTER, at + 1) >= 0) out.push(`expected exactly once: ${FILTER}`)
+  else {
+    const from = src.indexOf(".from('eatery_partners')"), awaitQ = src.indexOf('await q')
+    if (!(from >= 0 && from < at && awaitQ > at)) out.push('the is_active filter must sit between the query and its await')
+  }
+  return out
+}
+const READ_RE = /\.from\(\s*(['"])eatery_(partners|menu_items|photos)\1\s*\)/
+function readerProblems(byFile) {
+  const out = []
+  for (const [f, text] of Object.entries(byFile)) {
+    if (f === 'utils/loadEateryPartners.js') continue
+    if (READ_RE.test(stripComments(text))) out.push(`${f} reads an eatery table directly; go through utils/loadEateryPartners.js (it keeps the production is_active filter)`)
+  }
+  return out
 }
 
 // ─── (d) sponsored slug ─────────────────────────────────────────────────────
@@ -394,6 +422,27 @@ console.log(`flags: EATERY_LIVE=${flags.EATERY_LIVE} CRUNCHY_EXPRESS_LIVE=${flag
     assert(keys.length ? [] : ['EATERY_GATES has no keys (parse failure or gates removed)'], 'gate keys present')
     assert(keys.flatMap(k => slugProblems(k, seeded)), 'gate slugs seeded')
   }
+}
+
+// (e) Production keeps the is_active filter, and the loader is the only app reader of the eatery tables.
+{
+  const ctlLoader = "import { EATERY_PREVIEW_DATA } from '../constants/redesign'\nexport async function loadEateryPartners(cols) {\n  let q = supabase.from('eatery_partners').select(cols)\n  if (!EATERY_PREVIEW_DATA) q = q.eq('is_active', true)\n  const { data } = await q.order('sort_order')\n}\n"
+  mustPass('loader filter kept', loaderFilterProblems(ctlLoader))
+  mustFail('loader filter removed', loaderFilterProblems(ctlLoader.replace("  if (!EATERY_PREVIEW_DATA) q = q.eq('is_active', true)\n", '')))
+  mustFail('loader filter only in a comment', loaderFilterProblems(ctlLoader.replace("  if (!EATERY_PREVIEW_DATA)", "  // if (!EATERY_PREVIEW_DATA)")))
+  mustFail('loader filter under __DEV__', loaderFilterProblems(ctlLoader.replace('if (!EATERY_PREVIEW_DATA)', 'if (!__DEV__)')))
+  mustFail('loader filter under isAdmin', loaderFilterProblems(ctlLoader.replace('if (!EATERY_PREVIEW_DATA)', 'if (!EATERY_PREVIEW_DATA && !isAdmin)')))
+  mustFail('loader filter after the await', loaderFilterProblems(ctlLoader.replace("  if (!EATERY_PREVIEW_DATA) q = q.eq('is_active', true)\n  const { data } = await q.order('sort_order')\n", "  const { data } = await q.order('sort_order')\n  if (!EATERY_PREVIEW_DATA) q = q.eq('is_active', true)\n")))
+  mustFail('loader with a second read', loaderFilterProblems(ctlLoader + "const b = supabase.from('eatery_partners').select('*')\n"))
+  mustPass('reader: loader only', readerProblems({ 'utils/loadEateryPartners.js': ctlLoader, 'screens/X.js': "const COLS = 'slug, eatery_menu_items(name)'\n" }))
+  mustFail('reader: a screen queries eatery_partners', readerProblems({ 'utils/loadEateryPartners.js': ctlLoader, 'screens/X.js': "supabase.from('eatery_partners').select('*')\n" }))
+  mustFail('reader: a screen queries eatery_menu_items', readerProblems({ 'utils/loadEateryPartners.js': ctlLoader, 'screens/X.js': 'supabase.from("eatery_menu_items").select()\n' }))
+  mustPass('reader: mention in a comment', readerProblems({ 'utils/loadEateryPartners.js': ctlLoader, 'screens/X.js': "// supabase.from('eatery_photos')\n" }))
+
+  assert(loaderFilterProblems(read('utils/loadEateryPartners.js')), 'loader is_active filter')
+  const files = listSource()
+  assert(readerProblems(Object.fromEntries(files.map(f => [f, read(f)]))), 'single eatery reader')
+  console.log(`production is_active filter: kept under !EATERY_PREVIEW_DATA; eatery readers scanned in ${files.length} source files`)
 }
 
 // DB half
