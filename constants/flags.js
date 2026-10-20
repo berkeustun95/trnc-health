@@ -671,7 +671,8 @@ export const VOICE_INPUT = true   // on from the 1.4.0 store build (2026-10-09);
 // Yeme-İçme (Eateries) section. false = no Home tile and no way in. NOT a MODULE_FLAGS key: no
 // waitlist to collect and no notify path — the HOTELS_LIVE reasoning. Dev bundles and ADA Preview
 // open it through EATERY in constants/redesign.js. Do not flip until, in order:
-//   1. 20261115 (eatery_partners) applied and verify_schema green.
+//   1. 20261115 (eatery_partners) AND 20261121 (adult_only) applied and verify_schema green. Home selects
+//      adult_only; without the column the partner query fails and the strip silently shows no partner slides.
 //   2. Crunchy Express data loaded and activated (go-live SOP steps 1-3).
 //   3. Turkish device pass with this flipped LOCALLY.
 //   4. Both files in ONE commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs).
