@@ -94,7 +94,7 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeig
   useEffect(() => {
     const tab = tabRefs.current[active]
     const inner = scrollRef.current?.getInnerViewRef?.()
-    if (!tab || !inner || active === 0 || tabsViewW.current === 0) return
+    if (!tab || !inner || tabsViewW.current === 0) return
     tab.measureLayout(inner, (x, _y, w) => {
       scrollRef.current?.scrollTo({ x: Math.max(0, x + w / 2 - tabsViewW.current / 2), animated: !reduce })
     }, () => {})
