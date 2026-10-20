@@ -14,7 +14,7 @@ import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { effectiveWhatsapp, useBasket, getBasket, setBasket, changeQty } from '../utils/eateryBasket'
-import { QtyStepper, OrderBar, OrderSheet } from '../components/EateryOrder'
+import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
 
@@ -51,6 +51,7 @@ function HoursBlock({ week, open, lang }) {
   )
 }
 
+const SNACK_ABOVE_BAR = 150   // clears the pinned order bar / Sepetim footer (stacked bar at font scale 1.3 is the tallest)
 const THUMB = 64
 const SHOW_SECTION_COUNT = false  // "Nachos · 3": muted dish count beside a section title
 const TAB_SCROLL_OFFSET = 8       // a section is "current" once its top is within this of the pinned tab row
@@ -196,26 +197,42 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const orderDigits = eateryOrderDigits(effectiveWhatsapp(partner))
   const ordering = !!orderDigits
   const basket = useBasket(partner.id)
-  const onQty = useCallback((id, delta) => changeQty(partner.id, id, delta), [partner.id])
   const lines = useMemo(() => {
     if (!ordering) return []
     return sections.flatMap(sec => sec.items).filter(eateryOrderable)
-      .filter(i => basket[i.id] > 0).map(i => ({ id: i.id, name: i.name, qty: basket[i.id], price: Number(i.price) }))
+      .filter(i => basket[i.id] > 0).map(i => ({ id: i.id, name: i.name, qty: basket[i.id], price: Number(i.price), photoPath: i.photoPath }))
   }, [ordering, sections, basket])
   const orderCurrency = sections.flatMap(sec => sec.items).find(eateryOrderable)?.currency
   const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
   const orderCount = lines.reduce((n, l) => n + l.qty, 0)
   const orderTotalText = formatMoney(orderTotal(lines))
-  const [orderOpen, setOrderOpen] = useState(false)
+  const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
+  const [basketShown, setBasketShown] = useState(false)
   const [note, setNote] = useState('')
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
   const undoRef = useRef(null)
-  const [cleared, setCleared] = useState(false)
-  useEffect(() => { if (orderOpen && lines.length === 0) setOrderOpen(false) }, [orderOpen, lines.length])
-  // A refilled basket makes the old "Geri al" stale: drop the snapshot so Undo can never overwrite it.
-  useEffect(() => { if (lines.length > 0) { setCleared(false); undoRef.current = null } }, [lines.length])
+  const [snack, setSnack] = useState(null)   // 'eateryBasketCleared' | 'eateryBasketItemRemoved' while its "Geri al" is offered
+  // Empties the basket but keeps a snapshot for the snackbar's "Geri al" (no confirm dialog).
+  const clearBasket = () => {
+    undoRef.current = { basket: getBasket(partner.id), note: noteRef.current, withNote: true }
+    setBasket(partner.id, null)
+    setNote('')
+    setSnack('eateryBasketCleared')
+  }
+  // Every basket change drops the old snapshot first (a stale Undo must never overwrite newer edits); taking the last
+  // unit off a dish (the bin) then offers its own undo.
+  const onQty = useCallback((id, delta) => {
+    const cur = getBasket(partner.id)
+    undoRef.current = null
+    setSnack(null)
+    if (delta < 0 && cur[id] === 1) {
+      undoRef.current = { basket: cur, note: '', withNote: false }
+      setSnack('eateryBasketItemRemoved')
+    }
+    changeQty(partner.id, id, delta)
+  }, [partner.id])
   useEffect(() => {
     const sub = AppState.addEventListener('change', st => {
       const a = armedRef.current
@@ -223,10 +240,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       if (st !== 'active') { a.left = true; return }
       if (!a.left) return
       armedRef.current = null
-      undoRef.current = { basket: getBasket(partner.id), note: noteRef.current }
-      setBasket(partner.id, null)
-      setNote('')
-      setCleared(true)
+      clearBasket()
     })
     return () => sub.remove()
   }, [partner.id])
@@ -234,8 +248,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     const u = undoRef.current
     undoRef.current = null
     haptic()
-    setCleared(false)
-    if (u) { setBasket(partner.id, u.basket); setNote(u.note) }
+    setSnack(null)
+    if (u) { setBasket(partner.id, u.basket); if (u.withNote) setNote(u.note) }
   }
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
@@ -293,7 +307,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
-      if (orderOpen) { setOrderOpen(false); return true }
+      if (basketOpen) { setBasketOpen(false); return true }
       if (viewing) { setViewing(null); return true }
       return false
     }
@@ -306,17 +320,18 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     if (!partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
     Linking.openURL(url).catch(() => { onFail?.() })
   }
-  // Closes the sheet and opens WhatsApp. Only the tap is logged (action 'order_whatsapp'): never the basket or the note.
+  // Closes the basket page and opens WhatsApp. Only the tap is logged (action 'order_whatsapp'): never the basket or the note.
   const sendOrder = () => {
     if (!ordering || lines.length === 0) return
     armedRef.current = { left: false }
-    setOrderOpen(false)
+    setBasketOpen(false)
     go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(lines, note)), () => { armedRef.current = null })
   }
-  const openOrder = () => { armedRef.current = null; setOrderOpen(true) }
+  const openBasket = () => { armedRef.current = null; setBasketShown(true); setBasketOpen(true) }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <View style={s.under} {...(basketOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
       <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: lines.length > 0 ? space[20] : listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
         stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showTabs ? onScroll : undefined} scrollEventThrottle={16}
@@ -399,13 +414,15 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         )}
 
       </ScrollView>
-      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openOrder} />}
-      <Snackbar visible={cleared && lines.length === 0} message={t('eateryOrderCleared', lang)} actionLabel={t('eateryOrderUndo', lang)}
-        onAction={undoClear} onTimeout={() => { setCleared(false); undoRef.current = null }} reduce={reduce} bottom={insets.bottom + space[16]} />
-      {ordering && (
-        <OrderSheet bottomInset={insets.bottom} visible={orderOpen === true && lines.length > 0} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
-          note={note} onNote={setNote} lang={lang} onClose={() => setOrderOpen(false)} onSend={sendOrder} />
+      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} />}
+      </View>
+      {ordering && basketShown === true && (
+        <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
+          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
+      <Snackbar visible={snack !== null} message={snack ? t(snack, lang) : ''} actionLabel={t('eateryOrderUndo', lang)}
+        onAction={undoClear} onTimeout={() => { setSnack(null); undoRef.current = null }} reduce={reduce}
+        bottom={insets.bottom + (lines.length > 0 ? SNACK_ABOVE_BAR : space[16])} />
       <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>
   )
@@ -413,6 +430,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: colors.canvas },
+  under:     { flex: 1 },
   content:   { paddingHorizontal: 16, paddingTop: space[8], gap: 14 },
   head:      { flexDirection: 'row', alignItems: 'center', gap: space[16] },
   headText:  { flex: 1 },
