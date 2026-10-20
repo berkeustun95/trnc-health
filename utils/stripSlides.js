@@ -15,7 +15,7 @@ const byBase = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.n
 // paths (the component resolves the URL with eateryImageUrl); `placeholder` marks a Preview-fixture partner.
 const num = v => (Number.isFinite(v) ? v : 0)
 export const heroPathOf = items => {
-  const withPhoto = (Array.isArray(items) ? items : []).filter(i => i && typeof i.photo_path === 'string' && i.photo_path)
+  const withPhoto = (Array.isArray(items) ? items : []).filter(i => i && i.is_available !== false && typeof i.photo_path === 'string' && i.photo_path)
   withPhoto.sort((a, b) => num(a.section_order) - num(b.section_order) || num(a.sort_order) - num(b.sort_order) || num(a.id) - num(b.id))
   return withPhoto[0]?.photo_path ?? null
 }

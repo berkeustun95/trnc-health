@@ -130,6 +130,9 @@ t('partner slide (editorial: no sponsored flag)', sa, { kind: 'promo', id: 'eate
     { id: 4, section_order: 0, sort_order: 1, photo_path: 'a.jpg' }, { id: 3, section_order: 0, sort_order: 1, photo_path: 'a0.jpg' }]), 'a0.jpg')
   t('heroPath: items without photo_path are ignored (even if first)', await hero([
     { id: 1, section_order: 0, sort_order: 0, photo_path: null }, { id: 2, section_order: 0, sort_order: 1, photo_path: '' }, { id: 3, section_order: 0, sort_order: 2, photo_path: 'c.jpg' }]), 'c.jpg')
+  t('heroPath: an unavailable dish (is_available false) is never the hero', await hero([
+    { id: 1, section_order: 0, sort_order: 0, photo_path: 'hidden.jpg', is_available: false },
+    { id: 2, section_order: 0, sort_order: 1, photo_path: 'shown.jpg', is_available: true }]), 'shown.jpg')
   t('heroPath: null when no item has a photo / no items / not selected', [await hero([{ id: 1, photo_path: null }]), await hero([]), await hero(undefined)], [null, null, null])
 }
 t('placeholder flag carried', [sa.placeholder, sb.placeholder], [false, true])

@@ -404,7 +404,7 @@ export default function HomeScreen({
         // menu items' photo_path (the hero is the first dish photo; RLS scopes it to the partner). adult_only is selected so an adult partner keeps the 18+ gate in assembleStripSlides (fail closed).
         let partners = []
         if (EATERY === true) {
-          try { partners = (await loadEateryPartners('slug, name, logo_path, sort_order, adult_only, eatery_menu_items(photo_path, section_order, sort_order, id)')).rows } catch { partners = [] }
+          try { partners = (await loadEateryPartners('slug, name, logo_path, sort_order, adult_only, eatery_menu_items(photo_path, section_order, sort_order, id, is_available)')).rows } catch { partners = [] }
         }
         const rotation = await sessionRotation()
         const slides = await resolveStripSlides({ lang, promosEligible, dismissedIds, partners, gates: EATERY_GATES, rotation })
