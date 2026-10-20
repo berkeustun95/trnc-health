@@ -195,16 +195,18 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
     <View>
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
         accessibilityLabel={bannerLabel(item, lang)} style={s.banner}>
-        {showFrame ? (
+        {showFrame && showHero ? (
+          // The partner's dish photo fills the whole card like an event photo (directly in the card: the frame's
+          // padding would leave a strip); the band sits over its top.
+          <RemoteImage source={{ uri: heroUri }} style={s.bannerPhoto} resizeMode="cover" placeholderColor={colors.primaryLight}
+            onError={() => setHeroFailed(true)} accessibilityIgnoresInvertColors />
+        ) : showFrame ? (
           // A sponsor never borrows the events picture: ADA-theme frame (also the fallback for a photo
           // that fails to load). Padded by the MEASURED band height, so the logo can never meet the band.
-          <View style={[s.sponsorFrame, { paddingTop: showHero ? 0 : bandH + 6 }]}>
-            {showHero
-              ? <RemoteImage source={{ uri: heroUri }} style={s.bannerPhoto} resizeMode="cover" placeholderColor={colors.primaryLight}
-                  onError={() => setHeroFailed(true)} accessibilityIgnoresInvertColors />
-              : logoUri
-                ? <RemoteImage source={{ uri: logoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
-                : <Ionicons name={item.icon || 'restaurant-outline'} size={40} color={category.explore.ink} />}
+          <View style={[s.sponsorFrame, { paddingTop: bandH + 6 }]}>
+            {logoUri
+              ? <RemoteImage source={{ uri: logoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
+              : <Ionicons name={item.icon || 'restaurant-outline'} size={40} color={category.explore.ink} />}
           </View>
         ) : (
           <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
