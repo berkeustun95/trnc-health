@@ -3767,13 +3767,13 @@ WITH report AS (
     -- ── 1115: Yeme-Icme eatery partners ──────────────────────────────────────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object and would publish a partner
     --     before activation.
-    UNION ALL SELECT '1121_eatery_partners_adult_only','eatery_partners.adult_only boolean NOT NULL DEFAULT false (fail-safe default: editorial)',
-      COALESCE((SELECT data_type = 'boolean' AND is_nullable = 'NO' AND column_default = 'false' FROM information_schema.columns
-                 WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='adult_only'), false)
     UNION ALL SELECT '1115_eatery_partners','eatery_partners.is_active DEFAULT false',
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='is_active'
           AND column_default = 'false') = 1
+    UNION ALL SELECT '1121_eatery_partners_adult_only','eatery_partners.adult_only boolean NOT NULL DEFAULT false (fail-safe default: editorial)',
+      COALESCE((SELECT data_type = 'boolean' AND is_nullable = 'NO' AND column_default = 'false' FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='adult_only'), false)
     UNION ALL SELECT '1115_eatery_partners','eatery_menu_items: currency NOT NULL DEFAULT TRY, is_available NOT NULL DEFAULT true',
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='eatery_menu_items' AND is_nullable = 'NO'
