@@ -242,6 +242,7 @@ function pinCardContent(pin, lang) {
               REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : null].filter(Boolean).join(' · '),
       open,
       placeholder: !!row.placeholder,
+      unpublished: row.is_active === false,
     }
   }
   const photo = row.cover_image_url || row.photos?.[0]
@@ -266,7 +267,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
 
   const tc = { bg: pin.colorBg, text: pin.color }
 
-  const { image, title, badge, sub, open, placeholder } = pinCardContent(pin, lang)
+  const { image, title, badge, sub, open, placeholder, unpublished } = pinCardContent(pin, lang)
   const isEatery = pin.kind === 'eatery'
 
   if (REDESIGN) {
@@ -292,6 +293,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
           <IconButton icon="close" onPress={onClose} accessibilityLabel={t('uiClose', lang)} color={colors.textSecondary} style={r.close} />
         </View>
         {placeholder ? <PlaceholderTag lang={lang} /> : null}
+        {unpublished ? <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" /> : null}
         <Button title={t('viewProfile', lang)} onPress={onViewProfile} fullWidth />
       </View>
     )
@@ -321,6 +323,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
         </TouchableOpacity>
       </View>
       {placeholder ? <PlaceholderTag lang={lang} style={{ marginTop: 8 }} /> : null}
+      {unpublished ? <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={{ marginTop: 8 }} /> : null}
       <TouchableOpacity style={s.viewBtn} onPress={onViewProfile} activeOpacity={0.85}>
         <Text style={s.viewBtnText}>{t('viewProfile', lang)}</Text>
         <Ionicons name="chevron-forward" size={14} color="#fff" />
