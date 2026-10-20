@@ -118,6 +118,10 @@ const [, sa, sb] = await run({ partners: [A, B] })
 t('partner slide', sa, { kind: 'promo', id: 'eatery-a-cafe', sponsored: true, title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
 t('placeholder flag carried', [sa.placeholder, sb.placeholder], [false, true])
 t('no photo on a partner slide', [sa.imageUrl, sb.imageUrl], [undefined, undefined])
+{
+  const flag = async is_active => (await run({ partners: [{ ...A, is_active }] }))[1].unpublished
+  t('unpublished only when is_active === false (false/true/undefined/null)', [await flag(false), await flag(true), await flag(undefined), await flag(null)], [true, undefined, undefined, undefined])
+}
 console.log('never twice running applies to the lead only')
 t('last kind promo + promo in DB -> lead skips the promo, partners still follow',
   ids(await run({ rows: [dbPromo], lastKind: 'promo', partners: [A] })), ['generic', 'eatery-a-cafe'])
