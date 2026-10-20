@@ -168,7 +168,7 @@ function bannerParts(item, lang) {
   const tag = item.sponsored ? t('stripSponsored', lang) : item.soon ? t('stripStartingSoon', lang) : null
   return { title, chip, time, sponsorSub, tag }
 }
-// Screen-reader label. A partner slide reads "Sponsorlu, Crunchy Express, Menüye göz at"; slide 1 as before.
+// Screen-reader label. A partner slide (editorial, no Sponsorlu) reads "Crunchy Express, Menüye göz at"; slide 1 as before.
 function bannerLabel(item, lang) {
   const { title, time, sponsorSub, tag } = bannerParts(item, lang)
   return (item.eaterySlug ? [tag, title, sponsorSub] : [title, sponsorSub, time, tag]).filter(Boolean).join(', ')
@@ -204,7 +204,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
         <View onLayout={e => setBandH(Math.ceil(e.nativeEvent.layout.height))}
           style={[s.bannerBand, showFrame && s.bannerBandPartner, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
-          {(!!time || !!tag) && (
+          {(!!time || !!tag || !!item.placeholder || !!item.unpublished) && (
             <View style={s.bandMeta}>
               {!!time && (
                 <>

@@ -91,7 +91,7 @@ t('adult -> eligible', elig({ isGuest: false, dateOfBirth: '1990-01-01' }), true
 t('day before the 18th birthday -> not eligible', elig({ isGuest: false, dateOfBirth: '2008-10-19' }), false)
 t('the 18th birthday itself -> eligible', elig({ isGuest: false, dateOfBirth: '2008-10-18' }), true)
 
-const P = (slug, name, extra = {}) => ({ slug, name, sort_order: 0, logo_path: `${slug}/logo.png`, ...extra })
+const P = (slug, name, extra = {}) => ({ slug, name, sort_order: 0, logo_path: `${slug}/logo.png`, adult_only: false, ...extra })
 const A = P('a-cafe', 'Alpha'), B = P('b-bar', 'Bravo', { placeholder: true }), C = P('c-bake', 'Charlie')
 const run = async (o = {}) => {
   globalThis.__lastKind = o.lastKind ?? null; stubDb(o.rows ?? [])
@@ -100,7 +100,14 @@ const run = async (o = {}) => {
 const ids = s => s.map(x => x.id)
 
 console.log('assembly')
-t('ineligible + partners -> [lead] only', ids(await run({ promosEligible: false, partners: [A, B] })), ['generic'])
+t('ineligible + editorial partners -> lead + partners (no 18+ gate)', ids(await run({ promosEligible: false, partners: [A, B] })), ['generic', 'eatery-a-cafe', 'eatery-b-bar'])
+{
+  const Adult = P('d-wine', 'Delta', { adult_only: true }), Unknown = { ...P('e-pub', 'Echo'), adult_only: undefined }, Nul = P('f-x', 'Foxtrot', { adult_only: null })
+  t('adult_only partner: ineligible -> absent', ids(await run({ promosEligible: false, partners: [A, Adult] })).slice(1), ['eatery-a-cafe'])
+  t('adult_only partner: eligible -> present', ids(await run({ promosEligible: true, partners: [A, Adult] })).slice(1), ['eatery-a-cafe', 'eatery-d-wine'])
+  t('adult_only not selected (undefined) or null -> gated like adult (fail closed)', ids(await run({ promosEligible: false, partners: [Unknown, Nul, A] })).slice(1), ['eatery-a-cafe'])
+  t('rotation counts only the partners this user may see', ids(await run({ promosEligible: false, partners: [A, Adult, C], rotation: 1 })).slice(1), ['eatery-c-bake', 'eatery-a-cafe'])
+}
 t('eligible + 0 partners -> [lead]', ids(await run()), ['generic'])
 t('eligible + 2 partners, rotation 0 -> lead, a, b', ids(await run({ partners: [A, B] })), ['generic', 'eatery-a-cafe', 'eatery-b-bar'])
 t('rotation 1 -> lead, b, a', ids(await run({ partners: [A, B], rotation: 1 })), ['generic', 'eatery-b-bar', 'eatery-a-cafe'])
@@ -115,7 +122,7 @@ t('duplicate slug rows -> one slide', ids(await run({ partners: [A, A] })).slice
 t('rotation is relative to the visible partners (gated one does not count)', ids(await run({ partners: [A, B, C], gates: { 'a-cafe': false }, rotation: 1 })).slice(1), ['eatery-c-bake', 'eatery-b-bar'])
 console.log('slide shape')
 const [, sa, sb] = await run({ partners: [A, B] })
-t('partner slide', sa, { kind: 'promo', id: 'eatery-a-cafe', sponsored: true, title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
+t('partner slide (editorial: no sponsored flag)', sa, { kind: 'promo', id: 'eatery-a-cafe', title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
 t('placeholder flag carried', [sa.placeholder, sb.placeholder], [false, true])
 t('no photo on a partner slide', [sa.imageUrl, sb.imageUrl], [undefined, undefined])
 {
@@ -129,8 +136,9 @@ t('lead promo + partners -> promo first, partners after', ids(await run({ rows: 
 t('dismissing the lead does not remove partner slides', ids(await run({ rows: [dbPromo], dismissedIds: new Set(['db-promo-1']), partners: [A] })), ['generic', 'eatery-a-cafe'])
 console.log('pure assembler')
 t('null lead -> partners only, no throw', assembleStripSlides({ lead: null, partners: [A], promosEligible: true, gates: {}, rotation: 0, lang: 'Turkish' }).map(x => x.id), ['eatery-a-cafe'])
-t('null lead + ineligible -> []', assembleStripSlides({ lead: null, partners: [A], promosEligible: false, gates: {}, rotation: 0, lang: 'Turkish' }), [])
-t('non-boolean eligibility fails closed', ids(assembleStripSlides({ lead: { id: 'l' }, partners: [A], promosEligible: 'yes', gates: {}, rotation: 0, lang: 'Turkish' })), ['l'])
+t('null lead + ineligible -> editorial partners only', assembleStripSlides({ lead: null, partners: [A], promosEligible: false, gates: {}, rotation: 0, lang: 'Turkish' }).map(x => x.id), ['eatery-a-cafe'])
+t('null lead + ineligible + adult partner -> []', assembleStripSlides({ lead: null, partners: [P('d-wine', 'Delta', { adult_only: true })], promosEligible: false, gates: {}, rotation: 0, lang: 'Turkish' }), [])
+t('non-boolean eligibility fails closed for an adult partner', ids(assembleStripSlides({ lead: { id: 'l' }, partners: [P('d-wine', 'Delta', { adult_only: true })], promosEligible: 'yes', gates: {}, rotation: 0, lang: 'Turkish' })), ['l'])
 t('partners not an array -> lead only', ids(assembleStripSlides({ lead: { id: 'l' }, partners: null, promosEligible: true, gates: {}, rotation: 0, lang: 'Turkish' })), ['l'])
 t('nextStripRotation steps and wraps', [nextStripRotation(0, 2), nextStripRotation(1, 2), nextStripRotation(5, 3), nextStripRotation(0, 0), nextStripRotation(-4, 3), nextStripRotation(undefined, 3)], [1, 0, 0, 0, 1, 1])
 const src = readFileSync(resolve(ROOT, 'utils/stripSlides.js'), 'utf8').replace(/\/\/.*$/gm, '')
