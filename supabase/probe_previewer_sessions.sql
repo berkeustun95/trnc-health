@@ -17,3 +17,9 @@ SELECT count(*) AS all_sessions,
        (SELECT count(*) FROM auth.users WHERE id = '412cad91-2e3b-41b9-8186-175dfb8afa35') AS previewer_user_exists,
        (SELECT max(last_sign_in_at)::date FROM auth.users WHERE id = '412cad91-2e3b-41b9-8186-175dfb8afa35') AS previewer_last_sign_in
 FROM auth.sessions;
+
+-- How the previewer account signs in (provider names only, no email), so Berke picks the right login.
+SELECT u.raw_app_meta_data->>'provider' AS first_provider,
+       (SELECT string_agg(DISTINCT i.provider, ', ') FROM auth.identities i WHERE i.user_id = u.id) AS providers,
+       u.email IS NOT NULL AS has_email, u.email_confirmed_at IS NOT NULL AS email_confirmed
+FROM auth.users u WHERE u.id = '412cad91-2e3b-41b9-8186-175dfb8afa35';
