@@ -10,15 +10,22 @@ import { eateryPartnerVisible } from '../constants/eatery.js'
 
 const byBase = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.name).localeCompare(String(b.name))
 
-// A partner slide has no photo: the ADA frame + the partner logo are the whole design. `logoPath` is the raw
-// eatery-images storage path (the component resolves the URL with eateryImageUrl); `placeholder` marks a
-// Preview-fixture partner so the UI can say so.
+// A partner slide's hero is the partner's first dish photo (menu order: section_order, sort_order, id; items without a
+// photo_path skipped), null when none -> the ADA frame + logo. `heroPath` / `logoPath` are raw eatery-images storage
+// paths (the component resolves the URL with eateryImageUrl); `placeholder` marks a Preview-fixture partner.
+const num = v => (Number.isFinite(v) ? v : 0)
+export const heroPathOf = items => {
+  const withPhoto = (Array.isArray(items) ? items : []).filter(i => i && i.is_available !== false && typeof i.photo_path === 'string' && i.photo_path)
+  withPhoto.sort((a, b) => num(a.section_order) - num(b.section_order) || num(a.sort_order) - num(b.sort_order) || num(a.id) - num(b.id))
+  return withPhoto[0]?.photo_path ?? null
+}
 export const partnerSlide = (row, lang) => ({
   kind: 'promo', id: `eatery-${row.slug}`,
   title: row.name,
   subtitle: t('eateryStripSub', lang),
   eaterySlug: row.slug,
   logoPath: row.logo_path ?? null,
+  heroPath: heroPathOf(row.eatery_menu_items),
   placeholder: !!row.placeholder,
   ...(row.is_active === false ? { unpublished: true } : null),
   action: { type: 'eatery', slug: row.slug },

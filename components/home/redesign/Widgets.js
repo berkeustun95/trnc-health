@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions, FlatList, AccessibilityInfo, AppState } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, category, type, radii, press, space } from '../../../constants/theme'
+import { colors, category, type, radii, press, space, elevation } from '../../../constants/theme'
 import { t, tCount, dateLocale } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
@@ -174,22 +174,33 @@ function bannerLabel(item, lang) {
   return (item.eaterySlug ? [tag, title, sponsorSub] : [title, sponsorSub, time, tag]).filter(Boolean).join(', ')
 }
 
+const LOGO_BADGE = 44
+
 export function EventBanner({ item, loading, lang, onPress, onDismiss, remember = true }) {
   const kind = item?.kind
   const [bandH, setBandH] = useState(0)
+  const [heroFailed, setHeroFailed] = useState(false)
+  useEffect(() => { setHeroFailed(false) }, [item?.heroPath])   // a new hero gets its own chance to load
   useEffect(() => { if (remember && !loading && kind) rememberStripKind(kind) }, [remember, loading, kind])
   if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
   if (!item) return null
   const { title, chip, time, sponsorSub, tag } = bannerParts(item, lang)
-  // A partner slide is never a photo: the ADA frame + the contained logo (no crop of partner content).
+  // A partner slide: the dish photo full-bleed under the band + a round logo badge; no photo (or it fails) -> the ADA frame + larger logo.
   const showFrame = !!item.eaterySlug
   const logoUri = item.logoPath ? eateryImageUrl(item.logoPath) : null
+  const heroUri = item.heroPath ? eateryImageUrl(item.heroPath) : null
+  const showHero = !!heroUri && !heroFailed
   const fallback = (item.kind === 'notice' && NOTICE_FALLBACK[item.action?.route]) || EVENTS_IMAGE
   return (
     <View>
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
         accessibilityLabel={bannerLabel(item, lang)} style={s.banner}>
-        {showFrame ? (
+        {showFrame && showHero ? (
+          // The partner's dish photo fills the whole card like an event photo (directly in the card: the frame's
+          // padding would leave a strip); the band sits over its top.
+          <RemoteImage source={{ uri: heroUri }} style={s.bannerPhoto} resizeMode="cover" placeholderColor={colors.primaryLight}
+            onError={() => setHeroFailed(true)} accessibilityIgnoresInvertColors />
+        ) : showFrame ? (
           // A sponsor never borrows the events picture: ADA-theme frame (also the fallback for a photo
           // that fails to load). Padded by the MEASURED band height, so the logo can never meet the band.
           <View style={[s.sponsorFrame, { paddingTop: bandH + 6 }]}>
@@ -203,7 +214,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
         {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
         <View onLayout={e => setBandH(Math.ceil(e.nativeEvent.layout.height))}
-          style={[s.bannerBand, showFrame && s.bannerBandPartner, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
+          style={[s.bannerBand, showFrame && s.bannerBandPartner, showFrame && showHero && s.bannerBandOverHero, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
           {(!!time || !!tag || !!item.placeholder || !!item.unpublished) && (
             <View style={s.bandMeta}>
               {!!time && (
@@ -221,8 +232,13 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
             <Text style={s.bannerTitle} numberOfLines={showFrame ? 1 : 2} maxFontSizeMultiplier={showFrame ? 1.2 : undefined}>{title}</Text>
             <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </View>
-          {!!sponsorSub && <Text style={s.sponsorSub} numberOfLines={1} maxFontSizeMultiplier={1.2}>{sponsorSub}</Text>}
+          {!!sponsorSub && <Text style={[s.sponsorSub, showHero && !!logoUri && s.sponsorSubBadge]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{sponsorSub}</Text>}
         </View>
+        {showFrame && showHero && !!logoUri && bandH > 0 && (
+          <View style={[s.logoBadge, { top: bandH - LOGO_BADGE / 2 }]} accessible={false} importantForAccessibility="no-hide-descendants">
+            <RemoteImage source={{ uri: logoUri }} style={s.logoBadgeImg} resizeMode="contain" placeholderColor="transparent" />
+          </View>
+        )}
       </TouchableOpacity>
       {item.kind === 'notice' && !!onDismiss && (
         <IconButton icon="close" iconSize={16} variant="frosted" onPress={() => onDismiss(item)}
@@ -384,8 +400,18 @@ const s = StyleSheet.create({
   dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.7)' },
   dotOn:       { backgroundColor: '#FFFFFF' },
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
-  sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: category.explore.bg,
+  // Light ADA teal tint (primaryLight) behind the hero / the no-photo fallback; the photo sits below the measured band.
+  sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.primaryLight,
                   alignItems: 'center', justifyContent: 'center', paddingBottom: 18 },
+  // (heroPhoto removed 2026-10-20: offsets-only absolute positioning, with a top that changed after the band
+  //  measured, loaded but never showed on Android. The hero now uses bannerPhoto, the event photo's proven fill.)
+  // Round white logo badge straddling the band's bottom edge, right side (the chevron sits above it).
+  // A ring in the band's own colour (no border+shadow on one surface): the badge reads as a tab hanging off the band
+  // and keeps a clear edge on white food photos. Opaque white fill (Android borderRadius+borderWidth gotcha).
+  logoBadge:   { position: 'absolute', right: 12, width: LOGO_BADGE, height: LOGO_BADGE, borderRadius: LOGO_BADGE / 2,
+                 backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  logoBadgeImg: { width: LOGO_BADGE - 16, height: LOGO_BADGE - 16 },
+  sponsorSubBadge: { paddingRight: LOGO_BADGE + 8 },
   sponsorLogo: { width: 140, flex: 1, minHeight: 40 },
   sponsorSub:  { ...type.meta, color: '#FFFFFF' },
   placeholderTag: { marginLeft: 6, flexShrink: 1 },
@@ -401,6 +427,9 @@ const s = StyleSheet.create({
   // Partner slides have no photo behind the band: solid ADA dark teal, never black-on-lilac (which
   // read slate). White on primaryDark 7.58:1; the Sponsorlu pill on it 5.29:1 at 15 % white (computed).
   bannerBandPartner: { backgroundColor: colors.primaryDark },
+  // Taller hero (option 1): the dish photo runs under the band to the card's top edge, and the band lets it show
+  // through slightly. primaryDark at 90 % over a white photo is ≈ #226E6D: white text 5.96:1 (computed).
+  bannerBandOverHero: { backgroundColor: 'rgba(10, 94, 93, 0.9)' },
   tagOnTeal:   { backgroundColor: 'rgba(255,255,255,0.15)' },
   bannerBandDismiss: { paddingRight: 48 },
   bandMeta:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
