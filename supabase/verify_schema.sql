@@ -3955,10 +3955,16 @@ WITH report AS (
       OR (to_regclass('private.preview_key_hashes') IS NOT NULL
           -- Counted through query_to_xml: a plain FROM private.preview_key_hashes is resolved at parse time and
           -- would kill all of QUERY 1 on a database without the table (to_regclass alone cannot guard it).
-          AND (CASE WHEN to_regclass('private.preview_key_hashes') IS NULL THEN NULL
+          AND (CASE WHEN to_regclass('private.preview_key_hashes') IS NULL
+                         OR NOT has_table_privilege(current_user, 'private.preview_key_hashes', 'SELECT') THEN NULL
                     ELSE (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM private.preview_key_hashes', false, true, '')))[1]::text::int END) = 1
           AND NOT COALESCE((SELECT bool_or(a.grantee IN (0, (SELECT oid FROM pg_roles WHERE rolname = 'anon'), (SELECT oid FROM pg_roles WHERE rolname = 'authenticated')))
                             FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('private.preview_key_hashes')), false))
+    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (3 today: the eatery preview policies)',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 3
+          AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE (coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%')
+                            AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL OR qual NOT LIKE '%is_active%')))
     UNION ALL SELECT '1120_eatery_preview_key','eatery_partners_select_preview applies TO anon, authenticated',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
       OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'

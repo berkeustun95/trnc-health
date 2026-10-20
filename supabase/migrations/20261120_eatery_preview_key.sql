@@ -36,6 +36,12 @@
 -- today Crunchy Express's inactive row (address, hours, pin, maps_url), its 41 menu items and the paths of
 -- 16 dish photos (the bucket is public anyway). Nothing personal, no writes, no other table. The reuse
 -- contract stays: is_previewer() only in SELECT policies, always paired with an unpublished restriction.
+-- The key also sits in the EAS `preview` environment (sensitive), so anyone with an Expo token that can read that
+-- environment has it (that includes the Hermes Preview publisher). /rpc/is_previewer is callable by anon and
+-- answers "is this key valid?" — useless for guessing a 256-bit key (openssl rand -hex 32), stated for honesty.
+-- The reuse contract is enforced by verify_schema (1120): is_previewer() may appear only in SELECT policies that
+-- also test is_active. Production bundles are kept free of the key by check-ota-preflight.mjs (d) for OTAs and
+-- check-preview-key-build.mjs (eas-build-pre-install) for native builds.
 -- Rotation: new key in EAS preview env → new hash via a migration (delete the old row) → republish Preview.
 --
 -- ─── PROOF (inside, rolled back by a sentinel) ──────────────────────────────
@@ -257,7 +263,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261120_eatery_preview_key.sql', 'ac0098999d5b0ddb96c5aea74745c70f4f9bd17babbd9fc2d37ce55e0c7d6f93')
+VALUES ('20261120_eatery_preview_key.sql', '9c142dbefc16ec61663e741b23e0c85cd7d01fc7a888e295cab373318eb663b2')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
