@@ -564,6 +564,10 @@ parsed.forEach(({ sql }, fi) => {
 })
 const droppedTables = new Set([...tableOps].filter(([, v]) => v.op === 'drop').map(([t]) => t))
 for (const t of droppedTables) delete repo[t]
+// The live side reads schema public only, so a table in another schema (private.preview_key_hashes, 20261120)
+// would read as missing on every run. It is out of this audit's scope, like a dropped table: its columns,
+// constraints and indexes leave the model too. verify_schema.sql registers it instead.
+for (const t of Object.keys(repo)) if (t.includes('.')) { delete repo[t]; droppedTables.add(t) }
 
 // LAST operation wins. This is the whole fix for drop-then-create idempotency: the old
 // code subtracted a set of drops from a set of adds and lost every recreated object.
