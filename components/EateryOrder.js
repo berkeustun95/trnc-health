@@ -94,7 +94,7 @@ export function OrderSheet({ bottomInset = 0, visible, lines, onQty, formatMoney
       </View>
       <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
       <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} style={st.send} />
-      <View style={{ height: kb > 0 ? Math.max(0, kb - (Platform.OS === 'ios' ? insets.bottom : 0)) : Math.max(0, bottomInset - insets.bottom) }} />
+      <View style={{ height: space[16] + (kb > 0 ? Math.max(0, kb - (Platform.OS === 'ios' ? insets.bottom : 0)) : Math.max(0, bottomInset - insets.bottom)) }} />
     </BottomSheet>
   )
 }
