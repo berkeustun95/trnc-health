@@ -204,6 +204,11 @@ WITH report AS (
     ('1116_eatery_dish_photos','eatery_menu_items','photo_path'),
     ('1116_eatery_dish_photos','eatery_menu_items','photo_width'),
     ('1116_eatery_dish_photos','eatery_menu_items','photo_height'),
+    -- 1123: dish-finder tags (NULL = untagged).
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items','role'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items','protein'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items','spicy'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items','portion'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -701,6 +706,10 @@ WITH report AS (
     ('1116_eatery_dish_photos','eatery_menu_items_photo_size_check'),
     ('1116_eatery_dish_photos','eatery_menu_items_photo_size_needs_path_check'),
     ('1116_eatery_dish_photos','eatery_photos_partner_path_key'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items_role_check'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items_protein_check'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items_portion_check'),
+    ('20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items_tags_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -3881,6 +3890,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
       IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps','menu',
                                  'route_complete','website','whatsapp']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261123_eatery_dish_tags_order_whatsapp.sql') -- EATERY-ORDER-WHATSAPP:supersede (one count, one owner: the 1123 token owns the set once the ledger records it)
     -- ── 1116: Yeme-Icme dish photos ───────────────────────────────────────────────
     -- Tokens written from the PG 18 harness rendering (scripts/test-eatery-dish-photos-sql.mjs); prod is an
     -- older major and may render the regex literal / parentheses differently, so they match fragments, never a
@@ -3913,6 +3923,45 @@ WITH report AS (
                AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'photo_path', 'INSERT,UPDATE,REFERENCES')
                AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'photo_path', 'INSERT,UPDATE,REFERENCES')
                AND has_column_privilege('service_role', to_regclass('public.eatery_menu_items'), 'photo_path', 'SELECT,INSERT,UPDATE'), false)
+    -- ── 1123: dish-finder tags + contact_events 'order_whatsapp'. Renderings checked against fragments, not whole defs.
+    UNION ALL SELECT '20261123_eatery_dish_tags_order_whatsapp','contact_events action vocabulary is exactly the 12-action set (incl. order_whatsapp)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
+      IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps','menu',
+                                 'order_whatsapp','route_complete','website','whatsapp']
+    UNION ALL SELECT '20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items role/protein/portion CHECK vocabularies are exactly the agreed sets',
+      COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_role_check')
+        IS NOT DISTINCT FROM ARRAY['dessert','drink','main','sauce','side'], false)
+      AND COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_protein_check')
+        IS NOT DISTINCT FROM ARRAY['beef','chicken','none','pork','veg'], false)
+      AND COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_portion_check')
+        IS NOT DISTINCT FROM ARRAY['meal','share','snack'], false)
+    UNION ALL SELECT '20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items_tags_check: untagged, main needs portion, other roles must have none',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%role IS NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%''main''::text%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%portion IS NOT NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%portion IS NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%protein IS NOT NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%spicy IS NOT NULL%'
+                   AND pg_get_constraintdef(c.oid) LIKE '%''dessert''::text%'
+                 FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_tags_check'), false)
+    UNION ALL SELECT '20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items tag columns: text/text/boolean/text, nullable, no default; clients SELECT them and cannot write them',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='eatery_menu_items' AND is_nullable = 'YES' AND column_default IS NULL
+          AND ((column_name IN ('role','protein','portion') AND data_type = 'text') OR (column_name = 'spicy' AND data_type = 'boolean'))) = 4
+      AND COALESCE(NOT EXISTS (SELECT 1 FROM unnest(ARRAY['role','protein','spicy','portion']) c
+             WHERE NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), c, 'SELECT')
+                OR NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), c, 'SELECT')
+                OR has_column_privilege('anon', to_regclass('public.eatery_menu_items'), c, 'INSERT,UPDATE,REFERENCES')
+                OR has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), c, 'INSERT,UPDATE,REFERENCES')
+                OR NOT has_column_privilege('service_role', to_regclass('public.eatery_menu_items'), c, 'SELECT,INSERT,UPDATE')), false)
     UNION ALL SELECT '20261117_crunchy_express_data','crunchy-express has a partner pin, an address, menu_verified_on and >= 1 menu item, once 1117 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261117_crunchy_express_data.sql')
       OR COALESCE((SELECT p.lat IS NOT NULL AND p.geocode_source IS NOT DISTINCT FROM 'partner' AND p.address IS NOT NULL
