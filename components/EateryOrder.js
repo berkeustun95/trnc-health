@@ -27,7 +27,7 @@ export function QtyStepper({ id, name, qty, onQty, lang }) {
   return (
     <View style={st.row}>
       <Pressable onPress={() => onQty(id, -1)} style={({ pressed }) => [st.round, st.minus, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={sub('eateryOrderLess')}>
+        accessibilityRole="button" accessibilityLabel={sub(qty === 1 ? 'eateryOrderRemove' : 'eateryOrderLess')}>
         <Ionicons name={qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.primaryDark} />
       </Pressable>
       <Text style={st.qty} accessible accessibilityLiveRegion="polite" accessibilityLabel={sub('eateryOrderQty')}>{qty}</Text>
@@ -44,7 +44,7 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
   const insets = useSafeAreaInsets()
   return (
     <View style={[st.bar, { paddingBottom: insets.bottom + space[12] }]}>
-      <Text style={st.barSummary} numberOfLines={1} accessibilityLiveRegion="polite">
+      <Text style={st.barSummary} numberOfLines={1}>
         {t('eateryOrderCount', lang).replace('{n}', () => String(count)).replace('{total}', () => totalText)}
       </Text>
       <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderBar', lang)} onPress={onOpen} />
@@ -53,13 +53,13 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
 }
 
 // iOS: the keyboard covers the bottom of a bottom sheet and nothing resizes a Modal, so the sheet is padded by the
-// keyboard height. Android resizes its Modal window itself.
+// keyboard height. Android only needs the list capped (kb > 0) so the sheet never grows past the top.
 function useKeyboardPad() {
   const [h, setH] = useState(0)
   useEffect(() => {
-    if (Platform.OS !== 'ios') return
-    const show = Keyboard.addListener('keyboardWillChangeFrame', e => setH(Math.max(0, Math.round(e.endCoordinates.height))))
-    const hide = Keyboard.addListener('keyboardWillHide', () => setH(0))
+    const ios = Platform.OS === 'ios'
+    const show = Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidShow', e => setH(Math.max(0, Math.round(e.endCoordinates.height))))
+    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setH(0))
     return () => { show.remove(); hide.remove() }
   }, [])
   return h
@@ -93,7 +93,7 @@ export function OrderSheet({ visible, lines, onQty, formatMoney, totalText, note
       </View>
       <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
       <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} style={st.send} />
-      {kb > 0 && <View style={{ height: Math.max(0, kb - insets.bottom) }} />}
+      {kb > 0 && Platform.OS === 'ios' && <View style={{ height: Math.max(0, kb - insets.bottom) }} />}
     </BottomSheet>
   )
 }

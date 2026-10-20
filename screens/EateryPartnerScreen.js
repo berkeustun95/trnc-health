@@ -15,6 +15,7 @@ import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUr
 import { logContactEvent } from '../utils/logContactEvent'
 import { effectiveWhatsapp, useBasket, getBasket, setBasket, changeQty } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, OrderSheet } from '../components/EateryOrder'
+import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
 
 // ─── Yeme-İçme: one partner, in full ────────────────────────────────────────
@@ -213,6 +214,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const undoRef = useRef(null)
   const [cleared, setCleared] = useState(false)
   useEffect(() => { if (orderOpen && lines.length === 0) setOrderOpen(false) }, [orderOpen, lines.length])
+  // A refilled basket makes the old "Geri al" stale: drop the snapshot so Undo can never overwrite it.
+  useEffect(() => { if (lines.length > 0) { setCleared(false); undoRef.current = null } }, [lines.length])
   useEffect(() => {
     const sub = AppState.addEventListener('change', st => {
       const a = armedRef.current
@@ -230,6 +233,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const undoClear = () => {
     const u = undoRef.current
     undoRef.current = null
+    haptic()
     setCleared(false)
     if (u) { setBasket(partner.id, u.basket); setNote(u.note) }
   }
@@ -397,7 +401,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       </ScrollView>
       {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openOrder} />}
       <Snackbar visible={cleared && lines.length === 0} message={t('eateryOrderCleared', lang)} actionLabel={t('eateryOrderUndo', lang)}
-        onAction={undoClear} onTimeout={() => setCleared(false)} reduce={reduce} bottom={insets.bottom + space[16]} />
+        onAction={undoClear} onTimeout={() => { setCleared(false); undoRef.current = null }} reduce={reduce} bottom={insets.bottom + space[16]} />
       {ordering && (
         <OrderSheet visible={orderOpen === true && lines.length > 0} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} lang={lang} onClose={() => setOrderOpen(false)} onSend={sendOrder} />
