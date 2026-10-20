@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, Text, ScrollView, Linking, Modal, Pressable, AccessibilityInfo, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -47,6 +47,8 @@ function HoursBlock({ week, open, lang }) {
 }
 
 const THUMB = 64
+const SHOW_SECTION_COUNT = true   // "Nachos · 3": muted dish count beside a section title
+const TAB_SCROLL_OFFSET = 8       // a section is "current" once its top is within this of the pinned tab row
 
 // A dish photo is partner content: shown as sent (contain), never cropped. A file that fails to load
 // calls onFail and the row drops back to text-only. A Preview fixture dish draws the labelled frame.
@@ -68,7 +70,7 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   return (
@@ -81,7 +83,37 @@ function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto }) {
       {!!price && <Text style={s.itemPrice}>{price}</Text>}
     </View>
   )
-}
+})
+
+// Own memo component: an active-tab change re-renders this row only, never the 46 dish rows.
+// Tab positions inside the row are measured with measureLayout when the active tab changes.
+const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeight, reduce }) {
+  const scrollRef = useRef(null)
+  const tabRefs = useRef([])
+  const tabsViewW = useRef(0)
+  useEffect(() => {
+    const tab = tabRefs.current[active]
+    const inner = scrollRef.current?.getInnerViewRef?.()
+    if (!tab || !inner) return
+    tab.measureLayout(inner, (x, _y, w) => {
+      scrollRef.current?.scrollTo({ x: Math.max(0, x + w / 2 - tabsViewW.current / 2), animated: !reduce })
+    }, () => {})
+  }, [active, reduce])
+  return (
+    <View style={s.tabsWrap} onLayout={e => onHeight(e.nativeEvent.layout.height)}>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist"
+        onLayout={e => { tabsViewW.current = e.nativeEvent.layout.width }} contentContainerStyle={s.tabsContent}>
+        {titles.map((title, i) => (
+          <Pressable key={title} ref={r => { tabRefs.current[i] = r }} onPress={() => onSelect(i)}
+            style={[s.tab, i === active && s.tabOn]} accessibilityRole="tab" accessibilityLabel={title}
+            accessibilityState={{ selected: i === active }}>
+            <Text style={[s.tabText, i === active && s.tabTextOn]}>{title}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  )
+})
 
 // Fade only; none at all when the system asks for reduced motion.
 function useReduceMotion() {
@@ -131,7 +163,7 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
 export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null }) {
   const [viewing, setViewing] = useState(null)
   const [failedDishes, setFailedDishes] = useState({})
-  const failDish = id => setFailedDishes(f => ({ ...f, [id]: true }))
+  const failDish = useCallback(id => setFailedDishes(f => ({ ...f, [id]: true })), [])
   const reduce = useReduceMotion()
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
@@ -139,13 +171,56 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   const contacts = eateryContacts(partner)
   const menuUrl = eateryMenuUrl(partner)
-  const sections = eateryMenuSections(partner)
+  const sections = useMemo(() => eateryMenuSections(partner), [partner])
   const gallery = eateryPhotos(partner, 'gallery')
   const menuPhotos = eateryPhotos(partner, 'menu')
   const week = eateryWeek(partner)
   const open = eateryOpenStatus(partner, lang)
   const regionKey = REGION_LABEL_KEY[partner.region]
   const hasMenu = sections.length > 0 || menuPhotos.length > 0 || !!menuUrl
+
+  // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
+  const showTabs = sections.length >= 2
+  const tabsIndex = 1 + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], tabs
+  const scrollRef = useRef(null)
+  const secRefs = useRef([])
+  const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
+  const tabsH = useRef(0)
+  const activeRef = useRef(0)
+  const lockRef = useRef(false)    // true while a tab tap is scrolling: scroll-sync stays quiet
+  const lockTimer = useRef(null)
+  const [activeSec, setActiveSec] = useState(0)
+
+  const measureTops = useCallback(() => new Promise(resolve => {
+    const inner = scrollRef.current?.getInnerViewRef?.()
+    if (!inner) { resolve(); return }
+    Promise.all(secRefs.current.map((r, i) => new Promise(res => {
+      if (!r) { res(); return }
+      r.measureLayout(inner, (_x, y) => { tops.current[i] = y; res() }, () => res())
+    }))).then(resolve)
+  }), [])
+  useEffect(() => () => clearTimeout(lockTimer.current), [])
+
+  const onScroll = useCallback(e => {
+    if (lockRef.current) return
+    const edge = e.nativeEvent.contentOffset.y + tabsH.current + TAB_SCROLL_OFFSET
+    let idx = 0
+    for (let i = 0; i < tops.current.length; i++) if (tops.current[i] != null && tops.current[i] <= edge) idx = i
+    if (idx !== activeRef.current) { activeRef.current = idx; setActiveSec(idx) }
+  }, [])
+
+  const selectSection = useCallback(async i => {
+    await measureTops()
+    if (tops.current[i] == null) return
+    lockRef.current = true
+    activeRef.current = i
+    setActiveSec(i)
+    scrollRef.current?.scrollTo({ y: Math.max(0, tops.current[i] - tabsH.current), animated: !reduce })
+    clearTimeout(lockTimer.current)
+    lockTimer.current = setTimeout(() => { lockRef.current = false }, reduce ? 80 : 700)
+  }, [measureTops, reduce])
+  const setTabsH = useCallback(h => { tabsH.current = h }, [])
+  const sectionTitles = useMemo(() => sections.map(sec => sec.title), [sections])
 
   // App's single back handler asks here first (the dish photo viewer is a layer above the partner page).
   useEffect(() => {
@@ -167,7 +242,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
-      <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showTabs ? onScroll : undefined} scrollEventThrottle={16}
+        onContentSizeChange={showTabs ? measureTops : undefined}>
         <Card>
           <View style={s.head}>
             <EateryLogo partner={partner} width={72} height={72} decorative />
@@ -188,13 +265,19 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
 
+        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onHeight={setTabsH} reduce={reduce} />}
+
         {hasMenu && (
           <Card>
             <Text style={s.h}>{t('eateryMenu', lang)}</Text>
             {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tagGap} />}
-            {sections.map(sec => (
-              <View key={sec.title} style={s.menuSec}>
-                <Text style={s.secTitle}>{sec.title}</Text>
+            {sections.map((sec, si) => (
+              <View key={sec.title} ref={r => { secRefs.current[si] = r }} collapsable={false} onLayout={showTabs ? measureTops : undefined}
+                style={[s.menuSec, si > 0 && s.menuSecNext]}>
+                <Text style={s.secTitle} accessibilityRole="header">
+                  {sec.title}
+                  {SHOW_SECTION_COUNT && <Text style={s.secCount}>{' · ' + sec.items.length}</Text>}
+                </Text>
                 {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing} />)}
               </View>
             ))}
@@ -270,7 +353,15 @@ const s = StyleSheet.create({
   hourVal:   { ...type.body, color: colors.textPrimary, flexShrink: 0 },
   actions:   { gap: space[8] },
   menuSec:   { marginTop: space[12] },
-  secTitle:  { ...type.rowTitle, color: colors.primaryDark, marginBottom: space[4] },
+  menuSecNext: { marginTop: space[20], paddingTop: space[20], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  secTitle:  { ...type.sectionHeading, color: colors.primaryDark, marginBottom: space[4] },
+  secCount:  { color: colors.textSecondary },
+  tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  tabsContent: { paddingHorizontal: 16 },
+  tab:       { minHeight: 44, paddingHorizontal: space[12], justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  tabOn:     { borderBottomColor: colors.primary },
+  tabText:   { ...type.body, color: colors.textSecondary },
+  tabTextOn: { fontFamily: font.semibold, color: colors.primary },
   itemRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[12], paddingVertical: space[8] },
   itemText:  { flex: 1 },
   itemName:  { ...type.body, color: colors.textPrimary },
