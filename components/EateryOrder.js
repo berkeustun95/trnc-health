@@ -58,17 +58,22 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
   )
 }
 
-// How far the keyboard covers the bottom of `ref`'s view: measured against the keyboard's top edge, so it is the full
-// keyboard height when nothing resizes (iOS, edge-to-edge Android) and 0 when the window already shrank by itself.
+// How far the keyboard covers the bottom of `ref`'s view: the full keyboard height, or less when the window already
+// shrank by itself.
 function useKeyboardOverlap(ref) {
   const [h, setH] = useState(0)
   useEffect(() => {
     const ios = Platform.OS === 'ios'
     const show = Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidShow', e => {
       const { height, screenY } = e.endCoordinates
-      const fallback = Math.max(0, Math.round(height))
-      if (!ref.current?.measureInWindow || !(screenY > 0)) { setH(fallback); return }
-      ref.current.measureInWindow((_x, y, _w, vh) => setH(Math.max(0, Math.round(y + vh - screenY))))
+      const full = Math.max(0, Math.round(height))
+      if (!ref.current?.measureInWindow || !(screenY > 0)) { setH(full); return }
+      // Window and screen coordinates differ by the system bars, so the measured overlap only tells WHETHER the window
+      // shrank by itself (well under the keyboard height); otherwise the keyboard's full height is the lift (device-tested).
+      ref.current.measureInWindow((_x, y, _w, vh) => {
+        const overlap = Math.max(0, Math.round(y + vh - screenY))
+        setH(overlap < full * 0.5 ? overlap : full)
+      })
     })
     const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setH(0))
     return () => { show.remove(); hide.remove() }

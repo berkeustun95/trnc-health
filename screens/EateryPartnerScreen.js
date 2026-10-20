@@ -13,7 +13,7 @@ import { colors, font, type, radii, space, listBottomPad, withAlpha, press } fro
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
-import { effectiveWhatsapp, useBasket, getBasket, setBasket, changeQty } from '../utils/eateryBasket'
+import { effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
@@ -212,26 +212,17 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
-  const undoRef = useRef(null)
   const [snack, setSnack] = useState(null)   // 'eateryBasketCleared' | 'eateryBasketItemRemoved' while its "Geri al" is offered
-  // Empties the basket but keeps a snapshot for the snackbar's "Geri al" (no confirm dialog).
+  // Empties the basket but keeps it and the note for the snackbar's "Geri al" (no confirm dialog); see eateryBasketCore.js.
   const clearBasket = () => {
-    undoRef.current = { basket: getBasket(partner.id), note: noteRef.current, withNote: true }
-    setBasket(partner.id, null)
+    if (!clearAll(partner.id, noteRef.current)) return
     setNote('')
     setSnack('eateryBasketCleared')
   }
-  // Every basket change drops the old snapshot first (a stale Undo must never overwrite newer edits); taking the last
-  // unit off a dish (the bin) then offers its own undo.
+  // Any real edit drops the old snapshot inside the store; taking the last unit off a dish (the bin) offers its own undo.
   const onQty = useCallback((id, delta) => {
-    const cur = getBasket(partner.id)
-    undoRef.current = null
-    setSnack(null)
-    if (delta < 0 && cur[id] === 1) {
-      undoRef.current = { basket: cur, note: '', withNote: false }
-      setSnack('eateryBasketItemRemoved')
-    }
-    changeQty(partner.id, id, delta)
+    const r = changeQty(partner.id, id, delta)
+    if (r) setSnack(r === 'removed' ? 'eateryBasketItemRemoved' : null)
   }, [partner.id])
   useEffect(() => {
     const sub = AppState.addEventListener('change', st => {
@@ -245,11 +236,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     return () => sub.remove()
   }, [partner.id])
   const undoClear = () => {
-    const u = undoRef.current
-    undoRef.current = null
-    haptic()
+    try { haptic() } catch { /* never blocks the undo */ }
     setSnack(null)
-    if (u) { setBasket(partner.id, u.basket); if (u.withNote) setNote(u.note) }
+    const u = undo(partner.id)
+    if (u && u.kind === 'all') setNote(u.note)
   }
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
@@ -421,7 +411,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
       <Snackbar visible={snack !== null} message={snack ? t(snack, lang) : ''} actionLabel={t('eateryOrderUndo', lang)}
-        onAction={undoClear} onTimeout={() => { setSnack(null); undoRef.current = null }} reduce={reduce}
+        onAction={undoClear} onTimeout={() => { setSnack(null); dropSnapshot(partner.id) }} reduce={reduce}
         bottom={insets.bottom + (lines.length > 0 ? SNACK_ABOVE_BAR : space[16])} />
       <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>

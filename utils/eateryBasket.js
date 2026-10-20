@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import Constants from 'expo-constants'
+import { getBasket, subscribe } from './eateryBasketCore'
 
-// ─── Yeme-İçme order basket: in memory only ─────────────────────────────────
-// One basket per partner id, { [dishId]: qty }. It survives leaving and reopening the partner page and is
+// ─── Yeme-İçme order basket: in memory only (the store itself is eateryBasketCore.js) ──────────────
+// It survives leaving and reopening the partner page and is
 // gone when the app is killed. No AsyncStorage, no database: what someone wants to eat is not ours to keep.
 
 // ADA Preview only: a partner with no WhatsApp number of its own orders to the tester's number, so the flow can
@@ -18,37 +19,15 @@ export const effectiveWhatsapp = p => {
   return own || (TEST_WHATSAPP || '').trim()
 }
 
-const baskets = new Map()
-const listeners = new Set()
-const EMPTY = Object.freeze({})
-const emit = () => listeners.forEach(l => l())
-
-export const getBasket = pid => baskets.get(pid) || EMPTY
-
-export function setBasket(pid, basket) {
-  if (!basket || Object.keys(basket).length === 0) baskets.delete(pid)
-  else baskets.set(pid, basket)
-  emit()
-}
-
-// Adds delta (clamped 0..99) to one dish; 0 removes it.
-export function changeQty(pid, dishId, delta) {
-  const cur = getBasket(pid)
-  const next = Math.max(0, Math.min(99, (cur[dishId] || 0) + delta))
-  if (next === (cur[dishId] || 0)) return
-  const b = { ...cur }
-  if (next === 0) delete b[dishId]
-  else b[dishId] = next
-  setBasket(pid, b)
-}
+export { getBasket, changeQty, clearAll, undo, dropSnapshot } from './eateryBasketCore'
 
 export function useBasket(pid) {
   const [basket, setLocal] = useState(() => getBasket(pid))
   useEffect(() => {
     const sync = () => setLocal(getBasket(pid))
-    listeners.add(sync)
+    const off = subscribe(sync)
     sync()
-    return () => { listeners.delete(sync) }
+    return off
   }, [pid])
   return basket
 }
