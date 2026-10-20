@@ -3956,12 +3956,13 @@ WITH report AS (
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='eatery_menu_items' AND is_nullable = 'YES' AND column_default IS NULL
           AND ((column_name IN ('role','protein','portion') AND data_type = 'text') OR (column_name = 'spicy' AND data_type = 'boolean'))) = 4
-      AND COALESCE(NOT EXISTS (SELECT 1 FROM unnest(ARRAY['role','protein','spicy','portion']) c
-             WHERE NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), c, 'SELECT')
-                OR NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), c, 'SELECT')
-                OR has_column_privilege('anon', to_regclass('public.eatery_menu_items'), c, 'INSERT,UPDATE,REFERENCES')
-                OR has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), c, 'INSERT,UPDATE,REFERENCES')
-                OR NOT has_column_privilege('service_role', to_regclass('public.eatery_menu_items'), c, 'SELECT,INSERT,UPDATE')), false)
+      AND COALESCE(NOT EXISTS (SELECT 1 FROM pg_attribute a
+             WHERE a.attrelid = to_regclass('public.eatery_menu_items') AND a.attname IN ('role','protein','spicy','portion') AND NOT a.attisdropped
+               AND (NOT has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT')
+                OR NOT has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT')
+                OR has_column_privilege('anon', a.attrelid, a.attnum, 'INSERT,UPDATE,REFERENCES')
+                OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT,UPDATE,REFERENCES')
+                OR NOT has_column_privilege('service_role', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE'))), false)
     UNION ALL SELECT '20261117_crunchy_express_data','crunchy-express has a partner pin, an address, menu_verified_on and >= 1 menu item, once 1117 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261117_crunchy_express_data.sql')
       OR COALESCE((SELECT p.lat IS NOT NULL AND p.geocode_source IS NOT DISTINCT FROM 'partner' AND p.address IS NOT NULL
