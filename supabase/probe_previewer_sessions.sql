@@ -9,3 +9,11 @@ FROM auth.sessions s
 WHERE s.user_id = '412cad91-2e3b-41b9-8186-175dfb8afa35'
 ORDER BY coalesce(s.refreshed_at, s.updated_at) DESC NULLS LAST
 LIMIT 10;
+
+-- Positive control (counts only): the read-only user can see auth.sessions at all, and how many exist.
+SELECT count(*) AS all_sessions,
+       count(*) FILTER (WHERE coalesce(refreshed_at, updated_at) > now() - interval '24 hours') AS active_24h,
+       count(*) FILTER (WHERE user_id = '412cad91-2e3b-41b9-8186-175dfb8afa35') AS previewer_sessions,
+       (SELECT count(*) FROM auth.users WHERE id = '412cad91-2e3b-41b9-8186-175dfb8afa35') AS previewer_user_exists,
+       (SELECT max(last_sign_in_at)::date FROM auth.users WHERE id = '412cad91-2e3b-41b9-8186-175dfb8afa35') AS previewer_last_sign_in
+FROM auth.sessions;
