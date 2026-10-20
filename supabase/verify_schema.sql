@@ -3922,6 +3922,10 @@ WITH report AS (
     UNION ALL SELECT '20261118_crunchy_express_maps_url','crunchy-express maps_url = Google Maps directions to its pin 35.179003,33.357450, once 1118 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261118_crunchy_express_maps_url.sql')
       OR COALESCE((SELECT p.maps_url IS NOT DISTINCT FROM 'https://www.google.com/maps/dir/?api=1&destination=35.179003,33.357450' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    UNION ALL SELECT '20261122_crunchy_express_menu_1020','crunchy-express has the Nachos section and the 5 dishes added 2026-10-20, once 1122 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261122_crunchy_express_menu_1020.sql')
+      OR (SELECT count(*) FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
+           WHERE p.slug = 'crunchy-express' AND i.name IN ('Cheeseme Chicken Burger','Crunchy Classic Nachos','Buffalo Nachos','Hot Honey Nachos','Eritilmiş Peynir Sos')) = 5
     UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2 SELECT policies; eatery_partners_select_preview is authenticated-only, is_previewer() AND inactive',
       (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners') = 2
       AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'
