@@ -403,7 +403,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       <Snackbar visible={cleared && lines.length === 0} message={t('eateryOrderCleared', lang)} actionLabel={t('eateryOrderUndo', lang)}
         onAction={undoClear} onTimeout={() => { setCleared(false); undoRef.current = null }} reduce={reduce} bottom={insets.bottom + space[16]} />
       {ordering && (
-        <OrderSheet visible={orderOpen === true && lines.length > 0} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
+        <OrderSheet bottomInset={insets.bottom} visible={orderOpen === true && lines.length > 0} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} lang={lang} onClose={() => setOrderOpen(false)} onSend={sendOrder} />
       )}
       <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
