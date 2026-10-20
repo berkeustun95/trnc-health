@@ -200,7 +200,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
           // that fails to load). Padded by the MEASURED band height, so the logo can never meet the band.
           <View style={[s.sponsorFrame, { paddingTop: showHero ? 0 : bandH + 6 }]}>
             {showHero
-              ? <RemoteImage source={{ uri: heroUri }} style={[s.heroPhoto, { top: 0 }]} resizeMode="cover" placeholderColor={colors.primaryLight}
+              ? <RemoteImage source={{ uri: heroUri }} style={s.bannerPhoto} resizeMode="cover" placeholderColor={colors.primaryLight}
                   onError={() => setHeroFailed(true)} accessibilityIgnoresInvertColors />
               : logoUri
                 ? <RemoteImage source={{ uri: logoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
@@ -401,7 +401,8 @@ const s = StyleSheet.create({
   // Light ADA teal tint (primaryLight) behind the hero / the no-photo fallback; the photo sits below the measured band.
   sponsorFrame: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.primaryLight,
                   alignItems: 'center', justifyContent: 'center', paddingBottom: 18 },
-  heroPhoto:   { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  // (heroPhoto removed 2026-10-20: offsets-only absolute positioning, with a top that changed after the band
+  //  measured, loaded but never showed on Android. The hero now uses bannerPhoto, the event photo's proven fill.)
   // Round white logo badge straddling the band's bottom edge, right side (the chevron sits above it).
   // A ring in the band's own colour (no border+shadow on one surface): the badge reads as a tab hanging off the band
   // and keeps a clear edge on white food photos. Opaque white fill (Android borderRadius+borderWidth gotcha).
