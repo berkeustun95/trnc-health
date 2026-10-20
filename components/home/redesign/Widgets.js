@@ -200,7 +200,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
           // that fails to load). Padded by the MEASURED band height, so the logo can never meet the band.
           <View style={[s.sponsorFrame, { paddingTop: showHero ? 0 : bandH + 6 }]}>
             {showHero
-              ? <RemoteImage source={{ uri: heroUri }} style={[s.heroPhoto, { top: bandH }]} resizeMode="cover" placeholderColor={colors.primaryLight}
+              ? <RemoteImage source={{ uri: heroUri }} style={[s.heroPhoto, { top: 0 }]} resizeMode="cover" placeholderColor={colors.primaryLight}
                   onError={() => setHeroFailed(true)} accessibilityIgnoresInvertColors />
               : logoUri
                 ? <RemoteImage source={{ uri: logoUri }} style={s.sponsorLogo} resizeMode="contain" placeholderColor="transparent" />
@@ -212,7 +212,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
         {/* Title band at the TOP (Berke, 2026-10-15): at Home's first scroll position the card's
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
         <View onLayout={e => setBandH(Math.ceil(e.nativeEvent.layout.height))}
-          style={[s.bannerBand, showFrame && s.bannerBandPartner, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
+          style={[s.bannerBand, showFrame && s.bannerBandPartner, showFrame && showHero && s.bannerBandOverHero, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
           {(!!time || !!tag || !!item.placeholder || !!item.unpublished) && (
             <View style={s.bandMeta}>
               {!!time && (
@@ -424,6 +424,9 @@ const s = StyleSheet.create({
   // Partner slides have no photo behind the band: solid ADA dark teal, never black-on-lilac (which
   // read slate). White on primaryDark 7.58:1; the Sponsorlu pill on it 5.29:1 at 15 % white (computed).
   bannerBandPartner: { backgroundColor: colors.primaryDark },
+  // Taller hero (option 1): the dish photo runs under the band to the card's top edge, and the band lets it show
+  // through slightly. primaryDark at 90 % over a white photo is ≈ #2C7372: white text ≈ 5.6:1 (computed).
+  bannerBandOverHero: { backgroundColor: 'rgba(10, 94, 93, 0.9)' },
   tagOnTeal:   { backgroundColor: 'rgba(255,255,255,0.15)' },
   bannerBandDismiss: { paddingRight: 48 },
   bandMeta:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
