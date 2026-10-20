@@ -181,6 +181,8 @@ WITH report AS (
     ('1115_eatery_partners','eatery_partners','is_active'),
     ('1115_eatery_partners','eatery_partners','created_at'),
     ('1115_eatery_partners','eatery_partners','updated_at'),
+    -- 1121: an adult-only partner's Home slide keeps the 18+ gate (utils/stripSlides.js).
+    ('1121_eatery_partners_adult_only','eatery_partners','adult_only'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -3765,6 +3767,9 @@ WITH report AS (
     -- ── 1115: Yeme-Icme eatery partners ──────────────────────────────────────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object and would publish a partner
     --     before activation.
+    UNION ALL SELECT '1121_eatery_partners_adult_only','eatery_partners.adult_only boolean NOT NULL DEFAULT false (fail-safe default: editorial)',
+      COALESCE((SELECT data_type = 'boolean' AND is_nullable = 'NO' AND column_default = 'false' FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='adult_only'), false)
     UNION ALL SELECT '1115_eatery_partners','eatery_partners.is_active DEFAULT false',
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='is_active'
