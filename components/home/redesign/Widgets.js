@@ -425,7 +425,7 @@ const s = StyleSheet.create({
   // read slate). White on primaryDark 7.58:1; the Sponsorlu pill on it 5.29:1 at 15 % white (computed).
   bannerBandPartner: { backgroundColor: colors.primaryDark },
   // Taller hero (option 1): the dish photo runs under the band to the card's top edge, and the band lets it show
-  // through slightly. primaryDark at 90 % over a white photo is ≈ #2C7372: white text ≈ 5.6:1 (computed).
+  // through slightly. primaryDark at 90 % over a white photo is ≈ #226E6D: white text 5.96:1 (computed).
   bannerBandOverHero: { backgroundColor: 'rgba(10, 94, 93, 0.9)' },
   tagOnTeal:   { backgroundColor: 'rgba(255,255,255,0.15)' },
   bannerBandDismiss: { paddingRight: 48 },
