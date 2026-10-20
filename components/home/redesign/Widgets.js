@@ -180,6 +180,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
   const kind = item?.kind
   const [bandH, setBandH] = useState(0)
   const [heroFailed, setHeroFailed] = useState(false)
+  useEffect(() => { setHeroFailed(false) }, [item?.heroPath])   // a new hero gets its own chance to load
   useEffect(() => { if (remember && !loading && kind) rememberStripKind(kind) }, [remember, loading, kind])
   if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
   if (!item) return null
@@ -402,10 +403,11 @@ const s = StyleSheet.create({
                   alignItems: 'center', justifyContent: 'center', paddingBottom: 18 },
   heroPhoto:   { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // Round white logo badge straddling the band's bottom edge, right side (the chevron sits above it).
+  // A ring in the band's own colour (no border+shadow on one surface): the badge reads as a tab hanging off the band
+  // and keeps a clear edge on white food photos. Opaque white fill (Android borderRadius+borderWidth gotcha).
   logoBadge:   { position: 'absolute', right: 12, width: LOGO_BADGE, height: LOGO_BADGE, borderRadius: LOGO_BADGE / 2,
-                 backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
-                 alignItems: 'center', justifyContent: 'center', ...elevation.card },
-  logoBadgeImg: { width: LOGO_BADGE - 12, height: LOGO_BADGE - 12 },
+                 backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  logoBadgeImg: { width: LOGO_BADGE - 16, height: LOGO_BADGE - 16 },
   sponsorSubBadge: { paddingRight: LOGO_BADGE + 8 },
   sponsorLogo: { width: 140, flex: 1, minHeight: 40 },
   sponsorSub:  { ...type.meta, color: '#FFFFFF' },
