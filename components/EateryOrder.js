@@ -116,6 +116,13 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   const kbTop = useKeyboardTop()
   const footerRef = useRef(null)
   const rootRef = useRef(null)
+  const noteInput = useRef(null)
+  const hadKb = useRef(false)
+  // Back closes the keyboard but leaves the field focused, and the next tap elsewhere is then swallowed: blur with it.
+  useEffect(() => {
+    if (kbTop == null && hadKb.current) noteInput.current?.blur()
+    hadKb.current = kbTop != null
+  }, [kbTop])
   const [lift, setLift] = useState(0)
   const measureFooter = useCallback(() => {
     if (kbTop == null) { setLift(0); return }
@@ -171,7 +178,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
               <Card>
                 <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
-                <TextInput style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
+                <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
                   placeholder={t('eateryOrderNotePlaceholder', lang)} placeholderTextColor={colors.textSecondary}
                   accessibilityLabel={t('eateryOrderNote', lang)} textAlignVertical="top" />
                 <Text style={st.counter} accessibilityElementsHidden importantForAccessibility="no">{note.length}/{ORDER_NOTE_MAX}</Text>
