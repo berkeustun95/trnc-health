@@ -31,6 +31,7 @@ export const EATERY_PREVIEW_PARTNERS = [
     menu_verified_on: null,
     sort_order: 0,
     is_active: true,
+    adult_only: false,
     eatery_menu_items: [
       { id: -1, section: 'Sample section A', section_order: 0, name: 'Sample item 1', description: null, photo_placeholder: true, price: 100, currency: 'TRY', sort_order: 0, is_available: true },
       { id: -2, section: 'Sample section A', section_order: 0, name: 'Sample item 2', description: null, photo_placeholder: true, price: 150, currency: 'TRY', sort_order: 1, is_available: true },

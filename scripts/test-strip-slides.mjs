@@ -37,9 +37,11 @@ const NOW = new Date('2026-10-18T12:00:00')
 const dbPromo = { id: 'db-promo-1', kind: 'promo', title_i18n: { en: 'Paid sponsor' }, subtitle_i18n: null, image_url: null, link_url: 'https://x.example', pin_date: null }
 const todayPin = { ...dbPromo, id: 'db-today', pin_date: '2026-10-18' }
 const emptyChain = () => { const p = new Proxy(function () {}, { get: (_, k) => (k === 'then' ? r => r({ data: [], error: null }) : () => p), apply: () => p }); return p }
+const eventRow = { id: 'ev-1', title: 'Konser', images: [], source_image_url: null, start_date: '2026-10-18T19:00:00' }
+const rowChain = row => { const p = new Proxy(function () {}, { get: (_, k) => (k === 'then' ? r => r({ data: row, error: null }) : k === 'maybeSingle' ? async () => ({ data: row, error: null }) : () => p), apply: () => p }); return p }
 function stubDb(rows) {
   const pinChain = { select: () => ({ eq: async () => (rows === 'throw' ? { data: null, error: new Error('offline') } : { data: rows, error: null }) }) }
-  globalThis.__sbTable = tbl => (tbl === 'home_strip_pin' ? pinChain : emptyChain())
+  globalThis.__sbTable = tbl => (tbl === 'home_strip_pin' ? pinChain : tbl === 'events' && globalThis.__eventRow ? rowChain(globalThis.__eventRow) : emptyChain())
 }
 
 // ─── the lead snapshot ──────────────────────────────────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ t('adult -> eligible', elig({ isGuest: false, dateOfBirth: '1990-01-01' }), true
 t('day before the 18th birthday -> not eligible', elig({ isGuest: false, dateOfBirth: '2008-10-19' }), false)
 t('the 18th birthday itself -> eligible', elig({ isGuest: false, dateOfBirth: '2008-10-18' }), true)
 
-const P = (slug, name, extra = {}) => ({ slug, name, sort_order: 0, logo_path: `${slug}/logo.png`, ...extra })
+const P = (slug, name, extra = {}) => ({ slug, name, sort_order: 0, logo_path: `${slug}/logo.png`, adult_only: false, ...extra })
 const A = P('a-cafe', 'Alpha'), B = P('b-bar', 'Bravo', { placeholder: true }), C = P('c-bake', 'Charlie')
 const run = async (o = {}) => {
   globalThis.__lastKind = o.lastKind ?? null; stubDb(o.rows ?? [])
@@ -99,8 +101,36 @@ const run = async (o = {}) => {
 }
 const ids = s => s.map(x => x.id)
 
+console.log('pin for today: a PAID pin keeps the 18+ gate, an editorial pin shows to everyone (2026-10-20)')
+{
+  const noticeToday = { id: 'notice-today', kind: 'notice', route: 'events', title_i18n: null, subtitle_i18n: null, image_url: null, link_url: null, pin_date: '2026-10-18' }
+  for (const upcoming of [true, false]) {
+    const lead = async (rows, promosEligible) => { globalThis.__lastKind = null; stubDb(rows); return (await resolveStripItem({ lang: 'Turkish', now: NOW, upcoming, promosEligible }))?.id }
+    const path = upcoming ? 'slider lead' : 'legacy card'
+    t(`${path}: paid pin today + ineligible -> NOT shown`, (await lead([todayPin], false)) !== 'db-today', true)
+    t(`${path}: paid pin today + eligible -> shown`, await lead([todayPin], true), 'db-today')
+    t(`${path}: paid pin today + non-boolean eligibility -> NOT shown (fail closed)`, (await lead([todayPin], 'yes')) !== 'db-today', true)
+    t(`${path}: editorial pin today + ineligible -> shown`, await lead([noticeToday], false), 'notice-today')
+    t(`${path}: paid + editorial pins today, ineligible -> the editorial one`, await lead([todayPin, noticeToday], false), 'notice-today')
+    {
+      const evPin = { id: 'ev-pin', kind: 'event', target_id: 'ev-1', title_i18n: null, subtitle_i18n: null, image_url: null, link_url: null, pin_date: '2026-10-18' }
+      globalThis.__eventRow = eventRow
+      t(`${path}: event pin today, no sponsor + ineligible -> shown, unlabelled`, await (async () => { globalThis.__lastKind = null; stubDb([evPin]); const x = await resolveStripItem({ lang: 'Turkish', now: NOW, upcoming, promosEligible: false }); return [x?.kind, x?.sponsored] })(), ['event', false])
+      t(`${path}: event pin today WITH sponsor_name + ineligible -> NOT shown`, (await lead([{ ...evPin, sponsor_name: 'Acme' }], false)) !== 'ev-1', true)
+      t(`${path}: event pin today WITH sponsor_name + eligible -> shown, labelled`, await (async () => { globalThis.__lastKind = null; stubDb([{ ...evPin, sponsor_name: 'Acme' }]); const x = await resolveStripItem({ lang: 'Turkish', now: NOW, upcoming, promosEligible: true }); return [x?.id, x?.sponsored] })(), ['ev-1', true])
+      globalThis.__eventRow = null
+    }
+  }
+}
 console.log('assembly')
-t('ineligible + partners -> [lead] only', ids(await run({ promosEligible: false, partners: [A, B] })), ['generic'])
+t('ineligible + editorial partners -> lead + partners (no 18+ gate)', ids(await run({ promosEligible: false, partners: [A, B] })), ['generic', 'eatery-a-cafe', 'eatery-b-bar'])
+{
+  const Adult = P('d-wine', 'Delta', { adult_only: true }), Unknown = { ...P('e-pub', 'Echo'), adult_only: undefined }, Nul = P('f-x', 'Foxtrot', { adult_only: null })
+  t('adult_only partner: ineligible -> absent', ids(await run({ promosEligible: false, partners: [A, Adult] })).slice(1), ['eatery-a-cafe'])
+  t('adult_only partner: eligible -> present', ids(await run({ promosEligible: true, partners: [A, Adult] })).slice(1), ['eatery-a-cafe', 'eatery-d-wine'])
+  t('adult_only not selected (undefined) or null -> gated like adult (fail closed)', ids(await run({ promosEligible: false, partners: [Unknown, Nul, A] })).slice(1), ['eatery-a-cafe'])
+  t('rotation counts only the partners this user may see', ids(await run({ promosEligible: false, partners: [A, Adult, C], rotation: 1 })).slice(1), ['eatery-c-bake', 'eatery-a-cafe'])
+}
 t('eligible + 0 partners -> [lead]', ids(await run()), ['generic'])
 t('eligible + 2 partners, rotation 0 -> lead, a, b', ids(await run({ partners: [A, B] })), ['generic', 'eatery-a-cafe', 'eatery-b-bar'])
 t('rotation 1 -> lead, b, a', ids(await run({ partners: [A, B], rotation: 1 })), ['generic', 'eatery-b-bar', 'eatery-a-cafe'])
@@ -115,9 +145,25 @@ t('duplicate slug rows -> one slide', ids(await run({ partners: [A, A] })).slice
 t('rotation is relative to the visible partners (gated one does not count)', ids(await run({ partners: [A, B, C], gates: { 'a-cafe': false }, rotation: 1 })).slice(1), ['eatery-c-bake', 'eatery-b-bar'])
 console.log('slide shape')
 const [, sa, sb] = await run({ partners: [A, B] })
-t('partner slide', sa, { kind: 'promo', id: 'eatery-a-cafe', sponsored: true, title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
+t('partner slide (editorial: no sponsored flag)', sa, { kind: 'promo', id: 'eatery-a-cafe', title: 'Alpha', subtitle: 'Menüye göz at', eaterySlug: 'a-cafe', logoPath: 'a-cafe/logo.png', heroPath: null, placeholder: false, action: { type: 'eatery', slug: 'a-cafe' } })
+{
+  const hero = async items => (await run({ partners: [{ ...A, eatery_menu_items: items }] }))[1].heroPath
+  t('heroPath: first photo by section_order, sort_order, id', await hero([
+    { id: 9, section_order: 1, sort_order: 0, photo_path: 's1/z.jpg' }, { id: 5, section_order: 0, sort_order: 2, photo_path: 'b.jpg' },
+    { id: 4, section_order: 0, sort_order: 1, photo_path: 'a.jpg' }, { id: 3, section_order: 0, sort_order: 1, photo_path: 'a0.jpg' }]), 'a0.jpg')
+  t('heroPath: items without photo_path are ignored (even if first)', await hero([
+    { id: 1, section_order: 0, sort_order: 0, photo_path: null }, { id: 2, section_order: 0, sort_order: 1, photo_path: '' }, { id: 3, section_order: 0, sort_order: 2, photo_path: 'c.jpg' }]), 'c.jpg')
+  t('heroPath: an unavailable dish (is_available false) is never the hero', await hero([
+    { id: 1, section_order: 0, sort_order: 0, photo_path: 'hidden.jpg', is_available: false },
+    { id: 2, section_order: 0, sort_order: 1, photo_path: 'shown.jpg', is_available: true }]), 'shown.jpg')
+  t('heroPath: null when no item has a photo / no items / not selected', [await hero([{ id: 1, photo_path: null }]), await hero([]), await hero(undefined)], [null, null, null])
+}
 t('placeholder flag carried', [sa.placeholder, sb.placeholder], [false, true])
 t('no photo on a partner slide', [sa.imageUrl, sb.imageUrl], [undefined, undefined])
+{
+  const flag = async is_active => (await run({ partners: [{ ...A, is_active }] }))[1].unpublished
+  t('unpublished only when is_active === false (false/true/undefined/null)', [await flag(false), await flag(true), await flag(undefined), await flag(null)], [true, undefined, undefined, undefined])
+}
 console.log('never twice running applies to the lead only')
 t('last kind promo + promo in DB -> lead skips the promo, partners still follow',
   ids(await run({ rows: [dbPromo], lastKind: 'promo', partners: [A] })), ['generic', 'eatery-a-cafe'])
@@ -125,8 +171,9 @@ t('lead promo + partners -> promo first, partners after', ids(await run({ rows: 
 t('dismissing the lead does not remove partner slides', ids(await run({ rows: [dbPromo], dismissedIds: new Set(['db-promo-1']), partners: [A] })), ['generic', 'eatery-a-cafe'])
 console.log('pure assembler')
 t('null lead -> partners only, no throw', assembleStripSlides({ lead: null, partners: [A], promosEligible: true, gates: {}, rotation: 0, lang: 'Turkish' }).map(x => x.id), ['eatery-a-cafe'])
-t('null lead + ineligible -> []', assembleStripSlides({ lead: null, partners: [A], promosEligible: false, gates: {}, rotation: 0, lang: 'Turkish' }), [])
-t('non-boolean eligibility fails closed', ids(assembleStripSlides({ lead: { id: 'l' }, partners: [A], promosEligible: 'yes', gates: {}, rotation: 0, lang: 'Turkish' })), ['l'])
+t('null lead + ineligible -> editorial partners only', assembleStripSlides({ lead: null, partners: [A], promosEligible: false, gates: {}, rotation: 0, lang: 'Turkish' }).map(x => x.id), ['eatery-a-cafe'])
+t('null lead + ineligible + adult partner -> []', assembleStripSlides({ lead: null, partners: [P('d-wine', 'Delta', { adult_only: true })], promosEligible: false, gates: {}, rotation: 0, lang: 'Turkish' }), [])
+t('non-boolean eligibility fails closed for an adult partner', ids(assembleStripSlides({ lead: { id: 'l' }, partners: [P('d-wine', 'Delta', { adult_only: true })], promosEligible: 'yes', gates: {}, rotation: 0, lang: 'Turkish' })), ['l'])
 t('partners not an array -> lead only', ids(assembleStripSlides({ lead: { id: 'l' }, partners: null, promosEligible: true, gates: {}, rotation: 0, lang: 'Turkish' })), ['l'])
 t('nextStripRotation steps and wraps', [nextStripRotation(0, 2), nextStripRotation(1, 2), nextStripRotation(5, 3), nextStripRotation(0, 0), nextStripRotation(-4, 3), nextStripRotation(undefined, 3)], [1, 0, 0, 0, 1, 1])
 const src = readFileSync(resolve(ROOT, 'utils/stripSlides.js'), 'utf8').replace(/\/\/.*$/gm, '')

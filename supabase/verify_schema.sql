@@ -181,6 +181,8 @@ WITH report AS (
     ('1115_eatery_partners','eatery_partners','is_active'),
     ('1115_eatery_partners','eatery_partners','created_at'),
     ('1115_eatery_partners','eatery_partners','updated_at'),
+    -- 1121: an adult-only partner's Home slide keeps the 18+ gate (utils/stripSlides.js).
+    ('1121_eatery_partners_adult_only','eatery_partners','adult_only'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -570,7 +572,8 @@ WITH report AS (
     ('1059_hotels','hotels_touch_updated_at'),
     ('1070_live_scores','matches_touch_updated_at'),
     ('1070_live_scores','is_score_editor'),
-    ('1070_live_scores','claim_api_request')
+    ('1070_live_scores','claim_api_request'),
+    ('1119_eatery_preview_read','is_previewer')
   ) e(m,o)
 
   UNION ALL
@@ -1206,7 +1209,9 @@ WITH report AS (
     ('1056_route_medals','award_route_medal'),
     ('1056_route_medals','get_profile_route_badges'),
     -- 1070. Without it the editor button never shows (the app asks is_score_editor()).
-    ('1070_live_scores','is_score_editor')
+    ('1070_live_scores','is_score_editor'),
+    -- 1119. Without it every signed-in read of the three eatery tables fails (the preview policy calls it).
+    ('1119_eatery_preview_read','is_previewer')
   ) e(m,o)
 
   UNION ALL
@@ -3766,6 +3771,9 @@ WITH report AS (
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='is_active'
           AND column_default = 'false') = 1
+    UNION ALL SELECT '1121_eatery_partners_adult_only','eatery_partners.adult_only boolean NOT NULL DEFAULT false (fail-safe default: editorial)',
+      COALESCE((SELECT data_type = 'boolean' AND is_nullable = 'NO' AND column_default = 'false' FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='adult_only'), false)
     UNION ALL SELECT '1115_eatery_partners','eatery_menu_items: currency NOT NULL DEFAULT TRY, is_available NOT NULL DEFAULT true',
       (SELECT count(*) FROM information_schema.columns
         WHERE table_schema='public' AND table_name='eatery_menu_items' AND is_nullable = 'NO'
@@ -3814,9 +3822,8 @@ WITH report AS (
       IS NOT DISTINCT FROM ARRAY['gallery','menu']
     -- (4) One permissive SELECT policy per table (the full set per table is counted, so a dashboard
     --     policy or a write policy turns this red), RLS on, clients SELECT-only, service_role writes.
-    UNION ALL SELECT '1115_eatery_partners','eatery_partners: 1 SELECT policy (is_active), RLS on, clients SELECT-only, service_role writes',
+    UNION ALL SELECT '1115_eatery_partners','eatery_partners: the is_active SELECT policy, RLS on, clients SELECT-only, service_role writes',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_partners')), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners') = 1
       AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners'
         AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual = 'is_active')
       AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.eatery_partners'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -3824,9 +3831,8 @@ WITH report AS (
                AND has_table_privilege('anon', to_regclass('public.eatery_partners'), 'SELECT')
                AND has_table_privilege('authenticated', to_regclass('public.eatery_partners'), 'SELECT')
                AND has_table_privilege('service_role', to_regclass('public.eatery_partners'), 'SELECT,INSERT,UPDATE,DELETE'), false)
-    UNION ALL SELECT '1115_eatery_partners','eatery_menu_items: 1 SELECT policy (parent partner active), RLS on, clients SELECT-only, service_role writes',
+    UNION ALL SELECT '1115_eatery_partners','eatery_menu_items: the is_active SELECT policy (parent partner active), RLS on, clients SELECT-only, service_role writes',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_menu_items')), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items') = 1
       AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items'
         AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[]
         AND qual LIKE '%eatery_partners%' AND qual LIKE '%is_active%')
@@ -3835,9 +3841,8 @@ WITH report AS (
                AND has_table_privilege('anon', to_regclass('public.eatery_menu_items'), 'SELECT')
                AND has_table_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'SELECT')
                AND has_table_privilege('service_role', to_regclass('public.eatery_menu_items'), 'SELECT,INSERT,UPDATE,DELETE'), false)
-    UNION ALL SELECT '1115_eatery_partners','eatery_photos: 1 SELECT policy (parent partner active), RLS on, clients SELECT-only, service_role writes',
+    UNION ALL SELECT '1115_eatery_partners','eatery_photos: the is_active SELECT policy (parent partner active), RLS on, clients SELECT-only, service_role writes',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_photos')), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos') = 1
       AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos'
         AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[]
         AND qual LIKE '%eatery_partners%' AND qual LIKE '%is_active%')
@@ -3917,6 +3922,66 @@ WITH report AS (
     UNION ALL SELECT '20261118_crunchy_express_maps_url','crunchy-express maps_url = Google Maps directions to its pin 35.179003,33.357450, once 1118 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261118_crunchy_express_maps_url.sql')
       OR COALESCE((SELECT p.maps_url IS NOT DISTINCT FROM 'https://www.google.com/maps/dir/?api=1&destination=35.179003,33.357450' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2 SELECT policies; eatery_partners_select_preview is authenticated-only, is_previewer() AND inactive',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners') = 2
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND (roles::text[] = ARRAY['authenticated']::text[] OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')) -- EATERY-PREVIEW-KEY:supersede (1120 owns the roles)
+        AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%' AND with_check IS NULL)
+    UNION ALL SELECT '1119_eatery_preview_read','eatery_menu_items: exactly 2 SELECT policies; eatery_menu_items_select_preview is authenticated-only, is_previewer() AND inactive',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items') = 2
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items' AND policyname='eatery_menu_items_select_preview'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND (roles::text[] = ARRAY['authenticated']::text[] OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')) -- EATERY-PREVIEW-KEY:supersede (1120 owns the roles)
+        AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%' AND with_check IS NULL)
+    UNION ALL SELECT '1119_eatery_preview_read','eatery_photos: exactly 2 SELECT policies; eatery_photos_select_preview is authenticated-only, is_previewer() AND inactive',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos') = 2
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos' AND policyname='eatery_photos_select_preview'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND (roles::text[] = ARRAY['authenticated']::text[] OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')) -- EATERY-PREVIEW-KEY:supersede (1120 owns the roles)
+        AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%' AND with_check IS NULL)
+    UNION ALL SELECT '1119_eatery_preview_read','is_previewer(): STABLE, INVOKER, only 412cad91…, EXECUTE authenticated yes / anon no',
+      EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql') -- EATERY-PREVIEW-KEY:supersede (1120 replaced the function)
+      OR (COALESCE((SELECT p.provolatile = 's' AND NOT p.prosecdef AND p.prosrc LIKE '%412cad91-2e3b-41b9-8186-175dfb8afa35%'
+                FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_previewer()')), false)
+      AND COALESCE((SELECT bool_or(a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'authenticated') AND a.privilege_type = 'EXECUTE')
+                       AND NOT bool_or(a.grantee IN (0, (SELECT oid FROM pg_roles WHERE rolname = 'anon')) AND a.privilege_type = 'EXECUTE')
+                FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = to_regprocedure('public.is_previewer()')), false))
+    UNION ALL SELECT '1120_eatery_preview_key','is_previewer(): STABLE, SECURITY DEFINER, owner postgres, search_path '''', reads the x-ada-preview-key hash, no account id',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR COALESCE((SELECT p.provolatile = 's' AND p.prosecdef AND pg_get_userbyid(p.proowner) = 'postgres' AND p.proconfig @> ARRAY['search_path=""']
+                          AND p.prosrc LIKE '%request.headers%' AND p.prosrc LIKE '%x-ada-preview-key%' AND p.prosrc LIKE '%preview_key_hashes%'
+                          AND p.prosrc NOT LIKE '%412cad91%'
+                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_previewer()')), false)
+    UNION ALL SELECT '1120_eatery_preview_key','is_previewer() EXECUTE: anon + authenticated',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR COALESCE((SELECT bool_or(a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'anon') AND a.privilege_type = 'EXECUTE')
+                      AND bool_or(a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'authenticated') AND a.privilege_type = 'EXECUTE')
+                   FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = to_regprocedure('public.is_previewer()')), false)
+    UNION ALL SELECT '1120_eatery_preview_key','private.preview_key_hashes: exactly 1 hash, no privilege for anon / authenticated',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR (to_regclass('private.preview_key_hashes') IS NOT NULL
+          -- Counted through query_to_xml: a plain FROM private.preview_key_hashes is resolved at parse time and
+          -- would kill all of QUERY 1 on a database without the table (to_regclass alone cannot guard it).
+          AND (CASE WHEN to_regclass('private.preview_key_hashes') IS NULL
+                         OR NOT has_table_privilege(current_user, 'private.preview_key_hashes', 'SELECT') THEN NULL
+                    ELSE (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM private.preview_key_hashes', false, true, '')))[1]::text::int END) = 1
+          AND NOT COALESCE((SELECT bool_or(a.grantee IN (0, (SELECT oid FROM pg_roles WHERE rolname = 'anon'), (SELECT oid FROM pg_roles WHERE rolname = 'authenticated')))
+                            FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('private.preview_key_hashes')), false))
+    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (3 today: the eatery preview policies)',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 3
+          AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE (coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%')
+                            AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL OR qual NOT LIKE '%is_active%')))
+    UNION ALL SELECT '1120_eatery_preview_key','eatery_partners_select_preview applies TO anon, authenticated',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'
+        AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%')
+    UNION ALL SELECT '1120_eatery_preview_key','eatery_menu_items_select_preview applies TO anon, authenticated',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_menu_items' AND policyname='eatery_menu_items_select_preview'
+        AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%')
+    UNION ALL SELECT '1120_eatery_preview_key','eatery_photos_select_preview applies TO anon, authenticated',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
+      OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_photos' AND policyname='eatery_photos_select_preview'
+        AND roles::text[] = ARRAY['anon','authenticated']::text[] AND qual LIKE '%is_previewer()%' AND qual LIKE '%is_active%')
     -- ── 1113: connectivity_links (the eSIM landing's tile + support URLs) ──────────
     -- (1) Pre-launch DEFAULT: a reverted DEFAULT creates no named object.
     UNION ALL SELECT '1113_connectivity_links','connectivity_links.is_active DEFAULT false',

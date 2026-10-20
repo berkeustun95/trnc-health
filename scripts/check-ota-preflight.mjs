@@ -82,6 +82,32 @@ console.log('\nOTA preflight')
   console.log(`  ${!err && variant === null ? '✓' : '✗'} variant        ${err ? 'unresolved' : variant === null ? 'production (no extra.appVariant)' : `PREVIEW ('${variant}') — refused`}`)
 }
 
+// ── (d) the ADA Preview key must never reach a production bundle ──────────────
+// EXPO_PUBLIC_ADA_PREVIEW_KEY lets any request read unpublished rows (20261120 is_previewer()). Expo inlines an
+// EXPO_PUBLIC_ value at bundle time wherever it is defined — the shell, any .env file (loaded regardless of
+// --environment) or the EAS environment — so the code gate in lib/supabase.js does not keep it out of the BUNDLE.
+// Refuse when it can be seen from here, and when lib/supabase.js stops gating the header on the Preview config.
+{
+  const NAME = 'EXPO_PUBLIC_ADA_PREVIEW_KEY'
+  const seen = []
+  if (process.env[NAME]) seen.push('process env')
+  for (const f of ['.env.production.local', '.env.local', '.env.production', '.env']) {
+    const p = resolve(ROOT, f)
+    if (existsSync(p) && new RegExp(`^\\s*(?:export\\s+)?${NAME}\\s*=`, 'm').test(readFileSync(p, 'utf8'))) seen.push(f)
+  }
+  let eas = null
+  try {
+    eas = sh('npx', [...EAS, 'env:list', '--environment', 'production'])
+    if (new RegExp(`^${NAME}=`, 'm').test(eas)) seen.push('EAS production environment')
+  } catch (e) { problems.push(`could not list the EAS production environment (${String(e.message).split('\n')[0]}) — cannot prove the preview key is absent`) }
+  if (seen.length) problems.push(`${NAME} is defined in: ${seen.join(', ')} — it would be inlined into this production bundle and open unpublished rows to every user`)
+  const lib = readFileSync(resolve(ROOT, 'lib/supabase.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const gated = /appVariant\s*===\s*'preview'\s*\?\s*process\.env\.EXPO_PUBLIC_ADA_PREVIEW_KEY\s*:\s*undefined/.test(lib)
+  const uses = (lib.match(/EXPO_PUBLIC_ADA_PREVIEW_KEY/g) || []).length
+  if (!gated || uses !== 1) problems.push(`lib/supabase.js must read ${NAME} exactly once, behind extra.appVariant === 'preview' (found ${uses} use(s), gated: ${gated})`)
+  console.log(`  ${!seen.length && eas !== null && gated && uses === 1 ? '✓' : '✗'} preview key    ${seen.length ? 'VISIBLE in ' + seen.join(', ') + ' — refused' : eas === null ? 'unverified' : 'absent from shell, .env files and EAS production'}${gated && uses === 1 ? '' : '; lib/supabase.js gate broken'}`)
+}
+
 // ── (a) lineage: HEAD must contain the commit this runtime is running ─────────
 {
   const cfg = readFileSync(resolve(ROOT, 'app.config.js'), 'utf8')
