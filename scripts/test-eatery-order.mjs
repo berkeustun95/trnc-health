@@ -1,5 +1,6 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
+import * as B from '../utils/eateryBasketCore.js'
 import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryOrderable, orderTotal } from '../constants/eatery.js'
 
 let bad = 0
@@ -41,6 +42,38 @@ eq('digits: too short', eateryOrderDigits('+9'), null)
 eq('orderable: priced + available', eateryOrderable({ price: 120, is_available: true }), true)
 eq('orderable: NULL price', eateryOrderable({ price: null, is_available: true }), false)
 eq('orderable: unavailable', eateryOrderable({ price: 120, is_available: false }), false)
+
+
+// ── basket store: the undo snapshot ──────────────────────────────────────────
+const P = 'p1'
+const fill = () => { B.changeQty(P, 1, 2); B.changeQty(P, 2, 1); B.changeQty(P, 3, 5) }
+fill()
+eq('store: fill', B.getBasket(P), { 1: 2, 2: 1, 3: 5 })
+eq('clear-all: cleared', B.clearAll(P, 'soğansız') && B.getBasket(P), {})
+const u = B.undo(P)
+eq('clear-all -> undo restores the lines', B.getBasket(P), { 1: 2, 2: 1, 3: 5 })
+eq('clear-all -> undo returns the note', [u.kind, u.note], ['all', 'soğansız'])
+eq('undo twice: nothing the second time', B.undo(P), null)
+B.clearAll(P, 'x')
+eq('clear on an empty basket does not overwrite the snapshot', [B.clearAll(P, 'y'), B.undo(P).note], [false, 'x'])
+B.clearAll(P, 'x')
+B.changeQty(P, 9, 1)
+eq('clear-all -> NEW edit -> undo is gone (and the new line stays)', [B.undo(P), B.getBasket(P)], [null, { 9: 1 }])
+B.clearAll(P, '')
+B.changeQty(P, 9, 0)
+eq('a no-op edit (+0) keeps the snapshot', B.undo(P) !== null, true)
+fill()
+eq('bin: last unit of a dish reports removed', B.changeQty(P, 2, -1), 'removed')
+eq('bin -> undo brings the dish back', [B.undo(P).kind, B.getBasket(P)[2]], ['item', 1])
+B.changeQty(P, 2, -1)
+B.changeQty(P, 1, -1)
+eq('bin -> other edit -> undo is gone', B.undo(P), null)
+B.clearAll(P, 'n')
+B.dropSnapshot(P)
+eq('snackbar timeout (dropSnapshot) -> undo is gone', B.undo(P), null)
+const pBefore = JSON.stringify(B.getBasket(P))
+B.changeQty('p2', 1, 1)
+eq('baskets are per partner', [B.getBasket('p2'), JSON.stringify(B.getBasket(P)) === pBefore], [{ 1: 1 }, true])
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)
