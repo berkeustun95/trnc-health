@@ -47,7 +47,7 @@ function HoursBlock({ week, open, lang }) {
 }
 
 const THUMB = 64
-const SHOW_SECTION_COUNT = true   // "Nachos · 3": muted dish count beside a section title
+const SHOW_SECTION_COUNT = false  // "Nachos · 3": muted dish count beside a section title
 const TAB_SCROLL_OFFSET = 8       // a section is "current" once its top is within this of the pinned tab row
 
 // A dish photo is partner content: shown as sent (contain), never cropped. A file that fails to load
