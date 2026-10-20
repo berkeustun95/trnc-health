@@ -53,7 +53,8 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
 }
 
 // iOS: the keyboard covers the bottom of a bottom sheet and nothing resizes a Modal, so the sheet is padded by the
-// keyboard height. Android only needs the list capped (kb > 0) so the sheet never grows past the top.
+// keyboard height. Android does the same (device-tested: the Modal window does not resize), and the screen's own
+// bottom inset is added when the keyboard is closed because a Modal's insets read 0 there.
 function useKeyboardPad() {
   const [h, setH] = useState(0)
   useEffect(() => {
@@ -65,7 +66,7 @@ function useKeyboardPad() {
   return h
 }
 
-export function OrderSheet({ visible, lines, onQty, formatMoney, totalText, note, onNote, lang, onClose, onSend }) {
+export function OrderSheet({ bottomInset = 0, visible, lines, onQty, formatMoney, totalText, note, onNote, lang, onClose, onSend }) {
   const insets = useSafeAreaInsets()
   const { height: winH } = useWindowDimensions()
   const kb = useKeyboardPad()
@@ -93,7 +94,7 @@ export function OrderSheet({ visible, lines, onQty, formatMoney, totalText, note
       </View>
       <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
       <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} style={st.send} />
-      {kb > 0 && Platform.OS === 'ios' && <View style={{ height: Math.max(0, kb - insets.bottom) }} />}
+      <View style={{ height: kb > 0 ? Math.max(0, kb - (Platform.OS === 'ios' ? insets.bottom : 0)) : Math.max(0, bottomInset - insets.bottom) }} />
     </BottomSheet>
   )
 }
