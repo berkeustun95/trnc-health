@@ -176,6 +176,11 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
   `--changes_not_sent_for_review true` and send from Console.
 - ⚠ `fastlane supply init` overwrites the folder: snapshot into `fastlane/metadata-backup/android`.
 - Ruby 2.6, gems in `vendor/bundle` (`bundle install` once); compare files as UTF-8 (`LC_ALL=en_US.UTF-8`).
+- **Play developer account ID `7054171312151082560`.** Reviews bucket expected at
+  `gs://pubsite_prod_rev_7054171312151082560` (newer accounts use `pubsite_prod_<id>`): UNCONFIRMED, no monthly
+  report existed on 2026-10-20 — confirm via Console → Download reports → Copy Cloud Storage URI once one does.
+  Reviews API = last 7 days, text reviews only. iOS reviews: ASC `customerReviews` (app `6783996527`). Vault
+  `2026-10-20_store-reviews-pull.md`.
 
 ## Compliance (Google Play, declared mixed-audience app)
 - ⚠ **Category Travel & Local, Health declaration "no health features" — do not re-tick it,** even
