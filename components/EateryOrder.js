@@ -1,3 +1,4 @@
+import { StatusBar as RNStatusBar } from 'react-native'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -61,12 +62,14 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
 // The keyboard's top edge in screen coordinates (null while it is closed). The lift is NOT taken from the reported
 // height: BasketPage measures where its footer really ends against this edge (device-tested: the reported height
 // and the window's own partial resize disagree).
+const KBD_DIAG = { ev: null }   // TEMP-DIAG (remove with the logs below)
 function useKeyboardTop() {
   const [top, setTop] = useState(null)
   useEffect(() => {
     const ios = Platform.OS === 'ios'
     const show = Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidShow', e => {
       const { height, screenY } = e.endCoordinates
+      KBD_DIAG.ev = e.endCoordinates   // TEMP-DIAG
       setTop(screenY > 0 ? Math.round(screenY) : Math.round(Dimensions.get('screen').height - height))
     })
     const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setTop(null))
@@ -115,11 +118,20 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
   const footerRef = useRef(null)
+  const rootRef = useRef(null)   // TEMP-DIAG
   const [lift, setLift] = useState(0)
   const measureFooter = useCallback(() => {
     if (kbTop == null) { setLift(0); return }
-    footerRef.current?.measureInWindow((_x, y, _w, h) => setLift(Math.max(0, Math.round(y + h - kbTop))))
-  }, [kbTop])
+    footerRef.current?.measureInWindow((_x, y, _w, h) => {
+      const l = Math.max(0, Math.round(y + h - kbTop))
+      setLift(l)
+      // TEMP-DIAG: logcat tag [ADA-KBD]
+      const w = Dimensions.get('window'), sc = Dimensions.get('screen')
+      const rootM = rootRef.current?.measureInWindow ? (cb => rootRef.current.measureInWindow((x2, y2, w2, h2) => cb({ x: x2, y: y2, w: w2, h: h2 }))) : cb => cb(null)
+      rootM(root => console.log('[ADA-KBD]', JSON.stringify({ kbTop, ev: KBD_DIAG.ev, window: w, screen: sc, statusBar: RNStatusBar.currentHeight,
+        footer: { x: _x, y, w: _w, h }, root, insets: { top: insets.top, bottom: insets.bottom }, lift: l })))
+    })
+  }, [kbTop, insets.top, insets.bottom])
   useEffect(() => { measureFooter(); const id = setTimeout(measureFooter, 250); return () => clearTimeout(id) }, [measureFooter])
   const slide = useRef(new Animated.Value(reduce ? 0 : winW)).current
   const scrollRef = useRef(null)
@@ -138,7 +150,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   }, [kbTop, reduce])
   const empty = lines.length === 0
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+    <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
       <SafeAreaView style={st.page} edges={['top']}>
         <ScreenHeader lang={lang} title={t('eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
