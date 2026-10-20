@@ -101,6 +101,8 @@ BEGIN
       ON i.section = t->>0 AND i.name = t->>3 AND i.price = (t->>4)::numeric
    WHERE i.partner_id = c_id AND t IS NULL;
   IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'items not in the 2026-10-20 menu (name/section/price drift): %. Nothing applied.', v_bad; END IF;
+  SELECT string_agg(i.name, ', ') INTO v_bad FROM public.eatery_menu_items i WHERE i.partner_id = c_id AND i.is_available IS DISTINCT FROM true;
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'items marked unavailable (Berke: all items active on 2026-10-20): %. Nothing applied.', v_bad; END IF;
   SELECT count(*) INTO v_n FROM public.eatery_menu_items WHERE partner_id = c_id;
   IF v_n NOT IN (41, 46) THEN RAISE EXCEPTION 'crunchy-express has % items, expected 41 (20261117) or 46 (re-run)', v_n; END IF;
 
@@ -162,7 +164,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261122_crunchy_express_menu_1020.sql', 'a8873be3a91ff0e4e8042080fef1fb311967cf26e55db4c9d59be9a915c8a9e4')
+VALUES ('20261122_crunchy_express_menu_1020.sql', '8315aacab2ddf697c7a2073effa16cbefcef4d47dd959f7fe5cba144a528f88a')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
