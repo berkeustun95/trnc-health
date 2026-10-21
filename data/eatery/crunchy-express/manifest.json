@@ -20,6 +20,24 @@
     "Crunchy Classic Nachos": "10.png",
     "Buffalo Nachos": "9.png",
     "Hot Honey Nachos": "11.png",
-    "Cheeseme Chicken Burger": "20.jpg"
+    "Cheeseme Chicken Burger": "20.jpg",
+    "Crunchy Box": "ys-01.jpg",
+    "Crunchy Box XL": "ys-02.jpg",
+    "Crunchy Box XXL": "ys-03.jpg",
+    "Veggy Smash Burger": "ys-04.jpg",
+    "Mozzarella Sticks (6 Adet)": "ys-05.jpg",
+    "4'lü Mozzarella Sticks": "ys-06.jpg",
+    "Acılı Soğan Halkası (8 Adet)": "ys-07.jpg",
+    "Acılı Soğan Halkası (12 Adet)": "ys-08.jpg",
+    "Patates Kızartması": "ys-09.jpg",
+    "Nutella Smash": "ys-10.jpg"
+  },
+  "dishSizeWaivers": {
+    "Nutella Smash": {
+      "minShortSide": 679,
+      "reason": "Only photo available (Crunchy's Yemeksepeti listing, 719 px before trim); one-time exception approved by Berke",
+      "approvedBy": "Berke",
+      "date": "2026-10-21"
+    }
   }
 }
