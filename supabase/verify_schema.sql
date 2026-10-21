@@ -225,6 +225,7 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders','view_count'),
     ('20261125_eatery_orders','eatery_orders','created_by'),
     ('20261125_eatery_orders','eatery_orders','client_id'),
+    ('20261125_eatery_orders','eatery_orders','created_as_guest'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -1071,6 +1072,7 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_created_by_created_at_idx'),
     ('20261125_eatery_orders','eatery_orders_partner_created_at_idx'),
     ('20261125_eatery_orders','eatery_orders_created_at_idx'),
+    ('20261125_eatery_orders','eatery_orders_guest_partner_idx'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcements_list_idx'),
     ('1102_duyurular','announcements_deadline_idx'),
@@ -4059,11 +4061,12 @@ WITH report AS (
       AND COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) LIKE '%''view_count_before''%'
                AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
                AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%', false)
-    UNION ALL SELECT '20261125_eatery_orders','create_eatery_order body: prices from eatery_menu_items (never p_items price), 5/user + 60/partner per hour, is_previewer gate, account gate',
+    UNION ALL SELECT '20261125_eatery_orders','create_eatery_order body: prices from eatery_menu_items (never p_items price), 5/user + 60/partner (guest-session orders only) per hour, is_previewer gate, account gate',
       COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%JOIN public.eatery_menu_items m%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%m.price IS NOT NULL%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_user_n >= 5%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_part_n >= 60%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_guest AND v_part_n >= 60%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND created_at > now()%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%public.is_previewer()%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%public.is_anonymous_session()%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) NOT LIKE '%p_items -> %price%', false)

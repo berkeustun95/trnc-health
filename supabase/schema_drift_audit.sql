@@ -947,7 +947,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('eatery_orders', 'first_viewed_at', false, NULL, 'timestamp with time zone'),
     ('eatery_orders', 'view_count', true, '0', 'integer'),
     ('eatery_orders', 'created_by', true, NULL, 'uuid'),
-    ('eatery_orders', 'client_id', false, NULL, 'text')
+    ('eatery_orders', 'client_id', false, NULL, 'text'),
+    ('eatery_orders', 'created_as_guest', true, 'false', 'boolean')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -1462,6 +1463,7 @@ expected_index (iname) AS (VALUES
     ('eatery_menu_items_partner_idx'),
     ('eatery_orders_created_at_idx'),
     ('eatery_orders_created_by_created_at_idx'),
+    ('eatery_orders_guest_partner_idx'),
     ('eatery_orders_partner_created_at_idx'),
     ('eatery_photos_partner_idx'),
     ('f1_races_race_at_idx'),
