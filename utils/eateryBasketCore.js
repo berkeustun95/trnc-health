@@ -6,10 +6,12 @@
 const baskets = new Map()
 const snaps = new Map()
 const listeners = new Set()
+let lastAdded = null   // the partner id of the latest real add, anywhere (menu or quiz results): the results bar follows it
 const EMPTY = Object.freeze({})
 const emit = () => listeners.forEach(l => l())
 
 export const getBasket = pid => baskets.get(pid) || EMPTY
+export const getLastAdded = () => lastAdded
 export const subscribe = fn => { listeners.add(fn); return () => { listeners.delete(fn) } }
 
 function put(pid, basket) {
@@ -26,6 +28,7 @@ export function changeQty(pid, dishId, delta) {
   const next = Math.max(0, Math.min(99, before + delta))
   if (next === before) return null
   const removed = next === 0
+  if (next > before) lastAdded = pid
   if (removed) snaps.set(pid, { basket: cur, note: null, kind: 'item' })
   else snaps.delete(pid)
   const b = { ...cur }

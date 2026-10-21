@@ -9,7 +9,7 @@ import { colors, font, type, radii, space, elevation, press, motion, TAP } from 
 import { ScreenHeader, Card, Button, RemoteImage } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 import { QtyStepper, OrderBar } from './EateryOrder'
-import { effectiveWhatsapp, getBasket, changeQty } from '../utils/eateryBasket'
+import { effectiveWhatsapp, getBasket, changeQty, getLastAdded } from '../utils/eateryBasket'
 import { subscribe } from '../utils/eateryBasketCore'
 
 // ─── Yeme-İçme: "Ne yesem?" (dish finder) ───────────────────────────────────
@@ -241,17 +241,15 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
   // stepper) show here: any store change re-renders this page, which reads the baskets fresh.
   const [, setTick] = useState(0)
   useEffect(() => subscribe(() => setTick(n => n + 1)), [])
-  const [lastPid, setLastPid] = useState(null)   // the partner most recently added to: its basket is the one the bar shows
   const canOrder = p => !!eateryOrderDigits(effectiveWhatsapp(p))
   const onQty = (p, id, delta) => {
-    if (changeQty(p.id, id, delta) && delta > 0) setLastPid(p.id)
+    changeQty(p.id, id, delta)
   }
   const onAddAll = (p, ids) => {
     ids.forEach(id => changeQty(p.id, id, 1))
-    if (ids.length) setLastPid(p.id)
   }
   const resultPartners = result ? result.dishes.map(d => d.partner).filter((p, i, a) => a.findIndex(x => x.id === p.id) === i && canOrder(p)) : []
-  const barPartner = quizBarPartner(resultPartners, p => quizBasketSummary(p, getBasket(p.id)), lastPid)
+  const barPartner = quizBarPartner(resultPartners, p => quizBasketSummary(p, getBasket(p.id)), getLastAdded())
   const bar = barPartner ? quizBasketSummary(barPartner, getBasket(barPartner.id)) : null
   const cur = STEPS[step]
   const showBar = !cur && !!bar
