@@ -353,7 +353,7 @@ const st = StyleSheet.create({
   dotOn:      { backgroundColor: colors.primary },
   step:       { ...type.meta, color: colors.textSecondary },
   scroll:     { flex: 1 },
-  content:    { paddingHorizontal: space[16], paddingTop: space[16], gap: space[16] },
+  content:    { paddingHorizontal: space[16], paddingTop: space[4], gap: space[16] },
   question:   { flex: 1, ...type.detailTitle, color: colors.textPrimary },
   qRow:       { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   qMascot:    { width: 56, height: 56, flexShrink: 0 },
