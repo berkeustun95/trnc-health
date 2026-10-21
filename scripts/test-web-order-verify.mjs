@@ -18,11 +18,12 @@ const env = {
   ASSETS: { fetch: async req => { assetHits.push(req); return new Response('ASSET', { status: 200 }) } },
 }
 const BROWSER = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1'
-const call = (path, method = 'GET', ua) => worker.fetch(new Request('https://getadaapp.com' + path, { method, headers: ua ? { 'user-agent': ua } : {} }), env)
+const call = (path, method = 'GET', ua, extra = {}) => worker.fetch(new Request('https://getadaapp.com' + path, { method, headers: { ...(ua ? { 'user-agent': ua } : {}), ...extra } }), env)
 const plain = (path, method = 'GET') => call(path, method, BROWSER)
 // the server-rendered full result (no-script fallback)
 const get = path => call(path.replace(/\/?$/, '') + '?view=1', 'GET', BROWSER)
-const check = (path, ua = BROWSER) => call(path.replace(/\/?$/, '') + '/check', 'POST', ua)
+const SAME = { 'sec-fetch-site': 'same-origin' }
+const check = (path, ua = BROWSER, extra = SAME) => call(path.replace(/\/?$/, '') + '/check', 'POST', ua, extra)
 const okRow = (over = {}) => ({
   status: 'ok', partner_name: 'Crunchy Express', created_at: '2026-10-21T10:05:00Z', expires_at: '2026-10-21T14:05:00Z',
   lines: [{ name: 'Crunchy Burger', qty: 2, unit_price: 620 }], total: 1240, currency: 'TRY',
@@ -129,7 +130,9 @@ await test('inline script runs in a stub DOM: waits for visibility, POSTs /check
   assert.match(flat, /&lt;|<b>X<\/b>/) // payload text lands as plain text node content, never parsed
   assert.match(flat, /Bu sipariş ADA üzerinden geldi/)
   const bot = await run('visible', { status: 'bot' }); bot.timers[0][0](); await new Promise(r => setImmediate(r))
-  assert.equal(bot.box.children.length, 0)
+  assert.equal(bot.box.children.length, 1)
+  assert.match(JSON.stringify(bot.box), /Sonucu göster/)
+  assert.match(JSON.stringify(bot.box), /\?view=1/)
   const errRun = await run('visible', null); errRun.timers[0][0](); await new Promise(r => setImmediate(r))
   assert.match(JSON.stringify(errRun.box), /Tekrar dene/)
 })
@@ -138,8 +141,8 @@ await test('/check: refuses bot UAs without the RPC', async () => {
   rpcImpl = () => json(okRow())
   const bots = ['WhatsApp/2.23.20 A', 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)', 'Facebot', 'TelegramBot (like TwitterBot)',
     'Twitterbot/1.0', 'Slackbot-LinkExpanding 1.0', 'Mozilla/5.0 (compatible; Discordbot/2.0)', 'LinkedInBot/1.0', 'Mozilla/5.0 SkypeUriPreview Preview/0.5',
-    'Mozilla/5.0 (compatible; Googlebot/2.1)', 'Mozilla/5.0 (compatible; bingbot/2.0)', 'Mozilla/5.0 (Applebot/0.1)', 'Pinterest/0.2', 'redditbot/1.0',
-    'Mozilla/5.0 (compatible; Embedly/0.2)', 'WhatsApp', 'vkShare; +http://vk.com/dev/Share', 'Iframely/1.3.1', 'Viber', 'Snapchat/10.0', 'Line/12.0', 'ZoominfoBot']
+    'Mozilla/5.0 (compatible; Googlebot/2.1)', 'Mozilla/5.0 (compatible; bingbot/2.0)', 'Mozilla/5.0 (Applebot/0.1)', 'redditbot/1.0',
+    'Mozilla/5.0 (compatible; Embedly/0.2)', 'WhatsApp', 'vkShare; +http://vk.com/dev/Share', 'Iframely/1.3.1', 'ZoominfoBot']
   for (const ua of bots) {
     const res = await check('/o/7K3QX9MP', ua)
     assert.deepEqual(await res.json(), { status: 'bot' }, ua)
@@ -147,13 +150,50 @@ await test('/check: refuses bot UAs without the RPC', async () => {
     assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow')
   }
   assert.equal(rpcCalls.length, 0)
-  for (const ua of [BROWSER, 'curl/8.4.0', undefined]) {
+  const inApp = ['Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/118 Mobile Safari/537.36 Viber/21.0', 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Line/13.0.0',
+    'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Snapchat/12.0', 'Mozilla/5.0 (Linux; Android 13) Chrome/118 Mobile Safari/537.36 [Pinterest/Android]',
+    'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Instagram 300.0 FBAN/FBIOS', 'Mozilla/5.0 (Linux; Android 13; wv) Chrome/118 Mobile Safari/537.36 Telegram-Android/10.0']
+  for (const ua of [BROWSER, 'curl/8.4.0', undefined, ...inApp]) {
     rpcCalls.length = 0
     const res = await check('/o/7K3QX9MP', ua)
     assert.equal(res.status, 200)
     assert.equal((await res.json()).status, 'ok')
     assert.equal(rpcCalls.length, 1, String(ua))
   }
+})
+
+await test('/check: same-origin only (Sec-Fetch-Site, else Origin), otherwise 403 without the RPC', async () => {
+  rpcImpl = () => json(okRow())
+  for (const [name, extra] of [['cross-site', { 'sec-fetch-site': 'cross-site' }], ['same-site', { 'sec-fetch-site': 'same-site' }], ['none', { 'sec-fetch-site': 'none' }],
+    ['no headers', {}], ['foreign Origin', { origin: 'https://evil.example' }], ['Origin wins nothing over bad SFS', { 'sec-fetch-site': 'cross-site', origin: 'https://getadaapp.com' }]]) {
+    const res = await check('/o/7K3QX9MP', BROWSER, extra)
+    assert.equal(res.status, 403, name)
+    assert.deepEqual(await res.json(), { status: 'forbidden' }, name)
+  }
+  assert.equal(rpcCalls.length, 0)
+  assert.equal((await check('/o/7K3QX9MP', BROWSER, { origin: 'https://getadaapp.com' })).status, 200)
+  assert.equal((await check('/o/7K3QX9MP', BROWSER, SAME)).status, 200)
+  assert.equal(rpcCalls.length, 2)
+})
+
+await test('every /o/* response variant carries the privacy headers and a CSP', async () => {
+  rpcImpl = () => json(okRow())
+  const variants = [
+    plain('/o/7K3QX9MP'), plain('/o/7K3QX9MP', 'HEAD'), plain('/o/7K3QX9M0'), plain('/o/7K3QX9MP?view=1'), plain('/o/7K3QX9MP', 'DELETE'),
+    call('/o/7K3QX9MP', 'DELETE', BROWSER), call('/o/7K3QX9MP/check', 'GET', BROWSER), check('/o/7K3QX9MP'), check('/o/7K3QX9M0'),
+    check('/o/7K3QX9MP', 'WhatsApp/2'), check('/o/7K3QX9MP', BROWSER, {}),
+  ]
+  rpcImpl = () => { throw new Error('x') }
+  variants.push(plain('/o/7K3QX9MP?view=1'), check('/o/7K3QX9MP'))
+  for (const [i, p] of variants.entries()) {
+    const r = await p
+    assert.equal(r.headers.get('cache-control'), 'no-store', 'variant ' + i + ' status ' + r.status)
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow', 'variant ' + i)
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', 'variant ' + i)
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer', 'variant ' + i)
+    assert.match(r.headers.get('content-security-policy') || '', /default-src 'none'.*frame-ancestors 'none'/, 'variant ' + i)
+  }
+  assert.equal((await check('/o/7K3QX9MP')).headers.get('content-security-policy'), "default-src 'none'; frame-ancestors 'none'")
 })
 
 await test('/check: POST only, JSON shape, escaped-safe, error/not_found/malformed', async () => {

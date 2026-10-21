@@ -16,7 +16,8 @@ const csp = nonce => `default-src 'none'; style-src 'unsafe-inline'; script-src 
 const CSP_NO_SCRIPT = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 // Link-preview renderers and crawlers: never allowed to trigger the RPC.
-const BOT_UA = /whatsapp|facebookexternalhit|facebot|telegrambot|twitterbot|slackbot|discordbot|linkedinbot|skypeuripreview|googlebot|bingbot|applebot|pinterest|redditbot|embedly|vkshare|iframely|viber|snapchat|\bline\/|zoominfobot/i
+// Pure crawlers / preview fetchers only. Never add a pattern an in-app browser (Viber, Line, Snapchat, Pinterest...) sends: a real restaurant opening the link must verify.
+const BOT_UA = /whatsapp|facebookexternalhit|facebot|telegrambot|twitterbot|slackbot|discordbot|linkedinbot|skypeuripreview|googlebot|bingbot|applebot|redditbot|embedly|iframely|vkshare|zoominfobot/i
 
 const newNonce = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
 
@@ -79,7 +80,7 @@ function banner(tr,en,bad){var d=el('div','banner'+(bad?' bad':''));d.appendChil
 function put(){box.textContent='';for(var j=0;j<arguments.length;j++)box.appendChild(arguments[j])}
 function fail(){var b=banner('Şu an doğrulanamadı, biraz sonra tekrar dene','Could not verify right now, please try again shortly',true);var a=el('a','a','Tekrar dene');a.href='?view=1';var p=el('p','note');p.appendChild(a);put(b,p)}
 function show(j){
-if(j.status==='bot')return;
+if(j.status==='bot'){var a0=el('a','a','Sonucu göster');a0.href='?view=1';var p0=el('p','note');p0.appendChild(a0);box.appendChild(p0);return}
 if(j.status==='not_found'){put(banner("ADA'da böyle bir sipariş yok",'No such order in ADA',true));return}
 if(j.status!=='ok'&&j.status!=='expired')return fail();
 var ex=j.status==='expired';
@@ -102,11 +103,24 @@ function start(){if(document.visibilityState==='visible')go();else document.addE
 if(document.readyState==='complete')start();else window.addEventListener('load',start)
 })()`
 
+const JSON_CSP = "default-src 'none'; frame-ancestors 'none'"
+// Every /o/* response that is not a page goes through here so no variant misses the privacy headers.
+const plainResponse = (body, status, extra = {}) => new Response(body, { status, headers: {
+  'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',
+  'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': JSON_CSP, ...extra } })
+
+const sameOrigin = (request, url) => {
+  const site = request.headers.get('sec-fetch-site')
+  if (site) return site === 'same-origin'
+  const origin = request.headers.get('origin')
+  return !!origin && origin === url.origin
+}
+
 const jsonSafe = o => JSON.stringify(o).replace(/[<>&\u2028\u2029]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))
 function respondJson(o, status) {
   return new Response(jsonSafe(o), { status, headers: {
     'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',
-    'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': JSON_CSP,
   } })
 }
 
@@ -192,7 +206,8 @@ export default {
     const method = request.method
     const code = normalizeCode(m[1])
     if (isCheck) {
-      if (method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } })
+      if (method !== 'POST') return plainResponse('Method Not Allowed', 405, { Allow: 'POST' })
+      if (!sameOrigin(request, url)) return respondJson({ status: 'forbidden' }, 403)
       if (!code) return respondJson({ status: 'not_found' }, 404)
       if (BOT_UA.test(request.headers.get('user-agent') || '')) return respondJson({ status: 'bot' }, 200)
       const r = await verify(code, env)
@@ -200,7 +215,7 @@ export default {
       if (r.status === 'not_found') return respondJson({ status: 'not_found' }, 404)
       return respondJson(viewModel(code, r), 200)
     }
-    if (method !== 'GET' && method !== 'HEAD') return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } })
+    if (method !== 'GET' && method !== 'HEAD') return plainResponse('Method Not Allowed', 405, { Allow: 'GET, HEAD' })
     if (!code) return renderNotFound()
     // ?view=1 = no-script fallback: server-side result. Bots still never trigger it.
     if (method === 'GET' && url.searchParams.get('view') === '1' && !BOT_UA.test(request.headers.get('user-agent') || '')) {
