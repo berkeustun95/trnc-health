@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Image, Pressable, ScrollView, Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Image, Pressable, ScrollView, Animated, Easing, AccessibilityInfo, findNodeHandle, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -140,7 +140,17 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
     backRef.current = mine
     return () => { if (backRef.current === mine) backRef.current = null }
   })
-  useEffect(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }) }, [step])
+  const headRef = useRef(null)
+  const focusReady = useRef(false)
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false })
+    if (!focusReady.current) { focusReady.current = true; return }   // mount: the page's own entrance, nothing to move
+    const id = setTimeout(() => {   // after layout: the new header exists
+      const h = headRef.current && findNodeHandle(headRef.current)
+      if (h) AccessibilityInfo.setAccessibilityFocus(h)
+    }, 150)
+    return () => clearTimeout(id)
+  }, [step])
 
   const pick = (key, value) => {
     // An earlier answer changes what the later ones mean (budget bands follow Q1-Q3): everything after it is asked again.
@@ -182,7 +192,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + space[24] }]} showsVerticalScrollIndicator={false}>
           {cur ? (
             <>
-              <Text style={st.question} accessibilityRole="header">{t(cur.q, lang)}</Text>
+              <Text ref={headRef} style={st.question} accessibilityRole="header">{t(cur.q, lang)}</Text>
               <View style={st.options} accessibilityRole="radiogroup">
                 {(cur.key === 'budget' ? budgetOptions() : cur.opts.map(([v, k]) => [v, t(k, lang)])).map(([v, label]) => (
                   <Option key={v} label={label} selected={answers[cur.key] === v} onPress={() => pick(cur.key, v)} />
@@ -191,7 +201,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
             </>
           ) : (
             <>
-              <Text style={st.question} accessibilityRole="header">{t('eateryQuizResultTitle', lang)}</Text>
+              <Text ref={headRef} style={st.question} accessibilityRole="header">{t('eateryQuizResultTitle', lang)}</Text>
               {!!result && result.dishes.length === 0 ? (
                 <View style={st.empty}>
                   <Ionicons name="restaurant-outline" size={44} color={colors.textSecondary} />
@@ -223,7 +233,8 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
 
 const st = StyleSheet.create({
   entry:      { flexDirection: 'row', alignItems: 'center', gap: space[12] },
-  mascot:     { width: 56, height: 56 },
+  // 72 / 88 are content-driven, not tokens: Oli's artwork is mostly padding (72 box = ~25x48 visible), the photo box fits a 3-line dish name.
+  mascot:     { width: 72, height: 72 },
   entryText:  { flex: 1 },
   entryTitle: { ...type.rowTitle, color: colors.textPrimary },
   entryBody:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
@@ -235,7 +246,7 @@ const st = StyleSheet.create({
   step:       { ...type.meta, color: colors.textSecondary },
   scroll:     { flex: 1 },
   content:    { paddingHorizontal: space[16], paddingTop: space[16], gap: space[16] },
-  question:   { ...type.pageTitle, color: colors.textPrimary },
+  question:   { ...type.detailTitle, color: colors.textPrimary },
   options:    { gap: space[12] },
   option:     { minHeight: TAP + 12, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[12], paddingHorizontal: space[16], borderRadius: radii.tile, backgroundColor: colors.card, ...elevation.card },
   optionOn:   { backgroundColor: colors.primaryLight },
@@ -251,7 +262,7 @@ const st = StyleSheet.create({
   partnerRow: { flexDirection: 'row', alignItems: 'center', gap: space[8] },
   partnerName:{ flexShrink: 1, ...type.small, color: colors.textSecondary },
   price:      { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary },
-  pork:       { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radii.pill, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.dangerLight },
+  pork:       { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: space[4], backgroundColor: colors.dangerLight },
   porkText:   { ...type.meta, color: colors.dangerInk, flexShrink: 1 },
   side:       { flexDirection: 'row', alignItems: 'center', gap: space[8], marginTop: space[12], paddingTop: space[12], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   sideText:   { flex: 1, ...type.small, color: colors.textPrimary },

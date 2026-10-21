@@ -93,6 +93,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
 
   const list = (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <View style={s.shown} {...(quizOpen === true ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
       {loading || (!!openSlug && !error) ? (
         <View style={s.content}><CardSkeleton height={96} /></View>
@@ -104,6 +105,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
           {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => { setFocus(null); onOpenPartner(p) }} />)}
         </ScrollView>
       )}
+      </View>
       {quizShown === true && (
         <QuizPage lang={lang} open={quizOpen === true} rows={rows} reduce={reduce} backRef={listBackRef}
           onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)} onOpenDish={openDish} />
