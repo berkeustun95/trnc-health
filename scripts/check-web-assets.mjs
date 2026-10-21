@@ -48,6 +48,9 @@ const REQUIRED_PAGES = [
   { file: 'delete-account.html', route: 'getadaapp.com/delete-account', role: 'Play DELETE-ACCOUNT URL' },
 ]
 
+// The one wildcard the Worker may own: /o/<code> order verification (worker/index.js).
+const ORDER_ROUTE = 'getadaapp.com/o/*'
+
 const EXPECTED_ASSETS = {
   directory:           './web',
   html_handling:       'auto-trailing-slash',
@@ -86,10 +89,13 @@ function readWorld() {
       ? readFileSync(p, 'utf8')
       : null
   }
-  return { cfg, pages }
+  const mainPath = cfg.main ? join(ROOT, cfg.main) : null
+  const worker = mainPath && existsSync(mainPath) && statSync(mainPath).isFile() ? readFileSync(mainPath, 'utf8') : null
+  return { cfg, pages, worker }
 }
 
-function check({ cfg, pages }, log = console.log) {
+function check(world, log = console.log) {
+  const { cfg, pages } = world
   const problems = []
 
   // ── the pages themselves ──
@@ -137,15 +143,40 @@ function check({ cfg, pages }, log = console.log) {
   //    Worker would answer 404 for each one it has no asset for.
   const routes = (cfg.routes ?? []).map(r => (typeof r === 'string' ? r : r.pattern))
   log(`    · routes declared (${routes.length}): ${routes.join(', ') || '(none)'}`)
-  const wanted = REQUIRED_PAGES.map(p => p.route)
+  const wanted = [...REQUIRED_PAGES.map(p => p.route), ORDER_ROUTE]
   const missing = wanted.filter(r => !routes.includes(r))
   const extra   = routes.filter(r => !wanted.includes(r))
   if (routes.length !== wanted.length || missing.length || extra.length) {
     if (missing.length) problems.push(`route(s) missing from wrangler.jsonc: ${missing.join(', ')}`)
-    if (extra.length)   problems.push(`unexpected route(s): ${extra.join(', ')} — a wildcard would shadow Vercel-served paths like /logo.png`)
+    if (extra.length)   problems.push(`unexpected route(s): ${extra.join(', ')} — a wildcard would shadow Vercel-served paths like /logo.png (only ${ORDER_ROUTE} is allowed)`)
     log(`    ✗ expected exactly ${wanted.length}: ${wanted.join(', ')}`)
   } else {
-    log(`    ✓ exactly the ${wanted.length} expected routes, no wildcard`)
+    log(`    ✓ exactly the ${wanted.length} expected routes (3 pages + ${ORDER_ROUTE}, no other wildcard)`)
+  }
+
+  // ── the order-verify Worker script (static checks on its source) ──
+  const w = world.worker
+  if (!cfg.main || w === null) {
+    problems.push(`wrangler.jsonc "main" is ${JSON.stringify(cfg.main)} / script file missing — /o/* would have no handler`)
+    log('    ✗ main script MISSING')
+  } else {
+    log(`    ✓ main script ${cfg.main} (${w.length} chars)`)
+    const asserts = [
+      ['assets binding ASSETS in wrangler.jsonc', cfg.assets?.binding === 'ASSETS',
+        'assets.binding must be "ASSETS" — without it the script cannot fall through to the static pages'],
+      ['falls through to env.ASSETS.fetch(request) for non-/o paths',
+        /if\s*\(\s*!m\s*\)\s*return\s+env\.ASSETS\.fetch\(request\)/.test(w),
+        'worker must hand every non-/o/ request to env.ASSETS.fetch(request) unchanged'],
+      ['sets X-Robots-Tag noindex', /'X-Robots-Tag'\s*:\s*'noindex, nofollow'/.test(w), "worker must send X-Robots-Tag: noindex, nofollow"],
+      ['sets Cache-Control no-store', /'Cache-Control'\s*:\s*'no-store'/.test(w), 'worker must send Cache-Control: no-store (order data, per-view counter)'],
+      ['escapes RPC fields (partner_name, line name)',
+        /esc\(\s*r\.partner_name\s*\)/.test(w) && /esc\(\s*l\.name\s*\)/.test(w),
+        'partner_name and line name from the RPC must go through esc() — HTML injection'],
+    ]
+    for (const [name, ok, why] of asserts) {
+      if (ok) log(`    ✓ ${name}`)
+      else { problems.push(why); log(`    ✗ ${name}`) }
+    }
   }
 
   return problems
@@ -168,7 +199,7 @@ function self() {
   }
   console.log('  baseline: the real world PASSES, so any red below is caused by the mutation\n')
 
-  const clone = () => ({ cfg: JSON.parse(JSON.stringify(real.cfg)), pages: { ...real.pages } })
+  const clone = () => ({ cfg: JSON.parse(JSON.stringify(real.cfg)), pages: { ...real.pages }, worker: real.worker })
   const cases = [
     ['support.html deleted', w => { w.pages['support.html'] = null },
                              w => w.pages['support.html'] === null],
@@ -188,7 +219,23 @@ function self() {
                              w => w.cfg.assets.directory === './public'],
     ['/support route dropped', w => { w.cfg.routes = w.cfg.routes.filter(r => !r.pattern.endsWith('/support')) },
                              w => !w.cfg.routes.some(r => r.pattern.endsWith('/support'))],
-    ['wildcard route added', w => { w.cfg.routes.push({ pattern: 'getadaapp.com/*', zone_name: 'getadaapp.com' }) },
+    ['/o/* route dropped', w => { w.cfg.routes = w.cfg.routes.filter(r => r.pattern !== ORDER_ROUTE) },
+                             w => !w.cfg.routes.some(r => r.pattern === ORDER_ROUTE)],
+    ['main script removed from config', w => { delete w.cfg.main; w.worker = null },
+                             w => w.cfg.main === undefined && w.worker === null],
+    ['assets binding removed', w => { delete w.cfg.assets.binding },
+                             w => w.cfg.assets.binding === undefined],
+    ['worker no longer falls through to ASSETS', w => { w.worker = real.worker.replace('return env.ASSETS.fetch(request)', "return new Response('x')") },
+                             w => !w.worker.includes('env.ASSETS.fetch(request)')],
+    ['worker drops noindex header', w => { w.worker = real.worker.replace('noindex, nofollow', 'all') },
+                             w => !w.worker.includes('X-Robots-Tag\': \'noindex')],
+    ['worker drops no-store', w => { w.worker = real.worker.replace("'no-store'", "'max-age=60'") },
+                             w => !w.worker.includes("'no-store'")],
+    ['worker stops escaping partner_name', w => { w.worker = real.worker.replace('esc(r.partner_name)', 'r.partner_name') },
+                             w => !w.worker.includes('esc(r.partner_name)')],
+    ['worker stops escaping dish name', w => { w.worker = real.worker.replace('esc(l.name)', 'l.name') },
+                             w => !w.worker.includes('esc(l.name)')],
+    ['other wildcard route added', w => { w.cfg.routes.push({ pattern: 'getadaapp.com/*', zone_name: 'getadaapp.com' }) },
                              w => w.cfg.routes.some(r => r.pattern.endsWith('/*'))],
   ]
 
