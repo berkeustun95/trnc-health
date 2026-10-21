@@ -3,6 +3,7 @@
 // partner #2 is data only. Plain JS, no React, no network.
 import { dateLocale, t } from './i18n.js'
 import { cyprusNow, openState } from '../utils/towingHours.js'
+import { ADULT_AGE } from './profileGate.js'
 
 export const EATERY_BUCKET = 'eatery-images'
 
@@ -171,11 +172,28 @@ export function orderMismatch(basketLines, res) {
   return cents(res.total) !== cents(orderTotal(basketLines))
 }
 
-// PostgREST error -> what the sheet says: 'rate' | 'account' | 'items' | 'generic' (network, anything unknown).
+// 18+ ordering (adult_only partners). Age by the calendar date in Europe/Istanbul (fixed UTC+3 since 2016), dob 'YYYY-MM-DD'.
+// A missing or malformed dob is NOT an adult. ADULT_AGE is the one shared constant (constants/profileGate.js).
+export function isAdultForOrder(dob, now = new Date()) {
+  if (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false
+  const today = new Date(now.getTime() + 3 * 3600 * 1000).toISOString().slice(0, 10)
+  return dob <= `${Number(today.slice(0, 4)) - ADULT_AGE}${today.slice(4)}`
+}
+
+// null = may order; else why not: 'guest' | 'no_dob' | 'under_18'. Only an adult_only partner gates.
+export function orderAgeGate({ adultOnly, guest, dob, now }) {
+  if (adultOnly !== true) return null
+  if (guest) return 'guest'
+  if (!dob) return 'no_dob'
+  return isAdultForOrder(dob, now) ? null : 'under_18'
+}
+
+// PostgREST error -> what the sheet says: 'rate' | 'account' | 'adult' | 'items' | 'generic' (network, anything unknown).
 export function orderErrorKind(err) {
   const m = typeof err?.message === 'string' ? err.message : ''
   if (m === 'rate_limited') return 'rate'
   if (m === 'order_requires_account') return 'account'
+  if (m === 'adult_only') return 'adult'
   if (m === 'item_unavailable' || m === 'invalid_items' || m === 'mixed_currency') return 'items'
   return 'generic'
 }

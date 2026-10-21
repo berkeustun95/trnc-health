@@ -14,7 +14,7 @@ import { EateryLogo, eateryImageUrl } from './EateryBits'
 
 const MAX_QTY = 99
 // What the Sepetim footer says under the send button (null = nothing). Set by EateryPartnerScreen's sendOrder.
-const ORDER_ERR_KEY = { generic: 'eateryOrderErrGeneric', rate: 'eateryOrderErrRate', account: 'eateryOrderErrAccount', prices: 'eateryOrderErrPrices', items: 'eateryOrderErrItems' }
+const ORDER_ERR_KEY = { adult: 'eateryOrderAdultOnly', generic: 'eateryOrderErrGeneric', rate: 'eateryOrderErrRate', account: 'eateryOrderErrAccount', prices: 'eateryOrderErrPrices', items: 'eateryOrderErrItems' }
 
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
 export function QtyStepper({ id, name, qty, onQty, lang }) {
@@ -112,7 +112,7 @@ function BasketLine({ line, onQty, formatMoney, lang }) {
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -195,11 +195,16 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
-            <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} loading={sending} />
-            {!!orderError && (
+            {ageGate ? (
+              <View accessibilityLiveRegion="polite">
+                <Text style={st.errText}>{t('eateryOrderAdultOnly', lang)}</Text>
+                {ageGate === 'guest' && <Button variant="secondary" fullWidth title={t('login', lang)} onPress={onSignIn} style={st.errBtn} />}
+              </View>
+            ) : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} loading={sending} />}
+            {!ageGate && !!orderError && (
               <View accessibilityLiveRegion="polite">
                 <Text style={st.errText}>{t(ORDER_ERR_KEY[orderError], lang)}</Text>
-                {orderError === 'account' && <Button variant="secondary" fullWidth title={t('login', lang)} onPress={onSignIn} style={st.errBtn} />}
+                {(orderError === 'account') && <Button variant="secondary" fullWidth title={t('login', lang)} onPress={onSignIn} style={st.errBtn} />}
               </View>
             )}
           </View>

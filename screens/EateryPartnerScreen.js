@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderMismatch, orderErrorKind,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderMismatch, orderErrorKind, orderAgeGate,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -184,7 +184,7 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
 
 // focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below. openBasket: ... or straight into
 // Sepetim (its Back lands on this menu). Initial state only: the page remounts for every partner opened.
-export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null, openBasket: startInBasket = false, session = null, onRequireAccount = null, onRefresh = null }) {
+export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null, openBasket: startInBasket = false, session = null, dateOfBirth = null, onRequireAccount = null, onRefresh = null }) {
   const [viewing, setViewing] = useState(null)
   const [failedDishes, setFailedDishes] = useState({})
   const failDish = useCallback(id => setFailedDishes(f => ({ ...f, [id]: true })), [])
@@ -373,8 +373,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [sending, setSending] = useState(false)
   const sendingRef = useRef(false)
   const [orderError, setOrderError] = useState(null)   // null | 'generic' | 'rate' | 'account' | 'prices' | 'items'
+  // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
+  const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
   const sendOrder = async () => {
-    if (!ordering || lines.length === 0 || sendingRef.current) return
+    if (!ordering || lines.length === 0 || sendingRef.current || ageGate) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
     sendingRef.current = true
     setSending(true)
@@ -503,7 +505,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       </View>
       {ordering && basketShown === true && (
         <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
-          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
+          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
       {quizShown === true && (
         <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
