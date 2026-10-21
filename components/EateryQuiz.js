@@ -17,6 +17,20 @@ import { subscribe } from '../utils/eateryBasketCore'
 // full-page layer like Sepetim: slides in, stays mounted until onClosed so back animates out. Defined outside the
 // screen: these re-render on every tap and must not remount.
 
+// The quiz entry on a partner's own page: ADA chrome (soft teal band, no shadow), narrow on purpose: not a second hero.
+export function PartnerQuizBanner({ lang, partnerName, onPress }) {
+  const title = t('eateryQuizCardTitle', lang)
+  const body = t('eateryQuizPartnerBanner', lang).replace('{partner}', () => partnerName)
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${title} ${body}`}
+      style={({ pressed }) => [st.banner, pressed && { opacity: press.card }]}>
+      <Image source={require('../assets/oli-button.png')} style={st.bannerMascot} resizeMode="contain" accessibilityIgnoresInvertColors />
+      <Text style={st.bannerText}><Text style={st.bannerLead}>{title}</Text> {body}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.primaryDark} />
+    </Pressable>
+  )
+}
+
 export function QuizEntryCard({ lang, onPress }) {
   const title = t('eateryQuizCardTitle', lang)
   const body = t('eateryQuizCardBody', lang)
@@ -134,7 +148,7 @@ function SideRow({ item, text, qty, orderable, lang, onToggle }) {
   )
 }
 
-function ResultCard({ entry, lang, canOrder, basket, reduce, onPress, onOpenPartner, onQty }) {
+function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, onOpenPartner, onQty }) {
   const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
@@ -169,12 +183,12 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, onPress, onOpenPart
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
       </Pressable>
-      <Pressable onPress={onOpenPartner} accessibilityRole="button" accessibilityLabel={t('eateryQuizPartnerA11y', lang).replace('{partner}', () => partner.name)}
+      {!scoped && <Pressable onPress={onOpenPartner} accessibilityRole="button" accessibilityLabel={t('eateryQuizPartnerA11y', lang).replace('{partner}', () => partner.name)}
         style={({ pressed }) => [st.partnerRow, pressed && { opacity: press.small }]}>
         <EateryLogo partner={partner} width={20} height={20} radius={radii.pill} decorative />
         <Text style={st.partnerName} numberOfLines={1}>{partner.name}</Text>
         <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-      </Pressable>
+      </Pressable>}
       {canOrder && (
         <View style={st.orderRow}>
           {qty < 1
@@ -208,7 +222,8 @@ const STEPS = [
 const RELAX_KEY = { portion: 'eateryQuizRelaxPortion', spicy: 'eateryQuizRelaxSpicy' }
 
 // rows: the visible partner rows (with tagged menu items). backRef: App's back chain asks here first (the page is a layer above the list).
-export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed, onOpenDish, onOpenMenu, onOpenBasket }) {
+// scoped: rows is ONE partner (the quiz opened from that partner's own page): its cards drop the partner row and "Menüyü gör" is the caller's close.
+export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, onClose, onClosed, onOpenDish, onOpenMenu, onOpenBasket }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const width = winW
@@ -337,7 +352,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
                   <View style={st.cards}>
                     {result?.dishes.map(d => (
                       <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
-                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty}
+                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} scoped={scoped}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
@@ -367,6 +382,10 @@ const st = StyleSheet.create({
   entry:      { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   // 72 / 88 are content-driven, not tokens: Oli's artwork is mostly padding (72 box = ~25x48 visible), the photo box fits a 3-line dish name.
   mascot:     { width: 72, height: 72 },
+  banner:     { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: space[8], paddingVertical: space[4], paddingLeft: space[8], paddingRight: space[12], borderRadius: radii.sm, backgroundColor: colors.primaryLight },
+  bannerMascot:{ width: 56, height: 56 },   // the artwork is mostly padding: a 44 box shows a ~15x29 figure
+  bannerText: { flex: 1, ...type.small, color: colors.primaryDark },
+  bannerLead: { fontFamily: font.semibold },
   entryText:  { flex: 1 },
   entryTitle: { ...type.rowTitle, color: colors.textPrimary },
   entryBody:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
