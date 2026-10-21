@@ -173,6 +173,27 @@ function readerProblems(byFile) {
   return out
 }
 
+// ─── (f) contact numbers: one door ─────────────────────────────────────────
+// Every phone/WhatsApp an eatery screen dials or messages comes out of eateryContactNumbers (constants/eatery.js), which
+// swaps in the Preview test number. A direct partner.phone / partner.whatsapp read, or a hand-built tel: / wa.me link,
+// in any other eatery file would let a Preview tap reach a real shop.
+const CONTACT_FN = /export function eateryContactNumbers[\s\S]*?\n\}\n/
+const CONTACT_READ = /\??\.\s*(?:phone|whatsapp)\b|\[\s*['"](?:phone|whatsapp)['"]\s*\]/
+const LINK_BUILD = /\btel:|wa\.me\//  // only constants/eatery.js (eateryContacts, orderWhatsAppUrl) builds links, from the numbers
+// Reading the RESULT of the one door (nums.phone, partnerContactNumbers(p).whatsapp) is the point, not a leak.
+const RESULT_READ = /(?:\bnums\??|\bpartnerContactNumbers\([^)]*\))\??\.(?:phone|whatsapp)\b/g
+function contactReadProblems(byFile) {
+  const out = []
+  for (const [f, text] of Object.entries(byFile)) {
+    if (!/eatery/i.test(f)) continue
+    let code = stripComments(text).replace(RESULT_READ, '')
+    if (f === 'constants/eatery.js') code = code.replace(CONTACT_FN, '')
+    const m = code.match(CONTACT_READ) || (f === 'constants/eatery.js' ? null : code.match(LINK_BUILD))
+    if (m) out.push(`${f} touches a partner contact directly (${m[0].trim()}); go through eateryContactNumbers(partner, …)`)
+  }
+  return out
+}
+
 // ─── (d) sponsored slug ─────────────────────────────────────────────────────
 // Only top-level seeds count: the migration's verification DO blocks insert throwaway probe rows
 // (zz-on, zz-off, …) that are rolled back, and must never satisfy the gate-slug check.
@@ -439,6 +460,21 @@ console.log(`flags: EATERY_LIVE=${flags.EATERY_LIVE} CRUNCHY_EXPRESS_LIVE=${flag
   mustFail('reader: a screen queries eatery_menu_items', readerProblems({ 'utils/loadEateryPartners.js': ctlLoader, 'screens/X.js': 'supabase.from("eatery_menu_items").select()\n' }))
   mustPass('reader: mention in a comment', readerProblems({ 'utils/loadEateryPartners.js': ctlLoader, 'screens/X.js': "// supabase.from('eatery_photos')\n" }))
 
+  const fnSrc = 'export function eateryContactNumbers(p) {\n  return { phone: p.phone, whatsapp: p.whatsapp }\n}\nexport function eateryContacts(p, nums) {\n  return nums.phone\n}\n'
+  mustPass('contact: only inside eateryContactNumbers', contactReadProblems({ 'constants/eatery.js': fnSrc, 'screens/EateryPartnerScreen.js': "const c = eateryContacts(partner, partnerContactNumbers(partner))\n" }))
+  mustFail('contact: screen reads partner.whatsapp', contactReadProblems({ 'constants/eatery.js': fnSrc, 'screens/EateryPartnerScreen.js': "const d = eateryOrderDigits(partner.whatsapp)\n" }))
+  mustFail('contact: screen reads partner?.phone', contactReadProblems({ 'constants/eatery.js': fnSrc, 'components/EateryQuiz.js': "Linking.openURL(partner?.phone)\n" }))
+  mustFail('contact: eateryContacts reads p.phone itself', contactReadProblems({ 'constants/eatery.js': fnSrc.replace('nums.phone', 'p?.phone') }))
+  mustFail('contact: bracket read', contactReadProblems({ 'components/EateryOrder.js': "const w = p['whatsapp']\n" }))
+  mustFail('contact: hand-built tel:', contactReadProblems({ 'utils/eateryX.js': "const u = `tel:${n}`\n" }))
+  mustFail('contact: hand-built wa.me', contactReadProblems({ 'components/EateryOrder.js': "const u = 'https://wa.me/' + n\n" }))
+  mustFail('contact: constants/eatery.js reads phone outside the function', contactReadProblems({ 'constants/eatery.js': fnSrc + 'const x = p.phone\n' }))
+  mustPass('contact: mention in a comment', contactReadProblems({ 'screens/EateryPartnerScreen.js': "// partner.whatsapp is never read here\n" }))
+  {
+    const cf = Object.fromEntries(listSource().filter(f => /eatery/i.test(f)).map(f => [f, read(f)]))
+    assert(contactReadProblems(cf), 'eatery contact numbers: one door')
+    console.log(`eatery contact numbers: read only in eateryContactNumbers; ${Object.keys(cf).length} eatery files scanned`)
+  }
   assert(loaderFilterProblems(read('utils/loadEateryPartners.js')), 'loader is_active filter')
   const files = listSource()
   assert(readerProblems(Object.fromEntries(files.map(f => [f, read(f)]))), 'single eatery reader')

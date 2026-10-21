@@ -28,14 +28,26 @@ export const eateryPartnerVisible = (row, gates) => gates?.[row?.slug] !== false
 const filled = v => typeof v === 'string' && v.trim().length > 0
 const https = v => (filled(v) && /^https:\/\/\S+$/.test(v.trim()) ? v.trim() : null)
 
+// The ONLY place a partner's phone/WhatsApp is turned into a number to dial or message (calls, wa.me, orders).
+// Production: the partner's own numbers; testNumber is ignored. ADA Preview: ALWAYS the test number, never the
+// partner's own, and no test number = no contact at all (fail closed). A fixture partner has none either way.
+export function eateryContactNumbers(p, { isPreview = false, testNumber = null } = {}) {
+  if (!p || p.placeholder) return { phone: null, whatsapp: null }
+  if (isPreview === true) {
+    const n = filled(testNumber) ? testNumber.trim() : null
+    return { phone: n, whatsapp: n }
+  }
+  return { phone: filled(p.phone) ? p.phone.trim() : null, whatsapp: filled(p.whatsapp) ? p.whatsapp.trim() : null }
+}
+
 // One entry per contact button that has something behind it; an empty field yields no entry.
-// action is the contact_events action ('call' | 'whatsapp' | 'website' | 'maps').
-export function eateryContacts(p) {
+// action is the contact_events action ('call' | 'whatsapp' | 'website' | 'maps'). nums = eateryContactNumbers(...).
+export function eateryContacts(p, nums) {
   const out = []
-  const phone = filled(p?.phone) ? p.phone.replace(/[^\d+]/g, '') : ''
-  if (phone.length > 3) out.push({ action: 'call', url: `tel:${phone}`, value: p.phone.trim() })
-  const wa = filled(p?.whatsapp) ? p.whatsapp.replace(/\D/g, '') : ''
-  if (wa.length > 3) out.push({ action: 'whatsapp', url: `https://wa.me/${wa}`, value: p.whatsapp.trim() })
+  const phone = filled(nums?.phone) ? nums.phone.replace(/[^\d+]/g, '') : ''
+  if (phone.length > 3) out.push({ action: 'call', url: `tel:${phone}`, value: nums.phone.trim() })
+  const wa = filled(nums?.whatsapp) ? nums.whatsapp.replace(/\D/g, '') : ''
+  if (wa.length > 3) out.push({ action: 'whatsapp', url: `https://wa.me/${wa}`, value: nums.whatsapp.trim() })
   const site = https(p?.website_url)
   if (site) out.push({ action: 'website', url: site, value: null })
   const maps = https(p?.maps_url)
