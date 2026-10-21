@@ -15,6 +15,8 @@ import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUr
 import { logContactEvent } from '../utils/logContactEvent'
 import { effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
+import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
+import { quizHasMains } from '../constants/eateryQuiz'
 import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
 
@@ -216,6 +218,14 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const orderTotalText = formatMoney(orderTotal(lines))
   const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
   const [basketShown, setBasketShown] = useState(false)
+  // "Ne yesem?" scoped to this partner: a layer over the page (rows = just this partner), closed by Back first.
+  const showQuizBanner = !partner.placeholder && quizHasMains([partner])
+  const [quizOpen, setQuizOpen] = useState(false)
+  const [quizShown, setQuizShown] = useState(false)
+  const quizBackRef = useRef(null)
+  const quizRows = useMemo(() => [partner], [partner])
+  const [focusReq, setFocusReq] = useState(null)   // { id, n }: a dish picked on the quiz results; n lets the same dish be picked twice
+  const focusId = focusReq ? focusReq.id : focusItemId
   const [note, setNote] = useState('')
   const noteRef = useRef('')
   noteRef.current = note
@@ -252,7 +262,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
   const showTabs = sections.length >= 2
-  const tabsIndex = 1 + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], tabs
+  const tabsIndex = 1 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [quiz banner], [pager], tabs
   const scrollRef = useRef(null)
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
@@ -308,8 +318,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   reduceRef.current = reduce
   const [marked, setMarked] = useState(null)
   useEffect(() => {
-    if (focusItemId == null) return
-    const si = sections.findIndex(sec => sec.items.some(i => i.id === focusItemId))
+    if (focusId == null) return
+    const si = sections.findIndex(sec => sec.items.some(i => i.id === focusId))
     if (si < 0) return
     const timers = []
     const attempt = n => {
@@ -323,19 +333,20 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         setActiveSec(si)
         scrollRef.current?.scrollTo({ y: Math.max(0, y - tabsH.current - 8), animated: !reduceRef.current })
         timers.push(setTimeout(() => { lockRef.current = false }, reduceRef.current ? 80 : 1200))
-        setMarked(focusItemId)
+        setMarked(focusId)
         timers.push(setTimeout(() => setMarked(null), MARK_MS))
       }, retry)
     }
     timers.push(setTimeout(() => attempt(0), 350))
     return () => timers.forEach(clearTimeout)
-  }, [focusItemId, sections])
+  }, [focusId, focusReq, sections])
   const sectionTitles = useMemo(() => sections.map(sec => sec.title), [sections])
 
   // App's single back handler asks here first (the dish photo viewer is a layer above the partner page).
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
+      if (quizBackRef.current?.()) return true
       if (basketOpen) { setBasketOpen(false); return true }
       if (viewing) { setViewing(null); return true }
       return false
@@ -367,7 +378,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.under} {...(basketOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
+      <View style={s.under} {...(basketOpen || quizOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
       <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: lines.length > 0 ? space[20] : listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
         stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showTabs ? onScroll : undefined} scrollEventThrottle={16}
@@ -391,6 +402,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>
 
+        {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
+
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
 
         {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onHeight={setTabsH} reduce={reduce} />}
@@ -409,7 +422,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 {sec.items.map(i => {
                   const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
                     ordering={ordering} qty={basket[i.id] || 0} onQty={onQty} />
-                  return i.id === focusItemId
+                  return i.id === focusId
                     ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
                     : <Fragment key={i.id}>{row}</Fragment>
                 })}
@@ -460,6 +473,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       {ordering && basketShown === true && (
         <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} onClose={() => setBasketOpen(false)} reduce={reduce} />
+      )}
+      {quizShown === true && (
+        <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
+          onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)}
+          onOpenDish={(_p, id) => { setQuizOpen(false); setFocusReq({ id, n: Date.now() }) }}
+          onOpenMenu={() => setQuizOpen(false)} onOpenBasket={() => { setQuizOpen(false); openBasket() }} />
       )}
       <Snackbar visible={snack !== null} message={snack ? t(snack, lang) : ''} actionLabel={t('eateryOrderUndo', lang)}
         onAction={undoClear} onTimeout={() => { setSnack(null); dropSnapshot(partner.id) }} reduce={reduce}
