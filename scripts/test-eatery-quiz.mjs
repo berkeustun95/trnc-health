@@ -130,6 +130,18 @@ eq('sides per card: names come from that dish\'s partner', compOf([C, partner('y
 eq('Hiçbiri: no sides on any card', compOf([C, other], { extra: ['none'] }).every(l => l.length === 0), true)
 eq('top-level companions = the top dish\'s', Q.quizMatch([C], { ...ANY, extra: ['drink'] }).companions.map(c => c.item.name), ['Water'])
 
+// ── scoped to one partner (the quiz opened from that partner's own page: rows = [that partner]) ──
+{
+  const A = partner('a', 0, [dish('A burger'), dish('A sauce', { role: 'sauce', price: 30 })])
+  const Z = partner('z2', 1, [dish('Z burger'), dish('Z sauce', { role: 'sauce', price: 30 })])
+  const sc = Q.quizMatch([Z], { ...ANY, protein: ['any'], extra: ['sauce'] })
+  eq('scoped: only this partner\'s dishes', sc.dishes.map(d => d.item.name), ['Z burger'])
+  eq('scoped: only this partner\'s sides', sc.dishes.flatMap(d => d.companions.map(c => c.item.name)), ['Z sauce'])
+  eq('scoped: a partner without tagged mains has no quiz', [Q.quizHasMains([partner('e', 0, [dish('Fries', { role: 'side' })])]), Q.quizHasMains([A])], [false, true])
+  eq('scoped: protein never relaxes (no beef, no result)', Q.quizMatch([A], { ...ANY, portion: ['share'], protein: ['beef'] }).dishes.length, 0)
+  eq('scoped: relaxing the portion keeps a lone dish', Q.quizMatch([A], { ...ANY, protein: ['chicken'], portion: ['share'], spicy: 'any' }).dishes.map(d => d.item.name), ['A burger'])
+}
+
 // ── results basket: side orderability, summary, which partner the bar shows ──
 {
   const main = dish('Burger', { price: 620 })
@@ -146,6 +158,18 @@ eq('top-level companions = the top dish\'s', Q.quizMatch([C], { ...ANY, extra: [
   eq('bar: the partner last added to wins', Q.quizBarPartner([P, Q2], one, 'other').slug, 'other')
   eq('bar: last partner emptied -> another with items', Q.quizBarPartner([P, Q2], pp => (pp === P ? { count: 1 } : { count: 0 }), 'other').slug, 'crunchy')
   eq('bar: nobody has items -> none', Q.quizBarPartner([P, Q2], () => ({ count: 0 }), 'other'), null)
+}
+
+// ── static guard: the partner page scopes the quiz in the SCREEN, which the matcher tests cannot see ──
+{
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
+  const has = re => re.test(src)
+  eq('screen: quizRows is exactly [partner]', has(/const quizRows = useMemo\(\(\) => \[partner\], \[partner\]\)/), true)
+  eq('screen: QuizPage gets rows={quizRows} and scoped', has(/<QuizPage[^>]*rows=\{quizRows\}[^>]*\bscoped\b/), true)
+  eq('screen: banner only when not placeholder and quizHasMains([partner])', has(/const showQuizBanner = !partner\.placeholder && quizHasMains\(\[partner\]\)/), true)
+  eq('screen: banner rendered behind showQuizBanner', has(/\{showQuizBanner && <PartnerQuizBanner/), true)
+  eq('screen: tabsIndex counts the banner', has(/const tabsIndex = 1 \+ \(showQuizBanner \? 1 : 0\) \+ \(gallery\.length > 0 \? 1 : 0\)/), true)
 }
 
 if (bad) { console.log(`\n${bad} FAILED`); process.exit(1) }
