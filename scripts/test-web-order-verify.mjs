@@ -17,8 +17,13 @@ const env = {
   SUPABASE_URL: 'https://x.test', SUPABASE_ANON_KEY: 'anon-key',
   ASSETS: { fetch: async req => { assetHits.push(req); return new Response('ASSET', { status: 200 }) } },
 }
-const get = path => worker.fetch(new Request('https://getadaapp.com' + path, { method: 'POST' }), env)
-const plain = (path, method = 'GET') => worker.fetch(new Request('https://getadaapp.com' + path, { method }), env)
+const BROWSER = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1'
+const call = (path, method = 'GET', ua, extra = {}) => worker.fetch(new Request('https://getadaapp.com' + path, { method, headers: { ...(ua ? { 'user-agent': ua } : {}), ...extra } }), env)
+const plain = (path, method = 'GET') => call(path, method, BROWSER)
+// the server-rendered full result (no-script fallback)
+const get = path => call(path.replace(/\/?$/, '') + '?view=1', 'GET', BROWSER)
+const SAME = { 'sec-fetch-site': 'same-origin' }
+const check = (path, ua = BROWSER, extra = SAME) => call(path.replace(/\/?$/, '') + '/check', 'POST', ua, extra)
 const okRow = (over = {}) => ({
   status: 'ok', partner_name: 'Crunchy Express', created_at: '2026-10-21T10:05:00Z', expires_at: '2026-10-21T14:05:00Z',
   lines: [{ name: 'Crunchy Burger', qty: 2, unit_price: 620 }], total: 1240, currency: 'TRY',
@@ -54,28 +59,175 @@ await test('ok: renders order, formats, headers, RPC request shape', async () =>
   assert.equal(rpcCalls[0].init.headers.Authorization, 'Bearer anon-key')
 })
 
-await test('GET/HEAD never call the RPC; gate shows only the order no + button posting to same path', async () => {
+const nonceOf = res => res.headers.get('content-security-policy').match(/script-src 'nonce-([^']+)'/)?.[1]
+
+await test('GET/HEAD never call the RPC: order no only, nonce CSP matches inline script, no form', async () => {
   rpcImpl = () => { throw new Error('RPC must not be called') }
   const res = await plain('/o/7k3q-x9mp')
   const html = await res.text()
   assert.equal(res.status, 200)
   assert.match(html, /ADA sipariş doğrulama/)
+  assert.match(html, /ADA order verification/)
   assert.match(html, /7K3Q-X9MP/)
-  assert.match(html, /<form method="POST" action="\/o\/7K3Q-X9MP">/)
-  assert.match(html, /Siparişi doğrula/)
-  assert.doesNotMatch(html, /Crunchy|Bu sipariş ADA üzerinden geldi/)
-  assert.equal(res.headers.get('cache-control'), 'no-store')
-  assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow')
-  assert.match(res.headers.get('content-security-policy'), /form-action 'self'/)
+  assert.match(html, /Doğrulanıyor…/)
+  assert.doesNotMatch(html.replace(/<script[\s\S]*<\/script>/, ''), /<form|<button|Siparişi doğrula|Crunchy|Bu sipariş ADA üzerinden geldi/)
+  assert.match(html, /<noscript><meta http-equiv="refresh" content="1;url=\/o\/7K3QX9MP\?view=1"><\/noscript>/)
+  assert.match(html, /<noscript><p><a class="a" href="\/o\/7K3QX9MP\?view=1">Sonucu göster/)
+  const csp = res.headers.get('content-security-policy')
+  assert.match(csp, /default-src 'none'/)
+  assert.match(csp, /connect-src 'self'/)
+  assert.doesNotMatch(csp, /script-src[^;]*unsafe/)
+  const nonce = nonceOf(res)
+  assert.ok(nonce && nonce.length >= 16)
+  assert.equal([...html.matchAll(/<script nonce="([^"]+)">/g)].map(x => x[1]).join(), nonce)
+  assert.equal((html.match(/<script/g) || []).length, 1)
+  assert.match(html, /visibilityState/)
+  assert.match(html, /,400\)/)
+  assert.doesNotMatch(html, /innerHTML/)
+  assert.notEqual(nonceOf(await plain('/o/7k3q-x9mp')), nonce)
+  for (const r of [res, await plain('/o/7K3QX9MP', 'HEAD')]) {
+    assert.equal(r.headers.get('cache-control'), 'no-store')
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow')
+  }
   const head = await plain('/o/7K3QX9MP', 'HEAD')
   assert.equal(head.status, 200)
   assert.equal(await head.text(), '')
-  assert.equal(head.headers.get('cache-control'), 'no-store')
-  assert.equal(rpcCalls.length, 0)
+  // bots and no-UA requests on GET / ?view=1 get the neutral page, never the RPC
+  for (const ua of ['WhatsApp/2.23', 'facebookexternalhit/1.1', undefined]) assert.equal((await call('/o/7K3QX9MP', 'GET', ua)).status, 200)
+  assert.match(await (await call('/o/7K3QX9MP?view=1', 'GET', 'WhatsApp/2.23')).text(), /Doğrulanıyor/)
   const bad = await plain('/o/7K3QX9M0')
+  const badHtml = await bad.text()
   assert.equal(bad.status, 404)
-  assert.doesNotMatch(await bad.text(), /<form|<button/)
+  assert.doesNotMatch(badHtml, /<form|<button|<script|noscript/)
+  assert.doesNotMatch(bad.headers.get('content-security-policy'), /script-src/)
   assert.equal((await plain('/o/7K3QX9M0', 'HEAD')).status, 404)
+  assert.equal(rpcCalls.length, 0)
+})
+
+await test('inline script runs in a stub DOM: waits for visibility, POSTs /check, renders with textContent only', async () => {
+  rpcImpl = () => { throw new Error('RPC must not be called') }
+  const html = await (await plain('/o/7K3QX9MP')).text()
+  const js = html.match(/<script nonce="[^"]+">([\s\S]*)<\/script>/)[1]
+  const mkEl = tag => ({ tag, children: [], className: '', set textContent(v) { this._t = v; if (v === '') this.children = [] }, get textContent() { return this._t }, appendChild(c) { this.children.push(c) }, set innerHTML(_) { throw new Error('innerHTML used') } })
+  const run = async (visibility, payload) => {
+    const box = mkEl('div'); const listeners = {}; const timers = []; const calls = []
+    const doc = { visibilityState: visibility, readyState: 'complete', getElementById: () => box, createElement: mkEl, addEventListener: (e, f) => { listeners[e] = f } }
+    const fetchStub = (u, o) => { calls.push([u, o]); return Promise.resolve({ json: async () => payload }) }
+    new Function('document', 'window', 'location', 'fetch', 'setTimeout', js)(doc, { addEventListener() {} }, { pathname: '/o/7K3QX9MP' }, fetchStub, (f, ms) => timers.push([f, ms]))
+    return { box, listeners, timers, calls, doc }
+  }
+  const payload = { status: 'ok', partner: '<b>X</b>', orderNo: '7K3Q-X9MP', time: 't', lines: [{ l: '1 × A', r: '5,00 TL' }], total: '5,00 TL', seenTr: 'tr', seenEn: 'en' }
+  const hidden = await run('hidden', payload)
+  assert.equal(hidden.timers.length, 0); assert.equal(hidden.calls.length, 0)
+  hidden.doc.visibilityState = 'visible'; hidden.listeners.visibilitychange()
+  assert.equal(hidden.timers[0][1], 400); assert.equal(hidden.calls.length, 0)
+  const vis = await run('visible', payload)
+  assert.equal(vis.timers[0][1], 400)
+  vis.timers[0][0]()
+  await new Promise(r => setImmediate(r))
+  assert.deepEqual([vis.calls[0][0], vis.calls[0][1].method], ['/o/7K3QX9MP/check', 'POST'])
+  const flat = JSON.stringify(vis.box)
+  assert.match(flat, /&lt;|<b>X<\/b>/) // payload text lands as plain text node content, never parsed
+  assert.match(flat, /Bu sipariş ADA üzerinden geldi/)
+  const bot = await run('visible', { status: 'bot' }); bot.timers[0][0](); await new Promise(r => setImmediate(r))
+  assert.equal(bot.box.children.length, 1)
+  assert.match(JSON.stringify(bot.box), /Sonucu göster/)
+  assert.match(JSON.stringify(bot.box), /\?view=1/)
+  const errRun = await run('visible', null); errRun.timers[0][0](); await new Promise(r => setImmediate(r))
+  assert.match(JSON.stringify(errRun.box), /Tekrar dene/)
+})
+
+await test('/check: refuses bot UAs without the RPC', async () => {
+  rpcImpl = () => json(okRow())
+  const bots = ['WhatsApp/2.23.20 A', 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)', 'Facebot', 'TelegramBot (like TwitterBot)',
+    'Twitterbot/1.0', 'Slackbot-LinkExpanding 1.0', 'Mozilla/5.0 (compatible; Discordbot/2.0)', 'LinkedInBot/1.0', 'Mozilla/5.0 SkypeUriPreview Preview/0.5',
+    'Mozilla/5.0 (compatible; Googlebot/2.1)', 'Mozilla/5.0 (compatible; bingbot/2.0)', 'Mozilla/5.0 (Applebot/0.1)', 'redditbot/1.0',
+    'Mozilla/5.0 (compatible; Embedly/0.2)', 'WhatsApp', 'vkShare; +http://vk.com/dev/Share', 'Iframely/1.3.1', 'ZoominfoBot']
+  for (const ua of bots) {
+    const res = await check('/o/7K3QX9MP', ua)
+    assert.deepEqual(await res.json(), { status: 'bot' }, ua)
+    assert.equal(res.headers.get('cache-control'), 'no-store')
+    assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow')
+  }
+  assert.equal(rpcCalls.length, 0)
+  const inApp = ['Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/118 Mobile Safari/537.36 Viber/21.0', 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Line/13.0.0',
+    'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Snapchat/12.0', 'Mozilla/5.0 (Linux; Android 13) Chrome/118 Mobile Safari/537.36 [Pinterest/Android]',
+    'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Instagram 300.0 FBAN/FBIOS', 'Mozilla/5.0 (Linux; Android 13; wv) Chrome/118 Mobile Safari/537.36 Telegram-Android/10.0']
+  for (const ua of [BROWSER, 'curl/8.4.0', undefined, ...inApp]) {
+    rpcCalls.length = 0
+    const res = await check('/o/7K3QX9MP', ua)
+    assert.equal(res.status, 200)
+    assert.equal((await res.json()).status, 'ok')
+    assert.equal(rpcCalls.length, 1, String(ua))
+  }
+})
+
+await test('/check: same-origin only (Sec-Fetch-Site, else Origin), otherwise 403 without the RPC', async () => {
+  rpcImpl = () => json(okRow())
+  for (const [name, extra] of [['cross-site', { 'sec-fetch-site': 'cross-site' }], ['same-site', { 'sec-fetch-site': 'same-site' }], ['none', { 'sec-fetch-site': 'none' }],
+    ['no headers', {}], ['foreign Origin', { origin: 'https://evil.example' }], ['Origin wins nothing over bad SFS', { 'sec-fetch-site': 'cross-site', origin: 'https://getadaapp.com' }]]) {
+    const res = await check('/o/7K3QX9MP', BROWSER, extra)
+    assert.equal(res.status, 403, name)
+    assert.deepEqual(await res.json(), { status: 'forbidden' }, name)
+  }
+  assert.equal(rpcCalls.length, 0)
+  assert.equal((await check('/o/7K3QX9MP', BROWSER, { origin: 'https://getadaapp.com' })).status, 200)
+  assert.equal((await check('/o/7K3QX9MP', BROWSER, SAME)).status, 200)
+  assert.equal(rpcCalls.length, 2)
+})
+
+await test('every /o/* response variant carries the privacy headers and a CSP', async () => {
+  rpcImpl = () => json(okRow())
+  const variants = [
+    plain('/o/7K3QX9MP'), plain('/o/7K3QX9MP', 'HEAD'), plain('/o/7K3QX9M0'), plain('/o/7K3QX9MP?view=1'), plain('/o/7K3QX9MP', 'DELETE'),
+    call('/o/7K3QX9MP', 'DELETE', BROWSER), call('/o/7K3QX9MP/check', 'GET', BROWSER), check('/o/7K3QX9MP'), check('/o/7K3QX9M0'),
+    check('/o/7K3QX9MP', 'WhatsApp/2'), check('/o/7K3QX9MP', BROWSER, {}),
+  ]
+  rpcImpl = () => { throw new Error('x') }
+  variants.push(plain('/o/7K3QX9MP?view=1'), check('/o/7K3QX9MP'))
+  for (const [i, p] of variants.entries()) {
+    const r = await p
+    assert.equal(r.headers.get('cache-control'), 'no-store', 'variant ' + i + ' status ' + r.status)
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow', 'variant ' + i)
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', 'variant ' + i)
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer', 'variant ' + i)
+    assert.match(r.headers.get('content-security-policy') || '', /default-src 'none'.*frame-ancestors 'none'/, 'variant ' + i)
+  }
+  assert.equal((await check('/o/7K3QX9MP')).headers.get('content-security-policy'), "default-src 'none'; frame-ancestors 'none'")
+})
+
+await test('/check: POST only, JSON shape, escaped-safe, error/not_found/malformed', async () => {
+  rpcImpl = () => json(okRow({ partner_name: '</script><b>', view_count_before: 1, first_viewed_at_before: '2026-10-21T10:30:00Z' }))
+  assert.equal((await call('/o/7K3QX9MP/check', 'GET', BROWSER)).status, 405)
+  assert.equal((await call('/o/7K3QX9MP/check', 'HEAD', BROWSER)).status, 405)
+  assert.equal(rpcCalls.length, 0)
+  const res = await check('/o/7k3q-x9mp')
+  const raw = await res.text()
+  assert.doesNotMatch(raw, /[<>]/)
+  const j = JSON.parse(raw)
+  assert.equal(j.partner, '</script><b>')
+  assert.equal(j.orderNo, '7K3Q-X9MP')
+  assert.equal(j.time, '21.10.2026 13:05')
+  assert.deepEqual(j.lines, [{ l: '2 × Crunchy Burger', r: '1.240,00 TL' }])
+  assert.equal(j.total, '1.240,00 TL')
+  assert.equal(j.seenTr, 'İlk görüntülenme: 21.10.2026 13:30 · 2 kez açıldı')
+  assert.match(res.headers.get('content-type'), /application\/json/)
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow')
+  rpcImpl = () => json({ status: 'expired', ...okRow() , status: 'expired' })
+  assert.equal((await (await check('/o/7K3QX9MP')).json()).status, 'expired')
+  rpcImpl = () => json({ status: 'not_found' })
+  const nf = await check('/o/7K3QX9MP')
+  assert.equal(nf.status, 404)
+  assert.deepEqual(await nf.json(), { status: 'not_found' })
+  rpcImpl = () => { throw new Error('boom') }
+  const er = await check('/o/7K3QX9MP')
+  assert.equal(er.status, 503)
+  assert.deepEqual(await er.json(), { status: 'error' })
+  rpcCalls.length = 0
+  rpcImpl = () => json(okRow())
+  const mal = await check('/o/7K3QX9M0')
+  assert.equal(mal.status, 404)
   assert.equal(rpcCalls.length, 0)
 })
 
@@ -111,11 +263,11 @@ await test('escaping: <script> in dish and partner names', async () => {
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;&quot;&#39;/)
 })
 
-await test('malformed codes never call the RPC (404)', async () => {
+await test('malformed codes never call the RPC (404, any method)', async () => {
   rpcImpl = () => json(okRow())
   for (const bad of ['/o/', '/o/ABC', '/o/7K3QX9M0', '/o/7K3QX9MI', '/o/7K3QX9MPP', '/o/7K3Q%2FX9MP', '/o/%E0%A4%A', "/o/7K3Q'X9M"]) {
-    const res = await get(bad)
-    assert.equal(res.status, 404, bad)
+    assert.equal((await call(bad, 'GET', BROWSER)).status, 404, bad)
+    assert.equal((await call(bad + '?view=1', 'GET', BROWSER)).status, 404, bad)
   }
   assert.equal(rpcCalls.length, 0)
 })
