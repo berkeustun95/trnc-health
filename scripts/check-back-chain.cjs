@@ -79,6 +79,8 @@ const cases4=[
  ['Eatery quiz closed (handler declines) -> back closes the module', {...base, showEatery:true}, {eateryListBackRef:()=>false}, r=>r.r===true && r.calls==='setShowEatery(false)'],
  ['Eatery Sepetim opened from the quiz bar -> Back closes the basket page only (partner menu stays)', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryPartnerBackRef:()=>true}, r=>r.r===true && r.calls===''],
  ['Eatery Sepetim closed again (partner handler declines) over a quiz-opened partner -> closes the partner, back on the quiz results', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryPartnerBackRef:()=>false}, r=>r.r===true && r.calls==='setEateryPartner(null)'],
+ ['Eatery partner-scoped quiz open over the partner page -> steps/closes the quiz only (rides eateryPartnerBackRef), NOT the partner', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryPartnerBackRef:()=>true}, r=>r.r===true && r.calls===''],
+ ['Eatery partner-scoped quiz closed (handler declines) -> back closes the partner as before', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryPartnerBackRef:()=>false}, r=>r.r===true && r.calls==='setEateryPartner(null)'],
  ['Eatery partner opened from a quiz result -> closes the partner first, the quiz handler is not asked', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryListBackRef:()=>{throw new Error("quiz asked")}}, r=>r.r===true && r.calls==='setEateryPartner(null)'],
  ['Eatery list -> closes the module', {...base, showEatery:true}, {}, r=>r.r===true && r.calls==='setShowEatery(false)'],
  ['Ehliyet -> closes the module', {...base, showEhliyet:true}, {}, r=>r.calls==='setShowEhliyet(false)'],
