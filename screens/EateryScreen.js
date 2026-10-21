@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,7 +8,9 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
 import { colors, type, space, listBottomPad } from '../constants/theme'
 import { ScreenHeader, ErrorState, Card, CardSkeleton } from '../components/ui'
-import { EateryLogo, PlaceholderTag } from '../components/EateryBits'
+import { EateryLogo, PlaceholderTag, useReduceMotion } from '../components/EateryBits'
+import { QuizEntryCard, QuizPage } from '../components/EateryQuiz'
+import { quizHasMains } from '../constants/eateryQuiz'
 import EateryPartnerScreen from './EateryPartnerScreen'
 
 // ─── Yeme-İçme: the partner list ────────────────────────────────────────────
@@ -18,7 +20,7 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
 const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, ' +
-  'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height), ' +
+  'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height, role, protein, spicy, portion), ' +
   'eatery_photos(id, kind, storage_path, width, height, sort_order)'
 
 function PartnerCard({ partner, lang, onPress }) {
@@ -54,12 +56,21 @@ function PartnerCard({ partner, lang, onPress }) {
 
 // openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
 // once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
-export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone }) {
+export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(false)
   const [attempt, setAttempt] = useState(0)
+  // "Ne yesem?": the page is a layer above the list. Its state lives in a component that stays mounted while a
+  // partner page is open (the partner is drawn over the list, not instead of it), so back from the dish lands on the results.
+  const [quizOpen, setQuizOpen]   = useState(false)
+  const [quizShown, setQuizShown] = useState(false)
+  const [focus, setFocus] = useState(null)   // { partnerId, itemId }: scroll the partner page to this dish (only for that partner)
+  const reduce = useReduceMotion()
+  const showQuiz = useMemo(() => quizHasMains(rows), [rows])
+  const openQuiz = () => { setQuizShown(true); setQuizOpen(true) }
+  const openDish = (p, itemId) => { setFocus({ partnerId: p.id, itemId }); onOpenPartner(p) }
   const retry = useCallback(() => { setError(false); setLoading(true); setAttempt(a => a + 1) }, [])
 
   useEffect(() => {
@@ -80,9 +91,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
     return () => { alive = false }
   }, [attempt])
 
-  if (partner) return <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} backRef={partnerBackRef} />
-
-  return (
+  const list = (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
       {loading || (!!openSlug && !error) ? (
@@ -91,14 +100,35 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
         <ErrorState onRetry={retry} lang={lang} />
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
+          {showQuiz && <QuizEntryCard lang={lang} onPress={openQuiz} />}
           {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => onOpenPartner(p)} />)}
         </ScrollView>
       )}
+      {quizShown === true && (
+        <QuizPage lang={lang} open={quizOpen === true} rows={rows} reduce={reduce} backRef={listBackRef}
+          onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)} onOpenDish={openDish} />
+      )}
     </SafeAreaView>
+  )
+
+  // One stable tree: the list never remounts when a partner opens (its quiz state and scroll position survive).
+  return (
+    <View style={s.stack}>
+      <View style={partner ? s.hidden : s.shown} pointerEvents={partner ? 'none' : 'auto'}>{list}</View>
+      {!!partner && (
+        <View style={StyleSheet.absoluteFill}>
+          <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} backRef={partnerBackRef}
+            focusItemId={focus && focus.partnerId === partner.id ? focus.itemId : null} />
+        </View>
+      )}
+    </View>
   )
 }
 
 const s = StyleSheet.create({
+  stack:    { flex: 1, backgroundColor: colors.canvas },
+  shown:    { flex: 1 },
+  hidden:   { flex: 1, display: 'none' },
   safe:     { flex: 1, backgroundColor: colors.canvas },
   content:  { paddingHorizontal: 16, paddingTop: space[8], gap: 14 },
   row:      { flexDirection: 'row', alignItems: 'center', gap: space[12] },

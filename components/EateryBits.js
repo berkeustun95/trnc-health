@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { View, Text, FlatList, StyleSheet } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, FlatList, AccessibilityInfo, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { t } from '../constants/i18n'
@@ -9,6 +9,18 @@ import { RemoteImage } from './ui'
 
 // Shared pieces of the two Yeme-İçme screens. Defined here, outside both screens, so a re-render
 // of a screen never remounts them.
+
+// Fade only; none at all when the system asks for reduced motion.
+export function useReduceMotion() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
+    return () => { alive = false; sub?.remove?.() }
+  }, [])
+  return on
+}
 
 export const eateryImageUrl = path =>
   path ? supabase.storage.from(EATERY_BUCKET).getPublicUrl(path).data.publicUrl : null
