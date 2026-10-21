@@ -34,13 +34,15 @@ export function QuizEntryCard({ lang, onPress }) {
 // One answer: a big tile with an emoji and a short label. Selected = check badge + primary border + primaryLight fill (never
 // colour alone). Q2 is a radio, the multi-select questions are checkboxes. A tile the cap has locked stays tappable on
 // purpose (the tap says "En fazla 2") but is dimmed and announced as disabled. The border is its own transparent-fill layer.
-function Tile({ emoji, label, selected, locked, hint, role, onPress, cols }) {
+function Tile({ emoji, image, label, selected, locked, hint, role, onPress, cols }) {
   const row = cols === 1
   return (
     <Pressable onPress={onPress} accessibilityRole={role} accessibilityLabel={label} accessibilityHint={locked ? hint : undefined}
       accessibilityState={{ checked: selected }}
       style={({ pressed }) => [st.tile, row ? st.tileRow : st.tileCol, cols === 2 && st.tileHalf, selected && st.tileOn, locked && st.tileLocked, pressed && { opacity: press.card }]}>
-      <Text style={[st.emoji, locked && st.emojiLocked]} accessibilityElementsHidden importantForAccessibility="no">{emoji}</Text>
+      {image
+        ? <Image source={image} style={[st.icon, locked && st.emojiLocked]} resizeMode="contain" accessible={false} importantForAccessibility="no" accessibilityElementsHidden accessibilityIgnoresInvertColors />
+        : <Text style={[st.emoji, locked && st.emojiLocked]} accessibilityElementsHidden importantForAccessibility="no">{emoji}</Text>}
       <Text style={[st.tileText, selected && st.tileTextOn, locked && st.tileTextLocked]}>{label}</Text>
       {selected && (
         <View style={st.badge} accessible={false} importantForAccessibility="no-hide-descendants">
@@ -121,7 +123,7 @@ function ResultCard({ entry, companions, lang, onPress }) {
 const STEPS = [
   { key: 'protein', kind: 'multi', q: 'eateryQuizQ1', hint: 'eateryQuizHintMax2', opts: [['chicken', 'eateryQuizChicken', '🍗'], ['beef', 'eateryQuizBeef', '🥩'], ['veg', 'eateryQuizVeg', '🥗'], ['any', 'eateryQuizAny', '🤷']] },
   { key: 'spicy',   kind: 'single', q: 'eateryQuizQ2', opts: [['yes', 'eateryQuizYes', '🌶️'], ['no', 'eateryQuizNo', '😌'], ['any', 'eateryQuizAny', '🤷']] },
-  { key: 'portion', kind: 'multi', q: 'eateryQuizQ3', hint: 'eateryQuizHintMax2', opts: [['snack', 'eateryQuizSnack', '🥨'], ['meal', 'eateryQuizMeal', '🍔'], ['share', 'eateryQuizShare', '🍕']] },
+  { key: 'portion', kind: 'multi', q: 'eateryQuizQ3', hint: 'eateryQuizHintMax2', opts: [['snack', 'eateryQuizSnack', null, require('../assets/eatery-quiz/snack.png')], ['meal', 'eateryQuizMeal', null, require('../assets/eatery-quiz/meal.png')], ['share', 'eateryQuizShare', null, require('../assets/eatery-quiz/share.png')]] },
   { key: 'extra',   kind: 'multi', q: 'eateryQuizQ4', hint: 'eateryQuizHintAny', opts: [['sauce', 'eateryQuizSauce', '🥫'], ['drink', 'eateryQuizDrink', '🥤'], ['dessert', 'eateryQuizDessert', '🍰'], ['none', 'eateryQuizNone', '🚫']] },
 ]
 const RELAX_KEY = { portion: 'eateryQuizRelaxPortion', spicy: 'eateryQuizRelaxSpicy' }
@@ -211,13 +213,13 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
                 <Text style={[st.hint, capHit && st.hintHit]} accessibilityLiveRegion="polite">{t(cur.hint, lang)}</Text>
               )}
               <View style={[st.grid, cols === 2 && st.gridWrap]} accessibilityRole={cur.kind === 'single' ? 'radiogroup' : undefined} accessibilityLabel={t(cur.q, lang)}>
-                {cur.opts.map(([v, k, emoji]) => {
+                {cur.opts.map(([v, k, emoji, image]) => {
                   const sel = cur.kind === 'single' ? picked === v : picked.includes(v)
                   const max = cur.kind === 'multi' ? QUIZ_MULTI[cur.key].max : null
                   const locked = !!max && !sel && picked.length >= max
                   return (
                     <View key={v} style={tileW ? { width: tileW } : st.fullW}>
-                      <Tile emoji={emoji} label={t(k, lang)} selected={sel} locked={locked} hint={t('eateryQuizHintMax2', lang)}
+                      <Tile emoji={emoji} image={image} label={t(k, lang)} selected={sel} locked={locked} hint={t('eateryQuizHintMax2', lang)}
                         role={cur.kind === 'single' ? 'radio' : 'checkbox'} cols={cols} onPress={() => tap(cur, v)} />
                     </View>
                   )
@@ -293,6 +295,7 @@ const st = StyleSheet.create({
   emojiLocked:{ opacity: 0.5 },
   tileTextLocked: { color: colors.textSecondary },
   tileBorder: { ...StyleSheet.absoluteFillObject, borderRadius: radii.tile, borderWidth: 2, borderColor: colors.primary, backgroundColor: 'transparent' },
+  icon:       { width: 40, height: 40, marginVertical: 1 },   // emoji line box is 38 tall: the Q3 icons sit in the same row height
   emoji:      { fontSize: 30, lineHeight: 38 },
   tileText:   { ...type.rowTitle, color: colors.textPrimary },
   tileTextOn: { color: colors.primaryDark },
