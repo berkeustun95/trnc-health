@@ -19,7 +19,7 @@ export const effectiveWhatsapp = p => {
   return own || (TEST_WHATSAPP || '').trim()
 }
 
-export { getBasket, changeQty, clearAll, undo, dropSnapshot } from './eateryBasketCore'
+export { getBasket, changeQty, clearAll, undo, dropSnapshot, getLastAdded } from './eateryBasketCore'
 
 export function useBasket(pid) {
   const [basket, setLocal] = useState(() => getBasket(pid))

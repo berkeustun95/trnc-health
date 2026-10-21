@@ -3,11 +3,14 @@ import { View, Text, Image, Pressable, ScrollView, Animated, Easing, Accessibili
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { formatPrice } from '../constants/eatery'
-import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch } from '../constants/eateryQuiz'
+import { formatPrice, eateryOrderDigits } from '../constants/eatery'
+import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage } from './ui'
+import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
+import { QtyStepper, OrderBar } from './EateryOrder'
+import { effectiveWhatsapp, getBasket, changeQty, getLastAdded } from '../utils/eateryBasket'
+import { subscribe } from '../utils/eateryBasketCore'
 
 // ─── Yeme-İçme: "Ne yesem?" (dish finder) ───────────────────────────────────
 // The matching is constants/eateryQuiz.js (pure, tested); this file is the entry card and the page. The page is a
@@ -75,26 +78,87 @@ function DishPhoto({ photoPath }) {
   )
 }
 
-function ResultCard({ entry, companions, lang, onPress }) {
-  const { item, partner } = entry
+// A pill with a fixed 44pt target; the label may wrap to two lines.
+function PillButton({ icon, title, label, filled, onPress }) {
+  return (
+    <Pressable onPress={() => { try { haptic() } catch { /* never blocks the add */ } onPress?.() }} accessibilityRole="button" accessibilityLabel={label || title}
+      style={({ pressed }) => [st.pill, filled ? st.pillFilled : st.pillOutline, pressed && { opacity: press.small }]}>
+      <Ionicons name={icon} size={18} color={filled ? colors.onPrimary : colors.primaryDark} />
+      <Text style={[st.pillText, filled && st.pillTextFilled]} numberOfLines={2}>{title}</Text>
+    </Pressable>
+  )
+}
+
+// Height 0 <-> content height over motion.base (instant with reduced motion). The content is measured from an absolutely
+// placed copy, stays mounted while it animates out, and is hidden from screen readers while closed.
+function Expand({ open, reduce, children }) {
+  const [h, setH] = useState(0)
+  const [mounted, setMounted] = useState(open)
+  const v = useRef(new Animated.Value(0)).current
+  useEffect(() => { if (open) setMounted(true) }, [open])
+  useEffect(() => {
+    if (!mounted || h === 0) return
+    const to = open ? h : 0
+    const done = () => { if (!open) setMounted(false) }
+    if (reduce) { v.setValue(to); done(); return }
+    Animated.timing(v, { toValue: to, duration: motion.base, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => { if (finished) done() })
+    return () => v.stopAnimation()
+  }, [open, h, mounted, reduce])
+  if (!mounted) return null
+  return (
+    <Animated.View style={{ height: v, overflow: 'hidden' }} {...(open ? null : { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true })}>
+      <View style={st.expandInner} onLayout={e => setH(Math.ceil(e.nativeEvent.layout.height))}>{children}</View>
+    </Animated.View>
+  )
+}
+
+// One "Yanına" line. A priced side is a 44pt toggle (the whole row): the plus adds one unit to the partner's basket, then
+// it reads "Eklendi" and a second tap takes that one unit off again. A side that cannot be ordered stays a plain line.
+function SideRow({ item, text, qty, orderable, lang, onToggle }) {
+  if (!orderable) {
+    return (
+      <View style={st.sideRow}>
+        <Ionicons name="add-circle-outline" size={18} color={colors.primaryDark} />
+        <Text style={st.sideText}>{text}</Text>
+      </View>
+    )
+  }
+  const added = qty > 0
+  return (
+    <Pressable onPress={onToggle} style={({ pressed }) => [st.sideRow, st.sideTap, pressed && { opacity: press.small }]} accessibilityRole="button"
+      accessibilityLabel={added ? t('eateryQuizSideRemoveA11y', lang).replace('{name}', () => item.name) : `${t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)}. ${text}`}>
+      <Ionicons name={added ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={colors.primaryDark} />
+      <Text style={st.sideText}>{text}</Text>
+      {added && <Text style={st.sideAdded}>{t('eateryQuizSideAdded', lang)}</Text>}
+    </Pressable>
+  )
+}
+
+function ResultCard({ entry, lang, canOrder, basket, reduce, onPress, onOpenPartner, onQty }) {
+  const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
-  const sides = (companions || []).map(c => {
-    const p = formatPrice(c.item.price, c.item.currency, lang)
-    return p ? t('eateryQuizSide', lang).replace('{name}', () => c.item.name).replace('{price}', () => p)
-      : t('eateryQuizSideNoPrice', lang).replace('{name}', () => c.item.name)
+  const sideItems = (companions || []).map(c => c.item)
+  const sides = sideItems.map(i => {
+    const p = formatPrice(i.price, i.currency, lang)
+    return p ? `${i.name} · ${p}` : i.name
   })
-  const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : '', ...sides].filter(Boolean).join('. ')
+  const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : ''].filter(Boolean).join('. ')
+  const sideOk = sideItems.map(i => canOrder && quizSideOrderable(i))
+  const qty = basket[item.id] || 0
+  // The sides open once THIS dish is in the basket, and fold away when it goes back to 0 (sides already added stay).
+  const showSides = canOrder && qty > 0 && sides.length > 0
+  const wasOpen = useRef(showSides)
+  useEffect(() => {
+    if (showSides && !wasOpen.current) AccessibilityInfo.announceForAccessibility?.(t('eateryQuizSidesTitle', lang))
+    wasOpen.current = showSides
+  }, [showSides])
   return (
-    <Card onPress={onPress} accessibilityLabel={label} padding={space[12]}>
-      <View style={st.resultRow}>
+    <Card padding={space[12]}>
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [st.resultRow, pressed && { opacity: press.card }]}>
         <DishPhoto photoPath={item.photo_path} />
         <View style={st.resultText}>
           <Text style={st.dishName}>{item.name}</Text>
-          <View style={st.partnerRow}>
-            <EateryLogo partner={partner} width={20} height={20} radius={radii.pill} decorative />
-            <Text style={st.partnerName} numberOfLines={1}>{partner.name}</Text>
-          </View>
           {!!price && <Text style={st.price}>{price}</Text>}
           {pork && (
             <View style={st.pork}>
@@ -104,16 +168,31 @@ function ResultCard({ entry, companions, lang, onPress }) {
           )}
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-      </View>
-      {sides.length > 0 && (
-        <View style={st.side}>
-          {sides.map(line => (
-            <View key={line} style={st.sideRow}>
-              <Ionicons name="add-circle-outline" size={18} color={colors.primaryDark} />
-              <Text style={st.sideText}>{line}</Text>
-            </View>
-          ))}
+      </Pressable>
+      <Pressable onPress={onOpenPartner} accessibilityRole="button" accessibilityLabel={t('eateryQuizPartnerA11y', lang).replace('{partner}', () => partner.name)}
+        style={({ pressed }) => [st.partnerRow, pressed && { opacity: press.small }]}>
+        <EateryLogo partner={partner} width={20} height={20} radius={radii.pill} decorative />
+        <Text style={st.partnerName} numberOfLines={1}>{partner.name}</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+      </Pressable>
+      {canOrder && (
+        <View style={st.orderRow}>
+          {qty < 1
+            ? <PillButton filled icon="basket-outline" title={t('eateryQuizAddToBasket', lang)}
+                label={t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => onQty(partner, item.id, 1)} />
+            : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} />}
         </View>
+      )}
+      {sides.length > 0 && (
+        <Expand open={showSides} reduce={reduce}>
+          <View style={st.side}>
+            <Text style={st.sidesTitle} accessibilityRole="header">{t('eateryQuizSidesTitle', lang)}</Text>
+            {sides.map((line, k) => (
+              <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={basket[sideItems[k].id] || 0} orderable={sideOk[k]} lang={lang}
+                onToggle={() => onQty(partner, sideItems[k].id, (basket[sideItems[k].id] || 0) > 0 ? -1 : 1)} />
+            ))}
+          </View>
+        </Expand>
       )}
     </Card>
   )
@@ -129,7 +208,7 @@ const STEPS = [
 const RELAX_KEY = { portion: 'eateryQuizRelaxPortion', spicy: 'eateryQuizRelaxSpicy' }
 
 // rows: the visible partner rows (with tagged menu items). backRef: App's back chain asks here first (the page is a layer above the list).
-export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed, onOpenDish }) {
+export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed, onOpenDish, onOpenMenu, onOpenBasket }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const width = winW
@@ -184,7 +263,20 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
   const retry = () => { setAnswers({ protein: [], portion: [], extra: [] }); setStep(0) }
 
   const result = useMemo(() => (step >= QUIZ_STEPS ? quizMatch(rows, answers) : null), [step, rows, answers])
+
+  // Results basket: the SAME per-partner store the menu page uses, so edits made there (clear after sending, undo, the
+  // stepper) show here: any store change re-renders this page, which reads the baskets fresh.
+  const [, setTick] = useState(0)
+  useEffect(() => subscribe(() => setTick(n => n + 1)), [])
+  const canOrder = p => !!eateryOrderDigits(effectiveWhatsapp(p))
+  const onQty = (p, id, delta) => {
+    changeQty(p.id, id, delta)
+  }
+  const resultPartners = result ? result.dishes.map(d => d.partner).filter((p, i, a) => a.findIndex(x => x.id === p.id) === i && canOrder(p)) : []
+  const barPartner = quizBarPartner(resultPartners, p => quizBasketSummary(p, getBasket(p.id)), getLastAdded())
+  const bar = barPartner ? quizBasketSummary(barPartner, getBasket(barPartner.id)) : null
   const cur = STEPS[step]
+  const showBar = !cur && !!bar
   const picked = cur ? answers[cur.key] : null
   const canNext = !!cur && (cur.kind === 'single' ? !!picked : !!picked?.length)
   const cols = width < 340 || PixelRatio.getFontScale() >= 1.3 ? 1 : 2
@@ -202,7 +294,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
             </Text>
           )}
         </View>
-        <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + space[24] }]} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, { paddingBottom: showBar ? space[24] : insets.bottom + space[24] }]} showsVerticalScrollIndicator={false}>
           {cur ? (
             <>
               <View style={st.qRow}>
@@ -243,16 +335,24 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
                     </View>
                   )}
                   <View style={st.cards}>
-                    {result?.dishes.map((d, i) => (
-                      <ResultCard key={d.item.id} entry={d} lang={lang} companions={i === 0 ? result.companions : null} onPress={() => onOpenDish(d.partner, d.item.id)} />
+                    {result?.dishes.map(d => (
+                      <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
+                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty}
+                        onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
                 </>
               )}
-              <Button variant="secondary" icon="refresh-outline" title={t('eateryQuizRetry', lang)} onPress={retry} fullWidth style={st.retry} />
+              {!!result && result.dishes.length > 0 && (
+                <Button variant="secondary" icon="restaurant-outline" title={t('eateryQuizViewMenu', lang)} onPress={() => onOpenMenu(result.dishes[0].partner)} fullWidth style={st.retry} />
+              )}
+              <Button variant="text" icon="refresh-outline" title={t('eateryQuizRetry', lang)} onPress={retry} fullWidth style={st.retry} />
             </>
           )}
         </ScrollView>
+        {showBar && (
+          <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} onOpen={() => onOpenBasket(barPartner)} />
+        )}
         {!!cur && (
           <View style={[st.footer, { paddingBottom: insets.bottom + space[12] }]}>
             <Button fullWidth title={t(step === QUIZ_STEPS - 1 ? 'eateryQuizSeeResults' : 'eateryQuizNext', lang)} disabled={!canNext} disabledHint={t('eateryQuizPickOne', lang)} onPress={() => setStep(step + 1)} />
@@ -271,13 +371,13 @@ const st = StyleSheet.create({
   entryTitle: { ...type.rowTitle, color: colors.textPrimary },
   entryBody:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
   page:       { flex: 1, backgroundColor: colors.canvas },
-  progress:   { flexShrink: 0, paddingHorizontal: space[16], paddingTop: space[4], gap: space[8] },
+  progress:   { flexShrink: 0, backgroundColor: colors.canvas, zIndex: 1, paddingHorizontal: space[16], paddingTop: space[4], paddingBottom: space[12], gap: space[8] },
   dots:       { flexDirection: 'row', gap: space[4] },
   dot:        { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.border },
   dotOn:      { backgroundColor: colors.primary },
   step:       { ...type.meta, color: colors.textSecondary },
   scroll:     { flex: 1 },
-  content:    { paddingHorizontal: space[16], paddingTop: space[16], gap: space[16] },
+  content:    { paddingHorizontal: space[16], paddingTop: space[4], gap: space[16] },
   question:   { flex: 1, ...type.detailTitle, color: colors.textPrimary },
   qRow:       { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   qMascot:    { width: 56, height: 56, flexShrink: 0 },
@@ -308,12 +408,12 @@ const st = StyleSheet.create({
   fill:       { width: '100%', height: '100%' },
   resultText: { flex: 1, gap: 4 },
   dishName:   { ...type.rowTitle, color: colors.textPrimary },
-  partnerRow: { flexDirection: 'row', alignItems: 'center', gap: space[8] },
+  partnerRow: { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[8], marginTop: space[4] },
   partnerName:{ flexShrink: 1, ...type.small, color: colors.textSecondary },
   price:      { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   pork:       { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: space[4], backgroundColor: colors.dangerLight },
   porkText:   { ...type.meta, color: colors.dangerInk, flexShrink: 1 },
-  side:       { gap: space[8], marginTop: space[12], paddingTop: space[12], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  side:       { gap: space[4], marginTop: space[12], paddingTop: space[12], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   sideRow:    { flexDirection: 'row', alignItems: 'center', gap: space[8] },
   sideText:   { flex: 1, ...type.small, color: colors.textPrimary },
   relaxed:    { flexDirection: 'row', alignItems: 'flex-start', gap: space[8], padding: space[12], borderRadius: radii.md, backgroundColor: colors.primaryLight },
@@ -321,4 +421,14 @@ const st = StyleSheet.create({
   empty:      { alignItems: 'center', paddingVertical: space[24], gap: space[12] },
   emptyText:  { ...type.body, color: colors.textSecondary, textAlign: 'center' },
   retry:      { marginTop: space[4] },
+  pill:       { alignSelf: 'flex-start', minHeight: TAP, paddingHorizontal: space[16], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], borderRadius: radii.pill },
+  pillFilled: { backgroundColor: colors.primary },
+  pillOutline:{ borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
+  expandInner:{ position: 'absolute', top: 0, left: 0, right: 0 },
+  sidesTitle: { ...type.rowTitle, color: colors.textPrimary },
+  pillText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flexShrink: 1, textAlign: 'center' },
+  pillTextFilled: { color: colors.onPrimary },
+  orderRow:   { alignItems: 'flex-start', marginTop: space[8] },
+  sideTap:    { minHeight: TAP },
+  sideAdded:  { ...type.small, fontFamily: font.semibold, color: colors.primaryDark },
 })
