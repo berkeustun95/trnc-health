@@ -81,17 +81,29 @@ export function quizMatch(rows, answers) {
 
   const ranked = pool.map(c => ({ ...c, score: score(c), photo: filled(c.item.photo_path) ? 1 : 0 }))
     .sort((a, b) => b.score - a.score || b.photo - a.photo
-      || (a.partner.sort_order ?? 0) - (b.partner.sort_order ?? 0) || cmpItem(a.item, b.item))
+      || (a.partner.sort_order ?? 0) - (b.partner.sort_order ?? 0) || (a.item.section_order ?? 0) - (b.item.section_order ?? 0) || cmpItem(a.item, b.item))
   const spread = new Set(ranked.map(c => c.partner.id ?? c.partner.slug)).size > 1
+  // Coverage first: every picked protein / portion value (Q1 values, then Q3 values) that has a dish in the pool gets its
+  // best-ranked dish; the rest of the three slots fill by rank. Shown in rank order. Max 2 per partner when several partners.
   const perPartner = new Map()
-  const dishes = []
-  for (const c of ranked) {
+  const chosen = []
+  const take = c => {
     const key = c.partner.id ?? c.partner.slug
-    if (spread && (perPartner.get(key) || 0) >= 2) continue
+    if (chosen.includes(c) || chosen.length >= 3 || (spread && (perPartner.get(key) || 0) >= 2)) return false
     perPartner.set(key, (perPartner.get(key) || 0) + 1)
-    dishes.push({ item: c.item, partner: c.partner })
-    if (dishes.length === 3) break
+    chosen.push(c)
+    return true
   }
+  const wanted = [
+    ...(answers.protein || []).filter(v => v !== 'any').map(v => c => c.item.protein === v),
+    ...(answers.portion || []).map(v => c => c.item.portion === v),
+  ]
+  for (const carries of wanted) {
+    if (chosen.some(carries)) continue
+    ranked.find(c => carries(c) && take(c))   // take() refuses a dish the partner cap blocks; the next carrier is tried
+  }
+  for (const c of ranked) take(c)
+  const dishes = ranked.filter(c => chosen.includes(c)).map(c => ({ item: c.item, partner: c.partner }))
   return { dishes, relaxed, companions: quizCompanions(dishes[0].partner, answers) }
 }
 

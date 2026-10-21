@@ -95,6 +95,20 @@ eq('max 2 per partner when several partners', names(Q.quizMatch([big, small], AN
 eq('one partner only: up to 3', names(Q.quizMatch([big], ANY)), ['A', 'B', 'C'])
 eq('deterministic: same input, same output', JSON.stringify(Q.quizMatch([big, small], ANY)), JSON.stringify(Q.quizMatch([big, small], ANY)))
 
+// ── menu order and coverage (device pass 2026-10-21: three Nachos, no beef, no "Doyurucu") ──
+const M = partner('menu', 0, [
+  ...[1, 2, 3].map(n => dish('Nachos ' + n, { section_order: 0, sort_order: n, protein: 'chicken', portion: 'share', spicy: true })),
+  dish('Chicken Burger', { section_order: 1, sort_order: 5, protein: 'chicken', portion: 'meal', spicy: true }),
+  dish('Beef Smash', { section_order: 1, sort_order: 6, protein: 'beef', portion: 'meal', spicy: true }),
+])
+const both = Q.quizMatch([M], { protein: ['chicken', 'beef'], spicy: 'yes', portion: ['meal', 'share'], extra: ['none'] })
+const got = both.dishes.map(d => d.item)
+eq('Tavuk+Et / acı / Doyurucu+Paylaşmalık covers beef, meal and share', [got.some(i => i.protein === 'beef'), got.some(i => i.portion === 'meal'), got.some(i => i.portion === 'share')], [true, true, true])
+eq('...and fills the rest in menu order', both.dishes.map(d => d.item.name), ['Nachos 1', 'Nachos 2', 'Beef Smash'])
+eq('single pick keeps menu order (section_order before item sort_order)', names(Q.quizMatch([M], { protein: ['chicken'], spicy: 'any', portion: ['meal', 'share'], extra: ['none'] })).length, 3)
+eq('single pick, one portion: menu order', names(Q.quizMatch([M], { protein: ['any'], spicy: 'any', portion: ['share'], extra: ['none'] })), ['Nachos 1', 'Nachos 2', 'Nachos 3'])
+eq('coverage never breaks the partner cap', names(Q.quizMatch([M, partner('o', 1, [dish('Other', { protein: 'veg', portion: 'meal', section_order: 0 })])], { protein: ['any'], spicy: 'any', portion: ['share', 'meal'], extra: ['none'] })).length, 3)
+
 // ── companions: one per chosen role, from the top dish's partner ──
 const C = partner('c', 0, [
   dish('Burger'), dish('Hot sauce', { role: 'sauce', spicy: true, sort_order: 0, price: 65 }), dish('Ranch', { role: 'sauce', spicy: false, sort_order: 1, price: 65 }),
