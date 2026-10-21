@@ -1,7 +1,7 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
-import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryOrderable, orderTotal } from '../constants/eatery.js'
+import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryOrderable, orderTotal, orderCodeLine, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -81,6 +81,35 @@ B.changeQty('p3', 1, -1)
 eq('last added partner: set by an add, not moved by a removal', B.getLastAdded(), 'p4')
 B.changeQty('p3', 1, 0)
 eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
+
+// ── server-recorded order: code line, message from the SERVER lines, mismatch, error kinds ──
+{
+  eq('code line: dash in the first part, plain in the URL', orderCodeLine('AB23CD45'), 'ADA Sipariş No: AB23-CD45 · Doğrula: getadaapp.com/o/AB23CD45')
+  eq('code line: lower case input is upper-cased', orderCodeLine('ab23cd45'), 'ADA Sipariş No: AB23-CD45 · Doğrula: getadaapp.com/o/AB23CD45')
+  eq('code line: a malformed code gives no line', [orderCodeLine('short'), orderCodeLine(null)], ['', ''])
+  const server = { code: 'AB23CD45', total: 1890, currency: 'TRY', lines: [{ item_id: 1, name: 'Crunchy Burger', qty: 2, unit_price: 620 }, { item_id: 2, name: 'Çıtır Patates', qty: 1, unit_price: 650 }] }
+  const basket = [{ id: 1, name: 'Crunchy Burger', qty: 2, price: 620 }, { id: 2, name: 'Çıtır Patates', qty: 1, price: 650 }]
+  eq('mismatch: identical -> false', orderMismatch(basket, server), false)
+  eq('mismatch: a price changed on the server', orderMismatch(basket, { ...server, total: 1920, lines: [{ ...server.lines[0], unit_price: 635 }, server.lines[1]] }), true)
+  eq('mismatch: total differs only', orderMismatch(basket, { ...server, total: 1891 }), true)
+  eq('mismatch: a qty differs', orderMismatch(basket, { ...server, lines: [{ ...server.lines[0], qty: 3 }, server.lines[1]] }), true)
+  eq('mismatch: a line missing on the server', orderMismatch(basket, { ...server, total: 1240, lines: [server.lines[0]] }), true)
+  eq('mismatch: an extra server line', orderMismatch([basket[0]], server), true)
+  eq('mismatch: price as a string "620.00" still equal', orderMismatch(basket, { ...server, lines: [{ ...server.lines[0], unit_price: '620.00' }, server.lines[1]] }), false)
+  eq('mismatch: a malformed response counts as a mismatch', [orderMismatch(basket, null), orderMismatch(basket, { total: 1 })], [true, true])
+  const forged = [{ id: 1, name: 'Crunchy Burger', qty: 2, price: 1 }, { id: 2, name: 'Çıtır Patates', qty: 1, price: 1 }]
+  eq('a forged client price is a mismatch', orderMismatch(forged, server), true)
+  const msg = buildOrderMessage(serverOrderLines(server), 'soğansız', server.code).split('\n')
+  eq('message is built from the server lines and ends with the code line', msg, [
+    'ADA üzerinden sipariş:', '2 × Crunchy Burger — 1.240,00 TL', '1 × Çıtır Patates — 650,00 TL', '',
+    'Toplam: 1.890,00 TL', 'Not: soğansız', 'Fiyatlar ADA menüsündendir, değişiklik olabilir.',
+    'ADA Sipariş No: AB23-CD45 · Doğrula: getadaapp.com/o/AB23CD45'])
+  eq('server line prices drive the message, not the basket', buildOrderMessage(serverOrderLines({ lines: [{ item_id: 1, name: 'X', qty: 1, unit_price: 99 }] }), '', null).includes('1 × X — 99,00 TL'), true)
+  eq('no code -> no code line (old callers)', buildOrderMessage(lines, '').includes('Sipariş No'), false)
+  const E = (message, code = 'P0001', details = null) => ({ code, message, details })
+  eq('error kinds', [E('rate_limited'), E('order_requires_account'), E('item_unavailable'), E('invalid_items'), E('partner_unavailable'), E('mixed_currency'), E('boom'), { message: 'Network request failed' }, null].map(orderErrorKind),
+    ['rate', 'account', 'items', 'items', 'generic', 'items', 'generic', 'generic', 'generic'])
+}
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)

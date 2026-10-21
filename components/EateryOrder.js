@@ -13,6 +13,8 @@ import { EateryLogo, eateryImageUrl } from './EateryBits'
 // Defined outside the screen: these re-render on every tap and must not remount.
 
 const MAX_QTY = 99
+// What the Sepetim footer says under the send button (null = nothing). Set by EateryPartnerScreen's sendOrder.
+const ORDER_ERR_KEY = { generic: 'eateryOrderErrGeneric', rate: 'eateryOrderErrRate', account: 'eateryOrderErrAccount', prices: 'eateryOrderErrPrices', items: 'eateryOrderErrItems' }
 
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
 export function QtyStepper({ id, name, qty, onQty, lang }) {
@@ -110,7 +112,7 @@ function BasketLine({ line, onQty, formatMoney, lang }) {
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce }) {
+export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -193,7 +195,13 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
-            <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} />
+            <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} loading={sending} />
+            {!!orderError && (
+              <View accessibilityLiveRegion="polite">
+                <Text style={st.errText}>{t(ORDER_ERR_KEY[orderError], lang)}</Text>
+                {orderError === 'account' && <Button variant="secondary" fullWidth title={t('login', lang)} onPress={onSignIn} style={st.errBtn} />}
+              </View>
+            )}
           </View>
         )}
       </SafeAreaView>
@@ -227,6 +235,8 @@ const st = StyleSheet.create({
   thumb:     { width: 56, height: 56, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbEmpty:{ backgroundColor: colors.soft, borderWidth: 0 },
   fill:      { width: '100%', height: '100%' },
+  errText:   { ...type.small, color: colors.dangerInk, textAlign: 'center' },
+  errBtn:    { marginTop: space[8] },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },

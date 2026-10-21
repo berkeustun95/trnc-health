@@ -2503,7 +2503,7 @@ export default function App() {
     content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} />
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
-    content = <EateryScreen lang={lang} partner={eateryPartner} onOpenPartner={setEateryPartner}
+    content = <EateryScreen lang={lang} session={session} onRequireAccount={requireAccount} partner={eateryPartner} onOpenPartner={setEateryPartner}
       onClosePartner={closeEateryPartner} partnerBackRef={eateryPartnerBackRef} listBackRef={eateryListBackRef} onBack={() => setShowEatery(false)}
       openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} />
   } else if (showStudentHub) {
