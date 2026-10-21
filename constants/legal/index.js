@@ -56,7 +56,11 @@ import TERMS_TR   from './terms.tr.js'
 // PUBLISHED 2026-10-08: web + docs that day, the in-app copies with the next production OTA): what a check-in saves (no coordinates), who sees it
 // (feeds only, signed-in users, blocks respected), under-18s hidden by default, the hide
 // switch, deletion, the one-off position check. Terms unchanged; the pair moves together.
-export const LEGAL_VERSION = '2026-10-08'
+// Bumped 2026-10-08 -> 2026-10-21 for WhatsApp order records (Yeme-İçme): what the record holds
+// (no name, phone or note), the abuse limit, the verification link anyone with it can open, WhatsApp
+// as the carrier, and the 30-day deletion. Terms unchanged; the pair moves together. Raises the
+// in-app notice once; re-asks nobody (STUDENT_HUB_TERMS_MIN is a fixed floor, not this value).
+export const LEGAL_VERSION = '2026-10-21'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue
