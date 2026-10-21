@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
+import { Fragment, useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { View, Text, ScrollView, Linking, Modal, Pressable, AccessibilityInfo, AppState, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, ScrollView, Animated, Linking, Modal, Pressable, AppState, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -9,9 +9,9 @@ import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
   eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal,
 } from '../constants/eatery'
-import { colors, font, type, radii, space, listBottomPad, withAlpha, press } from '../constants/theme'
+import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
-import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl } from '../components/EateryBits'
+import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
@@ -49,6 +49,24 @@ function HoursBlock({ week, open, lang }) {
       ))}
     </View>
   )
+}
+
+// The quiz hand-off cue: a primaryLight wash that fades in, holds, fades out (1.2 s in all). Reduced motion keeps the cue
+// but drops the fade: a static wash for the same 1.2 s. Mounted only while marked, behind the row.
+const MARK_MS = 1200
+function FocusMark({ reduce }) {
+  const op = useRef(new Animated.Value(reduce ? 1 : 0)).current
+  useEffect(() => {
+    if (reduce) return
+    const a = Animated.sequence([
+      Animated.timing(op, { toValue: 1, duration: motion.fast, useNativeDriver: true }),
+      Animated.delay(MARK_MS - motion.fast - motion.base),
+      Animated.timing(op, { toValue: 0, duration: motion.base, useNativeDriver: true }),
+    ])
+    a.start()
+    return () => a.stop()
+  }, [])
+  return <Animated.View pointerEvents="none" style={[s.focusMark, { opacity: op }]} />
 }
 
 const SNACK_ABOVE_BAR = 150   // clears the pinned order bar / Sepetim footer (stacked bar at font scale 1.3 is the tallest)
@@ -128,18 +146,6 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeig
   )
 })
 
-// Fade only; none at all when the system asks for reduced motion.
-function useReduceMotion() {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    let alive = true
-    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setOn(v) }).catch(() => {})
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setOn)
-    return () => { alive = false; sub?.remove?.() }
-  }, [])
-  return on
-}
-
 function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
@@ -173,7 +179,8 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
   )
 }
 
-export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null }) {
+// focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below.
+export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null }) {
   const [viewing, setViewing] = useState(null)
   const [failedDishes, setFailedDishes] = useState({})
   const failDish = useCallback(id => setFailedDishes(f => ({ ...f, [id]: true })), [])
@@ -291,6 +298,37 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     lockTimer.current = setTimeout(() => { lockRef.current = false }, reduce ? 80 : 1200)
   }, [measureTops, reduce])
   const setTabsH = useCallback(h => { tabsH.current = h }, [])
+
+  // Quiz hand-off: scroll so the dish row sits just under the pinned tabs, then mark it for 1.2 s (no mark with reduced
+  // motion). One shot per open. The row is measured against the scroll content (no cached onLayout); a measure that
+  // fails because the row has not mounted yet is retried a few times.
+  const focusRef = useRef(null)
+  const reduceRef = useRef(reduce)
+  reduceRef.current = reduce
+  const [marked, setMarked] = useState(null)
+  useEffect(() => {
+    if (focusItemId == null) return
+    const si = sections.findIndex(sec => sec.items.some(i => i.id === focusItemId))
+    if (si < 0) return
+    const timers = []
+    const attempt = n => {
+      const inner = scrollRef.current?.getInnerViewRef?.()
+      const node = focusRef.current
+      const retry = () => { if (n < 5) timers.push(setTimeout(() => attempt(n + 1), 200)) }
+      if (!inner || !node) { retry(); return }
+      node.measureLayout(inner, (_x, y) => {
+        lockRef.current = true
+        activeRef.current = si
+        setActiveSec(si)
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - tabsH.current - 8), animated: !reduceRef.current })
+        timers.push(setTimeout(() => { lockRef.current = false }, reduceRef.current ? 80 : 1200))
+        setMarked(focusItemId)
+        timers.push(setTimeout(() => setMarked(null), MARK_MS))
+      }, retry)
+    }
+    timers.push(setTimeout(() => attempt(0), 350))
+    return () => timers.forEach(clearTimeout)
+  }, [focusItemId, sections])
   const sectionTitles = useMemo(() => sections.map(sec => sec.title), [sections])
 
   // App's single back handler asks here first (the dish photo viewer is a layer above the partner page).
@@ -360,8 +398,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                   {sec.title}
                   {SHOW_SECTION_COUNT && <Text style={s.secCount}>{' · ' + sec.items.length}</Text>}
                 </Text>
-                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
-                  ordering={ordering} qty={basket[i.id] || 0} onQty={onQty} />)}
+                {sec.items.map(i => {
+                  const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
+                    ordering={ordering} qty={basket[i.id] || 0} onQty={onQty} />
+                  return i.id === focusItemId
+                    ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
+                    : <Fragment key={i.id}>{row}</Fragment>
+                })}
               </View>
             ))}
             {menuPhotos.length > 0 && (
@@ -461,6 +504,8 @@ const s = StyleSheet.create({
   itemDesc:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
   itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   itemOrder: { alignItems: 'flex-end', marginBottom: space[4] },
+  focusRow:  { marginHorizontal: -space[8], paddingHorizontal: space[8], borderRadius: radii.sm },
+  focusMark: { ...StyleSheet.absoluteFillObject, borderRadius: radii.sm, backgroundColor: colors.primaryLight },
   menuBtn:   { marginTop: space[16] },
   fill:      { width: '100%', height: '100%' },
   thumb:     { width: THUMB, height: THUMB, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
