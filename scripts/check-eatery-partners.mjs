@@ -182,14 +182,56 @@ const CONTACT_READ = /\??\.\s*(?:phone|whatsapp)\b|\[\s*['"](?:phone|whatsapp)['
 const LINK_BUILD = /\btel:|wa\.me\//  // only constants/eatery.js (eateryContacts, orderWhatsAppUrl) builds links, from the numbers
 // Reading the RESULT of the one door (nums.phone, partnerContactNumbers(p).whatsapp) is the point, not a leak.
 const RESULT_READ = /(?:\bnums\??|\bpartnerContactNumbers\([^)]*\))\??\.(?:phone|whatsapp)\b/g
+// Any file that touches the eatery partner rows or the door is in scope, whatever its name.
+const USES_DOOR = /\b(?:eateryContacts|partnerContactNumbers|effectiveWhatsapp)\b/
+// A loadEateryPartners caller is in scope unless every call passes a literal column list with no phone / whatsapp
+// (it then cannot hold a contact: HomeScreen's tile row).
+function readsPartnerRows(text) {
+  const calls = [...stripComments(text).matchAll(/\bloadEateryPartners\s*\(\s*((['"`])[^'"`]*\2|[^)]*)/g)].filter(m => m.index === undefined || !/import/.test(text.slice(Math.max(0, m.index - 20), m.index)))
+  if (!/\bloadEateryPartners\b/.test(text)) return false
+  if (!calls.length) return true
+  return calls.some(m => !/^(['"`])[^'"`]*\1/.test(m[1].trim()) || /phone|whatsapp/i.test(m[1]))
+}
+const DESTRUCTURE = /\{[^{}]*\b(?:phone|whatsapp)\b[^{}]*\}\s*=\s*[\w.?]*(?:partner|row|p)\b(?!\w)/i
+function contactsSecondArgs(code) {
+  const bad = []
+  for (const m of code.matchAll(/(?<!function\s)(?<![\w.])eateryContacts\s*\(/g)) {
+    let depth = 1, i = m.index + m[0].length, arg = '', args = []
+    for (; i < code.length && depth > 0; i++) {
+      const c = code[i]
+      if (c === '(' || c === '[' || c === '{') depth++
+      else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) break }
+      if (c === ',' && depth === 1) { args.push(arg.trim()); arg = ''; continue }
+      arg += c
+    }
+    args.push(arg.trim())
+    if (!/^(?:nums\b|partnerContactNumbers\()/.test(args[1] || '')) bad.push(args[1] ?? '(missing)')
+  }
+  return bad
+}
 function contactReadProblems(byFile) {
   const out = []
   for (const [f, text] of Object.entries(byFile)) {
-    if (!/eatery/i.test(f)) continue
+    if (!/eatery/i.test(f) && !USES_DOOR.test(text) && !readsPartnerRows(text)) continue
     let code = stripComments(text).replace(RESULT_READ, '')
     if (f === 'constants/eatery.js') code = code.replace(CONTACT_FN, '')
     const m = code.match(CONTACT_READ) || (f === 'constants/eatery.js' ? null : code.match(LINK_BUILD))
     if (m) out.push(`${f} touches a partner contact directly (${m[0].trim()}); go through eateryContactNumbers(partner, …)`)
+    const d = code.match(DESTRUCTURE)
+    if (d) out.push(`${f} destructures a partner contact (${d[0].trim()}); go through eateryContactNumbers(partner, …)`)
+    for (const arg of contactsSecondArgs(code)) out.push(`${f} calls eateryContacts with a 2nd argument that is not nums / partnerContactNumbers(…): ${arg}`)
+  }
+  return out
+}
+
+// Test taps (Preview, dev) must not reach contact_events: every logContactEvent call in an eatery screen sits behind CONTACT_LOGGING.
+function logGateProblems(byFile) {
+  const out = []
+  for (const [f, text] of Object.entries(byFile)) {
+    if (!/eatery/i.test(f)) continue
+    const code = stripComments(text)
+    const calls = [...code.matchAll(/\blogContactEvent\s*\(/g)].filter(m => !/import[^\n]*$/.test(code.slice(0, m.index).split('\n').pop()))
+    for (const m of calls) if (!/\bCONTACT_LOGGING\s*&&\s*[^\n;]*$/.test(code.slice(0, m.index).split('\n').pop())) out.push(`${f} calls logContactEvent without CONTACT_LOGGING && on the same line`)
   }
   return out
 }
@@ -465,14 +507,28 @@ console.log(`flags: EATERY_LIVE=${flags.EATERY_LIVE} CRUNCHY_EXPRESS_LIVE=${flag
   mustFail('contact: screen reads partner.whatsapp', contactReadProblems({ 'constants/eatery.js': fnSrc, 'screens/EateryPartnerScreen.js': "const d = eateryOrderDigits(partner.whatsapp)\n" }))
   mustFail('contact: screen reads partner?.phone', contactReadProblems({ 'constants/eatery.js': fnSrc, 'components/EateryQuiz.js': "Linking.openURL(partner?.phone)\n" }))
   mustFail('contact: eateryContacts reads p.phone itself', contactReadProblems({ 'constants/eatery.js': fnSrc.replace('nums.phone', 'p?.phone') }))
+  mustFail('contact: any file importing the door is in scope (name has no "eatery")', contactReadProblems({ 'screens/HomeScreen.js': "import { effectiveWhatsapp } from '../utils/eateryBasket'\nconst w = partner.whatsapp\n" }))
+  mustFail('contact: loadEateryPartners with phone column is in scope', contactReadProblems({ 'screens/ExploreX.js': "const r = await loadEateryPartners('slug, phone')\nconst w = row.whatsapp\n" }))
+  mustPass('contact: loadEateryPartners tile-only columns out of scope', contactReadProblems({ 'screens/HomeX.js': "const r = await loadEateryPartners('slug, name')\nconst w = item.phone\n" }))
+  mustPass('contact: unrelated file with .phone is out of scope', contactReadProblems({ 'screens/TowingScreen.js': "const w = tow.phone\n" }))
+  mustFail('contact: destructure phone', contactReadProblems({ 'screens/EateryPartnerScreen.js': "const { phone, name } = partner\n" }))
+  mustFail('contact: destructure whatsapp from p', contactReadProblems({ 'components/EateryQuiz.js': "const { whatsapp } = p\n" }))
+  mustFail('contact: eateryContacts with raw partner as 2nd arg', contactReadProblems({ 'screens/EateryPartnerScreen.js': "const c = eateryContacts(partner, partner)\n" }))
+  mustFail('contact: eateryContacts with a literal 2nd arg', contactReadProblems({ 'screens/EateryPartnerScreen.js': "const c = eateryContacts(partner, { phone: x, whatsapp: y })\n" }))
+  mustFail('contact: eateryContacts with no 2nd arg', contactReadProblems({ 'screens/EateryPartnerScreen.js': "const c = eateryContacts(partner)\n" }))
+  mustPass('contact: eateryContacts with partnerContactNumbers', contactReadProblems({ 'screens/EateryPartnerScreen.js': "const c = eateryContacts(partner, partnerContactNumbers(partner))\n" }))
+  mustPass('log gate: behind CONTACT_LOGGING', logGateProblems({ 'screens/EateryPartnerScreen.js': "import { logContactEvent } from 'x'\n  if (CONTACT_LOGGING && !partner.placeholder) logContactEvent('eatery', 1, a)\n" }))
+  mustFail('log gate: ungated call', logGateProblems({ 'screens/EateryPartnerScreen.js': "  if (!partner.placeholder) logContactEvent('eatery', 1, a)\n" }))
+  mustFail('log gate: gate only in a comment', logGateProblems({ 'screens/EateryPartnerScreen.js': "  // CONTACT_LOGGING &&\n  logContactEvent('eatery', 1, a)\n" }))
   mustFail('contact: bracket read', contactReadProblems({ 'components/EateryOrder.js': "const w = p['whatsapp']\n" }))
   mustFail('contact: hand-built tel:', contactReadProblems({ 'utils/eateryX.js': "const u = `tel:${n}`\n" }))
   mustFail('contact: hand-built wa.me', contactReadProblems({ 'components/EateryOrder.js': "const u = 'https://wa.me/' + n\n" }))
   mustFail('contact: constants/eatery.js reads phone outside the function', contactReadProblems({ 'constants/eatery.js': fnSrc + 'const x = p.phone\n' }))
   mustPass('contact: mention in a comment', contactReadProblems({ 'screens/EateryPartnerScreen.js': "// partner.whatsapp is never read here\n" }))
   {
-    const cf = Object.fromEntries(listSource().filter(f => /eatery/i.test(f)).map(f => [f, read(f)]))
+    const cf = Object.fromEntries(listSource().map(f => [f, read(f)]))
     assert(contactReadProblems(cf), 'eatery contact numbers: one door')
+    assert(logGateProblems(cf), 'eatery contact taps: not logged on Preview / dev')
     console.log(`eatery contact numbers: read only in eateryContactNumbers; ${Object.keys(cf).length} eatery files scanned`)
   }
   assert(loaderFilterProblems(read('utils/loadEateryPartners.js')), 'loader is_active filter')

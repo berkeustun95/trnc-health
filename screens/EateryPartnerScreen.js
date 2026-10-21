@@ -14,7 +14,7 @@ import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
-import { IS_PREVIEW, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains } from '../constants/eateryQuiz'
@@ -364,7 +364,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // The tap is logged on the line BEFORE the link opens (utils/logContactEvent: it never throws);
   // a placeholder partner has no real id and an inactive (previewer-only) row is not live: both log nothing.
   const go = (action, url, onFail) => {
-    if (!partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
+    if (CONTACT_LOGGING && !partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
     Linking.openURL(url).catch(() => { onFail?.() })
   }
   // Closes the basket page and opens WhatsApp. Only the tap is logged (action 'order_whatsapp'): never the basket or the note.
@@ -496,7 +496,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 icon={CONTACT_UI[c.action].icon} title={t(CONTACT_UI[c.action].labelKey, lang)}
                 onPress={() => go(c.action, c.url)} />
             ))}
-            {IS_PREVIEW && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
+            {IS_PREVIEW && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
           </View>
         )}
 

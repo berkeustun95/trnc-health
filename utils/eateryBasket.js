@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Constants from 'expo-constants'
 import { getBasket, subscribe } from './eateryBasketCore'
-import { eateryContactNumbers } from '../constants/eatery'
+import { eateryContactNumbers, eateryLogsContacts } from '../constants/eatery'
 
 // ─── Yeme-İçme order basket: in memory only (the store itself is eateryBasketCore.js) ──────────────
 // It survives leaving and reopening the partner page and is
@@ -14,7 +14,9 @@ export const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
 const TEST_WHATSAPP = Constants.expoConfig?.extra?.appVariant === 'preview' ? process.env.EXPO_PUBLIC_ADA_TEST_WHATSAPP : undefined
 
 // The one door to a partner's numbers for the screens; the rule itself is eateryContactNumbers (constants/eatery.js).
-export const partnerContactNumbers = p => eateryContactNumbers(p, { isPreview: IS_PREVIEW, testNumber: TEST_WHATSAPP })
+const IS_DEV = typeof __DEV__ !== 'undefined' && __DEV__
+export const CONTACT_LOGGING = eateryLogsContacts({ isPreview: IS_PREVIEW, isDev: IS_DEV })
+export const partnerContactNumbers = p => eateryContactNumbers(p, { isPreview: IS_PREVIEW, testNumber: TEST_WHATSAPP, isDev: IS_DEV })
 export const effectiveWhatsapp = p => partnerContactNumbers(p).whatsapp || ''
 
 export { getBasket, changeQty, clearAll, undo, dropSnapshot, getLastAdded } from './eateryBasketCore'

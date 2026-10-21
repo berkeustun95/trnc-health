@@ -31,14 +31,19 @@ const https = v => (filled(v) && /^https:\/\/\S+$/.test(v.trim()) ? v.trim() : n
 // The ONLY place a partner's phone/WhatsApp is turned into a number to dial or message (calls, wa.me, orders).
 // Production: the partner's own numbers; testNumber is ignored. ADA Preview: ALWAYS the test number, never the
 // partner's own, and no test number = no contact at all (fail closed). A fixture partner has none either way.
-export function eateryContactNumbers(p, { isPreview = false, testNumber = null } = {}) {
+// A dev server / Expo Go (isDev, not Preview) gets nothing either: a dev session must never dial a real shop.
+export function eateryContactNumbers(p, { isPreview = false, testNumber = null, isDev = false } = {}) {
   if (!p || p.placeholder) return { phone: null, whatsapp: null }
   if (isPreview === true) {
     const n = filled(testNumber) ? testNumber.trim() : null
     return { phone: n, whatsapp: n }
   }
+  if (isDev === true) return { phone: null, whatsapp: null }
   return { phone: filled(p.phone) ? p.phone.trim() : null, whatsapp: filled(p.whatsapp) ? p.whatsapp.trim() : null }
 }
+
+// Test taps (Preview, dev) must not count toward a real partner's contact_events once it is live.
+export const eateryLogsContacts = ({ isPreview = false, isDev = false } = {}) => isPreview !== true && isDev !== true
 
 // One entry per contact button that has something behind it; an empty field yields no entry.
 // action is the contact_events action ('call' | 'whatsapp' | 'website' | 'maps'). nums = eateryContactNumbers(...).
