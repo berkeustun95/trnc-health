@@ -1,7 +1,7 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
-import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
+import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -129,6 +129,38 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const E = (message, code = 'P0001', details = null) => ({ code, message, details })
   eq('error kinds', [E('rate_limited'), E('order_requires_account'), E('item_unavailable'), E('invalid_items'), E('partner_unavailable'), E('mixed_currency'), E('adult_only', 'P0001', 'under_18'), E('boom'), { message: 'Network request failed' }, null].map(orderErrorKind),
     ['rate', 'account', 'items', 'items', 'generic', 'items', 'adult', 'generic', 'generic', 'generic'])
+}
+
+// Contact numbers: Preview ALWAYS uses the test number (never the partner's own), fail closed without it.
+{
+  const real = { phone: '+90 392 111 22 33', whatsapp: '+90 539 116 10 59' }
+  const T = '+90 533 000 00 01'
+  const NONE = { phone: null, whatsapp: null }
+  eq('preview + test number + real partner -> test number for both', eateryContactNumbers(real, { isPreview: true, testNumber: T }), { phone: T, whatsapp: T })
+  eq('preview + test number + partner without numbers -> test number', eateryContactNumbers({}, { isPreview: true, testNumber: T }), { phone: T, whatsapp: T })
+  eq('preview, no test number -> nothing (never the partner\'s)', eateryContactNumbers(real, { isPreview: true }), NONE)
+  eq('preview, empty test number -> nothing', eateryContactNumbers(real, { isPreview: true, testNumber: '  ' }), NONE)
+  eq('preview, null test number -> nothing', eateryContactNumbers(real, { isPreview: true, testNumber: null }), NONE)
+  eq('production -> the partner\'s own, test number ignored', eateryContactNumbers(real, { isPreview: false, testNumber: T }), { phone: '+90 392 111 22 33', whatsapp: '+90 539 116 10 59' })
+  eq('production, no options -> the partner\'s own', eateryContactNumbers(real), { phone: '+90 392 111 22 33', whatsapp: '+90 539 116 10 59' })
+  eq('production, partner without numbers + test number passed -> nothing', eateryContactNumbers({ phone: ' ', whatsapp: null }, { isPreview: false, testNumber: T }), NONE)
+  eq('isPreview must be exactly true (truthy string is production)', eateryContactNumbers(real, { isPreview: 'preview', testNumber: T }).whatsapp, '+90 539 116 10 59')
+  eq('placeholder partner -> nothing, even on preview', eateryContactNumbers({ ...real, placeholder: true }, { isPreview: true, testNumber: T }), NONE)
+  eq('placeholder partner -> nothing in production', eateryContactNumbers({ ...real, placeholder: true }, { isPreview: false }), NONE)
+  eq('null partner -> nothing', eateryContactNumbers(null, { isPreview: true, testNumber: T }), NONE)
+  const urls = eateryContacts({ website_url: 'https://x.com' }, eateryContactNumbers(real, { isPreview: true, testNumber: T })).map(c => c.url)
+  eq('preview buttons: tel: and wa.me point at the test number', urls, ['tel:+905330000001', 'https://wa.me/905330000001', 'https://x.com'])
+  eq('preview, no test number: no call / WhatsApp buttons', eateryContacts({ phone: real.phone, whatsapp: real.whatsapp }, eateryContactNumbers(real, { isPreview: true })).map(c => c.action), [])
+  eq('production buttons: the partner\'s own numbers', eateryContacts(real, eateryContactNumbers(real, { testNumber: T })).map(c => c.url), ['tel:+903921112233', 'https://wa.me/905391161059'])
+  eq('eateryContacts without numbers -> no call / WhatsApp (fail closed)', eateryContacts(real).map(c => c.action), [])
+}
+
+{
+  const real = { phone: '+90 392 111 22 33', whatsapp: '+90 539 116 10 59' }
+  const NONE = { phone: null, whatsapp: null }
+  eq('dev (not preview) -> nothing, test number or not', [eateryContactNumbers(real, { isDev: true }), eateryContactNumbers(real, { isDev: true, testNumber: '+90 533 000 00 01' })], [NONE, NONE])
+  eq('preview wins over dev: test number', eateryContactNumbers(real, { isPreview: true, isDev: true, testNumber: '+90 533 000 00 01' }).whatsapp, '+90 533 000 00 01')
+  eq('contact logging: production on, preview off, dev off', [eateryLogsContacts({}), eateryLogsContacts({ isPreview: true }), eateryLogsContacts({ isDev: true })], [true, false, false])
 }
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
