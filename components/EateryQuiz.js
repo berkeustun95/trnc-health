@@ -6,7 +6,7 @@ import { t } from '../constants/i18n'
 import { formatPrice, eateryOrderDigits } from '../constants/eatery'
 import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizAddAllIds, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage } from './ui'
+import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 import { QtyStepper, OrderBar } from './EateryOrder'
 import { effectiveWhatsapp, getBasket, changeQty, getLastAdded } from '../utils/eateryBasket'
@@ -81,10 +81,10 @@ function DishPhoto({ photoPath }) {
 // A pill with a fixed 44pt target. `dim` = the "already done" look (still focusable and announced: the state says disabled).
 function PillButton({ icon, title, label, filled, dim, onPress }) {
   return (
-    <Pressable onPress={dim ? undefined : onPress} accessibilityRole="button" accessibilityLabel={label || title} accessibilityState={{ disabled: !!dim }}
-      style={({ pressed }) => [st.pill, filled ? st.pillFilled : st.pillOutline, dim && st.pillDim, pressed && !dim && { opacity: press.small }]}>
+    <Pressable onPress={dim ? undefined : () => { try { haptic() } catch { /* never blocks the add */ } onPress?.() }} accessibilityRole="button" accessibilityLabel={label || title} accessibilityState={{ disabled: !!dim }}
+      style={({ pressed }) => [st.pill, filled ? st.pillFilled : dim ? st.pillSoft : st.pillOutline, pressed && !dim && { opacity: press.small }]}>
       <Ionicons name={icon} size={18} color={filled ? colors.onPrimary : colors.primaryDark} />
-      <Text style={[st.pillText, filled && st.pillTextFilled]} numberOfLines={1}>{title}</Text>
+      <Text style={[st.pillText, filled && st.pillTextFilled]} numberOfLines={2}>{title}</Text>
     </Pressable>
   )
 }
@@ -322,7 +322,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
               {!!result && result.dishes.length > 0 && (
                 <Button variant="secondary" icon="restaurant-outline" title={t('eateryQuizViewMenu', lang)} onPress={() => onOpenMenu(result.dishes[0].partner)} fullWidth style={st.retry} />
               )}
-              <Button variant="secondary" icon="refresh-outline" title={t('eateryQuizRetry', lang)} onPress={retry} fullWidth style={st.retry} />
+              <Button variant="text" icon="refresh-outline" title={t('eateryQuizRetry', lang)} onPress={retry} fullWidth style={st.retry} />
             </>
           )}
         </ScrollView>
@@ -400,8 +400,8 @@ const st = StyleSheet.create({
   pill:       { alignSelf: 'flex-start', minHeight: TAP, paddingHorizontal: space[16], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], borderRadius: radii.pill },
   pillFilled: { backgroundColor: colors.primary },
   pillOutline:{ borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
-  pillDim:    { opacity: 0.55 },
-  pillText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flexShrink: 1 },
+  pillSoft:   { backgroundColor: colors.primaryLight },
+  pillText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flexShrink: 1, textAlign: 'center' },
   pillTextFilled: { color: colors.onPrimary },
   orderRow:   { alignItems: 'flex-start', marginTop: space[8] },
   sideTap:    { minHeight: TAP },

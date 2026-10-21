@@ -214,8 +214,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
   const orderCount = lines.reduce((n, l) => n + l.qty, 0)
   const orderTotalText = formatMoney(orderTotal(lines))
-  const [basketOpen, setBasketOpen] = useState(startInBasket === true && ordering)     // the target; basketShown keeps the page mounted through its slide-out
-  const [basketShown, setBasketShown] = useState(startInBasket === true && ordering)
+  const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
+  const [basketShown, setBasketShown] = useState(false)
   const [note, setNote] = useState('')
   const noteRef = useRef('')
   noteRef.current = note
@@ -357,6 +357,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(lines, note)), () => { armedRef.current = null })
   }
   const openBasket = () => { armedRef.current = null; setBasketShown(true); setBasketOpen(true) }
+  // From the quiz bar: Sepetim opens once, and only when its lines exist (never an empty page).
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (!startInBasket || autoOpened.current || !ordering || lines.length === 0) return
+    autoOpened.current = true
+    openBasket()
+  }, [startInBasket, ordering, lines.length])
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

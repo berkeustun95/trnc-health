@@ -86,7 +86,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       setLoading(false)
       if (openSlug) {
         const hit = list.find(r => r.slug === openSlug)
-        if (hit) onOpenPartner(hit)
+        if (hit) { setFocus(null); onOpenPartner(hit) }
         onOpenSlugDone?.(!!hit)
       }
     })().catch(() => { if (alive) { setError(true); setLoading(false) } })
