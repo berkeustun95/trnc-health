@@ -172,6 +172,13 @@ export function orderMismatch(basketLines, res) {
   return cents(res.total) !== cents(orderTotal(basketLines))
 }
 
+// null = the server's answer may be sent; else 'prices' (not the basket the person saw) or 'generic' (no valid code: a message
+// ADA cannot verify is never sent).
+export function orderCheck(basketLines, res) {
+  if (orderMismatch(basketLines, res)) return 'prices'
+  return orderCodeLine(res.code) ? null : 'generic'
+}
+
 // 18+ ordering (adult_only partners). Age by the calendar date in Europe/Istanbul (fixed UTC+3 since 2016), dob 'YYYY-MM-DD'.
 // A missing or malformed dob is NOT an adult. ADULT_AGE is the one shared constant (constants/profileGate.js).
 export function isAdultForOrder(dob, now = new Date()) {

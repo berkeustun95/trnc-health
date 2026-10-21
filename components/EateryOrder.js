@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -151,6 +151,12 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     if (kbTop != null) { const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: !reduce }), 60); return () => clearTimeout(id) }
   }, [kbTop, reduce])
   const empty = lines.length === 0
+  const msgKey = ageGate ? 'eateryOrderAdultOnly' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const tone = !ageGate && ['generic', 'rate', 'account'].includes(orderError) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
+  const showSignIn = ageGate === 'guest' || (!ageGate && orderError === 'account')
+  useEffect(() => {
+    if (msgKey) AccessibilityInfo.announceForAccessibility?.(t(msgKey, lang))   // iOS does not always speak a live region
+  }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
       <SafeAreaView style={st.page} edges={['top']}>
@@ -195,17 +201,12 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
-            {ageGate ? (
-              <View accessibilityLiveRegion="polite">
-                <Text style={st.errText}>{t('eateryOrderAdultOnly', lang)}</Text>
-                {ageGate === 'guest' && <Button variant="secondary" fullWidth title={t('login', lang)} onPress={onSignIn} style={st.errBtn} />}
-              </View>
-            ) : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} loading={sending} />}
-            {!ageGate && !!orderError && (
-              <View accessibilityLiveRegion="polite">
-                <Text style={st.errText}>{t(ORDER_ERR_KEY[orderError], lang)}</Text>
-                {(orderError === 'account') && <Button variant="secondary" fullWidth title={t('login', lang)} onPress={onSignIn} style={st.errBtn} />}
-              </View>
+            {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending} />}
+            <View accessibilityLiveRegion="polite">
+              {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
+            </View>
+            {showSignIn && (
+              <Button variant="secondary" fullWidth title={t('eateryOrderErrAccount', lang)} onPress={onSignIn} style={st.errBtn} />
             )}
           </View>
         )}
@@ -240,7 +241,10 @@ const st = StyleSheet.create({
   thumb:     { width: 56, height: 56, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbEmpty:{ backgroundColor: colors.soft, borderWidth: 0 },
   fill:      { width: '100%', height: '100%' },
-  errText:   { ...type.small, color: colors.dangerInk, textAlign: 'center' },
+  errText:   { ...type.small, textAlign: 'center' },
+  errBad:    { color: colors.dangerInk },
+  errCalm:   { color: colors.textSecondary },
+  errInfo:   { color: colors.textPrimary },
   errBtn:    { marginTop: space[8] },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },

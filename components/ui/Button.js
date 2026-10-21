@@ -20,7 +20,7 @@ const VARIANTS = {
 }
 
 export default function Button({
-  title, onPress, variant = 'primary', icon, loading = false, disabled = false,
+  title, onPress, variant = 'primary', icon, loading = false, loadingTitle, disabled = false,
   disabledHint, fullWidth = false, accessibilityLabel, style,
   size,   // 'lg' = the 52pt pill used on the photo-led Welcome / onboarding
 }) {
@@ -49,7 +49,12 @@ export default function Button({
         ]}
       >
         {loading
-          ? <ActivityIndicator size="small" color={v.fg} />
+          ? (
+            <>
+              <ActivityIndicator size="small" color={v.fg} />
+              {!!loadingTitle && <Text style={[s.label, { color: v.fg }]} numberOfLines={1}>{loadingTitle}</Text>}
+            </>
+          )
           : (
             <>
               {!!icon && <Ionicons name={icon} size={18} color={v.fg} />}

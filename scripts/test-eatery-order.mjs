@@ -1,7 +1,7 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
-import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryOrderable, orderTotal, orderCodeLine, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
+import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -106,6 +106,9 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
     'ADA Sipariş No: AB23-CD45 · Doğrula: getadaapp.com/o/AB23CD45'])
   eq('server line prices drive the message, not the basket', buildOrderMessage(serverOrderLines({ lines: [{ item_id: 1, name: 'X', qty: 1, unit_price: 99 }] }), '', null).includes('1 × X — 99,00 TL'), true)
   eq('no code -> no code line (old callers)', buildOrderMessage(lines, '').includes('Sipariş No'), false)
+  eq('check: a good answer sends', orderCheck(basket, server), null)
+  eq('check: a changed price -> prices', orderCheck(basket, { ...server, total: 1891 }), 'prices')
+  eq('check: a malformed code is a failure (never an unverifiable message)', ['SHORT', null, undefined, '', 'AB23CD4I', 12345678].map(code => orderCheck(basket, { ...server, code })), Array(6).fill('generic'))
   // 2026-10-21 12:00 UTC = 15:00 in Istanbul (UTC+3)
   const now = new Date('2026-10-21T12:00:00Z')
   eq('adult: 18th birthday today', isAdultForOrder('2008-10-21', now), true)
@@ -115,6 +118,9 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('Istanbul date: 21:30 UTC on the 20th is already the 21st there', isAdultForOrder('2008-10-21', new Date('2026-10-20T21:30:00Z')), true)
   eq('Istanbul date: 20:30 UTC on the 20th is still the 20th there', isAdultForOrder('2008-10-21', new Date('2026-10-20T20:30:00Z')), false)
   eq('no/garbage dob is not adult', [isAdultForOrder(null, now), isAdultForOrder('', now), isAdultForOrder('soon', now)], [false, false, false])
+  eq('Feb 29 dob: 2008-02-29 is not yet 18 on 2026-02-28', isAdultForOrder('2008-02-29', new Date('2026-02-28T09:00:00Z')), false)
+  eq('Feb 29 dob: adult on 2026-03-01', isAdultForOrder('2008-02-29', new Date('2026-03-01T09:00:00Z')), true)
+  eq('Feb 29 today (leap year 2028): 2010-02-29 does not exist but 2010-03-01 is not yet 18 on 2028-02-29', isAdultForOrder('2010-03-01', new Date('2028-02-29T09:00:00Z')), false)
   eq('age gate: not an adult-only partner -> open', orderAgeGate({ adultOnly: false, guest: true, dob: null, now }), null)
   eq('age gate: guest', orderAgeGate({ adultOnly: true, guest: true, dob: '1990-01-05', now }), 'guest')
   eq('age gate: no dob', orderAgeGate({ adultOnly: true, guest: false, dob: null, now }), 'no_dob')
