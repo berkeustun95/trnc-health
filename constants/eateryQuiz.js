@@ -55,7 +55,7 @@ export function quizCandidates(rows, answers = null) {
 // The entry card shows exactly when the matcher has something to draw from.
 export const quizHasMains = rows => quizCandidates(rows).length > 0
 
-// -> { dishes: [{ item, partner }] (0-3), relaxed: ['portion'|'spicy'], companions: [{ item, partner }] }
+// -> { dishes: [{ item, partner, companions }] (0-3), relaxed: ['portion'|'spicy'], companions: the top dish's }
 export function quizMatch(rows, answers) {
   const spicyAsked = !!answers.spicy && answers.spicy !== 'any'
   const portionAsked = !!answers.portion?.length
@@ -104,7 +104,9 @@ export function quizMatch(rows, answers) {
   }
   for (const c of ranked) take(c)
   const dishes = ranked.filter(c => chosen.includes(c)).map(c => ({ item: c.item, partner: c.partner }))
-  return { dishes, relaxed, companions: quizCompanions(dishes[0].partner, answers) }
+  // Sides are per card: each dish carries the recommended sides of ITS OWN partner (the results page shows them once that dish is in the basket).
+  const withSides = dishes.map(d => ({ ...d, companions: quizCompanions(d.partner, answers) }))
+  return { dishes: withSides, relaxed, companions: withSides[0].companions }
 }
 
 // One item per chosen role (sauce, drink, dessert order) from the TOP dish's partner: first by sort_order; a sauce prefers a
@@ -130,17 +132,6 @@ export function quizCompanions(partner, answers) {
 // ── Results basket (the store is utils/eateryBasketCore.js; these are the pure decisions around it) ──
 // A side line is added only when it is priced and available; a priceless one stays a plain line.
 export const quizSideOrderable = eateryOrderable
-
-// The item ids "Hepsini sepete ekle" adds: the dish, then every orderable side, each once, skipping what the basket
-// already holds. Empty = everything is already in ("Hepsi sepette").
-export function quizAddAllIds(basket, dish, sides) {
-  const out = []
-  for (const i of [dish, ...(sides || [])]) {
-    if (!i || !eateryOrderable(i) || out.includes(i.id) || (basket?.[i.id] || 0) > 0) continue
-    out.push(i.id)
-  }
-  return out
-}
 
 // What the partner page would show for this basket: the same line set (eateryMenuSections + eateryOrderable), so the
 // bar on the results and the bar on the menu never disagree. -> { count, total, currency }
