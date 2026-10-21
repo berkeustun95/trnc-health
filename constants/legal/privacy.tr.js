@@ -94,7 +94,7 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Bir mekanda check-in yaptığınızda orada olduğunuzu kontrol etmek ve check-in'lerinizi giriş yapmış diğer kullanıcılara göstermek — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • 18 yaşından küçüklerin check-in'lerini, göstermeyi seçmedikleri sürece gizli tutmak — Küçükleri korumak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 • Check-in yaparken yakınınızdaki mekanları Google aracılığıyla bulmak — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
-• Restorana sipariş gönderdiğinizde sipariş kaydı oluşturmak ve oluşturulabilecek sipariş sayısını sınırlamak — Restoranın siparişi doğrulayabilmesi, spam ve sahte siparişlerin önlenmesi. Hukuki dayanak: Güvenilir ve kötüye kullanıma kapalı bir hizmetteki meşru menfaatimiz; sizinle yapılan sözleşmenin ifası
+• Restorana sipariş gönderdiğinizde sipariş kaydı oluşturmak ve oluşturulabilecek sipariş sayısını sınırlamak — Restoranın siparişi doğrulayabilmesi ve spam ile sahte siparişlerin önlenmesi için. Hukuki dayanak: Güvenilir ve kötüye kullanıma kapalı bir hizmetteki meşru menfaatimiz; sizinle yapılan sözleşmenin ifası
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
