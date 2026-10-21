@@ -102,6 +102,7 @@ function Expand({ open, reduce, children }) {
     const done = () => { if (!open) setMounted(false) }
     if (reduce) { v.setValue(to); done(); return }
     Animated.timing(v, { toValue: to, duration: motion.base, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => { if (finished) done() })
+    return () => v.stopAnimation()
   }, [open, h, mounted, reduce])
   if (!mounted) return null
   return (

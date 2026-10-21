@@ -130,7 +130,7 @@ eq('sides per card: names come from that dish\'s partner', compOf([C, partner('y
 eq('Hiçbiri: no sides on any card', compOf([C, other], { extra: ['none'] }).every(l => l.length === 0), true)
 eq('top-level companions = the top dish\'s', Q.quizMatch([C], { ...ANY, extra: ['drink'] }).companions.map(c => c.item.name), ['Water'])
 
-// ── results basket: add-all, side orderability, summary, which partner the bar shows ──
+// ── results basket: side orderability, summary, which partner the bar shows ──
 {
   const main = dish('Burger', { price: 620 })
   const sauce = dish('Sos', { role: 'sauce', price: 40 })
