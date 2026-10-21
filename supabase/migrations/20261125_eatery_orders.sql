@@ -44,13 +44,22 @@
 --     sets status 'expired': an expired order still returns its contents until the 30-day retention job deletes it,
 --     and verify is callable with the public anon key directly (the Worker's POST step is not the only path). The
 --     data is non-personal (dish names, quantities, prices); accepted.
---   • NOT age-gated: adult_only partners (20261121) can receive orders from any session. Product decision for later
---     (Crunchy Express is not adult_only).
+--   • 18+ RULE: for a partner with adult_only = true (20261121), create_eatery_order refuses with MESSAGE 'adult_only'
+--     and DETAIL 'guest' (anonymous session), 'no_dob' (signed in, profiles.date_of_birth NULL or no profile row) or
+--     'under_18' (date_of_birth later than today's Europe/Istanbul date minus 18 years; turning 18 today counts as 18).
+--     The age decision itself is the pure helper eatery_order_age_gate(dob, today) (internal: no client EXECUTE).
+--     PROOF SPLIT: prod probes here need no write to auth.users / profiles: the helper is tested exhaustively
+--     (NULL, birthday tomorrow / today, 30 years, a Feb-29 birth on non-leap years), and the create wiring is tested
+--     for 'guest' and for 'no_dob' (a signed-in uuid with no profile row). The end-to-end "adult accepted" and
+--     "under_18 refused" cases need real profile rows and are proven in the PGlite harness only
+--     (scripts/test-eatery-orders-sql.mjs). Leap-day rule: a Feb-29 birth turns 18 on Mar 1 in a non-leap year.
+--     The check runs after partner visibility and before items and rate limits, so a refusal writes no row and uses
+--     no rate-limit quota. adult_only = false partners (Crunchy Express) are unaffected.
 --   • eatery_partners.order_requires_account is readable by everyone who can already read an active partner
 --     (the existing table-level SELECT grant covers a new column; asserted: no column-level ACL).
 --
 -- ─── ERROR CODES (RAISE EXCEPTION, SQLSTATE P0001; the MESSAGE is the stable code the app matches) ──
---   not_authenticated · partner_unavailable · order_requires_account · invalid_items · invalid_client_id ·
+--   not_authenticated · partner_unavailable · adult_only (DETAIL guest | no_dob | under_18) · order_requires_account · invalid_items · invalid_client_id ·
 --   item_unavailable · mixed_currency · rate_limited · code_generation_failed
 --
 -- Random code: the 8 characters are 5 bits each, taken from five bytes of gen_random_uuid() (a core, CSPRNG-backed
@@ -77,6 +86,10 @@ BEGIN
   END IF;
   IF to_regprocedure('public.is_previewer()') IS NULL THEN
     RAISE EXCEPTION 'pre-state: public.is_previewer() missing (20261119/20261120 not applied)';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'eatery_partners' AND column_name = 'adult_only')
+     OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'date_of_birth') THEN
+    RAISE EXCEPTION 'pre-state: eatery_partners.adult_only (20261121) or profiles.date_of_birth (20261001) missing';
   END IF;
   IF to_regprocedure('public.is_anonymous_session()') IS NULL THEN
     RAISE EXCEPTION 'pre-state: public.is_anonymous_session() missing (20260714)';
@@ -147,6 +160,25 @@ COMMENT ON COLUMN public.eatery_orders.created_by IS
 COMMENT ON COLUMN public.eatery_orders.client_id IS
   'Optional random install id (8-64 chars of A-Za-z0-9_-). Never returned by verify_eatery_order.';
 
+-- ─── (3a) eatery_order_age_gate: the 18+ decision as a pure function ────────
+CREATE OR REPLACE FUNCTION public.eatery_order_age_gate(p_dob date, p_today date)
+  RETURNS text
+  LANGUAGE sql
+  IMMUTABLE
+  SET search_path = public, pg_temp
+AS $fn$
+  SELECT CASE
+    WHEN p_today IS NULL THEN 'under_18'
+    WHEN p_dob IS NULL THEN 'no_dob'
+    WHEN p_dob > (p_today - interval '18 years')::date THEN 'under_18'
+    ELSE NULL
+  END
+$fn$;
+ALTER FUNCTION public.eatery_order_age_gate(date, date) OWNER TO postgres;
+REVOKE EXECUTE ON FUNCTION public.eatery_order_age_gate(date, date) FROM PUBLIC, anon, authenticated;
+COMMENT ON FUNCTION public.eatery_order_age_gate(date, date) IS
+  'Internal helper of create_eatery_order. NULL = adult (18th birthday on or before p_today), no_dob, or under_18 (also for a NULL p_today: fail closed). A Feb-29 birth turns 18 on Mar 1 in non-leap years. No client EXECUTE. 20261125.';
+
 -- ─── (3) create_eatery_order ────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.create_eatery_order(p_partner uuid, p_items jsonb, p_client_id text DEFAULT NULL)
   RETURNS jsonb
@@ -167,6 +199,8 @@ DECLARE
   v_user_n  int;
   v_part_n  int;
   v_guest   boolean := public.is_anonymous_session();
+  v_dob     date;
+  v_gate    text;
   v_code    text;
   v_b       bytea;
   v_bits    bigint;
@@ -179,10 +213,21 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'not_authenticated';
   END IF;
 
-  SELECT p.id, p.is_active, p.order_requires_account INTO v_partner
+  SELECT p.id, p.is_active, p.order_requires_account, p.adult_only INTO v_partner
     FROM public.eatery_partners p WHERE p.id = p_partner;
   IF NOT FOUND OR NOT (v_partner.is_active OR public.is_previewer()) THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'partner_unavailable';
+  END IF;
+
+  IF v_partner.adult_only THEN
+    IF v_guest THEN
+      RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'adult_only', DETAIL = 'guest';
+    END IF;
+    SELECT pr.date_of_birth INTO v_dob FROM public.profiles pr WHERE pr.id = v_uid;
+    v_gate := public.eatery_order_age_gate(v_dob, (now() AT TIME ZONE 'Europe/Istanbul')::date);
+    IF v_gate IS NOT NULL THEN
+      RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'adult_only', DETAIL = v_gate;
+    END IF;
   END IF;
 
   IF v_partner.order_requires_account AND public.is_anonymous_session() THEN
@@ -276,7 +321,7 @@ ALTER FUNCTION public.create_eatery_order(uuid, jsonb, text) OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.create_eatery_order(uuid, jsonb, text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.create_eatery_order(uuid, jsonb, text) TO authenticated;
 COMMENT ON FUNCTION public.create_eatery_order(uuid, jsonb, text) IS
-  'Records a WhatsApp order and returns {code, lines, total, currency, expires_at}. Prices come from eatery_menu_items, never the client. authenticated only (guests included unless the partner sets order_requires_account). 5/user/h, 60/partner/h counted over guest-session orders only. Errors: SQLSTATE P0001, MESSAGE = not_authenticated | partner_unavailable | order_requires_account | invalid_items | invalid_client_id | item_unavailable | mixed_currency | rate_limited | code_generation_failed. 20261125.';
+  'Records a WhatsApp order and returns {code, lines, total, currency, expires_at}. Prices come from eatery_menu_items, never the client. authenticated only (guests included unless the partner sets order_requires_account). 5/user/h, 60/partner/h counted over guest-session orders only. Errors: SQLSTATE P0001, MESSAGE = not_authenticated | partner_unavailable | adult_only (DETAIL guest/no_dob/under_18) | order_requires_account | invalid_items | invalid_client_id | item_unavailable | mixed_currency | rate_limited | code_generation_failed. 20261125.';
 
 -- ─── (4) verify_eatery_order ────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.verify_eatery_order(p_code text)
@@ -345,7 +390,7 @@ SELECT cron.schedule('eatery-orders-retention', '40 3 * * *',
 -- ─── Assertions + probes (inside the transaction; a failure rolls the file back) ─
 DO $$
 DECLARE
-  v_pm uuid; v_m1 bigint;
+  v_pm uuid; v_m1 bigint; v_pad uuid; v_ad1 bigint;
   v_det text;
   v_n int; v_s text; v_def text; v_fn record; v_rls boolean;
   v_pre_orders int; v_pre_keys int; v_pre_partners int;
@@ -430,6 +475,28 @@ BEGIN
     END IF;
     RAISE NOTICE '% -> definer, owner %, config %, EXECUTE for %', v_fn.proname, v_fn.owner, v_fn.proconfig, v_fn.grantees;
   END LOOP;
+  -- The age helper: IMMUTABLE, pinned, no client EXECUTE (positive control: postgres can), and exact decisions.
+  SELECT p.provolatile, p.proconfig, pg_get_userbyid(p.proowner) AS owner INTO v_fn FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_order_age_gate(date,date)');
+  IF v_fn.provolatile IS DISTINCT FROM 'i' OR v_fn.owner IS DISTINCT FROM 'postgres' OR NOT COALESCE(v_fn.proconfig @> ARRAY['search_path=public, pg_temp'], false) THEN
+    RAISE EXCEPTION 'eatery_order_age_gate: volatility % owner % config %', v_fn.provolatile, v_fn.owner, v_fn.proconfig;
+  END IF;
+  IF has_function_privilege('anon', 'public.eatery_order_age_gate(date,date)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.eatery_order_age_gate(date,date)', 'EXECUTE')
+     OR NOT has_function_privilege('postgres', 'public.eatery_order_age_gate(date,date)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'eatery_order_age_gate EXECUTE rights wrong (anon/authenticated must have none, postgres must)';
+  END IF;
+  IF public.eatery_order_age_gate(NULL, DATE '2026-10-21') IS DISTINCT FROM 'no_dob'
+     OR public.eatery_order_age_gate(DATE '2008-10-22', DATE '2026-10-21') IS DISTINCT FROM 'under_18'
+     OR public.eatery_order_age_gate(DATE '2008-10-21', DATE '2026-10-21') IS NOT NULL
+     OR public.eatery_order_age_gate(DATE '2008-10-20', DATE '2026-10-21') IS NOT NULL
+     OR public.eatery_order_age_gate(DATE '1996-10-21', DATE '2026-10-21') IS NOT NULL
+     OR public.eatery_order_age_gate(DATE '2000-02-29', DATE '2018-02-28') IS DISTINCT FROM 'under_18'
+     OR public.eatery_order_age_gate(DATE '2000-02-29', DATE '2018-03-01') IS NOT NULL
+     OR public.eatery_order_age_gate(DATE '2000-02-29', DATE '2024-02-29') IS NOT NULL
+     OR public.eatery_order_age_gate(DATE '2000-01-01', NULL) IS DISTINCT FROM 'under_18' THEN
+    RAISE EXCEPTION 'eatery_order_age_gate decisions are wrong (age gate: NULL dob, birthday tomorrow/today, 30 y, Feb-29, NULL today)';
+  END IF;
+
   SELECT count(*) INTO v_n FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('create_eatery_order','verify_eatery_order');
   IF v_n IS DISTINCT FROM 2 THEN RAISE EXCEPTION 'expected exactly 2 order functions, found %', v_n; END IF;
   IF NOT has_function_privilege('authenticated', 'public.create_eatery_order(uuid,jsonb,text)', 'EXECUTE')
@@ -479,6 +546,9 @@ BEGIN
       VALUES ('zz-om', 'zz order mixed', 'cafe', 35.1, 33.3, 'partner', 'zz-om/logo.png', current_date, true) RETURNING id INTO v_pm;
     INSERT INTO public.eatery_menu_items (partner_id, section, name, price, currency) VALUES (v_pm, 'zz', 'zz mixed dish', 1.00, 'TRY') RETURNING id INTO v_m1;
 
+    INSERT INTO public.eatery_partners (slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active, adult_only)
+      VALUES ('zz-oad', 'zz order adult', 'cafe', 35.1, 33.3, 'partner', 'zz-oad/logo.png', current_date, true, true) RETURNING id INTO v_pad;
+    INSERT INTO public.eatery_menu_items (partner_id, section, name, price, currency) VALUES (v_pad, 'zz', 'zz adult dish', 9.00, 'TRY') RETURNING id INTO v_ad1;
     -- Seed rows as postgres: 60 fresh orders on the limit partner; an expired order; 5 two-hour-old orders for user 7.
     INSERT INTO public.eatery_orders (code, partner_id, lines, total, currency, created_by)
       SELECT 'ZZ' || lpad(translate(g::text, '01', 'AB'), 6, 'C'), v_pl, '[{"item_id":1,"name":"x","qty":1,"unit_price":1}]'::jsonb, 1, 'TRY', gen_random_uuid()
@@ -534,6 +604,9 @@ BEGIN
       ('create inactive partner, no preview key', 'user:2', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pi, jsonb_build_array(jsonb_build_object('item_id', v_i1, 'qty', 1))), 'err:partner_unavailable', NULL),
       ('create inactive partner, WRONG preview key', 'user:2', 'wrong', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pi, jsonb_build_array(jsonb_build_object('item_id', v_i1, 'qty', 1))), 'err:partner_unavailable', NULL),
       ('create inactive partner, preview key', 'user:2', 'key', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pi, jsonb_build_array(jsonb_build_object('item_id', v_i1, 'qty', 1))), 'ok', 'oi'),
+      -- 18+ rule (adult_only partner): refusals write no row and use no quota; the 18th birthday TODAY is adult
+      ('adult_only: guest refused', 'guest:10', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pad, jsonb_build_array(jsonb_build_object('item_id', v_ad1, 'qty', 1))), 'err:adult_only|guest', NULL),
+      ('adult_only: signed-in with no profile row, refused', 'user:15', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pad, jsonb_build_array(jsonb_build_object('item_id', v_ad1, 'qty', 1))), 'err:adult_only|no_dob', NULL),
       -- order_requires_account
       ('guest create, partner requires account', 'guest:3', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pr, jsonb_build_array(jsonb_build_object('item_id', v_r1, 'qty', 1))), 'err:order_requires_account', NULL),
       ('CONTROL signed-in create, partner requires account', 'user:3', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pr, jsonb_build_array(jsonb_build_object('item_id', v_r1, 'qty', 1))), 'ok', NULL),
@@ -657,6 +730,9 @@ BEGIN
     SELECT count(*) INTO v_n FROM public.eatery_orders WHERE code IN (v_saved -> 'ug' ->> 'code', v_saved -> 'gm' ->> 'code')
        AND created_as_guest = (code = v_saved -> 'gm' ->> 'code');
     IF v_n IS DISTINCT FROM 2 THEN RAISE EXCEPTION 'created_as_guest not stored from the session (signed-in = false, guest = true): % of 2', v_n; END IF;
+    SELECT count(*) INTO v_n FROM public.eatery_orders WHERE created_by IN
+      ('00000000-0000-4000-8000-000000000015','00000000-0000-4000-8000-000000000010');
+    IF v_n IS DISTINCT FROM 0 THEN RAISE EXCEPTION 'an 18+ refusal still wrote % order row(s)', v_n; END IF;
     SELECT view_count INTO v_n FROM public.eatery_orders WHERE code = v_o ->> 'code';
     IF v_n IS DISTINCT FROM 3 THEN RAISE EXCEPTION 'view_count after 3 verifies is %', v_n; END IF;
     IF (v_saved -> 'pgcount' #>> '{}')::int IS DISTINCT FROM v_pre_orders + 126 THEN
@@ -701,7 +777,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261125_eatery_orders.sql', '74598b36d2141b36e874850a089e4cf0f4e69879a55e045a54455ee40292da99')
+VALUES ('20261125_eatery_orders.sql', '8d2b4aec3bea7587556434d8cdcac4bf2cac410be083e1f6c59f1b982e621d5a')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

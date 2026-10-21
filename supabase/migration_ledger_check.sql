@@ -240,7 +240,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261122_crunchy_express_menu_1020.sql', '8315aacab2ddf697c7a2073effa16cbefcef4d47dd959f7fe5cba144a528f88a'),
   ('20261123_eatery_dish_tags_order_whatsapp.sql', 'cf1e77956ace1f3bbe8375eb7b7708c5cb0ca4afc410c2b42f53d7e0f7a830a1'),
   ('20261124_crunchy_express_dish_tags.sql', '67a7c302bde3785acdc644ce626f43bffcc28bb8bc4c6ca722e5aeda3c8472a2'),
-  ('20261125_eatery_orders.sql', '74598b36d2141b36e874850a089e4cf0f4e69879a55e045a54455ee40292da99')
+  ('20261125_eatery_orders.sql', '8d2b4aec3bea7587556434d8cdcac4bf2cac410be083e1f6c59f1b982e621d5a')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
