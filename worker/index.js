@@ -10,7 +10,7 @@ const HEADERS = {
   'X-Robots-Tag': 'noindex, nofollow',
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
 }
 
 export function esc(v) {
@@ -50,7 +50,7 @@ h2{margin:0 0 2px;font-size:20px}.meta{color:#55657A;font-size:14px;margin:2px 0
 ul{list-style:none;margin:16px 0 0;padding:0;border-top:1px solid #E3E8E6}li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #E3E8E6}
 li span:last-child{white-space:nowrap;color:#55657A}.total{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-top:12px;color:#0A5E5D}
 .grey{opacity:.55}.seen{margin-top:14px;font-size:14px;color:#55657A}.note{margin:16px 4px 0;font-size:13px;color:#55657A}
-.foot{margin-top:24px;text-align:center;font-size:12px}.foot a{color:#55657A}`
+.btn{display:block;width:100%;margin-top:18px;padding:16px;border:0;border-radius:12px;background:#0E7C7B;color:#fff;font:700 18px/1 inherit;font-family:inherit}.btn:active{background:#0A5E5D}.big{font-size:28px;font-weight:800;letter-spacing:.06em;color:#0A5E5D;margin:8px 0}.foot{margin-top:24px;text-align:center;font-size:12px}.foot a{color:#55657A}`
 
 function page(body, title) {
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -62,6 +62,15 @@ function page(body, title) {
 
 function respond(html, status) {
   return new Response(html, { status, headers: HEADERS })
+}
+
+// Link previews (WhatsApp) only GET/HEAD: no RPC, no partner or items, so a preview never counts as a view.
+function renderGate(code, head) {
+  const fmt = `${code.slice(0, 4)}-${code.slice(4)}`
+  const body = `<div class="card"><h2>ADA sipariş doğrulama</h2><div class="en">ADA order verification</div>
+<div class="big">${esc(fmt)}</div>
+<form method="POST" action="/o/${esc(fmt)}"><button class="btn" type="submit">Siparişi doğrula<br><span style="font-size:13px;font-weight:400">Verify order</span></button></form></div>`
+  return new Response(head ? null : page(body, 'ADA'), { status: 200, headers: HEADERS })
 }
 
 function renderNotFound() {
@@ -118,9 +127,10 @@ export default {
     const url = new URL(request.url)
     const m = url.pathname.match(/^\/o\/([^/]*)\/?$/)
     if (!m) return env.ASSETS.fetch(request)
-    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } })
+    if (!['GET', 'HEAD', 'POST'].includes(request.method)) return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD, POST' } })
     const code = normalizeCode(m[1])
     if (!code) return renderNotFound()
+    if (request.method !== 'POST') return renderGate(code, request.method === 'HEAD')
     const r = await verify(code, env)
     if (!r) return renderError()
     if (r.status === 'not_found') return renderNotFound()

@@ -164,6 +164,8 @@ function check(world, log = console.log) {
     const asserts = [
       ['assets binding ASSETS in wrangler.jsonc', cfg.assets?.binding === 'ASSETS',
         'assets.binding must be "ASSETS" — without it the script cannot fall through to the static pages'],
+      ['run_worker_first absent (assets-first keeps the store pages off the Worker)', cfg.assets?.run_worker_first === undefined,
+        'assets.run_worker_first must not be set — it would route /privacy, /support through the Worker script'],
       ['falls through to env.ASSETS.fetch(request) for non-/o paths',
         /if\s*\(\s*!m\s*\)\s*return\s+env\.ASSETS\.fetch\(request\)/.test(w),
         'worker must hand every non-/o/ request to env.ASSETS.fetch(request) unchanged'],
@@ -225,6 +227,8 @@ function self() {
                              w => w.cfg.main === undefined && w.worker === null],
     ['assets binding removed', w => { delete w.cfg.assets.binding },
                              w => w.cfg.assets.binding === undefined],
+    ['run_worker_first enabled', w => { w.cfg.assets.run_worker_first = true },
+                             w => w.cfg.assets.run_worker_first === true],
     ['worker no longer falls through to ASSETS', w => { w.worker = real.worker.replace('return env.ASSETS.fetch(request)', "return new Response('x')") },
                              w => !w.worker.includes('env.ASSETS.fetch(request)')],
     ['worker drops noindex header', w => { w.worker = real.worker.replace('noindex, nofollow', 'all') },

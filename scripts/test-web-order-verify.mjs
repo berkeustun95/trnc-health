@@ -17,7 +17,8 @@ const env = {
   SUPABASE_URL: 'https://x.test', SUPABASE_ANON_KEY: 'anon-key',
   ASSETS: { fetch: async req => { assetHits.push(req); return new Response('ASSET', { status: 200 }) } },
 }
-const get = path => worker.fetch(new Request('https://getadaapp.com' + path), env)
+const get = path => worker.fetch(new Request('https://getadaapp.com' + path, { method: 'POST' }), env)
+const plain = (path, method = 'GET') => worker.fetch(new Request('https://getadaapp.com' + path, { method }), env)
 const okRow = (over = {}) => ({
   status: 'ok', partner_name: 'Crunchy Express', created_at: '2026-10-21T10:05:00Z', expires_at: '2026-10-21T14:05:00Z',
   lines: [{ name: 'Crunchy Burger', qty: 2, unit_price: 620 }], total: 1240, currency: 'TRY',
@@ -51,6 +52,31 @@ await test('ok: renders order, formats, headers, RPC request shape', async () =>
   assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_code: '7K3QX9MP' })
   assert.equal(rpcCalls[0].init.headers.apikey, 'anon-key')
   assert.equal(rpcCalls[0].init.headers.Authorization, 'Bearer anon-key')
+})
+
+await test('GET/HEAD never call the RPC; gate shows only the order no + button posting to same path', async () => {
+  rpcImpl = () => { throw new Error('RPC must not be called') }
+  const res = await plain('/o/7k3q-x9mp')
+  const html = await res.text()
+  assert.equal(res.status, 200)
+  assert.match(html, /ADA sipariş doğrulama/)
+  assert.match(html, /7K3Q-X9MP/)
+  assert.match(html, /<form method="POST" action="\/o\/7K3Q-X9MP">/)
+  assert.match(html, /Siparişi doğrula/)
+  assert.doesNotMatch(html, /Crunchy|Bu sipariş ADA üzerinden geldi/)
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow')
+  assert.match(res.headers.get('content-security-policy'), /form-action 'self'/)
+  const head = await plain('/o/7K3QX9MP', 'HEAD')
+  assert.equal(head.status, 200)
+  assert.equal(await head.text(), '')
+  assert.equal(head.headers.get('cache-control'), 'no-store')
+  assert.equal(rpcCalls.length, 0)
+  const bad = await plain('/o/7K3QX9M0')
+  assert.equal(bad.status, 404)
+  assert.doesNotMatch(await bad.text(), /<form|<button/)
+  assert.equal((await plain('/o/7K3QX9M0', 'HEAD')).status, 404)
+  assert.equal(rpcCalls.length, 0)
 })
 
 await test('ok with prior views: count includes this open', async () => {
