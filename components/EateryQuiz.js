@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import { formatPrice, eateryOrderDigits } from '../constants/eatery'
-import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizAddAllIds, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
+import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
@@ -78,14 +78,37 @@ function DishPhoto({ photoPath }) {
   )
 }
 
-// A pill with a fixed 44pt target. `dim` = the "already done" look (still focusable and announced: the state says disabled).
-function PillButton({ icon, title, label, filled, dim, onPress }) {
+// A pill with a fixed 44pt target; the label may wrap to two lines.
+function PillButton({ icon, title, label, filled, onPress }) {
   return (
-    <Pressable onPress={dim ? undefined : () => { try { haptic() } catch { /* never blocks the add */ } onPress?.() }} accessibilityRole="button" accessibilityLabel={label || title} accessibilityState={{ disabled: !!dim }}
-      style={({ pressed }) => [st.pill, filled ? st.pillFilled : dim ? st.pillSoft : st.pillOutline, pressed && !dim && { opacity: press.small }]}>
+    <Pressable onPress={() => { try { haptic() } catch { /* never blocks the add */ } onPress?.() }} accessibilityRole="button" accessibilityLabel={label || title}
+      style={({ pressed }) => [st.pill, filled ? st.pillFilled : st.pillOutline, pressed && { opacity: press.small }]}>
       <Ionicons name={icon} size={18} color={filled ? colors.onPrimary : colors.primaryDark} />
       <Text style={[st.pillText, filled && st.pillTextFilled]} numberOfLines={2}>{title}</Text>
     </Pressable>
+  )
+}
+
+// Height 0 <-> content height over motion.base (instant with reduced motion). The content is measured from an absolutely
+// placed copy, stays mounted while it animates out, and is hidden from screen readers while closed.
+function Expand({ open, reduce, children }) {
+  const [h, setH] = useState(0)
+  const [mounted, setMounted] = useState(open)
+  const v = useRef(new Animated.Value(0)).current
+  useEffect(() => { if (open) setMounted(true) }, [open])
+  useEffect(() => {
+    if (!mounted || h === 0) return
+    const to = open ? h : 0
+    const done = () => { if (!open) setMounted(false) }
+    if (reduce) { v.setValue(to); done(); return }
+    Animated.timing(v, { toValue: to, duration: motion.base, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => { if (finished) done() })
+    return () => v.stopAnimation()
+  }, [open, h, mounted, reduce])
+  if (!mounted) return null
+  return (
+    <Animated.View style={{ height: v, overflow: 'hidden' }} {...(open ? null : { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true })}>
+      <View style={st.expandInner} onLayout={e => setH(Math.ceil(e.nativeEvent.layout.height))}>{children}</View>
+    </Animated.View>
   )
 }
 
@@ -111,8 +134,8 @@ function SideRow({ item, text, qty, orderable, lang, onToggle }) {
   )
 }
 
-function ResultCard({ entry, companions, lang, canOrder, basket, onPress, onOpenPartner, onQty, onAddAll }) {
-  const { item, partner } = entry
+function ResultCard({ entry, lang, canOrder, basket, reduce, onPress, onOpenPartner, onQty }) {
+  const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
   const sideItems = (companions || []).map(c => c.item)
@@ -124,7 +147,13 @@ function ResultCard({ entry, companions, lang, canOrder, basket, onPress, onOpen
   const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : ''].filter(Boolean).join('. ')
   const sideOk = sideItems.map(i => canOrder && quizSideOrderable(i))
   const qty = basket[item.id] || 0
-  const left = quizAddAllIds(basket, item, sideItems.filter((_, k) => sideOk[k]))
+  // The sides open once THIS dish is in the basket, and fold away when it goes back to 0 (sides already added stay).
+  const showSides = canOrder && qty > 0 && sides.length > 0
+  const wasOpen = useRef(showSides)
+  useEffect(() => {
+    if (showSides && !wasOpen.current) AccessibilityInfo.announceForAccessibility?.(t('eateryQuizSidesTitle', lang))
+    wasOpen.current = showSides
+  }, [showSides])
   return (
     <Card padding={space[12]}>
       <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [st.resultRow, pressed && { opacity: press.card }]}>
@@ -156,16 +185,15 @@ function ResultCard({ entry, companions, lang, canOrder, basket, onPress, onOpen
         </View>
       )}
       {sides.length > 0 && (
-        <View style={st.side}>
-          {sides.map((line, k) => (
-            <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={basket[sideItems[k].id] || 0} orderable={sideOk[k]} lang={lang}
-              onToggle={() => onQty(partner, sideItems[k].id, (basket[sideItems[k].id] || 0) > 0 ? -1 : 1)} />
-          ))}
-          {sideOk.some(Boolean) && (
-            <PillButton icon={left.length ? 'basket-outline' : 'checkmark'} title={t(left.length ? 'eateryQuizAddAll' : 'eateryQuizAllIn', lang)} dim={left.length === 0}
-              onPress={() => onAddAll(partner, left)} />
-          )}
-        </View>
+        <Expand open={showSides} reduce={reduce}>
+          <View style={st.side}>
+            <Text style={st.sidesTitle} accessibilityRole="header">{t('eateryQuizSidesTitle', lang)}</Text>
+            {sides.map((line, k) => (
+              <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={basket[sideItems[k].id] || 0} orderable={sideOk[k]} lang={lang}
+                onToggle={() => onQty(partner, sideItems[k].id, (basket[sideItems[k].id] || 0) > 0 ? -1 : 1)} />
+            ))}
+          </View>
+        </Expand>
       )}
     </Card>
   )
@@ -245,9 +273,6 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
   const onQty = (p, id, delta) => {
     changeQty(p.id, id, delta)
   }
-  const onAddAll = (p, ids) => {
-    ids.forEach(id => changeQty(p.id, id, 1))
-  }
   const resultPartners = result ? result.dishes.map(d => d.partner).filter((p, i, a) => a.findIndex(x => x.id === p.id) === i && canOrder(p)) : []
   const barPartner = quizBarPartner(resultPartners, p => quizBasketSummary(p, getBasket(p.id)), getLastAdded())
   const bar = barPartner ? quizBasketSummary(barPartner, getBasket(barPartner.id)) : null
@@ -311,9 +336,9 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
                     </View>
                   )}
                   <View style={st.cards}>
-                    {result?.dishes.map((d, i) => (
-                      <ResultCard key={d.item.id} entry={d} lang={lang} companions={i === 0 ? result.companions : null}
-                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} onAddAll={onAddAll}
+                    {result?.dishes.map(d => (
+                      <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
+                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
@@ -400,7 +425,8 @@ const st = StyleSheet.create({
   pill:       { alignSelf: 'flex-start', minHeight: TAP, paddingHorizontal: space[16], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], borderRadius: radii.pill },
   pillFilled: { backgroundColor: colors.primary },
   pillOutline:{ borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
-  pillSoft:   { backgroundColor: colors.primaryLight },
+  expandInner:{ position: 'absolute', top: 0, left: 0, right: 0 },
+  sidesTitle: { ...type.rowTitle, color: colors.textPrimary },
   pillText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flexShrink: 1, textAlign: 'center' },
   pillTextFilled: { color: colors.onPrimary },
   orderRow:   { alignItems: 'flex-start', marginTop: space[8] },
