@@ -3,6 +3,7 @@
 // partner #2 is data only. Plain JS, no React, no network.
 import { dateLocale, t } from './i18n.js'
 import { cyprusNow, openState } from '../utils/towingHours.js'
+import { ADULT_AGE } from './profileGate.js'
 
 export const EATERY_BUCKET = 'eatery-images'
 
@@ -142,14 +143,79 @@ export function formatTl(amount) {
 
 export const orderTotal = lines => lines.reduce((sum, l) => sum + Math.round(l.qty * Number(l.price) * 100), 0) / 100
 
+// ─── Server-recorded order (create_eatery_order, 20261125) ───
+// The app asks the server to record the order FIRST; the WhatsApp text is built from what the server answered
+// (names, quantities, DATABASE prices) and ends with a code the partner can verify at getadaapp.com/o/<code>.
+const ORDER_CODE = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/
+export function orderCodeLine(code) {
+  const c = typeof code === 'string' ? code.trim().toUpperCase() : ''
+  if (!ORDER_CODE.test(c)) return ''
+  return `ADA Sipariş No: ${c.slice(0, 4)}-${c.slice(4)} · Doğrula: getadaapp.com/o/${c}`
+}
+
+// The server's lines in the shape buildOrderMessage reads: [{ id, name, qty, price }].
+export const serverOrderLines = res => (Array.isArray(res?.lines) ? res.lines : [])
+  .map(l => ({ id: l.item_id, name: l.name, qty: Number(l.qty), price: Number(l.unit_price) }))
+
+const cents = n => Math.round(Number(n) * 100)
+
+// True when the server's answer is not exactly the basket the person saw: a line missing or extra, a different
+// quantity, a different unit price, or a different total. A malformed answer counts as a mismatch. Then NOTHING is sent.
+export function orderMismatch(basketLines, res) {
+  if (!res || !Array.isArray(res.lines) || res.lines.length === 0 || !Number.isFinite(Number(res.total))) return true
+  const srv = serverOrderLines(res)
+  if (srv.length !== basketLines.length) return true
+  for (const b of basketLines) {
+    const m = srv.find(l => l.id === b.id)
+    if (!m || m.qty !== Number(b.qty) || cents(m.price) !== cents(b.price)) return true
+  }
+  return cents(res.total) !== cents(orderTotal(basketLines))
+}
+
+// null = the server's answer may be sent; else 'prices' (not the basket the person saw) or 'generic' (no valid code: a message
+// ADA cannot verify is never sent).
+export function orderCheck(basketLines, res) {
+  if (orderMismatch(basketLines, res)) return 'prices'
+  return orderCodeLine(res.code) ? null : 'generic'
+}
+
+// 18+ ordering (adult_only partners). Age by the calendar date in Europe/Istanbul (fixed UTC+3 since 2016), dob 'YYYY-MM-DD'.
+// A missing or malformed dob is NOT an adult. ADULT_AGE is the one shared constant (constants/profileGate.js).
+export function isAdultForOrder(dob, now = new Date()) {
+  if (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false
+  const today = new Date(now.getTime() + 3 * 3600 * 1000).toISOString().slice(0, 10)
+  return dob <= `${Number(today.slice(0, 4)) - ADULT_AGE}${today.slice(4)}`
+}
+
+// null = may order; else why not: 'guest' | 'no_dob' | 'under_18'. Only an adult_only partner gates.
+export function orderAgeGate({ adultOnly, guest, dob, now }) {
+  if (adultOnly !== true) return null
+  if (guest) return 'guest'
+  if (!dob) return 'no_dob'
+  return isAdultForOrder(dob, now) ? null : 'under_18'
+}
+
+// PostgREST error -> what the sheet says: 'rate' | 'account' | 'adult' | 'items' | 'generic' (network, anything unknown).
+export function orderErrorKind(err) {
+  const m = typeof err?.message === 'string' ? err.message : ''
+  if (m === 'rate_limited') return 'rate'
+  if (m === 'order_requires_account') return 'account'
+  if (m === 'adult_only') return 'adult'
+  if (m === 'item_unavailable' || m === 'invalid_items' || m === 'mixed_currency') return 'items'
+  return 'generic'
+}
+
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
-export function buildOrderMessage(lines, note) {
+// code: the server's order code; its line is the LAST one.
+export function buildOrderMessage(lines, note, code = null) {
   const out = ['ADA üzerinden sipariş:']
   for (const l of lines) out.push(`${l.qty} × ${l.name} — ${formatTl(l.qty * Number(l.price))}`)
   out.push('', `Toplam: ${formatTl(orderTotal(lines))}`)
   const n = typeof note === 'string' ? note.trim().slice(0, ORDER_NOTE_MAX) : ''
   if (n) out.push(`Not: ${n}`)
   out.push('Fiyatlar ADA menüsündendir, değişiklik olabilir.')
+  const cl = orderCodeLine(code)
+  if (cl) out.push(cl)
   return out.join('\n')
 }
 

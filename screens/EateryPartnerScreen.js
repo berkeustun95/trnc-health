@@ -7,12 +7,13 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
+import { supabase, isGuest } from '../lib/supabase'
 import { effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
@@ -183,7 +184,7 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
 
 // focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below. openBasket: ... or straight into
 // Sepetim (its Back lands on this menu). Initial state only: the page remounts for every partner opened.
-export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null, openBasket: startInBasket = false }) {
+export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null, openBasket: startInBasket = false, session = null, dateOfBirth = null, onRequireAccount = null, onRefresh = null }) {
   const [viewing, setViewing] = useState(null)
   const [failedDishes, setFailedDishes] = useState({})
   const failDish = useCallback(id => setFailedDishes(f => ({ ...f, [id]: true })), [])
@@ -240,6 +241,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // Any real edit drops the old snapshot inside the store; taking the last unit off a dish (the bin) offers its own undo.
   const onQty = useCallback((id, delta) => {
     const r = changeQty(partner.id, id, delta)
+    setOrderError(null)
     if (r) setSnack(r === 'removed' ? 'eateryBasketItemRemoved' : null)
   }, [partner.id])
   useEffect(() => {
@@ -366,13 +368,38 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     Linking.openURL(url).catch(() => { onFail?.() })
   }
   // Closes the basket page and opens WhatsApp. Only the tap is logged (action 'order_whatsapp'): never the basket or the note.
-  const sendOrder = () => {
-    if (!ordering || lines.length === 0) return
+  // The server records the order FIRST (create_eatery_order, 20261125) and the WhatsApp text is built from its answer
+  // (database prices + a verifiable code). Any refusal, a changed price or a network failure sends nothing.
+  const [sending, setSending] = useState(false)
+  const sendingRef = useRef(false)
+  const [orderError, setOrderError] = useState(null)   // null | 'generic' | 'rate' | 'account' | 'prices' | 'items'
+  // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
+  const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
+  const sendOrder = async () => {
+    if (!ordering || lines.length === 0 || sendingRef.current || ageGate) return
+    if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
+    sendingRef.current = true
+    setSending(true)
+    setOrderError(null)
+    const sent = lines
+    let res = null, kind = null
+    try {
+      const { data, error } = await supabase.rpc('create_eatery_order', { p_partner: partner.id, p_items: sent.map(l => ({ item_id: l.id, qty: l.qty })) })
+      if (error || !data) kind = orderErrorKind(error)
+      else { kind = orderCheck(sent, data); if (!kind) res = data }
+    } catch { kind = 'generic' }
+    sendingRef.current = false
+    setSending(false)
+    if (!res) {
+      setOrderError(kind)
+      if (kind === 'prices' || kind === 'items') onRefresh?.()   // reload the menu rows so Sepetim shows the new prices
+      return
+    }
     armedRef.current = { left: false }
     setBasketOpen(false)
-    go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(lines, note)), () => { armedRef.current = null })
+    go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(serverOrderLines(res), note, res.code)), () => { armedRef.current = null })
   }
-  const openBasket = () => { armedRef.current = null; setBasketShown(true); setBasketOpen(true) }
+  const openBasket = () => { armedRef.current = null; setOrderError(null); setBasketShown(true); setBasketOpen(true) }
   // From the quiz bar: Sepetim opens once, and only when its lines exist (never an empty page).
   const autoOpened = useRef(false)
   useEffect(() => {
@@ -477,7 +504,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       </View>
       {ordering && basketShown === true && (
         <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
-          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} onClose={() => setBasketOpen(false)} reduce={reduce} />
+          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
       {quizShown === true && (
         <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
