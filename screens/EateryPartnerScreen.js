@@ -1,25 +1,30 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { View, Text, ScrollView, Linking, Modal, Pressable, AccessibilityInfo, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, ScrollView, Linking, Modal, Pressable, AccessibilityInfo, AppState, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
+import { effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
+import { haptic } from '../components/ui'
+import Snackbar from '../components/Snackbar'
 
 // ─── Yeme-İçme: one partner, in full ────────────────────────────────────────
 // Contact buttons are stacked full width: Button truncates its label to one line, and a two-column
 // grid leaves "Web sitesi" / "Wegbeschreibung" ~68pt at 320dp.
 // Everything comes from the row (constants/eatery.js decides what is empty): a section with
 // nothing behind it is absent, never degraded. Fixture partners (partner.placeholder) are labelled
-// and NEVER log a contact tap. No cart, no order, no checkout: the menu is information.
+// and NEVER log a contact tap or take an order. Order via WhatsApp: a dish with a price gets a quantity control, the
+// basket (in memory, utils/eateryBasket.js) becomes ONE Turkish wa.me message; ADA takes no payment and keeps nothing.
 
 const CONTACT_UI = {
   call:     { icon: 'call-outline',      labelKey: 'petHotelCall',       variant: 'primary' },
@@ -46,6 +51,7 @@ function HoursBlock({ week, open, lang }) {
   )
 }
 
+const SNACK_ABOVE_BAR = 150   // clears the pinned order bar / Sepetim footer (stacked bar at font scale 1.3 is the tallest)
 const THUMB = 64
 const SHOW_SECTION_COUNT = false  // "Nachos · 3": muted dish count beside a section title
 const TAB_SCROLL_OFFSET = 8       // a section is "current" once its top is within this of the pinned tab row
@@ -70,10 +76,10 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, onQty }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
-  return (
+  const row = (
     <View style={s.itemRow}>
       {hasPhoto && <DishThumb item={item} name={item.name} lang={lang} reduce={reduce} onOpen={() => onOpenPhoto(item)} onFail={() => onFail(item.id)} />}
       <View style={s.itemText}>
@@ -81,6 +87,13 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
         {!!item.description && <Text style={s.itemDesc}>{item.description}</Text>}
       </View>
       {!!price && <Text style={s.itemPrice}>{price}</Text>}
+    </View>
+  )
+  if (!ordering || !eateryOrderable(item)) return row
+  return (
+    <View>
+      {row}
+      <View style={s.itemOrder}><QtyStepper id={item.id} name={item.name} qty={qty} onQty={onQty} lang={lang} /></View>
     </View>
   )
 })
@@ -179,6 +192,56 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const regionKey = REGION_LABEL_KEY[partner.region]
   const hasMenu = sections.length > 0 || menuPhotos.length > 0 || !!menuUrl
 
+  // Order via WhatsApp. The basket (per partner, in memory) holds quantities only; names and prices are read from the
+  // menu rows here. No number behind it (and never a fixture partner) = no basket at all.
+  const orderDigits = eateryOrderDigits(effectiveWhatsapp(partner))
+  const ordering = !!orderDigits
+  const basket = useBasket(partner.id)
+  const lines = useMemo(() => {
+    if (!ordering) return []
+    return sections.flatMap(sec => sec.items).filter(eateryOrderable)
+      .filter(i => basket[i.id] > 0).map(i => ({ id: i.id, name: i.name, qty: basket[i.id], price: Number(i.price), photoPath: i.photoPath }))
+  }, [ordering, sections, basket])
+  const orderCurrency = sections.flatMap(sec => sec.items).find(eateryOrderable)?.currency
+  const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
+  const orderCount = lines.reduce((n, l) => n + l.qty, 0)
+  const orderTotalText = formatMoney(orderTotal(lines))
+  const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
+  const [basketShown, setBasketShown] = useState(false)
+  const [note, setNote] = useState('')
+  const noteRef = useRef('')
+  noteRef.current = note
+  const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
+  const [snack, setSnack] = useState(null)   // 'eateryBasketCleared' | 'eateryBasketItemRemoved' while its "Geri al" is offered
+  // Empties the basket but keeps it and the note for the snackbar's "Geri al" (no confirm dialog); see eateryBasketCore.js.
+  const clearBasket = () => {
+    if (!clearAll(partner.id, noteRef.current)) return
+    setNote('')
+    setSnack('eateryBasketCleared')
+  }
+  // Any real edit drops the old snapshot inside the store; taking the last unit off a dish (the bin) offers its own undo.
+  const onQty = useCallback((id, delta) => {
+    const r = changeQty(partner.id, id, delta)
+    if (r) setSnack(r === 'removed' ? 'eateryBasketItemRemoved' : null)
+  }, [partner.id])
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', st => {
+      const a = armedRef.current
+      if (!a) return
+      if (st !== 'active') { a.left = true; return }
+      if (!a.left) return
+      armedRef.current = null
+      clearBasket()
+    })
+    return () => sub.remove()
+  }, [partner.id])
+  const undoClear = () => {
+    try { haptic() } catch { /* never blocks the undo */ }
+    setSnack(null)
+    const u = undo(partner.id)
+    if (u && u.kind === 'all') setNote(u.note)
+  }
+
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
   const showTabs = sections.length >= 2
   const tabsIndex = 1 + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], tabs
@@ -234,6 +297,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
+      if (basketOpen) { setBasketOpen(false); return true }
       if (viewing) { setViewing(null); return true }
       return false
     }
@@ -242,15 +306,24 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   // The tap is logged on the line BEFORE the link opens (utils/logContactEvent: it never throws);
   // a placeholder partner has no real id and an inactive (previewer-only) row is not live: both log nothing.
-  const go = (action, url) => {
+  const go = (action, url, onFail) => {
     if (!partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
-    Linking.openURL(url).catch(() => {})
+    Linking.openURL(url).catch(() => { onFail?.() })
   }
+  // Closes the basket page and opens WhatsApp. Only the tap is logged (action 'order_whatsapp'): never the basket or the note.
+  const sendOrder = () => {
+    if (!ordering || lines.length === 0) return
+    armedRef.current = { left: false }
+    setBasketOpen(false)
+    go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(lines, note)), () => { armedRef.current = null })
+  }
+  const openBasket = () => { armedRef.current = null; setBasketShown(true); setBasketOpen(true) }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <View style={s.under} {...(basketOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
-      <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
+      <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: lines.length > 0 ? space[20] : listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
         stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showTabs ? onScroll : undefined} scrollEventThrottle={16}
         onContentSizeChange={showTabs ? scheduleMeasure : undefined}
         onMomentumScrollEnd={showTabs ? releaseLock : undefined} onScrollEndDrag={showTabs ? releaseLock : undefined}>
@@ -287,7 +360,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                   {sec.title}
                   {SHOW_SECTION_COUNT && <Text style={s.secCount}>{' · ' + sec.items.length}</Text>}
                 </Text>
-                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing} />)}
+                {sec.items.map(i => <MenuItemRow key={i.id} item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
+                  ordering={ordering} qty={basket[i.id] || 0} onQty={onQty} />)}
               </View>
             ))}
             {menuPhotos.length > 0 && (
@@ -330,6 +404,15 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         )}
 
       </ScrollView>
+      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} />}
+      </View>
+      {ordering && basketShown === true && (
+        <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
+          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} onClose={() => setBasketOpen(false)} reduce={reduce} />
+      )}
+      <Snackbar visible={snack !== null} message={snack ? t(snack, lang) : ''} actionLabel={t('eateryOrderUndo', lang)}
+        onAction={undoClear} onTimeout={() => { setSnack(null); dropSnapshot(partner.id) }} reduce={reduce}
+        bottom={insets.bottom + (lines.length > 0 ? SNACK_ABOVE_BAR : space[16])} />
       <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>
   )
@@ -337,6 +420,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: colors.canvas },
+  under:     { flex: 1 },
   content:   { paddingHorizontal: 16, paddingTop: space[8], gap: 14 },
   head:      { flexDirection: 'row', alignItems: 'center', gap: space[16] },
   headText:  { flex: 1 },
@@ -376,6 +460,7 @@ const s = StyleSheet.create({
   itemName:  { ...type.body, color: colors.textPrimary },
   itemDesc:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
   itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
+  itemOrder: { alignItems: 'flex-end', marginBottom: space[4] },
   menuBtn:   { marginTop: space[16] },
   fill:      { width: '100%', height: '100%' },
   thumb:     { width: THUMB, height: THUMB, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },

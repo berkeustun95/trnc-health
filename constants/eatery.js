@@ -118,3 +118,39 @@ export function eateryOpenStatus(p, lang, now = new Date()) {
   if (st.unknown) return null
   return { text: t('towingClosedToday', lang), tone: 'warn' }
 }
+
+// ─── Order via WhatsApp (pure; the basket itself lives in utils/eateryBasket.js) ───────────────
+// A dish can be ordered when it has a real price and is on today's menu; a priced-nothing dish has no control.
+export const eateryOrderable = i => !!i && i.is_available !== false && i.price != null && i.price !== '' && Number.isFinite(Number(i.price))
+export const ORDER_NOTE_MAX = 200
+
+// wa.me wants digits only (country code first). Same rule as eateryContacts(); null when too short to dial.
+export const eateryOrderDigits = wa => {
+  const d = filled(wa) ? wa.replace(/\D/g, '') : ''
+  return d.length > 3 ? d : null
+}
+
+// "1.240,00 TL": the order message is always Turkish, so the format is fixed here instead of leaning on
+// Intl('tr-TR'), which a stripped ICU build would turn into something else. Integer cents: no float drift.
+export function formatTl(amount) {
+  const cents = Math.round(Number(amount) * 100)
+  const sign = cents < 0 ? '-' : ''
+  const abs = Math.abs(cents)
+  const lira = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${sign}${lira},${String(abs % 100).padStart(2, '0')} TL`
+}
+
+export const orderTotal = lines => lines.reduce((sum, l) => sum + Math.round(l.qty * Number(l.price) * 100), 0) / 100
+
+// lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
+export function buildOrderMessage(lines, note) {
+  const out = ['ADA üzerinden sipariş:']
+  for (const l of lines) out.push(`${l.qty} × ${l.name} — ${formatTl(l.qty * Number(l.price))}`)
+  out.push('', `Toplam: ${formatTl(orderTotal(lines))}`)
+  const n = typeof note === 'string' ? note.trim().slice(0, ORDER_NOTE_MAX) : ''
+  if (n) out.push(`Not: ${n}`)
+  out.push('Fiyatlar ADA menüsündendir, değişiklik olabilir.')
+  return out.join('\n')
+}
+
+export const orderWhatsAppUrl = (digits, message) => `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
