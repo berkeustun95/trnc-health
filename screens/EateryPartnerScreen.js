@@ -179,8 +179,9 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
   )
 }
 
-// focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below.
-export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null }) {
+// focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below. openBasket: ... or straight into
+// Sepetim (its Back lands on this menu). Initial state only: the page remounts for every partner opened.
+export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null, openBasket: startInBasket = false }) {
   const [viewing, setViewing] = useState(null)
   const [failedDishes, setFailedDishes] = useState({})
   const failDish = useCallback(id => setFailedDishes(f => ({ ...f, [id]: true })), [])
@@ -356,6 +357,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(lines, note)), () => { armedRef.current = null })
   }
   const openBasket = () => { armedRef.current = null; setBasketShown(true); setBasketOpen(true) }
+  // From the quiz bar: Sepetim opens once, and only when its lines exist (never an empty page).
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (!startInBasket || autoOpened.current || !ordering || lines.length === 0) return
+    autoOpened.current = true
+    openBasket()
+  }, [startInBasket, ordering, lines.length])
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

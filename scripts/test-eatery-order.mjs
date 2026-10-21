@@ -75,5 +75,12 @@ const pBefore = JSON.stringify(B.getBasket(P))
 B.changeQty('p2', 1, 1)
 eq('baskets are per partner', [B.getBasket('p2'), JSON.stringify(B.getBasket(P)) === pBefore], [{ 1: 1 }, true])
 
+B.changeQty('p3', 1, 1)
+B.changeQty('p4', 1, 1)
+B.changeQty('p3', 1, -1)
+eq('last added partner: set by an add, not moved by a removal', B.getLastAdded(), 'p4')
+B.changeQty('p3', 1, 0)
+eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
+
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)
