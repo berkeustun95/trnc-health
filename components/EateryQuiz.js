@@ -38,10 +38,10 @@ function Tile({ emoji, label, selected, locked, hint, role, onPress, cols }) {
   const row = cols === 1
   return (
     <Pressable onPress={onPress} accessibilityRole={role} accessibilityLabel={label} accessibilityHint={locked ? hint : undefined}
-      accessibilityState={{ checked: selected, disabled: locked }}
+      accessibilityState={{ checked: selected }}
       style={({ pressed }) => [st.tile, row ? st.tileRow : st.tileCol, cols === 2 && st.tileHalf, selected && st.tileOn, locked && st.tileLocked, pressed && { opacity: press.card }]}>
-      <Text style={st.emoji} accessibilityElementsHidden importantForAccessibility="no">{emoji}</Text>
-      <Text style={[st.tileText, selected && st.tileTextOn]}>{label}</Text>
+      <Text style={[st.emoji, locked && st.emojiLocked]} accessibilityElementsHidden importantForAccessibility="no">{emoji}</Text>
+      <Text style={[st.tileText, selected && st.tileTextOn, locked && st.tileTextLocked]}>{label}</Text>
       {selected && (
         <View style={st.badge} accessible={false} importantForAccessibility="no-hide-descendants">
           <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
@@ -253,7 +253,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
         </ScrollView>
         {!!cur && (
           <View style={[st.footer, { paddingBottom: insets.bottom + space[12] }]}>
-            <Button fullWidth title={t(step === QUIZ_STEPS - 1 ? 'eateryQuizSeeResults' : 'eateryQuizNext', lang)} disabled={!canNext} onPress={() => setStep(step + 1)} />
+            <Button fullWidth title={t(step === QUIZ_STEPS - 1 ? 'eateryQuizSeeResults' : 'eateryQuizNext', lang)} disabled={!canNext} disabledHint={t('eateryQuizPickOne', lang)} onPress={() => setStep(step + 1)} />
           </View>
         )}
       </SafeAreaView>
@@ -289,7 +289,9 @@ const st = StyleSheet.create({
   tileHalf:   { flex: 1 },
   tileRow:    { flexDirection: 'row', alignItems: 'center', gap: space[16] },
   tileOn:     { backgroundColor: colors.primaryLight },
-  tileLocked: { opacity: 0.5 },
+  tileLocked: { backgroundColor: colors.soft },
+  emojiLocked:{ opacity: 0.5 },
+  tileTextLocked: { color: colors.textSecondary },
   tileBorder: { ...StyleSheet.absoluteFillObject, borderRadius: radii.tile, borderWidth: 2, borderColor: colors.primary, backgroundColor: 'transparent' },
   emoji:      { fontSize: 30, lineHeight: 38 },
   tileText:   { ...type.rowTitle, color: colors.textPrimary },
