@@ -124,5 +124,27 @@ eq('Hiçbiri -> none', comp({ extra: ['none'] }), [])
 const other = partner('z', 1, [dish('Z drink', { role: 'drink' })])
 eq('companions never cross partners', Q.quizMatch([C, other], { ...ANY, extra: ['drink'] }).companions[0].partner.slug, 'c')
 
+// ── results basket: add-all, side orderability, summary, which partner the bar shows ──
+{
+  const main = dish('Burger', { price: 620 })
+  const sauce = dish('Sos', { role: 'sauce', price: 40 })
+  const drink = dish('Ayran', { role: 'drink', price: 60 })
+  const free = dish('Sos bedava', { role: 'sauce', price: null })
+  const off = dish('Kola', { role: 'drink', is_available: false })
+  const P = partner('crunchy', 0, [main, sauce, drink, free, off])
+  eq('side orderable: priced + available', [sauce, free, off].map(Q.quizSideOrderable), [true, false, false])
+  eq('add-all: dish + orderable sides, in order', Q.quizAddAllIds({}, main, [sauce, free, drink]), [main.id, sauce.id, drink.id])
+  eq('add-all skips what is already in', Q.quizAddAllIds({ [sauce.id]: 2 }, main, [sauce, drink]), [main.id, drink.id])
+  eq('add-all with everything in: nothing left', Q.quizAddAllIds({ [main.id]: 1, [sauce.id]: 1 }, main, [sauce]), [])
+  eq('add-all lists a repeated id once', Q.quizAddAllIds({}, main, [sauce, sauce]), [main.id, sauce.id])
+  eq('summary: count and total of the partner basket', Q.quizBasketSummary(P, { [main.id]: 2, [sauce.id]: 1, [free.id]: 3, [off.id]: 1 }), { count: 3, total: 1280, currency: 'TRY' })
+  eq('summary: empty basket', Q.quizBasketSummary(P, {}).count, 0)
+  const Q2 = partner('other', 1, [dish('Kebap', { price: 100 })])
+  const one = pp => (pp === P ? { count: 1 } : { count: 2 })
+  eq('bar: the partner last added to wins', Q.quizBarPartner([P, Q2], one, 'other').slug, 'other')
+  eq('bar: last partner emptied -> another with items', Q.quizBarPartner([P, Q2], pp => (pp === P ? { count: 1 } : { count: 0 }), 'other').slug, 'crunchy')
+  eq('bar: nobody has items -> none', Q.quizBarPartner([P, Q2], () => ({ count: 0 }), 'other'), null)
+}
+
 if (bad) { console.log(`\n${bad} FAILED`); process.exit(1) }
 console.log('\nquiz: all passed')

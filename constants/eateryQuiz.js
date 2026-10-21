@@ -2,7 +2,7 @@
 // plain JS, no React, no network, tested by scripts/test-eatery-quiz.mjs. It reads the rows loadEateryPartners
 // already returned (never its own query), so a hidden partner is only here when the Preview key lets the list show it.
 // A dish is only ever suggested when it carries a tag: the Preview fixture and any untagged item have role null.
-import { eateryOrderable } from './eatery.js'
+import { eateryOrderable, eateryMenuSections, orderTotal } from './eatery.js'
 
 export const QUIZ_STEPS = 4
 export const QUIZ_EXTRAS = ['sauce', 'drink', 'dessert']
@@ -125,4 +125,36 @@ export function quizCompanions(partner, answers) {
     if (list.length) out.push({ item: list[0], partner })
   }
   return out
+}
+
+// ── Results basket (the store is utils/eateryBasketCore.js; these are the pure decisions around it) ──
+// A side line is added only when it is priced and available; a priceless one stays a plain line.
+export const quizSideOrderable = eateryOrderable
+
+// The item ids "Hepsini sepete ekle" adds: the dish, then every orderable side, each once, skipping what the basket
+// already holds. Empty = everything is already in ("Hepsi sepette").
+export function quizAddAllIds(basket, dish, sides) {
+  const out = []
+  for (const i of [dish, ...(sides || [])]) {
+    if (!i || !eateryOrderable(i) || out.includes(i.id) || (basket?.[i.id] || 0) > 0) continue
+    out.push(i.id)
+  }
+  return out
+}
+
+// What the partner page would show for this basket: the same line set (eateryMenuSections + eateryOrderable), so the
+// bar on the results and the bar on the menu never disagree. -> { count, total, currency }
+export function quizBasketSummary(partner, basket) {
+  const items = eateryMenuSections(partner).flatMap(sec => sec.items).filter(eateryOrderable)
+  const lines = items.filter(i => (basket?.[i.id] || 0) > 0).map(i => ({ qty: basket[i.id], price: Number(i.price) }))
+  return { count: lines.reduce((n, l) => n + l.qty, 0), total: orderTotal(lines), currency: items[0]?.currency }
+}
+
+// Which partner's basket the results bar shows: the one most recently added to; when that one is empty (cleared on the
+// partner page), the first result partner that still has items; none when all are empty.
+export function quizBarPartner(partners, summaryOf, lastId) {
+  const list = partners || []
+  const last = list.find(p => (p.id ?? p.slug) === lastId)
+  if (last && summaryOf(last).count > 0) return last
+  return list.find(p => summaryOf(p).count > 0) || null
 }

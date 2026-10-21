@@ -179,8 +179,9 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
   )
 }
 
-// focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below.
-export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null }) {
+// focusItemId: the "Ne yesem?" quiz opens the page at one dish; see the focus effect below. openBasket: ... or straight into
+// Sepetim (its Back lands on this menu). Initial state only: the page remounts for every partner opened.
+export default function EateryPartnerScreen({ partner, lang, onBack, backRef = null, focusItemId = null, openBasket: startInBasket = false }) {
   const [viewing, setViewing] = useState(null)
   const [failedDishes, setFailedDishes] = useState({})
   const failDish = useCallback(id => setFailedDishes(f => ({ ...f, [id]: true })), [])
@@ -213,8 +214,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
   const orderCount = lines.reduce((n, l) => n + l.qty, 0)
   const orderTotalText = formatMoney(orderTotal(lines))
-  const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
-  const [basketShown, setBasketShown] = useState(false)
+  const [basketOpen, setBasketOpen] = useState(startInBasket === true && ordering)     // the target; basketShown keeps the page mounted through its slide-out
+  const [basketShown, setBasketShown] = useState(startInBasket === true && ordering)
   const [note, setNote] = useState('')
   const noteRef = useRef('')
   noteRef.current = note
