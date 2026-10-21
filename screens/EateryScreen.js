@@ -19,7 +19,7 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // The table cannot legitimately be empty while the section is live: zero rows is an ERROR STATE.
 // utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
-const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, ' +
+const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, order_requires_account, adult_only, ' +
   'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height, role, protein, spicy, portion), ' +
   'eatery_photos(id, kind, storage_path, width, height, sort_order)'
 
@@ -56,7 +56,7 @@ function PartnerCard({ partner, lang, onPress }) {
 
 // openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
 // once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
-export default function EateryScreen({ lang, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null }) {
+export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +73,13 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
   const openDish = (p, itemId) => { setFocus({ partnerId: p.id, itemId }); onOpenPartner(p) }
   const openMenu = p => openDish(p, null)
   const openBasket = p => { setFocus({ partnerId: p.id, itemId: null, basket: true }); onOpenPartner(p) }
+  // After the server refuses an order for a stale price / item: reload the rows and swap the open partner for its fresh row.
+  const refreshRows = useCallback(async () => {
+    const { rows: list, error: err } = await loadEateryPartners(COLS)
+    if (err || !list.length) return
+    setRows(list)
+    if (partner) { const fresh = list.find(r => r.id === partner.id); if (fresh) onOpenPartner(fresh) }
+  }, [partner, onOpenPartner])
   const retry = useCallback(() => { setError(false); setLoading(true); setAttempt(a => a + 1) }, [])
 
   useEffect(() => {
@@ -121,7 +128,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       <View style={partner ? s.hidden : s.shown} pointerEvents={partner ? 'none' : 'auto'}>{list}</View>
       {!!partner && (
         <View style={StyleSheet.absoluteFill}>
-          <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} backRef={partnerBackRef}
+          <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} backRef={partnerBackRef} session={session} dateOfBirth={dateOfBirth} onRequireAccount={onRequireAccount} onRefresh={refreshRows}
             focusItemId={focus && focus.partnerId === partner.id ? focus.itemId : null} openBasket={!!focus && focus.partnerId === partner.id && focus.basket === true} />
         </View>
       )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -13,6 +13,8 @@ import { EateryLogo, eateryImageUrl } from './EateryBits'
 // Defined outside the screen: these re-render on every tap and must not remount.
 
 const MAX_QTY = 99
+// What the Sepetim footer says under the send button (null = nothing). Set by EateryPartnerScreen's sendOrder.
+const ORDER_ERR_KEY = { adult: 'eateryOrderAdultOnly', generic: 'eateryOrderErrGeneric', rate: 'eateryOrderErrRate', account: 'eateryOrderErrAccount', prices: 'eateryOrderErrPrices', items: 'eateryOrderErrItems' }
 
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
 export function QtyStepper({ id, name, qty, onQty, lang }) {
@@ -110,7 +112,7 @@ function BasketLine({ line, onQty, formatMoney, lang }) {
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce }) {
+export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -149,6 +151,12 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     if (kbTop != null) { const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: !reduce }), 60); return () => clearTimeout(id) }
   }, [kbTop, reduce])
   const empty = lines.length === 0
+  const msgKey = ageGate ? 'eateryOrderAdultOnly' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const tone = !ageGate && ['generic', 'rate', 'account'].includes(orderError) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
+  const showSignIn = ageGate === 'guest' || (!ageGate && orderError === 'account')
+  useEffect(() => {
+    if (msgKey) AccessibilityInfo.announceForAccessibility?.(t(msgKey, lang))   // iOS does not always speak a live region
+  }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
       <SafeAreaView style={st.page} edges={['top']}>
@@ -193,7 +201,13 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
-            <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} onPress={onSend} />
+            {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending} />}
+            <View accessibilityLiveRegion="polite">
+              {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
+            </View>
+            {showSignIn && (
+              <Button variant="secondary" fullWidth title={t('eateryOrderErrAccount', lang)} onPress={onSignIn} style={st.errBtn} />
+            )}
           </View>
         )}
       </SafeAreaView>
@@ -227,6 +241,11 @@ const st = StyleSheet.create({
   thumb:     { width: 56, height: 56, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbEmpty:{ backgroundColor: colors.soft, borderWidth: 0 },
   fill:      { width: '100%', height: '100%' },
+  errText:   { ...type.small, textAlign: 'center' },
+  errBad:    { color: colors.dangerInk },
+  errCalm:   { color: colors.textSecondary },
+  errInfo:   { color: colors.textPrimary },
+  errBtn:    { marginTop: space[8] },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },
