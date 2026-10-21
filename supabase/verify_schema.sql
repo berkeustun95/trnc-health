@@ -4020,6 +4020,9 @@ WITH report AS (
                           AND count(*) FILTER (WHERE to_jsonb(i)->>'role' = 'main') = 26
                      FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
                     WHERE p.slug = 'crunchy-express'), false)
+    UNION ALL SELECT '20261126_crunchy_express_contacts','crunchy-express phone = whatsapp = +905391161059, once 1126 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261126_crunchy_express_contacts.sql')
+      OR COALESCE((SELECT p.phone IS NOT DISTINCT FROM '+905391161059' AND p.whatsapp IS NOT DISTINCT FROM '+905391161059' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',
