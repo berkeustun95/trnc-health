@@ -66,11 +66,13 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
   // partner page is open (the partner is drawn over the list, not instead of it), so back from the dish lands on the results.
   const [quizOpen, setQuizOpen]   = useState(false)
   const [quizShown, setQuizShown] = useState(false)
-  const [focus, setFocus] = useState(null)   // { partnerId, itemId }: scroll the partner page to this dish (only for that partner)
+  const [focus, setFocus] = useState(null)   // { partnerId, itemId, basket }: scroll the partner page to this dish / open its Sepetim (only for that partner)
   const reduce = useReduceMotion()
   const showQuiz = useMemo(() => quizHasMains(rows), [rows])
   const openQuiz = () => { setQuizShown(true); setQuizOpen(true) }
   const openDish = (p, itemId) => { setFocus({ partnerId: p.id, itemId }); onOpenPartner(p) }
+  const openMenu = p => openDish(p, null)
+  const openBasket = p => { setFocus({ partnerId: p.id, itemId: null, basket: true }); onOpenPartner(p) }
   const retry = useCallback(() => { setError(false); setLoading(true); setAttempt(a => a + 1) }, [])
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       setLoading(false)
       if (openSlug) {
         const hit = list.find(r => r.slug === openSlug)
-        if (hit) onOpenPartner(hit)
+        if (hit) { setFocus(null); onOpenPartner(hit) }
         onOpenSlugDone?.(!!hit)
       }
     })().catch(() => { if (alive) { setError(true); setLoading(false) } })
@@ -108,7 +110,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       </View>
       {quizShown === true && (
         <QuizPage lang={lang} open={quizOpen === true} rows={rows} reduce={reduce} backRef={listBackRef}
-          onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)} onOpenDish={openDish} />
+          onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)} onOpenDish={openDish} onOpenMenu={openMenu} onOpenBasket={openBasket} />
       )}
     </SafeAreaView>
   )
@@ -120,7 +122,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       {!!partner && (
         <View style={StyleSheet.absoluteFill}>
           <EateryPartnerScreen partner={partner} lang={lang} onBack={onClosePartner} backRef={partnerBackRef}
-            focusItemId={focus && focus.partnerId === partner.id ? focus.itemId : null} />
+            focusItemId={focus && focus.partnerId === partner.id ? focus.itemId : null} openBasket={!!focus && focus.partnerId === partner.id && focus.basket === true} />
         </View>
       )}
     </View>
