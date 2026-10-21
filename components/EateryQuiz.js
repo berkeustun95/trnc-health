@@ -347,7 +347,7 @@ const st = StyleSheet.create({
   entryTitle: { ...type.rowTitle, color: colors.textPrimary },
   entryBody:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
   page:       { flex: 1, backgroundColor: colors.canvas },
-  progress:   { flexShrink: 0, backgroundColor: colors.canvas, zIndex: 1, paddingHorizontal: space[16], paddingTop: space[4], gap: space[8] },
+  progress:   { flexShrink: 0, backgroundColor: colors.canvas, zIndex: 1, paddingHorizontal: space[16], paddingTop: space[4], paddingBottom: space[12], gap: space[8] },
   dots:       { flexDirection: 'row', gap: space[4] },
   dot:        { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.border },
   dotOn:      { backgroundColor: colors.primary },
