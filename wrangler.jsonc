@@ -46,8 +46,12 @@
 {
   "name": "getadaapp",
   "account_id": "76f3dd64113159c180309aeb2b8583c4",
+  "main": "worker/index.js",
   "compatibility_date": "2026-06-19",
+  // Public project URL (also in the app bundle). SUPABASE_ANON_KEY is a Worker SECRET: `wrangler secret put SUPABASE_ANON_KEY`.
+  "vars": { "SUPABASE_URL": "https://jeihxnwqytnxtytgkzgf.supabase.co" },
   "assets": {
+    "binding": "ASSETS",
     "directory": "./web",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "none"
@@ -55,6 +59,7 @@
   "routes": [
     { "pattern": "getadaapp.com/support", "zone_name": "getadaapp.com" },
     { "pattern": "getadaapp.com/privacy", "zone_name": "getadaapp.com" },
-    { "pattern": "getadaapp.com/delete-account", "zone_name": "getadaapp.com" }
+    { "pattern": "getadaapp.com/delete-account", "zone_name": "getadaapp.com" },
+    { "pattern": "getadaapp.com/o/*", "zone_name": "getadaapp.com" }
   ]
 }
