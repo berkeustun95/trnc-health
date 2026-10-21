@@ -43,7 +43,7 @@ export function QtyStepper({ id, name, qty, onQty, lang }) {
 
 // Pinned under the scroll view. Wide enough: "Sepete git · 3 ürün · 1.890,00 TL" on one button; on a narrow phone
 // or a large font the count and total move to a line above instead of truncating.
-export function OrderBar({ count, totalText, lang, onOpen }) {
+export function OrderBar({ count, totalText, lang, onOpen, partnerName }) {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15
@@ -53,7 +53,7 @@ export function OrderBar({ count, totalText, lang, onOpen }) {
     <View style={[st.bar, { paddingBottom: insets.bottom + space[12] }]}>
       {stacked && <Text style={st.barSummary}>{summary}</Text>}
       <Button fullWidth icon="basket-outline" title={stacked ? go : `${go} · ${summary}`} onPress={onOpen}
-        accessibilityLabel={`${go}, ${summary}`} />
+        accessibilityLabel={`${partnerName ? partnerName + '. ' : ''}${go}, ${summary}`} />
     </View>
   )
 }
