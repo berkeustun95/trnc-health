@@ -141,8 +141,7 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, onPress, onOpenPart
   const sideItems = (companions || []).map(c => c.item)
   const sides = sideItems.map(i => {
     const p = formatPrice(i.price, i.currency, lang)
-    return p ? t('eateryQuizSide', lang).replace('{name}', () => i.name).replace('{price}', () => p)
-      : t('eateryQuizSideNoPrice', lang).replace('{name}', () => i.name)
+    return p ? `${i.name} · ${p}` : i.name
   })
   const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : ''].filter(Boolean).join('. ')
   const sideOk = sideItems.map(i => canOrder && quizSideOrderable(i))
