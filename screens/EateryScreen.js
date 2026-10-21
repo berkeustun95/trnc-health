@@ -101,7 +101,7 @@ export default function EateryScreen({ lang, partner, onOpenPartner, onClosePart
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
           {showQuiz && <QuizEntryCard lang={lang} onPress={openQuiz} />}
-          {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => onOpenPartner(p)} />)}
+          {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => { setFocus(null); onOpenPartner(p) }} />)}
         </ScrollView>
       )}
       {quizShown === true && (
