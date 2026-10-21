@@ -4061,12 +4061,15 @@ WITH report AS (
       AND COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) LIKE '%''view_count_before''%'
                AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
                AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%', false)
-    UNION ALL SELECT '20261125_eatery_orders','create_eatery_order body: prices from eatery_menu_items (never p_items price), 5/user + 60/partner (guest-session orders only) per hour, is_previewer gate, account gate',
+    UNION ALL SELECT '20261125_eatery_orders','create_eatery_order body: prices from eatery_menu_items (never p_items price), 5/user + 60/partner (guest-session orders only) per hour, is_previewer gate, adult_only 18+ gate, account gate',
       COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%JOIN public.eatery_menu_items m%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%m.price IS NOT NULL%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_user_n >= 5%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_guest AND v_part_n >= 60%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND created_at > now()%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_partner.adult_only%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%MESSAGE = ''adult_only''%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%Europe/Istanbul%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%public.is_previewer()%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%public.is_anonymous_session()%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) NOT LIKE '%p_items -> %price%', false)

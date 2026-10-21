@@ -22,6 +22,7 @@ CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $f$ SELECT nulli
 GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
 CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER SET search_path = ''
   AS $f$ SELECT coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) $f$;
+CREATE TABLE public.profiles (id uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE, date_of_birth date);
 CREATE SCHEMA private;
 CREATE TABLE private.preview_key_hashes (hash text PRIMARY KEY, label text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
 CREATE FUNCTION public.is_previewer() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $f$
@@ -32,7 +33,9 @@ CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid serial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean NOT NULL DEFAULT true);
 CREATE FUNCTION cron.schedule(n text, s text, c text) RETURNS bigint LANGUAGE sql AS $f$ INSERT INTO cron.job (jobname, schedule, command) VALUES (n, s, c) RETURNING jobid $f$;
 CREATE FUNCTION cron.unschedule(n text) RETURNS boolean LANGUAGE sql AS $f$ DELETE FROM cron.job WHERE jobname = n RETURNING true $f$;
-${PRIOR.slice(a, b)}`
+${PRIOR.slice(a, b)}
+ALTER TABLE public.eatery_partners ADD COLUMN adult_only boolean NOT NULL DEFAULT false;
+`
 
 let bad = 0
 const t = (name, got, want) => {
@@ -108,6 +111,12 @@ await refused('user rate limit 5 -> 6', mutant('rl', `IF v_user_n >= 5 THEN`, `I
 await refused('partner cap counts NON-guest rows too', mutant('pcg', `WHERE partner_id = p_partner AND created_as_guest AND created_at`, `WHERE partner_id = p_partner AND created_at`), 'do not block a guest')
 await refused('partner cap applies to signed-in users too', mutant('pcu', `IF v_guest AND v_part_n >= 60 THEN`, `IF v_part_n >= 60 THEN`), 'NOT blocked by the guest cap')
 await refused('created_as_guest never stored true', mutant('gst', `p_client_id, v_guest)`, `p_client_id, false)`), 'created_as_guest not stored')
+await refused('18+ gate removed', mutant('adg', `IF v_partner.adult_only THEN`, `IF false THEN`), 'adult_only')
+await refused('under-18 comparison off by one (>=)', mutant('adb', `IF v_dob > ((now() AT TIME ZONE`, `IF v_dob >= ((now() AT TIME ZONE`), 'TODAY')
+await refused('missing DOB treated as adult', mutant('add', `IF v_dob IS NULL THEN`, `IF false THEN`), 'adult_only')
+await refused('guest allowed on adult_only partner', mutant('adgu', `    IF v_guest THEN
+      RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'adult_only', DETAIL = 'guest';`, `    IF false THEN
+      RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'adult_only', DETAIL = 'guest';`), 'adult_only')
 await refused('partner rate limit dropped', mutant('rlp', `IF v_guest AND v_part_n >= 60 THEN`, `IF false THEN`), 'rate_limited')
 await refused('rate-limit window widened to 3 h (old orders count)', mutant('win', `created_by = v_uid AND created_at > now() - interval '1 hour'`, `created_by = v_uid AND created_at > now() - interval '3 hours'`), 'user 7')
 await refused('verify leaks created_by', mutant('leak', `'view_count_before',      v_o.view_count);`, `'view_count_before',      v_o.view_count, 'created_by', v_o.created_by);`), 'verify_eatery_order body')
