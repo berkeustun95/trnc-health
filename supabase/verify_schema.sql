@@ -3976,6 +3976,12 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261122_crunchy_express_menu_1020.sql')
       OR (SELECT count(*) FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
            WHERE p.slug = 'crunchy-express' AND i.name IN ('Cheeseme Chicken Burger','Crunchy Classic Nachos','Buffalo Nachos','Hot Honey Nachos','Eritilmiş Peynir Sos')) = 5
+    UNION ALL SELECT '20261124_crunchy_express_dish_tags','crunchy-express has 46 tagged dishes, 26 of them mains, once 1124 is applied (to_jsonb: never names the columns)',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261124_crunchy_express_dish_tags.sql')
+      OR COALESCE((SELECT count(*) FILTER (WHERE to_jsonb(i)->>'role' IS NOT NULL AND to_jsonb(i)->>'protein' IS NOT NULL AND to_jsonb(i)->>'spicy' IS NOT NULL) = 46
+                          AND count(*) FILTER (WHERE to_jsonb(i)->>'role' = 'main') = 26
+                     FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
+                    WHERE p.slug = 'crunchy-express'), false)
     UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2 SELECT policies; eatery_partners_select_preview is authenticated-only, is_previewer() AND inactive',
       (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners') = 2
       AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'
