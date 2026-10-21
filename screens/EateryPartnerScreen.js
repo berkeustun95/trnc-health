@@ -262,7 +262,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
   const showTabs = sections.length >= 2
-  const tabsIndex = 1 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [quiz banner], [pager], tabs
+  const tabsIndex = 1 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], [quiz banner], tabs
   const scrollRef = useRef(null)
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
@@ -317,9 +317,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const reduceRef = useRef(reduce)
   reduceRef.current = reduce
   const [marked, setMarked] = useState(null)
+  const sectionsRef = useRef(sections)
+  sectionsRef.current = sections
+  const focusDone = useRef(null)
+  const focusKey = focusReq ? 'r' + focusReq.n : 'p' + focusItemId
   useEffect(() => {
-    if (focusId == null) return
-    const si = sections.findIndex(sec => sec.items.some(i => i.id === focusId))
+    if (focusId == null || focusDone.current === focusKey) return   // once per request: a new partner object never re-scrolls
+    const si = sectionsRef.current.findIndex(sec => sec.items.some(i => i.id === focusId))
     if (si < 0) return
     const timers = []
     const attempt = n => {
@@ -328,6 +332,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       const retry = () => { if (n < 5) timers.push(setTimeout(() => attempt(n + 1), 200)) }
       if (!inner || !node) { retry(); return }
       node.measureLayout(inner, (_x, y) => {
+        focusDone.current = focusKey
         lockRef.current = true
         activeRef.current = si
         setActiveSec(si)
@@ -339,7 +344,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     }
     timers.push(setTimeout(() => attempt(0), 350))
     return () => timers.forEach(clearTimeout)
-  }, [focusId, focusReq, sections])
+  }, [focusId, focusReq])
   const sectionTitles = useMemo(() => sections.map(sec => sec.title), [sections])
 
   // App's single back handler asks here first (the dish photo viewer is a layer above the partner page).
@@ -402,9 +407,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>
 
-        {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
-
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
+
+        {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
 
         {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onHeight={setTabsH} reduce={reduce} />}
 

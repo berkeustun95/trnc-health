@@ -17,17 +17,17 @@ import { subscribe } from '../utils/eateryBasketCore'
 // full-page layer like Sepetim: slides in, stays mounted until onClosed so back animates out. Defined outside the
 // screen: these re-render on every tap and must not remount.
 
-// The quiz entry on a partner's own page: a slim banner, scoped to that partner's menu.
+// The quiz entry on a partner's own page: ADA chrome (soft teal band, no shadow), narrow on purpose: not a second hero.
 export function PartnerQuizBanner({ lang, partnerName, onPress }) {
-  const text = `${t('eateryQuizCardTitle', lang)} ${t('eateryQuizPartnerBanner', lang).replace('{partner}', () => partnerName)}`
+  const title = t('eateryQuizCardTitle', lang)
+  const body = t('eateryQuizPartnerBanner', lang).replace('{partner}', () => partnerName)
   return (
-    <Card onPress={onPress} accessibilityLabel={text} padding={space[8]}>
-      <View style={st.entry}>
-        <Image source={require('../assets/oli-button.png')} style={st.bannerMascot} resizeMode="contain" accessibilityIgnoresInvertColors />
-        <Text style={st.bannerText}><Text style={st.bannerLead}>{t('eateryQuizCardTitle', lang)}</Text> {t('eateryQuizPartnerBanner', lang).replace('{partner}', () => partnerName)}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-      </View>
-    </Card>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${title} ${body}`}
+      style={({ pressed }) => [st.banner, pressed && { opacity: press.card }]}>
+      <Image source={require('../assets/oli-button.png')} style={st.bannerMascot} resizeMode="contain" accessibilityIgnoresInvertColors />
+      <Text style={st.bannerText}><Text style={st.bannerLead}>{title}</Text> {body}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.primaryDark} />
+    </Pressable>
   )
 }
 
@@ -382,9 +382,10 @@ const st = StyleSheet.create({
   entry:      { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   // 72 / 88 are content-driven, not tokens: Oli's artwork is mostly padding (72 box = ~25x48 visible), the photo box fits a 3-line dish name.
   mascot:     { width: 72, height: 72 },
-  bannerMascot:{ width: 44, height: 44 },
-  bannerText: { flex: 1, ...type.small, color: colors.textSecondary },
-  bannerLead: { fontFamily: font.semibold, color: colors.textPrimary },
+  banner:     { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: space[8], paddingVertical: space[4], paddingLeft: space[8], paddingRight: space[12], borderRadius: radii.sm, backgroundColor: colors.primaryLight },
+  bannerMascot:{ width: 56, height: 56 },   // the artwork is mostly padding: a 44 box shows a ~15x29 figure
+  bannerText: { flex: 1, ...type.small, color: colors.primaryDark },
+  bannerLead: { fontFamily: font.semibold },
   entryText:  { flex: 1 },
   entryTitle: { ...type.rowTitle, color: colors.textPrimary },
   entryBody:  { ...type.small, color: colors.textSecondary, marginTop: 2 },

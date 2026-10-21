@@ -160,5 +160,17 @@ eq('top-level companions = the top dish\'s', Q.quizMatch([C], { ...ANY, extra: [
   eq('bar: nobody has items -> none', Q.quizBarPartner([P, Q2], () => ({ count: 0 }), 'other'), null)
 }
 
+// ── static guard: the partner page scopes the quiz in the SCREEN, which the matcher tests cannot see ──
+{
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
+  const has = re => re.test(src)
+  eq('screen: quizRows is exactly [partner]', has(/const quizRows = useMemo\(\(\) => \[partner\], \[partner\]\)/), true)
+  eq('screen: QuizPage gets rows={quizRows} and scoped', has(/<QuizPage[^>]*rows=\{quizRows\}[^>]*\bscoped\b/), true)
+  eq('screen: banner only when not placeholder and quizHasMains([partner])', has(/const showQuizBanner = !partner\.placeholder && quizHasMains\(\[partner\]\)/), true)
+  eq('screen: banner rendered behind showQuizBanner', has(/\{showQuizBanner && <PartnerQuizBanner/), true)
+  eq('screen: tabsIndex counts the banner', has(/const tabsIndex = 1 \+ \(showQuizBanner \? 1 : 0\) \+ \(gallery\.length > 0 \? 1 : 0\)/), true)
+}
+
 if (bad) { console.log(`\n${bad} FAILED`); process.exit(1) }
 console.log('\nquiz: all passed')
