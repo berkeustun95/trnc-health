@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { freshDb, applyFile } from './migration-harness.mjs'
+import { freshDb, applyFile, asRole } from './migration-harness.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261125_eatery_orders.sql', import.meta.url))
 const PRIOR = readFileSync(fileURLToPath(new URL('../supabase/migrations/20261115_eatery_partners.sql', import.meta.url)), 'utf8')
@@ -85,6 +85,27 @@ t('cron job present once', (await q(`SELECT jobname, schedule FROM cron.job`)), 
 t('no probe row survived', (await q(`SELECT (SELECT count(*) FROM public.eatery_orders)::int o, (SELECT count(*) FROM public.eatery_partners WHERE slug LIKE 'zz-%')::int p`)), [{ o: 0, p: 0 }])
 console.log('  renderings (PG 18):')
 for (const r of await q(`SELECT conname, pg_get_constraintdef(oid) d FROM pg_constraint WHERE conrelid='public.eatery_orders'::regclass ORDER BY 1`)) console.log(`    ${r.conname}: ${r.d}`)
+// END-TO-END 18+ (needs real profile rows, so harness only — see the migration header).
+await db.exec(`INSERT INTO public.eatery_partners (id, slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active, adult_only)
+   VALUES ('22222222-2222-4222-8222-222222222222','fx-adult','fx adult','cafe',35.1,33.3,'partner','fx/l.png',current_date,true,true);`)
+const adItem = (await q(`INSERT INTO public.eatery_menu_items (partner_id, section, name, price) VALUES ('22222222-2222-4222-8222-222222222222','s','adult dish',9) RETURNING id`))[0].id
+const mkUser = async (n, dobExpr) => {
+  const id = `00000000-0000-4000-8000-0000000000${n}`
+  await db.exec(`INSERT INTO auth.users (id) VALUES ('${id}'); INSERT INTO public.profiles (id, date_of_birth) VALUES ('${id}', ${dobExpr})`)
+  return id
+}
+const tdy = `(now() AT TIME ZONE 'Europe/Istanbul')::date`
+const call = (uid) => asRole(db, 'authenticated', uid, `SELECT public.create_eatery_order('22222222-2222-4222-8222-222222222222', '[{"item_id":${adItem},"qty":1}]'::jsonb) AS r`)
+const u = {
+  nodob: await mkUser(31, 'NULL'), tom: await mkUser(32, `((${tdy} - interval '18 years')::date + 1)`),
+  today: await mkUser(33, `((${tdy} - interval '18 years')::date)`), adult: await mkUser(34, `((${tdy} - interval '30 years')::date)`) }
+const r1 = await call(u.nodob), r2 = await call(u.tom), r3 = await call(u.today), r4 = await call(u.adult)
+t('18+ e2e: NULL dob refused', [r1.ok, r1.msg], [false, 'adult_only'])
+t('18+ e2e: 18th birthday tomorrow refused', [r2.ok, r2.msg], [false, 'adult_only'])
+t('18+ e2e: 18th birthday today ACCEPTED', r3.ok, true)
+t('18+ e2e: 30-year-old ACCEPTED', r4.ok, true)
+t('18+ e2e: refusals wrote no rows', (await q(`SELECT count(*)::int n FROM public.eatery_orders WHERE created_by IN ('${u.nodob}','${u.tom}')`))[0].n, 0)
+await db.exec(`DELETE FROM public.eatery_orders WHERE partner_id='22222222-2222-4222-8222-222222222222'`)
 // The retention job's command really deletes only > 30 days.
 await db.exec(`INSERT INTO public.eatery_partners (id, slug, name, category) VALUES ('11111111-1111-4111-8111-111111111111','fx','fx','cafe');
  INSERT INTO public.eatery_orders (code, partner_id, lines, total, currency, created_by, created_at, expires_at) VALUES
@@ -111,9 +132,10 @@ await refused('user rate limit 5 -> 6', mutant('rl', `IF v_user_n >= 5 THEN`, `I
 await refused('partner cap counts NON-guest rows too', mutant('pcg', `WHERE partner_id = p_partner AND created_as_guest AND created_at`, `WHERE partner_id = p_partner AND created_at`), 'do not block a guest')
 await refused('partner cap applies to signed-in users too', mutant('pcu', `IF v_guest AND v_part_n >= 60 THEN`, `IF v_part_n >= 60 THEN`), 'NOT blocked by the guest cap')
 await refused('created_as_guest never stored true', mutant('gst', `p_client_id, v_guest)`, `p_client_id, false)`), 'created_as_guest not stored')
+await refused('create ignores the age helper', mutant('adh', `IF v_gate IS NOT NULL THEN`, `IF false THEN`), 'no profile row')
 await refused('18+ gate removed', mutant('adg', `IF v_partner.adult_only THEN`, `IF false THEN`), 'adult_only')
-await refused('under-18 comparison off by one (>=)', mutant('adb', `IF v_dob > ((now() AT TIME ZONE`, `IF v_dob >= ((now() AT TIME ZONE`), 'TODAY')
-await refused('missing DOB treated as adult', mutant('add', `IF v_dob IS NULL THEN`, `IF false THEN`), 'adult_only')
+await refused('under-18 comparison off by one (>=)', mutant('adb', `WHEN p_dob > (p_today - interval '18 years')::date`, `WHEN p_dob >= (p_today - interval '18 years')::date`), 'age gate')
+await refused('missing DOB treated as adult', mutant('add', `WHEN p_dob IS NULL THEN 'no_dob'`, `WHEN false THEN 'no_dob'`), 'age gate')
 await refused('guest allowed on adult_only partner', mutant('adgu', `    IF v_guest THEN
       RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'adult_only', DETAIL = 'guest';`, `    IF false THEN
       RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'adult_only', DETAIL = 'guest';`), 'adult_only')
