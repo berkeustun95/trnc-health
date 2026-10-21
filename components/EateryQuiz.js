@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Image, Pressable, ScrollView, Animated, Easing, AccessibilityInfo, findNodeHandle, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Image, Pressable, ScrollView, Animated, Easing, AccessibilityInfo, findNodeHandle, PixelRatio, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import { formatPrice } from '../constants/eatery'
-import { QUIZ_STEPS, quizCandidates, quizBudgetBands, quizMatch, quizAmount } from '../constants/eateryQuiz'
+import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
@@ -13,8 +13,6 @@ import { EateryLogo, eateryImageUrl } from './EateryBits'
 // The matching is constants/eateryQuiz.js (pure, tested); this file is the entry card and the page. The page is a
 // full-page layer like Sepetim: slides in, stays mounted until onClosed so back animates out. Defined outside the
 // screen: these re-render on every tap and must not remount.
-
-const OPTION_ICON = { on: 'radio-button-on', off: 'radio-button-off' }
 
 export function QuizEntryCard({ lang, onPress }) {
   const title = t('eateryQuizCardTitle', lang)
@@ -33,12 +31,23 @@ export function QuizEntryCard({ lang, onPress }) {
   )
 }
 
-function Option({ label, selected, onPress }) {
+// One answer: a big tile with an emoji and a short label. Selected = check badge + primary border + primaryLight fill (never
+// colour alone). Q2 is a radio, the multi-select questions are checkboxes. A tile the cap has locked stays tappable on
+// purpose (the tap says "En fazla 2") but is dimmed and announced as disabled. The border is its own transparent-fill layer.
+function Tile({ emoji, label, selected, locked, hint, role, onPress, cols }) {
+  const row = cols === 1
   return (
-    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ checked: selected, selected }} accessibilityLabel={label}
-      style={({ pressed }) => [st.option, selected && st.optionOn, pressed && { opacity: press.card }]}>
-      <Ionicons name={selected ? OPTION_ICON.on : OPTION_ICON.off} size={22} color={selected ? colors.primary : colors.textSecondary} />
-      <Text style={[st.optionText, selected && st.optionTextOn]}>{label}</Text>
+    <Pressable onPress={onPress} accessibilityRole={role} accessibilityLabel={label} accessibilityHint={locked ? hint : undefined}
+      accessibilityState={{ checked: selected }}
+      style={({ pressed }) => [st.tile, row ? st.tileRow : st.tileCol, cols === 2 && st.tileHalf, selected && st.tileOn, locked && st.tileLocked, pressed && { opacity: press.card }]}>
+      <Text style={[st.emoji, locked && st.emojiLocked]} accessibilityElementsHidden importantForAccessibility="no">{emoji}</Text>
+      <Text style={[st.tileText, selected && st.tileTextOn, locked && st.tileTextLocked]}>{label}</Text>
+      {selected && (
+        <View style={st.badge} accessible={false} importantForAccessibility="no-hide-descendants">
+          <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+        </View>
+      )}
+      {selected && <View style={st.tileBorder} pointerEvents="none" />}
     </Pressable>
   )
 }
@@ -64,16 +73,16 @@ function DishPhoto({ photoPath }) {
   )
 }
 
-function ResultCard({ entry, companion, lang, onPress }) {
+function ResultCard({ entry, companions, lang, onPress }) {
   const { item, partner } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
-  const side = companion
-    ? (formatPrice(companion.item.price, companion.item.currency, lang)
-      ? t('eateryQuizSide', lang).replace('{name}', () => companion.item.name).replace('{price}', () => formatPrice(companion.item.price, companion.item.currency, lang))
-      : t('eateryQuizSideNoPrice', lang).replace('{name}', () => companion.item.name))
-    : ''
-  const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : '', side].filter(Boolean).join('. ')
+  const sides = (companions || []).map(c => {
+    const p = formatPrice(c.item.price, c.item.currency, lang)
+    return p ? t('eateryQuizSide', lang).replace('{name}', () => c.item.name).replace('{price}', () => p)
+      : t('eateryQuizSideNoPrice', lang).replace('{name}', () => c.item.name)
+  })
+  const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : '', ...sides].filter(Boolean).join('. ')
   return (
     <Card onPress={onPress} accessibilityLabel={label} padding={space[12]}>
       <View style={st.resultRow}>
@@ -94,31 +103,36 @@ function ResultCard({ entry, companion, lang, onPress }) {
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
       </View>
-      {!!side && (
+      {sides.length > 0 && (
         <View style={st.side}>
-          <Ionicons name="add-circle-outline" size={18} color={colors.primaryDark} />
-          <Text style={st.sideText}>{side}</Text>
+          {sides.map(line => (
+            <View key={line} style={st.sideRow}>
+              <Ionicons name="add-circle-outline" size={18} color={colors.primaryDark} />
+              <Text style={st.sideText}>{line}</Text>
+            </View>
+          ))}
         </View>
       )}
     </Card>
   )
 }
 
+// kind 'multi' = checkboxes (QUIZ_MULTI holds the cap and the exclusive tile), 'single' = radios.
 const STEPS = [
-  { key: 'protein', q: 'eateryQuizQ1', opts: [['chicken', 'eateryQuizChicken'], ['beef', 'eateryQuizBeef'], ['veg', 'eateryQuizVeg'], ['any', 'eateryQuizAny']] },
-  { key: 'spicy',   q: 'eateryQuizQ2', opts: [['yes', 'eateryQuizYes'], ['no', 'eateryQuizNo'], ['any', 'eateryQuizAny']] },
-  { key: 'portion', q: 'eateryQuizQ3', opts: [['snack', 'eateryQuizSnack'], ['meal', 'eateryQuizMeal'], ['share', 'eateryQuizShare']] },
-  { key: 'budget',  q: 'eateryQuizQ4' },
-  { key: 'extra',   q: 'eateryQuizQ5', opts: [['sauce', 'eateryQuizSauce'], ['drink', 'eateryQuizDrink'], ['dessert', 'eateryQuizDessert'], ['none', 'eateryQuizNone']] },
+  { key: 'protein', kind: 'multi', q: 'eateryQuizQ1', hint: 'eateryQuizHintMax2', opts: [['chicken', 'eateryQuizChicken', '🍗'], ['beef', 'eateryQuizBeef', '🥩'], ['veg', 'eateryQuizVeg', '🥗'], ['any', 'eateryQuizAny', '🤷']] },
+  { key: 'spicy',   kind: 'single', q: 'eateryQuizQ2', opts: [['yes', 'eateryQuizYes', '🌶️'], ['no', 'eateryQuizNo', '😌'], ['any', 'eateryQuizAny', '🤷']] },
+  { key: 'portion', kind: 'multi', q: 'eateryQuizQ3', hint: 'eateryQuizHintMax2', opts: [['snack', 'eateryQuizSnack', '🥨'], ['meal', 'eateryQuizMeal', '🍔'], ['share', 'eateryQuizShare', '🍕']] },
+  { key: 'extra',   kind: 'multi', q: 'eateryQuizQ4', hint: 'eateryQuizHintAny', opts: [['sauce', 'eateryQuizSauce', '🥫'], ['drink', 'eateryQuizDrink', '🥤'], ['dessert', 'eateryQuizDessert', '🍰'], ['none', 'eateryQuizNone', '🚫']] },
 ]
-const RELAX_KEY = { budget: 'eateryQuizRelaxBudget', portion: 'eateryQuizRelaxPortion', spicy: 'eateryQuizRelaxSpicy' }
+const RELAX_KEY = { portion: 'eateryQuizRelaxPortion', spicy: 'eateryQuizRelaxSpicy' }
 
 // rows: the visible partner rows (with tagged menu items). backRef: App's back chain asks here first (the page is a layer above the list).
 export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed, onOpenDish }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
+  const width = winW
   const [step, setStep] = useState(0)          // 0-4 = a question, 5 = the result
-  const [answers, setAnswers] = useState({})
+  const [answers, setAnswers] = useState({ protein: [], portion: [], extra: [] })
   const scrollRef = useRef(null)
 
   const slide = useRef(new Animated.Value(reduce ? 0 : winW)).current
@@ -152,30 +166,27 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
     return () => clearTimeout(id)
   }, [step])
 
-  const pick = (key, value) => {
-    // An earlier answer changes what the later ones mean (budget bands follow Q1-Q3): everything after it is asked again.
-    const idx = STEPS.findIndex(s => s.key === key)
-    const next = { ...answers }
-    STEPS.slice(idx + 1).forEach(s => { delete next[s.key] })
-    next[key] = value
-    setAnswers(next)
-    setStep(idx + 1)
+  const [capHit, setCapHit] = useState(false)
+  useEffect(() => { setCapHit(false) }, [step])
+  const tap = (cur, value) => {
+    if (cur.kind === 'single') { setAnswers(a => ({ ...a, [cur.key]: value })); return }
+    const { next, blocked } = quizToggle(cur.key, answers[cur.key], value)
+    if (blocked) {
+      setCapHit(true)
+      AccessibilityInfo.announceForAccessibility?.(t('eateryQuizHintMax2', lang))
+      return
+    }
+    setCapHit(false)
+    setAnswers(a => ({ ...a, [cur.key]: next }))
   }
-  const retry = () => { setAnswers({}); setStep(0) }
+  const retry = () => { setAnswers({ protein: [], portion: [], extra: [] }); setStep(0) }
 
-  const cands = useMemo(() => quizCandidates(rows, answers), [rows, answers])
-  const bands = useMemo(() => (step === 3 ? quizBudgetBands(cands) : []), [step, cands])
   const result = useMemo(() => (step >= QUIZ_STEPS ? quizMatch(rows, answers) : null), [step, rows, answers])
   const cur = STEPS[step]
-
-  const budgetOptions = () => {
-    const cur0 = cands[0]?.item.currency
-    const a = n => quizAmount(n, cur0, lang)
-    const label = b => b.key === 'low' ? t('eateryQuizBudgetLow', lang).replace('{a}', () => a(b.max))
-      : b.key === 'mid' ? t('eateryQuizBudgetMid', lang).replace('{a}', () => a(b.min)).replace('{b}', () => a(b.max))
-      : t('eateryQuizBudgetHigh', lang).replace('{a}', () => a(b.min))
-    return [...bands.map(b => [b.key, label(b)]), ['any', t('eateryQuizAny', lang)]]
-  }
+  const picked = cur ? answers[cur.key] : null
+  const canNext = !!cur && (cur.kind === 'single' ? !!picked : !!picked?.length)
+  const cols = width < 340 || PixelRatio.getFontScale() >= 1.3 ? 1 : 2
+  const tileW = cols === 2 ? Math.floor((width - space[16] * 2 - space[12]) / 2) : null
 
   return (
     <Animated.View collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
@@ -192,16 +203,30 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + space[24] }]} showsVerticalScrollIndicator={false}>
           {cur ? (
             <>
-              <Text ref={headRef} style={st.question} accessibilityRole="header">{t(cur.q, lang)}</Text>
-              <View style={st.options} accessibilityRole="radiogroup">
-                {(cur.key === 'budget' ? budgetOptions() : cur.opts.map(([v, k]) => [v, t(k, lang)])).map(([v, label]) => (
-                  <Option key={v} label={label} selected={answers[cur.key] === v} onPress={() => pick(cur.key, v)} />
-                ))}
+              <View style={st.qRow}>
+                <Image source={require('../assets/oli-button.png')} style={st.qMascot} resizeMode="contain" accessibilityIgnoresInvertColors />
+                <Text ref={headRef} style={st.question} accessibilityRole="header">{t(cur.q, lang)}</Text>
+              </View>
+              {!!cur.hint && (
+                <Text style={[st.hint, capHit && st.hintHit]} accessibilityLiveRegion="polite">{t(cur.hint, lang)}</Text>
+              )}
+              <View style={[st.grid, cols === 2 && st.gridWrap]} accessibilityRole={cur.kind === 'single' ? 'radiogroup' : undefined} accessibilityLabel={t(cur.q, lang)}>
+                {cur.opts.map(([v, k, emoji]) => {
+                  const sel = cur.kind === 'single' ? picked === v : picked.includes(v)
+                  const max = cur.kind === 'multi' ? QUIZ_MULTI[cur.key].max : null
+                  const locked = !!max && !sel && picked.length >= max
+                  return (
+                    <View key={v} style={tileW ? { width: tileW } : st.fullW}>
+                      <Tile emoji={emoji} label={t(k, lang)} selected={sel} locked={locked} hint={t('eateryQuizHintMax2', lang)}
+                        role={cur.kind === 'single' ? 'radio' : 'checkbox'} cols={cols} onPress={() => tap(cur, v)} />
+                    </View>
+                  )
+                })}
               </View>
             </>
           ) : (
             <>
-              <Text ref={headRef} style={st.question} accessibilityRole="header">{t('eateryQuizResultTitle', lang)}</Text>
+              <Text ref={headRef} style={[st.question, { flex: 0 }]} accessibilityRole="header">{t('eateryQuizResultTitle', lang)}</Text>
               {!!result && result.dishes.length === 0 ? (
                 <View style={st.empty}>
                   <Ionicons name="restaurant-outline" size={44} color={colors.textSecondary} />
@@ -217,7 +242,7 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
                   )}
                   <View style={st.cards}>
                     {result?.dishes.map((d, i) => (
-                      <ResultCard key={d.item.id} entry={d} lang={lang} companion={i === 0 ? result.companion : null} onPress={() => onOpenDish(d.partner, d.item.id)} />
+                      <ResultCard key={d.item.id} entry={d} lang={lang} companions={i === 0 ? result.companions : null} onPress={() => onOpenDish(d.partner, d.item.id)} />
                     ))}
                   </View>
                 </>
@@ -226,6 +251,11 @@ export function QuizPage({ lang, open, rows, reduce, backRef, onClose, onClosed,
             </>
           )}
         </ScrollView>
+        {!!cur && (
+          <View style={[st.footer, { paddingBottom: insets.bottom + space[12] }]}>
+            <Button fullWidth title={t(step === QUIZ_STEPS - 1 ? 'eateryQuizSeeResults' : 'eateryQuizNext', lang)} disabled={!canNext} disabledHint={t('eateryQuizPickOne', lang)} onPress={() => setStep(step + 1)} />
+          </View>
+        )}
       </SafeAreaView>
     </Animated.View>
   )
@@ -246,12 +276,28 @@ const st = StyleSheet.create({
   step:       { ...type.meta, color: colors.textSecondary },
   scroll:     { flex: 1 },
   content:    { paddingHorizontal: space[16], paddingTop: space[16], gap: space[16] },
-  question:   { ...type.detailTitle, color: colors.textPrimary },
-  options:    { gap: space[12] },
-  option:     { minHeight: TAP + 12, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[12], paddingHorizontal: space[16], borderRadius: radii.tile, backgroundColor: colors.card, ...elevation.card },
-  optionOn:   { backgroundColor: colors.primaryLight },
-  optionText: { flex: 1, ...type.sectionHeading, fontFamily: font.semibold, color: colors.textPrimary },
-  optionTextOn: { color: colors.primaryDark },
+  question:   { flex: 1, ...type.detailTitle, color: colors.textPrimary },
+  qRow:       { flexDirection: 'row', alignItems: 'center', gap: space[12] },
+  qMascot:    { width: 56, height: 56, flexShrink: 0 },
+  hint:       { ...type.small, color: colors.textSecondary, marginTop: -space[8] },
+  hintHit:    { color: colors.dangerInk, fontFamily: font.semibold },
+  grid:       { gap: space[12] },
+  gridWrap:   { flexDirection: 'row', flexWrap: 'wrap' },
+  fullW:      { width: '100%' },
+  tile:       { minHeight: TAP + 20, borderRadius: radii.tile, backgroundColor: colors.card, padding: space[16], ...elevation.card },
+  tileCol:    { justifyContent: 'center', gap: space[8], minHeight: 112 },
+  tileHalf:   { flex: 1 },
+  tileRow:    { flexDirection: 'row', alignItems: 'center', gap: space[16] },
+  tileOn:     { backgroundColor: colors.primaryLight },
+  tileLocked: { backgroundColor: colors.soft },
+  emojiLocked:{ opacity: 0.5 },
+  tileTextLocked: { color: colors.textSecondary },
+  tileBorder: { ...StyleSheet.absoluteFillObject, borderRadius: radii.tile, borderWidth: 2, borderColor: colors.primary, backgroundColor: 'transparent' },
+  emoji:      { fontSize: 30, lineHeight: 38 },
+  tileText:   { ...type.rowTitle, color: colors.textPrimary },
+  tileTextOn: { color: colors.primaryDark },
+  badge:      { position: 'absolute', top: space[8], right: space[8], width: 22, height: 22, borderRadius: radii.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  footer:     { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12] },
   cards:      { gap: space[12] },
   resultRow:  { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   photo:      { width: 88, height: 88, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
@@ -264,7 +310,8 @@ const st = StyleSheet.create({
   price:      { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   pork:       { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: space[4], backgroundColor: colors.dangerLight },
   porkText:   { ...type.meta, color: colors.dangerInk, flexShrink: 1 },
-  side:       { flexDirection: 'row', alignItems: 'center', gap: space[8], marginTop: space[12], paddingTop: space[12], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  side:       { gap: space[8], marginTop: space[12], paddingTop: space[12], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  sideRow:    { flexDirection: 'row', alignItems: 'center', gap: space[8] },
   sideText:   { flex: 1, ...type.small, color: colors.textPrimary },
   relaxed:    { flexDirection: 'row', alignItems: 'flex-start', gap: space[8], padding: space[12], borderRadius: radii.md, backgroundColor: colors.primaryLight },
   relaxedText:{ flex: 1, ...type.small, color: colors.primaryDark },
