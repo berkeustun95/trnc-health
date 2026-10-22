@@ -26,7 +26,7 @@ const STEPS = 3
 
 const toDraft = seed => ({
   kind: seed?.kind || 'home', name: seed?.name || '', district: seed?.district || '', street: seed?.street || '', building: seed?.building || '',
-  floor: seed?.floor || '', flat: seed?.flat || '', directions: seed?.directions || '', phone: formatPhone(seed?.phone), coords: seed?.coords || null,
+  floor: seed?.floor || '', flat: seed?.flat || '', directions: seed?.directions || '', phone: formatPhone(seed?.callPhone), coords: seed?.coords || null,
 })
 const newReg = () => ({ input: { current: null }, wrap: { current: null } })
 
@@ -242,7 +242,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
     setSaveErr(null)
     const entry = {
       kind: draft.kind, name: draft.kind === 'other' ? draft.name : '', district: draft.district, street: draft.street, building: draft.building,
-      floor: draft.floor, flat: draft.flat, directions: draft.directions, lat: draft.coords?.lat ?? null, lng: draft.coords?.lng ?? null, phone: phone.value,
+      floor: draft.floor, flat: draft.flat, directions: draft.directions, lat: draft.coords?.lat ?? null, lng: draft.coords?.lng ?? null, callPhone: phone.value,
     }
     const r = editing ? await updateAddress(seed.addressId, entry) : await addAddress(entry)
     if (r.ok) await setLastUsed(r.item.id)

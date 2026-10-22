@@ -29,7 +29,7 @@ export function normalizeEntry(raw) {
     floor: oneLine(raw.floor, ADDRESS_UNIT_MAX),
     flat: oneLine(raw.flat, ADDRESS_UNIT_MAX),
     directions: oneLine(raw.directions, ADDRESS_DIRECTIONS_MAX),
-    phone: normalizePhone(raw.phone).value ?? null,   // malformed stored value -> null
+    callPhone: normalizePhone(raw.callPhone).value ?? null,   // malformed stored value -> null
     lat: pin.lat,
     lng: pin.lng,
     updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0,

@@ -303,7 +303,7 @@ export function deliveryLine(delivery) {
   const f = sanitizeAddressField
   const floor = oneLine(delivery.floor, ADDRESS_UNIT_MAX), flat = oneLine(delivery.flat, ADDRESS_UNIT_MAX)
   const addr = [`${f(delivery.street)} No ${buildingNo(delivery.building)}`, floor && `Kat ${floor}`, flat && `Daire ${flat}`, f(delivery.district)].filter(Boolean).join(', ')
-  const phone = formatPhone(delivery.phone)
+  const phone = formatPhone(delivery.callPhone)
   const directions = oneLine(delivery.directions, ADDRESS_DIRECTIONS_MAX)
   const pin = delivery.coords || delivery
   const link = mapsLink(pin?.lat, pin?.lng), coords = coordText(pin?.lat, pin?.lng)

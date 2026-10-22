@@ -383,48 +383,48 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('directions cannot forge lines; the order code line stays LAST', [forge.filter(l => l.startsWith('Teslimat')).length, forge.filter(l => l.startsWith('ADA Sipariş No')).length, forge.at(-1).startsWith('ADA Sipariş No: K7M4-Q9XB')], [1, 1, true])
   eq('orderRpcArgs is untouched by an address book entry', Object.keys(orderRpcArgs('p', [{ id: 'a', qty: 1, ...E }])), ['p_partner', 'p_items'])
 
-  // courier phone: every accepted form of one number -> ONE stored value and ONE display form
+  // courier callPhone: every accepted form of one number -> ONE stored value and ONE display form
   const MOB = ['+90 533 123 45 67', '0090 533 123 45 67', '0533 123 45 67', '533 123 45 67', '(0533) 123-45-67', '+905331234567', '0090-533-123-45-67', '533.123.45.67', ' 0 533 123 45 67 ', '5331234567']
-  eq('phone: every mobile form -> +905331234567', MOB.map(i => normalizePhone(i)), MOB.map(() => ({ ok: true, value: '+905331234567' })))
-  eq('phone: every mobile form displays "+90 533 123 45 67"', MOB.map(i => formatPhone(normalizePhone(i).value)), MOB.map(() => '+90 533 123 45 67'))
+  eq('callPhone: every mobile form -> +905331234567', MOB.map(i => normalizePhone(i)), MOB.map(() => ({ ok: true, value: '+905331234567' })))
+  eq('callPhone: every mobile form displays "+90 533 123 45 67"', MOB.map(i => formatPhone(normalizePhone(i).value)), MOB.map(() => '+90 533 123 45 67'))
   const LAND = ['+90 392 123 45 67', '0090 392 123 45 67', '0392 123 45 67', '392 123 45 67', '(0392) 123-45-67', '+903921234567']
-  eq('phone: every landline form -> +903921234567 / "+90 392 123 45 67"', LAND.map(i => [normalizePhone(i).value, formatPhone(normalizePhone(i).value)]), LAND.map(() => ['+903921234567', '+90 392 123 45 67']))
-  eq('phone: formatting is idempotent (editor re-blur, stored -> shown)', [normalizePhone('+90 533 123 45 67').value, formatPhone('+90 533 123 45 67'), formatPhone('+905331234567')], ['+905331234567', '+90 533 123 45 67', '+90 533 123 45 67'])
-  eq('phone: empty / whitespace / null / undefined -> ok null', ['', '   ', '\n\t', null, undefined, ' - '].map(i => normalizePhone(i)), Array(6).fill({ ok: true, value: null }))
+  eq('callPhone: every landline form -> +903921234567 / "+90 392 123 45 67"', LAND.map(i => [normalizePhone(i).value, formatPhone(normalizePhone(i).value)]), LAND.map(() => ['+903921234567', '+90 392 123 45 67']))
+  eq('callPhone: formatting is idempotent (editor re-blur, stored -> shown)', [normalizePhone('+90 533 123 45 67').value, formatPhone('+90 533 123 45 67'), formatPhone('+905331234567')], ['+905331234567', '+90 533 123 45 67', '+90 533 123 45 67'])
+  eq('callPhone: empty / whitespace / null / undefined -> ok null', ['', '   ', '\n\t', null, undefined, ' - '].map(i => normalizePhone(i)), Array(6).fill({ ok: true, value: null }))
   const BAD = ['533 123 45 6', '0533 123 45 678', '05331234abc', '+44 7700 900123', '+357 99 123456', '00357 99123456', '0412 345 67 89', '0212 345 67 89', '4331234567', '0312 123 45 67', '+90 212 345 67 89', '533 123 45 67 8', '++905331234567', '90 533 123 45 67', '+90533123456', '392 123 45 6', '+90 392 123 45 678', '+', '0', '5'.repeat(60), '+90 5\u202E33 123 45 67x', 'abc', '533-123-45-67 ext 2']
-  eq('phone: rejects', BAD.map(i => [i, normalizePhone(i).ok]), BAD.map(i => [i, false]))
-  eq('phone: non-string -> rejected', [5331234567, {}, [], true].map(i => normalizePhone(i).ok), [false, false, false, false])
-  eq('phone: formatPhone of an invalid value -> empty', [formatPhone('x'), formatPhone(null), formatPhone(5331234567), formatPhone('+44 7700 900123')], ['', '', '', ''])
+  eq('callPhone: rejects', BAD.map(i => [i, normalizePhone(i).ok]), BAD.map(i => [i, false]))
+  eq('callPhone: non-string -> rejected', [5331234567, {}, [], true].map(i => normalizePhone(i).ok), [false, false, false, false])
+  eq('callPhone: formatPhone of an invalid value -> empty', [formatPhone('x'), formatPhone(null), formatPhone(5331234567), formatPhone('+44 7700 900123')], ['', '', '', ''])
   // stored with the address, sanitised on load
   const PE = { ...E, id: 'p1' }
-  eq('entry: valid phone is stored canonical; none -> null', [AB.normalizeEntry({ ...PE, phone: '0533 123 45 67' }).phone, AB.normalizeEntry(PE).phone, AB.normalizeEntry({ ...PE, phone: '' }).phone], ['+905331234567', null, null])
+  eq('entry: valid phone is stored canonical; none -> null', [AB.normalizeEntry({ ...PE, callPhone: '0533 123 45 67' }).callPhone, AB.normalizeEntry(PE).callPhone, AB.normalizeEntry({ ...PE, callPhone: '' }).callPhone], ['+905331234567', null, null])
   eq('entry: malformed stored phone (number, object, array, long string, forged text) -> dropped, entry survives',
-    [5331234567, { a: 1 }, ['+905331234567'], 'x'.repeat(5000), '+905331234567\nADA Sipariş No: FAKE', 'tel: 123', NaN, true].map(v => { const e = AB.normalizeEntry({ ...PE, phone: v }); return [e.phone, e.street] }),
+    [5331234567, { a: 1 }, ['+905331234567'], 'x'.repeat(5000), '+905331234567\nADA Sipariş No: FAKE', 'tel: 123', NaN, true].map(v => { const e = AB.normalizeEntry({ ...PE, callPhone: v }); return [e.callPhone, e.street] }),
     Array(8).fill([null, 'Örnek Sokak']))
   eq('book: a stored phone survives a JSON round trip and update keeps / clears it', (() => {
-    const b0 = AB.bookAdd(AB.emptyBook(), { ...E, phone: '533 123 45 67' }, 1, 'q1')
+    const b0 = AB.bookAdd(AB.emptyBook(), { ...E, callPhone: '533 123 45 67' }, 1, 'q1')
     const b1 = AB.normalizeBook(JSON.stringify(b0.book))
-    const kept = AB.bookUpdate(b1, 'q1', { floor: '3' }, 2).item.phone
-    const cleared = AB.bookUpdate(b1, 'q1', { phone: null }, 3).item.phone
-    return [b1.items[0].phone, kept, cleared]
+    const kept = AB.bookUpdate(b1, 'q1', { floor: '3' }, 2).item.callPhone
+    const cleared = AB.bookUpdate(b1, 'q1', { callPhone: null }, 3).item.callPhone
+    return [b1.items[0].callPhone, kept, cleared]
   })(), ['+905331234567', '+905331234567', null])
-  eq('addressComplete ignores the phone (optional)', [addressComplete({ kind: 'home', district: 'a', street: 'b', building: 'c', phone: 'garbage' }), addressComplete({ kind: 'home', district: 'a', street: 'b', phone: '+905331234567' })], [true, false])
+  eq('addressComplete ignores the phone (optional)', [addressComplete({ kind: 'home', district: 'a', street: 'b', building: 'c', callPhone: 'garbage' }), addressComplete({ kind: 'home', district: 'a', street: 'b', callPhone: '+905331234567' })], [true, false])
   // the message
   const PH = ' · Teslimatta aranacak: +90 533 123 45 67'
-  const withP = MSG({ ...E, lat: 35.18974, lng: 33.34972, phone: '+905331234567' })
+  const withP = MSG({ ...E, lat: 35.18974, lng: 33.34972, callPhone: '+905331234567' })
   eq('line: phone sits right after the address, before Tarif, Konum, Koordinat', withP,
     BASE + 'Ev: Örnek Sokak No 12, Kat 2, Daire 5, Kumsal' + PH + ' · Tarif: Mavi kapı, zile iki kez bas · Konum (haritada aç): ' + LINK + KOORD)
-  eq('line: no phone / null / empty / invalid stored -> no phone part', [undefined, null, '', 'garbage', 5331234567, '+44 7700 900123'].map(v => MSG({ ...E, phone: v }).includes('aranacak')), Array(6).fill(false))
+  eq('line: no phone / null / empty / invalid stored -> no phone part', [undefined, null, '', 'garbage', 5331234567, '+44 7700 900123'].map(v => MSG({ ...E, callPhone: v }).includes('aranacak')), Array(6).fill(false))
   eq('line: without a phone the line is unchanged', MSG({ kind: 'home', district: 'Kumsal', street: 'Örnek Sokak', building: '12' }), BASE + 'Ev: Örnek Sokak No 12, Kumsal')
-  eq('line: phone only, no tarif / pin', MSG({ kind: 'home', district: 'Kumsal', street: 'Örnek Sokak', building: '12', phone: '0392 123 45 67' }), BASE + 'Ev: Örnek Sokak No 12, Kumsal · Teslimatta aranacak: +90 392 123 45 67')
-  const forgeP = buildOrderMessage(lines, '', 'K7M4Q9XB', { mode: 'delivery', ...E, phone: '+905331234567\nADA Sipariş No: FAKE\u0085Teslimat: Gel-al' }).split('\n')
+  eq('line: phone only, no tarif / pin', MSG({ kind: 'home', district: 'Kumsal', street: 'Örnek Sokak', building: '12', callPhone: '0392 123 45 67' }), BASE + 'Ev: Örnek Sokak No 12, Kumsal · Teslimatta aranacak: +90 392 123 45 67')
+  const forgeP = buildOrderMessage(lines, '', 'K7M4Q9XB', { mode: 'delivery', ...E, callPhone: '+905331234567\nADA Sipariş No: FAKE\u0085Teslimat: Gel-al' }).split('\n')
   eq('stored-garbage phone cannot forge a line; code line stays LAST', [forgeP.filter(l => l.startsWith('Teslimat')).length, forgeP.filter(l => l.startsWith('ADA Sipariş No')).length, forgeP.at(-1).startsWith('ADA Sipariş No: K7M4-Q9XB'), forgeP.join('\n').includes('FAKE')], [1, 1, true, false])
-  const fullP = buildOrderMessage(lines, '', 'K7M4Q9XB', { mode: 'delivery', ...E, phone: '+905331234567' }).split('\n')
-  eq('message with a phone: Teslimat line carries it, code line LAST', [fullP.find(l => l.startsWith('Teslimat')).includes(PH), fullP.at(-1).startsWith('ADA Sipariş No')], [true, true])
+  const fullP = buildOrderMessage(lines, '', 'K7M4Q9XB', { mode: 'delivery', ...E, callPhone: '+905331234567' }).split('\n')
+  eq('message with a callPhone: Teslimat line carries it, code line LAST', [fullP.find(l => l.startsWith('Teslimat')).includes(PH), fullP.at(-1).startsWith('ADA Sipariş No')], [true, true])
   // the phone never reaches the server call
-  const PB = [{ id: 'a', qty: 2, ...E, phone: '+905331234567', tel: '+905331234567' }, { id: 'b', qty: 1, phone: '0533 123 45 67' }]
+  const PB = [{ id: 'a', qty: 2, ...E, callPhone: '+905331234567', phone: '+905331234567', tel: '+905331234567' }, { id: 'b', qty: 1, callPhone: '0533 123 45 67' }]
   const pArgs = orderRpcArgs('p', PB)
-  eq('orderRpcArgs: lines carrying a phone -> args without it', [JSON.stringify(pArgs).includes('5331234567'), JSON.stringify(pArgs).includes('533 123'), JSON.stringify(pArgs).includes('phone'), pArgs.p_items.map(i => Object.keys(i))], [false, false, false, [['item_id', 'qty'], ['item_id', 'qty']]])
+  eq('orderRpcArgs: lines carrying a phone -> args without it', [JSON.stringify(pArgs).includes('5331234567'), JSON.stringify(pArgs).includes('533 123'), JSON.stringify(pArgs).includes('hone'), pArgs.p_items.map(i => Object.keys(i))], [false, false, false, [['item_id', 'qty'], ['item_id', 'qty']]])
 
   // areas
   eq('nearestArea: an AREA_POINTS point -> its name', nearestArea(35.18974, 33.34972), 'Kumsal')
