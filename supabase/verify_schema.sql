@@ -4036,6 +4036,13 @@ WITH report AS (
     UNION ALL SELECT '20261128_eatery_orders_test_cleanup','eatery_orders exists once 1128 is applied (one-time test-order delete; asserted in-file, not re-checkable)',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261128_eatery_orders_test_cleanup.sql')
       OR to_regclass('public.eatery_orders') IS NOT NULL
+    -- 1130 deleted Berke's two live-check orders (fingerprints = first 6 hex of md5(id)); observable for good: no Crunchy
+    -- order in that 14-minute window may carry either fingerprint (eatery_orders exists since 1125, applied).
+    UNION ALL SELECT '20261130_crunchy_livecheck_orders_cleanup','no Crunchy order 2026-10-22 13:22–13:36 UTC with fp 113d9d/bda529, once 1130 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261130_crunchy_livecheck_orders_cleanup.sql')
+      OR NOT EXISTS(SELECT 1 FROM public.eatery_orders o JOIN public.eatery_partners p ON p.id = o.partner_id
+                    WHERE p.slug = 'crunchy-express' AND o.created_at >= timestamptz '2026-10-22 13:22:00+00'
+                      AND o.created_at < timestamptz '2026-10-22 13:36:00+00' AND left(md5(o.id::text), 6) IN ('113d9d', 'bda529'))
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',

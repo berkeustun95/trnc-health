@@ -17,7 +17,7 @@ import { partnerAsset } from '../constants/partnerAssets'
 //   operator row; the four targets from connectivity_links (20261113), keyed by slug. Only the
 //   artwork and the copy are in the app.
 //
-// The art is Oli & Maki in yellow KKTCELL beanies (2026-10-22), resolved through
+// The art is Oli & Maki in blue TURKCELL KUZEY KIBRIS caps (KKTCELL's request), resolved through
 // constants/partnerAssets.js like every partner asset. The logo comes off the operator row's
 // logo_key (20261129), the same pattern as driving_schools.logo_key.
 //
@@ -41,8 +41,8 @@ const REQUIRED_SLUGS = ['tasi', 'turist', 'yenihat', 'support']
 const GUTTER = 16
 const GAP = 12
 const CARD_PAD = 18
-const HERO_SHARE = 0.36        // of the card's inner width; keeps the card as tall as the 0.44 landscape art did
-const HERO_ASPECT = 624 / 700  // kktcell-hero.png (portrait)
+const HERO_SHARE = 0.37        // of the card's inner width; keeps the card as tall as the earlier art did
+const HERO_ASPECT = 647 / 700  // kktcell-hero.png
 // The column never grows past a large phone: on a tablet the card, art and tiles keep their phone
 // proportions, centred, instead of scaling up to a 490 pt hero and 390 pt tiles.
 const MAX_COLUMN = 480

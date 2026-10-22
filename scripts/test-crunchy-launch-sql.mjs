@@ -9,6 +9,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const M = (f) => fileURLToPath(new URL('../supabase/migrations/' + f, import.meta.url))
 const ACT = M('20261127_crunchy_express_activate.sql'), CLN = M('20261128_eatery_orders_test_cleanup.sql')
+const LIVE = M('20261130_crunchy_livecheck_orders_cleanup.sql')
 const PRIOR = readFileSync(M('20261115_eatery_partners.sql'), 'utf8')
 const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners')
 const b = PRIOR.indexOf('-- ─── Storage bucket')
@@ -98,5 +99,42 @@ for (const [name, ago, msg] of [['1127 missing', null, 'is not applied'], ['1127
   t(`${name}: refused`, [r.ok, (r.msg || '').includes(msg)], [false, true])
   await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
   t(`${name}: nothing deleted`, (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n, 3)
+}
+console.log('20261130 live-check cleanup')
+// Ids chosen so left(md5(id),6) = the probe's fingerprints 113d9d / bda529.
+const FA = '1aa4b1a5-4176-498d-8921-cbccb193959d', FB = 'd2f37c06-04b9-4528-b25c-caf3124a88dd'
+const BURGER = `'[{"name":"Crunchy Burger","qty":1,"unit_price":620.00}]'`
+const LO = (id, code, o = {}) => `INSERT INTO public.eatery_orders (id, code, partner_id, lines, total, currency, created_at, created_as_guest)
+  VALUES ('${id}','${code}','${o.partner ?? CID}',${o.lines ?? BURGER},${o.total ?? 620.00},'TRY','${o.at ?? '2026-10-22 13:25:19+00'}',${o.guest ?? true});`
+const live = async (setup, o = {}) => {
+  const d = await fx({ active: true })
+  await d.exec(`ALTER TABLE public.eatery_orders ADD COLUMN created_as_guest boolean NOT NULL DEFAULT false;`)
+  await d.exec(setup)
+  return d
+}
+const BASE = LO(FA, 'AAAA1111') + LO(FB, 'BBBB2222', { at: '2026-10-22 13:27:09+00' })
+  + ORD(2, 'O') + `INSERT INTO public.eatery_orders (code, partner_id, created_at) VALUES ('LATER001','${CID}','2026-10-22 15:00:00+00');`
+{
+  const d = await live(BASE)
+  t('fixture fingerprints', await q(d, `SELECT left(md5(id::text),6) fp FROM public.eatery_orders WHERE id IN ('${FA}','${FB}') ORDER BY 1`), [{ fp: '113d9d' }, { fp: 'bda529' }])
+  const r = await applyFile(d, LIVE)
+  t('baseline: both live-check orders deleted', r, { ok: true, msg: null })
+  t('only they went (other partner 2, later Crunchy 1)', await q(d, `SELECT count(*)::int n FROM public.eatery_orders`), [{ n: 3 }])
+  t('re-run refused (window now empty)', (await applyFile(d, LIVE)).ok, false)
+}
+for (const [name, setup] of [
+  ['a third Crunchy order in the window', BASE + LO('33333333-3333-4333-8333-333333333333', 'CCCC3333', { at: '2026-10-22 13:30:00+00' })],
+  ['one fingerprint missing', LO(FA, 'AAAA1111') + LO('44444444-4444-4444-8444-444444444444', 'DDDD4444', { at: '2026-10-22 13:27:09+00' })],
+  ['different items', LO(FA, 'AAAA1111') + LO(FB, 'BBBB2222', { lines: `'[{"name":"Kids Box","qty":1,"unit_price":620.00}]'` })],
+  ['different total', LO(FA, 'AAAA1111') + LO(FB, 'BBBB2222', { total: 1240.00 })],
+  ['signed-in, not guest', LO(FA, 'AAAA1111') + LO(FB, 'BBBB2222', { guest: false })],
+  ['outside the window', LO(FA, 'AAAA1111') + LO(FB, 'BBBB2222', { at: '2026-10-22 13:40:00+00' })],
+]) {
+  const d = await live(setup)
+  const before = (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n
+  const r = await applyFile(d, LIVE)
+  t(`${name}: refused`, [r.ok, (r.msg || '').includes('expected exactly the 2 live-check orders')], [false, true]); console.log(`      ${r.msg}`)
+  await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  t(`${name}: nothing deleted`, (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n, before)
 }
 console.log(bad ? `\n${bad} FAILED` : '\nall passed'); process.exit(bad ? 1 : 0)
