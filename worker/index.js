@@ -85,7 +85,7 @@ if(j.status==='not_found'){put(banner("ADA'da böyle bir sipariş yok",'No such 
 if(j.status!=='ok'&&j.status!=='expired')return fail();
 var ex=j.status==='expired';
 var b=j.isTest===true?banner('TEST SİPARİŞİ — hazırlamayın','TEST ORDER — do not prepare',true):ex?banner('Süresi dolmuş','Expired',true):banner('✓ Bu sipariş ADA üzerinden geldi','This order came through ADA',false);
-var c=el('div','card'+(ex?' grey':''));
+var c=el('div','card'+((ex||j.isTest===true)?' grey':''));
 c.appendChild(el('h2',null,j.partner));
 var m=el('div','meta','Sipariş no: ');m.appendChild(el('b',null,j.orderNo));c.appendChild(m);
 c.appendChild(el('div','meta',j.time));
@@ -172,7 +172,7 @@ function renderOrder(code, r) {
     : expired
     ? `<div class="banner bad"><b>Süresi dolmuş</b><div class="en">Expired</div></div>`
     : `<div class="banner"><b>✓ Bu sipariş ADA üzerinden geldi</b><div class="en">This order came through ADA</div></div>`
-  const body = `${banner}<div class="card${expired ? ' grey' : ''}"><h2>${esc(r.partner_name)}</h2>
+  const body = `${banner}<div class="card${(expired || v.isTest) ? ' grey' : ''}"><h2>${esc(r.partner_name)}</h2>
 <div class="meta">Sipariş no: <b>${esc(v.orderNo)}</b></div>
 <div class="meta">${esc(v.time)}</div>
 <ul>${lines}</ul><div class="total"><span>Toplam</span><span>${esc(v.total)}</span></div>

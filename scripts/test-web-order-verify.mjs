@@ -257,7 +257,10 @@ await test('is_test: test banner wins (server HTML, /check JSON, client script);
     assert.doesNotMatch(html, GREEN, status)
     assert.doesNotMatch(html, /<b>Süresi dolmuş/, status)
     assert.equal((await (await check('/o/7K3QX9MP')).json()).isTest, true, status)
+    assert.match(html, /class="card grey"/, status)
   }
+  rpcImpl = () => json(okRow())
+  assert.doesNotMatch(await (await get('/o/7K3QX9MP')).text(), /class="card grey"/)
   const js = (await (await plain('/o/7K3QX9MP')).text()).match(/<script nonce="[^"]+">([\s\S]*)<\/script>/)[1]
   assert.match(js, /j\.isTest===true\?banner\('TEST SİPARİŞİ — hazırlamayın','TEST ORDER — do not prepare',true\)/)
   const mkEl = tag => ({ tag, children: [], className: '', set textContent(v) { this._t = v; if (v === '') this.children = [] }, get textContent() { return this._t }, appendChild(c) { this.children.push(c) } })
@@ -273,6 +276,10 @@ await test('is_test: test banner wins (server HTML, /check JSON, client script);
   assert.match(t, TEST_TR); assert.match(t, TEST_EN); assert.match(t, /banner bad/); assert.doesNotMatch(t, GREEN)
   const te = await render({ ...base, status: 'expired', isTest: true })
   assert.match(te, TEST_TR); assert.doesNotMatch(te, /Süresi dolmuş/)
+  assert.match(t, /"className":"card grey"/)
+  assert.match(te, /"className":"card grey"/)
+  const ok = await render(base)
+  assert.match(ok, /"className":"card"/); assert.doesNotMatch(ok, /card grey/)
   assert.match(await render({ ...base, isTest: 'true' }), GREEN)
 })
 
