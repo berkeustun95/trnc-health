@@ -233,10 +233,15 @@ export const ADDRESS_FIELD_MAX = 100
 const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u034F\u115F\u1160\u17B4\u17B5\u3164\uFFA0\uFEFF]/g
 export const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
 export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
+// The ONE place the pin link's shape is decided ({lat} / {lng} are 5-decimal substitutions). Berke picks the final format after a
+// phone test: a bare `?q=lat,lng` snapped to the nearest labelled business (the clinic next door), so this is a one-constant change.
+export const MAPS_LINK_FORMAT = 'https://www.google.com/maps/search/?api=1&query={lat},{lng}'
+const validPin = (lat, lng) => typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+// "35.17900, 33.35745" (5 dp), or '' when the pin is missing / invalid.
+export const coordText = (lat, lng) => (validPin(lat, lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : '')
 export function mapsLink(lat, lng) {
-  const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
-  if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return ''
-  return `https://maps.google.com/?q=${la.toFixed(5)},${ln.toFixed(5)}`
+  if (!validPin(lat, lng)) return ''
+  return MAPS_LINK_FORMAT.replace('{lat}', () => lat.toFixed(5)).replace('{lng}', () => lng.toFixed(5))
 }
 
 // ─── Address book entries (utils/eateryAddressCore.js stores them; the pin is optional) ───
@@ -261,7 +266,8 @@ const KIND_LABEL = { home: 'Ev', work: 'İş' }
 // A building typed by an older version often already starts with "No" ("No 4", "No: 4", "no.4"): the line adds its own "No".
 // A building that is only "No" keeps itself rather than vanishing.
 const buildingNo = v => { const b = sanitizeAddressField(v); return b.replace(/^no\b[\s.:]*/i, '') || b }
-// ONE line, always Turkish: "<name>: <sokak> No <bina>, Kat <kat>, Daire <daire>, <mahalle> · Tarif: … · Konum (haritada aç): <link>".
+// ONE line, always Turkish: "<name>: <sokak> No <bina>, Kat <kat>, Daire <daire>, <mahalle> · Tarif: … · Konum (haritada aç): <link> · Koordinat: <lat>, <lng>".
+// A pin adds BOTH the link and the plain coordinates (a restaurant that cannot open the link can still read the numbers); no pin, neither.
 export function deliveryLine(delivery) {
   if (!deliveryReady(delivery)) return ''
   if (delivery.mode === 'pickup') return 'Teslimat: Gel-al'
@@ -272,8 +278,8 @@ export function deliveryLine(delivery) {
   const addr = [`${f(delivery.street)} No ${buildingNo(delivery.building)}`, floor && `Kat ${floor}`, flat && `Daire ${flat}`, f(delivery.district)].filter(Boolean).join(', ')
   const directions = oneLine(delivery.directions, ADDRESS_DIRECTIONS_MAX)
   const pin = delivery.coords || delivery
-  const link = mapsLink(pin?.lat, pin?.lng)
-  return ['Teslimat: Adrese teslim — ' + (name ? `${name}: ` : '') + addr, directions && `Tarif: ${directions}`, link && `Konum (haritada aç): ${link}`].filter(Boolean).join(' · ')
+  const link = mapsLink(pin?.lat, pin?.lng), coords = coordText(pin?.lat, pin?.lng)
+  return ['Teslimat: Adrese teslim — ' + (name ? `${name}: ` : '') + addr, directions && `Tarif: ${directions}`, link && `Konum (haritada aç): ${link}`, coords && `Koordinat: ${coords}`].filter(Boolean).join(' · ')
 }
 
 // The address editor's Back: step 3 -> 2 -> 1 -> closed (the editor is the first layer in the back chain, then the basket).
@@ -370,4 +376,51 @@ export function locateNote(outcome) {
     case 'denied': case 'noFix': return { msgKey: 'eateryDeliveryLocFail', action: null }
     default: return null
   }
+}
+
+// ─── A better fix before the pin is shown (the first fix of a cold GPS can be tens of metres off) ───
+export const LOCATE_REFINE_MS = 6000   // listen for fixes this long at most
+export const LOCATE_GOOD_M = 10        // ... and stop at once when one is this accurate (metres)
+export const LOCATE_POOR_M = 15        // a fix worse than this tells the person in the picker
+const fixAcc = f => (Number.isFinite(f?.coords?.accuracy) && f.coords.accuracy >= 0 ? f.coords.accuracy : Infinity)
+// The most accurate of the valid fixes (finite coordinates inside the globe); a fix without an accuracy ranks last but still counts.
+// Ties keep the earlier one. null when none is usable.
+export function pickBestFix(fixes) {
+  let best = null
+  for (const f of Array.isArray(fixes) ? fixes : []) {
+    if (!validPin(f?.coords?.latitude, f?.coords?.longitude)) continue
+    if (!best || fixAcc(f) < fixAcc(best)) best = f
+  }
+  return best
+}
+// null = say nothing; else the metres to show, rounded UP to the next 5 so a value over 15 m never reads as 15 or less
+// (15 -> null, 15.1 -> 20, 22 -> 25, 40 -> 40). Shown only in the picker's state: never stored, never in the message.
+export function accuracyNote(acc) {
+  return Number.isFinite(acc) && acc > LOCATE_POOR_M ? Math.ceil(acc / 5) * 5 : null
+}
+// After a refine with no fix: ask for a one-shot fresh fix only when location services are on (or unknown); off -> skip, the
+// caller reports services-off instead of stacking a second system dialog.
+export const askFreshFix = servicesOn => servicesOn !== false
+// Listens through watch(cb) -> Promise<{ remove() } | null> and settles on the best fix at the first of: a fix <= goodM, the
+// timeout, stop(). The subscription is removed on EVERY exit (also when it arrives after the exit). Resolves null with no valid fix
+// (also when watch() rejects, e.g. location services off and declined): then the caller falls back to the one-shot chain.
+// { done: Promise<fix | null>, stop() }. setT / clearT are injectable for tests.
+export function refineFix(watch, { ms = LOCATE_REFINE_MS, goodM = LOCATE_GOOD_M, setT = setTimeout, clearT = clearTimeout } = {}) {
+  let best = null, sub = null, settled = false, timer = null, resolveDone
+  const done = new Promise(r => { resolveDone = r })
+  const drop = () => { const s = sub; sub = null; try { s?.remove?.() } catch {} }
+  const finish = () => {
+    if (settled) return
+    settled = true
+    clearT(timer)
+    drop()
+    resolveDone(best)
+  }
+  timer = setT(finish, ms)
+  Promise.resolve().then(() => settled ? null : watch(fix => {
+    if (settled) return
+    best = pickBestFix([best, fix])
+    if (best && fixAcc(best) <= goodM) finish()
+  })).then(s => { sub = s || null; if (settled) drop() }, finish)
+  return { done, stop: finish }
 }

@@ -91,6 +91,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   const where = useRef({ open, step })   // read after an await: Back during the wait must not open the picker on a page the user already left
   where.current = { open, step }
   const onStep2 = () => alive.current && where.current.open && where.current.step === 2
+  useEffect(() => { if (!open || step !== 2) gps.cancel() }, [open, step])   // Back / close while the GPS is still listening: stop it
   const set = patch => setDraft(d => ({ ...d, ...patch }))
   const reg = useRef(Object.fromEntries(FIELD_KEYS.map(k => [k, newReg()]))).current
 
@@ -179,9 +180,10 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   }
 
   // ─── step 2 ───
+  // at: a GPS fix to CONFIRM on the map ({ lat, lng, accuracy }); without it the picker opens on the saved pin, a quiet fix or Lefkoşa.
   const openPicker = async at => {
     if (opening) return
-    let start = at ? { ...at, delta: 0.004 } : draft.coords ? { ...draft.coords, delta: 0.004 } : null
+    let start = at ? { lat: at.lat, lng: at.lng, accuracy: at.accuracy, gps: true, delta: 0.002 } : draft.coords ? { ...draft.coords, delta: 0.004 } : null
     if (!start) {
       setOpening(true)
       const q = await quietFix()   // only when location is already allowed; never asks
@@ -282,7 +284,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
               )}
               {step === 2 && (
                 <>
-                  <OptionRow icon="locate-outline" title={t('eateryAddrUseCurrent', lang)} busyTitle={t('eateryDeliveryLocating', lang)} busy={gps.locating} onPress={useCurrent} />
+                  <OptionRow icon="locate-outline" title={t('eateryAddrUseCurrent', lang)} busyTitle={t(gps.refining ? 'eateryDeliveryRefining' : 'eateryDeliveryLocating', lang)} busy={gps.locating} onPress={useCurrent} />
                   <OptionRow icon="map-outline" title={t('eateryAddrPickMap', lang)} busyTitle={t('eateryDeliveryLocating', lang)} busy={opening} onPress={() => openPicker()} />
                   {gps.note && (
                     <View style={s.locFail} accessibilityLiveRegion="polite">
