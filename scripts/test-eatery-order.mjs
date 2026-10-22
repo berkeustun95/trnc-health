@@ -201,7 +201,7 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('screen: the rpc statement mentions no delivery state', DELIVERY_ID.test(stmt), false)
   const addrUrl = new URL('../utils/eateryAddress.js', import.meta.url)
   if (fs.existsSync(addrUrl)) {
-    const a = fs.readFileSync(addrUrl, 'utf8')
+    const a = fs.readFileSync(addrUrl, 'utf8').replace(/\/\/.*$/gm, '')
     eq('eateryAddress.js imports no supabase / logContactEvent', /import[^\n]*(supabase|logContactEvent)|require\([^)]*(supabase|logContactEvent)/.test(a), false)
     eq('eateryAddress.js has no console / network call', /console\.|fetch\(|supabase/.test(a), false)
   }
