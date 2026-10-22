@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-10-08
-Son güncelleme: 8 Ekim 2026
+export default `Sürüm: 2026-10-22
+Son güncelleme: 22 Ekim 2026
 
 KİM OLDUĞUMUZ
 
@@ -58,6 +58,8 @@ Reddedilen gönderimler: gönderdiğiniz bir metin içerik filtremiz tarafından
 
 Onay kayıtları: Kullanım Koşulları'nın ve Gizlilik Politikası'nın hangi sürümünü, hangi dilde ve ne zaman kabul ettiğiniz. Pazarlama iletilerine onay verirseniz, onayı verdiğiniz tarihi ve daha sonra geri alırsanız geri aldığınız tarihi kaydederiz. Check-in kullanırsanız, check-in bildiriminin size ne zaman ve hangi sürümüyle gösterildiğini kaydederiz.
 
+Restorana WhatsApp ile gönderdiğiniz siparişler. “WhatsApp ile gönder”e dokunduğunuzda, restoranın siparişin gerçekten ADA üzerinden geldiğini doğrulayabilmesi için bir sipariş kaydı oluştururuz. Kayıtta sipariş numarası, restoran, ürünler, adetler ve fiyatlar (ADA menüsünden), toplam, oluşturulma ve geçerlilik süresi ile doğrulama sayfasının ne zaman ve kaç kez açıldığı bulunur. Kötüye kullanımı sınırlayabilmek için kayıt hesap kimliğinize (ya da misafir oturumunuza) bağlıdır ve giriş yapıp yapmadığınızı da kaydeder. Adınız, telefon numaranız ve yazdığınız not kayda girmez. Not yalnızca WhatsApp mesajınızın içinde restorana gider. Yalnızca 18 yaş ve üzerine hizmet veren bir restoranda siparişi oluşturmadan önce hesabınızdaki doğum tarihini kontrol ederiz.
+
 Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bunu istediğiniz zaman cihaz ayarlarınızdan kapatabilirsiniz. Uygulama konum olmadan da çalışır. Konumunuzu satmıyoruz ve reklam için kullanmıyoruz.
 • Telefonunuzda — ADA konumunuzu, listeleri uzaklığa göre sıralamak, haritada nerede olduğunuzu göstermek, Ana Sayfa'da şehrinizi seçmek ve bir yürüyüş rotasını takip etmek için kullanır. Bu işlemler telefonunuzda gerçekleşir ve konumunuz bunlar için bize gönderilmez.
 • Arama — arama yaptığınızda konumunuz telefonunuzdan çıkmadan önce yaklaşık 1 km'ye yuvarlanır ve yalnızca yakındaki sonuçları öne almak için sunucularımıza gönderilir. Saklamıyoruz.
@@ -92,6 +94,7 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Bir mekanda check-in yaptığınızda orada olduğunuzu kontrol etmek ve check-in'lerinizi giriş yapmış diğer kullanıcılara göstermek — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • 18 yaşından küçüklerin check-in'lerini, göstermeyi seçmedikleri sürece gizli tutmak — Küçükleri korumak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 • Check-in yaparken yakınınızdaki mekanları Google aracılığıyla bulmak — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• Restorana sipariş gönderdiğinizde sipariş kaydı oluşturmak ve oluşturulabilecek sipariş sayısını sınırlamak — Restoranın siparişi doğrulayabilmesi ve spam ile sahte siparişlerin önlenmesi için. Hukuki dayanak: Güvenilir ve kötüye kullanıma kapalı bir hizmetteki meşru menfaatimiz; sizinle yapılan sözleşmenin ifası
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
@@ -121,6 +124,8 @@ Bu durumda:
 • O sitede olup bitenler için ilgili iş ortağının kendi gizlilik politikası ve koşulları geçerlidir. Bunları okuyunuz.
 • İş ortağının yönlendirmenin ADA üzerinden geldiğini anlayabilmesi için ADA'yı kaynak olarak tanımlayan bir kod iletebiliriz. Bu kod sizi değil, uygulamayı tanımlar.
 • Bir iş ortağıyla kurduğunuz hiçbir sözleşmenin, satın almanın, kiralamanın, rezervasyonun veya hizmetin tarafı değiliz.
+
+Siparişiniz kendi WhatsApp’ınızdan restorana gider. Bu mesaj ve telefon numaranız için WhatsApp’ın kendi gizlilik politikası geçerlidir. Restoran bir doğrulama bağlantısı (getadaapp.com/o/…) açabilir. Bu bağlantı sipariş numarasını, restoranı, saati, ürünleri ve toplamı gösterir; kim olduğunuzu asla göstermez. Bağlantıya sahip olan herkes aynısını görebilir.
 
 5. REKLAM
 
@@ -156,6 +161,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Kaldırdığımız içerikler: topluluk kurallarımızı ihlal ettiği için kaldırılan içerikler, aynı hesabın tekrarlayan ihlallerini tespit edebilmemiz için dâhilî olarak saklanır. Diğer kullanıcılara artık görünmez.
 • Rota rozetleri: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Misafir kullanıcının rozeti yalnızca telefonda, 7 gün boyunca tutulur.
 • Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
+• Sipariş kayıtları — 30 gün: siparişin oluşturulmasından 30 gün sonra otomatik olarak silinir. Doğrulama sayfası, siparişi oluşturulmasından 2 saat sonra artık doğrulamaz.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
 8. YAŞ VE ÇOCUKLAR
