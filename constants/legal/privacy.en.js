@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-10-21
-Last updated: October 21, 2026
+export default `Version: 2026-10-22
+Last updated: October 22, 2026
 
 WHO WE ARE
 
