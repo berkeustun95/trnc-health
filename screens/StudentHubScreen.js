@@ -16,7 +16,7 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import StudentProfileScreen from './StudentProfileScreen'
 import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
-import { MODULE_FLAGS } from '../constants/flags'
+import { MODULE_FLAGS, CONNECTIVITY_LIVE } from '../constants/flags'
 import Avatar, { prefetchAvatars } from '../components/Avatar'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -409,7 +409,8 @@ function BasicsTab({ lang, tasks, tasksFailed, offline, progress, onRetryTasks, 
         </TouchableOpacity>
         <TouchableOpacity style={[s.linkBtnGhost, s.linkBtnStacked]} onPress={onShowEsim} activeOpacity={0.8}>
           <Ionicons name="cellular-outline" size={18} color={colors.primary} />
-          <Text style={s.linkBtnGhostText}>{t('studentSimBtn', lang)}</Text>
+          {/* While Connectivity is dark this opens the eSIM waitlist; once live, the module itself. */}
+          <Text style={s.linkBtnGhostText}>{t(CONNECTIVITY_LIVE ? 'studentSimBtnLive' : 'studentSimBtn', lang)}</Text>
         </TouchableOpacity>
       </ContentCard>
     </ScrollView>
