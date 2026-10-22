@@ -247,7 +247,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261129_connectivity_operator_logo_key.sql', 'c1c326aa6bcb475d9e97fa1c842add7deb9e80f432e46cfc591502566ad5f58b'),
   ('20261130_crunchy_livecheck_orders_cleanup.sql', '0cd6b6d1fcc14f781b6e82d7c4ae717e83334723f3f6af13ad8fd072fa1dc2eb'),
   ('20261131_crunchy_livecheck_orders_cleanup_2.sql', '84d6f29db7e0eb006db8ec5e8cd0d90bc8b6adaceb36d190c3cd776d14385bde'),
-  ('20261132_eatery_orders_is_test.sql', '991b7e2a936d729b52c30ed6e39366f060ab39f9726aab232b6b121a01c078c3')
+  ('20261132_eatery_orders_is_test.sql', 'd7dd85b234d5dbe7015c46d2cc5e5095e563da5154a9be00c249010e3682d82e')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

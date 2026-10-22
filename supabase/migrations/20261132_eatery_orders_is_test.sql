@@ -10,16 +10,21 @@
 -- (1) eatery_orders.is_test boolean NOT NULL DEFAULT false (every existing row stays false). No index: the table
 --     is tiny (5 orders per user per hour, 30 days of retention) and the hourly delete below is a sequential scan
 --     of a few thousand rows at most; a partial index would be one more object to register for nothing.
--- (2) public.order_testers (user_id uuid PRIMARY KEY, added_at, note): the people whose signed-in orders are test
---     orders. RLS ON, ZERO policies, ALL privileges revoked from PUBLIC, anon and authenticated. It starts EMPTY
---     (a migration cannot carry a user id: this repository is public). No foreign key to auth.users on purpose:
---     an FK ... ON DELETE SET NULL broke account deletion three times in this project; a deleted account's id
---     simply lingers in this list until someone removes it, which marks nothing (a deleted user cannot call).
+-- (2) public.order_testers (uid_sha256 text PRIMARY KEY, added_at, note): the people whose signed-in orders are test
+--     orders, stored as a FINGERPRINT (lowercase hex SHA-256 of the lowercase hyphenated uuid text), never the user id:
+--     this repository is public and so are workflow logs, and the raw id of a real account must not appear in either.
+--     There is NO user_id column. RLS ON, ZERO policies, ALL privileges revoked from PUBLIC, anon and authenticated.
+--     It starts EMPTY (a migration cannot carry a tester; a later one-row data migration adds Berke, see the block
+--     "ADDING A TESTER" below). No foreign key to auth.users (there is no uuid column to reference, and an FK ...
+--     ON DELETE SET NULL broke account deletion three times in this project): a deleted account's fingerprint simply
+--     lingers until someone removes it, which marks nothing (a deleted user cannot call).
 --     Placed in `public` as designed; the 20261120 preview-key store lives in schema `private` (not API-exposed).
 --     Here the table has no client privilege at all, so PostgREST cannot read it either way.
 -- (3) public.is_order_tester(p_uid): SECURITY DEFINER, search_path pinned to '', owner postgres, EXECUTE revoked
 --     from PUBLIC, anon and authenticated. Only create_eatery_order (owner postgres) calls it. False for a NULL
---     uid and for an anonymous (guest) session: a guest can never be a tester even if its id is listed.
+--     uid and for an anonymous (guest) session: a guest can never be a tester even if its fingerprint is listed.
+--     It fingerprints p_uid with the SAME built-in form 20261120 uses for the Preview key,
+--     encode(pg_catalog.sha256(pg_catalog.convert_to(p_uid::text, 'UTF8')), 'hex') (no pgcrypto), and looks that up.
 -- (4) create_eatery_order: IDENTICAL to 20261125 except (a) v_test := public.is_previewer() OR
 --     public.is_order_tester(v_uid), server-derived, NO new parameter (a client cannot send is_test, and cannot
 --     clear it); (b) the per-partner guest cap now reads `created_as_guest AND NOT is_test`; (c) the INSERT stores
@@ -32,8 +37,20 @@
 --     '40 3 * * *' a test order could live up to ~47 hours, which would break "deleted after 24 hours". The 30-day
 --     rule for real orders is exactly as before (an hourly run is harmless for it). No other job runs at :40.
 --
+-- ─── ADDING A TESTER (a later one-row DATA migration; this file adds nobody) ─
+--   The canonical text of the uid is the lowercase hyphenated uuid. Compute the fingerprint PRIVATELY, never in a
+--   committed file or a workflow log, with either of:
+--     SELECT encode(sha256(convert_to('<uuid>'::uuid::text, 'UTF8')), 'hex');      -- in the SQL editor, one statement
+--     printf %s '<lowercase uuid>' | shasum -a 256                                 -- on the Mac (lowercase hex, 64 chars)
+--   then the data migration is exactly:
+--     INSERT INTO public.order_testers (uid_sha256, note) VALUES ('<64 lowercase hex>', 'Berke live checks') ON CONFLICT DO NOTHING;
+--   (the placeholders above are placeholders: no real value belongs in this repository). The CHECK rejects anything
+--   that is not 64 lowercase hex characters, so a raw uuid pasted by mistake fails instead of being stored.
+--   Honest limit: the hash of a uuid is NOT secret-grade. uuids are not guessable, but the hash is a stable identifier
+--   of that account; it only keeps the raw id out of the public repository and its logs.
+--
 -- ─── WHO CAN READ / WRITE WHAT ──────────────────────────────────────────────
---   • order_testers: nobody through the API. Only postgres (this migration, and is_order_tester via DEFINER) and
+--   • order_testers: nobody through the API (and it holds fingerprints, not user ids). Only postgres (this migration, and is_order_tester via DEFINER) and
 --     service_role touch it; a tester is added/removed by a GitHub Actions workflow or the SQL editor, never by a
 --     client. No policy exists, so even a privilege granted back by mistake would show zero rows.
 --   • eatery_orders.is_test: same as the rest of eatery_orders (no client role can read or write the table). The
@@ -46,8 +63,8 @@
 -- before the ALTER), both function bodies contain what they must and the per-user count does NOT contain the
 -- test exclusion, create has exactly three arguments (none named *test*), grants, order_testers locked down
 -- (RLS on, 0 policies, no privilege), exactly one active cron job with the new schedule and command, and
--- behaviour probes in a rolled-back sentinel: Preview key -> test; no key -> real; listed tester -> test; listed
--- but anonymous -> real; authenticated calling is_order_tester -> 42501 (with positive control); a named
+-- behaviour probes in a rolled-back sentinel: Preview key -> test; no key -> real; listed tester (seeded BY FINGERPRINT) -> test;
+-- listed but anonymous -> real; a row with another uuid's fingerprint -> that user real; a raw uuid inserted -> 23514; authenticated calling is_order_tester -> 42501 (with positive control); a named
 -- p_is_test argument -> 42883; 60 guest TEST orders do not block a guest while 60 guest REAL orders do; five
 -- test orders by one user block the sixth; the retention command run as stored deletes a >24 h test order and a
 -- >30 d real order and keeps a <24 h test order and a <30 d real order. All rows end as they began.
@@ -110,17 +127,18 @@ COMMENT ON COLUMN public.eatery_orders.is_test IS
   'true = made from the ADA Preview app (key header) or by a listed order tester; set by create_eatery_order only. Never counts as real, never counts toward the partner guest cap, deleted by eatery-orders-retention after 24 hours. 20261132.';
 
 -- ─── (2) order_testers ──────────────────────────────────────────────────────
--- No FK to auth.users on purpose: an FK ... ON DELETE SET NULL broke account deletion three times in this project.
+-- Fingerprints, not user ids (public repo); no FK to auth.users (none possible, and FKs broke account deletion before).
 CREATE TABLE IF NOT EXISTS public.order_testers (
-  user_id  uuid        NOT NULL,
-  added_at timestamptz NOT NULL DEFAULT now(),
-  note     text,
-  CONSTRAINT order_testers_pkey PRIMARY KEY (user_id)
+  uid_sha256 text        NOT NULL,
+  added_at   timestamptz NOT NULL DEFAULT now(),
+  note       text,
+  CONSTRAINT order_testers_pkey PRIMARY KEY (uid_sha256),
+  CONSTRAINT order_testers_uid_sha256_check CHECK (uid_sha256 ~ '^[0-9a-f]{64}$')
 );
 ALTER TABLE public.order_testers ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.order_testers FROM PUBLIC, anon, authenticated;
 COMMENT ON TABLE public.order_testers IS
-  'Users whose signed-in orders are TEST orders (create_eatery_order -> is_test). RLS on, ZERO policies, all client privileges revoked; read only by is_order_tester (DEFINER). No FK to auth.users on purpose. Starts empty. 20261132.';
+  'Fingerprints (lowercase hex SHA-256 of the lowercase uuid text) of users whose signed-in orders are TEST orders (create_eatery_order -> is_test). Never a user id. RLS on, ZERO policies, all client privileges revoked; read only by is_order_tester (DEFINER). No FK. Starts empty. 20261132.';
 
 -- ─── (3) is_order_tester ────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.is_order_tester(p_uid uuid)
@@ -133,13 +151,14 @@ AS $fn$
   SELECT COALESCE(
     p_uid IS NOT NULL
     AND NOT public.is_anonymous_session()
-    AND EXISTS (SELECT 1 FROM public.order_testers t WHERE t.user_id = p_uid),
+    AND EXISTS (SELECT 1 FROM public.order_testers t
+                 WHERE t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(p_uid::text, 'UTF8')), 'hex')),
     false)
 $fn$;
 ALTER FUNCTION public.is_order_tester(uuid) OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.is_order_tester(uuid) FROM PUBLIC, anon, authenticated;
 COMMENT ON FUNCTION public.is_order_tester(uuid) IS
-  'true when p_uid is listed in order_testers AND the session is not anonymous. Internal helper of create_eatery_order: no client EXECUTE. 20261132.';
+  'true when the SHA-256 fingerprint of p_uid is listed in order_testers AND the session is not anonymous. Internal helper of create_eatery_order: no client EXECUTE. 20261132.';
 
 -- ─── (4) create_eatery_order: 20261125 body + v_test ────────────────────────
 CREATE OR REPLACE FUNCTION public.create_eatery_order(p_partner uuid, p_items jsonb, p_client_id text DEFAULT NULL)
@@ -451,6 +470,23 @@ BEGIN
   END IF;
   SELECT count(*) INTO v_n FROM pg_constraint WHERE conrelid = 'public.order_testers'::regclass AND contype = 'f';
   IF v_n IS DISTINCT FROM 0 THEN RAISE EXCEPTION 'order_testers has % foreign key(s) (want none)', v_n; END IF;
+  SELECT string_agg(a.attname || ' ' || format_type(a.atttypid, a.atttypmod) || CASE WHEN a.attnotnull THEN ' NOT NULL' ELSE '' END, ', ' ORDER BY a.attnum) INTO v_s
+    FROM pg_attribute a WHERE a.attrelid = 'public.order_testers'::regclass AND a.attnum > 0 AND NOT a.attisdropped;
+  IF v_s IS DISTINCT FROM 'uid_sha256 text NOT NULL, added_at timestamp with time zone NOT NULL, note text' THEN
+    RAISE EXCEPTION 'order_testers columns are [%] (want uid_sha256 text NOT NULL, added_at, note; no user_id)', v_s;
+  END IF;
+  SELECT string_agg(pg_get_constraintdef(c.oid), ' ; ' ORDER BY c.conname) INTO v_s FROM pg_constraint c
+   WHERE c.conrelid = 'public.order_testers'::regclass AND c.contype = 'p' AND c.conname = 'order_testers_pkey';
+  IF v_s IS DISTINCT FROM 'PRIMARY KEY (uid_sha256)' THEN RAISE EXCEPTION 'order_testers_pkey is [%] (want PRIMARY KEY (uid_sha256))', v_s; END IF;
+  SELECT string_agg(pg_get_constraintdef(c.oid), ' ; ') INTO v_s FROM pg_constraint c
+   WHERE c.conrelid = 'public.order_testers'::regclass AND c.contype = 'c' AND c.conname = 'order_testers_uid_sha256_check';
+  IF v_s IS NULL OR v_s NOT LIKE '%^[0-9a-f]{64}$%' THEN RAISE EXCEPTION 'order_testers_uid_sha256_check is [%] (want a ^[0-9a-f]{64}$ CHECK)', v_s; END IF;
+  v_def := pg_get_functiondef('public.is_order_tester(uuid)'::regprocedure);
+  IF v_def NOT LIKE '%sha256%' OR v_def NOT LIKE '%convert_to%' OR v_def NOT LIKE '%uid_sha256%'
+     OR v_def NOT LIKE '%t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(p_uid::text, ''UTF8'')), ''hex'')%'
+     OR v_def NOT LIKE '%NOT public.is_anonymous_session()%' OR v_def LIKE '%= p_uid%' OR v_def LIKE '%md5%' THEN
+    RAISE EXCEPTION 'is_order_tester body is not the fingerprint lookup (sha256 + convert_to + uid_sha256, anonymous refusal, no raw p_uid comparison)';
+  END IF;
   IF v_pre[4] IS DISTINCT FROM 'true' THEN
     EXECUTE 'SELECT count(*) FROM public.order_testers' INTO v_n;
     IF v_n IS DISTINCT FROM 0 THEN RAISE EXCEPTION 'order_testers was created with % row(s) (must start empty)', v_n; END IF;
@@ -475,7 +511,7 @@ DECLARE
   v_pa uuid; v_pl uuid; v_pm uuid; v_a1 bigint; v_l1 bigint; v_m1 bigint;
   s record; v_res jsonb; v_saved jsonb := '{}'::jsonb; v_sql text; v_state text; v_msg text; v_det text; v_role text; v_claims text; v_hdr text;
   v_got text; v_report text := ''; v_n int; v_cnt int; v_md5 text; v_keys text[]; v_b boolean; v_cmd text;
-  v_pre_keys int; v_pre_partners int; v_pre_testers int; v_u1 constant uuid := '00000000-0000-4000-8000-000000000001';
+  v_raw text; v_pre_keys int; v_pre_partners int; v_pre_testers int; v_u1 constant uuid := '00000000-0000-4000-8000-000000000001';
 BEGIN
   SELECT count(*) INTO v_pre_keys FROM private.preview_key_hashes;
   SELECT count(*) INTO v_pre_partners FROM public.eatery_partners;
@@ -483,9 +519,26 @@ BEGIN
 
   BEGIN
     INSERT INTO private.preview_key_hashes (hash, label) VALUES (encode(sha256(convert_to(c_key, 'UTF8')), 'hex'), 'zz probe 1132');
-    INSERT INTO public.order_testers (user_id, note) VALUES
-      ('00000000-0000-4000-8000-000000000001', 'zz probe tester'), ('00000000-0000-4000-8000-000000000003', 'zz probe listed guest'),
-      ('00000000-0000-4000-8000-000000000008', 'zz probe tester 8');
+    -- Testers are seeded BY FINGERPRINT, computed here from the synthetic uuids. Users 1, 3, 8 and 0...ab (hex letters: only these catch a case-folding bug) are listed with the
+    -- canonical fingerprint. User 12 has a WRONG row (fingerprint of the text 'zz wrong' + the real fingerprint of a
+    -- different uuid, 0...0b) so neither may mark user 12; user 12's own fingerprint is deliberately absent.
+    INSERT INTO public.order_testers (uid_sha256, note)
+      SELECT encode(sha256(convert_to(u::uuid::text, 'UTF8')), 'hex'), n FROM (VALUES
+        ('00000000-0000-4000-8000-000000000001', 'zz probe tester'), ('00000000-0000-4000-8000-000000000003', 'zz probe listed guest'),
+        ('00000000-0000-4000-8000-000000000008', 'zz probe tester 8'), ('00000000-0000-4000-8000-00000000000b', 'zz probe other uuid'),
+        ('00000000-0000-4000-8000-0000000000ab', 'zz probe tester whose uuid has hex letters')) AS x(u, n);
+    INSERT INTO public.order_testers (uid_sha256, note) VALUES (encode(sha256(convert_to('zz wrong', 'UTF8')), 'hex'), 'zz probe wrong hash');
+    -- The CHECK refuses anything but 64 lowercase hex: a raw uuid, an uppercased fingerprint, a short hash (23514 each).
+    FOREACH v_raw IN ARRAY ARRAY['00000000-0000-4000-8000-000000000001',
+        upper(encode(sha256(convert_to('00000000-0000-4000-8000-000000000001', 'UTF8')), 'hex')),
+        substr(encode(sha256(convert_to('00000000-0000-4000-8000-000000000001', 'UTF8')), 'hex'), 1, 63)] LOOP
+      v_state := NULL;
+      BEGIN
+        INSERT INTO public.order_testers (uid_sha256, note) VALUES (v_raw, 'zz must be refused');
+      EXCEPTION WHEN OTHERS THEN v_state := SQLSTATE;
+      END;
+      IF v_state IS DISTINCT FROM '23514' THEN RAISE EXCEPTION 'order_testers accepted or mis-refused a non-fingerprint value (sqlstate %): %', v_state, left(v_raw, 12); END IF;
+    END LOOP;
     INSERT INTO public.eatery_partners (slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active)
       VALUES ('zz-ta', 'zz test A', 'cafe', 35.1, 33.3, 'partner', 'zz-ta/logo.png', current_date, true) RETURNING id INTO v_pa;
     INSERT INTO public.eatery_partners (slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active)
@@ -510,12 +563,15 @@ BEGIN
       ('no key, unlisted user',                    'user:2',  '',      format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kr'),
       ('WRONG key header',                         'user:5',  'wrong', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kw'),
       ('listed tester, signed in',                 'user:1',  '',      format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kt'),
+      ('listed tester whose uuid has hex letters (lowercase canonical form)', 'user:ab', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kl'),
       ('listed uid but ANONYMOUS session',         'guest:3', '',      format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kg'),
+      ('user with only WRONG-hash rows in the list', 'user:12', '', format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kx'),
       ('CONTROL unlisted guest',                   'guest:9', '',      format('SELECT public.create_eatery_order(%L, %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kg0'),
       ('authenticated calls is_order_tester(listed)', 'user:1', '',    format('SELECT to_jsonb(public.is_order_tester(%L))', v_u1), 'state:42501', NULL),
       ('anon calls is_order_tester(listed)',       'anon',    '',      format('SELECT to_jsonb(public.is_order_tester(%L))', v_u1), 'state:42501', NULL),
       ('CONTROL postgres: is_order_tester(listed)', 'pg',     '',      format('SELECT to_jsonb(public.is_order_tester(%L))', v_u1), 'ok', 'ot1'),
       ('CONTROL postgres: is_order_tester(unlisted)', 'pg',   '',      format('SELECT to_jsonb(public.is_order_tester(%L))', '00000000-0000-4000-8000-000000000002'::uuid), 'ok', 'ot2'),
+      ('CONTROL postgres: is_order_tester(uuid whose fingerprint is not listed)', 'pg', '', format('SELECT to_jsonb(public.is_order_tester(%L))', '00000000-0000-4000-8000-000000000012'::uuid), 'ok', 'ot4'),
       ('CONTROL postgres: is_order_tester(NULL)',  'pg',      '',      'SELECT to_jsonb(public.is_order_tester(NULL))', 'ok', 'ot3'),
       ('named argument p_is_test => true',         'user:2',  '',      format('SELECT public.create_eatery_order(p_partner => %L, p_items => %L::jsonb, p_is_test => true)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'state:42883', NULL),
       ('CONTROL same named call without p_is_test', 'user:2', '',     format('SELECT public.create_eatery_order(p_partner => %L, p_items => %L::jsonb)', v_pa, jsonb_build_array(jsonb_build_object('item_id', v_a1, 'qty', 1))), 'ok', 'kn'),
@@ -572,8 +628,8 @@ BEGIN
 
     -- ── is_test as STORED (read as postgres, the role that may read the table) ──
     FOR s IN SELECT * FROM (VALUES
-      ('kp', true,  'Preview key header'), ('kr', false, 'no key'), ('kw', false, 'wrong key'), ('kt', true, 'listed tester'),
-      ('kg', false, 'listed uid, anonymous session'), ('kg0', false, 'unlisted guest'), ('kn', false, 'named-arg control'),
+      ('kp', true,  'Preview key header'), ('kr', false, 'no key'), ('kw', false, 'wrong key'), ('kt', true, 'listed tester'), ('kl', true, 'listed tester whose uuid has hex letters'),
+      ('kg', false, 'listed uid, anonymous session'), ('kg0', false, 'unlisted guest'), ('kx', false, 'user with a different uuid than the listed fingerprint'), ('kn', false, 'named-arg control'),
       ('cl', false, 'guest on the 60-test-orders partner')
     ) AS x(k, want, label) LOOP
       SELECT o.is_test INTO v_b FROM public.eatery_orders o WHERE o.code = v_saved -> s.k ->> 'code';
@@ -581,8 +637,9 @@ BEGIN
     END LOOP;
     SELECT count(*) INTO v_n FROM public.eatery_orders WHERE created_by = '00000000-0000-4000-8000-000000000008' AND is_test;
     IF v_n IS DISTINCT FROM 5 THEN RAISE EXCEPTION 'tester 8 should have 5 TEST orders, has %', v_n; END IF;
-    IF (v_saved -> 'ot1' #>> '{}') IS DISTINCT FROM 'true' OR (v_saved -> 'ot2' #>> '{}') IS DISTINCT FROM 'false' OR (v_saved -> 'ot3' #>> '{}') IS DISTINCT FROM 'false' THEN
-      RAISE EXCEPTION 'is_order_tester decisions: listed %, unlisted %, NULL %', v_saved -> 'ot1', v_saved -> 'ot2', v_saved -> 'ot3';
+    IF (v_saved -> 'ot1' #>> '{}') IS DISTINCT FROM 'true' OR (v_saved -> 'ot2' #>> '{}') IS DISTINCT FROM 'false' OR (v_saved -> 'ot3' #>> '{}') IS DISTINCT FROM 'false'
+       OR (v_saved -> 'ot4' #>> '{}') IS DISTINCT FROM 'false' THEN
+      RAISE EXCEPTION 'is_order_tester decisions: listed %, unlisted %, NULL %, other-fingerprint %', v_saved -> 'ot1', v_saved -> 'ot2', v_saved -> 'ot3', v_saved -> 'ot4';
     END IF;
 
     -- The app-facing result of create is unchanged; verify gained exactly is_test.
@@ -639,7 +696,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261132_eatery_orders_is_test.sql', '991b7e2a936d729b52c30ed6e39366f060ab39f9726aab232b6b121a01c078c3')
+VALUES ('20261132_eatery_orders_is_test.sql', 'd7dd85b234d5dbe7015c46d2cc5e5095e563da5154a9be00c249010e3682d82e')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -650,7 +707,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- ─── Verification after applying (read-only, run alone) ─────────────────────
 --   Run supabase/verify_schema.sql QUERY 1: every 20261132_eatery_orders_is_test row must read OK.
---   Adding a tester (a workflow or the SQL editor, never a client): INSERT INTO public.order_testers (user_id, note) VALUES ('<uuid>', '<who>');
+--   Adding a tester (a workflow or the SQL editor, never a client): INSERT INTO public.order_testers (uid_sha256, note) VALUES ('<64 hex>', '<who>');  -- see ADDING A TESTER above
 --
 -- ─── Rollback (only if abandoned) ───────────────────────────────────────────
 --   SELECT cron.unschedule('eatery-orders-retention');

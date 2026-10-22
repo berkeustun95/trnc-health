@@ -55,6 +55,11 @@ const mutant = (name, pairs) => {
   const p = join(dir, name.replace(/\W+/g, '_') + '.sql'); writeFileSync(p, text); return p
 }
 const table = []
+const FP = `WHERE t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(p_uid::text, 'UTF8')), 'hex')`
+const NEUT_BODY = ["RAISE EXCEPTION 'is_order_tester body is not the fingerprint lookup", "RAISE NOTICE 'is_order_tester body is not the fingerprint lookup"]
+const NEUT_CHECK = ["RAISE EXCEPTION 'order_testers_uid_sha256_check is [%]", "RAISE NOTICE 'order_testers_uid_sha256_check is [%]"]
+const CHK = `,\n  CONSTRAINT order_testers_uid_sha256_check CHECK (uid_sha256 ~ '^[0-9a-f]{64}$')`
+const BODYMSG = 'is_order_tester body is not the fingerprint lookup'
 const refused = async (name, p, wantMsg, { seed = SEED_ROW } = {}) => {
   if (!p) { table.push([name, 'ANCHOR MISSING', '']); return }
   const d = await after1125()
@@ -172,7 +177,7 @@ await refused('an existing order deleted by the migration', mutant('del', [['COM
 await refused('order_testers has a policy', mutant('pol', [['REVOKE ALL ON TABLE public.order_testers FROM PUBLIC, anon, authenticated;', `CREATE POLICY zz_open ON public.order_testers FOR SELECT TO authenticated USING (true);\nREVOKE ALL ON TABLE public.order_testers FROM PUBLIC, anon, authenticated;`]]), 'order_testers has 1 policies')
 await refused('order_testers left to authenticated (REVOKE without authenticated)', mutant('tbl', [['REVOKE ALL ON TABLE public.order_testers FROM PUBLIC, anon, authenticated;', 'REVOKE ALL ON TABLE public.order_testers FROM PUBLIC, anon;']]), 'authenticated holds')
 await refused('order_testers RLS not enabled', mutant('rls', [['ALTER TABLE public.order_testers ENABLE ROW LEVEL SECURITY;', '']]), 'RLS is not enabled on order_testers')
-await refused('order_testers given an FK to auth.users', mutant('fk', [['user_id  uuid        NOT NULL,', 'user_id  uuid        NOT NULL REFERENCES auth.users (id),']]), 'foreign key')
+await refused('order_testers given an FK to auth.users', mutant('fk', [['  note       text,\n', '  note       text,\n  zz_uid uuid REFERENCES auth.users (id),\n']]), 'foreign key')
 await refused('is_order_tester EXECUTE granted to authenticated', mutant('gr', [['REVOKE EXECUTE ON FUNCTION public.is_order_tester(uuid) FROM PUBLIC, anon, authenticated;', 'REVOKE EXECUTE ON FUNCTION public.is_order_tester(uuid) FROM PUBLIC, anon;']]), 'is_order_tester: EXECUTE grantees')
 await refused('is_order_tester search_path unpinned', mutant('sp', [[`  SET search_path = ''\nAS $fn$`, `AS $fn$`]]), 'is_order_tester: definer=')
 await refused('create EXECUTE granted to anon', mutant('ganon', [['GRANT  EXECUTE ON FUNCTION public.create_eatery_order(uuid, jsonb, text) TO authenticated;', 'GRANT  EXECUTE ON FUNCTION public.create_eatery_order(uuid, jsonb, text) TO anon, authenticated;']]), 'create_eatery_order: EXECUTE grantees')
@@ -184,10 +189,26 @@ await refused('derivation ignores testers (body + assertion): behaviour probe', 
 await refused('partner cap counts test orders again (body + assertion): behaviour probe', mutant('cap_beh', [[CAP, `created_as_guest AND created_at > now()`, true]]), 'fresh guest NOT blocked by 60 guest TEST orders')
 await refused('INSERT stores false (body + assertion): behaviour probe', mutant('ins_beh', [[`p_client_id, v_guest, v_test)`, `p_client_id, v_guest, false)`, true]]), 'is_test for "Preview key header"')
 await refused('per-user count excludes tests (body + assertion): behaviour probe', mutant('usr_beh', [[`created_by = v_uid AND created_at > now() - interval ''1 hour'';`, `created_by = v_uid AND NOT is_test AND created_at > now() - interval ''1 hour'';`, true], [PUC + `;\n  IF v_user_n`, PUC.replace('created_by = v_uid', 'created_by = v_uid AND NOT is_test') + `;\n  IF v_user_n`], [`OR v_def LIKE '%created_by = v_uid AND NOT is_test%'`, 'OR false']]), '5 TEST orders by one user block the 6th')
-await refused('is_order_tester drops the anonymous-session check: behaviour probe', mutant('anon', [['    AND NOT public.is_anonymous_session()\n', '']]), 'is_test for "listed uid, anonymous session"')
+await refused('is_order_tester drops the anonymous-session check: behaviour probe', mutant('anon', [['    AND NOT public.is_anonymous_session()\n', ''], NEUT_BODY]), 'is_test for "listed uid, anonymous session"')
 await refused("retention '24 hours' -> '240 hours' (command + assertion): behaviour probe", mutant('c240_beh', [["interval '24 hours')$$", "interval '240 hours')$$"], ["interval ''24 hours'')'", "interval ''240 hours'')'"]]), 'retention command left')
 await refused('retention drops the real-order 30-day branch (command + assertion): behaviour probe', mutant('c30', [["created_at < now() - interval '30 days' OR (is_test", "created_at < now() - interval '3000 days' OR (is_test"], ["created_at < now() - interval ''30 days'' OR (is_test", "created_at < now() - interval ''3000 days'' OR (is_test"]]), 'retention command left')
-await refused('is_order_tester answers true for everyone listed or not: behaviour probe', mutant('allt', [['    AND EXISTS (SELECT 1 FROM public.order_testers t WHERE t.user_id = p_uid),', '    AND true,']]), 'is_test for "no key"')
+await refused('is_order_tester answers true for everyone listed or not: behaviour probe', mutant('allt', [[FP, 'WHERE true'], NEUT_BODY]), 'is_test for "no key"')
+
+// ── fingerprint store (order_testers holds sha256(uuid text), never the user id) ──
+await refused('lookup compares the RAW uuid text (body only)', mutant('raw_s', [[FP, `WHERE t.uid_sha256 = p_uid::text`]]), BODYMSG)
+await refused('lookup compares the RAW uuid text (body + assertion): behaviour probe', mutant('raw_b', [[FP, `WHERE t.uid_sha256 = p_uid::text`], NEUT_BODY]), 'is_test for "listed tester"')
+await refused('lookup hashes md5 instead of sha256 (body only)', mutant('md5_s', [[FP, `WHERE t.uid_sha256 = pg_catalog.md5(p_uid::text)`]]), BODYMSG)
+await refused('lookup hashes md5 instead of sha256 (body + assertion): behaviour probe', mutant('md5_b', [[FP, `WHERE t.uid_sha256 = pg_catalog.md5(p_uid::text)`], NEUT_BODY]), 'is_test for "listed tester"')
+await refused('lookup hashes an UPPERCASED uuid text (body only)', mutant('up_s', [[FP, `WHERE t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(upper(p_uid::text), 'UTF8')), 'hex')`]]), BODYMSG)
+await refused('lookup hashes an UPPERCASED uuid text (body + assertion): behaviour probe', mutant('up_b', [[FP, `WHERE t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(upper(p_uid::text), 'UTF8')), 'hex')`], NEUT_BODY]), 'is_test for "listed tester whose uuid has hex letters"')
+await refused('lookup ignores p_uid, matches any listed row (body only)', mutant('any_s', [[FP, `WHERE true`]]), BODYMSG)
+await refused('CHECK on uid_sha256 dropped (DDL only)', mutant('chk_s', [[CHK, '']]), 'order_testers_uid_sha256_check is [')
+await refused('CHECK on uid_sha256 dropped (DDL + assertion): in-file insert probe', mutant('chk_b', [[CHK, ''], NEUT_CHECK]), 'order_testers accepted or mis-refused a non-fingerprint value')
+await refused('CHECK weakened to ^[0-9a-f]+$ (DDL only)', mutant('chk_w_s', [['CHECK (uid_sha256 ~ \'^[0-9a-f]{64}$\')', 'CHECK (uid_sha256 ~ \'^[0-9a-f]+$\')']]), 'order_testers_uid_sha256_check is [')
+await refused('CHECK weakened to ^[0-9a-f]+$ (DDL + assertion): in-file insert probe', mutant('chk_w_b', [['CHECK (uid_sha256 ~ \'^[0-9a-f]{64}$\')', 'CHECK (uid_sha256 ~ \'^[0-9a-f]+$\')'], NEUT_CHECK]), 'order_testers accepted or mis-refused a non-fingerprint value')
+await refused('CHECK weakened to case-insensitive ~* (DDL + assertion): in-file insert probe', mutant('chk_i_b', [['CHECK (uid_sha256 ~ \'^[0-9a-f]{64}$\')', 'CHECK (uid_sha256 ~* \'^[0-9a-f]{64}$\')'], ["v_s NOT LIKE '%^[0-9a-f]{64}$%' THEN", "false THEN"]]), 'order_testers accepted or mis-refused a non-fingerprint value')
+await refused('a user_id column re-added to order_testers', mutant('uid_col', [['  note       text,\n', '  note       text,\n  user_id    uuid,\n']]), 'order_testers columns are [')
+await refused('order_testers keyed on a different column (pkey moved to note, which turns NOT NULL)', mutant('pk', [['CONSTRAINT order_testers_pkey PRIMARY KEY (uid_sha256)', 'CONSTRAINT order_testers_pkey PRIMARY KEY (note)']]), 'order_testers columns are [')
 
 console.log('\nRED / GREEN TABLE')
 const w = Math.max(...table.map(r => r[0].length))

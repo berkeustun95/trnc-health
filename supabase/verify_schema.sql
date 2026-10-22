@@ -230,7 +230,7 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders','created_as_guest'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
-    ('20261132_eatery_orders_is_test','order_testers','user_id'),
+    ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
     ('20261132_eatery_orders_is_test','order_testers','added_at'),
     ('20261132_eatery_orders_is_test','order_testers','note'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
@@ -754,6 +754,7 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_client_id_check'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers_pkey'),
+    ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -4077,13 +4078,17 @@ WITH report AS (
                AND NOT has_any_column_privilege('authenticated', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,REFERENCES')
                AND has_table_privilege('service_role', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE'), false)
       AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.order_testers') AND c.contype = 'f') = 0
-    UNION ALL SELECT '20261132_eatery_orders_is_test','is_order_tester(uuid): STABLE SECURITY DEFINER, search_path empty, owner postgres, NO EXECUTE for anon/authenticated/PUBLIC, refuses anonymous sessions',
+      AND (SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.order_testers') AND a.attnum > 0 AND NOT a.attisdropped) = 3
+      AND (SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.order_testers') AND a.attname = 'user_id' AND NOT a.attisdropped) = 0
+    UNION ALL SELECT '20261132_eatery_orders_is_test','is_order_tester(uuid): STABLE SECURITY DEFINER, search_path empty, owner postgres, NO EXECUTE for anon/authenticated/PUBLIC, refuses anonymous sessions, looks up the sha256 fingerprint (never the raw uid)',
       COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proconfig @> ARRAY['search_path=""'] AND pg_get_userbyid(p.proowner) = 'postgres'
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_order_tester(uuid)')), false)
       AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
                        WHERE p.oid = to_regprocedure('public.is_order_tester(uuid)') AND a.privilege_type = 'EXECUTE'
                          AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) LIKE '%NOT public.is_anonymous_session()%', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) LIKE '%NOT public.is_anonymous_session()%'
+               AND pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) LIKE '%t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(p_uid::text, ''UTF8'')), ''hex'')%'
+               AND pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) NOT LIKE '%= p_uid%', false)
     UNION ALL SELECT '20261132_eatery_orders_is_test','create_eatery_order body: is_test derived server-side (previewer OR tester), partner cap excludes tests, per-user count counts ALL, INSERT stores is_test; still 3 arguments, none named *test*',
       COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_test := public.is_previewer() OR public.is_order_tester(v_uid);%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND NOT is_test AND created_at > now()%'
