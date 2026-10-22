@@ -222,14 +222,44 @@ export function orderErrorKind(err) {
   return 'generic'
 }
 
+// The ONLY arguments create_eatery_order receives: ids and quantities. Delivery details (address, location) travel in the
+// WhatsApp text alone and never reach the server; a test pins this shape and the call site.
+export const orderRpcArgs = (partnerId, lines) => ({ p_partner: partnerId, p_items: lines.map(l => ({ item_id: l.id, qty: l.qty })) })
+
+// ─── Delivery choice (Sepetim) ───
+export const ADDRESS_FIELD_MAX = 100
+// Invisible / direction-control characters, and all whitespace (newlines included) collapsed to single spaces: free text
+// the customer types (address fields, note) can never forge a line of the message or hide inside an empty-looking field.
+const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF]/g
+const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
+export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
+export function mapsLink(lat, lng) {
+  const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
+  if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return ''
+  return `https://maps.google.com/?q=${la.toFixed(5)},${ln.toFixed(5)}`
+}
+const addressParts = (d) => [d?.street, d?.building, d?.district].map(sanitizeAddressField)
+export function deliveryReady(delivery) {
+  if (delivery?.mode === 'pickup') return true
+  return delivery?.mode === 'delivery' && addressParts(delivery).every(Boolean)
+}
+export function deliveryLine(delivery) {
+  if (!deliveryReady(delivery)) return ''
+  if (delivery.mode === 'pickup') return 'Teslimat: Gel-al'
+  const link = mapsLink(delivery.coords?.lat, delivery.coords?.lng)
+  return `Teslimat: Adrese teslim — ${addressParts(delivery).join(', ')}${link ? ` · Konum: ${link}` : ''}`
+}
+
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
 // code: the server's order code; its line is the LAST one.
-export function buildOrderMessage(lines, note, code = null) {
+export function buildOrderMessage(lines, note, code = null, delivery = null) {
   const out = ['ADA üzerinden sipariş:']
   for (const l of lines) out.push(`${l.qty} × ${l.name} — ${formatTl(l.qty * Number(l.price))}`)
   out.push('', `Toplam: ${formatTl(orderTotal(lines))}`)
-  const n = typeof note === 'string' ? note.trim().slice(0, ORDER_NOTE_MAX) : ''
+  const n = oneLine(note, ORDER_NOTE_MAX)
   if (n) out.push(`Not: ${n}`)
+  const dl = deliveryLine(delivery)
+  if (dl) out.push(dl)
   out.push('Fiyatlar ADA menüsündendir, değişiklik olabilir.')
   const cl = orderCodeLine(code)
   if (cl) out.push(cl)
@@ -237,3 +267,28 @@ export function buildOrderMessage(lines, note, code = null) {
 }
 
 export const orderWhatsAppUrl = (digits, message) => `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+
+// ─── "Konumumu ekle": what happened → what the user sees (pure; the device calls live in EateryOrder.js) ───
+export const LOCATE_TIMEOUT_MS = 12000
+// null on timeout; a result that arrives later is ignored (the race has already settled), a rejection too.
+export function withTimeout(promise, ms) {
+  let timer
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), ms) })
+  return Promise.race([Promise.resolve(promise).catch(() => null), timeout]).finally(() => clearTimeout(timer))
+}
+const validFix = fix => Number.isFinite(fix?.coords?.latitude) && Number.isFinite(fix?.coords?.longitude)
+// iOS reports "denied" while location services are off, so services-off wins over the permission states.
+export function locateOutcome({ granted, canAskAgain, servicesOn, fix }) {
+  if (granted && validFix(fix)) return 'ok'
+  if (servicesOn === false) return 'servicesOff'
+  if (!granted) return canAskAgain === false ? 'blocked' : 'denied'
+  return 'noFix'
+}
+export function locateNote(outcome) {
+  switch (outcome) {
+    case 'servicesOff': return { msgKey: 'eateryLocOff', action: 'locationSettings' }
+    case 'blocked': return { msgKey: 'eateryLocBlocked', action: 'appSettings' }
+    case 'denied': case 'noFix': return { msgKey: 'eateryDeliveryLocFail', action: null }
+    default: return null
+  }
+}

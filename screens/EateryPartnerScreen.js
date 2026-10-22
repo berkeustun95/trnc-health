@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, deliveryReady,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -15,6 +15,7 @@ import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUr
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
 import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { loadAddress, saveAddress } from '../utils/eateryAddress'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains } from '../constants/eateryQuiz'
@@ -228,6 +229,14 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [focusReq, setFocusReq] = useState(null)   // { id, n }: a dish picked on the quiz results; n lets the same dish be picked twice
   const focusId = focusReq ? focusReq.id : focusItemId
   const [note, setNote] = useState('')
+  // Teslimat: mode is null until chosen (required). Address fields prefill from this phone; coords live for one order.
+  const [delivery, setDelivery] = useState({ mode: null, street: '', building: '', district: '', coords: null })
+  const onDelivery = useCallback(patch => { setOrderError(null); setDelivery(d => ({ ...d, ...patch })) }, [])
+  useEffect(() => {
+    let live = true
+    loadAddress().then(a => { if (live && a) setDelivery(d => (d.street || d.building || d.district ? d : { ...d, ...a })) })
+    return () => { live = false }
+  }, [])
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
@@ -376,7 +385,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
   const sendOrder = async () => {
-    if (!ordering || lines.length === 0 || sendingRef.current || ageGate) return
+    if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery)) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
     sendingRef.current = true
     setSending(true)
@@ -384,7 +393,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     const sent = lines
     let res = null, kind = null
     try {
-      const { data, error } = await supabase.rpc('create_eatery_order', { p_partner: partner.id, p_items: sent.map(l => ({ item_id: l.id, qty: l.qty })) })
+      const { data, error } = await supabase.rpc('create_eatery_order', orderRpcArgs(partner.id, sent))
       if (error || !data) kind = orderErrorKind(error)
       else { kind = orderCheck(sent, data); if (!kind) res = data }
     } catch { kind = 'generic' }
@@ -397,7 +406,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     }
     armedRef.current = { left: false }
     setBasketOpen(false)
-    go('order_whatsapp', orderWhatsAppUrl(orderDigits, buildOrderMessage(serverOrderLines(res), note, res.code)), () => { armedRef.current = null })
+    if (delivery.mode === 'delivery') saveAddress(delivery)
+    const text = buildOrderMessage(serverOrderLines(res), note, res.code, delivery)
+    setDelivery(d => ({ ...d, mode: null, coords: null }))
+    go('order_whatsapp', orderWhatsAppUrl(orderDigits, text), () => { armedRef.current = null })
   }
   const openBasket = () => { armedRef.current = null; setOrderError(null); setBasketShown(true); setBasketOpen(true) }
   // From the quiz bar: Sepetim opens once, and only when its lines exist (never an empty page).
@@ -505,7 +517,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       </View>
       {ordering && basketShown === true && (
         <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
-          note={note} onNote={setNote} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
+          note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
       {quizShown === true && (
         <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
