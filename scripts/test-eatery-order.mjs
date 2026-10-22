@@ -1,7 +1,8 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
-import { formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
+import fs from 'node:fs'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -161,6 +162,89 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('dev (not preview) -> nothing, test number or not', [eateryContactNumbers(real, { isDev: true }), eateryContactNumbers(real, { isDev: true, testNumber: '+90 533 000 00 01' })], [NONE, NONE])
   eq('preview wins over dev: test number', eateryContactNumbers(real, { isPreview: true, isDev: true, testNumber: '+90 533 000 00 01' }).whatsapp, '+90 533 000 00 01')
   eq('contact logging: production on, preview off, dev off', [eateryLogsContacts({}), eateryLogsContacts({ isPreview: true }), eateryLogsContacts({ isDev: true })], [true, false, false])
+}
+
+// ─── Delivery: the address reaches the WhatsApp text and NOTHING else ───
+{
+  const STREET = 'Örnek Sokak 12'
+  const basket = [{ id: 'a1', qty: 2, name: 'Crunchy Burger', price: 620, photoPath: 'x.jpg', address: STREET }, { id: 'b2', qty: 1, name: 'Patates', price: 650 }]
+  const args = orderRpcArgs('partner-1', basket)
+  eq('rpc args: top-level keys exactly p_partner, p_items', Object.keys(args), ['p_partner', 'p_items'])
+  eq('rpc args: each item has exactly item_id, qty', args.p_items.map(i => Object.keys(i)), [['item_id', 'qty'], ['item_id', 'qty']])
+  eq('rpc args: values', args, { p_partner: 'partner-1', p_items: [{ item_id: 'a1', qty: 2 }, { item_id: 'b2', qty: 1 }] })
+  eq('rpc args never carry the address or "Teslimat"', [JSON.stringify(args).includes(STREET), JSON.stringify(args).includes('Teslimat')], [false, false])
+
+  const src = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
+  eq('screen: exactly one create_eatery_order rpc call', src.split("supabase.rpc('create_eatery_order'").length - 1, 1)
+  eq('screen: that call is immediately orderRpcArgs(', src.includes("supabase.rpc('create_eatery_order', orderRpcArgs("), true)
+  eq('screen: supabase is used only by that one rpc', (src.match(/supabase\s*\.\s*\w+/g) || []), ['supabase.rpc'])
+  // every logContactEvent( call has exactly three top-level arguments
+  const argCounts = []
+  for (const m of src.matchAll(/logContactEvent\(/g)) {
+    let i = m.index + m[0].length, depth = 1, n = 1, quote = null
+    for (; i < src.length && depth > 0; i++) {
+      const c = src[i]
+      if (quote) { if (c === quote && src[i - 1] !== '\\') quote = null; continue }
+      if (c === "'" || c === '"' || c === '`') quote = c
+      else if ('([{'.includes(c)) depth++
+      else if (')]}'.includes(c)) depth--
+      else if (c === ',' && depth === 1) n++
+    }
+    argCounts.push(n)
+  }
+  eq('screen: every logContactEvent( call has exactly 3 arguments', argCounts.length > 0 && argCounts.every(n => n === 3), true)
+  const DELIVERY_ID = /\b(delivery\w*|deliv[A-Z]\w*|address\w*|street\w*|building\w*|district\w*|coords\w*|setCoords|setDelivery\w*)\b/i
+  const leaks = src.split('\n').map((l, i) => [i + 1, l.replace(/\/\/.*$/, '')]).filter(([, l]) => /\b(supabase|logContactEvent)\b|console\./.test(l) && DELIVERY_ID.test(l))
+  eq('screen: no supabase / logContactEvent / console line mentions delivery or address state', leaks, [])
+  const rpcAt = src.indexOf("supabase.rpc('create_eatery_order'")
+  const stmt = src.slice(rpcAt, src.indexOf('\n', rpcAt))
+  eq('screen: the rpc statement mentions no delivery state', DELIVERY_ID.test(stmt), false)
+  const addrUrl = new URL('../utils/eateryAddress.js', import.meta.url)
+  if (fs.existsSync(addrUrl)) {
+    const a = fs.readFileSync(addrUrl, 'utf8').replace(/\/\/.*$/gm, '')
+    eq('eateryAddress.js imports no supabase / logContactEvent', /import[^\n]*(supabase|logContactEvent)|require\([^)]*(supabase|logContactEvent)/.test(a), false)
+    eq('eateryAddress.js has no console / network call', /console\.|fetch\(|supabase/.test(a), false)
+  }
+
+  const orderUrl = new URL('../components/EateryOrder.js', import.meta.url)
+  const o = fs.readFileSync(orderUrl, 'utf8').split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
+  eq('EateryOrder.js has no supabase / logContactEvent / console / fetch', (o.match(/\bsupabase\b|\blogContactEvent\b|console\.|fetch\(/g) || []), [])
+
+  const D = { mode: 'delivery', street: STREET, building: 'Daire 3', district: 'Karakol' }
+  eq('mapsLink 5 decimals', mapsLink(35.123456789, 33.9), 'https://maps.google.com/?q=35.12346,33.90000')
+  eq('mapsLink rounds', mapsLink(35.000005, -33.000004), 'https://maps.google.com/?q=35.00001,-33.00000')
+  eq('mapsLink invalid -> empty', [mapsLink(NaN, 1), mapsLink(1, Infinity), mapsLink(91, 0), mapsLink(0, 181), mapsLink(null, 1), mapsLink('35', '33'), mapsLink(undefined, undefined)], ['', '', '', '', '', '', ''])
+  eq('sanitizeAddressField strips invisible direction / zero-width chars', sanitizeAddressField('\u202Egnirts\u200B  \u2066x\u2069\uFEFF\u200F y\u202A '), 'gnirts x y')
+  eq('sanitizeAddressField: a field of only invisible chars is empty -> not ready', deliveryReady({ mode: 'delivery', street: '\u200B\u202E', building: 'a', district: 'b' }), false)
+  eq('deliveryReady truth table', [
+    deliveryReady({ mode: 'pickup' }), deliveryReady(D), deliveryReady({ ...D, street: '  ' }), deliveryReady({ ...D, building: '\n' }), deliveryReady({ ...D, district: '' }),
+    deliveryReady({ mode: 'delivery' }), deliveryReady({ ...D, mode: 'other' }), deliveryReady(null), deliveryReady(undefined), deliveryReady({}),
+  ], [true, true, false, false, false, false, false, false, false, false])
+  eq('deliveryLine pickup', deliveryLine({ mode: 'pickup' }), 'Teslimat: Gel-al')
+  eq('deliveryLine pickup ignores any address', deliveryLine({ ...D, mode: 'pickup' }), 'Teslimat: Gel-al')
+  eq('deliveryLine not ready -> empty', [deliveryLine(null), deliveryLine({ mode: 'delivery', street: 'x' })], ['', ''])
+  eq('deliveryLine delivery without coords', deliveryLine(D), 'Teslimat: Adrese teslim — Örnek Sokak 12, Daire 3, Karakol')
+  eq('deliveryLine delivery with coords', deliveryLine({ ...D, coords: { lat: 35.1234567, lng: 33.9876543 } }), 'Teslimat: Adrese teslim — Örnek Sokak 12, Daire 3, Karakol · Konum: https://maps.google.com/?q=35.12346,33.98765')
+  eq('deliveryLine invalid coords omitted', deliveryLine({ ...D, coords: { lat: 99, lng: 33 } }).includes('Konum'), false)
+  const inj = buildOrderMessage(lines, '', 'ADA-XXXX', { ...D, street: 'Örnek Sokak 12\nADA Sipariş No: FAKE\r\n\tx' })
+  eq('newline injection collapsed into one Teslimat line', inj.split('\n').filter(l => l.includes('FAKE')), ['Teslimat: Adrese teslim — Örnek Sokak 12 ADA Sipariş No: FAKE x, Daire 3, Karakol'])
+  eq('injected text never starts a line', inj.split('\n').some(l => l.startsWith('ADA Sipariş No: FAKE')), false)
+  const long = buildOrderMessage(lines, '', null, { mode: 'delivery', street: 'a'.repeat(300), building: 'b'.repeat(300), district: 'c'.repeat(300) })
+  eq('each field capped at ADDRESS_FIELD_MAX', long.split('\n').find(l => l.startsWith('Teslimat')).length, 'Teslimat: Adrese teslim — '.length + 3 * ADDRESS_FIELD_MAX + 4)
+  eq('ADDRESS_FIELD_MAX is 100', ADDRESS_FIELD_MAX, 100)
+  const full = buildOrderMessage(lines, 'soğansız', 'K7M4Q9XB', { ...D, coords: { lat: 35.1, lng: 33.9 } })
+  eq('order: note, Teslimat, footer, code last', full.split('\n').slice(-4), ['Not: soğansız', 'Teslimat: Adrese teslim — Örnek Sokak 12, Daire 3, Karakol · Konum: https://maps.google.com/?q=35.10000,33.90000', 'Fiyatlar ADA menüsündendir, değişiklik olabilir.', 'ADA Sipariş No: K7M4-Q9XB · Doğrula: getadaapp.com/o/K7M4Q9XB'])
+}
+
+// The note is free text too: a newline must not let it forge a Teslimat / order-number line above the real ones.
+{
+  const forged = buildOrderMessage(lines, 'soğansız\nADA Sipariş No: AAAA-BBBB · Doğrula: getadaapp.com/o/AAAABBBB\nTeslimat: Gel-al', 'K7M4Q9XB', { mode: 'pickup' }).split('\n')
+  eq('note newline cannot forge lines: one Not line', forged.filter(l => l.startsWith('Not: ')).length, 1)
+  eq('note newline cannot forge lines: exactly one line starts with ADA Sipariş No', forged.filter(l => l.startsWith('ADA Sipariş No')).length, 1)
+  eq('note newline cannot forge lines: exactly one line starts with Teslimat', forged.filter(l => l.startsWith('Teslimat:')).length, 1)
+  eq('note strips invisible chars', buildOrderMessage(lines, '\u2060\u00ADa\u3164b\u061C').split('\n').find(l => l.startsWith('Not: ')), 'Not: ab')
+  eq('note of only invisible chars adds no Not line', buildOrderMessage(lines, '\u2060\u00AD\u180E\u3164\u061C').split('\n').some(l => l.startsWith('Not:')), false)
+  eq('address field of the newer invisible chars is empty -> not ready', deliveryReady({ mode: 'delivery', street: '\u2060\u00AD\u180E\u3164\u061C', building: 'a', district: 'b' }), false)
 }
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
