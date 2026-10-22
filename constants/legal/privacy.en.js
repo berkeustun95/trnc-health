@@ -12,7 +12,7 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-10-22
+export default `Version: 2026-10-23
 Last updated: October 22, 2026
 
 WHO WE ARE
@@ -58,7 +58,7 @@ Rejected submissions: if text you submit is rejected by our content filter, we k
 
 Consent records: which version of our Terms of Service and Privacy Policy you accepted, in which language, and when. If you opt in to marketing messages, we record when you did so, and when you withdrew it if you later do. If you use check-ins, we record when you were shown the check-in notice and which version of it.
 
-Orders you send to a restaurant through WhatsApp. When you tap “Send on WhatsApp”, we create an order record so the restaurant can check that the order really came through ADA. It contains the order number, the restaurant, the items, quantities and prices (taken from the ADA menu), the total, when it was created and when it expires, and how often and when its verification page was first opened. It is linked to your account identifier (or your guest session) and records whether you were signed in, so that we can limit misuse. It does not contain your name, phone number or the note you write. The note goes only to the restaurant, inside your WhatsApp message. If a restaurant serves only people aged 18 or over, we check the date of birth on your account before creating the order.
+Orders you send to a restaurant through WhatsApp. When you tap “Send on WhatsApp”, we create an order record so the restaurant can check that the order really came through ADA. It contains the order number, the restaurant, the items, quantities and prices (taken from the ADA menu), the total, when it was created and when it expires, and how often and when its verification page was first opened. It is linked to your account identifier (or your guest session) and records whether you were signed in, so that we can limit misuse. It does not contain your name, phone number or the note you write. The note goes only to the restaurant, inside your WhatsApp message. The same applies to your delivery choice, your delivery address and, if you add it, your location: they go only to the restaurant, inside your WhatsApp message. So that you don't have to type it again, ADA keeps your last delivery address in the app on your phone and never sends it to us; you can delete it in the basket at any time. If a restaurant serves only people aged 18 or over, we check the date of birth on your account before creating the order.
 
 Location: ADA uses your device's location only if you allow it, and you can turn it off at any time in your device settings. The app works without it. We do not sell your location and we do not use it for advertising.
 • On your phone — ADA uses your location to sort listings by distance, show where you are on the map, choose your city on the Home screen, and follow a walking route. This happens on your phone and your location is not sent to us for it.
@@ -73,6 +73,7 @@ Location: ADA uses your device's location only if you allow it, and you can turn
 • Maps — the maps in ADA are Google Maps (on iPhone, Apple Maps in versions of ADA that do not yet include Google Maps). To draw a map, your phone connects to Google or Apple directly, which receives your device's internet address and the area being shown, under its own privacy policy.
 • Contact taps — when you tap a call, WhatsApp, website or directions button for a listed business or partner, we record that the tap happened, for which business, and one of the seven broad districts of the TRNC it relates to (for example Girne or Lefke): the district your location places you in, or the one you chose in the app. We never record your account, your device or your exact position with it, so it cannot be traced back to you. We use these counts to tell businesses how many people contacted them through ADA.
 • Places you submit — if you submit a place and use your current location for its pin, that position is saved as the place's location and shown publicly once the place is approved.
+• Delivery location — if you choose delivery and tap “Add my location”, your phone's position is added to your WhatsApp message to the restaurant as a map link. It is not sent to us, and ADA does not store it.
 
 Microphone (Ask Oli): if you tap the microphone in Ask Oli, your speech is converted to text by your device's speech service. ADA never records or stores audio.
 

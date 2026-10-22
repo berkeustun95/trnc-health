@@ -141,6 +141,11 @@ const MARKERS = [
     why: 'the nightly purge (20261050): soft-deleted reviews/questions/messages go after 30 days' },
   { key: 'walking-path processor', re: /sent to our server, which asks openrouteservice \(run by HeiGIT/i,
     why: 'the live walking leg: HeiGIT sees our server only, and keeps ~1 km in its logs' },
+  // Delivery (Sepetim), 2026-10-22: address and location travel only inside the user's own WhatsApp message.
+  { key: 'delivery address WhatsApp-only', re: /your delivery address and, if you add it, your location: they go only to the restaurant/i,
+    why: 'the address/location never reach create_eatery_order or eatery_orders' },
+  { key: 'delivery location not stored',   re: /It is not sent to us, and ADA does not store it/i,
+    why: 'the "Add my location" map link is built on the phone and only put into the message' },
 ]
 
 // ── The field list is DERIVED from App.js PROFILE_COLUMNS, not typed here. A column
