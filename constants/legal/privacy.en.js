@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-10-08
-Last updated: October 8, 2026
+export default `Version: 2026-10-22
+Last updated: October 22, 2026
 
 WHO WE ARE
 
@@ -58,6 +58,8 @@ Rejected submissions: if text you submit is rejected by our content filter, we k
 
 Consent records: which version of our Terms of Service and Privacy Policy you accepted, in which language, and when. If you opt in to marketing messages, we record when you did so, and when you withdrew it if you later do. If you use check-ins, we record when you were shown the check-in notice and which version of it.
 
+Orders you send to a restaurant through WhatsApp. When you tap “Send on WhatsApp”, we create an order record so the restaurant can check that the order really came through ADA. It contains the order number, the restaurant, the items, quantities and prices (taken from the ADA menu), the total, when it was created and when it expires, and how often and when its verification page was first opened. It is linked to your account identifier (or your guest session) and records whether you were signed in, so that we can limit misuse. It does not contain your name, phone number or the note you write. The note goes only to the restaurant, inside your WhatsApp message. If a restaurant serves only people aged 18 or over, we check the date of birth on your account before creating the order.
+
 Location: ADA uses your device's location only if you allow it, and you can turn it off at any time in your device settings. The app works without it. We do not sell your location and we do not use it for advertising.
 • On your phone — ADA uses your location to sort listings by distance, show where you are on the map, choose your city on the Home screen, and follow a walking route. This happens on your phone and your location is not sent to us for it.
 • Search — when you search, your position is rounded to about 1 km before it leaves your phone and is sent to our servers only to put nearby results first. We do not store it.
@@ -92,6 +94,7 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Check that you are at a place when you check in, and show your check-ins to other signed-in users — To give you the feature you use. Legal basis: Performance of a contract with you
 • Keep the check-ins of under-18s hidden unless they choose to show them — To protect minors. Legal basis: Our legitimate interest in a safe service
 • Find the places near you through Google when you check in — To give you the feature you use. Legal basis: Performance of a contract with you
+• Create an order record when you send an order to a restaurant, and limit how many orders can be created — To let the restaurant verify the order and to prevent spam and fake orders. Legal basis: Our legitimate interest in a reliable, abuse-free service; performance of a contract with you
 
 We do not sell or rent your personal data, and we do not share it with third parties for their own marketing.
 
@@ -121,6 +124,8 @@ When this occurs:
 • That partner's own privacy policy and terms apply to what happens on their site. Read them.
 • We may pass a code identifying ADA as the source of the referral, so that the partner can tell that you came from us. This code identifies the app, not you.
 • We are not a party to any agreement, purchase, tenancy, booking or service you enter into with a partner.
+
+When you send an order, it is sent from your own WhatsApp to the restaurant, so WhatsApp's own privacy policy applies to that message and to your phone number. The restaurant can open a verification link (getadaapp.com/o/…) that shows the order number, restaurant, time, items and total. It never shows who you are. Anyone who has the link can see the same.
 
 5. ADVERTISING
 
@@ -156,6 +161,7 @@ Different data is kept for different lengths of time.
 • Content we have removed: content removed for breaching our community standards is retained internally so that we can identify repeat breaches by the same account. It is no longer visible to other users.
 • Route badges: retained for as long as your account is active, and deleted with it. A guest's badge is kept only on the phone, for 7 days.
 • Check-ins: retained for as long as your account is active, and deleted with it. A check-in you delete is removed at once.
+• Order records — 30 days: deleted automatically 30 days after the order was created. The verification page stops confirming an order 2 hours after it was created.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 
 8. AGE AND CHILDREN
