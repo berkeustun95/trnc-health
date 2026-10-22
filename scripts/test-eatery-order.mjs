@@ -2,9 +2,9 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack } from '../constants/eatery.js'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
-import { nearestArea, searchAreas, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
+import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -201,9 +201,10 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const rpcAt = src.indexOf("supabase.rpc('create_eatery_order'")
   const stmt = src.slice(rpcAt, src.indexOf('\n', rpcAt))
   eq('screen: the rpc statement mentions no delivery state', DELIVERY_ID.test(stmt), false)
-  // every delivery / address file: no supabase, logContactEvent, console or network (add the picker here when it lands)
-  for (const f of ['utils/eateryAddress.js', 'utils/eateryAddressCore.js', 'constants/deliveryAreas.js', 'components/DeliveryPinPicker.js']) {
+  // every delivery / address file: no supabase, logContactEvent, console or network 
+  for (const f of ['utils/eateryAddress.js', 'utils/eateryAddressCore.js', 'constants/deliveryAreas.js', 'components/DeliveryPinPicker.js', 'components/AddressEditor.js', 'utils/deliveryLocate.js', 'utils/useKeyboardTop.js']) {
     const url = new URL('../' + f, import.meta.url)
+    eq(`${f} exists (a renamed file must not slip out of the leak guard)`, fs.existsSync(url), true)
     if (!fs.existsSync(url)) continue
     const a = fs.readFileSync(url, 'utf8').replace(/\/\/.*$/gm, '')
     eq(`${f} imports no supabase / logContactEvent`, /import[^\n]*(supabase|logContactEvent)|require\([^)]*(supabase|logContactEvent)/.test(a), false)
@@ -371,6 +372,34 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
 
   // editor back
   eq('editorBack: 3 -> 2 -> 1 -> closed', [editorBack(3), editorBack(2), editorBack(1), editorBack(0), editorBack(undefined)], [2, 1, 'closed', 'closed', 'closed'])
+
+  // building "No" strip
+  const NB = b => MSG({ kind: 'home', district: 'K', street: 'Eski Sokak', building: b })
+  eq('building: a leading "No" in any spelling is not doubled', ['No 4', 'No: 4', 'no.4', 'NO  4', 'no:4'].map(NB), Array(5).fill(BASE + 'Ev: Eski Sokak No 4, K'))
+  eq('building: "4" and a building that merely starts with the letters "no" are kept', [NB('4'), NB('Nova 3'), NB('12/No 4')], [BASE + 'Ev: Eski Sokak No 4, K', BASE + 'Ev: Eski Sokak No Nova 3, K', BASE + 'Ev: Eski Sokak No 12/No 4, K'])
+  eq('building: only "No" keeps itself', NB('No'), BASE + 'Ev: Eski Sokak No No, K')
+
+  // Back ordering on the partner page
+  const calls = []
+  const BK = o => { calls.length = 0; return { r: eateryPartnerBack({ editorOpen: false, editorStep: 1, pickerOpen: false, basketOpen: false, viewing: false, ...o, quizBack: () => { calls.push('quiz'); return !!o.quizBack } }), calls: [...calls] } }
+  eq('back: editor step 3 -> 2, 2 -> 1, 1 -> closed', [3, 2, 1].map(st => BK({ editorOpen: true, editorStep: st }).r), [{ layer: 'editor', step: 2, picker: false }, { layer: 'editor', step: 1, picker: false }, { layer: 'editor', close: true }])
+  eq('back: the map picker goes back to step 2 whatever the step', BK({ editorOpen: true, editorStep: 2, pickerOpen: true }).r, { layer: 'editor', step: 2, picker: false })
+  eq('back: the editor beats the quiz and the basket, and the quiz is not even asked', BK({ editorOpen: true, editorStep: 3, quizBack: true, basketOpen: true }), { r: { layer: 'editor', step: 2, picker: false }, calls: [] })
+  eq('back: no editor -> the quiz first, then the basket, then the photo, else nothing', [BK({ quizBack: true, basketOpen: true }).r, BK({ basketOpen: true, viewing: true }).r, BK({ viewing: true }).r, BK({}).r], [{ layer: 'quiz' }, { layer: 'basket' }, { layer: 'viewing' }, null])
+  eq('back: the quiz is asked before the basket', BK({ basketOpen: true }).calls, ['quiz'])
+  const screenSrc = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
+  eq('screen: the backRef effect goes through eateryPartnerBack', /eateryPartnerBack\(\{/.test(screenSrc.replace(/\/\/.*$/gm, '')), true)
+
+  // editor logic
+  const ok3 = { district: 'K', street: 'S', building: '1' }
+  eq('editorStartStep: new 1; complete 3; unnamed Diğer 1; named-but-short Diğer 3', [editorStartStep(null), editorStartStep({ kind: 'home', ...ok3 }), editorStartStep({ kind: 'other', name: '', ...ok3 }), editorStartStep({ kind: 'other', name: 'Anne', district: 'K', street: '', building: '' }), firstIncompleteStep({ kind: 'home' })], [1, 3, 1, 3, 3])
+  eq('addressMissing: order name, district, street, building; home never needs a name', [addressMissing({ kind: 'other' }), addressMissing({ kind: 'home', street: 'S' }), addressMissing({ kind: 'work', ...ok3 }), addressMissing({ kind: 'other', name: '\u200B', ...ok3 })], [['name', 'district', 'street', 'building'], ['district', 'building'], [], ['name']])
+  eq('addressMissing agrees with addressComplete', [{ kind: 'home' }, { kind: 'home', ...ok3 }, { kind: 'other', ...ok3 }].map(e => addressMissing(e).length === 0 === addressComplete(e)), [true, true, true])
+  eq('districtPrefill: only when empty and a pin exists', [districtPrefill({ district: '', lat: 35.18974, lng: 33.34972 }), districtPrefill({ district: '  ', lat: 35.18974, lng: 33.34972 }), districtPrefill({ district: 'Girne', lat: 35.18974, lng: 33.34972 }), districtPrefill({ district: '', lat: null, lng: null }), districtPrefill({ district: '', lat: 35.25, lng: 33.0 })], ['Kumsal', 'Kumsal', '', '', ''])
+  eq('searchAreasTop: capped at PIN_SEARCH_MAX, same order as searchAreas', [PIN_SEARCH_MAX, searchAreas('a').length > PIN_SEARCH_MAX, searchAreasTop('a').length, JSON.stringify(searchAreasTop('a')) === JSON.stringify(searchAreas('a').slice(0, PIN_SEARCH_MAX))], [8, true, 8, true])
+  eq('NICOSIA start', NICOSIA, { lat: 35.1856, lng: 33.3823 })
+  eq('deliveryFromEntry: pin -> coords, id -> addressId, no updatedAt/lat/lng left over', deliveryFromEntry({ id: 'x', kind: 'other', name: '', district: 'K', street: 'S', building: '1', floor: '', flat: '', directions: '', lat: 35.1, lng: 33.2, updatedAt: 5 }), { kind: 'other', name: '', district: 'K', street: 'S', building: '1', floor: '', flat: '', directions: '', addressId: 'x', coords: { lat: 35.1, lng: 33.2 } })
+  eq('deliveryFromEntry: no pin -> coords null; same keys as the empty state', [deliveryFromEntry({ id: 'x', kind: 'home', name: '', district: '', street: '', building: '', floor: '', flat: '', directions: '', lat: null, lng: null }).coords, Object.keys(deliveryFromEntry({ id: 'x', kind: 'home', name: '', district: '', street: '', building: '', floor: '', flat: '', directions: '', lat: null, lng: null })).sort()], [null, Object.keys(EMPTY_DELIVERY_ADDRESS).sort()])
 }
 
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.

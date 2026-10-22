@@ -258,6 +258,9 @@ export function deliveryReady(delivery) {
   return delivery?.mode === 'delivery' && addressComplete(delivery)
 }
 const KIND_LABEL = { home: 'Ev', work: 'İş' }
+// A building typed by an older version often already starts with "No" ("No 4", "No: 4", "no.4"): the line adds its own "No".
+// A building that is only "No" keeps itself rather than vanishing.
+const buildingNo = v => { const b = sanitizeAddressField(v); return b.replace(/^no\b[\s.:]*/i, '') || b }
 // ONE line, always Turkish: "<name>: <sokak> No <bina>, Kat <kat>, Daire <daire>, <mahalle> · Tarif: … · Konum (haritada aç): <link>".
 export function deliveryLine(delivery) {
   if (!deliveryReady(delivery)) return ''
@@ -266,7 +269,7 @@ export function deliveryLine(delivery) {
   const name = KIND_LABEL[kind] || oneLine(delivery.name, ADDRESS_NAME_MAX)
   const f = sanitizeAddressField
   const floor = oneLine(delivery.floor, ADDRESS_UNIT_MAX), flat = oneLine(delivery.flat, ADDRESS_UNIT_MAX)
-  const addr = [`${f(delivery.street)} No ${f(delivery.building)}`, floor && `Kat ${floor}`, flat && `Daire ${flat}`, f(delivery.district)].filter(Boolean).join(', ')
+  const addr = [`${f(delivery.street)} No ${buildingNo(delivery.building)}`, floor && `Kat ${floor}`, flat && `Daire ${flat}`, f(delivery.district)].filter(Boolean).join(', ')
   const directions = oneLine(delivery.directions, ADDRESS_DIRECTIONS_MAX)
   const pin = delivery.coords || delivery
   const link = mapsLink(pin?.lat, pin?.lng)
@@ -275,6 +278,41 @@ export function deliveryLine(delivery) {
 
 // The address editor's Back: step 3 -> 2 -> 1 -> closed (the editor is the first layer in the back chain, then the basket).
 export const editorBack = step => (step === 3 ? 2 : step === 2 ? 1 : 'closed')
+
+// What one Back press does on the partner page, top layer first: the address editor (its map picker, then 3 -> 2 -> 1 -> closed),
+// the quiz, Sepetim, the dish photo. quizBack() is called only when the editor did not take the press; true = it closed something.
+// -> { layer:'editor', step, picker:false } | { layer:'editor', close:true } | { layer:'quiz' | 'basket' | 'viewing' } | null
+export function eateryPartnerBack({ editorOpen, editorStep, pickerOpen, quizBack, basketOpen, viewing }) {
+  if (editorOpen) {
+    if (pickerOpen) return { layer: 'editor', step: 2, picker: false }
+    const n = editorBack(editorStep)
+    return n === 'closed' ? { layer: 'editor', close: true } : { layer: 'editor', step: n, picker: false }
+  }
+  if (quizBack?.()) return { layer: 'quiz' }
+  if (basketOpen) return { layer: 'basket' }
+  if (viewing) return { layer: 'viewing' }
+  return null
+}
+
+// Editor: a new address starts at step 1; an incomplete one at the first step that lacks something (name -> 1, else the details -> 3);
+// a complete one at the details (3), where most edits happen.
+export function firstIncompleteStep(e) {
+  return addressKind(e?.kind) === 'other' && !oneLine(e?.name, ADDRESS_NAME_MAX) ? 1 : 3
+}
+export const editorStartStep = e => (!e ? 1 : addressComplete(e) ? 3 : firstIncompleteStep(e))
+// The required fields still empty, in the order the editor shows them: 'name' (Diğer only), 'district', 'street', 'building'.
+export function addressMissing(e) {
+  const out = []
+  if (addressKind(e?.kind) === 'other' && !oneLine(e?.name, ADDRESS_NAME_MAX)) out.push('name')
+  for (const k of ['district', 'street', 'building']) if (!sanitizeAddressField(e?.[k])) out.push(k)
+  return out
+}
+// A book entry -> the Sepetim delivery state (pin as coords). UI only: a name is never invented here.
+export function deliveryFromEntry(a) {
+  const { lat, lng, id, updatedAt, ...fields } = a
+  return { ...fields, addressId: id, coords: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null }
+}
+export const EMPTY_DELIVERY_ADDRESS = { addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null }
 
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
 // code: the server's order code; its line is the LAST one.

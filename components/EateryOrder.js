@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, AppState, Animated, Dimensions, Easing, Linking, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import * as Location from 'expo-location'
-import { ORDER_NOTE_MAX, ADDRESS_FIELD_MAX, deliveryReady, withTimeout, locateOutcome, locateNote, LOCATE_TIMEOUT_MS } from '../constants/eatery'
-import { REDESIGN } from '../constants/redesign'
-import { requestWithPrimer } from '../utils/permissionPrimer'
-import { askedFix } from '../utils/locationServices'
-import { deleteAddress } from '../utils/eateryAddress'
+import { ORDER_NOTE_MAX, deliveryReady, addressComplete, addressKind, oneLine, sanitizeAddressField, ADDRESS_NAME_MAX } from '../constants/eatery'
+import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
@@ -65,23 +61,6 @@ export function OrderBar({ count, totalText, lang, onOpen, partnerName }) {
   )
 }
 
-// The keyboard's top edge in screen coordinates (null while it is closed). The lift is NOT taken from the reported
-// height: BasketPage measures where its footer really ends against this edge (device-tested: the reported height
-// and the window's own partial resize disagree).
-function useKeyboardTop() {
-  const [top, setTop] = useState(null)
-  useEffect(() => {
-    const ios = Platform.OS === 'ios'
-    const show = Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidShow', e => {
-      const { height, screenY } = e.endCoordinates
-      setTop(screenY > 0 ? Math.round(screenY) : Math.round(Dimensions.get('screen').height - height))
-    })
-    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setTop(null))
-    return () => { show.remove(); hide.remove() }
-  }, [])
-  return top
-}
-
 // A dish photo is partner content, shown as sent (contain) in the menu's white frame. Always a 56 box so names
 // align: a dish with no photo, or one that failed to load, gets a soft tile with an icon.
 function LineThumb({ photoPath }) {
@@ -114,10 +93,9 @@ function BasketLine({ line, onQty, formatMoney, lang }) {
   )
 }
 
-// "Teslimat": pick-up or delivery is REQUIRED before sending. The address and the optional location go into the WhatsApp text
-// only (constants/eatery.js deliveryLine); nothing here touches the server. Defined outside BasketPage so typing never remounts it.
-const FIELDS = [['street', 'eateryDeliveryStreet'], ['building', 'eateryDeliveryBuilding'], ['district', 'eateryDeliveryDistrict']]
-
+// "Teslimat": pick-up or delivery is REQUIRED before sending. The address comes from the address book on this phone (components/AddressEditor.js
+// adds and edits it); it and its optional map pin go into the WhatsApp text only (constants/eatery.js deliveryLine). Nothing here touches the
+// server. Defined outside BasketPage so it never remounts.
 function DeliveryOption({ checked, label, onPress }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [st.opt, checked && st.optOn, pressed && { opacity: press.small }]}
@@ -128,107 +106,40 @@ function DeliveryOption({ checked, label, onPress }) {
   )
 }
 
-function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocusInput, onBlurInput }) {
-  const [locating, setLocating] = useState(false)
-  const [locNote, setLocNote] = useState(null)   // { msgKey, action } | null
-  const alive = useRef(true)
-  const wentToSettings = useRef(false)   // the services-off dialog itself backgrounds the app on Android; only a trip to Settings may clear the note
-  const openRef = useRef(open)
-  const modeRef = useRef(delivery.mode)
-  openRef.current = open
-  modeRef.current = delivery.mode
-  useEffect(() => () => { alive.current = false }, [])
-  const noteHasAction = !!locNote?.action
-  useEffect(() => { wentToSettings.current = false }, [locNote])
-  useEffect(() => {
-    if (!noteHasAction) return
-    const sub = AppState.addEventListener('change', s => { if (s === 'active' && wentToSettings.current) { wentToSettings.current = false; setLocNote(null) } })
-    return () => sub.remove()
-  }, [noteHasAction])
+const KIND_ICON = { home: 'home-outline', work: 'briefcase-outline', other: 'location-outline' }
+const KIND_KEY = { home: 'eateryAddrKindHome', work: 'eateryAddrKindWork' }
+// What the card calls an entry (UI only; the message line has its own rule): Ev / İş, else the name, else "Adresim".
+const addressLabel = (d, lang) => { const k = addressKind(d.kind); return KIND_KEY[k] ? t(KIND_KEY[k], lang) : oneLine(d.name, ADDRESS_NAME_MAX) || t('eateryAddrUnnamed', lang) }
+const addressText = d => [[sanitizeAddressField(d.street), sanitizeAddressField(d.building)].filter(Boolean).join(' '), sanitizeAddressField(d.district)].filter(Boolean).join(', ')
+
+function DeliveryCard({ lang, delivery, onDelivery, onAddress }) {
   const isHome = delivery.mode === 'delivery'
-  const hasAny = !!(delivery.street || delivery.building || delivery.district || delivery.coords)
-  const choose = mode => { setLocNote(null); onDelivery(mode === 'pickup' ? { mode, coords: null } : { mode }) }
-  // Last known (2 min) first, else a fresh fix raced against a timeout (indoors it can hang), else an older one.
-  const getFix = async () => {
-    const last = async maxAge => { try { return await Location.getLastKnownPositionAsync({ maxAge }) } catch { return null } }
-    return (await last(120000))
-      ?? (await withTimeout(askedFix(Location.Accuracy.Balanced), LOCATE_TIMEOUT_MS))
-      ?? (await last(600000))
-  }
-  const addLocation = async () => {
-    if (locating) return
-    setLocating(true)
-    setLocNote(null)
-    let perm = { status: null, canAskAgain: true }
-    let fix = null
-    try {
-      perm = REDESIGN ? await requestWithPrimer('location') : await Location.requestForegroundPermissionsAsync()
-      if (perm?.status === 'granted') fix = await getFix()
-    } catch { fix = null }
-    let servicesOn = true
-    try { servicesOn = await Location.hasServicesEnabledAsync() } catch {}
-    if (!alive.current) return
-    setLocating(false)
-    if (!openRef.current || modeRef.current !== 'delivery') return
-    const outcome = locateOutcome({ granted: perm?.status === 'granted', canAskAgain: perm?.canAskAgain !== false, servicesOn, fix })
-    if (outcome === 'ok') {
-      const c = fix.coords
-      onDelivery({ coords: { lat: c.latitude, lng: c.longitude } })
-      AccessibilityInfo.announceForAccessibility?.(t('eateryDeliveryLocated', lang))
-    } else {
-      const note = locateNote(outcome)
-      setLocNote(note)
-      AccessibilityInfo.announceForAccessibility?.(t(note.msgKey, lang))
-    }
-  }
-  const openLocationFix = async action => {
-    wentToSettings.current = true
-    try {
-      if (action === 'locationSettings' && Platform.OS === 'android') {
-        try { await Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS') } catch { await Linking.openSettings() }
-      } else await Linking.openSettings()
-    } catch {}
-  }
-  const clear = () => { setLocNote(null); if (delivery.addressId) deleteAddress(delivery.addressId); onDelivery({ addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null }) }
+  const has = !!delivery.addressId
+  const complete = addressComplete(delivery)
+  const label = has ? addressLabel(delivery, lang) : ''
+  const text = has ? addressText(delivery) : ''
   return (
     <Card>
       <Text style={st.noteLabel} accessibilityRole="header">{t('eateryDeliveryTitle', lang)}</Text>
       <View accessibilityRole="radiogroup" style={st.opts}>
-        <DeliveryOption checked={delivery.mode === 'pickup'} label={t('eateryDeliveryPickup', lang)} onPress={() => choose('pickup')} />
-        <DeliveryOption checked={isHome} label={t('eateryDeliveryHome', lang)} onPress={() => choose('delivery')} />
+        <DeliveryOption checked={delivery.mode === 'pickup'} label={t('eateryDeliveryPickup', lang)} onPress={() => onDelivery({ mode: 'pickup' })} />
+        <DeliveryOption checked={isHome} label={t('eateryDeliveryHome', lang)} onPress={() => onDelivery({ mode: 'delivery' })} />
       </View>
       {isHome && (
         <View style={st.addr}>
-          {FIELDS.map(([f, key], i) => (
-            <View key={f} ref={wraps[f]} collapsable={false}>
-              <Text style={st.fieldLabel}>{t(key, lang)}</Text>
-              <TextInput ref={inputs[f]} style={st.field} value={delivery[f]} onChangeText={v => onDelivery({ [f]: v })} maxLength={ADDRESS_FIELD_MAX}
-                autoCapitalize="words" autoCorrect={false} autoComplete="off" importantForAutofill="no" textContentType="none" accessibilityLabel={t(key, lang)}
-                returnKeyType={i < FIELDS.length - 1 ? 'next' : 'done'} blurOnSubmit={i === FIELDS.length - 1}
-                onSubmitEditing={() => { if (i < FIELDS.length - 1) inputs[FIELDS[i + 1][0]].current?.focus() }}
-                onFocus={() => onFocusInput(inputs[f], wraps[f])} onBlur={() => onBlurInput(inputs[f])} />
+          {has && (
+            <View style={st.sum} accessible accessibilityLabel={`${label}. ${complete ? text : t('eateryAddrIncomplete', lang)}${delivery.coords ? `. ${t('eateryAddrPinSet', lang)}` : ''}`}>
+              <Ionicons name={KIND_ICON[addressKind(delivery.kind)]} size={22} color={colors.primaryDark} style={st.sumIcon} />
+              <View style={st.sumMain}>
+                <Text style={st.sumLabel}>{label}</Text>
+                <Text style={st.sumText}>{complete ? text : t('eateryAddrIncomplete', lang)}</Text>
+                {complete && !!delivery.coords && <Text style={st.sumPin}>{t('eateryAddrPinSet', lang)}</Text>}
+              </View>
             </View>
-          ))}
-          {delivery.coords ? (
-            <View style={st.locRow}>
-              <Ionicons name="location" size={18} color={colors.primaryDark} />
-              <Text style={st.locText}>{t('eateryDeliveryLocated', lang)}</Text>
-              <Button variant="text" title={t('eateryDeliveryLocRemove', lang)} onPress={() => onDelivery({ coords: null })}
-                accessibilityLabel={t('eateryDeliveryLocRemoveA11y', lang)} />
-            </View>
-          ) : (
-            <Button variant="secondary" fullWidth icon="locate-outline" title={t('eateryDeliveryLocate', lang)} loading={locating}
-              loadingTitle={t('eateryDeliveryLocating', lang)} onPress={addLocation} />
           )}
-          {!delivery.coords && (locNote ? (
-            <View style={st.locFail}>
-              <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
-              <Text style={st.locFailText}>{t(locNote.msgKey, lang)}</Text>
-              {locNote.action && <Button variant="text" title={t('openSettings', lang)} onPress={() => openLocationFix(locNote.action)} />}
-            </View>
-          ) : <Text style={st.locNote}>{t('eateryDeliveryLocateNote', lang)}</Text>)}
+          <Button variant={has && complete ? 'secondary' : 'primary'} fullWidth icon={has ? (complete ? 'create-outline' : 'alert-circle-outline') : 'add'}
+            title={t(!has ? 'eateryAddrAdd' : complete ? 'eateryAddrEdit' : 'eateryAddrComplete', lang)} onPress={() => onAddress(has ? delivery : null)} />
           <Text style={st.hint}>{t('eateryDeliveryPrivacy', lang)}</Text>
-          {hasAny && <Button variant="text" icon="trash-outline" title={t('eateryDeliveryClear', lang)} onPress={clear} style={st.clear} />}
         </View>
       )}
     </Card>
@@ -238,25 +149,22 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, delivery, onDelivery, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
   const footerRef = useRef(null)
   const rootRef = useRef(null)
   const noteInput = useRef(null)
-  const addrInputs = useRef({ street: { current: null }, building: { current: null }, district: { current: null } }).current
-  const addrWraps = useRef({ street: { current: null }, building: { current: null }, district: { current: null } }).current
-  const focusedWrap = useRef(null)   // the address field's label + input wrapper, measured so the label is revealed too
-  const focused = useRef(null)   // the input the keyboard is for (note or an address field)
+  const focused = useRef(null)   // the input the keyboard is for (the note)
   const scrollY = useRef(0)
   const hadKb = useRef(false)
   // Back closes the keyboard but leaves the field focused, and the next tap elsewhere is then swallowed: blur with it.
   useEffect(() => {
-    if (kbTop == null && hadKb.current) { focused.current?.current?.blur(); noteInput.current?.blur() }
+    if (kbTop == null && hadKb.current) noteInput.current?.blur()
     hadKb.current = kbTop != null
   }, [kbTop])
-  const onFocusInput = useCallback((ref, wrap) => { focused.current = ref; focusedWrap.current = wrap || null }, [])
+  const onFocusInput = useCallback(ref => { focused.current = ref }, [])
   const onBlurInput = useCallback(ref => { if (focused.current === ref) focused.current = null }, [])
   const [lift, setLift] = useState(0)
   const measureFooter = useCallback(() => {
@@ -280,25 +188,16 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     Animated.timing(slide, { toValue: to, duration: open ? motion.sheetIn : motion.sheetOut,
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic), useNativeDriver: true }).start(done)
   }, [open])
-  // Keeps the focused input above the pinned footer: the note scrolls to the end (its counter and hint show), an address
-  // field is measured NOW against the footer's top (window coordinates, never cached layout) and the list moves by the gap.
+  // Keeps the note above the pinned footer: it scrolls to the end (its counter and hint show).
   const reveal = useCallback(() => {
-    const ref = focused.current, sv = scrollRef.current, footer = footerRef.current
-    if (!ref?.current || !sv) return
-    if (ref === noteInput) { sv.scrollToEnd({ animated: !reduce }); return }
-    if (!footer) return
-    sv.measureInWindow((_sx, sy) => footer.measureInWindow((_fx, fy) => (focusedWrap.current?.current || ref.current)?.measureInWindow((_x, y, _w, h) => {
-      const bottom = y + h + space[16], top = y - space[16]
-      if (bottom > fy) sv.scrollTo({ y: Math.max(0, scrollY.current + (bottom - fy)), animated: !reduce })
-      else if (top < sy) sv.scrollTo({ y: Math.max(0, scrollY.current - (sy - top)), animated: !reduce })
-    })))
+    if (focused.current && scrollRef.current) scrollRef.current.scrollToEnd({ animated: !reduce })
   }, [reduce])
   useEffect(() => {
     if (kbTop == null) return
     const ids = [setTimeout(reveal, 60), setTimeout(reveal, 320)]   // again once the footer lift has settled
     return () => ids.forEach(clearTimeout)
   }, [kbTop, reveal])
-  const focusReveal = useCallback((ref, wrap) => { onFocusInput(ref, wrap); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
+  const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
   const msgKey = ageGate ? 'eateryOrderAdultOnly' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && ['generic', 'rate', 'account'].includes(orderError) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
@@ -310,7 +209,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
-      <SafeAreaView style={st.page} edges={['top']}>
+      <SafeAreaView style={st.page} edges={['top']} {...(covered ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
         <ScreenHeader lang={lang} title={t('eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
@@ -336,7 +235,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
                 ))}
               </Card>
               <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              <DeliveryCard lang={lang} open={open} delivery={delivery} onDelivery={onDelivery} inputs={addrInputs} wraps={addrWraps} onFocusInput={focusReveal} onBlurInput={onBlurInput} />
+              <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} />
               <Card>
                 <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
                 <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
@@ -409,11 +308,12 @@ const st = StyleSheet.create({
   addr:      { marginTop: space[12], gap: space[8] },
   fieldLabel:{ ...type.small, fontFamily: font.semibold, color: colors.textPrimary, marginBottom: space[4] },
   field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
-  locRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
-  locText:   { flex: 1, ...type.body, color: colors.textPrimary },
-  locFail:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
-  locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
-  locNote:   { ...type.small, color: colors.textSecondary },
+  sum:       { flexDirection: 'row', alignItems: 'flex-start', gap: space[12], padding: space[12], borderRadius: radii.md, backgroundColor: colors.soft },
+  sumIcon:   { marginTop: 1 },
+  sumMain:   { flex: 1, gap: 2 },
+  sumLabel:  { ...type.rowTitle, color: colors.textPrimary },
+  sumText:   { ...type.body, color: colors.textPrimary },
+  sumPin:    { ...type.small, color: colors.primaryDark },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },

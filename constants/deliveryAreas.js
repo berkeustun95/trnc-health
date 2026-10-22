@@ -37,3 +37,14 @@ export function searchAreas(query) {
     .sort((x, y) => (y.f.startsWith(q) - x.f.startsWith(q)) || x.a.name.localeCompare(y.a.name, 'tr'))
     .map(x => ({ ...x.a }))
 }
+
+// The map picker's start when there is no pin and no location already allowed: central Lefkoşa.
+export const NICOSIA = { lat: 35.1856, lng: 33.3823 }
+export const PIN_SEARCH_MAX = 8
+export const searchAreasTop = query => searchAreas(query).slice(0, PIN_SEARCH_MAX)
+
+// The Mahalle / köy to prefill: only when that field is still empty AND there is a pin; '' = leave it alone.
+export function districtPrefill({ district, lat, lng }) {
+  if (String(district ?? '').trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) return ''
+  return nearestArea(lat, lng)
+}

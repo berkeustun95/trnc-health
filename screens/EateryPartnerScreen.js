@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, deliveryReady,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -15,8 +15,9 @@ import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUr
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
 import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
-import { loadBook, addAddress, updateAddress, setLastUsed } from '../utils/eateryAddress'
+import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
+import AddressEditor from '../components/AddressEditor'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains } from '../constants/eateryQuiz'
 import { haptic } from '../components/ui'
@@ -229,20 +230,26 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [focusReq, setFocusReq] = useState(null)   // { id, n }: a dish picked on the quiz results; n lets the same dish be picked twice
   const focusId = focusReq ? focusReq.id : focusItemId
   const [note, setNote] = useState('')
-  // Teslimat: mode is null until chosen (required). Prefilled from the last used address in this phone's address book
-  // (until the book UI lands the three-field form edits that one entry); coords = its optional map pin.
-  const [delivery, setDelivery] = useState({ mode: null, addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null })
+  // Teslimat: mode is null until chosen (required). The address is one entry of this phone's address book (utils/eateryAddress.js):
+  // the last used one is selected on open; components/AddressEditor.js adds, edits and deletes. coords = its optional map pin.
+  const [delivery, setDelivery] = useState({ mode: null, ...EMPTY_DELIVERY_ADDRESS })
   const onDelivery = useCallback(patch => { setOrderError(null); setDelivery(d => ({ ...d, ...patch })) }, [])
   useEffect(() => {
     let live = true
     loadBook().then(book => {
       const a = book.items.find(i => i.id === book.lastUsedId)
-      if (!live || !a) return
-      const { lat, lng, id, updatedAt, ...fields } = a
-      setDelivery(d => (d.street || d.building || d.district ? d : { ...d, ...fields, addressId: id, name: a.kind === 'other' && !a.name ? 'Adres' : a.name, coords: lat != null ? { lat, lng } : null }))
+      if (live && a) setDelivery(d => (d.addressId ? d : { ...d, ...deliveryFromEntry(a) }))
     })
     return () => { live = false }
   }, [])
+  // The address editor: a page over Sepetim. shown keeps it mounted through its slide-out; step / picker live here so Back and the header
+  // arrow share one code path (editorBackTo); the draft lives in the editor.
+  const [editor, setEditor] = useState({ shown: false, open: false, seed: null, step: 1, picker: false, key: 0 })
+  const openEditor = seed => setEditor(e => ({ shown: true, open: true, seed, step: editorStartStep(seed), picker: false, key: e.key + 1 }))
+  const closeEditor = () => setEditor(e => ({ ...e, open: false }))
+  const editorBackTo = r => { if (r.close) closeEditor(); else setEditor(e => ({ ...e, step: r.step, picker: r.picker })) }
+  const onAddressSaved = item => { setOrderError(null); setDelivery(d => ({ ...d, ...deliveryFromEntry(item) })); closeEditor() }
+  const onAddressDeleted = next => { setOrderError(null); setDelivery(d => ({ ...d, ...(next ? deliveryFromEntry(next) : EMPTY_DELIVERY_ADDRESS) })); closeEditor() }
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
@@ -368,10 +375,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
-      if (quizBackRef.current?.()) return true
-      if (basketOpen) { setBasketOpen(false); return true }
-      if (viewing) { setViewing(null); return true }
-      return false
+      const r = eateryPartnerBack({ editorOpen: editor.open === true, editorStep: editor.step, pickerOpen: editor.picker === true,
+        quizBack: () => quizBackRef.current?.(), basketOpen, viewing: !!viewing })
+      if (!r) return false
+      if (r.layer === 'editor') editorBackTo(r)
+      else if (r.layer === 'basket') setBasketOpen(false)
+      else if (r.layer === 'viewing') setViewing(null)
+      return true
     }
     return () => { backRef.current = null }
   })
@@ -390,12 +400,6 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [orderError, setOrderError] = useState(null)   // null | 'generic' | 'rate' | 'account' | 'prices' | 'items'
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
-  const storeAddress = async d => {
-    // An existing entry keeps its own kind / name (a migrated one stays unnamed; 'Adres' above is only the in-flight label).
-    const entry = { ...(d.addressId ? {} : { kind: d.kind, name: d.name }), district: d.district, street: d.street, building: d.building, floor: d.floor, flat: d.flat, directions: d.directions, lat: d.coords?.lat, lng: d.coords?.lng }
-    const r = d.addressId ? await updateAddress(d.addressId, entry) : await addAddress(entry)
-    if (r.ok) { await setLastUsed(r.item.id); setDelivery(x => (x.addressId ? x : { ...x, addressId: r.item.id })) }
-  }
   const sendOrder = async () => {
     if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery)) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
@@ -418,7 +422,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     }
     armedRef.current = { left: false }
     setBasketOpen(false)
-    if (delivery.mode === 'delivery') storeAddress(delivery)
+    if (delivery.mode === 'delivery' && delivery.addressId) setLastUsed(delivery.addressId)
     const text = buildOrderMessage(serverOrderLines(res), note, res.code, delivery)
     setDelivery(d => ({ ...d, mode: null }))
     go('order_whatsapp', orderWhatsAppUrl(orderDigits, text), () => { armedRef.current = null })
@@ -529,7 +533,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       </View>
       {ordering && basketShown === true && (
         <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
-          note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
+          note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onAddress={openEditor} covered={editor.open === true} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
+      )}
+      {ordering && editor.shown === true && (
+        <AddressEditor key={editor.key} lang={lang} open={editor.open === true} step={editor.step} pickerOpen={editor.picker === true} seed={editor.seed} reduce={reduce}
+          onStep={n => setEditor(e => ({ ...e, step: n }))} onPicker={v => setEditor(e => ({ ...e, picker: v }))}
+          onBack={() => editorBackTo(eateryPartnerBack({ editorOpen: true, editorStep: editor.step, pickerOpen: editor.picker === true }))}
+          onClosed={() => setEditor(e => (e.open ? e : { ...e, shown: false }))} onSaved={onAddressSaved} onDeleted={onAddressDeleted} />
       )}
       {quizShown === true && (
         <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
