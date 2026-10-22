@@ -14,7 +14,7 @@ import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
-import { effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains } from '../constants/eateryQuiz'
@@ -193,7 +193,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const { width: winW } = useWindowDimensions()
   const W = winW - 32
 
-  const contacts = eateryContacts(partner)
+  const contacts = eateryContacts(partner, partnerContactNumbers(partner))
   const menuUrl = eateryMenuUrl(partner)
   const sections = useMemo(() => eateryMenuSections(partner), [partner])
   const gallery = eateryPhotos(partner, 'gallery')
@@ -364,7 +364,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // The tap is logged on the line BEFORE the link opens (utils/logContactEvent: it never throws);
   // a placeholder partner has no real id and an inactive (previewer-only) row is not live: both log nothing.
   const go = (action, url, onFail) => {
-    if (!partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
+    if (CONTACT_LOGGING && !partner.placeholder && partner.is_active !== false) logContactEvent('eatery', partner.id, action)
     Linking.openURL(url).catch(() => { onFail?.() })
   }
   // Closes the basket page and opens WhatsApp. Only the tap is logged (action 'order_whatsapp'): never the basket or the note.
@@ -496,6 +496,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 icon={CONTACT_UI[c.action].icon} title={t(CONTACT_UI[c.action].labelKey, lang)}
                 onPress={() => go(c.action, c.url)} />
             ))}
+            {IS_PREVIEW && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
           </View>
         )}
 
@@ -547,6 +548,7 @@ const s = StyleSheet.create({
   hourDay:   { ...type.body, color: colors.textSecondary, flexShrink: 1 },
   hourVal:   { ...type.body, color: colors.textPrimary, flexShrink: 0 },
   actions:   { gap: space[8] },
+  previewHint: { ...type.small, color: colors.textSecondary, textAlign: 'center' },
   menuSec:   { marginTop: space[12] },
   menuSecNext: { marginTop: space[20] },
   secTitle:  { ...type.sectionHeading, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.sm, paddingVertical: space[8], paddingHorizontal: space[12], marginBottom: space[4] },
