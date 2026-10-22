@@ -233,6 +233,33 @@ export const ADDRESS_FIELD_MAX = 100
 const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u034F\u115F\u1160\u17B4\u17B5\u3164\uFFA0\uFEFF]/g
 export const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
 export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
+
+// ─── Courier phone (optional, per address). Stored as canonical digits "+905331234567" / "+903921234567"; shown (editor and message) as
+// "+90 533 123 45 67" / "+90 392 123 45 67". Only a TRNC-reachable number: a Turkish mobile (5xx) or a TRNC landline (392).
+// Input: "+90 …", "0090 …", "0 …" or bare national digits; spaces, dashes, dots and parentheses are ignored. Never throws.
+export const PHONE_INPUT_MAX = 24
+export function normalizePhone(input) {
+  if (input == null || input === '') return { ok: true, value: null }
+  if (typeof input !== 'string') return { ok: false }
+  const raw = input.replace(INVISIBLE, '')
+  if (raw.length > 40) return { ok: false }
+  const s = raw.replace(/[\s\u0085\-.()]/g, '')
+  if (!s) return { ok: true, value: null }
+  if (!/^\+?\d+$/.test(s)) return { ok: false }
+  let national
+  if (s.startsWith('+')) { if (!s.startsWith('+90')) return { ok: false }; national = s.slice(3) }
+  else if (s.startsWith('00')) { if (!s.startsWith('0090')) return { ok: false }; national = s.slice(4) }
+  else if (s.startsWith('0')) national = s.slice(1)
+  else national = s
+  return /^(5\d{9}|392\d{7})$/.test(national) ? { ok: true, value: '+90' + national } : { ok: false }
+}
+// The standard display form of a normalised value; '' when it is not a valid phone.
+export function formatPhone(value) {
+  const r = normalizePhone(value)
+  if (!r.ok || !r.value) return ''
+  const n = r.value.slice(3)
+  return `+90 ${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6, 8)} ${n.slice(8)}`
+}
 // The ONE place the pin link's shape is decided ({lat} / {lng} are 5-decimal substitutions). Berke picks the final format after a
 // phone test: a bare `?q=lat,lng` snapped to the nearest labelled business (the clinic next door), so this is a one-constant change.
 export const MAPS_LINK_FORMAT = 'https://www.google.com/maps/search/?api=1&query={lat},{lng}'
@@ -266,7 +293,7 @@ const KIND_LABEL = { home: 'Ev', work: 'İş' }
 // A building typed by an older version often already starts with "No" ("No 4", "No: 4", "no.4"): the line adds its own "No".
 // A building that is only "No" keeps itself rather than vanishing.
 const buildingNo = v => { const b = sanitizeAddressField(v); return b.replace(/^no\b[\s.:]*/i, '') || b }
-// ONE line, always Turkish: "<name>: <sokak> No <bina>, Kat <kat>, Daire <daire>, <mahalle> · Tarif: … · Konum (haritada aç): <link> · Koordinat: <lat>, <lng>".
+// ONE line, always Turkish: "<name>: <sokak> No <bina>, Kat <kat>, Daire <daire>, <mahalle> · Teslimatta aranacak: <telefon> · Tarif: … · Konum (haritada aç): <link> · Koordinat: <lat>, <lng>".
 // A pin adds BOTH the link and the plain coordinates (a restaurant that cannot open the link can still read the numbers); no pin, neither.
 export function deliveryLine(delivery) {
   if (!deliveryReady(delivery)) return ''
@@ -276,10 +303,11 @@ export function deliveryLine(delivery) {
   const f = sanitizeAddressField
   const floor = oneLine(delivery.floor, ADDRESS_UNIT_MAX), flat = oneLine(delivery.flat, ADDRESS_UNIT_MAX)
   const addr = [`${f(delivery.street)} No ${buildingNo(delivery.building)}`, floor && `Kat ${floor}`, flat && `Daire ${flat}`, f(delivery.district)].filter(Boolean).join(', ')
+  const phone = formatPhone(delivery.phone)
   const directions = oneLine(delivery.directions, ADDRESS_DIRECTIONS_MAX)
   const pin = delivery.coords || delivery
   const link = mapsLink(pin?.lat, pin?.lng), coords = coordText(pin?.lat, pin?.lng)
-  return ['Teslimat: Adrese teslim — ' + (name ? `${name}: ` : '') + addr, directions && `Tarif: ${directions}`, link && `Konum (haritada aç): ${link}`, coords && `Koordinat: ${coords}`].filter(Boolean).join(' · ')
+  return ['Teslimat: Adrese teslim — ' + (name ? `${name}: ` : '') + addr, phone && `Teslimatta aranacak: ${phone}`, directions && `Tarif: ${directions}`, link && `Konum (haritada aç): ${link}`, coords && `Koordinat: ${coords}`].filter(Boolean).join(' · ')
 }
 
 // The address editor's Back: step 3 -> 2 -> 1 -> closed (the editor is the first layer in the back chain, then the basket).
