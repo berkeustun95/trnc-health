@@ -44,8 +44,15 @@ if (process.argv.includes('--mutants')) {
     ['PNG width read from wrong offset', 'b.readUInt32BE(16)', 'b.readUInt32BE(12)'],
     ['WebP VP8L height wrong', '((bits >>> 14) & 0x3fff) + 1', '((bits >>> 13) & 0x3fff) + 1'],
     ['WebP VP8X animated accepted', 'if (b[20] & 0x02)', 'if (false)'],
-    ['dish minimum removed', 'Math.min(width, height) < MIN.dishShortSide', 'false'],
-    ['dish minimum off by one', 'Math.min(width, height) < MIN.dishShortSide', 'Math.min(width, height) < MIN.dishShortSide - 1'],
+    ['dish minimum removed', 'if (short < minShort)', 'if (false)'],
+    ['waiver: floor 600 removed', 'w.minShortSide >= DISH_WAIVER_FLOOR', 'true'],
+    ['waiver: unnecessary waiver accepted', 'if (wv && short >= MIN.dishShortSide)', 'if (false)'],
+    ['waiver: unknown dish accepted', '!dishKeys.has(k)', 'false'],
+    ['waiver: reason length unchecked', "w.reason.trim().length < 20", 'false'],
+    ['waiver: approvedBy unchecked', "w.approvedBy.trim() === ''", 'false'],
+    ['waiver: date unchecked', "const dateOk = typeof w.date === 'string'", 'const dateOk = true || typeof w.date === \'string\''],
+    ['waiver: minimum ignored for waived dish', 'const minShort = wv ? wv.minShortSide : MIN.dishShortSide', 'const minShort = 0'],
+    ['dish minimum off by one', 'if (short < minShort)', 'if (short < minShort - 1)'],
     ['dish key not trimmed', "want.push({ kind: 'dish', n: i + 1, name, key: key.trim() })", "want.push({ kind: 'dish', n: i + 1, name, key })"],
     ['dish match: unknown key accepted', 'if (hit.length === 0) {', 'if (false) {'],
     ['dish match: ambiguous name accepted', 'if (hit.length > 1) {', 'if (false) {'],
@@ -260,6 +267,37 @@ check('RED dish empty key', has(dv({ '  ': 'burger.jpg' }).problems, /empty item
 check('RED dish file missing', has(dv({ 'Chicken Burger': 'nope.jpg' }).problems, /not found/))
 check('RED dish short side 799', has(run({ dishes: { A: 'd.jpg' } }, () => jpeg(2000, 799)).problems, /short side must be >= 800/))
 check('green dish short side 800 (wide)', run({ dishes: { A: 'd.jpg' } }, () => jpeg(2000, 800)).problems.length === 0)
+// dishSizeWaivers
+{
+  const W = { minShortSide: 679, reason: 'Only photo available, one-time exception approved by Berke', approvedBy: 'Berke', date: '2026-10-21' }
+  const wr = (dishes, dishSizeWaivers, f = () => jpeg(679, 705)) => run({ dishes, dishSizeWaivers }, f)
+  const D = { 'Nutella Smash': 'n.jpg' }
+  const v = wr(D, { 'Nutella Smash': W })
+  check('waiver: a 679 px dish passes', v.problems.length === 0 && v.dishes.length === 1, v.problems.join(' | '))
+  check('waiver: the applied waiver is reported by file name + minimum, no dish name', v.waivers.length === 1 && v.waivers[0].src === 'n.jpg' && v.waivers[0].minShortSide === 679 && !JSON.stringify(v.waivers).includes('Nutella'))
+  check('RED without the waiver the 679 px dish is refused', has(run({ dishes: D }, () => jpeg(679, 705)).problems, /short side must be >= 800/))
+  check('RED waiver minimum is still enforced (678 < 679)', has(wr(D, { 'Nutella Smash': W }, () => jpeg(678, 705)).problems, /short side must be >= 679 \(waived\)/))
+  check('RED minShortSide 599 refused (floor 600)', has(wr(D, { 'Nutella Smash': { ...W, minShortSide: 599 } }, () => jpeg(599, 705)).problems, /minShortSide must be an integer from 600 to 799/))
+  check('green minShortSide 600 accepted', wr(D, { 'Nutella Smash': { ...W, minShortSide: 600 } }, () => jpeg(650, 705)).problems.length === 0)
+  check('RED minShortSide 800 refused (not a waiver)', has(wr(D, { 'Nutella Smash': { ...W, minShortSide: 800 } }).problems, /minShortSide must be an integer/))
+  check('RED minShortSide non-integer / string refused', has(wr(D, { 'Nutella Smash': { ...W, minShortSide: 679.5 } }).problems, /minShortSide must be/) && has(wr(D, { 'Nutella Smash': { ...W, minShortSide: '679' } }).problems, /minShortSide must be/))
+  check('RED waiver on an unknown dish refused', has(wr(D, { 'Ghost Dish': W }).problems, /no such dish in manifest\.dishes/))
+  check('RED unnecessary waiver (dish already 800) refused', has(wr(D, { 'Nutella Smash': W }, () => jpeg(900, 800)).problems, /unnecessary waiver/))
+  check('waiver key is trimmed like the dish key', wr({ ' Nutella Smash ': 'n.jpg' }, { 'Nutella Smash ': W }).problems.length === 0)
+  check('RED reason under 20 chars refused', has(wr(D, { 'Nutella Smash': { ...W, reason: 'too short' } }).problems, /reason must be at least 20/))
+  { const { reason, ...x } = W; check('RED reason missing refused', has(wr(D, { 'Nutella Smash': x }).problems, /reason must be at least 20/)) }
+  { const { approvedBy, ...x } = W; check('RED approvedBy missing refused', has(wr(D, { 'Nutella Smash': x }).problems, /approvedBy is required/)) }
+  check('RED approvedBy blank refused', has(wr(D, { 'Nutella Smash': { ...W, approvedBy: '  ' } }).problems, /approvedBy is required/))
+  { const { date, ...x } = W; check('RED date missing refused', has(wr(D, { 'Nutella Smash': x }).problems, /date must be a valid/)) }
+  check('RED date invalid refused', has(wr(D, { 'Nutella Smash': { ...W, date: '2026-02-31' } }).problems, /date must be a valid/) && has(wr(D, { 'Nutella Smash': { ...W, date: '21/10/2026' } }).problems, /date must be a valid/))
+  check('RED unknown waiver field refused', has(wr(D, { 'Nutella Smash': { ...W, extra: 1 } }).problems, /unknown field 'extra'/))
+  check('RED dishSizeWaivers not an object refused', has(wr(D, [W]).problems, /dishSizeWaivers must be an object/))
+  check('RED waived dish > 2 MB still refused', has(wr(D, { 'Nutella Smash': W }, () => pad(jpeg(679, 705), 2 * 1024 * 1024 + 1)).problems, /exceeds/))
+  check('RED waived dish with wrong magic bytes still refused', wr(D, { 'Nutella Smash': W }, () => Buffer.from('not an image at all, just text bytes')).problems.length > 0)
+  check('RED waived .jpg that is really PNG still refused', has(wr(D, { 'Nutella Smash': W }, () => png(679, 705)).problems, /extension \.jpg but the bytes are PNG/))
+  check('waiver does not relax a neighbouring dish', has(run({ dishes: { A: 'a.jpg', ...D }, dishSizeWaivers: { 'Nutella Smash': W } }, n => n === 'a.jpg' ? jpeg(700, 700) : jpeg(679, 705)).problems, /dish#1 'a\.jpg'.*short side must be >= 800/))
+  check('waiver without dishes at all is refused', has(run({ gallery: ['g1.jpg'], dishSizeWaivers: { X: W } }).problems, /no such dish/))
+}
 check('RED dish 799 wide (tall) is judged on the short side too', has(run({ dishes: { A: 'd.jpg' } }, () => jpeg(799, 2000)).problems, /short side/))
 check('RED dish png bytes named .jpg', has(run({ dishes: { A: 'd.jpg' } }, () => png(900, 900)).problems, /bytes are PNG/))
 check('RED same file used twice for two dishes', has(dv({ 'Chicken Burger': 'burger.jpg', Fries: 'burger.jpg' }).problems, /listed twice/))
