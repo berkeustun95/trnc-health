@@ -142,6 +142,17 @@ export const PARTNER_ASSETS = {
   // (#294EA6 / #213565) on transparency. ⚠ NO onDark VARIANT EXISTS: it may only ever sit on a
   // white or light surface (EhliyetScreen's card is white).
   'seyhun/logo':              require('../assets/partners/seyhun/logo.png'),
+
+  // ─── KKTCELL (Bağlantı & eSIM) ─────────────────────────────────────────────
+  // The partner's mark, 150x150 RGBA, yellow on transparency. Read by connectivity_operators.logo_key
+  // (20261129); sits in the white logo square on the landing card. Light surfaces only.
+  'kktcell/logo':             require('../assets/partners/kktcell/kktcell-logo.png'),
+  // Landing art: Oli & Maki in yellow KKTCELL beanies, transparent PNGs (2026-10-22). The earlier
+  // yellow character was removed at KKTCELL Turkey's request; it is not in any of these files.
+  'kktcell/hero':             require('../assets/partners/kktcell/kktcell-hero.png'),     // 624x700
+  'kktcell/tasi':             require('../assets/partners/kktcell/kktcell-tasi.png'),     // 544x600
+  'kktcell/turist':           require('../assets/partners/kktcell/kktcell-turist.png'),   // 600x547
+  'kktcell/yenihat':          require('../assets/partners/kktcell/kktcell-yenihat.png'),  // 526x600
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)
