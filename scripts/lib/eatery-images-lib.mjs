@@ -22,6 +22,7 @@ const FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(jpg|jpeg|png|webp)$/i
 //   dish    short side >= 800: a dish shows as a ~200 pt thumbnail in the menu list but opens in a full-screen viewer
 //           on a 1170 px-wide phone; the short side is what survives fit-to-screen without a visible upscale
 //           beyond ~1.5x, whatever the crop (square, 4:3, portrait). Below 800 the viewer is visibly soft.
+export const DISH_WAIVER_FLOOR = 600   // a size waiver can never go below this, whatever the manifest says
 export const MIN = { logoShortSide: 256, galleryWidth: 800, menuWidth: 1000, dishShortSide: 800 }
 // Separator of the "Section › Name" dish key (U+203A), used when one name occurs in several sections.
 export const DISH_SEP = ' \u203a '
@@ -98,12 +99,13 @@ export function validateLocal(slug, manifest, readFile) {
   const problems = []
   const items = []
   const dishes = []
+  const waivers = []
   if (typeof slug !== 'string' || !SLUG_RE.test(slug)) problems.push(`slug '${slug}' does not match ${SLUG_RE}`)
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
     problems.push('manifest.json is not a JSON object')
-    return { problems, items, dishes }
+    return { problems, items, dishes, waivers }
   }
-  for (const k of Object.keys(manifest)) if (!['logo', 'gallery', 'menu', 'dishes'].includes(k)) problems.push(`manifest: unknown key '${k}'`)
+  for (const k of Object.keys(manifest)) if (!['logo', 'gallery', 'menu', 'dishes', 'dishSizeWaivers'].includes(k)) problems.push(`manifest: unknown key '${k}'`)
   const want = []
   if (manifest.logo !== undefined) {
     if (typeof manifest.logo !== 'string') problems.push("manifest.logo must be a file name string")
@@ -123,6 +125,30 @@ export function validateLocal(slug, manifest, readFile) {
       else if (key.trim() === '') problems.push(`manifest.dishes #${i + 1} '${name}': empty item name key`)
       else want.push({ kind: 'dish', n: i + 1, name, key: key.trim() })
     })
+  }
+  // dishSizeWaivers: { '<dish key>': { minShortSide, reason, approvedBy, date } }. Problems name the waiver by number, never the key (item name, public logs).
+  const waiverFor = new Map()
+  if (manifest.dishSizeWaivers !== undefined) {
+    const wv = manifest.dishSizeWaivers
+    if (!wv || typeof wv !== 'object' || Array.isArray(wv)) problems.push('manifest.dishSizeWaivers must be an object of "dish name": { minShortSide, reason, approvedBy, date }')
+    else {
+      const dishKeys = new Set(manifest.dishes && typeof manifest.dishes === 'object' && !Array.isArray(manifest.dishes) ? Object.keys(manifest.dishes).map(k => k.trim()) : [])
+      Object.entries(wv).forEach(([key, w], i) => {
+        const tag = `manifest.dishSizeWaivers #${i + 1}`
+        const k = key.trim()
+        if (!dishKeys.has(k)) problems.push(`${tag}: no such dish in manifest.dishes`)
+        if (waiverFor.has(k)) problems.push(`${tag}: duplicate waiver for the same dish`)
+        if (!w || typeof w !== 'object' || Array.isArray(w)) { problems.push(`${tag}: must be an object`); return }
+        for (const f of Object.keys(w)) if (!['minShortSide', 'reason', 'approvedBy', 'date'].includes(f)) problems.push(`${tag}: unknown field '${f}'`)
+        const okMin = Number.isInteger(w.minShortSide) && w.minShortSide >= DISH_WAIVER_FLOOR && w.minShortSide < MIN.dishShortSide
+        if (!okMin) problems.push(`${tag}: minShortSide must be an integer from ${DISH_WAIVER_FLOOR} to ${MIN.dishShortSide - 1}`)
+        if (typeof w.reason !== 'string' || w.reason.trim().length < 20) problems.push(`${tag}: reason must be at least 20 characters`)
+        if (typeof w.approvedBy !== 'string' || w.approvedBy.trim() === '') problems.push(`${tag}: approvedBy is required`)
+        const dateOk = typeof w.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.date) && new Date(w.date + 'T00:00:00Z').toISOString().slice(0, 10) === w.date
+        if (!dateOk) problems.push(`${tag}: date must be a valid YYYY-MM-DD`)
+        if (okMin && typeof w.approvedBy === 'string' && typeof w.date === 'string') waiverFor.set(k, { ...w, tag })
+      })
+    }
   }
   if (!want.length && !problems.length) problems.push('manifest lists no images')
   const seen = new Map()
@@ -146,7 +172,12 @@ export function validateLocal(slug, manifest, readFile) {
     if (w.kind === 'gallery' && width < MIN.galleryWidth) problems.push(`${tag}: ${width}x${height}, width must be >= ${MIN.galleryWidth}`)
     if (w.kind === 'menu' && width < MIN.menuWidth) problems.push(`${tag}: ${width}x${height}, width must be >= ${MIN.menuWidth}`)
     if (w.kind === 'dish') {
-      if (Math.min(width, height) < MIN.dishShortSide) problems.push(`${tag}: ${width}x${height}, short side must be >= ${MIN.dishShortSide}`)
+      const wv = waiverFor.get(w.key)
+      const short = Math.min(width, height)
+      if (wv && short >= MIN.dishShortSide) problems.push(`${tag}: ${wv.tag} is an unnecessary waiver, the photo is ${width}x${height} and meets ${MIN.dishShortSide}; remove it`)
+      const minShort = wv ? wv.minShortSide : MIN.dishShortSide
+      if (short < minShort) problems.push(`${tag}: ${width}x${height}, short side must be >= ${minShort}${wv ? ' (waived)' : ''}`)
+      else if (wv) waivers.push({ src: w.name, minShortSide: wv.minShortSide, width, height, approvedBy: wv.approvedBy.trim(), date: wv.date })
       dishes.push({ key: w.key, src: w.name, format: s.format, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
       continue
     }
@@ -154,7 +185,7 @@ export function validateLocal(slug, manifest, readFile) {
     if (!PATH_RE.test(path)) problems.push(`${tag}: object path '${path}' does not match the database path CHECK`)
     items.push({ kind: w.kind, n: w.n, src: w.name, path, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
   }
-  return { problems, items, dishes }
+  return { problems, items, dishes, waivers }
 }
 
 // ─── dish → menu item matching ──────────────────────────────────────────────

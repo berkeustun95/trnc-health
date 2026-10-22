@@ -40,7 +40,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { BUCKET, SLUG_RE, sha256, validateLocal, readiness, plan, safeRead, matchDishes, planDishes, applyPlan } from './lib/eatery-images-lib.mjs'
+import { BUCKET, MIN, SLUG_RE, sha256, validateLocal, readiness, plan, safeRead, matchDishes, planDishes, applyPlan } from './lib/eatery-images-lib.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -84,6 +84,7 @@ if (local.problems.length) refuse(local.problems)
 out(`manifest OK: ${local.items.length} image(s) + ${local.dishes.length} dish photo(s) for ${slug}`)
 for (const it of local.items) out(`  ${it.path}  ${it.bytes} bytes  ${it.mime}  ${it.width}x${it.height}`)
 for (const d of local.dishes) out(`  dish ${d.src}  ${d.bytes} bytes  ${d.mime}  ${d.width}x${d.height}`)
+for (const w of local.waivers) out(`  !! SIZE WAIVER APPLIED: ${w.src} is ${w.width}x${w.height}, below ${MIN.dishShortSide}; accepted down to ${w.minShortSide} (approved by ${w.approvedBy}, ${w.date})`)
 
 // 2. production state (service key; reads only until the apply section below)
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL
