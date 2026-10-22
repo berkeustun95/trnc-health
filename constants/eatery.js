@@ -222,14 +222,41 @@ export function orderErrorKind(err) {
   return 'generic'
 }
 
+// The ONLY arguments create_eatery_order receives: ids and quantities. Delivery details (address, location) travel in the
+// WhatsApp text alone and never reach the server; a test pins this shape and the call site.
+export const orderRpcArgs = (partnerId, lines) => ({ p_partner: partnerId, p_items: lines.map(l => ({ item_id: l.id, qty: l.qty })) })
+
+// ─── Delivery choice (Sepetim) ───
+export const ADDRESS_FIELD_MAX = 100
+// All whitespace (newlines included) collapses to single spaces, so an address can never forge a line of the message.
+export const sanitizeAddressField = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, ADDRESS_FIELD_MAX).trim() : '')
+export function mapsLink(lat, lng) {
+  const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
+  if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return ''
+  return `https://maps.google.com/?q=${la.toFixed(5)},${ln.toFixed(5)}`
+}
+const addressParts = (d) => [d?.street, d?.building, d?.district].map(sanitizeAddressField)
+export function deliveryReady(delivery) {
+  if (delivery?.mode === 'pickup') return true
+  return delivery?.mode === 'delivery' && addressParts(delivery).every(Boolean)
+}
+export function deliveryLine(delivery) {
+  if (!deliveryReady(delivery)) return ''
+  if (delivery.mode === 'pickup') return 'Teslimat: Gel-al'
+  const link = mapsLink(delivery.coords?.lat, delivery.coords?.lng)
+  return `Teslimat: Adrese teslim — ${addressParts(delivery).join(', ')}${link ? ` · Konum: ${link}` : ''}`
+}
+
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
 // code: the server's order code; its line is the LAST one.
-export function buildOrderMessage(lines, note, code = null) {
+export function buildOrderMessage(lines, note, code = null, delivery = null) {
   const out = ['ADA üzerinden sipariş:']
   for (const l of lines) out.push(`${l.qty} × ${l.name} — ${formatTl(l.qty * Number(l.price))}`)
   out.push('', `Toplam: ${formatTl(orderTotal(lines))}`)
   const n = typeof note === 'string' ? note.trim().slice(0, ORDER_NOTE_MAX) : ''
   if (n) out.push(`Not: ${n}`)
+  const dl = deliveryLine(delivery)
+  if (dl) out.push(dl)
   out.push('Fiyatlar ADA menüsündendir, değişiklik olabilir.')
   const cl = orderCodeLine(code)
   if (cl) out.push(cl)

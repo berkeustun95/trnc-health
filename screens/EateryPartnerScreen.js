@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -384,7 +384,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     const sent = lines
     let res = null, kind = null
     try {
-      const { data, error } = await supabase.rpc('create_eatery_order', { p_partner: partner.id, p_items: sent.map(l => ({ item_id: l.id, qty: l.qty })) })
+      const { data, error } = await supabase.rpc('create_eatery_order', orderRpcArgs(partner.id, sent))
       if (error || !data) kind = orderErrorKind(error)
       else { kind = orderCheck(sent, data); if (!kind) res = data }
     } catch { kind = 'generic' }
