@@ -357,8 +357,9 @@ const s = StyleSheet.create({
   chipOn:    { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   chipText:  { ...type.body, color: colors.textPrimary },
   chipTextOn:{ fontFamily: font.semibold, color: colors.primaryDark },
-  option:    { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingHorizontal: space[12], paddingVertical: space[8], borderRadius: radii.card, backgroundColor: colors.card },
-  optionIcon:{ width: 44, height: 44, borderRadius: radii.tile, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  option:    { minHeight: TAP + space[8] * 2,   // the TAP-sized well plus the row's vertical padding
+                 flexDirection: 'row', alignItems: 'center', gap: space[12], paddingHorizontal: space[12], paddingVertical: space[8], borderRadius: radii.card, backgroundColor: colors.card },
+  optionIcon:{ width: TAP, height: TAP, borderRadius: radii.tile, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   optionText:{ flex: 1, ...type.rowTitle, color: colors.textPrimary },
   locFail:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
   locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },

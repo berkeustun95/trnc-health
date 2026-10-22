@@ -312,6 +312,21 @@ export function deliveryFromEntry(a) {
   const { lat, lng, id, updatedAt, ...fields } = a
   return { ...fields, addressId: id, coords: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null }
 }
+// The short address the card and the sheet show: "<sokak> No <bina>, <mahalle>" (the message line minus floor / flat / directions). Sanitized.
+export function shortAddress(e) {
+  const street = sanitizeAddressField(e?.street), b = sanitizeAddressField(e?.building)
+  const head = street && b ? `${street} No ${buildingNo(b)}` : street || (b ? `No ${buildingNo(b)}` : '')
+  return [head, sanitizeAddressField(e?.district)].filter(Boolean).join(', ')
+}
+// What the Sepetim card shows for an entry (a book entry with lat / lng, or the delivery state with coords):
+// 'none' (nothing selected) | 'incomplete' (a required field is empty) | 'noPin' (complete, no map pin) | 'pin'.
+export function cardState(e) {
+  if (!e || typeof e !== 'object') return 'none'
+  if (!addressComplete(e)) return 'incomplete'
+  const p = e.coords || e
+  return Number.isFinite(p.lat) && Number.isFinite(p.lng) ? 'pin' : 'noPin'
+}
+export const canAddMore = n => Number.isFinite(n) && n < ADDRESS_BOOK_MAX
 export const EMPTY_DELIVERY_ADDRESS = { addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null }
 
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.

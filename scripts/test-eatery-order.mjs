@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS } from '../constants/eatery.js'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -202,7 +202,7 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const stmt = src.slice(rpcAt, src.indexOf('\n', rpcAt))
   eq('screen: the rpc statement mentions no delivery state', DELIVERY_ID.test(stmt), false)
   // every delivery / address file: no supabase, logContactEvent, console or network 
-  for (const f of ['utils/eateryAddress.js', 'utils/eateryAddressCore.js', 'constants/deliveryAreas.js', 'components/DeliveryPinPicker.js', 'components/AddressEditor.js', 'utils/deliveryLocate.js', 'utils/useKeyboardTop.js']) {
+  for (const f of ['utils/eateryAddress.js', 'utils/eateryAddressCore.js', 'constants/deliveryAreas.js', 'components/DeliveryPinPicker.js', 'components/AddressEditor.js', 'components/AddressBookSheet.js', 'utils/deliveryLocate.js', 'utils/useKeyboardTop.js']) {
     const url = new URL('../' + f, import.meta.url)
     eq(`${f} exists (a renamed file must not slip out of the leak guard)`, fs.existsSync(url), true)
     if (!fs.existsSync(url)) continue
@@ -400,6 +400,11 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('NICOSIA start', NICOSIA, { lat: 35.1856, lng: 33.3823 })
   eq('deliveryFromEntry: pin -> coords, id -> addressId, no updatedAt/lat/lng left over', deliveryFromEntry({ id: 'x', kind: 'other', name: '', district: 'K', street: 'S', building: '1', floor: '', flat: '', directions: '', lat: 35.1, lng: 33.2, updatedAt: 5 }), { kind: 'other', name: '', district: 'K', street: 'S', building: '1', floor: '', flat: '', directions: '', addressId: 'x', coords: { lat: 35.1, lng: 33.2 } })
   eq('deliveryFromEntry: no pin -> coords null; same keys as the empty state', [deliveryFromEntry({ id: 'x', kind: 'home', name: '', district: '', street: '', building: '', floor: '', flat: '', directions: '', lat: null, lng: null }).coords, Object.keys(deliveryFromEntry({ id: 'x', kind: 'home', name: '', district: '', street: '', building: '', floor: '', flat: '', directions: '', lat: null, lng: null })).sort()], [null, Object.keys(EMPTY_DELIVERY_ADDRESS).sort()])
+  const full = { id: 'x', kind: 'home', name: '', district: 'Karakol', street: 'Atatürk Cd.', building: 'No: 4', floor: '2', flat: '5', directions: 'mavi kapı', lat: 35.1, lng: 33.2 }
+  eq('shortAddress: "<sokak> No <bina>, <mahalle>"; the old "No" prefix is not doubled; floor / flat / directions stay out', shortAddress(full), 'Atatürk Cd. No 4, Karakol')
+  eq('shortAddress: sanitized (invisible chars, newlines) and partial entries', [shortAddress({ street: ' a\u202E\n b ', building: '', district: 'K' }), shortAddress({ building: '7', district: '' }), shortAddress({}), shortAddress(null)], ['a b, K', 'No 7', '', ''])
+  eq('cardState: none / incomplete / noPin / pin (book entry and delivery state)', [cardState(null), cardState({ ...full, street: '' }), cardState({ ...full, kind: 'other', name: '' }), cardState({ ...full, lat: null, lng: null }), cardState(full), cardState(deliveryFromEntry(full)), cardState(deliveryFromEntry({ ...full, lat: null, lng: null }))], ['none', 'incomplete', 'incomplete', 'noPin', 'pin', 'pin', 'noPin'])
+  eq('canAddMore: the 10th fits, the 11th does not', [canAddMore(0), canAddMore(9), canAddMore(10), canAddMore(NaN)], [true, true, false, false])
 }
 
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.

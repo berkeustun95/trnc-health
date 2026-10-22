@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ORDER_NOTE_MAX, deliveryReady, addressComplete, addressKind, oneLine, sanitizeAddressField, ADDRESS_NAME_MAX } from '../constants/eatery'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry } from '../constants/eatery'
+import MapView from 'react-native-maps'
+import { MAP_PROVIDER } from '../utils/googleMap'
+import { loadBook, setLastUsed } from '../utils/eateryAddress'
+import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from './ui'
@@ -106,42 +110,95 @@ function DeliveryOption({ checked, label, onPress }) {
   )
 }
 
-const KIND_ICON = { home: 'home-outline', work: 'briefcase-outline', other: 'location-outline' }
-const KIND_KEY = { home: 'eateryAddrKindHome', work: 'eateryAddrKindWork' }
-// What the card calls an entry (UI only; the message line has its own rule): Ev / İş, else the name, else "Adresim".
-const addressLabel = (d, lang) => { const k = addressKind(d.kind); return KIND_KEY[k] ? t(KIND_KEY[k], lang) : oneLine(d.name, ADDRESS_NAME_MAX) || t('eateryAddrUnnamed', lang) }
-const addressText = d => [[sanitizeAddressField(d.street), sanitizeAddressField(d.building)].filter(Boolean).join(' '), sanitizeAddressField(d.district)].filter(Boolean).join(', ')
+const PIN = 32
+// The card's map strip: full card width. 112 is no token: tall enough that Google's logo / Apple's "Legal" label are never clipped, short
+// enough to leave the basket page light. A picture only (liteMode on Android = a static image, no gestures); the pin is an overlay at its centre.
+const MAP_H = 112
+const MAP_DELTA = 0.004
+function PinMap({ lat, lng, live }) {
+  return (
+    <View style={st.map} pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden accessible={false}>
+      {live && (
+        <MapView key={`${lat},${lng}`} style={StyleSheet.absoluteFill} provider={MAP_PROVIDER} liteMode={Platform.OS === 'android'}
+          initialRegion={{ latitude: lat, longitude: lng, latitudeDelta: MAP_DELTA, longitudeDelta: MAP_DELTA }}
+          scrollEnabled={false} zoomEnabled={false} rotateEnabled={false} pitchEnabled={false} toolbarEnabled={false} zoomControlEnabled={false}
+          showsUserLocation={false} />
+      )}
+      {live && <View style={st.mapPin}><Ionicons name="location" size={PIN} color={colors.primary} style={st.mapPinIcon} /></View>}
+    </View>
+  )
+}
 
-function DeliveryCard({ lang, delivery, onDelivery, onAddress }) {
+// open: the basket page is on screen; the map view mounts only then (delivery mode, with a pin), its empty frame stays through the slide-out.
+function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
   const isHome = delivery.mode === 'delivery'
-  const has = !!delivery.addressId
-  const complete = addressComplete(delivery)
+  const state = cardState(delivery.addressId ? delivery : null)
+  const has = state !== 'none'
   const label = has ? addressLabel(delivery, lang) : ''
-  const text = has ? addressText(delivery) : ''
+  const text = has ? shortAddress(delivery) : ''
+  const alive = useRef(true)
+  const timer = useRef(null)
+  useEffect(() => () => { alive.current = false; clearTimeout(timer.current) }, [])
+  const [sheet, setSheet] = useState({ open: false, book: null })
+  const openSheet = async () => {
+    const book = await loadBook()   // read again each time: no stale list after an edit or a delete
+    if (alive.current) setSheet({ open: true, book })
+  }
+  // BottomSheet's onClose fires only for the user's own dismissal; a close we ask for slides out unannounced. So anything that opens the
+  // editor waits out the slide: the editor is an overlay of the partner page, and a Modal still on screen would cover it.
+  const closeThen = fn => {
+    if (timer.current) return
+    setSheet(sh => ({ ...sh, open: false }))
+    if (!fn) return
+    timer.current = setTimeout(() => { timer.current = null; if (alive.current) fn() }, motion.sheetOut + 60)
+  }
+  const choose = e => { setLastUsed(e.id); onDelivery(deliveryFromEntry(e)); closeThen() }
+  const pickHome = async () => {
+    onDelivery({ mode: 'delivery' })
+    if (delivery.addressId || isHome) return
+    const book = await loadBook()
+    const a = book.items.find(i => i.id === book.lastUsedId)
+    if (!alive.current) return
+    if (a) onDelivery(deliveryFromEntry(a)); else onAddress(null)   // an empty book goes straight into the editor
+  }
+  const a11y = `${label}. ${state === 'incomplete' ? t('eateryAddrIncomplete', lang) : text}${state === 'pin' ? `. ${t('eateryAddrPinSet', lang)}` : ''}`
   return (
     <Card>
       <Text style={st.noteLabel} accessibilityRole="header">{t('eateryDeliveryTitle', lang)}</Text>
       <View accessibilityRole="radiogroup" style={st.opts}>
         <DeliveryOption checked={delivery.mode === 'pickup'} label={t('eateryDeliveryPickup', lang)} onPress={() => onDelivery({ mode: 'pickup' })} />
-        <DeliveryOption checked={isHome} label={t('eateryDeliveryHome', lang)} onPress={() => onDelivery({ mode: 'delivery' })} />
+        <DeliveryOption checked={isHome} label={t('eateryDeliveryHome', lang)} onPress={pickHome} />
       </View>
       {isHome && (
         <View style={st.addr}>
           {has && (
-            <View style={st.sum} accessible accessibilityLabel={`${label}. ${complete ? text : t('eateryAddrIncomplete', lang)}${delivery.coords ? `. ${t('eateryAddrPinSet', lang)}` : ''}`}>
-              <Ionicons name={KIND_ICON[addressKind(delivery.kind)]} size={22} color={colors.primaryDark} style={st.sumIcon} />
-              <View style={st.sumMain}>
-                <Text style={st.sumLabel}>{label}</Text>
-                <Text style={st.sumText}>{complete ? text : t('eateryAddrIncomplete', lang)}</Text>
-                {complete && !!delivery.coords && <Text style={st.sumPin}>{t('eateryAddrPinSet', lang)}</Text>}
+            <View style={st.sum}>
+              <View style={st.sumHead} accessible accessibilityLabel={a11y}>
+                <KindWell kind={delivery.kind} onTint />
+                <View style={st.sumMain}>
+                  <Text style={st.sumLabel} numberOfLines={1}>{label}</Text>
+                  <Text style={st.sumText} numberOfLines={2}>{state === 'incomplete' ? t('eateryAddrIncomplete', lang) : text}</Text>
+                </View>
               </View>
+              {state === 'pin' && <PinMap lat={delivery.coords.lat} lng={delivery.coords.lng} live={open === true} />}
+              {state === 'noPin' && (
+                <Pressable onPress={() => onAddress(delivery, 2)} style={({ pressed }) => [st.markPin, pressed && { opacity: press.small }]}
+                  accessibilityRole="button" accessibilityLabel={t('eateryAddrMarkOnMap', lang)}>
+                  <Ionicons name="map-outline" size={20} color={colors.primaryDark} />
+                  <Text style={st.markPinText}>{t('eateryAddrMarkOnMap', lang)}</Text>
+                </Pressable>
+              )}
             </View>
           )}
-          <Button variant={has && complete ? 'secondary' : 'primary'} fullWidth icon={has ? (complete ? 'create-outline' : 'alert-circle-outline') : 'add'}
-            title={t(!has ? 'eateryAddrAdd' : complete ? 'eateryAddrEdit' : 'eateryAddrComplete', lang)} onPress={() => onAddress(has ? delivery : null)} />
+          {state === 'none' && <Button fullWidth icon="add" title={t('eateryAddrAdd', lang)} onPress={() => onAddress(null)} />}
+          {state === 'incomplete' && <Button fullWidth icon="alert-circle-outline" title={t('eateryAddrComplete', lang)} onPress={() => onAddress(delivery)} />}
+          {has && <Button variant="secondary" fullWidth icon="swap-horizontal" title={t('eateryAddrChange', lang)} onPress={openSheet} />}
           <Text style={st.hint}>{t('eateryDeliveryPrivacy', lang)}</Text>
         </View>
       )}
+      <AddressBookSheet visible={sheet.open === true} lang={lang} book={sheet.book} selectedId={delivery.addressId}
+        onClose={() => setSheet(sh => ({ ...sh, open: false }))} onChoose={choose}
+        onEdit={e => closeThen(() => onAddress(deliveryFromEntry(e)))} onNew={() => closeThen(() => onAddress(null))} />
     </Card>
   )
 }
@@ -235,7 +292,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
                 ))}
               </Card>
               <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} />
+              <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />
               <Card>
                 <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
                 <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
@@ -306,14 +363,16 @@ const st = StyleSheet.create({
   optText:   { flex: 1, ...type.body, color: colors.textPrimary },
   optTextOn: { fontFamily: font.semibold, color: colors.primaryDark },
   addr:      { marginTop: space[12], gap: space[8] },
-  fieldLabel:{ ...type.small, fontFamily: font.semibold, color: colors.textPrimary, marginBottom: space[4] },
-  field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
-  sum:       { flexDirection: 'row', alignItems: 'flex-start', gap: space[12], padding: space[12], borderRadius: radii.md, backgroundColor: colors.soft },
-  sumIcon:   { marginTop: 1 },
+  sum:       { padding: space[12], gap: space[12], borderRadius: radii.md, backgroundColor: colors.soft, overflow: 'hidden' },
+  sumHead:   { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   sumMain:   { flex: 1, gap: 2 },
   sumLabel:  { ...type.rowTitle, color: colors.textPrimary },
   sumText:   { ...type.body, color: colors.textPrimary },
-  sumPin:    { ...type.small, color: colors.primaryDark },
+  map:       { height: MAP_H, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.border },
+  mapPin:    { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  mapPinIcon:{ marginBottom: PIN },
+  markPin:   { minHeight: TAP, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[8], paddingHorizontal: space[12], borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
+  markPinText:{ ...type.body, fontFamily: font.semibold, color: colors.primaryDark },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },

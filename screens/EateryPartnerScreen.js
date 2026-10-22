@@ -245,11 +245,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // The address editor: a page over Sepetim. shown keeps it mounted through its slide-out; step / picker live here so Back and the header
   // arrow share one code path (editorBackTo); the draft lives in the editor.
   const [editor, setEditor] = useState({ shown: false, open: false, seed: null, step: 1, picker: false, key: 0 })
-  const openEditor = seed => setEditor(e => ({ shown: true, open: true, seed, step: editorStartStep(seed), picker: false, key: e.key + 1 }))
+  const openEditor = (seed, step) => setEditor(e => ({ shown: true, open: true, seed, step: step || editorStartStep(seed), picker: false, key: e.key + 1 }))
   const closeEditor = () => setEditor(e => ({ ...e, open: false }))
   const editorBackTo = r => { if (r.close) closeEditor(); else setEditor(e => ({ ...e, step: r.step, picker: r.picker })) }
   const onAddressSaved = item => { setOrderError(null); setDelivery(d => ({ ...d, ...deliveryFromEntry(item) })); closeEditor() }
-  const onAddressDeleted = next => { setOrderError(null); setDelivery(d => ({ ...d, ...(next ? deliveryFromEntry(next) : EMPTY_DELIVERY_ADDRESS) })); closeEditor() }
+  // Deleting an entry that is not the selected one leaves the selection alone.
+  const onAddressDeleted = next => { setOrderError(null); setDelivery(d => (d.addressId && d.addressId !== editor.seed?.addressId ? d : { ...d, ...(next ? deliveryFromEntry(next) : EMPTY_DELIVERY_ADDRESS) })); closeEditor() }
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
