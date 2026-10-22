@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, Animated, Dimensions, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, Animated, Dimensions, Easing, Linking, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import * as Location from 'expo-location'
-import { ORDER_NOTE_MAX, ADDRESS_FIELD_MAX, deliveryReady } from '../constants/eatery'
+import { ORDER_NOTE_MAX, ADDRESS_FIELD_MAX, deliveryReady, withTimeout, locateOutcome, locateNote, LOCATE_TIMEOUT_MS } from '../constants/eatery'
 import { REDESIGN } from '../constants/redesign'
 import { requestWithPrimer } from '../utils/permissionPrimer'
 import { askedFix } from '../utils/locationServices'
@@ -130,7 +130,7 @@ function DeliveryOption({ checked, label, onPress }) {
 
 function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocusInput, onBlurInput }) {
   const [locating, setLocating] = useState(false)
-  const [locFail, setLocFail] = useState(false)
+  const [locNote, setLocNote] = useState(null)   // { msgKey, action } | null
   const alive = useRef(true)
   const openRef = useRef(open)
   const modeRef = useRef(delivery.mode)
@@ -139,29 +139,48 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
   useEffect(() => () => { alive.current = false }, [])
   const isHome = delivery.mode === 'delivery'
   const hasAny = !!(delivery.street || delivery.building || delivery.district || delivery.coords)
-  const choose = mode => { setLocFail(false); onDelivery(mode === 'pickup' ? { mode, coords: null } : { mode }) }
+  const choose = mode => { setLocNote(null); onDelivery(mode === 'pickup' ? { mode, coords: null } : { mode }) }
+  // Last known (2 min) first, else a fresh fix raced against a timeout (indoors it can hang), else an older one.
+  const getFix = async () => {
+    const last = async maxAge => { try { return await Location.getLastKnownPositionAsync({ maxAge }) } catch { return null } }
+    return (await last(120000))
+      ?? (await withTimeout(askedFix(Location.Accuracy.Balanced), LOCATE_TIMEOUT_MS))
+      ?? (await last(600000))
+  }
   const addLocation = async () => {
     if (locating) return
     setLocating(true)
-    setLocFail(false)
+    setLocNote(null)
+    let perm = { status: null, canAskAgain: true }
     let fix = null
     try {
-      const { status } = REDESIGN ? await requestWithPrimer('location') : await Location.requestForegroundPermissionsAsync()
-      if (status === 'granted') fix = await askedFix(Location.Accuracy.Balanced)
+      perm = REDESIGN ? await requestWithPrimer('location') : await Location.requestForegroundPermissionsAsync()
+      if (perm?.status === 'granted') fix = await getFix()
     } catch { fix = null }
+    let servicesOn = true
+    try { servicesOn = await Location.hasServicesEnabledAsync() } catch {}
     if (!alive.current) return
     setLocating(false)
     if (!openRef.current || modeRef.current !== 'delivery') return
-    const c = fix?.coords
-    if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+    const outcome = locateOutcome({ granted: perm?.status === 'granted', canAskAgain: perm?.canAskAgain !== false, servicesOn, fix })
+    if (outcome === 'ok') {
+      const c = fix.coords
       onDelivery({ coords: { lat: c.latitude, lng: c.longitude } })
       AccessibilityInfo.announceForAccessibility?.(t('eateryDeliveryLocated', lang))
     } else {
-      setLocFail(true)
-      AccessibilityInfo.announceForAccessibility?.(t('eateryDeliveryLocFail', lang))
+      const note = locateNote(outcome)
+      setLocNote(note)
+      AccessibilityInfo.announceForAccessibility?.(t(note.msgKey, lang))
     }
   }
-  const clear = () => { setLocFail(false); clearAddress(); onDelivery({ street: '', building: '', district: '', coords: null }) }
+  const openLocationFix = async action => {
+    try {
+      if (action === 'locationSettings' && Platform.OS === 'android') {
+        try { await Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS') } catch { await Linking.openSettings() }
+      } else await Linking.openSettings()
+    } catch {}
+  }
+  const clear = () => { setLocNote(null); clearAddress(); onDelivery({ street: '', building: '', district: '', coords: null }) }
   return (
     <Card>
       <Text style={st.noteLabel} accessibilityRole="header">{t('eateryDeliveryTitle', lang)}</Text>
@@ -192,10 +211,11 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
             <Button variant="secondary" fullWidth icon="locate-outline" title={t('eateryDeliveryLocate', lang)} loading={locating}
               loadingTitle={t('eateryDeliveryLocating', lang)} onPress={addLocation} />
           )}
-          {!delivery.coords && (locFail ? (
-            <View style={st.locFail} accessibilityLiveRegion="polite">
+          {!delivery.coords && (locNote ? (
+            <View style={st.locFail}>
               <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={st.locFailIcon} />
-              <Text style={st.locFailText}>{t('eateryDeliveryLocFail', lang)}</Text>
+              <Text style={st.locFailText}>{t(locNote.msgKey, lang)}</Text>
+              {locNote.action && <Button variant="text" title={t('openSettings', lang)} onPress={() => openLocationFix(locNote.action)} />}
             </View>
           ) : <Text style={st.locNote}>{t('eateryDeliveryLocateNote', lang)}</Text>)}
           <Text style={st.hint}>{t('eateryDeliveryPrivacy', lang)}</Text>
@@ -382,9 +402,9 @@ const st = StyleSheet.create({
   field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   locRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
   locText:   { flex: 1, ...type.body, color: colors.textPrimary },
-  locFail:   { flexDirection: 'row', alignItems: 'flex-start', gap: space[8] },
+  locFail:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
   locFailIcon:{ marginTop: 2 },
-  locFailText:{ flex: 1, ...type.small, color: colors.textPrimary },
+  locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
   locNote:   { ...type.small, color: colors.textSecondary },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },

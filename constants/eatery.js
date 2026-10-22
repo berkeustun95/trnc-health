@@ -267,3 +267,28 @@ export function buildOrderMessage(lines, note, code = null, delivery = null) {
 }
 
 export const orderWhatsAppUrl = (digits, message) => `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+
+// ─── "Konumumu ekle": what happened → what the user sees (pure; the device calls live in EateryOrder.js) ───
+export const LOCATE_TIMEOUT_MS = 12000
+// null on timeout; a result that arrives later is ignored (the race has already settled), a rejection too.
+export function withTimeout(promise, ms) {
+  let timer
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), ms) })
+  return Promise.race([Promise.resolve(promise).catch(() => null), timeout]).finally(() => clearTimeout(timer))
+}
+const validFix = fix => Number.isFinite(fix?.coords?.latitude) && Number.isFinite(fix?.coords?.longitude)
+// iOS reports "denied" while location services are off, so services-off wins over the permission states.
+export function locateOutcome({ granted, canAskAgain, servicesOn, fix }) {
+  if (granted && validFix(fix)) return 'ok'
+  if (servicesOn === false) return 'servicesOff'
+  if (!granted) return canAskAgain === false ? 'blocked' : 'denied'
+  return 'noFix'
+}
+export function locateNote(outcome) {
+  switch (outcome) {
+    case 'servicesOff': return { msgKey: 'eateryLocOff', action: 'locationSettings' }
+    case 'blocked': return { msgKey: 'eateryLocBlocked', action: 'appSettings' }
+    case 'denied': case 'noFix': return { msgKey: 'eateryDeliveryLocFail', action: null }
+    default: return null
+  }
+}
