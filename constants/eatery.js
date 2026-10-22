@@ -231,7 +231,7 @@ export const ADDRESS_FIELD_MAX = 100
 // Invisible / direction-control characters, and all whitespace (newlines included) collapsed to single spaces: free text
 // the customer types (address fields, note) can never forge a line of the message or hide inside an empty-looking field.
 const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF]/g
-const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '')
+const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
 export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
 export function mapsLink(lat, lng) {
   const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
@@ -267,3 +267,28 @@ export function buildOrderMessage(lines, note, code = null, delivery = null) {
 }
 
 export const orderWhatsAppUrl = (digits, message) => `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+
+// ─── "Konumumu ekle": what happened → what the user sees (pure; the device calls live in EateryOrder.js) ───
+export const LOCATE_TIMEOUT_MS = 12000
+// null on timeout; a result that arrives later is ignored (the race has already settled), a rejection too.
+export function withTimeout(promise, ms) {
+  let timer
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), ms) })
+  return Promise.race([Promise.resolve(promise).catch(() => null), timeout]).finally(() => clearTimeout(timer))
+}
+const validFix = fix => Number.isFinite(fix?.coords?.latitude) && Number.isFinite(fix?.coords?.longitude)
+// iOS reports "denied" while location services are off, so services-off wins over the permission states.
+export function locateOutcome({ granted, canAskAgain, servicesOn, fix }) {
+  if (granted && validFix(fix)) return 'ok'
+  if (servicesOn === false) return 'servicesOff'
+  if (!granted) return canAskAgain === false ? 'blocked' : 'denied'
+  return 'noFix'
+}
+export function locateNote(outcome) {
+  switch (outcome) {
+    case 'servicesOff': return { msgKey: 'eateryLocOff', action: 'locationSettings' }
+    case 'blocked': return { msgKey: 'eateryLocBlocked', action: 'appSettings' }
+    case 'denied': case 'noFix': return { msgKey: 'eateryDeliveryLocFail', action: null }
+    default: return null
+  }
+}

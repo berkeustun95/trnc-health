@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote } from '../constants/eatery.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -246,6 +246,34 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('note of only invisible chars adds no Not line', buildOrderMessage(lines, '\u2060\u00AD\u180E\u3164\u061C').split('\n').some(l => l.startsWith('Not:')), false)
   eq('address field of the newer invisible chars is empty -> not ready', deliveryReady({ mode: 'delivery', street: '\u2060\u00AD\u180E\u3164\u061C', building: 'a', district: 'b' }), false)
 }
+
+// "Konumumu ekle": every state of the tap, as a pure decision + mapping.
+{
+  const FIX = { coords: { latitude: 35.1, longitude: 33.9 } }
+  const G = { granted: true, canAskAgain: true, servicesOn: true, fix: FIX }
+  eq('locate: granted + fix -> ok', locateOutcome(G), 'ok')
+  eq('locate: granted, no fix, services on (timeout) -> noFix', locateOutcome({ ...G, fix: null }), 'noFix')
+  eq('locate: granted, NaN fix -> noFix', locateOutcome({ ...G, fix: { coords: { latitude: NaN, longitude: 1 } } }), 'noFix')
+  eq('locate: granted, no fix, services off -> servicesOff', locateOutcome({ ...G, fix: null, servicesOn: false }), 'servicesOff')
+  eq('locate: denied, can ask again -> denied', locateOutcome({ granted: false, canAskAgain: true, servicesOn: true, fix: null }), 'denied')
+  eq('locate: denied, cannot ask again -> blocked', locateOutcome({ granted: false, canAskAgain: false, servicesOn: true, fix: null }), 'blocked')
+  eq('locate: not granted + services off -> servicesOff (iOS reports denied)', locateOutcome({ granted: false, canAskAgain: false, servicesOn: false, fix: null }), 'servicesOff')
+  eq('locate: a fix without permission is not ok', locateOutcome({ ...G, granted: false }), 'denied')
+  eq('note: ok -> none', locateNote('ok'), null)
+  eq('note: denied -> quiet, no action', locateNote('denied'), { msgKey: 'eateryDeliveryLocFail', action: null })
+  eq('note: noFix -> quiet, no action', locateNote('noFix'), { msgKey: 'eateryDeliveryLocFail', action: null })
+  eq('note: blocked -> app settings', locateNote('blocked'), { msgKey: 'eateryLocBlocked', action: 'appSettings' })
+  eq('note: servicesOff -> location settings', locateNote('servicesOff'), { msgKey: 'eateryLocOff', action: 'locationSettings' })
+  const never = new Promise(() => {})
+  eq('withTimeout: a hanging promise resolves null', await withTimeout(never, 20), null)
+  eq('withTimeout: a fast result wins', await withTimeout(new Promise(r => setTimeout(() => r('fix'), 5)), 200), 'fix')
+  eq('withTimeout: a late result is ignored', await withTimeout(new Promise(r => setTimeout(() => r('late'), 80)), 10), null)
+  eq('withTimeout: a rejection is null, not a throw', await withTimeout(Promise.reject(new Error('x')), 50), null)
+}
+
+// U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.
+eq('NEL does not survive in a note', buildOrderMessage(lines, 'a\u0085b').split('\n').find(l => l.startsWith('Not: ')), 'Not: a b')
+eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'), 'x y')
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)
