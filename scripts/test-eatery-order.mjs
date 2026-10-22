@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -455,30 +455,32 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
     return r
   }
   const tick = () => new Promise(res => setImmediate(res))
+  // a broken early stop must print FAIL, not hang the run (an unsettled top-level await exits 13); the sentinel is fix-shaped so .coords.accuracy reads don't throw
+  const bd = p => { let t; return Promise.race([p, new Promise(res => { t = setTimeout(() => res({ coords: { accuracy: 'HUNG (never settled)' } }), 500) })]).finally(() => clearTimeout(t)) }
   { const r = rig(); const h = refineFix(r.watch, r.opts); await tick()
     eq('refine: timer armed with LOCATE_REFINE_MS', r.timers[0].ms, LOCATE_REFINE_MS)
     r.cb(F(40)); r.cb(F(18)); r.cb(F(30)); eq('refine: still listening while no fix is <= 10 m', r.removed, 0)
-    r.cb(F(9)); const best = await h.done
+    r.cb(F(9)); const best = await bd(h.done)
     eq('refine: early stop at <= 10 m returns that fix and removes the watcher once', [best.coords.accuracy, r.removed, r.cleared], [9, 1, 1])
     r.cb(F(1)); r.fire(); h.stop(); await tick(); eq('refine: later fixes / timer / stop change nothing; still removed once', r.removed, 1) }
   { const r = rig(); const h = refineFix(r.watch, r.opts); await tick(); r.cb(F(40)); r.cb(F(18)); r.cb(F(30)); r.cb(F(1, NaN, 1))
-    r.fire(); const best = await h.done
+    r.fire(); const best = await bd(h.done)
     eq('refine: timeout keeps the BEST fix so far (18 m, the invalid 1 m ignored), watcher removed once', [best.coords.accuracy, r.removed], [18, 1]) }
   { const r = rig(); const h = refineFix(r.watch, r.opts); await tick(); r.fire()
-    eq('refine: timeout with no fix -> null (caller falls back to the one-shot chain), watcher removed', [await h.done, r.removed], [null, 1]) }
+    eq('refine: timeout with no fix -> null (caller falls back to the one-shot chain), watcher removed', [await bd(h.done), r.removed], [null, 1]) }
   { const r = rig(); const h = refineFix(r.watch, r.opts); await tick(); r.cb(F(30)); h.stop()
-    eq('refine: stop() (Back / editor closed / unmount) resolves with the best so far and removes the watcher', [(await h.done).coords.accuracy, r.removed], [30, 1]) }
-  { const r = rig(true); const h = refineFix(r.watch, r.opts); await tick(); r.fire(); const best = await h.done; r.give(); await tick()
+    eq('refine: stop() (Back / editor closed / unmount) resolves with the best so far and removes the watcher', [(await bd(h.done)).coords.accuracy, r.removed], [30, 1]) }
+  { const r = rig(true); const h = refineFix(r.watch, r.opts); await tick(); r.fire(); const best = await bd(h.done); r.give(); await tick()
     eq('refine: the watcher that arrives AFTER the exit is removed the moment it arrives (exactly once)', [best, r.removed], [null, 1]) }
   { const r = rig(true); const h = refineFix(r.watch, r.opts); await tick(); h.stop(); r.give(); await tick(); h.stop(); r.fire()
     eq('refine: stop before the subscription exists -> still removed once, no double remove', r.removed, 1) }
   { const r = rig(); const h = refineFix(r.watch, r.opts); h.stop(); await tick()
-    eq('refine: stop before the watcher was even started -> it is never started', [r.subscribed, r.removed, await h.done], [0, 0, null]) }
+    eq('refine: stop before the watcher was even started -> it is never started', [r.subscribed, r.removed, await bd(h.done)], [0, 0, null]) }
   { const r = { removed: 0, cleared: 0, timers: [] }; const h = refineFix(() => Promise.reject(new Error('services off')), { setT: fn => { r.timers.push(fn); return 1 }, clearT: () => { r.cleared++ } })
-    eq('refine: watch() rejects (services off, declined) -> null at once, timer cleared', [await h.done, r.cleared], [null, 1]) }
+    eq('refine: watch() rejects (services off, declined) -> null at once, timer cleared', [await bd(h.done), r.cleared], [null, 1]) }
   { const r = { removed: 0 }; const h = refineFix(() => null, { setT: () => 1, clearT: () => {} }); await tick(); h.stop()
-    eq('refine: watch() resolves null (no subscription) -> no crash', await h.done, null) }
-  { const r = rig(); const h = refineFix(cb => { cb(F(5)); return Promise.resolve({ remove: () => { r.removed++ } }) }, r.opts); const best = await h.done; await tick()
+    eq('refine: watch() resolves null (no subscription) -> no crash', await bd(h.done), null) }
+  { const r = rig(); const h = refineFix(cb => { cb(F(5)); return Promise.resolve({ remove: () => { r.removed++ } }) }, r.opts); const best = await bd(h.done); await tick()
     eq('refine: a fix delivered before the subscription returns still stops early and removes the watcher', [best.coords.accuracy, r.removed], [5, 1]) }
   // wiring: the device code uses exactly this loop, with the services-aware watch, Highest accuracy, and never leaves it running
   const dl = fs.readFileSync(new URL('../utils/deliveryLocate.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
@@ -487,6 +489,9 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const ed = fs.readFileSync(new URL('../components/AddressEditor.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   eq('wiring: a GPS fix is NEVER saved straight away: useCurrent only opens the picker; pinChosen is the only writer of a pin (the other is Remove = null)', [/const useCurrent[\s\S]*?openPicker\(p\)/.test(ed), (ed.match(/set\(\{ coords: (?!null)/g) || []).length, /const useCurrent[^}]*set\(/.test(ed)], [true, 1, false])
   const pk = fs.readFileSync(new URL('../components/DeliveryPinPicker.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('askFreshFix: skipped only when services are known off', [askFreshFix(false), askFreshFix(true), askFreshFix(undefined)], [false, true, true])
+  eq('wiring: getFix checks services before the fresh fix and uses askFreshFix', [/hasServicesEnabledAsync[\s\S]*askFreshFix\(servicesOn\) \? await withTimeout\(askedFix/.test(dl)], [true])
+  eq('wiring: goTo clears the accuracy note (any programmatic move); goMe sets it AFTER goTo; the map label carries it', [/const goTo = [^\n]*\n\s*setAcc\(null\)/.test(pk), /goTo\(p\.lat, p\.lng, AREA_DELTA \/ 2\); setAcc\(p\.accuracy\)/.test(pk), /eateryPinMapA11y'[^\n]*accText/.test(pk), /useState\(start\.accuracy \?\? null\)/.test(pk)], [true, true, true, true])
   eq('wiring: the picker hands back lat / lng only (no accuracy) and shows the note from state', [/onUse\(centre\.current\)/.test(pk), /centre\.current = \{ lat: r\.latitude, lng: r\.longitude \}/.test(pk)], [true, true])
 }
 

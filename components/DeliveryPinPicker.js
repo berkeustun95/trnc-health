@@ -34,8 +34,10 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
   const { locating, refining, note, locate, openFix } = useLocate(lang)
   const results = searchAreasTop(query)
   const accM = accuracyNote(acc)
+  const accText = accM != null ? t('eateryPinAccuracy', lang).replace('{m}', () => String(accM)) : ''
 
   const goTo = (lat, lng, delta) => {
+    setAcc(null)   // any programmatic move leaves the fix the note was about; goMe sets the new one after
     centre.current = { lat, lng }
     mapRef.current?.animateToRegion({ latitude: lat, longitude: lng, latitudeDelta: delta, longitudeDelta: delta }, reduce ? 0 : motion.base)
   }
@@ -43,12 +45,12 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
   const goMe = async () => {
     Keyboard.dismiss()
     const p = await locate()
-    if (p) { setAcc(p.accuracy); goTo(p.lat, p.lng, AREA_DELTA / 2) }
+    if (p) { goTo(p.lat, p.lng, AREA_DELTA / 2); setAcc(p.accuracy) }
   }
   return (
     <View style={s.root}>
       <View style={s.mapWrap}>
-      <View style={StyleSheet.absoluteFill} accessible accessibilityLabel={t(gpsMode ? 'eateryPinMapA11yGps' : 'eateryPinMapA11y', lang)}>
+      <View style={StyleSheet.absoluteFill} accessible accessibilityLabel={t(gpsMode ? 'eateryPinMapA11yGps' : 'eateryPinMapA11y', lang) + (accM != null ? '. ' + accText : '')}>
         <MapView ref={mapRef} style={StyleSheet.absoluteFill} provider={MAP_PROVIDER}
           initialRegion={{ latitude: start.lat, longitude: start.lng, latitudeDelta: start.delta, longitudeDelta: start.delta }}
           onPanDrag={() => setAcc(null)}
@@ -86,7 +88,7 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
         ) : (
           <View style={[s.help, elevation.card]}>
             <Text style={s.helpText}>{t(gpsMode ? 'eateryPinHelpGps' : 'eateryPinHelp', lang)}</Text>
-            {accM != null && <Text style={s.accText} accessibilityLiveRegion="polite">{t('eateryPinAccuracy', lang).replace('{m}', () => String(accM))}</Text>}
+            {accM != null && <Text style={s.accText} accessibilityLiveRegion="polite">{accText}</Text>}
           </View>
         )}
       </View>

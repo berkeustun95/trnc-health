@@ -398,6 +398,9 @@ export function pickBestFix(fixes) {
 export function accuracyNote(acc) {
   return Number.isFinite(acc) && acc > LOCATE_POOR_M ? Math.ceil(acc / 5) * 5 : null
 }
+// After a refine with no fix: ask for a one-shot fresh fix only when location services are on (or unknown); off -> skip, the
+// caller reports services-off instead of stacking a second system dialog.
+export const askFreshFix = servicesOn => servicesOn !== false
 // Listens through watch(cb) -> Promise<{ remove() } | null> and settles on the best fix at the first of: a fix <= goodM, the
 // timeout, stop(). The subscription is removed on EVERY exit (also when it arrives after the exit). Resolves null with no valid fix
 // (also when watch() rejects, e.g. location services off and declined): then the caller falls back to the one-shot chain.

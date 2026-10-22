@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, AppState, Linking, Platform } from 'react-native'
 import * as Location from 'expo-location'
 import { t } from '../constants/i18n'
-import { withTimeout, locateOutcome, locateNote, refineFix, LOCATE_TIMEOUT_MS } from '../constants/eatery'
+import { withTimeout, locateOutcome, locateNote, refineFix, askFreshFix, LOCATE_TIMEOUT_MS } from '../constants/eatery'
 import { REDESIGN } from '../constants/redesign'
 import { requestWithPrimer } from './permissionPrimer'
 import { askedFix, askedWatch, passiveFix } from './locationServices'
@@ -11,6 +11,7 @@ import { askedFix, askedWatch, passiveFix } from './locationServices'
 // centre / an optional pin in the address book on this phone. Must not import supabase or logContactEvent (test-eatery-order.mjs).
 
 // First up to LOCATE_REFINE_MS of the best GPS (Highest, stops at LOCATE_GOOD_M): a cached or first fix can sit on the neighbour.
+// Services off: no second fresh fix (it would stack a second settings dialog); locate() then shows "Ayarları aç".
 // Nothing arrived (services off and declined, indoors) -> the old chain: last known (2 min), else a fresh fix raced against a
 // timeout (indoors it can hang), else an older one. ctx.refine holds the live watcher so cancel() can remove it; ctx.stopped() = the
 // person left (Back, editor closed, unmount): then no further device call is made.
@@ -23,8 +24,10 @@ async function getFix(ctx) {
   ctx.onRefining?.(false)
   if (best || ctx.stopped()) return best
   const last = async maxAge => { try { return await Location.getLastKnownPositionAsync({ maxAge }) } catch { return null } }
+  let servicesOn = true
+  try { servicesOn = await Location.hasServicesEnabledAsync() } catch {}
   return (await last(120000))
-    ?? (await withTimeout(askedFix(Location.Accuracy.Balanced), LOCATE_TIMEOUT_MS))
+    ?? (askFreshFix(servicesOn) ? await withTimeout(askedFix(Location.Accuracy.Balanced), LOCATE_TIMEOUT_MS) : null)
     ?? (await last(600000))
 }
 
