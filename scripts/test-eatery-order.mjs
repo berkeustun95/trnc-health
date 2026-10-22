@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore } from '../constants/eatery.js'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -218,8 +218,8 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('EateryOrder.js has no supabase / logContactEvent / console / fetch', (o.match(/\bsupabase\b|\blogContactEvent\b|console\.|fetch\(/g) || []), [])
 
   const D = { mode: 'delivery', kind: 'home', street: STREET, building: '3', district: 'Karakol' }
-  eq('mapsLink 5 decimals', mapsLink(35.123456789, 33.9), 'https://maps.google.com/?q=35.12346,33.90000')
-  eq('mapsLink rounds', mapsLink(35.000005, -33.000004), 'https://maps.google.com/?q=35.00001,-33.00000')
+  eq('mapsLink 5 decimals', mapsLink(35.123456789, 33.9), 'https://www.google.com/maps/search/?api=1&query=35.12346,33.90000')
+  eq('mapsLink rounds', mapsLink(35.000005, -33.000004), 'https://www.google.com/maps/search/?api=1&query=35.00001,-33.00000')
   eq('mapsLink invalid -> empty', [mapsLink(NaN, 1), mapsLink(1, Infinity), mapsLink(91, 0), mapsLink(0, 181), mapsLink(null, 1), mapsLink('35', '33'), mapsLink(undefined, undefined)], ['', '', '', '', '', '', ''])
   eq('sanitizeAddressField strips invisible direction / zero-width chars', sanitizeAddressField('\u202Egnirts\u200B  \u2066x\u2069\uFEFF\u200F y\u202A '), 'gnirts x y')
   eq('sanitizeAddressField: a field of only invisible chars is empty -> not ready', deliveryReady({ mode: 'delivery', kind: 'home', street: '\u200B\u202E', building: 'a', district: 'b' }), false)
@@ -231,8 +231,24 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('deliveryLine pickup ignores any address', deliveryLine({ ...D, mode: 'pickup' }), 'Teslimat: Gel-al')
   eq('deliveryLine not ready -> empty', [deliveryLine(null), deliveryLine({ mode: 'delivery', street: 'x' })], ['', ''])
   eq('deliveryLine delivery without coords', deliveryLine(D), 'Teslimat: Adrese teslim — Ev: Örnek Sokak 12 No 3, Karakol')
-  eq('deliveryLine delivery with coords', deliveryLine({ ...D, coords: { lat: 35.1234567, lng: 33.9876543 } }), 'Teslimat: Adrese teslim — Ev: Örnek Sokak 12 No 3, Karakol · Konum (haritada aç): https://maps.google.com/?q=35.12346,33.98765')
-  eq('deliveryLine invalid coords omitted', deliveryLine({ ...D, coords: { lat: 99, lng: 33 } }).includes('Konum'), false)
+  eq('deliveryLine delivery with coords', deliveryLine({ ...D, coords: { lat: 35.1234567, lng: 33.9876543 } }), 'Teslimat: Adrese teslim — Ev: Örnek Sokak 12 No 3, Karakol · Konum (haritada aç): https://www.google.com/maps/search/?api=1&query=35.12346,33.98765 · Koordinat: 35.12346, 33.98765')
+  eq('deliveryLine invalid coords omit BOTH Konum and Koordinat', [{ lat: 99, lng: 33 }, { lat: NaN, lng: 33 }, { lat: '35', lng: '33' }, { lat: 35, lng: 181 }, {}].map(c => { const l = deliveryLine({ ...D, coords: c }); return l.includes('Konum') || l.includes('Koordinat') }), [false, false, false, false, false])
+  eq('deliveryLine no pin -> neither part', [deliveryLine(D).includes('Konum'), deliveryLine(D).includes('Koordinat')], [false, false])
+  eq('MAPS_LINK_FORMAT: the one constant, exact string', MAPS_LINK_FORMAT, 'https://www.google.com/maps/search/?api=1&query={lat},{lng}')
+  eq('mapsLink: exact link, 5 dp', mapsLink(35.179, 33.35745), 'https://www.google.com/maps/search/?api=1&query=35.17900,33.35745')
+  eq('coordText: exact Koordinat text, 5 dp, invalid -> empty', [coordText(35.179, 33.35745), coordText(-0.000004, 180), coordText(91, 0), coordText(NaN, 1), coordText('35', '33')], ['35.17900, 33.35745', '-0.00000, 180.00000', '', '', ''])
+  const PIN = { lat: 35.179, lng: 33.35745 }
+  eq('deliveryLine with a pin: exact single line, link then Koordinat, after Tarif', deliveryLine({ ...D, directions: 'mavi kapı', coords: PIN }), 'Teslimat: Adrese teslim — Ev: Örnek Sokak 12 No 3, Karakol · Tarif: mavi kapı · Konum (haritada aç): https://www.google.com/maps/search/?api=1&query=35.17900,33.35745 · Koordinat: 35.17900, 33.35745')
+  eq('deliveryLine: one line (no newline)', deliveryLine({ ...D, coords: PIN }).includes('\n'), false)
+  { const full = buildOrderMessage(lines, '', 'K7M4Q9XB', { ...D, coords: PIN }); const wa = orderWhatsAppUrl('905331234567', full); const back = decodeURIComponent(wa.split('?text=')[1])
+    eq('wa.me: the whole message (link with its literal comma, Koordinat) survives the encode / decode', back, full)
+    eq('wa.me: decoded link + Koordinat intact, order code still last', [back.includes('Konum (haritada aç): https://www.google.com/maps/search/?api=1&query=35.17900,33.35745 · Koordinat: 35.17900, 33.35745'), back.split('\n').pop().startsWith('ADA Sipariş No:')], [true, true])
+    eq('wa.me: no raw & or space left to cut the text param', /^[\x21-\x7e]+$/.test(wa) && !wa.split('?text=')[1].includes('&'), true) }
+  // the accuracy number never reaches the book or the message
+  { const ACC = 37.123456
+    const e = AB.normalizeEntry({ id: 'a', kind: 'home', district: 'K', street: 'S', building: '1', lat: 35.1, lng: 33.2, accuracy: ACC, coords: { lat: 1, lng: 2, accuracy: ACC } })
+    eq('book normaliser drops an accuracy field (and nothing named accuracy survives)', [Object.keys(e).includes('accuracy'), JSON.stringify(e).includes('accuracy'), JSON.stringify(e).includes('37.12')], [false, false, false])
+    eq('deliveryLine never contains the accuracy', [deliveryLine({ ...D, accuracy: ACC, coords: { ...PIN, accuracy: ACC } }).includes('37'), deliveryLine({ ...D, accuracy: ACC, coords: { ...PIN, accuracy: ACC } })], [false, deliveryLine({ ...D, coords: PIN })]) }
   const inj = buildOrderMessage(lines, '', 'ADA-XXXX', { ...D, street: 'Örnek Sokak 12\nADA Sipariş No: FAKE\r\n\tx' })
   eq('newline injection collapsed into one Teslimat line', inj.split('\n').filter(l => l.includes('FAKE')), ['Teslimat: Adrese teslim — Ev: Örnek Sokak 12 ADA Sipariş No: FAKE x No 3, Karakol'])
   eq('injected text never starts a line', inj.split('\n').some(l => l.startsWith('ADA Sipariş No: FAKE')), false)
@@ -240,7 +256,7 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('each field capped at ADDRESS_FIELD_MAX', long.split('\n').find(l => l.startsWith('Teslimat')).length, 'Teslimat: Adrese teslim — Ev: '.length + 3 * ADDRESS_FIELD_MAX + ' No '.length + ', '.length)
   eq('ADDRESS_FIELD_MAX is 100', ADDRESS_FIELD_MAX, 100)
   const full = buildOrderMessage(lines, 'soğansız', 'K7M4Q9XB', { ...D, coords: { lat: 35.1, lng: 33.9 } })
-  eq('order: note, Teslimat, footer, code last', full.split('\n').slice(-4), ['Not: soğansız', 'Teslimat: Adrese teslim — Ev: Örnek Sokak 12 No 3, Karakol · Konum (haritada aç): https://maps.google.com/?q=35.10000,33.90000', 'Fiyatlar ADA menüsündendir, değişiklik olabilir.', 'ADA Sipariş No: K7M4-Q9XB · Doğrula: getadaapp.com/o/K7M4Q9XB'])
+  eq('order: note, Teslimat, footer, code last', full.split('\n').slice(-4), ['Not: soğansız', 'Teslimat: Adrese teslim — Ev: Örnek Sokak 12 No 3, Karakol · Konum (haritada aç): https://www.google.com/maps/search/?api=1&query=35.10000,33.90000 · Koordinat: 35.10000, 33.90000', 'Fiyatlar ADA menüsündendir, değişiklik olabilir.', 'ADA Sipariş No: K7M4-Q9XB · Doğrula: getadaapp.com/o/K7M4Q9XB'])
 }
 
 // The note is free text too: a newline must not let it forge a Teslimat / order-number line above the real ones.
@@ -353,14 +369,15 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
 
   // exact message lines
   const BASE = 'Teslimat: Adrese teslim — '
-  const LINK = 'https://maps.google.com/?q=35.18974,33.34972'
-  eq('line: home with everything', MSG({ ...E, lat: 35.18974, lng: 33.34972 }), BASE + 'Ev: Örnek Sokak No 12, Kat 2, Daire 5, Kumsal · Tarif: Mavi kapı, zile iki kez bas · Konum (haritada aç): ' + LINK)
+  const LINK = 'https://www.google.com/maps/search/?api=1&query=35.18974,33.34972'
+  const KOORD = ' · Koordinat: 35.18974, 33.34972'
+  eq('line: home with everything', MSG({ ...E, lat: 35.18974, lng: 33.34972 }), BASE + 'Ev: Örnek Sokak No 12, Kat 2, Daire 5, Kumsal · Tarif: Mavi kapı, zile iki kez bas · Konum (haritada aç): ' + LINK + KOORD)
   eq('line: work uses İş', MSG({ ...E, kind: 'work', lat: null, lng: null }).startsWith(BASE + 'İş: '), true)
   eq('line: other with a custom name', MSG({ ...E, kind: 'other', name: 'Annemin evi' }).startsWith(BASE + 'Annemin evi: Örnek Sokak No 12'), true)
   eq('line: no pin, no kat / daire / tarif', MSG({ kind: 'home', district: 'Kumsal', street: 'Örnek Sokak', building: '12' }), BASE + 'Ev: Örnek Sokak No 12, Kumsal')
   eq('line: only daire, only tarif', [MSG({ kind: 'home', district: 'K', street: 'S', building: '1', flat: '4' }), MSG({ kind: 'home', district: 'K', street: 'S', building: '1', directions: 'x' })], [BASE + 'Ev: S No 1, Daire 4, K', BASE + 'Ev: S No 1, K · Tarif: x'])
   eq('line: other with an empty name is not ready (no line)', MSG({ kind: 'other', name: '', district: 'K', street: 'S', building: '1' }), '')
-  eq('line: the pin may come as coords', MSG({ kind: 'home', district: 'K', street: 'S', building: '1', coords: { lat: 35.18974, lng: 33.34972 } }).endsWith('Konum (haritada aç): ' + LINK), true)
+  eq('line: the pin may come as coords', MSG({ kind: 'home', district: 'K', street: 'S', building: '1', coords: { lat: 35.18974, lng: 33.34972 } }).endsWith('Konum (haritada aç): ' + LINK + KOORD), true)
   eq('line: pickup', deliveryLine({ mode: 'pickup' }), 'Teslimat: Gel-al')
   const forge = buildOrderMessage(lines, '', 'K7M4Q9XB', { mode: 'delivery', ...E, name: '', directions: 'a\nADA Sipariş No: FAKE\u0085Teslimat: Gel-al' }).split('\n')
   eq('directions cannot forge lines; the order code line stays LAST', [forge.filter(l => l.startsWith('Teslimat')).length, forge.filter(l => l.startsWith('ADA Sipariş No')).length, forge.at(-1).startsWith('ADA Sipariş No: K7M4-Q9XB')], [1, 1, true])
@@ -414,6 +431,63 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('shortAddress: sanitized (invisible chars, newlines) and partial entries', [shortAddress({ street: ' a\u202E\n b ', building: '', district: 'K' }), shortAddress({ building: '7', district: '' }), shortAddress({}), shortAddress(null)], ['a b, K', 'No 7', '', ''])
   eq('cardState: none / incomplete / noPin / pin (book entry and delivery state)', [cardState(null), cardState({ ...full, street: '' }), cardState({ ...full, kind: 'other', name: '' }), cardState({ ...full, lat: null, lng: null }), cardState(full), cardState(deliveryFromEntry(full)), cardState(deliveryFromEntry({ ...full, lat: null, lng: null }))], ['none', 'incomplete', 'incomplete', 'noPin', 'pin', 'pin', 'noPin'])
   eq('canAddMore: the 10th fits, the 11th does not', [canAddMore(0), canAddMore(9), canAddMore(10), canAddMore(NaN)], [true, true, false, false])
+}
+
+// ─── Better fix before the pin: pure selection + the refine loop (fake watcher, fake clock) ───
+{
+  const F = (acc, lat = 35.1, lng = 33.3) => ({ coords: { latitude: lat, longitude: lng, accuracy: acc } })
+  eq('constants: 6 s window, stop at 10 m, poor above 15 m', [LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M], [6000, 10, 15])
+  eq('pickBestFix: smallest accuracy wins', pickBestFix([F(40), F(12), F(25)]).coords.accuracy, 12)
+  eq('pickBestFix: tie keeps the earlier', pickBestFix([F(20, 1, 1), F(20, 2, 2)]).coords.latitude, 1)
+  eq('pickBestFix: invalid fixes ignored (NaN / missing / out of range / null)', pickBestFix([F(1, NaN, 3), { coords: {} }, null, undefined, F(2, 95, 0), F(3, 0, 200), F(50)]).coords.accuracy, 50)
+  eq('pickBestFix: nothing usable -> null (also for non-arrays)', [pickBestFix([]), pickBestFix([F(5, NaN, 1)]), pickBestFix(null)], [null, null, null])
+  eq('pickBestFix: a fix with no accuracy ranks last but counts', [pickBestFix([{ coords: { latitude: 1, longitude: 2 } }, F(80)]).coords.accuracy, pickBestFix([{ coords: { latitude: 1, longitude: 2 } }]).coords.latitude], [80, 1])
+  eq('accuracyNote: nothing at <= 15, otherwise rounded UP to 5 (never <= 15)', [accuracyNote(15), accuracyNote(15.1), accuracyNote(16), accuracyNote(20), accuracyNote(22), accuracyNote(40.4), accuracyNote(5), accuracyNote(null), accuracyNote(NaN), accuracyNote(undefined)], [null, 20, 20, 20, 25, 45, null, null, null, null])
+  // fake clock + fake watcher with a remove counter
+  const rig = (late = false) => {
+    const r = { removed: 0, cb: null, timers: [], cleared: 0, subscribed: 0 }
+    const sub = { remove: () => { r.removed++ } }
+    r.watch = cb => { r.cb = cb; r.subscribed++; return late ? new Promise(res => { r.give = () => res(sub) }) : Promise.resolve(sub) }
+    r.setT = (fn, ms) => { r.timers.push({ fn, ms }); return r.timers.length }
+    r.clearT = () => { r.cleared++ }
+    r.fire = () => r.timers[0].fn()
+    r.opts = { setT: r.setT, clearT: r.clearT }
+    return r
+  }
+  const tick = () => new Promise(res => setImmediate(res))
+  { const r = rig(); const h = refineFix(r.watch, r.opts); await tick()
+    eq('refine: timer armed with LOCATE_REFINE_MS', r.timers[0].ms, LOCATE_REFINE_MS)
+    r.cb(F(40)); r.cb(F(18)); r.cb(F(30)); eq('refine: still listening while no fix is <= 10 m', r.removed, 0)
+    r.cb(F(9)); const best = await h.done
+    eq('refine: early stop at <= 10 m returns that fix and removes the watcher once', [best.coords.accuracy, r.removed, r.cleared], [9, 1, 1])
+    r.cb(F(1)); r.fire(); h.stop(); await tick(); eq('refine: later fixes / timer / stop change nothing; still removed once', r.removed, 1) }
+  { const r = rig(); const h = refineFix(r.watch, r.opts); await tick(); r.cb(F(40)); r.cb(F(18)); r.cb(F(30)); r.cb(F(1, NaN, 1))
+    r.fire(); const best = await h.done
+    eq('refine: timeout keeps the BEST fix so far (18 m, the invalid 1 m ignored), watcher removed once', [best.coords.accuracy, r.removed], [18, 1]) }
+  { const r = rig(); const h = refineFix(r.watch, r.opts); await tick(); r.fire()
+    eq('refine: timeout with no fix -> null (caller falls back to the one-shot chain), watcher removed', [await h.done, r.removed], [null, 1]) }
+  { const r = rig(); const h = refineFix(r.watch, r.opts); await tick(); r.cb(F(30)); h.stop()
+    eq('refine: stop() (Back / editor closed / unmount) resolves with the best so far and removes the watcher', [(await h.done).coords.accuracy, r.removed], [30, 1]) }
+  { const r = rig(true); const h = refineFix(r.watch, r.opts); await tick(); r.fire(); const best = await h.done; r.give(); await tick()
+    eq('refine: the watcher that arrives AFTER the exit is removed the moment it arrives (exactly once)', [best, r.removed], [null, 1]) }
+  { const r = rig(true); const h = refineFix(r.watch, r.opts); await tick(); h.stop(); r.give(); await tick(); h.stop(); r.fire()
+    eq('refine: stop before the subscription exists -> still removed once, no double remove', r.removed, 1) }
+  { const r = rig(); const h = refineFix(r.watch, r.opts); h.stop(); await tick()
+    eq('refine: stop before the watcher was even started -> it is never started', [r.subscribed, r.removed, await h.done], [0, 0, null]) }
+  { const r = { removed: 0, cleared: 0, timers: [] }; const h = refineFix(() => Promise.reject(new Error('services off')), { setT: fn => { r.timers.push(fn); return 1 }, clearT: () => { r.cleared++ } })
+    eq('refine: watch() rejects (services off, declined) -> null at once, timer cleared', [await h.done, r.cleared], [null, 1]) }
+  { const r = { removed: 0 }; const h = refineFix(() => null, { setT: () => 1, clearT: () => {} }); await tick(); h.stop()
+    eq('refine: watch() resolves null (no subscription) -> no crash', await h.done, null) }
+  { const r = rig(); const h = refineFix(cb => { cb(F(5)); return Promise.resolve({ remove: () => { r.removed++ } }) }, r.opts); const best = await h.done; await tick()
+    eq('refine: a fix delivered before the subscription returns still stops early and removes the watcher', [best.coords.accuracy, r.removed], [5, 1]) }
+  // wiring: the device code uses exactly this loop, with the services-aware watch, Highest accuracy, and never leaves it running
+  const dl = fs.readFileSync(new URL('../utils/deliveryLocate.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('wiring: getFix refines through askedWatch at Accuracy.Highest, then the old chain', [/refineFix\(watch\)/.test(dl), /askedWatch\(\{ accuracy: Location\.Accuracy\.Highest/.test(dl), /askedFix\(Location\.Accuracy\.Balanced\)/.test(dl)], [true, true, true])
+  eq('wiring: unmount cancels the search; the editor cancels on Back / close', [/alive\.current = false; cancel\(\)/.test(dl), /gps\.cancel\(\)/.test(fs.readFileSync(new URL('../components/AddressEditor.js', import.meta.url), 'utf8'))], [true, true])
+  const ed = fs.readFileSync(new URL('../components/AddressEditor.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('wiring: a GPS fix is NEVER saved straight away: useCurrent only opens the picker; pinChosen is the only writer of a pin (the other is Remove = null)', [/const useCurrent[\s\S]*?openPicker\(p\)/.test(ed), (ed.match(/set\(\{ coords: (?!null)/g) || []).length, /const useCurrent[^}]*set\(/.test(ed)], [true, 1, false])
+  const pk = fs.readFileSync(new URL('../components/DeliveryPinPicker.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('wiring: the picker hands back lat / lng only (no accuracy) and shows the note from state', [/onUse\(centre\.current\)/.test(pk), /centre\.current = \{ lat: r\.latitude, lng: r\.longitude \}/.test(pk)], [true, true])
 }
 
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.

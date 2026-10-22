@@ -9,6 +9,7 @@ import { MAP_PROVIDER } from '../utils/googleMap'
 import { useLocate } from '../utils/deliveryLocate'
 import { colors, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import useKeyboardTop from '../utils/useKeyboardTop'
+import { accuracyNote } from '../constants/eatery'
 import { Button } from './ui'
 
 // Step 2's map: the pin stays in the middle and the MAP moves under it (no draggable marker, which is fiddly with a thumb); the
@@ -16,7 +17,9 @@ import { Button } from './ui'
 // network, no geocoder. Base-map POIs stay on here (unlike the check-in maps): there is no Places content on this map.
 // The map has its own flex:1 frame and the buttons sit BELOW it, so the provider's attribution (Google logo / Apple Legal) is never
 // covered and the pin centres on the visible map. While the keyboard is open the button bar is hidden (the map is not squeezed on Android).
-// Defined outside the editor so it never remounts. start: { lat, lng, delta }. onUse({ lat, lng }) = "Bu konumu kullan".
+// Defined outside the editor so it never remounts. start: { lat, lng, delta, gps?, accuracy? }. onUse({ lat, lng }) = "Bu konumu kullan".
+// start.gps = the map opened on a GPS fix the person must CONFIRM ("Pin tam kapında mı?" / "Evet, bu konum"); a fix worse than
+// LOCATE_POOR_M says so in words until they move the map. The accuracy lives in this state only: onUse hands back lat / lng and nothing else.
 const PIN_H = 44
 const AREA_DELTA = 0.01
 
@@ -26,8 +29,11 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
   const mapRef = useRef(null)
   const centre = useRef({ lat: start.lat, lng: start.lng })
   const [query, setQuery] = useState('')
-  const { locating, note, locate, openFix } = useLocate(lang)
+  const [acc, setAcc] = useState(start.accuracy ?? null)   // metres, of the fix the pin is still sitting on; cleared by the first pan
+  const gpsMode = start.gps === true
+  const { locating, refining, note, locate, openFix } = useLocate(lang)
   const results = searchAreasTop(query)
+  const accM = accuracyNote(acc)
 
   const goTo = (lat, lng, delta) => {
     centre.current = { lat, lng }
@@ -37,14 +43,15 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
   const goMe = async () => {
     Keyboard.dismiss()
     const p = await locate()
-    if (p) goTo(p.lat, p.lng, AREA_DELTA / 2)
+    if (p) { setAcc(p.accuracy); goTo(p.lat, p.lng, AREA_DELTA / 2) }
   }
   return (
     <View style={s.root}>
       <View style={s.mapWrap}>
-      <View style={StyleSheet.absoluteFill} accessible accessibilityLabel={t('eateryPinMapA11y', lang)}>
+      <View style={StyleSheet.absoluteFill} accessible accessibilityLabel={t(gpsMode ? 'eateryPinMapA11yGps' : 'eateryPinMapA11y', lang)}>
         <MapView ref={mapRef} style={StyleSheet.absoluteFill} provider={MAP_PROVIDER}
           initialRegion={{ latitude: start.lat, longitude: start.lng, latitudeDelta: start.delta, longitudeDelta: start.delta }}
+          onPanDrag={() => setAcc(null)}
           onRegionChangeComplete={r => { centre.current = { lat: r.latitude, lng: r.longitude } }}
           toolbarEnabled={false} rotateEnabled={false} pitchEnabled={false} showsUserLocation={false} />
       </View>
@@ -78,7 +85,8 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
           </View>
         ) : (
           <View style={[s.help, elevation.card]}>
-            <Text style={s.helpText}>{t('eateryPinHelp', lang)}</Text>
+            <Text style={s.helpText}>{t(gpsMode ? 'eateryPinHelpGps' : 'eateryPinHelp', lang)}</Text>
+            {accM != null && <Text style={s.accText} accessibilityLiveRegion="polite">{t('eateryPinAccuracy', lang).replace('{m}', () => String(accM))}</Text>}
           </View>
         )}
       </View>
@@ -91,8 +99,8 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
           </View>
         )}
         <Button variant="secondary" fullWidth icon="locate-outline" title={t('eateryPinGoMe', lang)} loading={locating}
-          loadingTitle={t('eateryDeliveryLocating', lang)} onPress={goMe} />
-        <Button fullWidth icon="checkmark" title={t('eateryPinUse', lang)} onPress={() => onUse(centre.current)} />
+          loadingTitle={t(refining ? 'eateryDeliveryRefining' : 'eateryDeliveryLocating', lang)} onPress={goMe} />
+        <Button fullWidth icon="checkmark" title={t(gpsMode ? 'eateryPinUseGps' : 'eateryPinUse', lang)} onPress={() => onUse(centre.current)} />
       </View>}
     </View>
   )
@@ -111,6 +119,7 @@ const s = StyleSheet.create({
   clear:    { width: TAP, height: TAP, alignItems: 'center', justifyContent: 'center' },
   help:     { borderRadius: radii.md, backgroundColor: colors.card, paddingHorizontal: space[12], paddingVertical: space[8] },
   helpText: { ...type.small, color: colors.textPrimary },
+  accText:  { ...type.small, color: colors.textSecondary, marginTop: space[4] },
   list:     { borderRadius: radii.md, backgroundColor: colors.card, overflow: 'hidden' },
   row:      { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[8], paddingHorizontal: space[12] },
   rowText:  { flex: 1, ...type.body, color: colors.textPrimary },
