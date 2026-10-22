@@ -13879,7 +13879,7 @@ const translations = {
     eateryDeliveryLocRemoveA11y: "Quitar la ubicación",
     eateryDeliveryLocRemove: "Quitar",
     eateryDeliveryLocFail: "No se pudo obtener tu ubicación. Basta con la dirección escrita.",
-    eateryLocOff: "La ubicación está desactivée.",
+    eateryLocOff: "La ubicación está desactivada.",
     eateryLocBlocked: "El permiso de ubicación está desactivado.",
     eateryDeliveryNeedChoose: "Elige recoger o entrega para enviar.",
     eateryDeliveryNeedAddress: "Rellena la dirección para enviar.",

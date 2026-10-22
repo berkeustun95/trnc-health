@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, Animated, Dimensions, Easing, Linking, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, AppState, Animated, Dimensions, Easing, Linking, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -137,6 +137,12 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
   openRef.current = open
   modeRef.current = delivery.mode
   useEffect(() => () => { alive.current = false }, [])
+  const noteHasAction = !!locNote?.action
+  useEffect(() => {
+    if (!noteHasAction) return
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') setLocNote(null) })
+    return () => sub.remove()
+  }, [noteHasAction])
   const isHome = delivery.mode === 'delivery'
   const hasAny = !!(delivery.street || delivery.building || delivery.district || delivery.coords)
   const choose = mode => { setLocNote(null); onDelivery(mode === 'pickup' ? { mode, coords: null } : { mode }) }
@@ -403,7 +409,7 @@ const st = StyleSheet.create({
   locRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
   locText:   { flex: 1, ...type.body, color: colors.textPrimary },
   locFail:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
-  locFailIcon:{ marginTop: 2 },
+  locFailIcon:{},
   locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
   locNote:   { ...type.small, color: colors.textSecondary },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
