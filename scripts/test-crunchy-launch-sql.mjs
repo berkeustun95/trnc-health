@@ -65,9 +65,11 @@ await refused('no menu items', { noItems: true }, 'no available priced')
 await refused('another partner already active', { extraActive: true }, 'active eatery partners')
 
 console.log('20261128 cleanup')
+const ACT_ROW = (ago) => `INSERT INTO public.schema_migrations_applied (filename, checksum, applied_at) VALUES ('20261127_crunchy_express_activate.sql','x', now() - interval '${ago}')`
 const ORD = (n, p) => `INSERT INTO public.eatery_orders (code, partner_id) SELECT '${p}'||lpad(g::text,7,'A'), '${p === 'C' ? CID : OID}' FROM generate_series(1,${n}) g;`
 {
   const d = await fx({ active: true })
+  await d.exec(ACT_ROW('1 hour'))
   await d.exec(ORD(8, 'C') + ORD(2, 'O'))
   const r = await applyFile(d, CLN)
   t('8 Crunchy test orders deleted', r, { ok: true, msg: null })
@@ -75,6 +77,7 @@ const ORD = (n, p) => `INSERT INTO public.eatery_orders (code, partner_id) SELEC
 }
 {
   const d = await fx({ active: true })
+  await d.exec(ACT_ROW('1 hour'))
   await d.exec(ORD(51, 'C'))
   const r = await applyFile(d, CLN)
   t('51 Crunchy rows refused (limit 50)', [r.ok, (r.msg || '').includes('limit 50')], [false, true])
@@ -83,7 +86,17 @@ const ORD = (n, p) => `INSERT INTO public.eatery_orders (code, partner_id) SELEC
 }
 {
   const d = await fx({ active: true })
+  await d.exec(ACT_ROW('1 hour'))
   const r = await applyFile(d, CLN)
   t('0 rows: passes', r, { ok: true, msg: null })
+}
+for (const [name, ago, msg] of [['1127 missing', null, 'is not applied'], ['1127 applied 25 h ago', '25 hours', 'within 24 hours']]) {
+  const d = await fx({ active: true })
+  if (ago) await d.exec(ACT_ROW(ago))
+  await d.exec(ORD(3, 'C'))
+  const r = await applyFile(d, CLN)
+  t(`${name}: refused`, [r.ok, (r.msg || '').includes(msg)], [false, true])
+  await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  t(`${name}: nothing deleted`, (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n, 3)
 }
 console.log(bad ? `\n${bad} FAILED` : '\nall passed'); process.exit(bad ? 1 : 0)

@@ -13,6 +13,10 @@
 -- There is no flag in the database to prove "before the OTA", so the guard is a size limit: if more than 50
 -- rows would be deleted the file aborts (a launched shop accumulates faster than testing does).
 --
+-- RESIDUAL RISK: once 1127 has activated Crunchy, create_eatery_order is callable directly by any authenticated
+-- user even before the OTA, so a stray real order could exist. The bounds: the file aborts unless the 1127 ledger
+-- row exists, was applied before this transaction and less than 24 hours ago, and unless at most 50 rows would go.
+--
 -- Rows cascade from nothing else; Crunchy's partner row and menu are untouched. Only COUNTS are printed
 -- (codes stay out of the public workflow log).
 -- ASSERTED: Crunchy row count <= 50 before; 0 Crunchy rows remain (created before now()); rows of every
@@ -34,12 +38,21 @@ DECLARE
   c_max constant int  := 50;
   v_slug text;
   v_cut  timestamptz := now();
+  v_applied timestamptz;
   v_before int; v_del int; v_after int; v_late int;
   v_oth_n_b int; v_oth_n_a int; v_oth_m_b text; v_oth_m_a text;
 BEGIN
   SELECT slug INTO v_slug FROM public.eatery_partners WHERE id = c_id;
   IF v_slug IS DISTINCT FROM 'crunchy-express' THEN
     RAISE EXCEPTION 'crunchy-express row % not found (slug %). Nothing applied.', c_id, v_slug;
+  END IF;
+
+  SELECT applied_at INTO v_applied FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql';
+  IF v_applied IS NULL THEN
+    RAISE EXCEPTION '20261127 (activation) is not applied: apply it first. Nothing applied.';
+  END IF;
+  IF v_applied >= v_cut OR v_cut - v_applied > interval '24 hours' THEN
+    RAISE EXCEPTION '20261127 was applied at %, cleanup runs at %: must be earlier and within 24 hours. Nothing applied.', v_applied, v_cut;
   END IF;
 
   SELECT count(*) INTO v_before FROM public.eatery_orders WHERE partner_id = c_id AND created_at < v_cut;
@@ -80,7 +93,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261128_eatery_orders_test_cleanup.sql', '93108c267a7028359f4f99e206cc87d6463cead26487353c1f1cf2120d220d43')
+VALUES ('20261128_eatery_orders_test_cleanup.sql', '8ed7845a4e8a36ed6f4f79946aaa2936d4ec8c3d406155306b6e8e232d752586')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

@@ -242,8 +242,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261124_crunchy_express_dish_tags.sql', '67a7c302bde3785acdc644ce626f43bffcc28bb8bc4c6ca722e5aeda3c8472a2'),
   ('20261125_eatery_orders.sql', '8d2b4aec3bea7587556434d8cdcac4bf2cac410be083e1f6c59f1b982e621d5a'),
   ('20261126_crunchy_express_contacts.sql', '15ada4b9bdc977c46256e431c5a90c0e21986c746f27377947512123e6c71aca'),
-  ('20261127_crunchy_express_activate.sql', 'e0b0e425aad001ce58c79ff3b7ad9f0c8e78d1593e5891f0ff182b1116c310e6'),
-  ('20261128_eatery_orders_test_cleanup.sql', '93108c267a7028359f4f99e206cc87d6463cead26487353c1f1cf2120d220d43')
+  ('20261127_crunchy_express_activate.sql', 'e0fcf9b3a823c0a9db3fe75f9cf418d171a9de040aaf4c6f882b337ad3ad3270'),
+  ('20261128_eatery_orders_test_cleanup.sql', '8ed7845a4e8a36ed6f4f79946aaa2936d4ec8c3d406155306b6e8e232d752586')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

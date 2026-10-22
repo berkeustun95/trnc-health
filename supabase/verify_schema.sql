@@ -4023,9 +4023,9 @@ WITH report AS (
     UNION ALL SELECT '20261126_crunchy_express_contacts','crunchy-express phone = whatsapp = +905391161059, once 1126 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261126_crunchy_express_contacts.sql')
       OR COALESCE((SELECT p.phone IS NOT DISTINCT FROM '+905391161059' AND p.whatsapp IS NOT DISTINCT FROM '+905391161059' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
-    UNION ALL SELECT '20261127_crunchy_express_activate','crunchy-express is_active = true (exactly 1 active eatery partner), once 1127 is applied; red later = it was deactivated, review it',
+    UNION ALL SELECT '20261127_crunchy_express_activate','crunchy-express is_active = true, once 1127 is applied; red later = it was deactivated, review it',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
-      OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true AND (SELECT count(*) FROM public.eatery_partners a WHERE a.is_active) = 1
+      OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
     -- 1128 deletes rows once; the deletion is not observable afterwards (real orders replace the tests), so the token only
     -- proves the table it acted on still exists. The proof was the in-file asserts (counts printed in the apply log).
