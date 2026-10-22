@@ -391,7 +391,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
   const storeAddress = async d => {
-    const entry = { kind: d.kind, name: d.name, district: d.district, street: d.street, building: d.building, floor: d.floor, flat: d.flat, directions: d.directions, lat: d.coords?.lat, lng: d.coords?.lng }
+    // An existing entry keeps its own kind / name (a migrated one stays unnamed; 'Adres' above is only the in-flight label).
+    const entry = { ...(d.addressId ? {} : { kind: d.kind, name: d.name }), district: d.district, street: d.street, building: d.building, floor: d.floor, flat: d.flat, directions: d.directions, lat: d.coords?.lat, lng: d.coords?.lng }
     const r = d.addressId ? await updateAddress(d.addressId, entry) : await addAddress(entry)
     if (r.ok) { await setLastUsed(r.item.id); setDelivery(x => (x.addressId ? x : { ...x, addressId: r.item.id })) }
   }

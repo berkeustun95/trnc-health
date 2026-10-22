@@ -189,7 +189,7 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
       } else await Linking.openSettings()
     } catch {}
   }
-  const clear = () => { setLocNote(null); if (delivery.addressId) deleteAddress(delivery.addressId); onDelivery({ street: '', building: '', district: '', coords: null, addressId: null }) }
+  const clear = () => { setLocNote(null); if (delivery.addressId) deleteAddress(delivery.addressId); onDelivery({ addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null }) }
   return (
     <Card>
       <Text style={st.noteLabel} accessibilityRole="header">{t('eateryDeliveryTitle', lang)}</Text>

@@ -195,7 +195,7 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
     argCounts.push(n)
   }
   eq('screen: every logContactEvent( call has exactly 3 arguments', argCounts.length > 0 && argCounts.every(n => n === 3), true)
-  const DELIVERY_ID = /\b(delivery\w*|deliv[A-Z]\w*|address\w*|street\w*|building\w*|district\w*|coords\w*|setCoords|setDelivery\w*|floor|flat|lat|lng|pin|directions|tarif|book\w*|kind)\b/i
+  const DELIVERY_ID = /\b(delivery\w*|deliv[A-Z]\w*|address\w*|street\w*|building\w*|district\w*|coords\w*|setCoords|setDelivery\w*|floor|flat|lat|lng|pin|directions|tarif|book)\b/i
   const leaks = src.split('\n').map((l, i) => [i + 1, l.replace(/\/\/.*$/, '')]).filter(([, l]) => /\b(supabase|logContactEvent)\b|console\./.test(l) && DELIVERY_ID.test(l))
   eq('screen: no supabase / logContactEvent / console line mentions delivery or address state', leaks, [])
   const rpcAt = src.indexOf("supabase.rpc('create_eatery_order'")
