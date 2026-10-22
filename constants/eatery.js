@@ -236,12 +236,12 @@ export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
 
 // ─── Courier phone (optional, per address). Stored as canonical digits "+905331234567" / "+903921234567"; shown (editor and message) as
 // "+90 533 123 45 67" / "+90 392 123 45 67". Only a TRNC-reachable number: a Turkish mobile (5xx) or a TRNC landline (392).
-// Input: "+90 …", "0090 …", "0 …" or bare national digits; spaces, dashes, dots and parentheses are ignored. Never throws.
-export const PHONE_INPUT_MAX = 24
+// Input (Persian / Arabic-Indic digits included): "+90 …", "0090 …", "0 …" or bare national digits; spaces, dashes, dots and parentheses are ignored. Never throws.
+export const PHONE_INPUT_MAX = 32
 export function normalizePhone(input) {
   if (input == null || input === '') return { ok: true, value: null }
   if (typeof input !== 'string') return { ok: false }
-  const raw = input.replace(INVISIBLE, '')
+  const raw = input.replace(INVISIBLE, '').replace(/[\u0660-\u0669\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) & 0xF))   // fa / ar keyboards type their own digits
   if (raw.length > 40) return { ok: false }
   const s = raw.replace(/[\s\u0085\-.()]/g, '')
   if (!s) return { ok: true, value: null }
@@ -361,7 +361,7 @@ export function cardState(e) {
   return Number.isFinite(p.lat) && Number.isFinite(p.lng) ? 'pin' : 'noPin'
 }
 export const canAddMore = n => Number.isFinite(n) && n < ADDRESS_BOOK_MAX
-export const EMPTY_DELIVERY_ADDRESS = { addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null }
+export const EMPTY_DELIVERY_ADDRESS = { addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', callPhone: null, coords: null }
 
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
 // code: the server's order code; its line is the LAST one.

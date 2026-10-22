@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, ActivityIndicator, Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Platform, AccessibilityInfo, ActivityIndicator, Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -65,7 +65,7 @@ function Field({ label, value, onChange, max, reg, onFocusField, onBlurField, er
         autoCapitalize={autoCapitalize} autoCorrect={false} autoComplete="off" importantForAutofill="no" textContentType="none" accessibilityLabel={label} accessibilityHint={hint}
         returnKeyType={next ? 'next' : 'done'} blurOnSubmit={!next} onSubmitEditing={() => next?.input.current?.focus()}
         onFocus={() => onFocusField(reg)} onBlur={() => { onBlurField(reg); onBlurValue?.() }} {...inputProps} />
-      {!!hint && !error && <Text style={s.hint}>{hint}</Text>}
+      {!!hint && !error && <Text style={s.hint} accessible={false} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{hint}</Text>}
       {!!error && <Text style={s.error} accessibilityLiveRegion="polite">{error}</Text>}
     </View>
   )
@@ -216,12 +216,13 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
     const r = normalizePhone(draft.phone)
     if (r.ok) { set({ phone: formatPhone(r.value) }); return }
     setPhoneTried(true)
-    AccessibilityInfo.announceForAccessibility?.(t('eateryAddrPhoneInvalid', lang))
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility?.(t('eateryAddrPhoneInvalid', lang))   // Android's live region on the error Text speaks it
   }
   const errFor = k => (tried && missing.includes(k) ? t('eateryAddrFieldMissing', lang) : null)
   const save = async () => {
     if (saving) return
     const phone = normalizePhone(draft.phone)
+    const phoneShown = phoneTried
     if (!phone.ok) setPhoneTried(true)
     if (missing.length) {
       setTried(true)
@@ -233,7 +234,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
     }
     if (!phone.ok) {
       setSaveErr(null)
-      AccessibilityInfo.announceForAccessibility?.(t('eateryAddrPhoneInvalid', lang))
+      if (Platform.OS === 'ios' || phoneShown) AccessibilityInfo.announceForAccessibility?.(t('eateryAddrPhoneInvalid', lang))   // Android: the live region fires only when the error first appears
       reg.phone.input.current?.focus()
       return
     }
@@ -284,7 +285,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
         ) : (
           <>
             <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content}
-              keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}
               onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y }} scrollEventThrottle={16}>
               <Text style={s.stepTitle} accessibilityRole="header">{t(STEP_TITLE[step], lang)}</Text>
               {step === 1 && (

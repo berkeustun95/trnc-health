@@ -12260,7 +12260,7 @@ const translations = {
     eateryAddrFlat: "Appartement (facultatif)",
     eateryAddrDirections: "Indications (facultatif)",
     eateryAddrDirectionsPlaceholder: "Portail bleu, sonnez deux fois…",
-    eateryAddrPhone: "Téléphone (appelé à la livraison)",
+    eateryAddrPhone: "Téléphone (pour vous joindre à la livraison)",
     eateryAddrPhoneHint: "Laissez vide : le restaurant utilisera votre numéro WhatsApp.",
     eateryAddrPhoneInvalid: "Ce numéro ne semble pas valide.",
     eateryAddrSave: "Enregistrer et utiliser",
