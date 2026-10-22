@@ -949,6 +949,10 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('eatery_orders', 'created_by', true, NULL, 'uuid'),
     ('eatery_orders', 'client_id', false, NULL, 'text'),
     ('eatery_orders', 'created_as_guest', true, 'false', 'boolean'),
+    ('eatery_orders', 'is_test', true, 'false', 'boolean'),
+    ('order_testers', 'user_id', true, NULL, 'uuid'),
+    ('order_testers', 'added_at', true, 'now()', 'timestamp with time zone'),
+    ('order_testers', 'note', false, NULL, 'text'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1292,6 +1296,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('notifications_pkey', '', 'id'),
     ('notifications_type_check', 'admin_alert|admin_message|duty|featured|general|message|question|waitlist', 'type'),
     ('notifications_user_id_fkey', '', 'id|user_id'),
+    ('order_testers_pkey', '', 'user_id'),
     ('pharmacist_scores_facility_id_fkey', '', 'facility_id'),
     ('pharmacist_scores_pkey', '', 'facility_id'),
     ('place_claims_pkey', '', 'id'),

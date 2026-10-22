@@ -49,6 +49,8 @@ WITH report AS (
     ('1115_eatery_partners','eatery_photos'),
     -- WhatsApp order proof (1125): registered ahead of the apply; red until it runs.
     ('20261125_eatery_orders','eatery_orders'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','order_testers'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources'),
     ('1102_duyurular','announcements'),
@@ -226,6 +228,11 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders','created_by'),
     ('20261125_eatery_orders','eatery_orders','client_id'),
     ('20261125_eatery_orders','eatery_orders','created_as_guest'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
+    ('20261132_eatery_orders_is_test','order_testers','user_id'),
+    ('20261132_eatery_orders_is_test','order_testers','added_at'),
+    ('20261132_eatery_orders_is_test','order_testers','note'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -601,7 +608,9 @@ WITH report AS (
     -- WhatsApp order proof (1125): registered ahead of the apply; red until it runs.
     ('20261125_eatery_orders','eatery_order_age_gate'),
     ('20261125_eatery_orders','create_eatery_order'),
-    ('20261125_eatery_orders','verify_eatery_order')
+    ('20261125_eatery_orders','verify_eatery_order'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','is_order_tester')
   ) e(m,o)
 
   UNION ALL
@@ -743,6 +752,8 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_expires_check'),
     ('20261125_eatery_orders','eatery_orders_view_count_check'),
     ('20261125_eatery_orders','eatery_orders_client_id_check'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','order_testers_pkey'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -4050,6 +4061,48 @@ WITH report AS (
                     WHERE p.slug = 'crunchy-express'
                       AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
                         OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
+    -- ── 1132: server-marked TEST orders. Same discipline as the 1125 block: only to_regclass / to_regprocedure / catalogs,
+    --    red until applied, never an error. (1125's body token lost its `created_as_guest AND created_at` half: 1132 owns it.)
+    UNION ALL SELECT '20261132_eatery_orders_is_test','eatery_orders.is_test: boolean NOT NULL DEFAULT false (existing rows were set false by the in-file proof)',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='eatery_orders' AND column_name='is_test'
+          AND data_type='boolean' AND is_nullable='NO' AND column_default='false') = 1
+    UNION ALL SELECT '20261132_eatery_orders_is_test','order_testers: RLS on, 0 policies, no anon/authenticated privilege (table or column), no FK, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.order_testers')), false)
+      AND to_regclass('public.order_testers') IS NOT NULL
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'order_testers') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_any_column_privilege('anon', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,REFERENCES')
+               AND NOT has_any_column_privilege('authenticated', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,REFERENCES')
+               AND has_table_privilege('service_role', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.order_testers') AND c.contype = 'f') = 0
+    UNION ALL SELECT '20261132_eatery_orders_is_test','is_order_tester(uuid): STABLE SECURITY DEFINER, search_path empty, owner postgres, NO EXECUTE for anon/authenticated/PUBLIC, refuses anonymous sessions',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proconfig @> ARRAY['search_path=""'] AND pg_get_userbyid(p.proowner) = 'postgres'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_order_tester(uuid)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                       WHERE p.oid = to_regprocedure('public.is_order_tester(uuid)') AND a.privilege_type = 'EXECUTE'
+                         AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) LIKE '%NOT public.is_anonymous_session()%', false)
+    UNION ALL SELECT '20261132_eatery_orders_is_test','create_eatery_order body: is_test derived server-side (previewer OR tester), partner cap excludes tests, per-user count counts ALL, INSERT stores is_test; still 3 arguments, none named *test*',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_test := public.is_previewer() OR public.is_order_tester(v_uid);%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND NOT is_test AND created_at > now()%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%WHERE created_by = v_uid AND created_at > now() - interval ''1 hour'';%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) NOT LIKE '%created_by = v_uid AND NOT is_test%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%client_id, created_as_guest, is_test)%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%p_client_id, v_guest, v_test)%', false)
+      AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id']::text[] FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
+    UNION ALL SELECT '20261132_eatery_orders_is_test','verify_eatery_order body returns the is_test key (and still no created_by / client_id)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) LIKE '%''is_test'',                v_o.is_test%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%', false)
+    UNION ALL SELECT '20261132_eatery_orders_is_test','COMMENTs: create / verify / is_order_tester / order_testers / eatery_orders.is_test all carry the 20261132 text',
+      COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%NOT test orders%' AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%20261132.', false)
+      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%is_test%' AND obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%20261132.', false)
+      AND COALESCE(obj_description(to_regprocedure('public.is_order_tester(uuid)'), 'pg_proc') LIKE '%20261132.', false)
+      AND COALESCE(obj_description(to_regclass('public.order_testers'), 'pg_class') LIKE '%20261132.', false)
+      AND COALESCE(col_description(to_regclass('public.eatery_orders'), (SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_orders') AND a.attname = 'is_test' AND NOT a.attisdropped)) LIKE '%20261132.', false)
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',
@@ -4108,7 +4161,7 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%m.price IS NOT NULL%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_user_n >= 5%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_guest AND v_part_n >= 60%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND created_at > now()%'
+           -- RETIRED half (1132 owns the partner-count shape `created_as_guest AND NOT is_test AND created_at > now()`; see its body token)
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_partner.adult_only%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%eatery_order_age_gate(v_dob%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%MESSAGE = ''adult_only''%'
@@ -5031,7 +5084,7 @@ FROM (VALUES
   -- timeout (the run takes ~12 s; the 5 s default logged every run as a timeout).
   ('1106_sync_novest_cron_timeout','sync-novest-morning'),
   ('1106_sync_novest_cron_timeout','sync-novest-evening'),
-  -- 30-day retention on eatery_orders (order proof). 03:40 UTC, after the other purges.
+  -- Retention on eatery_orders (order proof): since 20261132 hourly at :40 (30 days real, 24 h TEST); schedule + command are the 1132 row below.
   ('20261125_eatery_orders','eatery-orders-retention')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
@@ -5056,6 +5109,16 @@ SELECT '1052_purge_status_reporter', 'app_update_events_purge_status: reports ON
          WHEN position('purge-app-update-events' in pg_get_functiondef(to_regprocedure('public.app_update_events_purge_status()'))) = 0
            THEN 'NAMES NO JOB ← FIX'
          ELSE 'OK' END
+
+UNION ALL
+-- ─── 1132: eatery-orders-retention is hourly at :40 and deletes real orders after 30 days, TEST orders after 24 hours ───
+SELECT '20261132_eatery_orders_is_test', 'eatery-orders-retention: schedule 40 * * * * and the exact 30-day / 24-hour delete command',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'eatery-orders-retention') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'eatery-orders-retention' AND active
+                    AND schedule = '40 * * * *'
+                    AND btrim(command) = 'DELETE FROM public.eatery_orders WHERE created_at < now() - interval ''30 days'' OR (is_test AND created_at < now() - interval ''24 hours'')') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 ORDER BY status ASC, migration;
 
 
