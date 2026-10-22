@@ -231,24 +231,50 @@ export const ADDRESS_FIELD_MAX = 100
 // Invisible / direction-control characters, and all whitespace (newlines included) collapsed to single spaces: free text
 // the customer types (address fields, note) can never forge a line of the message or hide inside an empty-looking field.
 const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF]/g
-const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
+export const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
 export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
 export function mapsLink(lat, lng) {
   const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
   if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return ''
   return `https://maps.google.com/?q=${la.toFixed(5)},${ln.toFixed(5)}`
 }
-const addressParts = (d) => [d?.street, d?.building, d?.district].map(sanitizeAddressField)
+
+// ─── Address book entries (utils/eateryAddressCore.js stores them; the pin is optional) ───
+export const ADDRESS_BOOK_MAX = 10
+export const ADDRESS_NAME_MAX = 30
+export const ADDRESS_UNIT_MAX = 10          // floor / flat
+export const ADDRESS_DIRECTIONS_MAX = 140
+export const ADDRESS_KINDS = ['home', 'work', 'other']
+export const addressKind = k => (ADDRESS_KINDS.includes(k) ? k : 'other')
+// Home and work carry an implicit name; only 'other' needs the customer's own. Floor, flat, directions and pin are optional.
+export function addressComplete(e) {
+  if (!e || typeof e !== 'object') return false
+  const need = [e.district, e.street, e.building]
+  if (addressKind(e.kind) === 'other') need.push(oneLine(e.name, ADDRESS_NAME_MAX))
+  return need.every(v => sanitizeAddressField(v))
+}
 export function deliveryReady(delivery) {
   if (delivery?.mode === 'pickup') return true
-  return delivery?.mode === 'delivery' && addressParts(delivery).every(Boolean)
+  return delivery?.mode === 'delivery' && addressComplete(delivery)
 }
+const KIND_LABEL = { home: 'Ev', work: 'İş' }
+// ONE line, always Turkish: "<name>: <sokak> No <bina>, Kat <kat>, Daire <daire>, <mahalle> · Tarif: … · Konum (haritada aç): <link>".
 export function deliveryLine(delivery) {
   if (!deliveryReady(delivery)) return ''
   if (delivery.mode === 'pickup') return 'Teslimat: Gel-al'
-  const link = mapsLink(delivery.coords?.lat, delivery.coords?.lng)
-  return `Teslimat: Adrese teslim — ${addressParts(delivery).join(', ')}${link ? ` · Konum: ${link}` : ''}`
+  const kind = addressKind(delivery.kind)
+  const name = KIND_LABEL[kind] || oneLine(delivery.name, ADDRESS_NAME_MAX)
+  const f = sanitizeAddressField
+  const floor = oneLine(delivery.floor, ADDRESS_UNIT_MAX), flat = oneLine(delivery.flat, ADDRESS_UNIT_MAX)
+  const addr = [`${f(delivery.street)} No ${f(delivery.building)}`, floor && `Kat ${floor}`, flat && `Daire ${flat}`, f(delivery.district)].filter(Boolean).join(', ')
+  const directions = oneLine(delivery.directions, ADDRESS_DIRECTIONS_MAX)
+  const pin = delivery.coords || delivery
+  const link = mapsLink(pin?.lat, pin?.lng)
+  return ['Teslimat: Adrese teslim — ' + (name ? `${name}: ` : '') + addr, directions && `Tarif: ${directions}`, link && `Konum (haritada aç): ${link}`].filter(Boolean).join(' · ')
 }
+
+// The address editor's Back: step 3 -> 2 -> 1 -> closed (the editor is the first layer in the back chain, then the basket).
+export const editorBack = step => (step === 3 ? 2 : step === 2 ? 1 : 'closed')
 
 // lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
 // code: the server's order code; its line is the LAST one.

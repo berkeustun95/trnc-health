@@ -15,7 +15,7 @@ import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUr
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
 import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
-import { loadAddress, saveAddress } from '../utils/eateryAddress'
+import { loadBook, addAddress, updateAddress, setLastUsed } from '../utils/eateryAddress'
 import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains } from '../constants/eateryQuiz'
@@ -229,12 +229,18 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [focusReq, setFocusReq] = useState(null)   // { id, n }: a dish picked on the quiz results; n lets the same dish be picked twice
   const focusId = focusReq ? focusReq.id : focusItemId
   const [note, setNote] = useState('')
-  // Teslimat: mode is null until chosen (required). Address fields prefill from this phone; coords live for one order.
-  const [delivery, setDelivery] = useState({ mode: null, street: '', building: '', district: '', coords: null })
+  // Teslimat: mode is null until chosen (required). Prefilled from the last used address in this phone's address book
+  // (until the book UI lands the three-field form edits that one entry); coords = its optional map pin.
+  const [delivery, setDelivery] = useState({ mode: null, addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', coords: null })
   const onDelivery = useCallback(patch => { setOrderError(null); setDelivery(d => ({ ...d, ...patch })) }, [])
   useEffect(() => {
     let live = true
-    loadAddress().then(a => { if (live && a) setDelivery(d => (d.street || d.building || d.district ? d : { ...d, ...a })) })
+    loadBook().then(book => {
+      const a = book.items.find(i => i.id === book.lastUsedId)
+      if (!live || !a) return
+      const { lat, lng, id, updatedAt, ...fields } = a
+      setDelivery(d => (d.street || d.building || d.district ? d : { ...d, ...fields, addressId: id, name: a.kind === 'other' && !a.name ? 'Adres' : a.name, coords: lat != null ? { lat, lng } : null }))
+    })
     return () => { live = false }
   }, [])
   const noteRef = useRef('')
@@ -384,6 +390,11 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [orderError, setOrderError] = useState(null)   // null | 'generic' | 'rate' | 'account' | 'prices' | 'items'
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
+  const storeAddress = async d => {
+    const entry = { kind: d.kind, name: d.name, district: d.district, street: d.street, building: d.building, floor: d.floor, flat: d.flat, directions: d.directions, lat: d.coords?.lat, lng: d.coords?.lng }
+    const r = d.addressId ? await updateAddress(d.addressId, entry) : await addAddress(entry)
+    if (r.ok) { await setLastUsed(r.item.id); setDelivery(x => (x.addressId ? x : { ...x, addressId: r.item.id })) }
+  }
   const sendOrder = async () => {
     if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery)) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
@@ -406,9 +417,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     }
     armedRef.current = { left: false }
     setBasketOpen(false)
-    if (delivery.mode === 'delivery') saveAddress(delivery)
+    if (delivery.mode === 'delivery') storeAddress(delivery)
     const text = buildOrderMessage(serverOrderLines(res), note, res.code, delivery)
-    setDelivery(d => ({ ...d, mode: null, coords: null }))
+    setDelivery(d => ({ ...d, mode: null }))
     go('order_whatsapp', orderWhatsAppUrl(orderDigits, text), () => { armedRef.current = null })
   }
   const openBasket = () => { armedRef.current = null; setOrderError(null); setBasketShown(true); setBasketOpen(true) }

@@ -8,7 +8,7 @@ import { ORDER_NOTE_MAX, ADDRESS_FIELD_MAX, deliveryReady, withTimeout, locateOu
 import { REDESIGN } from '../constants/redesign'
 import { requestWithPrimer } from '../utils/permissionPrimer'
 import { askedFix } from '../utils/locationServices'
-import { clearAddress } from '../utils/eateryAddress'
+import { deleteAddress } from '../utils/eateryAddress'
 import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
@@ -189,7 +189,7 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
       } else await Linking.openSettings()
     } catch {}
   }
-  const clear = () => { setLocNote(null); clearAddress(); onDelivery({ street: '', building: '', district: '', coords: null }) }
+  const clear = () => { setLocNote(null); if (delivery.addressId) deleteAddress(delivery.addressId); onDelivery({ street: '', building: '', district: '', coords: null, addressId: null }) }
   return (
     <Card>
       <Text style={st.noteLabel} accessibilityRole="header">{t('eateryDeliveryTitle', lang)}</Text>
