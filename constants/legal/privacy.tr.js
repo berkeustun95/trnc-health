@@ -12,7 +12,7 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-10-22
+export default `Sürüm: 2026-10-23
 Son güncelleme: 22 Ekim 2026
 
 KİM OLDUĞUMUZ

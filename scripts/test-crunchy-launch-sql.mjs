@@ -9,7 +9,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const M = (f) => fileURLToPath(new URL('../supabase/migrations/' + f, import.meta.url))
 const ACT = M('20261127_crunchy_express_activate.sql'), CLN = M('20261128_eatery_orders_test_cleanup.sql')
-const LIVE = M('20261130_crunchy_livecheck_orders_cleanup.sql')
+const LIVE = M('20261130_crunchy_livecheck_orders_cleanup.sql'), LIVE2 = M('20261131_crunchy_livecheck_orders_cleanup_2.sql')
 const PRIOR = readFileSync(M('20261115_eatery_partners.sql'), 'utf8')
 const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners')
 const b = PRIOR.indexOf('-- ─── Storage bucket')
@@ -136,5 +136,34 @@ for (const [name, setup] of [
   t(`${name}: refused`, [r.ok, (r.msg || '').includes('expected exactly the 2 live-check orders')], [false, true]); console.log(`      ${r.msg}`)
   await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
   t(`${name}: nothing deleted`, (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n, before)
+}
+console.log('20261131 test-order cleanup 2 (Crunchy is live: real orders sit next to the targets)')
+// left(md5(id),6) = 508028 / 9397de, the probe's fingerprints.
+const GA = 'aed49a53-1b41-4895-a6ac-52942c3201a9', GB = '27d18ec9-ae24-4ad5-bdc4-4c0efd22d66b'
+const A_AT = '2026-10-22 14:45:10+00', B_AT = '2026-10-22 16:15:30+00'
+const REAL = LO('55555555-5555-4555-8555-555555555555', 'REAL0001', { at: '2026-10-22 14:45:20+00' })   // identical order, same minute, other fp
+const BASE2 = LO(GA, 'AAAA1111', { at: A_AT }) + LO(GB, 'BBBB2222', { at: B_AT }) + REAL + ORD(2, 'O')
+{
+  const d = await live(BASE2)
+  t('fixture fingerprints (1131)', await q(d, `SELECT left(md5(id::text),6) fp FROM public.eatery_orders WHERE id IN ('${GA}','${GB}') ORDER BY 1`), [{ fp: '508028' }, { fp: '9397de' }])
+  const r = await applyFile(d, LIVE2)
+  t('baseline: both test orders deleted', r, { ok: true, msg: null })
+  t('the real identical order in the same minute survives, others too', await q(d, `SELECT (SELECT count(*)::int FROM public.eatery_orders WHERE code='REAL0001') real, (SELECT count(*)::int FROM public.eatery_orders) n`), [{ real: 1, n: 3 }])
+  t('re-run refused (0 match)', (await applyFile(d, LIVE2)).ok, false)
+}
+for (const [name, setup] of [
+  ['B missing', LO(GA, 'AAAA1111', { at: A_AT }) + REAL],
+  ['B different total', LO(GA, 'AAAA1111', { at: A_AT }) + LO(GB, 'BBBB2222', { at: B_AT, total: 1240.00 })],
+  ['B signed-in', LO(GA, 'AAAA1111', { at: A_AT }) + LO(GB, 'BBBB2222', { at: B_AT, guest: false })],
+  ['B outside its minute', LO(GA, 'AAAA1111', { at: A_AT }) + LO(GB, 'BBBB2222', { at: '2026-10-22 16:17:00+00' })],
+  ['B different item', LO(GA, 'AAAA1111', { at: A_AT }) + LO(GB, 'BBBB2222', { at: B_AT, lines: `'[{"name":"Kids Box","qty":1,"unit_price":620.00}]'` })],
+  ['B at another partner', LO(GA, 'AAAA1111', { at: A_AT }) + LO(GB, 'BBBB2222', { at: B_AT, partner: OID })],
+]) {
+  const d = await live(setup)
+  const before = (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n
+  const r = await applyFile(d, LIVE2)
+  t(`1131 ${name}: refused`, [r.ok, (r.msg || '').includes('expected exactly the 2 confirmed test orders')], [false, true]); console.log(`      ${r.msg}`)
+  await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  t(`1131 ${name}: nothing deleted`, (await q(d, `SELECT count(*)::int n FROM public.eatery_orders`))[0].n, before)
 }
 console.log(bad ? `\n${bad} FAILED` : '\nall passed'); process.exit(bad ? 1 : 0)

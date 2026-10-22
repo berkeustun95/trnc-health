@@ -60,7 +60,11 @@ import TERMS_TR   from './terms.tr.js'
 // (no name, phone or note), the abuse limit, the verification link anyone with it can open, WhatsApp
 // as the carrier, and the 30-day deletion. Terms unchanged; the pair moves together. Raises the
 // in-app notice once; re-asks nobody (STUDENT_HUB_TERMS_MIN is a fixed floor, not this value).
-export const LEGAL_VERSION = '2026-10-22'
+// Bumped 2026-10-22 -> 2026-10-23 (published the evening of 2026-10-22; Berke chose the next date over a suffix
+// because check-legal-live reads "Version YYYY-MM-DD" strictly): delivery choice in Sepetim — address, choice and
+// optional location go only into the WhatsApp message, the last address is kept in the app on the phone. Also
+// replaces the policy-updated notice text, which still described the 2026-10-08 change. Terms unchanged.
+export const LEGAL_VERSION = '2026-10-23'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue

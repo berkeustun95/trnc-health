@@ -4043,6 +4043,13 @@ WITH report AS (
       OR NOT EXISTS(SELECT 1 FROM public.eatery_orders o JOIN public.eatery_partners p ON p.id = o.partner_id
                     WHERE p.slug = 'crunchy-express' AND o.created_at >= timestamptz '2026-10-22 13:22:00+00'
                       AND o.created_at < timestamptz '2026-10-22 13:36:00+00' AND left(md5(o.id::text), 6) IN ('113d9d', 'bda529'))
+    -- 1131 deleted Berke's two evening test orders (fp 508028 @14:45 UTC, 9397de @16:15 UTC); observable for good.
+    UNION ALL SELECT '20261131_crunchy_livecheck_orders_cleanup_2','no Crunchy order with fp 508028 (14:44:40–14:45:40 UTC) or 9397de (16:15–16:16 UTC) on 2026-10-22, once 1131 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261131_crunchy_livecheck_orders_cleanup_2.sql')
+      OR NOT EXISTS(SELECT 1 FROM public.eatery_orders o JOIN public.eatery_partners p ON p.id = o.partner_id
+                    WHERE p.slug = 'crunchy-express'
+                      AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
+                        OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',
