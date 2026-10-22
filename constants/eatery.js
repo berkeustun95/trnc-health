@@ -229,7 +229,7 @@ export const orderRpcArgs = (partnerId, lines) => ({ p_partner: partnerId, p_ite
 // ─── Delivery choice (Sepetim) ───
 export const ADDRESS_FIELD_MAX = 100
 // All whitespace (newlines included) collapses to single spaces, so an address can never forge a line of the message.
-export const sanitizeAddressField = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, ADDRESS_FIELD_MAX).trim() : '')
+export const sanitizeAddressField = (v) => (typeof v === 'string' ? v.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').replace(/\s+/g, ' ').trim().slice(0, ADDRESS_FIELD_MAX).trim() : '')
 export function mapsLink(lat, lng) {
   const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
   if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return ''

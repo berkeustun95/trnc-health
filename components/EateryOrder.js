@@ -121,14 +121,14 @@ const FIELDS = [['street', 'eateryDeliveryStreet'], ['building', 'eateryDelivery
 function DeliveryOption({ checked, label, onPress }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [st.opt, checked && st.optOn, pressed && { opacity: press.small }]}
-      accessibilityRole="radio" accessibilityState={{ checked }} accessibilityLabel={label}>
+      accessibilityRole="radio" accessibilityState={{ checked }}>
       <Ionicons name={checked ? 'radio-button-on' : 'radio-button-off'} size={22} color={checked ? colors.primaryDark : colors.textSecondary} />
       <Text style={[st.optText, checked && st.optTextOn]}>{label}</Text>
     </Pressable>
   )
 }
 
-function DeliveryCard({ lang, open, delivery, onDelivery, inputs, onFocusInput, onBlurInput }) {
+function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocusInput, onBlurInput }) {
   const [locating, setLocating] = useState(false)
   const [locFail, setLocFail] = useState(false)
   const alive = useRef(true)
@@ -153,8 +153,13 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, onFocusInput, 
     setLocating(false)
     if (!openRef.current || modeRef.current !== 'delivery') return
     const c = fix?.coords
-    if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) onDelivery({ coords: { lat: c.latitude, lng: c.longitude } })
-    else setLocFail(true)
+    if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+      onDelivery({ coords: { lat: c.latitude, lng: c.longitude } })
+      AccessibilityInfo.announceForAccessibility?.(t('eateryDeliveryLocated', lang))
+    } else {
+      setLocFail(true)
+      AccessibilityInfo.announceForAccessibility?.(t('eateryDeliveryLocFail', lang))
+    }
   }
   const clear = () => { setLocFail(false); clearAddress(); onDelivery({ street: '', building: '', district: '', coords: null }) }
   return (
@@ -167,26 +172,32 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, onFocusInput, 
       {isHome && (
         <View style={st.addr}>
           {FIELDS.map(([f, key], i) => (
-            <View key={f}>
+            <View key={f} ref={wraps[f]} collapsable={false}>
               <Text style={st.fieldLabel}>{t(key, lang)}</Text>
               <TextInput ref={inputs[f]} style={st.field} value={delivery[f]} onChangeText={v => onDelivery({ [f]: v })} maxLength={ADDRESS_FIELD_MAX}
-                autoCapitalize="words" autoCorrect={false} textContentType="none" accessibilityLabel={t(key, lang)}
+                autoCapitalize="words" autoCorrect={false} autoComplete="off" importantForAutofill="no" textContentType="none" accessibilityLabel={t(key, lang)}
                 returnKeyType={i < FIELDS.length - 1 ? 'next' : 'done'} blurOnSubmit={i === FIELDS.length - 1}
                 onSubmitEditing={() => { if (i < FIELDS.length - 1) inputs[FIELDS[i + 1][0]].current?.focus() }}
-                onFocus={() => onFocusInput(inputs[f])} onBlur={() => onBlurInput(inputs[f])} />
+                onFocus={() => onFocusInput(inputs[f], wraps[f])} onBlur={() => onBlurInput(inputs[f])} />
             </View>
           ))}
           {delivery.coords ? (
             <View style={st.locRow}>
               <Ionicons name="location" size={18} color={colors.primaryDark} />
               <Text style={st.locText}>{t('eateryDeliveryLocated', lang)}</Text>
-              <Button variant="text" title={t('eateryDeliveryLocRemove', lang)} onPress={() => onDelivery({ coords: null })} />
+              <Button variant="text" title={t('eateryDeliveryLocRemove', lang)} onPress={() => onDelivery({ coords: null })}
+                accessibilityLabel={t('eateryDeliveryLocRemoveA11y', lang)} />
             </View>
           ) : (
             <Button variant="secondary" fullWidth icon="locate-outline" title={t('eateryDeliveryLocate', lang)} loading={locating}
               loadingTitle={t('eateryDeliveryLocating', lang)} onPress={addLocation} />
           )}
-          {locFail && !delivery.coords && <Text style={st.hint} accessibilityLiveRegion="polite">{t('eateryDeliveryLocFail', lang)}</Text>}
+          {!delivery.coords && (locFail ? (
+            <View style={st.locFail} accessibilityLiveRegion="polite">
+              <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={st.locFailIcon} />
+              <Text style={st.locFailText}>{t('eateryDeliveryLocFail', lang)}</Text>
+            </View>
+          ) : <Text style={st.locNote}>{t('eateryDeliveryLocateNote', lang)}</Text>)}
           <Text style={st.hint}>{t('eateryDeliveryPrivacy', lang)}</Text>
           {hasAny && <Button variant="text" icon="trash-outline" title={t('eateryDeliveryClear', lang)} onPress={clear} style={st.clear} />}
         </View>
@@ -206,6 +217,8 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   const rootRef = useRef(null)
   const noteInput = useRef(null)
   const addrInputs = useRef({ street: { current: null }, building: { current: null }, district: { current: null } }).current
+  const addrWraps = useRef({ street: { current: null }, building: { current: null }, district: { current: null } }).current
+  const focusedWrap = useRef(null)   // the address field's label + input wrapper, measured so the label is revealed too
   const focused = useRef(null)   // the input the keyboard is for (note or an address field)
   const scrollY = useRef(0)
   const hadKb = useRef(false)
@@ -214,7 +227,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     if (kbTop == null && hadKb.current) { focused.current?.current?.blur(); noteInput.current?.blur() }
     hadKb.current = kbTop != null
   }, [kbTop])
-  const onFocusInput = useCallback(ref => { focused.current = ref }, [])
+  const onFocusInput = useCallback((ref, wrap) => { focused.current = ref; focusedWrap.current = wrap || null }, [])
   const onBlurInput = useCallback(ref => { if (focused.current === ref) focused.current = null }, [])
   const [lift, setLift] = useState(0)
   const measureFooter = useCallback(() => {
@@ -245,7 +258,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     if (!ref?.current || !sv) return
     if (ref === noteInput) { sv.scrollToEnd({ animated: !reduce }); return }
     if (!footer) return
-    sv.measureInWindow((_sx, sy) => footer.measureInWindow((_fx, fy) => ref.current?.measureInWindow((_x, y, _w, h) => {
+    sv.measureInWindow((_sx, sy) => footer.measureInWindow((_fx, fy) => (focusedWrap.current?.current || ref.current)?.measureInWindow((_x, y, _w, h) => {
       const bottom = y + h + space[16], top = y - space[16]
       if (bottom > fy) sv.scrollTo({ y: Math.max(0, scrollY.current + (bottom - fy)), animated: !reduce })
       else if (top < sy) sv.scrollTo({ y: Math.max(0, scrollY.current - (sy - top)), animated: !reduce })
@@ -256,7 +269,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     const ids = [setTimeout(reveal, 60), setTimeout(reveal, 320)]   // again once the footer lift has settled
     return () => ids.forEach(clearTimeout)
   }, [kbTop, reveal])
-  const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
+  const focusReveal = useCallback((ref, wrap) => { onFocusInput(ref, wrap); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
   const msgKey = ageGate ? 'eateryOrderAdultOnly' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && ['generic', 'rate', 'account'].includes(orderError) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
@@ -294,7 +307,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
                 ))}
               </Card>
               <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              <DeliveryCard lang={lang} open={open} delivery={delivery} onDelivery={onDelivery} inputs={addrInputs} onFocusInput={focusReveal} onBlurInput={onBlurInput} />
+              <DeliveryCard lang={lang} open={open} delivery={delivery} onDelivery={onDelivery} inputs={addrInputs} wraps={addrWraps} onFocusInput={focusReveal} onBlurInput={onBlurInput} />
               <Card>
                 <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
                 <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
@@ -314,7 +327,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
             {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
-              disabled={!ready} disabledHint={!orderError && deliveryKey ? t(deliveryKey, lang) : undefined} />}
+              disabled={!ready} disabledHint={!orderError && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
             <View accessibilityLiveRegion="polite">
               {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
             </View>
@@ -360,7 +373,7 @@ const st = StyleSheet.create({
   errInfo:   { color: colors.textPrimary },
   errBtn:    { marginTop: space[8] },
   opts:      { gap: space[8] },
-  opt:       { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingHorizontal: space[12], paddingVertical: space[8], borderRadius: radii.md, borderWidth: 1.5, borderColor: colors.fieldBorder, backgroundColor: 'transparent' },
+  opt:       { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingHorizontal: space[12], paddingVertical: space[8], borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: 'transparent' },
   optOn:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   optText:   { flex: 1, ...type.body, color: colors.textPrimary },
   optTextOn: { fontFamily: font.semibold, color: colors.primaryDark },
@@ -369,6 +382,10 @@ const st = StyleSheet.create({
   field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   locRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
   locText:   { flex: 1, ...type.body, color: colors.textPrimary },
+  locFail:   { flexDirection: 'row', alignItems: 'flex-start', gap: space[8] },
+  locFailIcon:{ marginTop: 2 },
+  locFailText:{ flex: 1, ...type.small, color: colors.textPrimary },
+  locNote:   { ...type.small, color: colors.textSecondary },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },

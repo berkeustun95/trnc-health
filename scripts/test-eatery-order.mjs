@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
+import { sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind } from '../constants/eatery.js'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -206,10 +206,16 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
     eq('eateryAddress.js has no console / network call', /console\.|fetch\(|supabase/.test(a), false)
   }
 
+  const orderUrl = new URL('../components/EateryOrder.js', import.meta.url)
+  const o = fs.readFileSync(orderUrl, 'utf8').split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
+  eq('EateryOrder.js has no supabase / logContactEvent / console / fetch', (o.match(/\bsupabase\b|\blogContactEvent\b|console\.|fetch\(/g) || []), [])
+
   const D = { mode: 'delivery', street: STREET, building: 'Daire 3', district: 'Karakol' }
   eq('mapsLink 5 decimals', mapsLink(35.123456789, 33.9), 'https://maps.google.com/?q=35.12346,33.90000')
   eq('mapsLink rounds', mapsLink(35.000005, -33.000004), 'https://maps.google.com/?q=35.00001,-33.00000')
   eq('mapsLink invalid -> empty', [mapsLink(NaN, 1), mapsLink(1, Infinity), mapsLink(91, 0), mapsLink(0, 181), mapsLink(null, 1), mapsLink('35', '33'), mapsLink(undefined, undefined)], ['', '', '', '', '', '', ''])
+  eq('sanitizeAddressField strips invisible direction / zero-width chars', sanitizeAddressField('\u202Egnirts\u200B  \u2066x\u2069\uFEFF\u200F y\u202A '), 'gnirts x y')
+  eq('sanitizeAddressField: a field of only invisible chars is empty -> not ready', deliveryReady({ mode: 'delivery', street: '\u200B\u202E', building: 'a', district: 'b' }), false)
   eq('deliveryReady truth table', [
     deliveryReady({ mode: 'pickup' }), deliveryReady(D), deliveryReady({ ...D, street: '  ' }), deliveryReady({ ...D, building: '\n' }), deliveryReady({ ...D, district: '' }),
     deliveryReady({ mode: 'delivery' }), deliveryReady({ ...D, mode: 'other' }), deliveryReady(null), deliveryReady(undefined), deliveryReady({}),
