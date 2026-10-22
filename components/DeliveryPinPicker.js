@@ -7,18 +7,22 @@ import { t } from '../constants/i18n'
 import { searchAreasTop } from '../constants/deliveryAreas'
 import { MAP_PROVIDER } from '../utils/googleMap'
 import { useLocate } from '../utils/deliveryLocate'
-import { colors, type, radii, space, elevation, press, TAP } from '../constants/theme'
+import { colors, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
+import useKeyboardTop from '../utils/useKeyboardTop'
 import { Button } from './ui'
 
 // Step 2's map: the pin stays in the middle and the MAP moves under it (no draggable marker, which is fiddly with a thumb); the
 // coordinate is whatever is under the pin when the map stops. The search box only knows the bundled area list: on this phone, no
 // network, no geocoder. Base-map POIs stay on here (unlike the check-in maps): there is no Places content on this map.
+// The map has its own flex:1 frame and the buttons sit BELOW it, so the provider's attribution (Google logo / Apple Legal) is never
+// covered and the pin centres on the visible map. While the keyboard is open the button bar is hidden (the map is not squeezed on Android).
 // Defined outside the editor so it never remounts. start: { lat, lng, delta }. onUse({ lat, lng }) = "Bu konumu kullan".
 const PIN_H = 44
 const AREA_DELTA = 0.01
 
 export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
   const insets = useSafeAreaInsets()
+  const kbTop = useKeyboardTop()
   const mapRef = useRef(null)
   const centre = useRef({ lat: start.lat, lng: start.lng })
   const [query, setQuery] = useState('')
@@ -27,7 +31,7 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
 
   const goTo = (lat, lng, delta) => {
     centre.current = { lat, lng }
-    mapRef.current?.animateToRegion({ latitude: lat, longitude: lng, latitudeDelta: delta, longitudeDelta: delta }, reduce ? 0 : 400)
+    mapRef.current?.animateToRegion({ latitude: lat, longitude: lng, latitudeDelta: delta, longitudeDelta: delta }, reduce ? 0 : motion.base)
   }
   const pickArea = a => { setQuery(''); Keyboard.dismiss(); goTo(a.lat, a.lng, AREA_DELTA) }
   const goMe = async () => {
@@ -37,6 +41,7 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
   }
   return (
     <View style={s.root}>
+      <View style={s.mapWrap}>
       <View style={StyleSheet.absoluteFill} accessible accessibilityLabel={t('eateryPinMapA11y', lang)}>
         <MapView ref={mapRef} style={StyleSheet.absoluteFill} provider={MAP_PROVIDER}
           initialRegion={{ latitude: start.lat, longitude: start.lng, latitudeDelta: start.delta, longitudeDelta: start.delta }}
@@ -77,7 +82,8 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
           </View>
         )}
       </View>
-      <View style={[s.bottom, { paddingBottom: insets.bottom + space[12] }]}>
+      </View>
+      {kbTop == null && <View style={[s.bottom, { paddingBottom: insets.bottom + space[12] }]}>
         {!!note && (
           <View style={s.fail} accessibilityLiveRegion="polite">
             <Text style={s.failText}>{t(note.msgKey, lang)}</Text>
@@ -87,13 +93,14 @@ export default function DeliveryPinPicker({ lang, start, reduce, onUse }) {
         <Button variant="secondary" fullWidth icon="locate-outline" title={t('eateryPinGoMe', lang)} loading={locating}
           loadingTitle={t('eateryDeliveryLocating', lang)} onPress={goMe} />
         <Button fullWidth icon="checkmark" title={t('eateryPinUse', lang)} onPress={() => onUse(centre.current)} />
-      </View>
+      </View>}
     </View>
   )
 }
 
 const s = StyleSheet.create({
   root:     { flex: 1, backgroundColor: colors.canvas },
+  mapWrap:  { flex: 1, overflow: 'hidden' },
   // The pin's tip (not its middle) sits on the centre of the map: lift the icon by its own height.
   pinWrap:  { alignItems: 'center', justifyContent: 'center' },
   pin:      { marginBottom: PIN_H },
@@ -108,7 +115,7 @@ const s = StyleSheet.create({
   row:      { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[8], paddingHorizontal: space[12] },
   rowText:  { flex: 1, ...type.body, color: colors.textPrimary },
   none:     { ...type.small, color: colors.textSecondary, padding: space[12] },
-  bottom:   { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },
+  bottom:   { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },
   fail:     { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
   failText: { flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
 })

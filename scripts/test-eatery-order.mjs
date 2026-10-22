@@ -195,24 +195,26 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
     argCounts.push(n)
   }
   eq('screen: every logContactEvent( call has exactly 3 arguments', argCounts.length > 0 && argCounts.every(n => n === 3), true)
+  // Whole-line and block comments only: a `//` inside a string ('https://…') is code, and cutting there would hide a call behind it.
+  const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' ')).replace(/^\s*\/\/.*$/gm, '')
   const DELIVERY_ID = /\b(delivery\w*|deliv[A-Z]\w*|address\w*|street\w*|building\w*|district\w*|coords\w*|setCoords|setDelivery\w*|floor|flat|lat|lng|pin|directions|tarif|book)\b/i
-  const leaks = src.split('\n').map((l, i) => [i + 1, l.replace(/\/\/.*$/, '')]).filter(([, l]) => /\b(supabase|logContactEvent)\b|console\./.test(l) && DELIVERY_ID.test(l))
+  const leaks = stripComments(src).split('\n').map((l, i) => [i + 1, l]).filter(([, l]) => /\b(supabase|logContactEvent)\b|console\./.test(l) && DELIVERY_ID.test(l))
   eq('screen: no supabase / logContactEvent / console line mentions delivery or address state', leaks, [])
   const rpcAt = src.indexOf("supabase.rpc('create_eatery_order'")
   const stmt = src.slice(rpcAt, src.indexOf('\n', rpcAt))
   eq('screen: the rpc statement mentions no delivery state', DELIVERY_ID.test(stmt), false)
-  // every delivery / address file: no supabase, logContactEvent, console or network 
+  // every delivery / address file: no supabase, logContactEvent, console or network call
   for (const f of ['utils/eateryAddress.js', 'utils/eateryAddressCore.js', 'constants/deliveryAreas.js', 'components/DeliveryPinPicker.js', 'components/AddressEditor.js', 'components/AddressBookSheet.js', 'utils/deliveryLocate.js', 'utils/useKeyboardTop.js']) {
     const url = new URL('../' + f, import.meta.url)
     eq(`${f} exists (a renamed file must not slip out of the leak guard)`, fs.existsSync(url), true)
     if (!fs.existsSync(url)) continue
-    const a = fs.readFileSync(url, 'utf8').replace(/\/\/.*$/gm, '')
+    const a = stripComments(fs.readFileSync(url, 'utf8'))
     eq(`${f} imports no supabase / logContactEvent`, /import[^\n]*(supabase|logContactEvent)|require\([^)]*(supabase|logContactEvent)/.test(a), false)
     eq(`${f} has no console / network call`, /console\.|fetch\(|supabase|logContactEvent/.test(a), false)
   }
 
   const orderUrl = new URL('../components/EateryOrder.js', import.meta.url)
-  const o = fs.readFileSync(orderUrl, 'utf8').split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
+  const o = stripComments(fs.readFileSync(orderUrl, 'utf8'))
   eq('EateryOrder.js has no supabase / logContactEvent / console / fetch', (o.match(/\bsupabase\b|\blogContactEvent\b|console\.|fetch\(/g) || []), [])
 
   const D = { mode: 'delivery', kind: 'home', street: STREET, building: '3', district: 'Karakol' }
@@ -343,6 +345,11 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
     addressComplete({ kind: 'other', district: 'a', street: 'b', building: 'c' }), addressComplete({ kind: 'other', name: 'Anne', district: 'a', street: 'b', building: 'c' }),
     addressComplete({ kind: 'home', district: 'a', street: 'b' }), addressComplete(null),
   ], [true, true, false, true, false, false])
+
+  eq('addressComplete: a name / district made only of invisible characters is empty', [
+    addressComplete({ kind: 'other', name: '\u034F\u115F\u1160\u17B4\u17B5\uFFA0', district: 'a', street: 'b', building: 'c' }),
+    addressComplete({ kind: 'home', district: '\u034F\u115F\u1160\u17B4\u17B5\uFFA0', street: 'b', building: 'c' }),
+  ], [false, false])
 
   // exact message lines
   const BASE = 'Teslimat: Adrese teslim — '

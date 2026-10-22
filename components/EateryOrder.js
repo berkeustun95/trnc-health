@@ -182,15 +182,11 @@ function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
               </View>
               {state === 'pin' && <PinMap lat={delivery.coords.lat} lng={delivery.coords.lng} live={open === true} />}
               {state === 'noPin' && (
-                <Pressable onPress={() => onAddress(delivery, 2)} style={({ pressed }) => [st.markPin, pressed && { opacity: press.small }]}
-                  accessibilityRole="button" accessibilityLabel={t('eateryAddrMarkOnMap', lang)}>
-                  <Ionicons name="map-outline" size={20} color={colors.primaryDark} />
-                  <Text style={st.markPinText}>{t('eateryAddrMarkOnMap', lang)}</Text>
-                </Pressable>
+                <Button variant="secondary" fullWidth icon="map-outline" title={t('eateryAddrMarkOnMap', lang)} onPress={() => onAddress(delivery, 2)} />
               )}
             </View>
           )}
-          {state === 'none' && <Button fullWidth icon="add" title={t('eateryAddrAdd', lang)} onPress={() => onAddress(null)} />}
+          {state === 'none' && <Button variant="secondary" fullWidth icon="add" title={t('eateryAddrAdd', lang)} onPress={() => onAddress(null)} />}
           {state === 'incomplete' && <Button fullWidth icon="alert-circle-outline" title={t('eateryAddrComplete', lang)} onPress={() => onAddress(delivery)} />}
           {has && <Button variant="secondary" fullWidth icon="swap-horizontal" title={t('eateryAddrChange', lang)} onPress={openSheet} />}
           <Text style={st.hint}>{t('eateryDeliveryPrivacy', lang)}</Text>
@@ -363,16 +359,14 @@ const st = StyleSheet.create({
   optText:   { flex: 1, ...type.body, color: colors.textPrimary },
   optTextOn: { fontFamily: font.semibold, color: colors.primaryDark },
   addr:      { marginTop: space[12], gap: space[8] },
-  sum:       { padding: space[12], gap: space[12], borderRadius: radii.md, backgroundColor: colors.soft, overflow: 'hidden' },
+  sum:       { padding: space[12], gap: space[12], borderRadius: radii.card, backgroundColor: colors.soft, overflow: 'hidden' },   // the map inside keeps radii.md: the strip's own corners sit 12pt (the padding) away from it, so the clip never reaches the map's attribution
   sumHead:   { flexDirection: 'row', alignItems: 'center', gap: space[12] },
-  sumMain:   { flex: 1, gap: 2 },
+  sumMain:   { flex: 1, gap: 2 },   // label and address read as one pair: closer than space[4]
   sumLabel:  { ...type.rowTitle, color: colors.textPrimary },
   sumText:   { ...type.body, color: colors.textPrimary },
   map:       { height: MAP_H, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.border },
   mapPin:    { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   mapPinIcon:{ marginBottom: PIN },
-  markPin:   { minHeight: TAP, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[8], paddingHorizontal: space[12], borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-  markPinText:{ ...type.body, fontFamily: font.semibold, color: colors.primaryDark },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },

@@ -88,6 +88,9 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   const gps = useLocate(lang)
   const alive = useRef(true)
   useEffect(() => () => { alive.current = false }, [])
+  const where = useRef({ open, step })   // read after an await: Back during the wait must not open the picker on a page the user already left
+  where.current = { open, step }
+  const onStep2 = () => alive.current && where.current.open && where.current.step === 2
   const set = patch => setDraft(d => ({ ...d, ...patch }))
   const reg = useRef(Object.fromEntries(FIELD_KEYS.map(k => [k, newReg()]))).current
 
@@ -184,6 +187,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
       const q = await quietFix()   // only when location is already allowed; never asks
       if (!alive.current) return
       setOpening(false)
+      if (!onStep2()) return
       start = q ? { ...q, delta: 0.006 } : { ...NICOSIA, delta: 0.06 }
     }
     setPickerStart(start)
@@ -191,7 +195,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   }
   const useCurrent = async () => {
     const p = await gps.locate()
-    if (p && alive.current) openPicker(p)
+    if (p && onStep2()) openPicker(p)
   }
   const pinChosen = pin => {
     set({ coords: pin })
@@ -251,13 +255,16 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
       <SafeAreaView style={s.page} edges={['top']}>
         <ScreenHeader lang={lang} title={title} onBack={onBack} />
         <View style={s.progress} accessible accessibilityRole="progressbar" accessibilityLabel={progress} accessibilityValue={{ min: 1, max: STEPS, now: step }}>
-          {[1, 2, 3].map(n => <View key={n} style={[s.seg, n <= step && s.segOn]} />)}
+          <Text style={s.progressText}>{progress}</Text>
+          <View style={s.segs}>
+            {[1, 2, 3].map(n => <View key={n} style={[s.seg, n <= step && s.segOn]} />)}
+          </View>
         </View>
         {showMap ? (
           <DeliveryPinPicker lang={lang} start={pickerStart} reduce={reduce} onUse={pinChosen} />
         ) : (
           <>
-            <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={[s.content, step === 2 && { paddingBottom: insets.bottom + space[16] }]}
+            <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content}
               keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
               onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y }} scrollEventThrottle={16}>
               <Text style={s.stepTitle} accessibilityRole="header">{t(STEP_TITLE[step], lang)}</Text>
@@ -288,11 +295,10 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
                     <View style={s.pinRow}>
                       <Ionicons name="location" size={18} color={colors.primaryDark} />
                       <Text style={s.pinText}>{t('eateryAddrPinSet', lang)}</Text>
-                      <Button variant="text" title={t('eateryAddrPinChange', lang)} onPress={() => openPicker()} />
+                      <Button variant="text" title={t('eateryAddrPinChange', lang)} onPress={() => openPicker()} accessibilityLabel={t('eateryAddrPinChangeA11y', lang)} />
                       <Button variant="text" title={t('eateryDeliveryLocRemove', lang)} onPress={() => set({ coords: null })} accessibilityLabel={t('eateryDeliveryLocRemoveA11y', lang)} />
                     </View>
                   ) : <Text style={s.note}>{t('eateryDeliveryLocateNote', lang)}</Text>}
-                  <Button variant={hasPin ? 'primary' : 'text'} fullWidth={hasPin} title={t(hasPin ? 'eateryAddrContinue' : 'eateryAddrNoMap', lang)} onPress={() => onStep(3)} style={s.noMap} />
                   <Text style={s.note}>{t('eateryDeliveryPrivacy', lang)}</Text>
                 </>
               )}
@@ -321,19 +327,19 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
                 </>
               )}
             </ScrollView>
-            {step !== 2 && (
-              <View ref={footerRef} collapsable={false} onLayout={measureFooter} style={[s.footer, { paddingBottom: footerPad }]}>
-                {step === 3 && (
-                  <View accessibilityLiveRegion="polite">
-                    {!!missingText && <Text style={s.err}>{missingText}</Text>}
-                    {!!saveErr && <Text style={s.err}>{saveErr}</Text>}
-                  </View>
-                )}
-                {step === 1
-                  ? <Button fullWidth title={t('eateryAddrContinue', lang)} onPress={toLocation} />
-                  : <Button fullWidth icon="checkmark" title={t('eateryAddrSave', lang)} loadingTitle={t('eateryAddrSaving', lang)} loading={saving} onPress={save} />}
-              </View>
-            )}
+            <View ref={footerRef} collapsable={false} onLayout={measureFooter} style={[s.footer, { paddingBottom: footerPad }]}>
+              {step === 3 && (
+                <View accessibilityLiveRegion="polite">
+                  {!!missingText && <Text style={s.err}>{missingText}</Text>}
+                  {!!saveErr && <Text style={s.err}>{saveErr}</Text>}
+                </View>
+              )}
+              {step === 1 && <Button fullWidth title={t('eateryAddrContinue', lang)} onPress={toLocation} />}
+              {step === 2 && (hasPin
+                ? <Button fullWidth title={t('eateryAddrContinue', lang)} onPress={() => onStep(3)} />
+                : <Button variant="text" fullWidth title={t('eateryAddrNoMap', lang)} onPress={() => onStep(3)} />)}
+              {step === 3 && <Button fullWidth icon="checkmark" title={t('eateryAddrSave', lang)} loadingTitle={t('eateryAddrSaving', lang)} loading={saving} onPress={save} />}
+            </View>
           </>
         )}
       </SafeAreaView>
@@ -345,8 +351,10 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
 
 const s = StyleSheet.create({
   page:      { flex: 1, backgroundColor: colors.canvas },
-  progress:  { flexShrink: 0, flexDirection: 'row', gap: space[8], paddingHorizontal: space[16], paddingVertical: space[8] },
-  seg:       { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.border },
+  progress:  { flexShrink: 0, gap: space[8], paddingHorizontal: space[16], paddingVertical: space[8] },
+  progressText:{ ...type.meta, color: colors.textSecondary },
+  segs:      { flexDirection: 'row', gap: space[8] },
+  seg:       { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.fieldBorder },   // 4pt: a hairline rail, not a control; fieldBorder (colors.border is 1.18:1 on canvas)
   segOn:     { backgroundColor: colors.primary },
   scroll:    { flex: 1 },
   content:   { paddingHorizontal: space[16], paddingTop: space[8], paddingBottom: space[16], gap: space[12] },
@@ -366,10 +374,9 @@ const s = StyleSheet.create({
   pinRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
   pinText:   { flex: 1, minWidth: 120, ...type.body, color: colors.textPrimary },
   note:      { ...type.small, color: colors.textSecondary },
-  noMap:     { alignSelf: 'stretch' },
   labelRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[8], marginBottom: space[4] },
   fieldLabel:{ flexShrink: 1, ...type.small, fontFamily: font.semibold, color: colors.textPrimary },
-  tag:       { ...type.caption, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: 2, overflow: 'hidden' },
+  tag:       { ...type.caption, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: 2, overflow: 'hidden' },   // 2pt: a caption pill is shorter than the smallest space token
   field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   fieldMulti:{ minHeight: 72, maxHeight: 140 },
   fieldBad:  { borderColor: colors.dangerInk },

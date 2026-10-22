@@ -230,7 +230,7 @@ export const orderRpcArgs = (partnerId, lines) => ({ p_partner: partnerId, p_ite
 export const ADDRESS_FIELD_MAX = 100
 // Invisible / direction-control characters, and all whitespace (newlines included) collapsed to single spaces: free text
 // the customer types (address fields, note) can never forge a line of the message or hide inside an empty-looking field.
-const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF]/g
+const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u034F\u115F\u1160\u17B4\u17B5\u3164\uFFA0\uFEFF]/g
 export const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/[\s\u0085]+/g, ' ').trim().slice(0, max).trim() : '')
 export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
 export function mapsLink(lat, lng) {
