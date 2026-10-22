@@ -132,15 +132,17 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
   const [locating, setLocating] = useState(false)
   const [locNote, setLocNote] = useState(null)   // { msgKey, action } | null
   const alive = useRef(true)
+  const wentToSettings = useRef(false)   // the services-off dialog itself backgrounds the app on Android; only a trip to Settings may clear the note
   const openRef = useRef(open)
   const modeRef = useRef(delivery.mode)
   openRef.current = open
   modeRef.current = delivery.mode
   useEffect(() => () => { alive.current = false }, [])
   const noteHasAction = !!locNote?.action
+  useEffect(() => { wentToSettings.current = false }, [locNote])
   useEffect(() => {
     if (!noteHasAction) return
-    const sub = AppState.addEventListener('change', s => { if (s === 'active') setLocNote(null) })
+    const sub = AppState.addEventListener('change', s => { if (s === 'active' && wentToSettings.current) { wentToSettings.current = false; setLocNote(null) } })
     return () => sub.remove()
   }, [noteHasAction])
   const isHome = delivery.mode === 'delivery'
@@ -180,6 +182,7 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
     }
   }
   const openLocationFix = async action => {
+    wentToSettings.current = true
     try {
       if (action === 'locationSettings' && Platform.OS === 'android') {
         try { await Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS') } catch { await Linking.openSettings() }
@@ -219,7 +222,7 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
           )}
           {!delivery.coords && (locNote ? (
             <View style={st.locFail}>
-              <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={st.locFailIcon} />
+              <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
               <Text style={st.locFailText}>{t(locNote.msgKey, lang)}</Text>
               {locNote.action && <Button variant="text" title={t('openSettings', lang)} onPress={() => openLocationFix(locNote.action)} />}
             </View>
@@ -409,7 +412,6 @@ const st = StyleSheet.create({
   locRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
   locText:   { flex: 1, ...type.body, color: colors.textPrimary },
   locFail:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
-  locFailIcon:{},
   locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
   locNote:   { ...type.small, color: colors.textSecondary },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
