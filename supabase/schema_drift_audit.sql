@@ -948,7 +948,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('eatery_orders', 'view_count', true, '0', 'integer'),
     ('eatery_orders', 'created_by', true, NULL, 'uuid'),
     ('eatery_orders', 'client_id', false, NULL, 'text'),
-    ('eatery_orders', 'created_as_guest', true, 'false', 'boolean')
+    ('eatery_orders', 'created_as_guest', true, 'false', 'boolean'),
+    ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -1031,6 +1032,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('connectivity_links_pkey', '', 'id'),
     ('connectivity_links_slug_check', 'support|tasi|turist|yenihat', 'slug'),
     ('connectivity_links_url_check', '^https://', 'url'),
+    ('connectivity_operators_logo_key_check', '9|^[a-z0-9-]+/[a-z0-9-]+$', 'logo_key'),
     ('contact_events_action_check', 'book|call|call_secondary|email|facebook|instagram|maps|menu|order_whatsapp|route_complete|website|whatsapp', 'action'),
     ('contact_events_lang_check', 'Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish', 'lang'),
     ('contact_events_module_check', 'accommodation|connectivity|eatery|ehliyet|events|explore|garages|grooming|homeServices|hotels|insurance|jobs|pets|studentHub|towing|transport', 'module'),
