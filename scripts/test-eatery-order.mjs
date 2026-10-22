@@ -369,6 +369,8 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   // areas
   eq('nearestArea: an AREA_POINTS point -> its name', nearestArea(35.18974, 33.34972), 'Kumsal')
   eq('nearestArea: ~50 m off still Kumsal', nearestArea(35.1902, 33.34972), 'Kumsal')
+  // 35.17,33.36 is south of the buffer zone (resolveRegion null) yet within 2 km of Köşklüçiftlik: only the region guard keeps it ''.
+  eq('nearestArea: a pin just outside the TRNC but within 2 km of an area point -> empty', nearestArea(35.17, 33.36), '')
   eq('nearestArea: >2 km from every point -> empty', [nearestArea(35.25, 33.0), nearestArea(34.9, 33.6), nearestArea(NaN, 1), nearestArea(51.5, -0.1)], ['', '', '', ''])
   eq('NEAREST_AREA_MAX_KM is 2', NEAREST_AREA_MAX_KM, 2)
   eq('searchAreas: kumsal / KUMSAL / Kumsal', ['kumsal', 'KUMSAL', 'Kumsal'].map(q => searchAreas(q)[0]?.name), ['Kumsal', 'Kumsal', 'Kumsal'])
