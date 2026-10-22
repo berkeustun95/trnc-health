@@ -4023,6 +4023,15 @@ WITH report AS (
     UNION ALL SELECT '20261126_crunchy_express_contacts','crunchy-express phone = whatsapp = +905391161059, once 1126 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261126_crunchy_express_contacts.sql')
       OR COALESCE((SELECT p.phone IS NOT DISTINCT FROM '+905391161059' AND p.whatsapp IS NOT DISTINCT FROM '+905391161059' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    UNION ALL SELECT '20261127_crunchy_express_activate','crunchy-express is_active = true (exactly 1 active eatery partner), once 1127 is applied; red later = it was deactivated, review it',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
+      OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true AND (SELECT count(*) FROM public.eatery_partners a WHERE a.is_active) = 1
+                     FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    -- 1128 deletes rows once; the deletion is not observable afterwards (real orders replace the tests), so the token only
+    -- proves the table it acted on still exists. The proof was the in-file asserts (counts printed in the apply log).
+    UNION ALL SELECT '20261128_eatery_orders_test_cleanup','eatery_orders exists once 1128 is applied (one-time test-order delete; asserted in-file, not re-checkable)',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261128_eatery_orders_test_cleanup.sql')
+      OR to_regclass('public.eatery_orders') IS NOT NULL
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',
