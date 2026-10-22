@@ -8,6 +8,7 @@ import BackButton from '../components/BackButton'
 import ConnectivityErrorState from '../components/ConnectivityErrorState'
 import { fetchOperator, fetchLinks, openHandoff } from '../lib/connectivity'
 import { logContactEvent } from '../utils/logContactEvent'
+import { partnerAsset } from '../constants/partnerAssets'
 
 // Bağlantı & eSIM — module landing (Berke, 2026-10-15): a partner card, three tiles and a
 // support bar, each opening a KKTCELL page in the in-app browser.
@@ -16,17 +17,18 @@ import { logContactEvent } from '../utils/logContactEvent'
 //   operator row; the four targets from connectivity_links (20261113), keyed by slug. Only the
 //   artwork and the copy are in the app.
 //
-// ⚠ THE ARTWORK IS A DRAFT. The yellow character (Teknocan) is not KKTCELL's official file;
-//   it must be replaced with their artwork, with their written OK, before go-live.
+// The art is Oli & Maki in yellow KKTCELL beanies (2026-10-22), resolved through
+// constants/partnerAssets.js like every partner asset. The logo comes off the operator row's
+// logo_key (20261129), the same pattern as driving_schools.logo_key.
 //
 // The previous landing linked to the operator / package / stores screens; nothing links to them
 // now. Their code and App.js routes are kept.
 
 const ART = {
-  hero:    require('../assets/partners/kktcell/kktcell-hero.png'),
-  tasi:    require('../assets/partners/kktcell/kktcell-tasi.png'),
-  turist:  require('../assets/partners/kktcell/kktcell-turist.png'),
-  yenihat: require('../assets/partners/kktcell/kktcell-yenihat.png'),
+  hero:    partnerAsset('kktcell/hero'),
+  tasi:    partnerAsset('kktcell/tasi'),
+  turist:  partnerAsset('kktcell/turist'),
+  yenihat: partnerAsset('kktcell/yenihat'),
 }
 
 const TILES = [
@@ -39,8 +41,8 @@ const REQUIRED_SLUGS = ['tasi', 'turist', 'yenihat', 'support']
 const GUTTER = 16
 const GAP = 12
 const CARD_PAD = 18
-const HERO_SHARE = 0.44        // of the card's inner width
-const HERO_ASPECT = 700 / 637  // kktcell-hero.png
+const HERO_SHARE = 0.36        // of the card's inner width; keeps the card as tall as the 0.44 landscape art did
+const HERO_ASPECT = 624 / 700  // kktcell-hero.png (portrait)
 // The column never grows past a large phone: on a tablet the card, art and tiles keep their phone
 // proportions, centred, instead of scaling up to a 490 pt hero and 390 pt tiles.
 const MAX_COLUMN = 480
@@ -62,16 +64,19 @@ function withAlpha(hex, a) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
 }
 
-// White square for the partner's logo. logo_url is NULL until KKTCELL sends it; until then (or
-// if the image fails) the square carries a neutral icon in the brand colour, never a broken box.
+// White square for the partner's logo: the bundled asset named by logo_key first, then a remote
+// logo_url, then (no key, no URL, or the image fails) a neutral icon in the brand colour, never a
+// broken box. A row without logo_key (before 20261129 applies) therefore shows the icon.
 function LogoSquare({ operator, brand }) {
   const [broken, setBroken] = useState(false)
-  useEffect(() => { setBroken(false) }, [operator?.logo_url])
-  const showImage = !!operator?.logo_url && !broken
+  const bundled = partnerAsset(operator?.logo_key)
+  const source = bundled ?? (operator?.logo_url ? { uri: operator.logo_url } : null)
+  useEffect(() => { setBroken(false) }, [operator?.logo_key, operator?.logo_url])
+  const showImage = !!source && !broken
   return (
     <View style={s.logoSquare}>
       {showImage ? (
-        <Image source={{ uri: operator.logo_url }} style={s.logoImg} resizeMode="contain"
+        <Image source={source} style={s.logoImg} resizeMode="contain"
                onError={() => setBroken(true)} accessibilityLabel={operator?.name ?? ''} />
       ) : (
         <Ionicons name="cellular" size={22} color={brand} />
