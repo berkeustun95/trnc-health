@@ -669,8 +669,8 @@ export const SOCIAL_AUTH_LIVE = true
 //   3. Turkish device pass with this flipped LOCALLY.
 //   4. Both files in ONE commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs).
 //   5. `npm run eatery:check` green.
-export const EATERY_LIVE = false
+export const EATERY_LIVE = true
 
 // Crunchy Express — the first eatery partner inside Yeme-İçme (PET_HOTEL_LIVE precedent).
 // Requires EATERY_LIVE: a live partner in a dark section is a guard failure (eatery:check).
-export const CRUNCHY_EXPRESS_LIVE = false
+export const CRUNCHY_EXPRESS_LIVE = true
