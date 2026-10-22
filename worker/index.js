@@ -84,7 +84,7 @@ if(j.status==='bot'){var a0=el('a','a','Sonucu göster');a0.href='?view=1';var p
 if(j.status==='not_found'){put(banner("ADA'da böyle bir sipariş yok",'No such order in ADA',true));return}
 if(j.status!=='ok'&&j.status!=='expired')return fail();
 var ex=j.status==='expired';
-var b=ex?banner('Süresi dolmuş','Expired',true):banner('✓ Bu sipariş ADA üzerinden geldi','This order came through ADA',false);
+var b=j.isTest===true?banner('TEST SİPARİŞİ — hazırlamayın','TEST ORDER — do not prepare',true):ex?banner('Süresi dolmuş','Expired',true):banner('✓ Bu sipariş ADA üzerinden geldi','This order came through ADA',false);
 var c=el('div','card'+(ex?' grey':''));
 c.appendChild(el('h2',null,j.partner));
 var m=el('div','meta','Sipariş no: ');m.appendChild(el('b',null,j.orderNo));c.appendChild(m);
@@ -151,6 +151,7 @@ function viewModel(code, r) {
   const first = fmtTime(r.first_viewed_at_before)
   return {
     status: r.status,
+    isTest: r.is_test === true,
     partner: String(r.partner_name ?? ''),
     orderNo: `${code.slice(0, 4)}-${code.slice(4)}`,
     time: fmtTime(r.created_at),
@@ -166,7 +167,9 @@ function renderOrder(code, r) {
   const v = viewModel(code, r)
   const lines = v.lines.map(l => `<li><span>${esc(l.l)}</span><span>${esc(l.r)}</span></li>`).join('')
   const seen = `${esc(v.seenTr)}<div class="en">${esc(v.seenEn)}</div>`
-  const banner = expired
+  const banner = v.isTest
+    ? `<div class="banner bad"><b>TEST SİPARİŞİ — hazırlamayın</b><div class="en">TEST ORDER — do not prepare</div></div>`
+    : expired
     ? `<div class="banner bad"><b>Süresi dolmuş</b><div class="en">Expired</div></div>`
     : `<div class="banner"><b>✓ Bu sipariş ADA üzerinden geldi</b><div class="en">This order came through ADA</div></div>`
   const body = `${banner}<div class="card${expired ? ' grey' : ''}"><h2>${esc(r.partner_name)}</h2>
