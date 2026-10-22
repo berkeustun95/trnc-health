@@ -236,7 +236,7 @@ export function eligibleModules({ flags = FAVOURITE_FLAGS, overrides = {} } = {}
 // Structural, not hopeful, and it matters because the section HEADING lives in HomeScreen
 // (so it uses the same token as the other headings) and would otherwise be left standing
 // over nothing. UNGATED_MODULES holds ids that no flag can turn off; the ones not in
-// HIDDEN_TILES (five since games and esim were hidden, 2026-10-10) are the auto-fill pool's
+// HIDDEN_TILES (five since games and esim were hidden, 2026-10-10; six once CONNECTIVITY_LIVE unhides esim) are the auto-fill pool's
 // floor whatever the flags say, whatever is stored, and whatever the network is doing.
 //
 // Asserted rather than asserted-about: `npm run home:check` computes this against an

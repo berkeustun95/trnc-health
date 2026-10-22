@@ -1,3 +1,5 @@
+import { CONNECTIVITY_LIVE } from './flags.js'
+
 // Home V2 module grid — the whole grid, as data.
 //
 // ─── WHY THIS IS A CONFIG FILE AND NOT A LIST INSIDE HomeScreen ─────────────
@@ -118,9 +120,10 @@ export const HIDDEN_TILES = new Set([
   'jobPostings',
   'transport',
   'games',
-  // eSIM: Connectivity is dark (CONNECTIVITY_LIVE false), so this was a "Yakında" tile; hidden
-  // so Şehir is one clean row of four. Its waitlist pauses with it.
-  'esim',
+  // eSIM: hidden ONLY while Connectivity is dark (it would be a "Yakında" tile; hidden so Şehir is
+  // one clean row of four, waitlist paused). The day CONNECTIVITY_LIVE flips, the tile appears in
+  // Şehir ve Ulaşım with no other change: homeGroups.js already gates it on the same flag.
+  ...(CONNECTIVITY_LIVE ? [] : ['esim']),
 ])
 
 // The Emlak & Konaklama tile's two label states; AccommodationScreen's title reads the same

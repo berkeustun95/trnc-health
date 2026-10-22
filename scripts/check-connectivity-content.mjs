@@ -163,7 +163,18 @@ try {
     if (op.brand_confirmed === false) notes.push(`${op.name}: brand_confirmed is false — colours/logo are still estimates.`)
     const unconfirmed = pkgs.filter(p => p.price_confirmed === false).length
     if (unconfirmed) notes.push(`${op.name}: ${unconfirmed} of ${pkgs.length} package price(s) not confirmed by the partner.`)
-    if (!op.logo_url) notes.push(`${op.name}: logo_url is null — rendering the text wordmark fallback.`)
+    // The landing shows partnerAsset(logo_key), then logo_url, then an icon (20261129). The registry is
+    // read as TEXT: Node cannot load its PNG require()s. A key the registry does not have is a fault
+    // (the partner's square would silently fall back to the icon).
+    if (op.logo_key) {
+      const registry = readFileSync(resolve(ROOT, 'constants/partnerAssets.js'), 'utf8')
+      if (registry.includes(`'${op.logo_key}':`)) console.log(`  ${op.name}: logo from logo_key '${op.logo_key}' (bundled)`)
+      else problems.push(`${op.name}: logo_key '${op.logo_key}' is not in constants/partnerAssets.js — the logo square would show the fallback icon.`)
+    } else if (op.logo_url) {
+      notes.push(`${op.name}: no logo_key; logo from logo_url (remote).`)
+    } else {
+      notes.push(`${op.name}: no logo_key and no logo_url — the logo square shows the fallback icon.`)
+    }
   }
 } catch (e) {
   problems.push(`could not read the connectivity tables: ${e.message}`)
