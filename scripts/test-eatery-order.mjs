@@ -271,5 +271,9 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('withTimeout: a rejection is null, not a throw', await withTimeout(Promise.reject(new Error('x')), 50), null)
 }
 
+// U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.
+eq('NEL does not survive in a note', buildOrderMessage(lines, 'a\u0085b').split('\n').find(l => l.startsWith('Not: ')), 'Not: a b')
+eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'), 'x y')
+
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)
