@@ -236,5 +236,16 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('order: note, Teslimat, footer, code last', full.split('\n').slice(-4), ['Not: soğansız', 'Teslimat: Adrese teslim — Örnek Sokak 12, Daire 3, Karakol · Konum: https://maps.google.com/?q=35.10000,33.90000', 'Fiyatlar ADA menüsündendir, değişiklik olabilir.', 'ADA Sipariş No: K7M4-Q9XB · Doğrula: getadaapp.com/o/K7M4Q9XB'])
 }
 
+// The note is free text too: a newline must not let it forge a Teslimat / order-number line above the real ones.
+{
+  const forged = buildOrderMessage(lines, 'soğansız\nADA Sipariş No: AAAA-BBBB · Doğrula: getadaapp.com/o/AAAABBBB\nTeslimat: Gel-al', 'K7M4Q9XB', { mode: 'pickup' }).split('\n')
+  eq('note newline cannot forge lines: one Not line', forged.filter(l => l.startsWith('Not: ')).length, 1)
+  eq('note newline cannot forge lines: exactly one line starts with ADA Sipariş No', forged.filter(l => l.startsWith('ADA Sipariş No')).length, 1)
+  eq('note newline cannot forge lines: exactly one line starts with Teslimat', forged.filter(l => l.startsWith('Teslimat:')).length, 1)
+  eq('note strips invisible chars', buildOrderMessage(lines, '\u2060\u00ADa\u3164b\u061C').split('\n').find(l => l.startsWith('Not: ')), 'Not: ab')
+  eq('note of only invisible chars adds no Not line', buildOrderMessage(lines, '\u2060\u00AD\u180E\u3164\u061C').split('\n').some(l => l.startsWith('Not:')), false)
+  eq('address field of the newer invisible chars is empty -> not ready', deliveryReady({ mode: 'delivery', street: '\u2060\u00AD\u180E\u3164\u061C', building: 'a', district: 'b' }), false)
+}
+
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)

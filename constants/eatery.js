@@ -228,8 +228,11 @@ export const orderRpcArgs = (partnerId, lines) => ({ p_partner: partnerId, p_ite
 
 // ─── Delivery choice (Sepetim) ───
 export const ADDRESS_FIELD_MAX = 100
-// All whitespace (newlines included) collapses to single spaces, so an address can never forge a line of the message.
-export const sanitizeAddressField = (v) => (typeof v === 'string' ? v.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').replace(/\s+/g, ' ').trim().slice(0, ADDRESS_FIELD_MAX).trim() : '')
+// Invisible / direction-control characters, and all whitespace (newlines included) collapsed to single spaces: free text
+// the customer types (address fields, note) can never forge a line of the message or hide inside an empty-looking field.
+const INVISIBLE = /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF]/g
+const oneLine = (v, max) => (typeof v === 'string' ? v.replace(INVISIBLE, '').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '')
+export const sanitizeAddressField = (v) => oneLine(v, ADDRESS_FIELD_MAX)
 export function mapsLink(lat, lng) {
   const la = typeof lat === 'number' ? lat : NaN, ln = typeof lng === 'number' ? lng : NaN
   if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return ''
@@ -253,7 +256,7 @@ export function buildOrderMessage(lines, note, code = null, delivery = null) {
   const out = ['ADA üzerinden sipariş:']
   for (const l of lines) out.push(`${l.qty} × ${l.name} — ${formatTl(l.qty * Number(l.price))}`)
   out.push('', `Toplam: ${formatTl(orderTotal(lines))}`)
-  const n = typeof note === 'string' ? note.trim().slice(0, ORDER_NOTE_MAX) : ''
+  const n = oneLine(note, ORDER_NOTE_MAX)
   if (n) out.push(`Not: ${n}`)
   const dl = deliveryLine(delivery)
   if (dl) out.push(dl)
