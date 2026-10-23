@@ -46,6 +46,7 @@ import MyCheckins from '../components/checkins/MyCheckins'
 import { PRESET_AVATARS } from '../constants/avatars'
 import Avatar, { prefetchAvatars, invalidateAvatar } from '../components/Avatar'
 import BackButton from '../components/BackButton'
+import { clearBook } from '../utils/eateryAddress'
 
 
 
@@ -707,6 +708,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       setDeleting(false)
       return
     }
+    await clearBook()   // delivery addresses live on this phone only; gone with the account (not on sign-out)
     await supabase.auth.signOut()
   }
 

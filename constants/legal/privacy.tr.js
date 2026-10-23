@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-10-23
-Son güncelleme: 22 Ekim 2026
+export default `Sürüm: 2026-10-24
+Son güncelleme: 23 Ekim 2026
 
 KİM OLDUĞUMUZ
 
@@ -58,7 +58,7 @@ Reddedilen gönderimler: gönderdiğiniz bir metin içerik filtremiz tarafından
 
 Onay kayıtları: Kullanım Koşulları'nın ve Gizlilik Politikası'nın hangi sürümünü, hangi dilde ve ne zaman kabul ettiğiniz. Pazarlama iletilerine onay verirseniz, onayı verdiğiniz tarihi ve daha sonra geri alırsanız geri aldığınız tarihi kaydederiz. Check-in kullanırsanız, check-in bildiriminin size ne zaman ve hangi sürümüyle gösterildiğini kaydederiz.
 
-Restorana WhatsApp ile gönderdiğiniz siparişler. “WhatsApp ile gönder”e dokunduğunuzda, restoranın siparişin gerçekten ADA üzerinden geldiğini doğrulayabilmesi için bir sipariş kaydı oluştururuz. Kayıtta sipariş numarası, restoran, ürünler, adetler ve fiyatlar (ADA menüsünden), toplam, oluşturulma ve geçerlilik süresi ile doğrulama sayfasının ne zaman ve kaç kez açıldığı bulunur. Kötüye kullanımı sınırlayabilmek için kayıt hesap kimliğinize (ya da misafir oturumunuza) bağlıdır ve giriş yapıp yapmadığınızı da kaydeder. Adınız, telefon numaranız ve yazdığınız not kayda girmez. Not yalnızca WhatsApp mesajınızın içinde restorana gider. Teslimat seçiminiz, teslimat adresiniz ve eklerseniz konumunuz için de aynısı geçerlidir: yalnızca WhatsApp mesajınızın içinde restorana gider. Tekrar yazmanız gerekmesin diye ADA son teslimat adresinizi bize göndermeden, telefonunuzda uygulamanın içinde saklar; sepette istediğiniz zaman silebilirsiniz. Yalnızca 18 yaş ve üzerine hizmet veren bir restoranda siparişi oluşturmadan önce hesabınızdaki doğum tarihini kontrol ederiz.
+Restorana WhatsApp ile gönderdiğiniz siparişler. “WhatsApp ile gönder”e dokunduğunuzda, restoranın siparişin gerçekten ADA üzerinden geldiğini doğrulayabilmesi için bir sipariş kaydı oluştururuz. Kayıtta sipariş numarası, restoran, ürünler, adetler ve fiyatlar (ADA menüsünden), toplam, oluşturulma ve geçerlilik süresi ile doğrulama sayfasının ne zaman ve kaç kez açıldığı bulunur. Kötüye kullanımı sınırlayabilmek için kayıt hesap kimliğinize (ya da misafir oturumunuza) bağlıdır ve giriş yapıp yapmadığınızı da kaydeder. Adınız, telefon numaranız ve yazdığınız not kayda girmez. Not yalnızca WhatsApp mesajınızın içinde restorana gider. Teslimat seçiminiz, adrese verdiğiniz ad, teslimat adresiniz, teslimatta aranacak kişi için eklediğiniz telefon numarası, kurye için yazdığınız adres tarifi ve harita konumu için de aynısı geçerlidir: yalnızca WhatsApp mesajınızın içinde restorana gider. Tekrar yazmanız gerekmesin diye, her biri adı, harita konumu ve isteğe bağlı telefon numarasıyla birlikte en fazla 10 teslimat adresini telefonunuzda uygulamanın içinde kaydedebilirsiniz; ADA bunları bize göndermez. Her birini sepette istediğiniz zaman değiştirebilir veya silebilirsiniz. Android'de, ADA'nın diğer uygulama verileri gibi, telefonunuzun kendi Google yedeğine dahil olabilir ve uygulamayı yeniden yüklediğinizde geri gelebilir. Yalnızca 18 yaş ve üzerine hizmet veren bir restoranda siparişi oluşturmadan önce hesabınızdaki doğum tarihini kontrol ederiz.
 
 Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bunu istediğiniz zaman cihaz ayarlarınızdan kapatabilirsiniz. Uygulama konum olmadan da çalışır. Konumunuzu satmıyoruz ve reklam için kullanmıyoruz.
 • Telefonunuzda — ADA konumunuzu, listeleri uzaklığa göre sıralamak, haritada nerede olduğunuzu göstermek, Ana Sayfa'da şehrinizi seçmek ve bir yürüyüş rotasını takip etmek için kullanır. Bu işlemler telefonunuzda gerçekleşir ve konumunuz bunlar için bize gönderilmez.
@@ -73,7 +73,7 @@ Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bu
 • Haritalar — ADA'daki haritalar Google Haritalar'dır (iPhone'da, henüz Google Haritalar içermeyen ADA sürümlerinde Apple Haritalar). Bir haritayı çizmek için telefonunuz doğrudan Google'a veya Apple'a bağlanır; bunlar cihazınızın internet adresini ve gösterilen bölgeyi kendi gizlilik politikaları kapsamında alır.
 • İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
 • Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
-• Teslimat konumu — adrese teslimi seçip “Konumumu ekle”ye dokunursanız, telefonunuzun konumu restorana gönderdiğiniz WhatsApp mesajına harita bağlantısı olarak eklenir. Bize gönderilmez ve ADA tarafından saklanmaz.
+• Teslimat konumu — adrese teslim için kapınızı haritada işaretlersiniz; haritayı kaydırmak konum izni gerektirmez. “Şu anki konumumu kullan”, izin verirseniz telefonunuzun konumunu yalnızca pini yerleştirmek için kullanır. Pin, restorana gönderdiğiniz WhatsApp mesajına harita bağlantısı olarak eklenir ve o adresle birlikte telefonunuzda saklanır. Bize gönderilmez.
 
 Mikrofon (Oli'ye sor): Oli'ye sor alanındaki mikrofona dokunursanız, konuşmanız cihazınızın konuşma tanıma hizmeti tarafından yazıya çevrilir. ADA hiçbir zaman ses kaydetmez veya saklamaz.
 

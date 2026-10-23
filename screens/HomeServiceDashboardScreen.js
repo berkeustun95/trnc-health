@@ -11,6 +11,7 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import HomeServiceIcon from '../components/HomeServiceIcon'
 import { HS_CATEGORIES, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
+import { clearBook } from '../utils/eateryAddress'
 
 const CONTACT_PREFS = [
   { key: 'whatsapp', labelKey: 'hsContactPrefWA',   icon: 'logo-whatsapp' },
@@ -281,7 +282,7 @@ export default function HomeServiceDashboardScreen({ session, lang = 'English' }
             style={[s.saveBtn, { backgroundColor: colors.dangerLight, marginTop: 12 }]}
             onPress={async () => {
               const { error: err } = await supabase.rpc('delete_own_account')
-              if (!err) await supabase.auth.signOut()
+              if (!err) { await clearBook(); await supabase.auth.signOut() }
             }}
           >
             <Text style={[s.saveBtnText, { color: colors.danger }]}>Delete Account</Text>

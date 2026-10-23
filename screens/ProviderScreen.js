@@ -14,6 +14,7 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import ListingHiddenBanner from '../components/ListingHiddenBanner'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
+import { clearBook } from '../utils/eateryAddress'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -264,6 +265,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       setDeletingAccount(false)
       return
     }
+    await clearBook()   // delivery addresses live on this phone only; gone with the account (not on sign-out)
     await supabase.auth.signOut()
   }
 
