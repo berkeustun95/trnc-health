@@ -142,9 +142,9 @@ const MARKERS = [
   { key: 'walking-path processor', re: /sent to our server, which asks openrouteservice \(run by HeiGIT/i,
     why: 'the live walking leg: HeiGIT sees our server only, and keeps ~1 km in its logs' },
   // Delivery (Sepetim), 2026-10-22: address and location travel only inside the user's own WhatsApp message.
-  { key: 'delivery address WhatsApp-only', re: /the name you give the address, your delivery address, your directions for the courier and the map pin: they go only to the restaurant/i,
+  { key: 'delivery address WhatsApp-only', re: /the name you give the address, your delivery address, the phone number you add for the delivery, your directions for the courier and the map pin: they go only to the restaurant/i,
     why: 'the address, its name, directions and pin never reach create_eatery_order or eatery_orders' },
-  { key: 'delivery book on-phone',         re: /save up to 10 delivery addresses, each with its name and map pin, in the app on your phone; ADA never sends them to us/i,
+  { key: 'delivery book on-phone',         re: /save up to 10 delivery addresses, each with its name, map pin and optional phone number, in the app on your phone; ADA never sends them to us/i,
     why: 'the address book (ada.eateryAddresses.v1) is AsyncStorage only; the Android Google backup caveat sits right after it' },
   { key: 'delivery pin on-phone',          re: /The pin is added to your WhatsApp message to the restaurant as a map link and saved with that address on your phone\. It is not sent to us/i,
     why: 'the map pin is built on the phone, put into the message and saved with the address; never sent to us' },
