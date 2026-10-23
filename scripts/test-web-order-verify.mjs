@@ -247,6 +247,56 @@ await test('expired: banner, greyed, 200', async () => {
   assert.doesNotMatch(html, /Bu sipariş ADA üzerinden geldi/)
 })
 
+await test('is_test: test banner wins (server HTML, /check JSON, client script); green banner absent', async () => {
+  const TEST_TR = /TEST SİPARİŞİ — hazırlamayın/, TEST_EN = /TEST ORDER — do not prepare/, GREEN = /Bu sipariş ADA üzerinden geldi/
+  for (const status of ['ok', 'expired']) {
+    rpcImpl = () => json(okRow({ status, is_test: true }))
+    const html = await (await get('/o/7K3QX9MP')).text()
+    assert.match(html, TEST_TR, status); assert.match(html, TEST_EN, status)
+    assert.match(html, /<div class="banner bad"><b>TEST SİPARİŞİ/, status)
+    assert.doesNotMatch(html, GREEN, status)
+    assert.doesNotMatch(html, /<b>Süresi dolmuş/, status)
+    assert.equal((await (await check('/o/7K3QX9MP')).json()).isTest, true, status)
+    assert.match(html, /class="card grey"/, status)
+  }
+  rpcImpl = () => json(okRow())
+  assert.doesNotMatch(await (await get('/o/7K3QX9MP')).text(), /class="card grey"/)
+  const js = (await (await plain('/o/7K3QX9MP')).text()).match(/<script nonce="[^"]+">([\s\S]*)<\/script>/)[1]
+  assert.match(js, /j\.isTest===true\?banner\('TEST SİPARİŞİ — hazırlamayın','TEST ORDER — do not prepare',true\)/)
+  const mkEl = tag => ({ tag, children: [], className: '', set textContent(v) { this._t = v; if (v === '') this.children = [] }, get textContent() { return this._t }, appendChild(c) { this.children.push(c) } })
+  const render = async payload => {
+    const box = mkEl('div'); const timers = []
+    const doc = { visibilityState: 'visible', readyState: 'complete', getElementById: () => box, createElement: mkEl, addEventListener() {} }
+    new Function('document', 'window', 'location', 'fetch', 'setTimeout', js)(doc, { addEventListener() {} }, { pathname: '/o/7K3QX9MP' }, () => Promise.resolve({ json: async () => payload }), (f, ms) => timers.push([f, ms]))
+    timers[0][0](); await new Promise(r => setImmediate(r))
+    return JSON.stringify(box)
+  }
+  const base = { status: 'ok', partner: 'P', orderNo: '7K3Q-X9MP', time: 't', lines: [], total: '0', seenTr: 'tr', seenEn: 'en' }
+  const t = await render({ ...base, isTest: true })
+  assert.match(t, TEST_TR); assert.match(t, TEST_EN); assert.match(t, /banner bad/); assert.doesNotMatch(t, GREEN)
+  const te = await render({ ...base, status: 'expired', isTest: true })
+  assert.match(te, TEST_TR); assert.doesNotMatch(te, /Süresi dolmuş/)
+  assert.match(t, /"className":"card grey"/)
+  assert.match(te, /"className":"card grey"/)
+  const ok = await render(base)
+  assert.match(ok, /"className":"card"/); assert.doesNotMatch(ok, /card grey/)
+  assert.match(await render({ ...base, isTest: 'true' }), GREEN)
+})
+
+await test('is_test false / absent / truthy non-booleans: green banner unchanged, never a test banner', async () => {
+  for (const over of [{ is_test: false }, {}, { is_test: null }, { is_test: 'true' }, { is_test: 1 }, { is_test: 'false' }]) {
+    rpcImpl = () => json(okRow(over))
+    const html = await (await get('/o/7K3QX9MP')).text()
+    const label = JSON.stringify(over)
+    assert.match(html, /✓ Bu sipariş ADA üzerinden geldi/, label)
+    assert.doesNotMatch(html, /TEST SİPARİŞİ|TEST ORDER/, label)
+    assert.equal((await (await check('/o/7K3QX9MP')).json()).isTest, false, label)
+  }
+  rpcImpl = () => json(okRow({ status: 'expired', is_test: false }))
+  const html = await (await get('/o/7K3QX9MP')).text()
+  assert.match(html, /Süresi dolmuş/); assert.doesNotMatch(html, /TEST SİPARİŞİ/)
+})
+
 await test('not_found: 404 and message', async () => {
   rpcImpl = () => json({ status: 'not_found' })
   const res = await get('/o/7K3QX9MP')

@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { clearBook } from '../utils/eateryAddress'
 
 const CATEGORIES = [
   { key: 'health', icon: 'heart-outline',    labelKey: 'insTypeHealth' },
@@ -302,7 +303,7 @@ export default function InsuranceDashboardScreen({ session, lang = 'English' }) 
             style={[s.saveBtn, { backgroundColor: colors.dangerLight, marginTop: 12 }]}
             onPress={async () => {
               const { error: err } = await supabase.rpc('delete_own_account')
-              if (!err) await supabase.auth.signOut()
+              if (!err) { await clearBook(); await supabase.auth.signOut() }
             }}
           >
             <Text style={[s.saveBtnText, { color: colors.danger }]}>Delete Account</Text>

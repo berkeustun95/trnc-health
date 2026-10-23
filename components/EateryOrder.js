@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, AppState, Animated, Dimensions, Easing, Linking, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import * as Location from 'expo-location'
-import { ORDER_NOTE_MAX, ADDRESS_FIELD_MAX, deliveryReady, withTimeout, locateOutcome, locateNote, LOCATE_TIMEOUT_MS } from '../constants/eatery'
-import { REDESIGN } from '../constants/redesign'
-import { requestWithPrimer } from '../utils/permissionPrimer'
-import { askedFix } from '../utils/locationServices'
-import { clearAddress } from '../utils/eateryAddress'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry } from '../constants/eatery'
+import MapView from 'react-native-maps'
+import { MAP_PROVIDER } from '../utils/googleMap'
+import { loadBook, setLastUsed } from '../utils/eateryAddress'
+import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
+import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
@@ -65,23 +65,6 @@ export function OrderBar({ count, totalText, lang, onOpen, partnerName }) {
   )
 }
 
-// The keyboard's top edge in screen coordinates (null while it is closed). The lift is NOT taken from the reported
-// height: BasketPage measures where its footer really ends against this edge (device-tested: the reported height
-// and the window's own partial resize disagree).
-function useKeyboardTop() {
-  const [top, setTop] = useState(null)
-  useEffect(() => {
-    const ios = Platform.OS === 'ios'
-    const show = Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidShow', e => {
-      const { height, screenY } = e.endCoordinates
-      setTop(screenY > 0 ? Math.round(screenY) : Math.round(Dimensions.get('screen').height - height))
-    })
-    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setTop(null))
-    return () => { show.remove(); hide.remove() }
-  }, [])
-  return top
-}
-
 // A dish photo is partner content, shown as sent (contain) in the menu's white frame. Always a 56 box so names
 // align: a dish with no photo, or one that failed to load, gets a soft tile with an icon.
 function LineThumb({ photoPath }) {
@@ -114,10 +97,9 @@ function BasketLine({ line, onQty, formatMoney, lang }) {
   )
 }
 
-// "Teslimat": pick-up or delivery is REQUIRED before sending. The address and the optional location go into the WhatsApp text
-// only (constants/eatery.js deliveryLine); nothing here touches the server. Defined outside BasketPage so typing never remounts it.
-const FIELDS = [['street', 'eateryDeliveryStreet'], ['building', 'eateryDeliveryBuilding'], ['district', 'eateryDeliveryDistrict']]
-
+// "Teslimat": pick-up or delivery is REQUIRED before sending. The address comes from the address book on this phone (components/AddressEditor.js
+// adds and edits it); it and its optional map pin go into the WhatsApp text only (constants/eatery.js deliveryLine). Nothing here touches the
+// server. Defined outside BasketPage so it never remounts.
 function DeliveryOption({ checked, label, onPress }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [st.opt, checked && st.optOn, pressed && { opacity: press.small }]}
@@ -128,109 +110,91 @@ function DeliveryOption({ checked, label, onPress }) {
   )
 }
 
-function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocusInput, onBlurInput }) {
-  const [locating, setLocating] = useState(false)
-  const [locNote, setLocNote] = useState(null)   // { msgKey, action } | null
-  const alive = useRef(true)
-  const wentToSettings = useRef(false)   // the services-off dialog itself backgrounds the app on Android; only a trip to Settings may clear the note
-  const openRef = useRef(open)
-  const modeRef = useRef(delivery.mode)
-  openRef.current = open
-  modeRef.current = delivery.mode
-  useEffect(() => () => { alive.current = false }, [])
-  const noteHasAction = !!locNote?.action
-  useEffect(() => { wentToSettings.current = false }, [locNote])
-  useEffect(() => {
-    if (!noteHasAction) return
-    const sub = AppState.addEventListener('change', s => { if (s === 'active' && wentToSettings.current) { wentToSettings.current = false; setLocNote(null) } })
-    return () => sub.remove()
-  }, [noteHasAction])
+const PIN = 32
+// The card's map strip: full card width. 112 is no token: tall enough that Google's logo / Apple's "Legal" label are never clipped, short
+// enough to leave the basket page light. A picture only (liteMode on Android = a static image, no gestures); the pin is an overlay at its centre.
+const MAP_H = 112
+const MAP_DELTA = 0.004
+function PinMap({ lat, lng, live }) {
+  return (
+    <View style={st.map} pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden accessible={false}>
+      {live && (
+        <MapView key={`${lat},${lng}`} style={StyleSheet.absoluteFill} provider={MAP_PROVIDER} liteMode={Platform.OS === 'android'}
+          initialRegion={{ latitude: lat, longitude: lng, latitudeDelta: MAP_DELTA, longitudeDelta: MAP_DELTA }}
+          scrollEnabled={false} zoomEnabled={false} rotateEnabled={false} pitchEnabled={false} toolbarEnabled={false} zoomControlEnabled={false}
+          showsUserLocation={false} />
+      )}
+      {live && <View style={st.mapPin}><Ionicons name="location" size={PIN} color={colors.primary} style={st.mapPinIcon} /></View>}
+    </View>
+  )
+}
+
+// open: the basket page is on screen; the map view mounts only then (delivery mode, with a pin), its empty frame stays through the slide-out.
+function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
   const isHome = delivery.mode === 'delivery'
-  const hasAny = !!(delivery.street || delivery.building || delivery.district || delivery.coords)
-  const choose = mode => { setLocNote(null); onDelivery(mode === 'pickup' ? { mode, coords: null } : { mode }) }
-  // Last known (2 min) first, else a fresh fix raced against a timeout (indoors it can hang), else an older one.
-  const getFix = async () => {
-    const last = async maxAge => { try { return await Location.getLastKnownPositionAsync({ maxAge }) } catch { return null } }
-    return (await last(120000))
-      ?? (await withTimeout(askedFix(Location.Accuracy.Balanced), LOCATE_TIMEOUT_MS))
-      ?? (await last(600000))
+  const state = cardState(delivery.addressId ? delivery : null)
+  const has = state !== 'none'
+  const label = has ? addressLabel(delivery, lang) : ''
+  const text = has ? shortAddress(delivery) : ''
+  const alive = useRef(true)
+  const timer = useRef(null)
+  useEffect(() => () => { alive.current = false; clearTimeout(timer.current) }, [])
+  const [sheet, setSheet] = useState({ open: false, book: null })
+  const openSheet = async () => {
+    const book = await loadBook()   // read again each time: no stale list after an edit or a delete
+    if (alive.current) setSheet({ open: true, book })
   }
-  const addLocation = async () => {
-    if (locating) return
-    setLocating(true)
-    setLocNote(null)
-    let perm = { status: null, canAskAgain: true }
-    let fix = null
-    try {
-      perm = REDESIGN ? await requestWithPrimer('location') : await Location.requestForegroundPermissionsAsync()
-      if (perm?.status === 'granted') fix = await getFix()
-    } catch { fix = null }
-    let servicesOn = true
-    try { servicesOn = await Location.hasServicesEnabledAsync() } catch {}
+  // BottomSheet's onClose fires only for the user's own dismissal; a close we ask for slides out unannounced. So anything that opens the
+  // editor waits out the slide: the editor is an overlay of the partner page, and a Modal still on screen would cover it.
+  const closeThen = fn => {
+    if (timer.current) return
+    setSheet(sh => ({ ...sh, open: false }))
+    if (!fn) return
+    timer.current = setTimeout(() => { timer.current = null; if (alive.current) fn() }, motion.sheetOut + 60)
+  }
+  const choose = e => { setLastUsed(e.id); onDelivery(deliveryFromEntry(e)); closeThen() }
+  const pickHome = async () => {
+    onDelivery({ mode: 'delivery' })
+    if (delivery.addressId || isHome) return
+    const book = await loadBook()
+    const a = book.items.find(i => i.id === book.lastUsedId)
     if (!alive.current) return
-    setLocating(false)
-    if (!openRef.current || modeRef.current !== 'delivery') return
-    const outcome = locateOutcome({ granted: perm?.status === 'granted', canAskAgain: perm?.canAskAgain !== false, servicesOn, fix })
-    if (outcome === 'ok') {
-      const c = fix.coords
-      onDelivery({ coords: { lat: c.latitude, lng: c.longitude } })
-      AccessibilityInfo.announceForAccessibility?.(t('eateryDeliveryLocated', lang))
-    } else {
-      const note = locateNote(outcome)
-      setLocNote(note)
-      AccessibilityInfo.announceForAccessibility?.(t(note.msgKey, lang))
-    }
+    if (a) onDelivery(deliveryFromEntry(a)); else onAddress(null)   // an empty book goes straight into the editor
   }
-  const openLocationFix = async action => {
-    wentToSettings.current = true
-    try {
-      if (action === 'locationSettings' && Platform.OS === 'android') {
-        try { await Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS') } catch { await Linking.openSettings() }
-      } else await Linking.openSettings()
-    } catch {}
-  }
-  const clear = () => { setLocNote(null); clearAddress(); onDelivery({ street: '', building: '', district: '', coords: null }) }
+  const a11y = `${label}. ${state === 'incomplete' ? t('eateryAddrIncomplete', lang) : text}${state === 'pin' ? `. ${t('eateryAddrPinSet', lang)}` : ''}`
   return (
     <Card>
       <Text style={st.noteLabel} accessibilityRole="header">{t('eateryDeliveryTitle', lang)}</Text>
       <View accessibilityRole="radiogroup" style={st.opts}>
-        <DeliveryOption checked={delivery.mode === 'pickup'} label={t('eateryDeliveryPickup', lang)} onPress={() => choose('pickup')} />
-        <DeliveryOption checked={isHome} label={t('eateryDeliveryHome', lang)} onPress={() => choose('delivery')} />
+        <DeliveryOption checked={delivery.mode === 'pickup'} label={t('eateryDeliveryPickup', lang)} onPress={() => onDelivery({ mode: 'pickup' })} />
+        <DeliveryOption checked={isHome} label={t('eateryDeliveryHome', lang)} onPress={pickHome} />
       </View>
       {isHome && (
         <View style={st.addr}>
-          {FIELDS.map(([f, key], i) => (
-            <View key={f} ref={wraps[f]} collapsable={false}>
-              <Text style={st.fieldLabel}>{t(key, lang)}</Text>
-              <TextInput ref={inputs[f]} style={st.field} value={delivery[f]} onChangeText={v => onDelivery({ [f]: v })} maxLength={ADDRESS_FIELD_MAX}
-                autoCapitalize="words" autoCorrect={false} autoComplete="off" importantForAutofill="no" textContentType="none" accessibilityLabel={t(key, lang)}
-                returnKeyType={i < FIELDS.length - 1 ? 'next' : 'done'} blurOnSubmit={i === FIELDS.length - 1}
-                onSubmitEditing={() => { if (i < FIELDS.length - 1) inputs[FIELDS[i + 1][0]].current?.focus() }}
-                onFocus={() => onFocusInput(inputs[f], wraps[f])} onBlur={() => onBlurInput(inputs[f])} />
+          {has && (
+            <View style={st.sum}>
+              <View style={st.sumHead} accessible accessibilityLabel={a11y}>
+                <KindWell kind={delivery.kind} onTint />
+                <View style={st.sumMain}>
+                  <Text style={st.sumLabel} numberOfLines={1}>{label}</Text>
+                  <Text style={st.sumText} numberOfLines={2}>{state === 'incomplete' ? t('eateryAddrIncomplete', lang) : text}</Text>
+                </View>
+              </View>
+              {state === 'pin' && <PinMap lat={delivery.coords.lat} lng={delivery.coords.lng} live={open === true} />}
+              {state === 'noPin' && (
+                <Button variant="secondary" fullWidth icon="map-outline" title={t('eateryAddrMarkOnMap', lang)} onPress={() => onAddress(delivery, 2)} />
+              )}
             </View>
-          ))}
-          {delivery.coords ? (
-            <View style={st.locRow}>
-              <Ionicons name="location" size={18} color={colors.primaryDark} />
-              <Text style={st.locText}>{t('eateryDeliveryLocated', lang)}</Text>
-              <Button variant="text" title={t('eateryDeliveryLocRemove', lang)} onPress={() => onDelivery({ coords: null })}
-                accessibilityLabel={t('eateryDeliveryLocRemoveA11y', lang)} />
-            </View>
-          ) : (
-            <Button variant="secondary" fullWidth icon="locate-outline" title={t('eateryDeliveryLocate', lang)} loading={locating}
-              loadingTitle={t('eateryDeliveryLocating', lang)} onPress={addLocation} />
           )}
-          {!delivery.coords && (locNote ? (
-            <View style={st.locFail}>
-              <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
-              <Text style={st.locFailText}>{t(locNote.msgKey, lang)}</Text>
-              {locNote.action && <Button variant="text" title={t('openSettings', lang)} onPress={() => openLocationFix(locNote.action)} />}
-            </View>
-          ) : <Text style={st.locNote}>{t('eateryDeliveryLocateNote', lang)}</Text>)}
+          {state === 'none' && <Button variant="secondary" fullWidth icon="add" title={t('eateryAddrAdd', lang)} onPress={() => onAddress(null)} />}
+          {state === 'incomplete' && <Button fullWidth icon="alert-circle-outline" title={t('eateryAddrComplete', lang)} onPress={() => onAddress(delivery)} />}
+          {has && <Button variant="secondary" fullWidth icon="swap-horizontal" title={t('eateryAddrChange', lang)} onPress={openSheet} />}
           <Text style={st.hint}>{t('eateryDeliveryPrivacy', lang)}</Text>
-          {hasAny && <Button variant="text" icon="trash-outline" title={t('eateryDeliveryClear', lang)} onPress={clear} style={st.clear} />}
         </View>
       )}
+      <AddressBookSheet visible={sheet.open === true} lang={lang} book={sheet.book} selectedId={delivery.addressId}
+        onClose={() => setSheet(sh => ({ ...sh, open: false }))} onChoose={choose}
+        onEdit={e => closeThen(() => onAddress(deliveryFromEntry(e)))} onNew={() => closeThen(() => onAddress(null))} />
     </Card>
   )
 }
@@ -238,25 +202,22 @@ function DeliveryCard({ lang, open, delivery, onDelivery, inputs, wraps, onFocus
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, delivery, onDelivery, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
   const footerRef = useRef(null)
   const rootRef = useRef(null)
   const noteInput = useRef(null)
-  const addrInputs = useRef({ street: { current: null }, building: { current: null }, district: { current: null } }).current
-  const addrWraps = useRef({ street: { current: null }, building: { current: null }, district: { current: null } }).current
-  const focusedWrap = useRef(null)   // the address field's label + input wrapper, measured so the label is revealed too
-  const focused = useRef(null)   // the input the keyboard is for (note or an address field)
+  const focused = useRef(null)   // the input the keyboard is for (the note)
   const scrollY = useRef(0)
   const hadKb = useRef(false)
   // Back closes the keyboard but leaves the field focused, and the next tap elsewhere is then swallowed: blur with it.
   useEffect(() => {
-    if (kbTop == null && hadKb.current) { focused.current?.current?.blur(); noteInput.current?.blur() }
+    if (kbTop == null && hadKb.current) noteInput.current?.blur()
     hadKb.current = kbTop != null
   }, [kbTop])
-  const onFocusInput = useCallback((ref, wrap) => { focused.current = ref; focusedWrap.current = wrap || null }, [])
+  const onFocusInput = useCallback(ref => { focused.current = ref }, [])
   const onBlurInput = useCallback(ref => { if (focused.current === ref) focused.current = null }, [])
   const [lift, setLift] = useState(0)
   const measureFooter = useCallback(() => {
@@ -280,25 +241,16 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
     Animated.timing(slide, { toValue: to, duration: open ? motion.sheetIn : motion.sheetOut,
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic), useNativeDriver: true }).start(done)
   }, [open])
-  // Keeps the focused input above the pinned footer: the note scrolls to the end (its counter and hint show), an address
-  // field is measured NOW against the footer's top (window coordinates, never cached layout) and the list moves by the gap.
+  // Keeps the note above the pinned footer: it scrolls to the end (its counter and hint show).
   const reveal = useCallback(() => {
-    const ref = focused.current, sv = scrollRef.current, footer = footerRef.current
-    if (!ref?.current || !sv) return
-    if (ref === noteInput) { sv.scrollToEnd({ animated: !reduce }); return }
-    if (!footer) return
-    sv.measureInWindow((_sx, sy) => footer.measureInWindow((_fx, fy) => (focusedWrap.current?.current || ref.current)?.measureInWindow((_x, y, _w, h) => {
-      const bottom = y + h + space[16], top = y - space[16]
-      if (bottom > fy) sv.scrollTo({ y: Math.max(0, scrollY.current + (bottom - fy)), animated: !reduce })
-      else if (top < sy) sv.scrollTo({ y: Math.max(0, scrollY.current - (sy - top)), animated: !reduce })
-    })))
+    if (focused.current && scrollRef.current) scrollRef.current.scrollToEnd({ animated: !reduce })
   }, [reduce])
   useEffect(() => {
     if (kbTop == null) return
     const ids = [setTimeout(reveal, 60), setTimeout(reveal, 320)]   // again once the footer lift has settled
     return () => ids.forEach(clearTimeout)
   }, [kbTop, reveal])
-  const focusReveal = useCallback((ref, wrap) => { onFocusInput(ref, wrap); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
+  const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
   const msgKey = ageGate ? 'eateryOrderAdultOnly' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && ['generic', 'rate', 'account'].includes(orderError) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
@@ -310,7 +262,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
-      <SafeAreaView style={st.page} edges={['top']}>
+      <SafeAreaView style={st.page} edges={['top']} {...(covered ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
         <ScreenHeader lang={lang} title={t('eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
@@ -336,7 +288,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
                 ))}
               </Card>
               <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              <DeliveryCard lang={lang} open={open} delivery={delivery} onDelivery={onDelivery} inputs={addrInputs} wraps={addrWraps} onFocusInput={focusReveal} onBlurInput={onBlurInput} />
+              <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />
               <Card>
                 <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
                 <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
@@ -407,13 +359,14 @@ const st = StyleSheet.create({
   optText:   { flex: 1, ...type.body, color: colors.textPrimary },
   optTextOn: { fontFamily: font.semibold, color: colors.primaryDark },
   addr:      { marginTop: space[12], gap: space[8] },
-  fieldLabel:{ ...type.small, fontFamily: font.semibold, color: colors.textPrimary, marginBottom: space[4] },
-  field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
-  locRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
-  locText:   { flex: 1, ...type.body, color: colors.textPrimary },
-  locFail:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8] },
-  locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
-  locNote:   { ...type.small, color: colors.textSecondary },
+  sum:       { padding: space[12], gap: space[12], borderRadius: radii.card, backgroundColor: colors.soft, overflow: 'hidden' },   // the map inside keeps radii.md: the strip's own corners sit 12pt (the padding) away from it, so the clip never reaches the map's attribution
+  sumHead:   { flexDirection: 'row', alignItems: 'center', gap: space[12] },
+  sumMain:   { flex: 1, gap: 2 },   // label and address read as one pair: closer than space[4]
+  sumLabel:  { ...type.rowTitle, color: colors.textPrimary },
+  sumText:   { ...type.body, color: colors.textPrimary },
+  map:       { height: MAP_H, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.border },
+  mapPin:    { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  mapPinIcon:{ marginBottom: PIN },
   clear:     { alignSelf: 'flex-start', marginTop: -space[8] },
   totalRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   totalLabel:{ ...type.sectionHeading, color: colors.textPrimary },
