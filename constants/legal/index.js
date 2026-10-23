@@ -64,7 +64,11 @@ import TERMS_TR   from './terms.tr.js'
 // because check-legal-live reads "Version YYYY-MM-DD" strictly): delivery choice in Sepetim — address, choice and
 // optional location go only into the WhatsApp message, the last address is kept in the app on the phone. Also
 // replaces the policy-updated notice text, which still described the 2026-10-08 change. Terms unchanged.
-export const LEGAL_VERSION = '2026-10-23'
+// Bumped 2026-10-23 -> 2026-10-24 (shipped 2026-10-23 evening or later; strict date for check-legal-live, Berke's
+// rule: next date, or the actual ship date if later): Sepetim address book — up to 10 named delivery addresses with
+// a map pin and an optional phone for the delivery, kept in the app on the phone (Android backup disclosed), sent
+// only inside the WhatsApp message. Terms unchanged.
+export const LEGAL_VERSION = '2026-10-24'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue

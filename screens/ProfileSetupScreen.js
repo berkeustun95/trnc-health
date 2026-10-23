@@ -38,6 +38,7 @@ import {
   ActivityIndicator, Modal, Platform, Alert, Image,
 } from 'react-native'
 import { addBackListener } from '../utils/backHandler'
+import { clearBook } from '../utils/eateryAddress'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -574,6 +575,7 @@ export default function ProfileSetupScreen({
     if (hasAppleIdentity(session)) await revokeApple()
     const { error } = await supabase.rpc('delete_own_account')
     if (error) { setSaving(false); setSaveError('pgSaveError'); return }
+    await clearBook()
     onAgeIneligibleDeleted()
     await supabase.auth.signOut()
   }
