@@ -4108,6 +4108,20 @@ WITH report AS (
       AND COALESCE(obj_description(to_regprocedure('public.is_order_tester(uuid)'), 'pg_proc') LIKE '%20261132.', false)
       AND COALESCE(obj_description(to_regclass('public.order_testers'), 'pg_class') LIKE '%20261132.', false)
       AND COALESCE(col_description(to_regclass('public.eatery_orders'), (SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_orders') AND a.attname = 'is_test' AND NOT a.attisdropped)) LIKE '%20261132.', false)
+    -- 1133: Berke's two tester rows. Located by the SHA-256 of the lower-cased e-mail (no id or e-mail in this public file).
+    -- order_testers exists only after 1132, so it is read through query_to_xml (SQL text, run only when called) behind a
+    -- to_regclass CASE: before 1132/1133 this plans and reads false/true without ever naming a missing table.
+    UNION ALL SELECT '20261133_order_testers_berke','order_testers holds the fingerprints of both Berke accounts, once 1133 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261133_order_testers_berke.sql')
+      OR CASE WHEN to_regclass('public.order_testers') IS NULL THEN false ELSE
+           (xpath('/row/n/text()', query_to_xml($q$
+              SELECT count(*) AS n FROM auth.users u
+               WHERE encode(pg_catalog.sha256(pg_catalog.convert_to(lower(u.email), 'UTF8')), 'hex') IN
+                     ('e5c89d1732071519678ad760eee802f4eeb2e214aaed8e24e7aa7b956d0e0d0a', 'c5f67310246afe9b8deb939625d530743650b4412bcbf3ba5e852956130a025c')
+                 AND EXISTS (SELECT 1 FROM public.order_testers t
+                              WHERE t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(u.id::text, 'UTF8')), 'hex'))
+            $q$, false, true, '')))[1]::text::int = 2
+         END
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',
