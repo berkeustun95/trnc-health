@@ -270,7 +270,7 @@ const EXPECTED_SCALARS = {
   // before 2026-09-13, and runtimeVersion.policy 'appVersion' does not fence them. A
   // working-tree flip riding out on an unrelated `npm run ota` would expose a module whose
   // primary CTA cannot work on any install that has not taken the new build.
-  CONNECTIVITY_LIVE:     false,
+  CONNECTIVITY_LIVE:     true,
   // Social sign-in kill-switch. Baselined TRUE: a working-tree flip to false left over from
   // testing the email-only screen would ship a sign-in screen that has silently dropped
   // Google and Apple — and locked every social-only account out with it.
