@@ -145,7 +145,7 @@ try {
   res = await fetch(url, { signal: ctl.signal, headers: { Accept: 'application/json' } })
   body = await res.text()
 } catch (e) {
-  fail(`Could not reach the feed (${mask(url)}): ${e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : e.message}`)
+  fail(`Could not reach the feed (${mask(url)}): ${e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''}`)
 } finally { clearTimeout(timer) }
 
 let rows
