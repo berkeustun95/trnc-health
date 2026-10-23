@@ -63,4 +63,24 @@ for (const [name, seed, uidA, msg] of [
   await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
   t(`${name}: nothing inserted`, (await q(d, `SELECT count(*)::int n FROM public.order_testers`))[0].n, 1)
 }
+
+console.log('verify_schema token for 1133')
+{
+  const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
+  const a = VS.indexOf("UNION ALL SELECT '20261133_order_testers_berke'"); if (a < 0) throw new Error('token missing')
+  const b = VS.indexOf('\n    -- ', a + 10)
+  const expr = VS.slice(a, b).replace(/^UNION ALL SELECT '20261133_order_testers_berke','[^']*',\s*/, '')
+  const swapped = expr.replace(/'[0-9a-f]{64}', '[0-9a-f]{64}'/, `'${h(A.email)}', '${h(B.email)}'`)
+  t('token text swapped to fixtures (landed)', swapped.includes(h(A.email)) && swapped.includes(h(B.email)), true)
+  const run = async (d) => { try { return (await q(d, `SELECT (${swapped}) AS ok`))[0].ok } catch (e) { return 'ERROR: ' + e.message } }
+  const bare = await freshDb(`ALTER TABLE auth.users ADD COLUMN email text, ADD COLUMN is_anonymous boolean NOT NULL DEFAULT false;`)
+  await bare.exec(users())
+  t('before 1132 (no order_testers), 1133 not applied: reads true, no error', await run(bare), true)
+  await bare.exec(`INSERT INTO public.schema_migrations_applied (filename, checksum) VALUES ('20261133_order_testers_berke.sql','x')`)
+  t('ledger says applied but the table is missing: reads false, no error', await run(bare), false)
+  const d = await db(L1132 + users()); await applyFile(d, variant())
+  t('after a real apply: reads true', await run(d), true)
+  await d.exec(`DELETE FROM public.order_testers WHERE note = 'Berke live checks (B)'`)
+  t('one tester row deleted later: reads false (red)', await run(d), false)
+}
 console.log(bad ? `\n${bad} FAILED` : '\nall passed'); process.exit(bad ? 1 : 0)
