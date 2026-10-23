@@ -527,9 +527,6 @@ const SAME_AS_ENGLISH = {
   'hospital':             { Spanish: 'Hospital is Spanish' },
 
   // Brand / technical terms that are the same word everywhere by design.
-  'menuEsim':             { Turkish: 'eSIM is the technical term worldwide', Arabic: 'eSIM worldwide',
-                            Russian: 'eSIM worldwide', Greek: 'eSIM worldwide', French: 'eSIM worldwide',
-                            Spanish: 'eSIM worldwide', German: 'eSIM worldwide', Persian: 'eSIM worldwide' },
   // 'Garage' IS the French word for an auto repair shop. Declared explicitly in the
   // locale table rather than left absent, so this line records a decision and not the
   // oversight it was in the other six locales until 2026-08-26.
