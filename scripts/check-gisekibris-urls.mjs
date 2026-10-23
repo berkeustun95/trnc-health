@@ -133,7 +133,7 @@ async function probe(ev) {
         note: landedOn404 ? `redirected to ${r.finalUrl}` : null,
       }
     } catch (e) {
-      last = e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : e.message
+      last = e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : `${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''} · ${url}`
     }
   }
   return { ev, status: null, ok: false, cancelled: null, note: last }

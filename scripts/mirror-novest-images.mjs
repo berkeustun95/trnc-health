@@ -123,6 +123,7 @@ async function politeFetch(url) {
   if (wait > 0) await new Promise(r => setTimeout(r, wait))
   lastFetchAt = Date.now()
   const res = await fetch(url, { headers: { 'User-Agent': 'ADA-TRNC-Health/1.0 (+partner image mirror)' } })
+    .catch(e => { throw new Error(`GET ${url}: ${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''}`) })
   if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`)
   return { body: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || '' }
 }
