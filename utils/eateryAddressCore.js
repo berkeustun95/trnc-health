@@ -1,6 +1,6 @@
 // Delivery address book, the pure half (no AsyncStorage, so plain Node can test it). utils/eateryAddress.js is the storage half.
 // This file must not import supabase or logContactEvent (test-eatery-order.mjs).
-import { oneLine, sanitizeAddressField, addressKind, addressComplete, ADDRESS_BOOK_MAX, ADDRESS_NAME_MAX, ADDRESS_UNIT_MAX, ADDRESS_DIRECTIONS_MAX } from '../constants/eatery.js'
+import { oneLine, normalizePhone, sanitizeAddressField, addressKind, addressComplete, ADDRESS_BOOK_MAX, ADDRESS_NAME_MAX, ADDRESS_UNIT_MAX, ADDRESS_DIRECTIONS_MAX } from '../constants/eatery.js'
 
 export { ADDRESS_BOOK_MAX, ADDRESS_NAME_MAX, ADDRESS_UNIT_MAX, ADDRESS_DIRECTIONS_MAX }
 export const BOOK_KEY = 'ada.eateryAddresses.v1'
@@ -29,6 +29,7 @@ export function normalizeEntry(raw) {
     floor: oneLine(raw.floor, ADDRESS_UNIT_MAX),
     flat: oneLine(raw.flat, ADDRESS_UNIT_MAX),
     directions: oneLine(raw.directions, ADDRESS_DIRECTIONS_MAX),
+    callPhone: normalizePhone(raw.callPhone).value ?? null,   // malformed stored value -> null
     lat: pin.lat,
     lng: pin.lng,
     updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0,

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Keyboard, AccessibilityInfo, ActivityIndicator, Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Keyboard, Platform, AccessibilityInfo, ActivityIndicator, Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ADDRESS_FIELD_MAX, ADDRESS_NAME_MAX, ADDRESS_UNIT_MAX, ADDRESS_DIRECTIONS_MAX, addressMissing } from '../constants/eatery'
+import { ADDRESS_FIELD_MAX, ADDRESS_NAME_MAX, ADDRESS_UNIT_MAX, ADDRESS_DIRECTIONS_MAX, PHONE_INPUT_MAX, addressMissing, normalizePhone, formatPhone } from '../constants/eatery'
 import { NICOSIA, districtPrefill } from '../constants/deliveryAreas'
 import { addAddress, updateAddress, deleteAddress, setLastUsed, ADDRESS_BOOK_MAX } from '../utils/eateryAddress'
 import { quietFix, useLocate } from '../utils/deliveryLocate'
@@ -19,14 +19,14 @@ import DeliveryPinPicker from './DeliveryPinPicker'
 // Defined outside the screen so typing never remounts it. seed: the delivery state of the entry being edited, or null for a new one.
 
 const KINDS = [['home', 'home-outline', 'eateryAddrKindHome'], ['work', 'briefcase-outline', 'eateryAddrKindWork'], ['other', 'location-outline', 'eateryAddrKindOther']]
-const FIELD_KEYS = ['name', 'district', 'street', 'building', 'floor', 'flat', 'directions']
+const FIELD_KEYS = ['name', 'district', 'street', 'building', 'floor', 'flat', 'directions', 'phone']
 const MISSING_LABEL = { name: 'eateryAddrOtherName', district: 'eateryDeliveryDistrict', street: 'eateryDeliveryStreet', building: 'eateryDeliveryBuilding' }
 const STEP_TITLE = { 1: 'eateryAddrNameTitle', 2: 'eateryAddrLocTitle', 3: 'eateryAddrDetailsTitle' }
 const STEPS = 3
 
 const toDraft = seed => ({
   kind: seed?.kind || 'home', name: seed?.name || '', district: seed?.district || '', street: seed?.street || '', building: seed?.building || '',
-  floor: seed?.floor || '', flat: seed?.flat || '', directions: seed?.directions || '', coords: seed?.coords || null,
+  floor: seed?.floor || '', flat: seed?.flat || '', directions: seed?.directions || '', phone: formatPhone(seed?.callPhone), coords: seed?.coords || null,
 })
 const newReg = () => ({ input: { current: null }, wrap: { current: null } })
 
@@ -53,7 +53,7 @@ function OptionRow({ icon, title, onPress, busy, busyTitle }) {
   )
 }
 
-function Field({ label, value, onChange, max, reg, onFocusField, onBlurField, error, tag, multiline, placeholder, next, autoCapitalize = 'words' }) {
+function Field({ label, value, onChange, max, reg, onFocusField, onBlurField, error, tag, multiline, placeholder, next, autoCapitalize = 'words', hint, onBlurValue, inputProps }) {
   return (
     <View ref={reg.wrap} collapsable={false}>
       <View style={s.labelRow}>
@@ -62,10 +62,11 @@ function Field({ label, value, onChange, max, reg, onFocusField, onBlurField, er
       </View>
       <TextInput ref={reg.input} style={[s.field, multiline && s.fieldMulti, !!error && s.fieldBad]} value={value} onChangeText={onChange} maxLength={max}
         multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} placeholder={placeholder} placeholderTextColor={colors.textSecondary}
-        autoCapitalize={autoCapitalize} autoCorrect={false} autoComplete="off" importantForAutofill="no" textContentType="none" accessibilityLabel={label}
+        autoCapitalize={autoCapitalize} autoCorrect={false} autoComplete="off" importantForAutofill="no" textContentType="none" accessibilityLabel={label} accessibilityHint={hint}
         returnKeyType={next ? 'next' : 'done'} blurOnSubmit={!next} onSubmitEditing={() => next?.input.current?.focus()}
-        onFocus={() => onFocusField(reg)} onBlur={() => onBlurField(reg)} />
-      {!!error && <Text style={s.error}>{error}</Text>}
+        onFocus={() => onFocusField(reg)} onBlur={() => { onBlurField(reg); onBlurValue?.() }} {...inputProps} />
+      {!!hint && !error && <Text style={s.hint} accessible={false} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{hint}</Text>}
+      {!!error && <Text style={s.error} accessibilityLiveRegion="polite">{error}</Text>}
     </View>
   )
 }
@@ -79,6 +80,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   const [mapDistrict, setMapDistrict] = useState('')   // the Mahalle the map filled in: its "Haritadan" tag shows until it is edited
   const [nameTried, setNameTried] = useState(false)
   const [tried, setTried] = useState(false)
+  const [phoneTried, setPhoneTried] = useState(false)   // the phone is checked on blur and on save, not on every keystroke
   const [saving, setSaving] = useState(false)
   const [saveErr, setSaveErr] = useState(null)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -209,9 +211,19 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   // ─── step 3 ───
   const missing = addressMissing(draft)
   const missingText = tried && missing.length ? t('eateryAddrMissing', lang).replace('{fields}', () => missing.map(k => t(MISSING_LABEL[k], lang)).join(', ')) : null
+  const phoneBad = phoneTried && !normalizePhone(draft.phone).ok
+  const phoneBlur = () => {
+    const r = normalizePhone(draft.phone)
+    if (r.ok) { set({ phone: formatPhone(r.value) }); return }
+    setPhoneTried(true)
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility?.(t('eateryAddrPhoneInvalid', lang))   // Android's live region on the error Text speaks it
+  }
   const errFor = k => (tried && missing.includes(k) ? t('eateryAddrFieldMissing', lang) : null)
   const save = async () => {
     if (saving) return
+    const phone = normalizePhone(draft.phone)
+    const phoneShown = phoneTried
+    if (!phone.ok) setPhoneTried(true)
     if (missing.length) {
       setTried(true)
       setSaveErr(null)
@@ -220,12 +232,18 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
       reg[missing[0]].input.current?.focus()
       return
     }
+    if (!phone.ok) {
+      setSaveErr(null)
+      if (Platform.OS === 'ios' || phoneShown) AccessibilityInfo.announceForAccessibility?.(t('eateryAddrPhoneInvalid', lang))   // Android: the live region fires only when the error first appears
+      reg.phone.input.current?.focus()
+      return
+    }
     Keyboard.dismiss()
     setSaving(true)
     setSaveErr(null)
     const entry = {
       kind: draft.kind, name: draft.kind === 'other' ? draft.name : '', district: draft.district, street: draft.street, building: draft.building,
-      floor: draft.floor, flat: draft.flat, directions: draft.directions, lat: draft.coords?.lat ?? null, lng: draft.coords?.lng ?? null,
+      floor: draft.floor, flat: draft.flat, directions: draft.directions, lat: draft.coords?.lat ?? null, lng: draft.coords?.lng ?? null, callPhone: phone.value,
     }
     const r = editing ? await updateAddress(seed.addressId, entry) : await addAddress(entry)
     if (r.ok) await setLastUsed(r.item.id)
@@ -267,7 +285,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
         ) : (
           <>
             <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content}
-              keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}
               onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y }} scrollEventThrottle={16}>
               <Text style={s.stepTitle} accessibilityRole="header">{t(STEP_TITLE[step], lang)}</Text>
               {step === 1 && (
@@ -325,6 +343,10 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
                   </View>
                   <Field label={t('eateryAddrDirections', lang)} value={draft.directions} onChange={v => set({ directions: v })} max={ADDRESS_DIRECTIONS_MAX} reg={reg.directions} multiline
                     onFocusField={focusField} onBlurField={onBlurField} placeholder={t('eateryAddrDirectionsPlaceholder', lang)} autoCapitalize="sentences" />
+                  <Field label={t('eateryAddrPhone', lang)} value={draft.phone} onChange={v => { setPhoneTried(false); set({ phone: v }) }} max={PHONE_INPUT_MAX} reg={reg.phone}
+                    onFocusField={focusField} onBlurField={onBlurField} onBlurValue={phoneBlur} hint={t('eateryAddrPhoneHint', lang)} autoCapitalize="none"
+                    error={phoneBad ? t('eateryAddrPhoneInvalid', lang) : null}
+                    inputProps={{ keyboardType: 'phone-pad', textContentType: 'telephoneNumber', autoComplete: 'tel', importantForAutofill: 'yes' }} />
                   {editing && <Button variant="text" icon="trash-outline" title={t('eateryDeliveryClear', lang)} onPress={() => { setSaveErr(null); setConfirmDel(true) }} style={s.del} />}
                 </>
               )}
@@ -382,6 +404,7 @@ const s = StyleSheet.create({
   field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   fieldMulti:{ minHeight: 72, maxHeight: 140 },
   fieldBad:  { borderColor: colors.dangerInk },
+  hint:      { ...type.small, color: colors.textSecondary, marginTop: space[4] },
   error:     { ...type.small, color: colors.dangerInk, marginTop: space[4] },
   err:       { ...type.small, color: colors.dangerInk, textAlign: 'center' },
   pair:      { flexDirection: 'row', gap: space[12] },
