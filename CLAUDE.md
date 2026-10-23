@@ -353,6 +353,10 @@ before every production OTA, web deploy, flag flips, version bumps. One question
 **Branch ruleset `protect-release-lanes`** (2026-10-12): `main`, `feat/voice-input`, `release/**` need a pull
 request, no force-push, no deletion; only Berke's admin role bypasses (a Mac push prints "Bypassed rule
 violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal repo it counts as admin and bypasses.
+**Who merges** (Berke, 2026-10-23): Code on this Mac (`ada-claude-code[bot]`) merges its OWN PRs to `main` /
+`feat/voice-input` (`gh pr merge`, allowed in the Mac-only `.claude/settings.local.json`; no ruleset bypass, the
+0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
+Berke's `production-db` approval.
 
 **Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
 team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
