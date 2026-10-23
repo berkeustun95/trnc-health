@@ -357,6 +357,7 @@ violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal re
 `feat/voice-input` (`gh pr merge`, allowed in the Mac-only `.claude/settings.local.json`; no ruleset bypass, the
 0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
 Berke's `production-db` approval.
+Sync PRs from `main` into a release branch (`feat/voice-input`, `release/**`) count as Mac Code's own PRs.
 
 **Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
 team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
