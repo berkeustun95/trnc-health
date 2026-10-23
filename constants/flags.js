@@ -640,7 +640,7 @@ export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 //   separate words and were already safe; those two were the only offenders.
 //
 // Reverting is this one boolean, and so is the emergency direction.
-export const CONNECTIVITY_LIVE = false
+export const CONNECTIVITY_LIVE = true
 
 // ─── SOCIAL SIGN-IN — A KILL-SWITCH, SO IT DEFAULTS ON ──────────────────────
 //
