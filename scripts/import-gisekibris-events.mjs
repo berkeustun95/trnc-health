@@ -608,7 +608,8 @@ function fetchableImageUrl(url) {
 }
 
 async function mirrorOne(row) {
-  const res = await fetch(fetchableImageUrl(row.source_image_url))
+  const url = fetchableImageUrl(row.source_image_url)
+  const res = await fetch(url).catch(e => { throw new Error(`download ${url}: ${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''}`) })
   if (!res.ok) throw new Error(`download ${res.status} ${res.statusText}`)
   const contentType = res.headers.get('content-type') || 'image/jpeg'
   if (!contentType.toLowerCase().startsWith('image/')) {
