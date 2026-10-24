@@ -138,7 +138,7 @@ t('extras: tenders on 13 dishes (10 burgers + 3 boxes, not Kids), burger peyniri
 t('Kids Box has no option at all', (await q(db, `SELECT count(*)::int n FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name = 'Crunchy Kids Box'`))[0].n, 0)
 t('pork bacon label says pork in all nine languages',
   (await q(db, `SELECT label_i18n ->> 'English' en, label_i18n ->> 'Turkish' tr, label_i18n ->> 'Arabic' ar, label_i18n ->> 'Russian' ru, label_i18n ->> 'Greek' el, label_i18n ->> 'French' fr, label_i18n ->> 'Spanish' es, label_i18n ->> 'German' de, label_i18n ->> 'Persian' fa FROM public.eatery_item_options WHERE message_tr = 'domuz bacon' LIMIT 1`))
-    .map(r => [/pork/i.test(r.en), /domuz/i.test(r.tr), /خنزير/.test(r.ar), /свин/i.test(r.ru), /χοιριν/.test(r.el), /porc/i.test(r.fr), /cerdo/i.test(r.es), /schwein/i.test(r.de), /خوک/.test(r.fa)].every(Boolean)), [true])
+    .map(r => [/pork/i.test(r.en), /domuz/i.test(r.tr), /خنزير/.test(r.ar), /свин/i.test(r.ru), /χοιριν/i.test(r.el), /porc/i.test(r.fr), /cerdo/i.test(r.es), /schwein/i.test(r.de), /خوک/.test(r.fa)].every(Boolean)), [true])
 console.log('  sample rows (dish | kind | sort | message_tr | English | Turkish):')
 for (const r of await q(db, `SELECT i.name, o.kind, o.sort_order, o.message_tr, o.label_i18n ->> 'English' en, o.label_i18n ->> 'Turkish' tr
     FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
