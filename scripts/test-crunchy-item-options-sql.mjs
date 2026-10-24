@@ -1,4 +1,4 @@
-// 20261135_crunchy_express_item_options.sql (data) against the PGlite harness (PostgreSQL 18; prod is older).
+// 20261135_crunchy_express_item_options.sql and 20261136_crunchy_express_options_owner_answers.sql (data, the owner's answers) against the PGlite harness (PostgreSQL 18; prod is older).
 // Fixture: the SAME fixture text as scripts/test-eatery-orders-sql.mjs (sliced, not retyped) + the 20261120 preview-key policies,
 // then the REAL 20261116, 20261117, 20261122 (Crunchy's 46-dish menu), 20261125, 20261132 and 20261134 files, then Crunchy made live
 // (what 20261127 does; its own gates are tested in test-crunchy-launch-sql.mjs). Proves:
@@ -7,6 +7,7 @@
 //   (positive control); the verify_schema token is red before / green after and never errors;
 //   RED-FIRST: a renamed dish, a missing dictionary message, a duplicated dish, a partial state, a foreign row and an
 //   inactive partner each make the apply FAIL with the readable message (anchor asserted present first).
+// 20261136 section (bottom): applies on the 1135 state, per-dish before/after, ids kept, re-run writes nothing, token, red-first mutants.
 // Not wired into package.json / pre-push / CI, like its siblings: run by hand.
 //
 //   node scripts/test-crunchy-item-options-sql.mjs
@@ -19,6 +20,8 @@ import { freshDb, applyFile, asRole } from './migration-harness.mjs'
 const M = (n) => fileURLToPath(new URL(`../supabase/migrations/${n}`, import.meta.url))
 const F1135 = M('20261135_crunchy_express_item_options.sql')
 const SQL = readFileSync(F1135, 'utf8')
+const F1136 = M('20261136_crunchy_express_options_owner_answers.sql')
+const SQL36 = readFileSync(F1136, 'utf8')
 const PRIOR = readFileSync(M('20261115_eatery_partners.sql'), 'utf8')
 const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners'), b = PRIOR.indexOf('-- ─── Storage bucket')
 const s0 = PRIOR.indexOf('-- ─── Seed: Crunchy Express, INACTIVE'), s1 = PRIOR.indexOf('-- ─── contact_events: module')
@@ -101,7 +104,7 @@ const pre = await state(db)
 t('fixture: Crunchy live with its 46 dishes and no option rows', [pre.active, pre.items, pre.opts], [true, 46, 0])
 t('verify_schema 1135 token BEFORE apply: no error, red', await (async () => {
   const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
-  const i0 = VS.indexOf("    UNION ALL SELECT '20261135_crunchy_express_item_options'"), i1 = VS.indexOf('    -- ── 1134: per-dish options')
+  const i0 = VS.indexOf("    UNION ALL SELECT '20261135_crunchy_express_item_options'"), i1 = VS.indexOf("    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers'")
   if (i0 < 0 || i1 < i0) return 'token anchors missing'
   globalThis.TOK = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS.slice(i0, i1)}) z`
   try { return (await q(db, globalThis.TOK)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] }
@@ -199,6 +202,161 @@ await refused('a Crunchy dish removed from the menu', F1135, 'not matching exact
   const r = await applyFile(d, F1135); await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
   t('20261134 not in the ledger aborts', [r.ok, (r.msg || '').includes('is not in the ledger')], [false, true])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 20261136 — the owner's answers, applied on the 20261135 state
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n20261136_crunchy_express_options_owner_answers — on the 1135 state')
+const NAME36 = '20261136_crunchy_express_options_owner_answers.sql'
+const after1135 = async () => { const d = await prepared(); const r = await applyFile(d, F1135); if (!r.ok) throw new Error('1135: ' + r.msg); return d }
+const mutant36 = (name, pairs) => {
+  let text = SQL36
+  for (const [from, to] of pairs) {
+    const n = text.split(from).length - 1
+    if (n !== 1) { bad++; console.log(`  ✗ ${name}: anchor ${JSON.stringify(from.slice(0, 70))} found ${n}x`); return null }
+    text = text.replace(from, () => to)
+  }
+  const p = join(dir, name.replace(/\W+/g, '_') + '.sql'); writeFileSync(p, text); return p
+}
+const led36 = async (d) => (await q(d, `SELECT count(*)::int n FROM public.schema_migrations_applied WHERE filename = '${NAME36}'`))[0].n
+const refused36 = async (name, file, wantMsg, prep = async () => {}) => {
+  if (!file) return
+  const d = await after1135(); await prep(d)
+  const before = await state(d)
+  const r = await applyFile(d, file)
+  t(`${name}: apply FAILS with "${wantMsg}"`, [r.ok, (r.msg || '').includes(wantMsg)], [false, true])
+  console.log(`      ${r.ok ? '(applied!)' : r.msg}`)
+  await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  const after = await state(d)
+  t(`${name}: nothing written (option rows ${before.opts} -> ${after.opts}, md5 equal), no ledger row`,
+    [after.opts_md5, await led36(d)], [before.opts_md5, 0])
+}
+const dishRows = (d) => q(d, `SELECT i.name dish, o.kind, o.sort_order ord, o.message_tr msg, o.price::float8 price, o.max_qty qty, o.id::int id
+  FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id ORDER BY i.name, o.kind DESC, o.sort_order, o.id`)
+const fmt = (rows, dish) => rows.filter(r => r.dish === dish).map(r => `${r.kind === 'remove' ? '-' : '+'}${r.msg}${r.price != null ? ' ' + r.price : ''}`).join(' | ')
+
+const d36 = await after1135()
+const rows0 = await dishRows(d36)
+const st0 = await state(d36)
+const sec0 = await q(d36, `SELECT i.section, count(*) FILTER (WHERE o.kind = 'remove')::int rm, count(*) FILTER (WHERE o.kind = 'extra')::int ex FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id GROUP BY 1 ORDER BY 1`)
+t('1135 state: 107 rows (73 removals + 34 hidden extras)', [rows0.length, rows0.filter(r => r.kind === 'remove').length, rows0.filter(r => r.kind === 'extra' && r.price == null).length], [107, 73, 34])
+t('verify_schema 1136 token BEFORE apply: no error, red', await (async () => {
+  const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
+  const i0 = VS.indexOf("    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers'"), i1 = VS.indexOf('    -- ── 1134: per-dish options')
+  if (i0 < 0 || i1 < i0) return 'token anchors missing'
+  globalThis.TOK36 = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS.slice(i0, i1)}) z`
+  try { return (await q(d36, globalThis.TOK36)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] } })(), [false])
+t('verify_schema 1136 token with the table MISSING (prod before 1134): no error, red', await (async () => {
+  const d = await freshDb(FIXTURE)
+  try { return (await q(d, globalThis.TOK36)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] } })(), [false])
+
+const r36 = await applyFile(d36, F1136)
+console.log('  apply:', r36.ok ? 'ok' : r36.msg)
+t('1136 applies cleanly on the 1135 state (in-file asserts green)', r36, { ok: true, msg: null })
+if (!r36.ok) process.exit(1)
+const rows1 = await dishRows(d36)
+const st1 = await state(d36)
+const kinds = await q(d36, `SELECT kind, count(*)::int n, count(DISTINCT item_id)::int dishes, count(*) FILTER (WHERE price IS NULL)::int hidden FROM public.eatery_item_options GROUP BY kind ORDER BY kind DESC`)
+console.log('  derived from the table:', JSON.stringify(kinds))
+t('new counts: 77 removals on 19 dishes, 19 visible extras on 9 dishes, 0 hidden', kinds, [{ kind: 'remove', n: 77, dishes: 19, hidden: 77 }, { kind: 'extra', n: 19, dishes: 9, hidden: 0 }])
+t('menu untouched, 96 option rows', [st1.items, st1.opts, st1.menu_md5 === st0.menu_md5], [46, 96, true])
+
+console.log('  per dish, before -> after (- removal, + extra with TL price):')
+for (const dish of [...new Set([...rows0, ...rows1].map(r => r.dish))]) {
+  const b = fmt(rows0, dish), a = fmt(rows1, dish)
+  if (b !== a) console.log(`    ${dish}\n      before: ${b}\n      after:  ${a}`)
+}
+const unchanged = [...new Set(rows0.map(r => r.dish))].filter(x => fmt(rows0, x) === fmt(rows1, x))
+console.log('  unchanged dishes:', unchanged.join(', '))
+
+const g = (dish, kind) => rows1.filter(r => r.dish === dish && r.kind === kind).map(r => r.msg)
+t('BBQ Chicken Burger: barbekü soslu turşusuz is gone, barbekü sossuz + turşusuz in its place',
+  g('Crunchy BBQ Chicken Burger', 'remove'), ['peynirsiz', 'çıtır soğansız', 'barbekü sossuz', 'turşusuz'])
+t('Pineapple +marulsuz, TNT +füme peynirsiz, Buffalo Nachos +buffalo sossuz',
+  [g('Pineapple Chicken Burger', 'remove').at(-1), g('TNT Chicken Burger', 'remove').at(-1), g('Buffalo Nachos', 'remove').at(-1)], ['marulsuz', 'füme peynirsiz', 'buffalo sossuz'])
+t('renames: Nashville özel sossuz, Buffalo Chicken buffalo sossuz, Classic Nachos jalapeño turşusuz',
+  [g('Nashville Tavuk Burger', 'remove')[1], g('Buffalo Chicken Burger', 'remove')[0], g('Crunchy Classic Nachos', 'remove')[0]], ['özel sossuz', 'buffalo sossuz', 'jalapeño turşusuz'])
+t('Express / BBQ / Trüf / Big Pork / Jalapeño Drip: köfte 250, dana bacon 90, hellim 85 (in that order)',
+  ['Express Smash Burger', 'BBQ Smash Burger', 'Trüf Smash Burger', 'Big Pork Smash Burger', 'Jalapeño Drip Smash Burger']
+    .map(x => rows1.filter(r => r.dish === x && r.kind === 'extra').map(r => `${r.msg}:${r.price}`).join(',')),
+  Array(5).fill('köfte:250,dana bacon:90,hellim:85'))
+t('Veggy Smash Burger: hellim 85 only (no köfte, no bacon)', rows1.filter(r => r.dish === 'Veggy Smash Burger' && r.kind === 'extra').map(r => `${r.msg}:${r.price}`), ['hellim:85'])
+t('three Nachos: eritilmiş peynir sos 110, own row', ['Crunchy Classic Nachos', 'Buffalo Nachos', 'Hot Honey Nachos'].map(x => rows1.filter(r => r.dish === x && r.kind === 'extra').map(r => `${r.msg}:${r.price}`).join()), Array(3).fill('eritilmiş peynir sos:110'))
+t('deleted for good: no tavuk tenders / burger peyniri / cheddar / jalapeño / domuz bacon EXTRA anywhere (positive control: 19 extras remain)',
+  [rows1.filter(r => r.kind === 'extra' && ['tavuk tenders', 'burger peyniri', 'cheddar', 'jalapeño', 'domuz bacon'].includes(r.msg)).length, rows1.filter(r => r.kind === 'extra').length], [0, 19])
+t('no Box dish has any option; no chicken burger has an extra; no burger has a sauce extra',
+  [rows1.filter(r => r.dish.includes('Box')).length, rows1.filter(r => r.dish.includes('Chicken Burger') && r.kind === 'extra').length,
+   rows1.filter(r => r.kind === 'extra' && /sos/.test(r.msg) && r.dish.includes('Burger')).length], [0, 0, 0])
+// ids: in-place rows keep their id, replaced rows get new ones
+const idOf = (rows, dish, kind, msg) => rows.find(r => r.dish === dish && r.kind === kind && r.msg === msg)?.id
+t('rename in place keeps the option id: Nashville / Buffalo Chicken / Classic Nachos removal',
+  [idOf(rows0, 'Nashville Tavuk Burger', 'remove', 'çıtır özel sossuz') === idOf(rows1, 'Nashville Tavuk Burger', 'remove', 'özel sossuz'),
+   idOf(rows0, 'Buffalo Chicken Burger', 'remove', 'acı sossuz') === idOf(rows1, 'Buffalo Chicken Burger', 'remove', 'buffalo sossuz'),
+   idOf(rows0, 'Crunchy Classic Nachos', 'remove', 'jalapeñosuz') === idOf(rows1, 'Crunchy Classic Nachos', 'remove', 'jalapeño turşusuz')], [true, true, true])
+t('hidden köfte / dana bacon extras keep their id when they become visible (BBQ Smash)',
+  [idOf(rows0, 'BBQ Smash Burger', 'extra', 'köfte') === idOf(rows1, 'BBQ Smash Burger', 'extra', 'köfte'),
+   idOf(rows0, 'BBQ Smash Burger', 'extra', 'dana bacon') === idOf(rows1, 'BBQ Smash Burger', 'extra', 'dana bacon')], [true, true])
+t('BBQ Chicken: the old barbekü soslu turşusuz id is gone and not reused (a held basket must re-choose)',
+  [idOf(rows0, 'Crunchy BBQ Chicken Burger', 'remove', 'barbekü soslu turşusuz') !== undefined,
+   rows1.some(r => r.id === idOf(rows0, 'Crunchy BBQ Chicken Burger', 'remove', 'barbekü soslu turşusuz'))], [true, false])
+t('ids that survive = 107 - 27 deleted extras (13 tenders, 9 burger peyniri, 2 cheddar, 2 jalapeño, 1 domuz bacon) - 1 barbekü soslu turşusuz = 79',
+  rows0.filter(r => rows1.some(x => x.id === r.id)).length, 79)
+// labels
+const lab = await q(d36, `SELECT DISTINCT message_tr, label_i18n FROM public.eatery_item_options WHERE message_tr IN ('hellim','eritilmiş peynir sos','özel sossuz','buffalo sossuz','füme peynirsiz','jalapeño turşusuz') ORDER BY message_tr LIMIT 6`)
+console.log('  new ingredient labels:'); for (const l of lab) console.log('    ' + l.message_tr + ' => ' + JSON.stringify(l.label_i18n))
+t('every label of the file has exactly the nine full-English-name keys, none "tr"/"en"',
+  (await q(d36, `SELECT count(*)::int n FROM public.eatery_item_options WHERE NOT public.eatery_option_label_valid(label_i18n) OR label_i18n ? 'tr' OR label_i18n ? 'en'`))[0].n, 0)
+// anon + inactive control
+{
+  const anon = await asRole(d36, 'anon', null, `SELECT count(*)::int total, count(*) FILTER (WHERE kind = 'remove')::int removals, count(*) FILTER (WHERE kind = 'extra' AND price IS NOT NULL)::int priced_extras, count(*) FILTER (WHERE kind = 'remove' OR price IS NOT NULL)::int shown FROM public.eatery_item_options`)
+  t('anon reads 96 rows: 77 removals + 19 priced extras, all shown', anon.rows, [{ total: 96, removals: 77, priced_extras: 19, shown: 96 }])
+  const w = await asRole(d36, 'anon', null, `UPDATE public.eatery_item_options SET price = 1`)
+  t('anon cannot write (positive control: the SELECT above worked)', w.ok, false)
+}
+// re-run writes nothing
+const stA = await state(d36)
+t('1136 applies a SECOND time (re-runnable)', await applyFile(d36, F1136), { ok: true, msg: null })
+const stB = await state(d36)
+t('re-apply wrote nothing: rows, ids, identity sequence, menu all identical', [stB.opts, stB.opts_md5, stB.seq, stB.menu_md5], [stA.opts, stA.opts_md5, stA.seq, stA.menu_md5])
+t('verify_schema 1136 token AFTER apply: green; the 1135 token (ledger half only) still green', [(await q(d36, globalThis.TOK36)).map(r => r.ok), (await q(d36, globalThis.TOK)).map(r => r.ok)], [[true], [true]])
+{
+  await d36.exec(`UPDATE public.eatery_item_options SET price = 99 WHERE message_tr = 'hellim'`)
+  const r = await applyFile(d36, F1136)
+  await d36.exec('ROLLBACK').catch(() => {}); await d36.exec('RESET ROLE').catch(() => {})
+  t('a later price edit makes the re-run abort (neither state), nothing written', [r.ok, (r.msg || '').includes('neither the')], [false, true])
+}
+
+console.log('red-first mutants of 20261136 (each makes the apply FAIL, readable message):')
+await refused36('1135 not in the ledger', F1136, 'are not both in the ledger',
+  async (d) => { await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql'`) })
+await refused36('a 1135 row is missing', F1136, 'neither the',
+  async (d) => { await d.exec(`DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options)`) })
+await refused36('a 1135 extra already priced by hand', F1136, 'neither the',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET price = 25 WHERE kind = 'extra' AND message_tr = 'burger peyniri'`) })
+await refused36('a 1135 message hand-edited', F1136, 'neither the',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET message_tr = 'turşu yok' WHERE message_tr = 'acı sossuz'`) })
+await refused36('a foreign extra row on a Crunchy dish', F1136, 'neither the',
+  async (d) => { await d.exec(`INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT id, 'extra', (SELECT label_i18n FROM public.eatery_item_options LIMIT 1), 'sucuk', 10 FROM public.eatery_menu_items WHERE name = 'Veggy Smash Burger'`) })
+await refused36('partner not live', F1136, 'missing or not active',
+  async (d) => { await d.exec(`UPDATE public.eatery_partners SET is_active = false WHERE id = '${CID}'`) })
+await refused36('a Crunchy dish removed from the menu', F1136, 'not matching exactly one menu item',
+  async (d) => { await d.exec(`DELETE FROM public.eatery_menu_items WHERE partner_id = '${CID}' AND name = 'Hot Honey Nachos'`) })
+await refused36('renamed dish in the literal', mutant36('r36dish', [['["Veggy Smash Burger", ["peynir", "tursu", "burger_sos"], [["hellim"', '["Veggy Smash Burgerr", ["peynir", "tursu", "burger_sos"], [["hellim"']]), 'dish names not matching exactly one menu item: Veggy Smash Burgerr (0 matches)')
+await refused36('dictionary key missing (hellim used but not defined)', mutant36('r36key', [['[["hellim", 85]]]', '[["hellim_x", 85]]]']]), 'option without a dictionary entry or message')
+await refused36('an extra without a price', mutant36('r36price', [['[["hellim", 85]]]', '[["hellim"]]]']]), 'an extra without a positive price')
+await refused36('a removal key used as extra (no ex message)', mutant36('r36exmsg', [['[["hellim", 85]]]', '[["peynir", 85]]]']]), 'option without a dictionary entry or message')
+await refused36('a dictionary label with 8 languages', mutant36('r36lang', [['"Persian":"هالومی"', '"Farsi":"هالومی"']]), 'label not nine full-English-name languages')
+await refused36('a dictionary label with an ISO code key', mutant36('r36iso', [['"English":"Halloumi"', '"en":"Halloumi"']]), 'label not nine full-English-name languages')
+await refused36('a dish listed twice', mutant36('r36dup', [['["Hot Honey Nachos", ["aci_bal", "cheddar"], [[', '["Buffalo Nachos", ["parmesan"], []],\n    ["Hot Honey Nachos", ["aci_bal", "cheddar"], [[']]), 'a dish is listed twice')
+await refused36('rename whose source is not a 1135 row', mutant36('r36ren', [['"remove", "çıtır özel sossuz"', '"remove", "çıtır özel sosssuz"']]), 'a rename whose source is not a 20261135 row')
+await refused36('the same extra twice on one dish', mutant36('r36dupx', [['[["hellim", 85]]]', '[["hellim", 85],["hellim", 80]]]']]), 'duplicate (dish, kind, message)')
+await refused36('the write counts notice an UPDATE that did not happen (AND false)',
+  mutant36('r36noupd', [["AND r.r ->> 'src' = o.message_tr\n       AND (o.label_i18n", "AND r.r ->> 'src' = o.message_tr AND false\n       AND (o.label_i18n"]]), 'inserted 20 rows, expected 17')
+await refused36('the write counts notice a DELETE that did not happen (AND false)',
+  mutant36('r36nodel', [["WHERE o.item_id = i.id AND i.partner_id = c_id\n       AND NOT EXISTS", "WHERE o.item_id = i.id AND i.partner_id = c_id AND false\n       AND NOT EXISTS"]]), 'deleted 0 rows, expected')
+// the apply path is also guarded: break the write so the post-state notices (the write really is checked)
+await refused36('a zero price on a kept hidden extra is refused before any write',
+  mutant36('r36zero', [['"cheddar"], [["kofte", 250]', '"cheddar"], [["kofte", 0]']]), 'an extra without a positive price')
 
 console.log(bad ? `\n${bad} FAILED` : '\nall green')
 process.exit(bad ? 1 : 0)

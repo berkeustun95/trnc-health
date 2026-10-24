@@ -4088,14 +4088,20 @@ WITH report AS (
                     WHERE p.slug = 'crunchy-express'
                       AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
                         OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
-    -- 1135 Crunchy per-dish options (data). Red until applied, never an error: query_to_xml runs the count at run time,
-    --     behind to_regclass, so the token parses even before 20261134 created the table.
-    UNION ALL SELECT '20261135_crunchy_express_item_options','crunchy-express has 73 removal options on 19 dishes and 34 extras, once 1135 is applied (rows only; prices of the extras are a later migration)',
+    -- 1135 Crunchy per-dish options (data). ONLY its own half is left: the file is in the ledger. The counts it once asserted
+    --     (73 removals, 34 hidden extras) moved to 1136 below (one count, one owner). Never an error, red until applied.
+    UNION ALL SELECT '20261135_crunchy_express_item_options','20261135 (Crunchy per-dish options, first load) is in the ledger; the row counts live in the 20261136 token',
       EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql')
+    -- 1136 Crunchy options, the owner's answers (data). Red until applied, never an error: query_to_xml runs the counts at run
+    --     time, behind to_regclass, so the token parses even before 20261134 created the table. Rows only: 77 removals on 19
+    --     dishes, 19 extras on 9 dishes, every extra priced (0 hidden), and none of the extras the owner refused is left.
+    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers','crunchy-express has 77 removal options on 19 dishes and 19 priced extras on 9 dishes (0 hidden; no tenders / burger peyniri / cheddar / jalapeño / domuz bacon extra), once 1136 is applied',
+      EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261136_crunchy_express_options_owner_answers.sql')
       AND COALESCE(CASE WHEN to_regclass('public.eatery_item_options') IS NULL THEN false ELSE
-        (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '73'
+        (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '77'
         AND (xpath('/row/c/text()', query_to_xml('SELECT count(DISTINCT i.id) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '19'
-        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra''', false, true, '')))[1]::text = '34'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.price > 0', false, true, '')))[1]::text = '19'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND (o.price IS NULL OR o.message_tr IN (''tavuk tenders'', ''burger peyniri'', ''cheddar'', ''jalapeño'', ''domuz bacon''))', false, true, '')))[1]::text = '0'
         END, false)
     -- ── 1134: per-dish options + create/verify v2. Same discipline as the blocks below: only to_regclass / to_regprocedure /
     --    catalogs and COALESCE around every bool_and / subquery, red until applied, never an error. It sits ABOVE the 1132 and
