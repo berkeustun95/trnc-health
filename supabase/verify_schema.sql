@@ -4346,9 +4346,9 @@ WITH report AS (
                     ELSE (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM private.preview_key_hashes', false, true, '')))[1]::text::int END) = 1
           AND NOT COALESCE((SELECT bool_or(a.grantee IN (0, (SELECT oid FROM pg_roles WHERE rolname = 'anon'), (SELECT oid FROM pg_roles WHERE rolname = 'authenticated')))
                             FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('private.preview_key_hashes')), false))
-    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (3 today: the eatery preview policies)',
+    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (4 since 20261134: eatery_partners, eatery_menu_items, eatery_photos? + eatery_item_options preview policies — see supabase/readonly/previewer_policies.sql)',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
-      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 3
+      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 4
           AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE (coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%')
                             AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL OR qual NOT LIKE '%is_active%')))
     UNION ALL SELECT '1120_eatery_preview_key','eatery_partners_select_preview applies TO anon, authenticated',
