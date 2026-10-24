@@ -1754,7 +1754,7 @@ export default function HomeScreen({
               }} />
             ) : (
               <View style={s.headerLogoWrap} pointerEvents="none">
-                <Image source={require('../assets/logonobg.png')} style={s.headerIcon} resizeMode="contain" />
+                <Image source={require('../assets/brand/v2/ada-logo-full.webp')} style={s.headerIcon} resizeMode="contain" />
               </View>
             )}
             {hideHeaderActions ? <View /> : (

@@ -51,7 +51,7 @@ function AuthHead({ title, top }) {
   if (!REDESIGN) {
     return (
       <View style={legacy.logoArea}>
-        <Image source={require('../assets/logonobg.png')} style={legacy.logoImg} resizeMode="contain" />
+        <Image source={require('../assets/brand/v2/ada-logo-full.webp')} style={legacy.logoImg} resizeMode="contain" />
       </View>
     )
   }

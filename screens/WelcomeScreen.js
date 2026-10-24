@@ -14,7 +14,7 @@ import { LanguageSheet } from '../components/shell/Sheets'
 
 const WELCOME_SCENE = require('../assets/oli-scenes/welcome.png')
 const WELCOME_PHOTO = require('../assets/backgrounds/ada-bg-accommodation.jpg')
-const WORDMARK = require('../assets/hero/ada-wordmark-keyline.png')
+const WORDMARK = require('../assets/brand/v2/ada-logo-keyline.png')
 // Headline geometry (labels:check reads these): centred, full width (page padding 24), ≤ 3 lines.
 export const WELCOME_HEAD_PX = 26
 // The harbour is the recognisable part (source y ≈ 0.40–0.58): centre it in the photo zone.
@@ -99,7 +99,7 @@ export default function WelcomeScreen({ lang, onLogin, onSignUp, onLangChange })
           </TouchableOpacity>
 
           <View style={s.logoWrap}>
-            <Image source={require('../assets/logonobg.png')} style={s.logo} resizeMode="contain" />
+            <Image source={require('../assets/brand/v2/ada-logo-full.webp')} style={s.logo} resizeMode="contain" />
           </View>
           <View style={s.taglineBand}>
             <Text style={s.tagline}>{t('welcomeTagline', lang)}</Text>

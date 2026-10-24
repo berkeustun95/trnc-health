@@ -97,7 +97,7 @@ function WelcomeSlide({ lang, setLang }) {
     >
       <View style={s.logoWrap}>
         <Image
-          source={require('../assets/adalogo.png')}
+          source={require('../assets/brand/v2/ada-logo-full.webp')}
           style={{ width: LOGO, height: LOGO }}
           resizeMode="contain"
         />

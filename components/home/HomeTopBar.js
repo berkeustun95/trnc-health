@@ -6,8 +6,8 @@ import { t } from '../../constants/i18n'
 import { HERO_LOGO_H } from './homeLayout'
 
 // The wordmark with its keyline BAKED IN — one asset, one Image, identical on both
-// platforms. Generated from assets/logonobg.png by a true disc dilation of its alpha at
-// source resolution (radius 8px on a 566px-tall artwork = 1pt at the 72pt render size),
+// platforms. Generated from the v2 ada-logo-full.png by a true disc dilation of its alpha at
+// source resolution (radius 8px on a 568px-tall artwork = 1pt at the 72pt render size),
 // thresholded hard so the edge has no falloff.
 //
 // ─── WHY BAKED AND NOT A RING OF COPIES ─────────────────────────────────────
@@ -18,7 +18,7 @@ import { HERO_LOGO_H } from './homeLayout'
 // baked disc uses 197 offsets and is uniform by construction.
 //
 // It also drops nine Image mounts to one.
-const LOGO = require('../../assets/hero/ada-wordmark-keyline.png')
+const LOGO = require('../../assets/brand/v2/ada-logo-keyline.png')
 
 // The app bar. Two forms, one component.
 //

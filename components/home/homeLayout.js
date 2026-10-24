@@ -47,7 +47,7 @@ export const OLI_OVERHANG = 0
 // Height of the keylined wordmark on the hero.
 //
 // ⚠ TWO HALVES OF ONE NUMBER. The keyline is BAKED into the asset at a radius chosen for
-//   this exact render height (see assets/hero/ada-wordmark-keyline.json). Change this
+//   this exact render height (see assets/brand/v2/ada-logo-keyline.json). Change this
 //   without re-baking and the keyline is no longer 1pt on screen — thicker if the render
 //   shrinks, thinner if it grows. `npm run logo:check` fails when the two disagree; that
 //   guard exists because this is the class of bug that cost rounds 3 to 5.
