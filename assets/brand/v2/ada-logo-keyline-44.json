@@ -1,0 +1,16 @@
+{
+  "source": "ada-logo-v2-compass/ada-logo-full.png (Berke's team-approved v2 set, 2048x2511; not in the repo)",
+  "artworkPx": [
+    132,
+    162
+  ],
+  "bakedPx": [
+    146,
+    176
+  ],
+  "renderHeightPt": 44,
+  "keylinePt": 1.75,
+  "dilationRadiusPx": 7,
+  "discOffsets": 149,
+  "note": "renderHeightPt MUST equal the RedesignHero logo height (HERO_LOGO_H_COMPACT in components/home/homeLayout.js). Verified by scripts/check-hero-logo.mjs."
+}
