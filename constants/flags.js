@@ -154,10 +154,9 @@ export const MODULE_FLAGS = {
   // ⚠ The flag does NOT publish or unpublish rows; the data switch is announcement_sources.publish.
   //   Off = no banner, and the screen falls back to ComingSoonScreen.
   duyurular:    true,
-  // Ehliyet — driving schools (first partner: Seyhun Bıkmaz Şoför Okulu). DARK, no waitlist and no
-  // Coming Soon screen: production shows no tile. Dev and ADA Preview open the screen through
-  // EHLIYET (constants/redesign.js) on a local fixture until driving_schools is applied and the row active.
-  ehliyet:      false,
+  // Ehliyet — driving schools (first partner: Seyhun Bıkmaz Şoför Okulu). LIVE 2026-10-14
+  // (20261108/20261109/20261110). No waitlist and no Coming Soon screen. Off = tile hidden again.
+  ehliyet:      true,
 }
 
 // Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.
@@ -659,6 +658,15 @@ export const CONNECTIVITY_LIVE = true
 // Needs the 1.2.0 binary: the native modules behind both buttons are absent from every
 // build before it, and runtimeVersion 1.2.0 is what keeps this JS off those installs.
 export const SOCIAL_AUTH_LIVE = true
+
+// ─── ASK OLI VOICE INPUT ────────────────────────────────────────────────────
+// ADA's own mic in the Ask Oli field (components/OliMic.js, expo-speech-recognition). Off =
+// the keyboard-mic hint, which is also the fallback when the language or permission is not
+// there. NEEDS A NATIVE BUILD: the module and RECORD_AUDIO / the iOS mic + speech strings
+// exist only in builds from feat/voice-input on; OliMic also checks the module is present,
+// so a flip reaching an older binary shows the hint instead of crashing. Before flipping:
+// privacy line on getadaapp.com/privacy + store Audio answers (vault 2026-10-08 note).
+export const VOICE_INPUT = true   // on from the 1.4.0 store build (2026-10-09); runtime 1.4.0 fences older binaries
 
 // Yeme-İçme (Eateries) section. false = no Home tile and no way in. NOT a MODULE_FLAGS key: no
 // waitlist to collect and no notify path — the HOTELS_LIVE reasoning. Dev bundles and ADA Preview

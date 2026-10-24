@@ -117,9 +117,32 @@ for (const l of present) {
 }
 console.log(`limits: title ≤${LIMITS['title.txt']}, short ≤${LIMITS['short_description.txt']}, full ≤${LIMITS['full_description.txt']} · ${checked} files read`)
 
+// "What's new" (changelogs/<versionCode>.txt) is listing text on Play too: same banned words,
+// Play's 500-character limit. Printed per file, so "no changelogs" is visible, not silent.
+const CHANGELOG_MAX = 500
+let changelogs = 0
+for (const l of present) {
+  const dir = join(ROOT, l, 'changelogs')
+  if (!existsSync(dir)) continue
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.txt'))) {
+    const txt = readFileSync(join(dir, f), 'utf8')
+    const n = [...txt].length
+    changelogs++
+    console.log(`changelog ${l}/${f}: ${n} chars`)
+    if (!/^(\d+|default)\.txt$/.test(f)) fails.push(`${l}/changelogs/${f}: name must be <versionCode>.txt`)
+    if (n === 0) fails.push(`${l}/changelogs/${f}: empty`)
+    if (n > CHANGELOG_MAX) fails.push(`${l}/changelogs/${f}: ${n} > ${CHANGELOG_MAX}`)
+    txt.split('\n').forEach((line, i) => {
+      const re = hit(line)
+      if (re) fails.push(`${l}/changelogs/${f}:${i + 1} matches ${re} → "${line.trim()}"`)
+    })
+  }
+}
+console.log(`changelogs: ${changelogs} file(s) read, limit ${CHANGELOG_MAX}`)
+
 if (checked !== present.length * 3) fails.push(`read ${checked} files, expected ${present.length * 3}`)
 if (fails.length) {
   console.error(`\n✗ store listing check FAILED (${fails.length}):\n  ` + fails.join('\n  '))
   process.exit(1)
 }
-console.log(`✓ store listing OK — ${present.length} languages, disclaimer + ${SOURCE_URLS.length} source URLs in each, no health/pharmacy/eSIM words (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)
+console.log(`✓ store listing OK — ${present.length} languages, disclaimer + ${SOURCE_URLS.length} source URLs in each, no health/pharmacy/eSIM words in listing or ${changelogs} changelog(s) (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)

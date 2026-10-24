@@ -54,7 +54,7 @@ const EXPECTED_MODULES = {
   towing:        true,   // live
   checkins:      true,   // live 2026-10-08 — check-ins + Google places (20261092/20261093)
   duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
-  ehliyet:       false,  // dark — driving schools; no waitlist, tile hidden until the flip
+  ehliyet:       true,   // live 2026-10-14 — driving schools (20261108/20261109/20261110); no waitlist
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //
@@ -152,6 +152,8 @@ const WAITLIST_BLAST_DONE = new Set([
   // Normal users never had an entry to its Coming Soon screen (the Şehir tile only ever shipped
   // to ADA Preview), so nothing was sent and nothing is owed.
   'duyurular',
+  'ehliyet',  // 0 signups (read 2026-10-14, supabase/readonly/ehliyet_golive.sql, run 38559171228):
+              // no waitlist UI and no ComingSoon screen (NO_WAITLIST), so nothing is owed.
 ])
 
 const EXPECTED_SCALARS = {
@@ -273,6 +275,10 @@ const EXPECTED_SCALARS = {
   // testing the email-only screen would ship a sign-in screen that has silently dropped
   // Google and Apple — and locked every social-only account out with it.
   SOCIAL_AUTH_LIVE:      true,
+  // Ask Oli voice input. Baselined because a flip turns the microphone on for every user of
+  // a build that has the module, and the privacy policy + store Audio answers must be live first.
+  VOICE_INPUT:           true,   // 1.4.0 store build (2026-10-09)
+
   // Yeme-İçme section. A flip opens the eateries Home tile and screens for every user; the
   // partner rows must be loaded and active first (see the precondition list on the flag).
   EATERY_LIVE:           true,
