@@ -4088,6 +4088,15 @@ WITH report AS (
                     WHERE p.slug = 'crunchy-express'
                       AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
                         OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
+    -- 1135 Crunchy per-dish options (data). Red until applied, never an error: query_to_xml runs the count at run time,
+    --     behind to_regclass, so the token parses even before 20261134 created the table.
+    UNION ALL SELECT '20261135_crunchy_express_item_options','crunchy-express has 73 removal options on 19 dishes and 34 extras, once 1135 is applied (rows only; prices of the extras are a later migration)',
+      EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql')
+      AND COALESCE(CASE WHEN to_regclass('public.eatery_item_options') IS NULL THEN false ELSE
+        (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '73'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(DISTINCT i.id) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '19'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra''', false, true, '')))[1]::text = '34'
+        END, false)
     -- ── 1134: per-dish options + create/verify v2. Same discipline as the blocks below: only to_regclass / to_regprocedure /
     --    catalogs and COALESCE around every bool_and / subquery, red until applied, never an error. It sits ABOVE the 1132 and
     --    1125 blocks on purpose: scripts/test-eatery-orders-*.mjs slice those two and expect them green after their own file.
