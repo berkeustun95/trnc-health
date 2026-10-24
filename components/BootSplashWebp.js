@@ -22,9 +22,14 @@ const CLIP_W = 1080
 const CLIP_H = 2560
 
 // expo-image is native from 1.3.0; requiring its entry where it is missing kills the app at
-// launch, so App.js renders this only when the module exists.
+// launch, so App.js renders this only when the module exists, and the entry is require()d
+// inside a function, never at module scope (check-native-import-safety).
 export const WEBP_SPLASH_AVAILABLE = !!requireOptionalNativeModule('ExpoImage')
-const ExpoImage = WEBP_SPLASH_AVAILABLE ? require('expo-image').Image : null
+let ExpoImage
+function loadExpoImage() {
+  if (ExpoImage === undefined) ExpoImage = WEBP_SPLASH_AVAILABLE ? require('expo-image').Image : null
+  return ExpoImage
+}
 
 // ms from the clip's first displayed frame. The clip runs 2.39 s and holds its last frame.
 const WORD_IN = 1600
@@ -38,6 +43,7 @@ export default function BootSplashWebp({ ready, lang, fontsLoaded, onDone }) {
   const { width: W, height: H } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const reduce = useReduceMotion()
+  const ExpoImage = loadExpoImage()
   const morph = useRef(new Animated.Value(1)).current
   const word = useRef(new Animated.Value(0)).current
   const exit = useRef(new Animated.Value(1)).current
