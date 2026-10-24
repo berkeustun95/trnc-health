@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -84,6 +84,76 @@ B.changeQty('p3', 1, -1)
 eq('last added partner: set by an add, not moved by a removal', B.getLastAdded(), 'p4')
 B.changeQty('p3', 1, 0)
 eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
+
+// ── per-dish options (eatery_item_options, 20261134): keys, lines, detail text, message, positional mismatch, rpc args ──
+{
+  const O = (id, kind, tr, o = {}) => ({ id, kind, label_i18n: { English: tr + ' (en)', Turkish: tr }, message_tr: o.msg ?? tr, price: o.price ?? null, max_qty: o.max ?? 1, sort_order: o.so ?? id, is_available: o.on ?? true })
+  const opts = [O(11, 'remove', 'Turşu', { msg: 'turşusuz' }), O(12, 'remove', 'Marul', { msg: 'marulsuz' }), O(13, 'extra', 'Burger peyniri', { msg: 'burger peyniri', price: 30 }),
+    O(14, 'extra', 'Köfte', { msg: 'köfte', price: 100, max: 3 }), O(15, 'extra', 'Gizli', { msg: 'gizli' }), O(16, 'remove', 'Soğan', { msg: 'soğansız', on: false })]
+  const burger = { id: 5, name: 'Crunchy Burger', price: 620, currency: 'TRY', is_available: true, photoPath: null, eatery_item_options: opts }
+  const fries = { id: 6, name: 'Patates', price: 100, currency: 'TRY', is_available: true, photoPath: null }
+
+  // keys
+  eq('key: no options is the bare dish id (unchanged shape)', [B.lineKey(5, []), B.lineKey(5, null), B.lineKey(5, [{ id: 3, qty: 0 }])], ['5', '5', '5'])
+  eq('key: sorted option ids, extra qty as xN, order of input irrelevant', [B.lineKey(5, [{ id: 12, qty: 1 }, { id: 11, qty: 1 }]), B.lineKey(5, [{ id: 11, qty: 1 }, { id: 12, qty: 1 }]), B.lineKey(5, [{ id: 14, qty: 2 }, { id: 11, qty: 1 }])], ['5|11,12', '5|11,12', '5|11,14x2'])
+  eq('key: ids sort numerically, not as text', B.lineKey(5, [{ id: 100, qty: 1 }, { id: 9, qty: 1 }]), '5|9,100')
+  eq('parseKey: round trip', [B.parseKey('5'), B.parseKey('5|11,14x2')], [{ itemId: '5', opts: [] }, { itemId: '5', opts: [{ id: 11, qty: 1 }, { id: 14, qty: 2 }] }])
+  eq('parseKey: garbage tail -> a plain key, never throws', B.parseKey('5|x,').opts, [])
+  const Q = 'q1'
+  B.changeQty(Q, B.lineKey(5, []), 1); B.changeQty(Q, B.lineKey(5, [{ id: 11, qty: 1 }]), 2); B.changeQty(Q, '6', 4)
+  eq('store: keyed lines stay separate', B.getBasket(Q), { 5: 1, '5|11': 2, 6: 4 })
+  eq('dishQty: sums every line of one dish (and only that dish)', [B.dishQty(B.getBasket(Q), 5), B.dishQty(B.getBasket(Q), 6), B.dishQty(B.getBasket(Q), 7), B.dishKeys(B.getBasket(Q), 5)], [3, 4, 0, ['5', '5|11']])
+  eq('store: the bin on a keyed line offers undo', [B.changeQty(Q, '5|11', -2), B.undo(Q).kind, B.getBasket(Q)['5|11']], ['removed', 'item', 2])
+  eq('setLine: a new keyed line', [B.setLine(Q, null, '5|12', 1), B.getBasket(Q)['5|12']], [true, 1])
+  eq('setLine: editing replaces the old line', [B.setLine(Q, '5|12', '5|11,12', 2), B.getBasket(Q)['5|12'], B.getBasket(Q)['5|11,12']], [true, undefined, 2])
+  eq('setLine: landing on an existing line adds to it', [B.setLine(Q, '5|11,12', '5|11', 1), B.getBasket(Q)['5|11'], B.getBasket(Q)['5|11,12']], [true, 3, undefined])
+  eq('setLine: same key, new qty replaces the qty', [B.setLine(Q, '5|11', '5|11', 1), B.getBasket(Q)['5|11']], [true, 1])
+
+  // visible options and the detail text
+  eq('visible options: hidden extra (price NULL) and unavailable ones are out; remove kept', eateryItemOptions(burger).map(o => o.id), [11, 12, 13, 14])
+  eq('no embed / empty embed -> no options', [eateryItemOptions(fries), eateryItemOptions({ eatery_item_options: [] }), eateryItemOptions(null)], [[], [], []])
+  eq('label: own language, else English, else the Turkish text', [eateryOptionLabel(opts[0], 'Turkish'), eateryOptionLabel(opts[0], 'German'), eateryOptionLabel({ message_tr: 'x' }, 'German')], ['Turşu', 'Turşu (en)', 'x'])
+  const rOpts = o => resolveLineOptions(burger, o)
+  eq('detail: two removals -> "turşusuz, marulsuz"', rOpts([{ id: 11, qty: 1 }, { id: 12, qty: 1 }]).detail, 'turşusuz, marulsuz')
+  eq('detail: removal then extra -> "turşusuz, +ekstra burger peyniri"', rOpts([{ id: 13, qty: 1 }, { id: 11, qty: 1 }]).detail, 'turşusuz, +ekstra burger peyniri')
+  eq('detail: extra qty 2 -> "+2 ekstra köfte"', rOpts([{ id: 14, qty: 2 }]).detail, '+2 ekstra köfte')
+  eq('price: base + extras x qty, cents exact', [rOpts([{ id: 11, qty: 1 }]).unit, rOpts([{ id: 13, qty: 1 }]).unit, rOpts([{ id: 14, qty: 2 }, { id: 13, qty: 1 }]).unit], [620, 650, 850])
+  eq('unresolved: a hidden / unknown / over-max / removal-qty-2 option makes the line not ok', [rOpts([{ id: 15, qty: 1 }]).ok, rOpts([{ id: 99, qty: 1 }]).ok, rOpts([{ id: 14, qty: 4 }]).ok, rOpts([{ id: 11, qty: 2 }]).ok, rOpts([{ id: 16, qty: 1 }]).ok], [false, false, false, false, false])
+  eq('optionDetail: sort_order wins over input order', optionDetail([opts[1], opts[0]], []), 'turşusuz, marulsuz')
+
+  // lines from a basket
+  const items = [burger, fries]
+  const bl = basketLines(items, { 6: 1, '5|11,12': 1, 5: 2, '9': 3, '5|99': 1 })
+  eq('basketLines: menu order, a dish\'s lines in basket order, unknown dish skipped', bl.map(l => [l.key, l.id, l.qty]), [['5', 5, 2], ['5|11,12', 5, 1], ['5|99', 5, 1], ['6', 6, 1]])
+  eq('basketLines: plain line has no detail / opts, is not stale', [bl[0].detail, bl[0].opts, bl[0].stale, bl[0].price], ['', [], false, 620])
+  eq('basketLines: options line carries the detail and its unit price', [bl[1].detail, bl[1].price, bl[1].stale], ['turşusuz, marulsuz', 620, false])
+  eq('basketLines: an option id that no longer resolves -> stale (kept, never dropped)', [bl[2].stale, bl[2].detail], [true, ''])
+
+  // message and server answer
+  const two = [{ id: 5, name: 'Crunchy Burger', qty: 1, price: 620, detail: 'turşusuz, marulsuz', opts: [{ id: 11, qty: 1 }, { id: 12, qty: 1 }] }, { id: 5, name: 'Crunchy Burger', qty: 1, price: 650, detail: 'turşusuz, +ekstra burger peyniri', opts: [{ id: 11, qty: 1 }, { id: 13, qty: 1 }] }, { id: 6, name: 'Patates', qty: 2, price: 100 }]
+  const srv = { code: 'AB23CD45', total: 1470, lines: [
+    { item_id: 5, name: 'Crunchy Burger', qty: 1, unit_price: 620, detail: 'turşusuz, marulsuz' },
+    { item_id: 5, name: 'Crunchy Burger', qty: 1, unit_price: 650, detail: 'turşusuz, +ekstra burger peyniri' },
+    { item_id: 6, name: 'Patates', qty: 2, unit_price: 100, detail: null }] }
+  const mLines = buildOrderMessage(serverOrderLines(srv), '', srv.code).split('\n')
+  eq('message: a line with options prints "qty × name — detail — total"', mLines.slice(1, 4), ['1 × Crunchy Burger — turşusuz, marulsuz — 620,00 TL', '1 × Crunchy Burger — turşusuz, +ekstra burger peyniri — 650,00 TL', '2 × Patates — 200,00 TL'])
+  eq('message: the plain line is unchanged', buildOrderMessage([{ name: 'Crunchy Burger', qty: 2, price: 620 }], '').split('\n')[1], '2 × Crunchy Burger — 1.240,00 TL')
+  eq('mismatch: two lines of one dish, identical -> false', orderMismatch(two, srv), false)
+  const swap = { ...srv, lines: [srv.lines[1], srv.lines[0], srv.lines[2]] }
+  eq('mismatch: positional - the same two lines swapped is a mismatch (find-by-id would pass)', orderMismatch(two, swap), true)
+  eq('mismatch: a different detail on the right position', orderMismatch(two, { ...srv, lines: [srv.lines[0], { ...srv.lines[1], detail: 'turşusuz' }, srv.lines[2]] }), true)
+  eq('mismatch: the server dropped the detail of an options line', orderMismatch(two, { ...srv, lines: [{ ...srv.lines[0], detail: null }, srv.lines[1], srv.lines[2]] }), true)
+  eq('mismatch: the server added a detail to a plain line', orderMismatch(two, { ...srv, lines: [srv.lines[0], srv.lines[1], { ...srv.lines[2], detail: 'x' }] }), true)
+  eq('mismatch: item id differs at a position', orderMismatch(two, { ...srv, lines: [srv.lines[0], srv.lines[1], { ...srv.lines[2], item_id: 7 }] }), true)
+  eq('check: a good options answer sends', orderCheck(two, srv), null)
+  eq('error: option_unavailable -> items (the menu refresh)', orderErrorKind({ message: 'option_unavailable' }), 'items')
+
+  // rpc args
+  const plain = [{ id: 5, qty: 2, name: 'x', price: 620, detail: '', opts: [] }, { id: 6, qty: 1, name: 'y', price: 100 }]
+  eq('rpc args: a plain basket is byte-identical to today (item_id, qty only)', JSON.stringify(orderRpcArgs('p', plain)), '{"p_partner":"p","p_items":[{"item_id":5,"qty":2},{"item_id":6,"qty":1}]}')
+  eq('rpc args: opts only on the lines that have options', JSON.stringify(orderRpcArgs('p', two)), '{"p_partner":"p","p_items":[{"item_id":5,"qty":1,"opts":[{"id":11,"qty":1},{"id":12,"qty":1}]},{"item_id":5,"qty":1,"opts":[{"id":11,"qty":1},{"id":13,"qty":1}]},{"item_id":6,"qty":2}]}')
+  eq('rpc args: name, price, detail never travel', ['name', 'price', 'detail', 'Crunchy'].map(w => JSON.stringify(orderRpcArgs('p', two)).includes(w)), [false, false, false, false])
+}
 
 // ── server-recorded order: code line, message from the SERVER lines, mismatch, error kinds ──
 {

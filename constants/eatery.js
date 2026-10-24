@@ -4,6 +4,7 @@
 import { dateLocale, t } from './i18n.js'
 import { cyprusNow, openState } from '../utils/towingHours.js'
 import { ADULT_AGE } from './profileGate.js'
+import { parseKey } from '../utils/eateryBasketCore.js'
 
 export const EATERY_BUCKET = 'eatery-images'
 
@@ -158,6 +159,82 @@ export function formatTl(amount) {
   return `${sign}${lira},${String(abs % 100).padStart(2, '0')} TL`
 }
 
+// ─── Per-dish options ("Malzeme çıkar" / "Ekstra ekle"; eatery_item_options, 20261134) ───
+// A dish's visible options: available, and either a removal or an extra with a real price (price NULL = hidden). A row fetched
+// without the embed has none, and then nothing about the dish changes.
+export function eateryItemOptions(item) {
+  const list = Array.isArray(item?.eatery_item_options) ? item.eatery_item_options : []
+  return list
+    .filter(o => o && Number.isFinite(Number(o.id)) && o.is_available !== false &&
+      (o.kind === 'remove' || (o.kind === 'extra' && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) && Number(o.price) > 0)))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || Number(a.id) - Number(b.id))
+}
+
+// What the customer reads: their language's label, else English, else the Turkish text the restaurant reads.
+export function eateryOptionLabel(opt, lang) {
+  const l = opt?.label_i18n
+  const pick = v => (filled(v) ? v.trim() : null)
+  return pick(l?.[lang]) || pick(l?.English) || pick(opt?.message_tr) || ''
+}
+
+const sortedByOrder = (a, b) => (a.opt.sort_order ?? 0) - (b.opt.sort_order ?? 0) || Number(a.opt.id) - Number(b.opt.id)
+
+// The ONE Turkish detail text, the same the server stores (create_eatery_order, 20261134): removals first as the restaurant's
+// removed form, then extras "+ekstra x" / "+2 ekstra x", all in (sort_order, id) order, joined with ", ".
+export function optionDetail(removals, extras) {
+  return [
+    ...[...removals].sort((a, b) => sortedByOrder({ opt: a }, { opt: b })).map(o => o.message_tr),
+    ...[...extras].sort((a, b) => sortedByOrder(a, b)).map(({ opt, qty }) => (qty > 1 ? `+${qty} ekstra ${opt.message_tr}` : `+ekstra ${opt.message_tr}`)),
+  ].join(', ')
+}
+
+// item + chosen opts [{ id, qty }] -> { ok, unit, removals: [opt], extras: [{ opt, qty }], detail }. ok is false when an id is no
+// longer a visible option of the dish (the menu changed under a line) or a quantity is out of range; then unit is the base price.
+export function resolveLineOptions(item, opts) {
+  const base = Number(item?.price)
+  const list = opts || []
+  const known = new Map(eateryItemOptions(item).map(o => [Number(o.id), o]))
+  const removals = [], extras = []
+  let extraCents = 0, ok = true
+  for (const o of list) {
+    const opt = known.get(Number(o.id))
+    const qty = Number(o.qty)
+    if (!opt || !Number.isInteger(qty) || qty < 1) { ok = false; continue }
+    if (opt.kind === 'remove') {
+      if (qty !== 1) { ok = false; continue }
+      removals.push(opt)
+    } else {
+      if (qty > (Number(opt.max_qty) || 1)) { ok = false; continue }
+      extras.push({ opt, qty })
+      extraCents += Math.round(Number(opt.price) * 100) * qty
+    }
+  }
+  if (!ok) return { ok: false, unit: base, removals: [], extras: [], detail: '' }
+  removals.sort((x, y) => sortedByOrder({ opt: x }, { opt: y }))
+  extras.sort(sortedByOrder)
+  return { ok: true, unit: (Math.round(base * 100) + extraCents) / 100, removals, extras, detail: optionDetail(removals, extras) }
+}
+
+// The basket's lines for the orderable dishes of a partner, in menu order (a dish's own lines in basket order):
+// [{ key, id, item, name, qty, price (unit, extras included), photoPath, opts, removals, extras, detail, stale }].
+// A key whose dish is no longer on the menu is skipped (as before); a key whose options no longer resolve stays, stale.
+export function basketLines(items, basket) {
+  const byId = new Map((items || []).map(i => [String(i.id), i]))
+  const per = new Map()
+  for (const key of Object.keys(basket || {})) {
+    const qty = basket[key]
+    if (!(qty > 0)) continue
+    const { itemId, opts } = parseKey(key)
+    const item = byId.get(itemId)
+    if (!item) continue
+    const r = resolveLineOptions(item, opts)
+    const line = { key, id: item.id, item, name: item.name, qty, price: r.unit, photoPath: item.photoPath, opts, removals: r.removals, extras: r.extras, detail: r.detail, stale: !r.ok }
+    if (!per.has(itemId)) per.set(itemId, [])
+    per.get(itemId).push(line)
+  }
+  return (items || []).flatMap(i => per.get(String(i.id)) || [])
+}
+
 export const orderTotal = lines => lines.reduce((sum, l) => sum + Math.round(l.qty * Number(l.price) * 100), 0) / 100
 
 // ─── Server-recorded order (create_eatery_order, 20261125) ───
@@ -170,21 +247,23 @@ export function orderCodeLine(code) {
   return `ADA Sipariş No: ${c.slice(0, 4)}-${c.slice(4)} · Doğrula: getadaapp.com/o/${c}`
 }
 
-// The server's lines in the shape buildOrderMessage reads: [{ id, name, qty, price }].
+// The server's lines in the shape buildOrderMessage reads: [{ id, name, qty, price, detail }] (detail '' on a plain line).
 export const serverOrderLines = res => (Array.isArray(res?.lines) ? res.lines : [])
-  .map(l => ({ id: l.item_id, name: l.name, qty: Number(l.qty), price: Number(l.unit_price) }))
+  .map(l => ({ id: l.item_id, name: l.name, qty: Number(l.qty), price: Number(l.unit_price), detail: typeof l.detail === 'string' ? l.detail.trim() : '' }))
 
 const cents = n => Math.round(Number(n) * 100)
 
 // True when the server's answer is not exactly the basket the person saw: a line missing or extra, a different
-// quantity, a different unit price, or a different total. A malformed answer counts as a mismatch. Then NOTHING is sent.
+// quantity, a different unit price, a different option detail, or a different total. The server keeps the input order, so the
+// comparison is POSITIONAL (two lines of one dish, with different options, share an item id). A malformed answer counts as a
+// mismatch. Then NOTHING is sent.
 export function orderMismatch(basketLines, res) {
   if (!res || !Array.isArray(res.lines) || res.lines.length === 0 || !Number.isFinite(Number(res.total))) return true
   const srv = serverOrderLines(res)
   if (srv.length !== basketLines.length) return true
-  for (const b of basketLines) {
-    const m = srv.find(l => l.id === b.id)
-    if (!m || m.qty !== Number(b.qty) || cents(m.price) !== cents(b.price)) return true
+  for (let i = 0; i < basketLines.length; i++) {
+    const b = basketLines[i], m = srv[i]
+    if (String(m.id) !== String(b.id) || m.qty !== Number(b.qty) || cents(m.price) !== cents(b.price) || m.detail !== (typeof b.detail === 'string' ? b.detail.trim() : '')) return true
   }
   return cents(res.total) !== cents(orderTotal(basketLines))
 }
@@ -218,13 +297,19 @@ export function orderErrorKind(err) {
   if (m === 'rate_limited') return 'rate'
   if (m === 'order_requires_account') return 'account'
   if (m === 'adult_only') return 'adult'
-  if (m === 'item_unavailable' || m === 'invalid_items' || m === 'mixed_currency') return 'items'
+  if (m === 'item_unavailable' || m === 'invalid_items' || m === 'mixed_currency' || m === 'option_unavailable') return 'items'
   return 'generic'
 }
 
-// The ONLY arguments create_eatery_order receives: ids and quantities. Delivery details (address, location) travel in the
-// WhatsApp text alone and never reach the server; a test pins this shape and the call site.
-export const orderRpcArgs = (partnerId, lines) => ({ p_partner: partnerId, p_items: lines.map(l => ({ item_id: l.id, qty: l.qty })) })
+// The ONLY arguments create_eatery_order receives: ids and quantities (and, for a line with options, their ids and quantities).
+// Delivery details (address, location) travel in the WhatsApp text alone and never reach the server; a test pins this shape and
+// the call site. A plain line is exactly { item_id, qty }, as the shipped apps send it.
+export const orderRpcArgs = (partnerId, lines) => ({
+  p_partner: partnerId,
+  p_items: lines.map(l => (Array.isArray(l.opts) && l.opts.length > 0
+    ? { item_id: l.id, qty: l.qty, opts: l.opts.map(o => ({ id: o.id, qty: o.qty })) }
+    : { item_id: l.id, qty: l.qty })),
+})
 
 // ─── Delivery choice (Sepetim) ───
 export const ADDRESS_FIELD_MAX = 100
@@ -363,11 +448,14 @@ export function cardState(e) {
 export const canAddMore = n => Number.isFinite(n) && n < ADDRESS_BOOK_MAX
 export const EMPTY_DELIVERY_ADDRESS = { addressId: null, kind: 'home', name: '', street: '', building: '', district: '', floor: '', flat: '', directions: '', callPhone: null, coords: null }
 
-// lines: [{ name, qty, price }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
+// lines: [{ name, qty, price, detail? }]. ALWAYS Turkish whatever the app language: the restaurant reads it, not the customer.
 // code: the server's order code; its line is the LAST one.
 export function buildOrderMessage(lines, note, code = null, delivery = null) {
   const out = ['ADA üzerinden sipariş:']
-  for (const l of lines) out.push(`${l.qty} × ${l.name} — ${formatTl(l.qty * Number(l.price))}`)
+  for (const l of lines) {
+    const d = typeof l.detail === 'string' ? l.detail.trim() : ''
+    out.push(`${l.qty} × ${l.name}${d ? ` — ${d}` : ''} — ${formatTl(l.qty * Number(l.price))}`)
+  }
   out.push('', `Toplam: ${formatTl(orderTotal(lines))}`)
   const n = oneLine(note, ORDER_NOTE_MAX)
   if (n) out.push(`Not: ${n}`)

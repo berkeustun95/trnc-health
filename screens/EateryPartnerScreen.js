@@ -7,16 +7,16 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
-import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
-import { QtyStepper, OrderBar, BasketPage } from '../components/EateryOrder'
+import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains } from '../constants/eateryQuiz'
@@ -99,7 +99,7 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, onQty }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, onQty, onOptions }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   const row = (
@@ -116,7 +116,11 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
   return (
     <View>
       {row}
-      <View style={s.itemOrder}><QtyStepper id={item.id} name={item.name} qty={qty} onQty={onQty} lang={lang} /></View>
+      <View style={s.itemOrder}>
+        {eateryItemOptions(item).length > 0
+          ? <DishAddButton name={item.name} count={qty} onPress={() => onOptions(item)} lang={lang} />
+          : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={onQty} lang={lang} />}
+      </View>
     </View>
   )
 })
@@ -212,8 +216,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
     if (!ordering) return []
-    return sections.flatMap(sec => sec.items).filter(eateryOrderable)
-      .filter(i => basket[i.id] > 0).map(i => ({ id: i.id, name: i.name, qty: basket[i.id], price: Number(i.price), photoPath: i.photoPath }))
+    return basketLines(sections.flatMap(sec => sec.items).filter(eateryOrderable), basket)
   }, [ordering, sections, basket])
   const orderCurrency = sections.flatMap(sec => sec.items).find(eateryOrderable)?.currency
   const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
@@ -251,6 +254,17 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const onAddressSaved = item => { setOrderError(null); setDelivery(d => ({ ...d, ...deliveryFromEntry(item) })); closeEditor() }
   // Deleting an entry that is not the selected one leaves the selection alone.
   const onAddressDeleted = next => { setOrderError(null); setDelivery(d => (d.addressId && d.addressId !== editor.seed?.addressId ? d : { ...d, ...(next ? deliveryFromEntry(next) : EMPTY_DELIVERY_ADDRESS) })); closeEditor() }
+  // Per-dish options: one sheet for the whole screen. fromKey = the Sepetim line being edited (null = a fresh add); the item stays
+  // set while the sheet slides out.
+  const [optSheet, setOptSheet] = useState({ open: false, item: null, fromKey: null, initial: null })
+  const openOptions = useCallback(item => setOptSheet({ open: true, item, fromKey: null, initial: null }), [])
+  const editLine = line => setOptSheet({ open: true, item: line.item, fromKey: line.key, initial: { opts: line.opts, qty: line.qty } })
+  const confirmOptions = ({ opts, qty }) => {
+    setLine(partner.id, optSheet.fromKey, lineKey(optSheet.item.id, opts), qty)
+    setOrderError(null)
+    setSnack(null)
+    setOptSheet(o => ({ ...o, open: false }))
+  }
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
@@ -402,7 +416,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
   const sendOrder = async () => {
-    if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery)) return
+    if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery) || lines.some(l => l.stale)) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
     sendingRef.current = true
     setSending(true)
@@ -482,7 +496,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 </Text>
                 {sec.items.map(i => {
                   const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
-                    ordering={ordering} qty={basket[i.id] || 0} onQty={onQty} />
+                    ordering={ordering} qty={dishQty(basket, i.id)} onQty={onQty} onOptions={openOptions} />
                   return i.id === focusId
                     ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
                     : <Fragment key={i.id}>{row}</Fragment>
@@ -533,7 +547,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} />}
       </View>
       {ordering && basketShown === true && (
-        <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} formatMoney={formatMoney} totalText={orderTotalText}
+        <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onAddress={openEditor} covered={editor.open === true} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
       {ordering && editor.shown === true && (
@@ -547,6 +561,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)}
           onOpenDish={(_p, id) => { setQuizOpen(false); setFocusReq({ id, n: Date.now() }) }}
           onOpenMenu={() => setQuizOpen(false)} onOpenBasket={() => { setQuizOpen(false); openBasket() }} />
+      )}
+      {ordering && !!optSheet.item && (
+        <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item} initial={optSheet.initial} editing={optSheet.fromKey != null}
+          onClose={() => setOptSheet(o => ({ ...o, open: false }))} onConfirm={confirmOptions} />
       )}
       <Snackbar visible={snack !== null} message={snack ? t(snack, lang) : ''} actionLabel={t('eateryOrderUndo', lang)}
         onAction={undoClear} onTimeout={() => { setSnack(null); dropSnapshot(partner.id) }} reduce={reduce}

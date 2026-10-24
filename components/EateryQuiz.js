@@ -3,13 +3,13 @@ import { View, Text, Image, Pressable, ScrollView, Animated, Easing, Accessibili
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { formatPrice, eateryOrderDigits } from '../constants/eatery'
+import { formatPrice, eateryOrderDigits, eateryItemOptions } from '../constants/eatery'
 import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
-import { QtyStepper, OrderBar } from './EateryOrder'
-import { effectiveWhatsapp, getBasket, changeQty, getLastAdded } from '../utils/eateryBasket'
+import { QtyStepper, DishOptionsSheet, OrderBar } from './EateryOrder'
+import { effectiveWhatsapp, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
 import { subscribe } from '../utils/eateryBasketCore'
 
 // ─── Yeme-İçme: "Ne yesem?" (dish finder) ───────────────────────────────────
@@ -148,7 +148,7 @@ function SideRow({ item, text, qty, orderable, lang, onToggle }) {
   )
 }
 
-function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, onOpenPartner, onQty }) {
+function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
   const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
@@ -159,7 +159,15 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
   })
   const label = [t('eateryQuizOpenA11y', lang).replace('{name}', () => item.name).replace('{partner}', () => partner.name), price, pork ? t('eateryQuizPork', lang) : ''].filter(Boolean).join('. ')
   const sideOk = sideItems.map(i => canOrder && quizSideOrderable(i))
-  const qty = basket[item.id] || 0
+  const qty = dishQty(basket, item.id)
+  const hasOpts = eateryItemOptions(item).length > 0
+  // A side that has options opens the sheet to add; once added, a second tap takes one unit off its first line.
+  const toggleSide = side => {
+    const q = dishQty(basket, side.id)
+    if (q > 0) onQty(partner, dishKeys(basket, side.id)[0], -1)
+    else if (eateryItemOptions(side).length > 0) onOptions(partner, side)
+    else onQty(partner, side.id, 1)
+  }
   // The sides open once THIS dish is in the basket, and fold away when it goes back to 0 (sides already added stay).
   const showSides = canOrder && qty > 0 && sides.length > 0
   const wasOpen = useRef(showSides)
@@ -191,10 +199,11 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
       </Pressable>}
       {canOrder && (
         <View style={st.orderRow}>
-          {qty < 1
+          {qty < 1 || hasOpts
             ? <PillButton filled icon="basket-outline" title={t('eateryQuizAddToBasket', lang)}
-                label={t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => onQty(partner, item.id, 1)} />
+                label={t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
             : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} />}
+          {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
         </View>
       )}
       {sides.length > 0 && (
@@ -202,8 +211,8 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
           <View style={st.side}>
             <Text style={st.sidesTitle} accessibilityRole="header">{t('eateryQuizSidesTitle', lang)}</Text>
             {sides.map((line, k) => (
-              <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={basket[sideItems[k].id] || 0} orderable={sideOk[k]} lang={lang}
-                onToggle={() => onQty(partner, sideItems[k].id, (basket[sideItems[k].id] || 0) > 0 ? -1 : 1)} />
+              <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={dishQty(basket, sideItems[k].id)} orderable={sideOk[k]} lang={lang}
+                onToggle={() => toggleSide(sideItems[k])} />
             ))}
           </View>
         </Expand>
@@ -287,6 +296,9 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
   const onQty = (p, id, delta) => {
     changeQty(p.id, id, delta)
   }
+  // Per-dish options: the sheet for a quiz dish or side. Adds to the same per-partner store; the item stays set through the slide-out.
+  const [optSheet, setOptSheet] = useState({ open: false, partner: null, item: null })
+  const onOptions = (partner, item) => setOptSheet({ open: true, partner, item })
   const resultPartners = result ? result.dishes.map(d => d.partner).filter((p, i, a) => a.findIndex(x => x.id === p.id) === i && canOrder(p)) : []
   const barPartner = quizBarPartner(resultPartners, p => quizBasketSummary(p, getBasket(p.id)), getLastAdded())
   const bar = barPartner ? quizBasketSummary(barPartner, getBasket(barPartner.id)) : null
@@ -352,7 +364,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
                   <View style={st.cards}>
                     {result?.dishes.map(d => (
                       <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
-                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} scoped={scoped}
+                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
@@ -367,6 +379,11 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
         </ScrollView>
         {showBar && (
           <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} onOpen={() => onOpenBasket(barPartner)} />
+        )}
+        {!!optSheet.item && (
+          <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item}
+            onClose={() => setOptSheet(o => ({ ...o, open: false }))}
+            onConfirm={({ opts, qty }) => { setLine(optSheet.partner.id, null, lineKey(optSheet.item.id, opts), qty); setOptSheet(o => ({ ...o, open: false })) }} />
         )}
         {!!cur && (
           <View style={[st.footer, { paddingBottom: insets.bottom + space[12] }]}>

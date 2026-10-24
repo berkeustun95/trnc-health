@@ -20,8 +20,16 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
 const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, order_requires_account, adult_only, ' +
-  'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height, role, protein, spicy, portion), ' +
+  'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height, role, protein, spicy, portion, eatery_item_options(id, kind, label_i18n, message_tr, price, max_qty, sort_order, is_available)), ' +
   'eatery_photos(id, kind, storage_path, width, height, sort_order)'
+
+// Until the options table exists on the server the embed is an error for the whole request: retry without it, so Yeme-İçme
+// still opens (a dish then simply has no options).
+const COLS_PLAIN = COLS.replace(/, eatery_item_options\([^)]*\)/, '')
+async function loadRows() {
+  const r = await loadEateryPartners(COLS)
+  return r.error ? loadEateryPartners(COLS_PLAIN) : r
+}
 
 function PartnerCard({ partner, lang, onPress }) {
   const open = eateryOpenStatus(partner, lang)
@@ -75,7 +83,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
   const openBasket = p => { setFocus({ partnerId: p.id, itemId: null, basket: true }); onOpenPartner(p) }
   // After the server refuses an order for a stale price / item: reload the rows and swap the open partner for its fresh row.
   const refreshRows = useCallback(async () => {
-    const { rows: list, error: err } = await loadEateryPartners(COLS)
+    const { rows: list, error: err } = await loadRows()
     if (err || !list.length) return
     setRows(list)
     if (partner) { const fresh = list.find(r => r.id === partner.id); if (fresh) onOpenPartner(fresh) }
@@ -85,7 +93,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const { rows: list, error: err } = await loadEateryPartners(COLS)
+      const { rows: list, error: err } = await loadRows()
       if (!alive) return
       if (err) { setError(true); setLoading(false); return }
       if (!list.length) { setError(true); setLoading(false); return }
