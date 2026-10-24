@@ -583,6 +583,9 @@ export default function App() {
   const [openFacilityList, setOpenFacilityList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
   const [bootSplashDone, setBootSplashDone] = useState(false)
+  // While the boot splash is up, nothing may open over it: an RN Modal is its own native
+  // window and draws above any View, so each launch-time sheet/notice below waits for this.
+  const splashUp = BOOT_SPLASH_LIVE && !bootSplashDone
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)
@@ -1669,8 +1672,8 @@ export default function App() {
   // must not be welcoming them anywhere. (decideWelcome already guarantees this
   // — asked=false suppresses the card — but the two overlays share a slot, so
   // this makes the precedence explicit rather than incidental.)
-  const homeCityAskVisible = showHomeCityAsk && inCustomerHub
-  const cityWelcomeVisible = !!cityWelcome && inCustomerHub && !homeCityAskVisible
+  const homeCityAskVisible = showHomeCityAsk && inCustomerHub && !splashUp
+  const cityWelcomeVisible = !!cityWelcome && inCustomerHub && !homeCityAskVisible && !splashUp
 
   // Burn the city's 30-day cooldown only once the card is actually on screen.
   // Marking it at decision time would spend the cooldown on a card the user
@@ -2930,7 +2933,7 @@ export default function App() {
   // top of the tutorial or a city prompt, and only once the profile has loaded (an account
   // that already accepted this version must not see it flash).
   const policyNoticeVisible =
-    inTabShell && activeTab === 'home' && policySeen !== undefined && (!session || profile !== null) &&
+    !splashUp && inTabShell && activeTab === 'home' && policySeen !== undefined && (!session || profile !== null) &&
     !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
     shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
                              current: LEGAL_VERSION, returning: returningDevice })
@@ -3207,7 +3210,7 @@ export default function App() {
           above it), but this Modal lives out here and knows nothing about onboarding, so
           without the repeat it would cover the carousel a new user is still reading. */}
       <AppUpdateNotice
-        visible={session !== undefined && fontsLoaded && onboarded === true &&
+        visible={!splashUp && session !== undefined && fontsLoaded && onboarded === true &&
                  (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))}
         tier={updateTier}
         lang={lang}
@@ -3219,7 +3222,7 @@ export default function App() {
       <EdgeSwipeStrip />
       {REDESIGN && fontsLoaded && <PermissionPrimer lang={lang} />}
       {/* Last in the final return so it covers everything until it fades out. */}
-      {BOOT_SPLASH_LIVE && !bootSplashDone && (
+      {splashUp && (
         <BootSplash ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
       )}
     </SafeAreaProvider>

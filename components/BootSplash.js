@@ -46,6 +46,8 @@ const END = 2700
 const EXIT_MIN = 2750
 const EXIT_MAX = 3000
 const EXIT_FADE = 250
+// The spill-over copies are clipped this far below the gate centre (see Mascot).
+const CLIP_LINE = 75
 
 // ─── Which first frame ──────────────────────────────────────────────────────
 // A binary with expo-splash-screen has the new native splash (emblem in the Ø184 disc),
@@ -78,7 +80,7 @@ function useReduceMotion() {
 }
 
 // Each mascot is drawn twice with the same transform: once clipped to the gate hole,
-// once clipped to a rectangle that ends 45 pt below the gate centre. Above that line
+// once clipped to a rectangle that ends CLIP_LINE pt below the gate centre. Above that line
 // they spill over the rim; below it only the hole shows them, so the cut-off bottom of
 // the art never appears outside the gate.
 function Mascot({ m, ox, oy }) {
@@ -109,9 +111,10 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
   const startedAt = useRef(null)
   const readyAt = useRef(null)
   const [laidOut, setLaidOut] = useState(false)
+  const [emblemLoaded, setEmblemLoaded] = useState(false)
 
   useEffect(() => {
-    if (!laidOut || reduce === null || startedAt.current != null) return
+    if (!laidOut || !emblemLoaded || reduce === null || startedAt.current != null) return
     startedAt.current = Date.now()
     if (reduce) {
       clock.setValue(END)
@@ -120,7 +123,7 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
     } else {
       Animated.timing(clock, { toValue: END, duration: END, easing: Easing.linear, useNativeDriver: true }).start()
     }
-  }, [laidOut, reduce])
+  }, [laidOut, emblemLoaded, reduce])
 
   useEffect(() => {
     if (ready && readyAt.current == null) readyAt.current = Date.now()
@@ -136,7 +139,7 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
         .start(() => onDone?.())
     }, Math.max(0, at - elapsed))
     return () => clearTimeout(timer)
-  }, [ready, laidOut, reduce])
+  }, [ready, laidOut, emblemLoaded, reduce])
 
   const s = Math.max(0.85, Math.min(1.1, Math.min(W / 390, H / 844)))
   const cx = W / 2
@@ -150,7 +153,7 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
   //   1050   zoom into the compass: gate opens, dial ring spins, white rose spins and fades
   //   1450   Oli then Maki rush up the tunnel, small → big
   //   2000   burst out over the rim, 1.14 → 1 overshoot, shockwave
-  //   2250   lean + bob; 2250 wordmark + tagline, 2450 "Merhaba!"
+  //   2150   lean + bob, wordmark + tagline; 2300 "Merhaba!" — landed by 2500, held to the exit
   const emblemScale = kf(clock, [[0, 1], [700, 1], [875, 1.6], [1050, 1.85], [1200, 2.6], [1350, 4.4]])
   const emblemOpacity = kf(clock, [[0, 1], [1050, 1], [1150, 0.6], [1350, 0]])
   const discOpacity = kf(clock, [[0, 1], [700, 1], [1000, 0]])
@@ -163,13 +166,13 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
   const roseRotate = deg(clock, [[0, 0], [1050, 0], [1350, 300], [1550, 540]])
   const shockOpacity = kf(clock, [[0, 0], [1990, 0], [2010, 0.9], [2400, 0]])
   const shockScale = kf(clock, [[0, 1], [2000, 1], [2400, 1.5]])
-  const wordOpacity = kf(clock, [[0, 0], [2250, 0], [2600, 1]])
-  const wordY = kf(clock, [[0, -14], [2250, -14], [2600, 0]])
-  const bubbleOpacity = kf(clock, [[0, 0], [2450, 0], [2550, 1]])
-  const bubbleScale = kf(clock, [[0, 0.4], [2450, 0.4], [2550, 1.08], [2650, 1]])
+  const wordOpacity = kf(clock, [[0, 0], [2150, 0], [2450, 1]])
+  const wordY = kf(clock, [[0, -14], [2150, -14], [2450, 0]])
+  const bubbleOpacity = kf(clock, [[0, 0], [2300, 0], [2400, 1]])
+  const bubbleScale = kf(clock, [[0, 0.4], [2300, 0.4], [2400, 1.08], [2500, 1]])
   const morphOpacity = kf(clock, [[0, 1], [80, 1], [380, 0]])
 
-  // Mascot geometry at s = 1, relative to the gate centre (from the v2 canvas board).
+  // Mascot geometry at s = 1, relative to the gate centre.
   // Each grows from its bottom centre; `start` puts that point near the tunnel's centre.
   const mascot = (src, aspect, box, start, delay, sign) => {
     const d = delay
@@ -187,10 +190,13 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
       },
     }
   }
-  const oli = mascot(OLI, 1867 / 1603, { x: -235, y: -192, w: 300 }, { x: 65, y: -56 }, 0, -1)
-  const maki = mascot(MAKI, 1963 / 1394, { x: -75, y: -105, w: 290 }, { x: -50, y: -86 }, 50, 1)
+  // Positions are solved, not eyeballed: at the final pose no pixel of Oli's ring-cut edge
+  // lands outside the hole above the clip line, and no pixel of either body lands outside
+  // the hole below it (so nothing is sliced). Re-solve if the art or the gate size changes.
+  const oli = mascot(OLI, 1867 / 1603, { x: -136, y: -188, w: 260 }, { x: 5, y: -30 }, 0, -1)
+  const maki = mascot(MAKI, 1963 / 1394, { x: -45, y: -195, w: 250 }, { x: -75, y: 15 }, 50, 1)
 
-  const lineY = cy + 45 * s
+  const lineY = cy + CLIP_LINE * s
   const wordTop = Math.max(insets.top + 24, cy - 398 * s)
 
   return (
@@ -201,7 +207,7 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
       accessibilityLabel="ADA"
       importantForAccessibility="yes"
     >
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: scene }]} importantForAccessibility="no-hide-descendants">
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: emblemLoaded ? scene : 0 }]} importantForAccessibility="no-hide-descendants">
         <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: wordTop, alignItems: 'center', opacity: wordOpacity, transform: [{ translateY: wordY }] }}>
           <Image source={WORDMARK} fadeDuration={0} style={{ width: 190 * s, height: 190 * s * 184 / 570 }} resizeMode="contain" />
           {fontsLoaded && (
@@ -243,14 +249,14 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
           <Mascot m={oli} ox={cx} oy={cy} />
         </View>
 
-        <Animated.View style={{ position: 'absolute', left: cx - 13 * s, bottom: H - (cy - 190 * s) - 40 * s, opacity: bubbleOpacity, transform: [{ scale: bubbleScale }], transformOrigin: '0% 100%' }}>
+        <Animated.View style={{ position: 'absolute', left: cx - 40 * s, bottom: H - (cy - 198 * s), opacity: bubbleOpacity, transform: [{ scale: bubbleScale }], transformOrigin: '0% 100%' }}>
           <View style={styles.bubble}>
             {fontsLoaded && <Text style={styles.bubbleText} maxFontSizeMultiplier={1.15} numberOfLines={1}>{t('splashHello', lang)}</Text>}
           </View>
         </Animated.View>
 
         <Animated.View style={{ position: 'absolute', left: cx - EMBLEM_W * ROSE_FX, top: cy - EMBLEM_H * ROSE_FY, width: EMBLEM_W, height: EMBLEM_H, opacity: emblemOpacity, transform: [{ scale: emblemScale }], transformOrigin: `${ROSE_FX * 100}% ${ROSE_FY * 100}%` }}>
-          <Image source={EMBLEM_BASE} fadeDuration={0} style={{ width: EMBLEM_W, height: EMBLEM_H }} />
+          <Image source={EMBLEM_BASE} fadeDuration={0} onLoad={() => setEmblemLoaded(true)} onError={() => setEmblemLoaded(true)} style={{ width: EMBLEM_W, height: EMBLEM_H }} />
           <Image source={EMBLEM_ROSE} fadeDuration={0} style={{ position: 'absolute', left: EMBLEM_W * ROSE_FX - ROSE_W / 2, top: EMBLEM_H * ROSE_FY - ROSE_W / 2, width: ROSE_W, height: ROSE_W }} />
         </Animated.View>
       </Animated.View>
