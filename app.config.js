@@ -149,7 +149,7 @@ export default {
         'expo-notifications',
         {
           icon: './assets/brand/v2/notification-icon.png',
-          color: '#ffffff',
+          color: '#0E7C7B',
           defaultChannel: 'default',
           sounds: [],
         },
