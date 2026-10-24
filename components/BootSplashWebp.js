@@ -16,6 +16,7 @@ import { MorphFrame, NEW_NATIVE, useReduceMotion } from './BootSplash'
 const BG = '#CBFAE8'
 const TEAL_DARK = '#0A5E5D'
 const CLIP = require('../assets/splash/gate-video.webp')
+const FIRST = require('../assets/splash/gate-video-first.jpg')
 const LAST = require('../assets/splash/gate-video-last.jpg')
 const WORDMARK = require('../assets/splash/wordmark.png')
 const CLIP_W = 1080
@@ -48,6 +49,7 @@ export default function BootSplashWebp({ ready, lang, fontsLoaded, onDone }) {
   const word = useRef(new Animated.Value(0)).current
   const exit = useRef(new Animated.Value(1)).current
   const [shownAt, setShownAt] = useState(null)
+  const [firstShown, setFirstShown] = useState(false)
   const readyAt = useRef(null)
 
   useEffect(() => {
@@ -60,8 +62,13 @@ export default function BootSplashWebp({ ready, lang, fontsLoaded, onDone }) {
   }, [reduce])
 
   useEffect(() => {
+    if (firstShown || shownAt != null) {
+      Animated.timing(morph, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
+    }
+  }, [firstShown, shownAt])
+
+  useEffect(() => {
     if (shownAt == null) return
-    Animated.timing(morph, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
     if (!reduce) {
       Animated.timing(word, { toValue: 1, duration: 300, delay: WORD_IN, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
     }
@@ -91,6 +98,11 @@ export default function BootSplashWebp({ ready, lang, fontsLoaded, onDone }) {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: BG, opacity: exit }]} accessible accessibilityLabel="ADA" importantForAccessibility="yes">
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
+        {/* Decoding the clip takes ~0.6 s on the S20+; its first frames are this same still
+            gate, so the still shows at once and the clip starts on top of it invisibly. */}
+        {reduce === false && (
+          <Image source={FIRST} fadeDuration={0} onLoad={() => setFirstShown(true)} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+        )}
         {reduce === false && (
           <ExpoImage
             source={CLIP}
