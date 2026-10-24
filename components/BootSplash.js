@@ -54,7 +54,7 @@ const CLIP_LINE = 75
 // so frame 1 is exactly that. Every binary shipped before it shows the OLD native splash,
 // so frame 1 copies that and cross-fades out of it ("morph", Berke 2026-10-23).
 const devPath = __DEV__ ? process.env.EXPO_PUBLIC_SPLASH_PATH : undefined
-const NEW_NATIVE = devPath ? devPath === 'native' : !!requireOptionalNativeModule('ExpoSplashScreen')
+export const NEW_NATIVE = devPath ? devPath === 'native' : !!requireOptionalNativeModule('ExpoSplashScreen')
 const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
 
 // Old Android 12+ native frame: the adaptive-icon foreground, centred on white. Measured
@@ -67,7 +67,18 @@ const MORPH_IMAGE = Platform.OS === 'ios'
   ? require('../assets/splash/morph-ios.png')
   : IS_PREVIEW ? require('../assets/splash/morph-android-preview.png') : require('../assets/splash/morph-android.png')
 
-function useReduceMotion() {
+// The old native splash, redrawn so the first JS frame matches it; fades out by `opacity`.
+export function MorphFrame({ opacity, W, cx, cy }) {
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', opacity }]}>
+      {Platform.OS === 'ios'
+        ? <Image source={MORPH_IMAGE} fadeDuration={0} resizeMode="contain" style={{ position: 'absolute', left: 0, top: cy - W / 2, width: W, height: W }} />
+        : <Image source={MORPH_IMAGE} fadeDuration={0} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy + MORPH_ANDROID_DY - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
+    </Animated.View>
+  )
+}
+
+export function useReduceMotion() {
   const [on, setOn] = useState(null)
   useEffect(() => {
     let alive = true
@@ -314,13 +325,7 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
         </Animated.View>
       </Animated.View>
 
-      {!NEW_NATIVE && reduce !== true && (
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', opacity: morphOpacity }]}>
-          {Platform.OS === 'ios'
-            ? <Image source={MORPH_IMAGE} fadeDuration={0} resizeMode="contain" style={{ position: 'absolute', left: 0, top: cy - W / 2, width: W, height: W }} />
-            : <Image source={MORPH_IMAGE} fadeDuration={0} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy + MORPH_ANDROID_DY - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
-        </Animated.View>
-      )}
+      {!NEW_NATIVE && reduce !== true && <MorphFrame opacity={morphOpacity} W={W} cx={cx} cy={cy} />}
     </Animated.View>
   )
 }
