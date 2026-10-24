@@ -393,6 +393,10 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
   - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
   - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
+  - **Logo v2 native assets (wired 2026-10-24, first store build after 1.4.0)**: app icon, Android adaptive
+    foreground + themed (monochrome) icon, splash, notification icon and both Preview icons (`assets/brand/v2/`).
+    Check on device (Android: launcher, themed icons on, splash, a push) and in TestFlight (iOS: home screen,
+    splash) BEFORE submission. Old logo files stay until that release is out. Vault `2026-10-24_logo-v2-compass.md`.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
