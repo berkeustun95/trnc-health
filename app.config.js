@@ -41,9 +41,9 @@ export default {
     slug: 'trnc-health',
     version: '1.3.0',
     orientation: 'portrait',
-    icon: IS_PREVIEW ? './assets/preview/icon.png' : './assets/icon.png',
+    icon: IS_PREVIEW ? './assets/brand/v2/preview-icon.png' : './assets/brand/v2/icon.png',
     splash: {
-      image: './assets/splash-icon.png',
+      image: './assets/brand/v2/splash-icon.png',
       resizeMode: 'contain',
       backgroundColor: '#FFFFFF',
     },
@@ -93,9 +93,9 @@ export default {
         },
       },
       adaptiveIcon: {
-        foregroundImage: IS_PREVIEW ? './assets/preview/android-icon-foreground.png' : './assets/android-icon-foreground.png',
+        foregroundImage: IS_PREVIEW ? './assets/brand/v2/preview-adaptive-icon.png' : './assets/brand/v2/adaptive-icon.png',
         backgroundColor: '#FFFFFF',
-        monochromeImage: './assets/android-icon-monochrome.png',
+        monochromeImage: './assets/brand/v2/monochrome-icon.png',
       },
       minSdkVersion: 24,
       permissions: [
@@ -137,7 +137,7 @@ export default {
       [
         'expo-notifications',
         {
-          icon: './assets/android-icon-monochrome.png',
+          icon: './assets/brand/v2/notification-icon.png',
           color: '#ffffff',
           defaultChannel: 'default',
           sounds: [],

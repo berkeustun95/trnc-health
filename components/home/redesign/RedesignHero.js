@@ -48,7 +48,7 @@ export const ROW_GAP = 8
 const TOP = rampLayers(0.32)
 const BOTTOM = rampLayers(0.35)
 const STEPS = TOP.length
-const LOGO = require('../../../assets/hero/ada-wordmark-keyline.png')
+const LOGO = require('../../../assets/brand/v2/ada-logo-keyline.png')
 
 const WEATHER_ION = {
   clear: 'sunny', partlyCloudy: 'partly-sunny', overcast: 'cloudy', fog: 'cloudy',
