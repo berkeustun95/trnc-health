@@ -116,7 +116,7 @@ await test('inline script runs in a stub DOM: waits for visibility, POSTs /check
     new Function('document', 'window', 'location', 'fetch', 'setTimeout', js)(doc, { addEventListener() {} }, { pathname: '/o/7K3QX9MP' }, fetchStub, (f, ms) => timers.push([f, ms]))
     return { box, listeners, timers, calls, doc }
   }
-  const payload = { status: 'ok', partner: '<b>X</b>', orderNo: '7K3Q-X9MP', time: 't', lines: [{ l: '1 × A', r: '5,00 TL' }], total: '5,00 TL', seenTr: 'tr', seenEn: 'en' }
+  const payload = { status: 'ok', partner: '<b>X</b>', orderNo: '7K3Q-X9MP', time: 't', lines: [{ l: '1 × A', r: '5,00 TL', d: '<i>Soğan yok' }, { l: '1 × B', r: '1,00 TL' }], total: '5,00 TL', seenTr: 'tr', seenEn: 'en' }
   const hidden = await run('hidden', payload)
   assert.equal(hidden.timers.length, 0); assert.equal(hidden.calls.length, 0)
   hidden.doc.visibilityState = 'visible'; hidden.listeners.visibilitychange()
@@ -129,6 +129,7 @@ await test('inline script runs in a stub DOM: waits for visibility, POSTs /check
   const flat = JSON.stringify(vis.box)
   assert.match(flat, /&lt;|<b>X<\/b>/) // payload text lands as plain text node content, never parsed
   assert.match(flat, /Bu sipariş ADA üzerinden geldi/)
+  assert.match(flat, /"className":"d"[^}]*<i>Soğan yok|<i>Soğan yok[^}]*"className":"d"/) // detail sub-line is a text node
   const bot = await run('visible', { status: 'bot' }); bot.timers[0][0](); await new Promise(r => setImmediate(r))
   assert.equal(bot.box.children.length, 1)
   assert.match(JSON.stringify(bot.box), /Sonucu göster/)
@@ -247,6 +248,56 @@ await test('expired: banner, greyed, 200', async () => {
   assert.doesNotMatch(html, /Bu sipariş ADA üzerinden geldi/)
 })
 
+await test('is_test: test banner wins (server HTML, /check JSON, client script); green banner absent', async () => {
+  const TEST_TR = /TEST SİPARİŞİ — hazırlamayın/, TEST_EN = /TEST ORDER — do not prepare/, GREEN = /Bu sipariş ADA üzerinden geldi/
+  for (const status of ['ok', 'expired']) {
+    rpcImpl = () => json(okRow({ status, is_test: true }))
+    const html = await (await get('/o/7K3QX9MP')).text()
+    assert.match(html, TEST_TR, status); assert.match(html, TEST_EN, status)
+    assert.match(html, /<div class="banner bad"><b>TEST SİPARİŞİ/, status)
+    assert.doesNotMatch(html, GREEN, status)
+    assert.doesNotMatch(html, /<b>Süresi dolmuş/, status)
+    assert.equal((await (await check('/o/7K3QX9MP')).json()).isTest, true, status)
+    assert.match(html, /class="card grey"/, status)
+  }
+  rpcImpl = () => json(okRow())
+  assert.doesNotMatch(await (await get('/o/7K3QX9MP')).text(), /class="card grey"/)
+  const js = (await (await plain('/o/7K3QX9MP')).text()).match(/<script nonce="[^"]+">([\s\S]*)<\/script>/)[1]
+  assert.match(js, /j\.isTest===true\?banner\('TEST SİPARİŞİ — hazırlamayın','TEST ORDER — do not prepare',true\)/)
+  const mkEl = tag => ({ tag, children: [], className: '', set textContent(v) { this._t = v; if (v === '') this.children = [] }, get textContent() { return this._t }, appendChild(c) { this.children.push(c) } })
+  const render = async payload => {
+    const box = mkEl('div'); const timers = []
+    const doc = { visibilityState: 'visible', readyState: 'complete', getElementById: () => box, createElement: mkEl, addEventListener() {} }
+    new Function('document', 'window', 'location', 'fetch', 'setTimeout', js)(doc, { addEventListener() {} }, { pathname: '/o/7K3QX9MP' }, () => Promise.resolve({ json: async () => payload }), (f, ms) => timers.push([f, ms]))
+    timers[0][0](); await new Promise(r => setImmediate(r))
+    return JSON.stringify(box)
+  }
+  const base = { status: 'ok', partner: 'P', orderNo: '7K3Q-X9MP', time: 't', lines: [], total: '0', seenTr: 'tr', seenEn: 'en' }
+  const t = await render({ ...base, isTest: true })
+  assert.match(t, TEST_TR); assert.match(t, TEST_EN); assert.match(t, /banner bad/); assert.doesNotMatch(t, GREEN)
+  const te = await render({ ...base, status: 'expired', isTest: true })
+  assert.match(te, TEST_TR); assert.doesNotMatch(te, /Süresi dolmuş/)
+  assert.match(t, /"className":"card grey"/)
+  assert.match(te, /"className":"card grey"/)
+  const ok = await render(base)
+  assert.match(ok, /"className":"card"/); assert.doesNotMatch(ok, /card grey/)
+  assert.match(await render({ ...base, isTest: 'true' }), GREEN)
+})
+
+await test('is_test false / absent / truthy non-booleans: green banner unchanged, never a test banner', async () => {
+  for (const over of [{ is_test: false }, {}, { is_test: null }, { is_test: 'true' }, { is_test: 1 }, { is_test: 'false' }]) {
+    rpcImpl = () => json(okRow(over))
+    const html = await (await get('/o/7K3QX9MP')).text()
+    const label = JSON.stringify(over)
+    assert.match(html, /✓ Bu sipariş ADA üzerinden geldi/, label)
+    assert.doesNotMatch(html, /TEST SİPARİŞİ|TEST ORDER/, label)
+    assert.equal((await (await check('/o/7K3QX9MP')).json()).isTest, false, label)
+  }
+  rpcImpl = () => json(okRow({ status: 'expired', is_test: false }))
+  const html = await (await get('/o/7K3QX9MP')).text()
+  assert.match(html, /Süresi dolmuş/); assert.doesNotMatch(html, /TEST SİPARİŞİ/)
+})
+
 await test('not_found: 404 and message', async () => {
   rpcImpl = () => json({ status: 'not_found' })
   const res = await get('/o/7K3QX9MP')
@@ -261,6 +312,20 @@ await test('escaping: <script> in dish and partner names', async () => {
   assert.doesNotMatch(html, /<script/i)
   assert.doesNotMatch(html, /<img/i)
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;&quot;&#39;/)
+})
+
+await test('line detail: sub-line escaped in page, textContent in client, carried by /check; plain line unchanged', async () => {
+  const D = '<b>&"'
+  rpcImpl = () => json(okRow({ lines: [{ name: 'Burger', qty: 1, unit_price: 5, detail: D }, { name: 'Fries', qty: 2, unit_price: 3, detail: null }, { name: 'Cola', qty: 1, unit_price: 1 }] }))
+  const html = await (await get('/o/7K3QX9MP')).text()
+  assert.ok(html.includes('<li><span>1 × Burger<span class="d">&lt;b&gt;&amp;&quot;</span></span><span>5,00 TL</span></li>'), 'detail sub-line escaped')
+  assert.ok(html.includes('<li><span>2 × Fries</span><span>6,00 TL</span></li>'), 'null detail: plain line byte-identical')
+  assert.ok(html.includes('<li><span>1 × Cola</span><span>1,00 TL</span></li>'), 'absent detail: plain line byte-identical')
+  assert.doesNotMatch(html, /<b>&"/)
+  const j = await (await check('/o/7K3QX9MP')).json()
+  assert.deepEqual(j.lines, [{ l: '1 × Burger', r: '5,00 TL', d: D }, { l: '2 × Fries', r: '6,00 TL' }, { l: '1 × Cola', r: '1,00 TL' }])
+  const src = await (await get('/o/7K3QX9MP')).text()
+  assert.ok(!/class="d"[^>]*style=/.test(src), 'no inline style')
 })
 
 await test('malformed codes never call the RPC (404, any method)', async () => {

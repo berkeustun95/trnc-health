@@ -399,6 +399,33 @@ function loadGoLiveTexts() {
   return out
 }
 
+// ── Turkish in-app copy: the delivery / address-book sentences, VERBATIM ─────────────────
+// The three copies above are English, so the regex markers cannot see constants/legal/privacy.tr.js.
+// These are Berke's approved Turkish sentences (2026-10-23), compared as exact text after collapsing
+// whitespace: a missing sentence OR any change to one goes red. Changing the wording = changing it here
+// in the same commit, which is the review moment.
+const TR_PATH = 'constants/legal/privacy.tr.js'
+const TR_SENTENCES = [
+  { key: 'TR delivery data WhatsApp-only', text: 'Teslimat seçiminiz, adrese verdiğiniz ad, teslimat adresiniz, teslimatta aranacak kişi için eklediğiniz telefon numarası, kurye için yazdığınız adres tarifi ve harita konumu için de aynısı geçerlidir: yalnızca WhatsApp mesajınızın içinde restorana gider.' },
+  { key: 'TR address book on-phone',      text: 'Tekrar yazmanız gerekmesin diye, her biri adı, harita konumu ve isteğe bağlı telefon numarasıyla birlikte en fazla 10 teslimat adresini telefonunuzda uygulamanın içinde kaydedebilirsiniz; ADA bunları bize göndermez.' },
+  { key: 'TR change/delete in basket',    text: 'Her birini sepette istediğiniz zaman değiştirebilir veya silebilirsiniz.' },
+  { key: 'TR Android backup',             text: "Android'de, ADA'nın diğer uygulama verileri gibi, telefonunuzun kendi Google yedeğine dahil olabilir ve uygulamayı yeniden yüklediğinizde geri gelebilir." },
+  { key: 'TR delivery location bullet',   text: '• Teslimat konumu — adrese teslim için kapınızı haritada işaretlersiniz; haritayı kaydırmak konum izni gerektirmez. “Şu anki konumumu kullan”, izin verirseniz telefonunuzun konumunu yalnızca pini yerleştirmek için kullanır. Pin, restorana gönderdiğiniz WhatsApp mesajına harita bağlantısı olarak eklenir ve o adresle birlikte telefonunuzda saklanır. Bize gönderilmez.' },
+]
+const squash = t => t.replace(/\s+/g, ' ')
+function loadTr() {
+  const p = join(ROOT, TR_PATH)
+  if (!existsSync(p)) throw new Error(`missing Turkish copy: ${TR_PATH}`)
+  return squash(readFileSync(p, 'utf8'))
+}
+function checkTurkish(problems, log, trText) {
+  log('\n  Turkish in-app copy (approved delivery sentences, verbatim)')
+  for (const s of TR_SENTENCES) {
+    if (trText.includes(squash(s.text))) log(`    ✓ ${s.key}`)
+    else { problems.push(`"${s.key}" missing or changed in ${TR_PATH} — the approved Turkish sentence must appear word for word`); log(`    ✗ ${s.key.padEnd(30)} missing or changed in ${TR_PATH}`) }
+  }
+}
+
 // `world` lets --self substitute a mutated flag/texts without touching the real files.
 function check(copies, columns, log = console.log, world = null) {
   const problems = []
@@ -408,6 +435,7 @@ function check(copies, columns, log = console.log, world = null) {
   checkGoLive(problems, log, flagOn, texts)
   checkCheckinsDisclosure(problems, log, world ? !!world.checkinsOn : readModuleFlag('checkins'), texts)
   checkVoiceDisclosure(problems, log, world ? !!world.voiceOn : readScalarFlag('VOICE_INPUT'), texts)
+  checkTurkish(problems, log, world?.trText ?? loadTr())
 
   // ── 1. same "Last updated" ──
   log('  dates')
@@ -462,7 +490,7 @@ function self() {
   // has flipped the module on locally to preview it — which is step 4 of the go-live SOP,
   // i.e. a normal and correct working state. The tripwire's own paths are driven by
   // flipping flagOn to true as a MUTATION in the two cases below, so nothing goes unchecked.
-  const realWorld = { flagOn: false, checkinsOn: false, voiceOn: false, texts: loadGoLiveTexts() }
+  const realWorld = { flagOn: false, checkinsOn: false, voiceOn: false, texts: loadGoLiveTexts(), trText: loadTr() }
   if (check(copies, columns, quiet, realWorld).length) {
     console.error('  --self cannot run: the real files are already failing.')
     return 1
@@ -554,6 +582,10 @@ function self() {
         return [copies, columns, { ...realWorld, voiceOn: true, texts }]
       },
       ([,,w]) => w.voiceOn === true && !/ADA hiçbir zaman ses kaydetmez veya saklamaz/.test(w.texts['constants/legal/privacy.tr.js'])],
+    ['Turkish phone phrase dropped', () => [copies, columns, { ...realWorld, trText: realWorld.trText.replace('teslimatta aranacak kişi için eklediğiniz telefon numarası, ', '') }],
+      ([,,w]) => !w.trText.includes('teslimatta aranacak kişi için')],
+    ['Turkish address-book sentence reworded', () => [copies, columns, { ...realWorld, trText: realWorld.trText.replace('en fazla 10 teslimat adresini', 'en fazla 20 teslimat adresini') }],
+      ([,,w]) => w.trText.includes('en fazla 20 teslimat adresini')],
   ]
   let bad = 0
   for (const [name, build, landed] of cases) {

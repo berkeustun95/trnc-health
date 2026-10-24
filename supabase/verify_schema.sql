@@ -49,6 +49,10 @@ WITH report AS (
     ('1115_eatery_partners','eatery_photos'),
     -- WhatsApp order proof (1125): registered ahead of the apply; red until it runs.
     ('20261125_eatery_orders','eatery_orders'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','order_testers'),
+    -- Per-dish options (1134): registered ahead of the apply; red until it runs.
+    ('20261134_eatery_item_options','eatery_item_options'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources'),
     ('1102_duyurular','announcements'),
@@ -226,6 +230,21 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders','created_by'),
     ('20261125_eatery_orders','eatery_orders','client_id'),
     ('20261125_eatery_orders','eatery_orders','created_as_guest'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
+    ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
+    ('20261132_eatery_orders_is_test','order_testers','added_at'),
+    ('20261132_eatery_orders_is_test','order_testers','note'),
+    -- Per-dish options (1134): registered ahead of the apply; red until it runs.
+    ('20261134_eatery_item_options','eatery_item_options','id'),
+    ('20261134_eatery_item_options','eatery_item_options','item_id'),
+    ('20261134_eatery_item_options','eatery_item_options','kind'),
+    ('20261134_eatery_item_options','eatery_item_options','label_i18n'),
+    ('20261134_eatery_item_options','eatery_item_options','message_tr'),
+    ('20261134_eatery_item_options','eatery_item_options','price'),
+    ('20261134_eatery_item_options','eatery_item_options','max_qty'),
+    ('20261134_eatery_item_options','eatery_item_options','sort_order'),
+    ('20261134_eatery_item_options','eatery_item_options','is_available'),
     -- Institutions outside the TRNC (1095). The Student Hub and both pickers select country.
     ('1095_institutions_country','institutions','country'),
     ('1095_institutions_country','institutions','city_name'),
@@ -601,7 +620,11 @@ WITH report AS (
     -- WhatsApp order proof (1125): registered ahead of the apply; red until it runs.
     ('20261125_eatery_orders','eatery_order_age_gate'),
     ('20261125_eatery_orders','create_eatery_order'),
-    ('20261125_eatery_orders','verify_eatery_order')
+    ('20261125_eatery_orders','verify_eatery_order'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','is_order_tester'),
+    -- Per-dish options (1134): registered ahead of the apply; red until it runs.
+    ('20261134_eatery_item_options','eatery_option_label_valid')
   ) e(m,o)
 
   UNION ALL
@@ -743,6 +766,19 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_expires_check'),
     ('20261125_eatery_orders','eatery_orders_view_count_check'),
     ('20261125_eatery_orders','eatery_orders_client_id_check'),
+    -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261132_eatery_orders_is_test','order_testers_pkey'),
+    ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
+    -- Per-dish options (1134): registered ahead of the apply; red until it runs.
+    ('20261134_eatery_item_options','eatery_item_options_pkey'),
+    ('20261134_eatery_item_options','eatery_item_options_item_id_fkey'),
+    ('20261134_eatery_item_options','eatery_item_options_item_kind_message_key'),
+    ('20261134_eatery_item_options','eatery_item_options_kind_check'),
+    ('20261134_eatery_item_options','eatery_item_options_label_check'),
+    ('20261134_eatery_item_options','eatery_item_options_message_check'),
+    ('20261134_eatery_item_options','eatery_item_options_price_check'),
+    ('20261134_eatery_item_options','eatery_item_options_max_qty_check'),
+    ('20261134_eatery_item_options','eatery_item_options_remove_shape_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -1078,6 +1114,8 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_partner_created_at_idx'),
     ('20261125_eatery_orders','eatery_orders_created_at_idx'),
     ('20261125_eatery_orders','eatery_orders_guest_partner_idx'),
+    -- Per-dish options (1134): registered ahead of the apply; red until it runs.
+    ('20261134_eatery_item_options','eatery_item_options_item_idx'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcements_list_idx'),
     ('1102_duyurular','announcements_deadline_idx'),
@@ -4050,6 +4088,148 @@ WITH report AS (
                     WHERE p.slug = 'crunchy-express'
                       AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
                         OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
+    -- 1135 Crunchy per-dish options (data). Red until applied, never an error: query_to_xml runs the count at run time,
+    --     behind to_regclass, so the token parses even before 20261134 created the table.
+    UNION ALL SELECT '20261135_crunchy_express_item_options','crunchy-express has 73 removal options on 19 dishes and 34 extras, once 1135 is applied (rows only; prices of the extras are a later migration)',
+      EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql')
+      AND COALESCE(CASE WHEN to_regclass('public.eatery_item_options') IS NULL THEN false ELSE
+        (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '73'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(DISTINCT i.id) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '19'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra''', false, true, '')))[1]::text = '34'
+        END, false)
+    -- ── 1134: per-dish options + create/verify v2. Same discipline as the blocks below: only to_regclass / to_regprocedure /
+    --    catalogs and COALESCE around every bool_and / subquery, red until applied, never an error. It sits ABOVE the 1132 and
+    --    1125 blocks on purpose: scripts/test-eatery-orders-*.mjs slice those two and expect them green after their own file.
+    --    One count, one owner: the create / verify COMMENT halves of the 1132 token moved here (they end `20261134.` now).
+    UNION ALL SELECT '20261134_eatery_item_options','eatery_item_options: RLS on, exactly 2 policies, both permissive SELECT TO anon, authenticated without WITH CHECK; _select_active = partner is_active; _select_preview = is_previewer() AND partner NOT is_active',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_item_options')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_item_options') = 2
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_item_options'
+              AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[] AND with_check IS NULL
+              AND policyname IN ('eatery_item_options_select_active','eatery_item_options_select_preview')) = 2
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_item_options' AND policyname = 'eatery_item_options_select_active'
+              AND qual LIKE '%p.is_active%' AND qual NOT LIKE '%NOT p.is_active%' AND qual NOT LIKE '%is_previewer%' AND qual LIKE '%eatery_menu_items%' AND qual LIKE '%eatery_partners%')
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_item_options' AND policyname = 'eatery_item_options_select_preview'
+              AND qual LIKE '%is_previewer()%' AND qual LIKE '%NOT p.is_active%' AND qual LIKE '%eatery_menu_items%' AND qual LIKE '%eatery_partners%')
+    UNION ALL SELECT '20261134_eatery_item_options','eatery_item_options grants: anon + authenticated SELECT only (table and column level), nothing for PUBLIC, service_role writes',
+      COALESCE(has_table_privilege('anon', to_regclass('public.eatery_item_options'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.eatery_item_options'), 'SELECT')
+               AND NOT has_table_privilege('anon', to_regclass('public.eatery_item_options'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.eatery_item_options'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_any_column_privilege('anon', to_regclass('public.eatery_item_options'), 'INSERT,UPDATE,REFERENCES')
+               AND NOT has_any_column_privilege('authenticated', to_regclass('public.eatery_item_options'), 'INSERT,UPDATE,REFERENCES')
+               AND has_table_privilege('service_role', to_regclass('public.eatery_item_options'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_class c, LATERAL aclexplode(c.relacl) a WHERE c.oid = to_regclass('public.eatery_item_options') AND a.grantee = 0)
+      AND to_regclass('public.eatery_item_options') IS NOT NULL
+    UNION ALL SELECT '20261134_eatery_item_options','eatery_item_options columns: types, NOT NULL, GENERATED ALWAYS identity and the defaults (max_qty 1, sort_order 0, is_available true)',
+      COALESCE((SELECT string_agg(a.attname || ' ' || format_type(a.atttypid, a.atttypmod) || CASE WHEN a.attnotnull THEN ' NOT NULL' ELSE '' END
+                       || CASE WHEN a.attidentity = 'a' THEN ' IDENTITY' ELSE '' END, ', ' ORDER BY a.attnum)
+                  FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_item_options') AND a.attnum > 0 AND NOT a.attisdropped)
+               = 'id bigint NOT NULL IDENTITY, item_id bigint NOT NULL, kind text NOT NULL, label_i18n jsonb NOT NULL, message_tr text NOT NULL, price numeric(8,2), max_qty smallint NOT NULL, sort_order integer NOT NULL, is_available boolean NOT NULL', false)
+      AND COALESCE((SELECT string_agg(a.attname || '=' || pg_get_expr(d.adbin, d.adrelid), ', ' ORDER BY a.attname)
+                  FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum WHERE d.adrelid = to_regclass('public.eatery_item_options'))
+               = 'is_available=true, max_qty=1, sort_order=0', false)
+    UNION ALL SELECT '20261134_eatery_item_options','eatery_item_options constraints: exactly 9 (primary, foreign, unique, check; NOT NULL entries of PG 18 aside); one FK to eatery_menu_items ON DELETE CASCADE; CHECKs say kind remove/extra, label helper, price > 0 (rendered price > (0)::numeric), a removal has no price and max_qty 1; index on (item_id)',
+      (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.contype IN ('p','f','u','c')) = 9
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.contype = 'f'
+              AND c.confrelid = to_regclass('public.eatery_menu_items') AND c.confdeltype = 'c') = 1
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%eatery_option_label_valid(label_i18n)%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_label_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%remove%' AND pg_get_constraintdef(c.oid) LIKE '%extra%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_kind_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%price > (0)::numeric%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_price_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%price IS NULL%' AND pg_get_constraintdef(c.oid) LIKE '%max_qty = 1%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_remove_shape_check'), false)
+      AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'eatery_item_options' AND indexname = 'eatery_item_options_item_idx' AND indexdef LIKE '%(item_id)%') = 1
+    UNION ALL SELECT '20261134_eatery_item_options','eatery_option_label_valid(jsonb): IMMUTABLE, owner postgres, search_path empty, NO EXECUTE for anon/authenticated/PUBLIC, service_role keeps it; body is the nine-name check',
+      COALESCE((SELECT p.provolatile = 'i' AND pg_get_userbyid(p.proowner) = 'postgres' AND p.proconfig @> ARRAY['search_path=""']
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_option_label_valid(jsonb)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                       WHERE p.oid = to_regprocedure('public.eatery_option_label_valid(jsonb)') AND a.privilege_type = 'EXECUTE'
+                         AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+      AND COALESCE(has_function_privilege('service_role', to_regprocedure('public.eatery_option_label_valid(jsonb)'), 'EXECUTE'), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_option_label_valid(jsonb)')) LIKE '%''English'',''Turkish'',''Arabic'',''Russian'',''Greek'',''French'',''Spanish'',''German'',''Persian''%'
+               AND pg_get_functiondef(to_regprocedure('public.eatery_option_label_valid(jsonb)')) LIKE '%jsonb_path_exists%', false)
+    UNION ALL SELECT '20261134_eatery_item_options','create_eatery_order body v2: options joined on THIS line''s dish (io.item_id = m.id and = r.item_id), is_available, extras need a price, option_unavailable, qty > max_qty, still 3 arguments, never reads a client price',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%JOIN public.eatery_item_options io%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%io.item_id = m.id%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%io.item_id = r.item_id%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%io.is_available%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%io.kind = ''remove'' OR io.price IS NOT NULL%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%MESSAGE = ''option_unavailable''%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%r.qty > io.max_qty%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%JOIN public.eatery_menu_items m%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) NOT LIKE '%p_items -> %', false)
+      AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id']::text[] FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
+    UNION ALL SELECT '20261134_eatery_item_options','verify_eatery_order body returns a per-line detail (and still no created_by / client_id / option id)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) LIKE '%''detail'', l -> ''detail''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%option_id%', false)
+    UNION ALL SELECT '20261134_eatery_item_options','COMMENTs: create (lists option_unavailable, keeps the NOT test orders sentence) / verify (lines carry detail) / the table / the helper all carry the 20261134 text',
+      COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%option_unavailable%'
+           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%NOT test orders%'
+           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%20261134.', false)
+      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%detail%'
+           AND obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%20261134.', false)
+      AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%20261134.', false)
+      AND COALESCE(obj_description(to_regprocedure('public.eatery_option_label_valid(jsonb)'), 'pg_proc') LIKE '%20261134.', false)
+    -- ── 1132: server-marked TEST orders. Same discipline as the 1125 block: only to_regclass / to_regprocedure / catalogs,
+    --    red until applied, never an error. (1125's body token lost its `created_as_guest AND created_at` half: 1132 owns it.)
+    UNION ALL SELECT '20261132_eatery_orders_is_test','eatery_orders.is_test: boolean NOT NULL DEFAULT false (existing rows were set false by the in-file proof)',
+      (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='eatery_orders' AND column_name='is_test'
+          AND data_type='boolean' AND is_nullable='NO' AND column_default='false') = 1
+    UNION ALL SELECT '20261132_eatery_orders_is_test','order_testers: RLS on, 0 policies, no anon/authenticated privilege (table or column), no FK, service_role writes',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.order_testers')), false)
+      AND to_regclass('public.order_testers') IS NOT NULL
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'order_testers') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_any_column_privilege('anon', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,REFERENCES')
+               AND NOT has_any_column_privilege('authenticated', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,REFERENCES')
+               AND has_table_privilege('service_role', to_regclass('public.order_testers'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.order_testers') AND c.contype = 'f') = 0
+      AND (SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.order_testers') AND a.attnum > 0 AND NOT a.attisdropped) = 3
+      AND (SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.order_testers') AND a.attname = 'user_id' AND NOT a.attisdropped) = 0
+    UNION ALL SELECT '20261132_eatery_orders_is_test','is_order_tester(uuid): STABLE SECURITY DEFINER, search_path empty, owner postgres, NO EXECUTE for anon/authenticated/PUBLIC, refuses anonymous sessions, looks up the sha256 fingerprint (never the raw uid)',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proconfig @> ARRAY['search_path=""'] AND pg_get_userbyid(p.proowner) = 'postgres'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_order_tester(uuid)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                       WHERE p.oid = to_regprocedure('public.is_order_tester(uuid)') AND a.privilege_type = 'EXECUTE'
+                         AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) LIKE '%NOT public.is_anonymous_session()%'
+               AND pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) LIKE '%t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(p_uid::text, ''UTF8'')), ''hex'')%'
+               AND pg_get_functiondef(to_regprocedure('public.is_order_tester(uuid)')) NOT LIKE '%= p_uid%', false)
+    UNION ALL SELECT '20261132_eatery_orders_is_test','create_eatery_order body: is_test derived server-side (previewer OR tester), partner cap excludes tests, per-user count counts ALL, INSERT stores is_test; still 3 arguments, none named *test*',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_test := public.is_previewer() OR public.is_order_tester(v_uid);%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND NOT is_test AND created_at > now()%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%WHERE created_by = v_uid AND created_at > now() - interval ''1 hour'';%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) NOT LIKE '%created_by = v_uid AND NOT is_test%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%client_id, created_as_guest, is_test)%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%p_client_id, v_guest, v_test)%', false)
+      AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id']::text[] FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
+    UNION ALL SELECT '20261132_eatery_orders_is_test','verify_eatery_order body returns the is_test key (and still no created_by / client_id)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) LIKE '%''is_test'',                v_o.is_test%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%', false)
+    UNION ALL SELECT '20261132_eatery_orders_is_test','COMMENTs: is_order_tester / order_testers / eatery_orders.is_test carry the 20261132 text (the create / verify COMMENTs belong to 20261134 now)',
+      COALESCE(obj_description(to_regprocedure('public.is_order_tester(uuid)'), 'pg_proc') LIKE '%20261132.', false)
+      AND COALESCE(obj_description(to_regclass('public.order_testers'), 'pg_class') LIKE '%20261132.', false)
+      AND COALESCE(col_description(to_regclass('public.eatery_orders'), (SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_orders') AND a.attname = 'is_test' AND NOT a.attisdropped)) LIKE '%20261132.', false)
+    -- 1133: Berke's two tester rows. Located by the SHA-256 of the lower-cased e-mail (no id or e-mail in this public file).
+    -- order_testers exists only after 1132, so it is read through query_to_xml (SQL text, run only when called) behind a
+    -- to_regclass CASE: before 1132/1133 this plans and reads false/true without ever naming a missing table.
+    UNION ALL SELECT '20261133_order_testers_berke','order_testers holds the fingerprints of both Berke accounts, once 1133 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261133_order_testers_berke.sql')
+      OR CASE WHEN to_regclass('public.order_testers') IS NULL THEN false ELSE
+           (xpath('/row/n/text()', query_to_xml($q$
+              SELECT count(*) AS n FROM auth.users u
+               WHERE encode(pg_catalog.sha256(pg_catalog.convert_to(lower(u.email), 'UTF8')), 'hex') IN
+                     ('e5c89d1732071519678ad760eee802f4eeb2e214aaed8e24e7aa7b956d0e0d0a', 'c5f67310246afe9b8deb939625d530743650b4412bcbf3ba5e852956130a025c')
+                 AND EXISTS (SELECT 1 FROM public.order_testers t
+                              WHERE t.uid_sha256 = encode(pg_catalog.sha256(pg_catalog.convert_to(u.id::text, 'UTF8')), 'hex'))
+            $q$, false, true, '')))[1]::text::int = 2
+         END
     -- ── 1125: WhatsApp order proof. Every token reaches objects through to_regclass / to_regprocedure / catalogs
     --    (never a bare name, never a named column of a table that may not exist yet): red until applied, never an error.
     UNION ALL SELECT '20261125_eatery_orders','eatery_orders: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes',
@@ -4108,7 +4288,7 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%m.price IS NOT NULL%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_user_n >= 5%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_guest AND v_part_n >= 60%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%created_as_guest AND created_at > now()%'
+           -- RETIRED half (1132 owns the partner-count shape `created_as_guest AND NOT is_test AND created_at > now()`; see its body token)
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%v_partner.adult_only%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%eatery_order_age_gate(v_dob%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%MESSAGE = ''adult_only''%'
@@ -4166,9 +4346,9 @@ WITH report AS (
                     ELSE (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM private.preview_key_hashes', false, true, '')))[1]::text::int END) = 1
           AND NOT COALESCE((SELECT bool_or(a.grantee IN (0, (SELECT oid FROM pg_roles WHERE rolname = 'anon'), (SELECT oid FROM pg_roles WHERE rolname = 'authenticated')))
                             FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('private.preview_key_hashes')), false))
-    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (3 today: the eatery preview policies)',
+    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (4 since 20261134, read from prod 2026-10-24: eatery_partners, eatery_menu_items, eatery_photos, eatery_item_options _select_preview — supabase/readonly/previewer_policies.sql)',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
-      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 3
+      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 4
           AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE (coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%')
                             AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL OR qual NOT LIKE '%is_active%')))
     UNION ALL SELECT '1120_eatery_preview_key','eatery_partners_select_preview applies TO anon, authenticated',
@@ -5031,7 +5211,7 @@ FROM (VALUES
   -- timeout (the run takes ~12 s; the 5 s default logged every run as a timeout).
   ('1106_sync_novest_cron_timeout','sync-novest-morning'),
   ('1106_sync_novest_cron_timeout','sync-novest-evening'),
-  -- 30-day retention on eatery_orders (order proof). 03:40 UTC, after the other purges.
+  -- Retention on eatery_orders (order proof): since 20261132 hourly at :40 (30 days real, 24 h TEST); schedule + command are the 1132 row below.
   ('20261125_eatery_orders','eatery-orders-retention')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
@@ -5056,6 +5236,16 @@ SELECT '1052_purge_status_reporter', 'app_update_events_purge_status: reports ON
          WHEN position('purge-app-update-events' in pg_get_functiondef(to_regprocedure('public.app_update_events_purge_status()'))) = 0
            THEN 'NAMES NO JOB ← FIX'
          ELSE 'OK' END
+
+UNION ALL
+-- ─── 1132: eatery-orders-retention is hourly at :40 and deletes real orders after 30 days, TEST orders after 24 hours ───
+SELECT '20261132_eatery_orders_is_test', 'eatery-orders-retention: schedule 40 * * * * and the exact 30-day / 24-hour delete command',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'eatery-orders-retention') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'eatery-orders-retention' AND active
+                    AND schedule = '40 * * * *'
+                    AND btrim(command) = 'DELETE FROM public.eatery_orders WHERE created_at < now() - interval ''30 days'' OR (is_test AND created_at < now() - interval ''24 hours'')') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 ORDER BY status ASC, migration;
 
 

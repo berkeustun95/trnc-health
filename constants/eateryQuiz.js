@@ -2,7 +2,7 @@
 // plain JS, no React, no network, tested by scripts/test-eatery-quiz.mjs. It reads the rows loadEateryPartners
 // already returned (never its own query), so a hidden partner is only here when the Preview key lets the list show it.
 // A dish is only ever suggested when it carries a tag: the Preview fixture and any untagged item have role null.
-import { eateryOrderable, eateryMenuSections, orderTotal } from './eatery.js'
+import { eateryOrderable, eateryMenuSections, orderTotal, basketLines } from './eatery.js'
 
 export const QUIZ_STEPS = 4
 export const QUIZ_EXTRAS = ['sauce', 'drink', 'dessert']
@@ -137,7 +137,7 @@ export const quizSideOrderable = eateryOrderable
 // bar on the results and the bar on the menu never disagree. -> { count, total, currency }
 export function quizBasketSummary(partner, basket) {
   const items = eateryMenuSections(partner).flatMap(sec => sec.items).filter(eateryOrderable)
-  const lines = items.filter(i => (basket?.[i.id] || 0) > 0).map(i => ({ qty: basket[i.id], price: Number(i.price) }))
+  const lines = basketLines(items, basket)   // one entry per line key: a dish with options is priced with its extras
   return { count: lines.reduce((n, l) => n + l.qty, 0), total: orderTotal(lines), currency: items[0]?.currency }
 }
 

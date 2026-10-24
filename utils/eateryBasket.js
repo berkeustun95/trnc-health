@@ -19,7 +19,7 @@ export const CONTACT_LOGGING = eateryLogsContacts({ isPreview: IS_PREVIEW, isDev
 export const partnerContactNumbers = p => eateryContactNumbers(p, { isPreview: IS_PREVIEW, testNumber: TEST_WHATSAPP, isDev: IS_DEV })
 export const effectiveWhatsapp = p => partnerContactNumbers(p).whatsapp || ''
 
-export { getBasket, changeQty, clearAll, undo, dropSnapshot, getLastAdded } from './eateryBasketCore'
+export { getBasket, changeQty, setLine, clearAll, undo, dropSnapshot, getLastAdded, lineKey, parseKey, dishQty, dishKeys, dishUsesSheet } from './eateryBasketCore'
 
 export function useBasket(pid) {
   const [basket, setLocal] = useState(() => getBasket(pid))

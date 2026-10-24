@@ -3,14 +3,14 @@ import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animat
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry } from '../constants/eatery'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, eateryOptionLabel, resolveLineOptions, formatPrice } from '../constants/eatery'
 import MapView from 'react-native-maps'
 import { MAP_PROVIDER } from '../utils/googleMap'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage } from './ui'
+import { ScreenHeader, Card, Button, RemoteImage, BottomSheet } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 
 // ─── Yeme-İçme: order via WhatsApp (the basket is utils/eateryBasket.js, the message constants/eatery.js) ───
@@ -22,9 +22,12 @@ const MAX_QTY = 99
 const ORDER_ERR_KEY = { adult: 'eateryOrderAdultOnly', generic: 'eateryOrderErrGeneric', rate: 'eateryOrderErrRate', account: 'eateryOrderErrAccount', prices: 'eateryOrderErrPrices', items: 'eateryOrderErrItems' }
 
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
-export function QtyStepper({ id, name, qty, onQty, lang }) {
+// min / max: the options sheet's own bounds. Without min (every menu and basket row) nothing changes: the pill at 0 and the bin at 1.
+// With min it is always [−] n [+], the minus dimmed at min.
+export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY }) {
+  const bare = min == null
   const sub = key => t(key, lang).replace('{name}', () => name).replace('{qty}', () => String(qty))
-  if (qty < 1) {
+  if (bare && qty < 1) {
     return (
       <Pressable onPress={() => onQty(id, 1)} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
         accessibilityRole="button" accessibilityLabel={sub('eateryOrderAddA11y')}>
@@ -35,13 +38,13 @@ export function QtyStepper({ id, name, qty, onQty, lang }) {
   }
   return (
     <View style={st.row}>
-      <Pressable onPress={() => onQty(id, -1)} style={({ pressed }) => [st.round, st.minus, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={sub(qty === 1 ? 'eateryOrderRemove' : 'eateryOrderLess')}>
-        <Ionicons name={qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.primaryDark} />
+      <Pressable onPress={() => onQty(id, -1)} disabled={!bare && qty <= min} style={({ pressed }) => [st.round, st.minus, !bare && qty <= min && st.dim, pressed && { opacity: press.small }]}
+        accessibilityRole="button" accessibilityState={bare ? undefined : { disabled: qty <= min }} accessibilityLabel={sub(bare && qty === 1 ? 'eateryOrderRemove' : 'eateryOrderLess')}>
+        <Ionicons name={bare && qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.primaryDark} />
       </Pressable>
       <Text style={st.qty} accessible accessibilityLiveRegion="polite" accessibilityLabel={sub('eateryOrderQty')}>{qty}</Text>
-      <Pressable onPress={() => onQty(id, 1)} disabled={qty >= MAX_QTY} style={({ pressed }) => [st.round, st.plus, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityState={{ disabled: qty >= MAX_QTY }} accessibilityLabel={sub('eateryOrderMore')}>
+      <Pressable onPress={() => onQty(id, 1)} disabled={qty >= max} style={({ pressed }) => [st.round, st.plus, !bare && qty >= max && st.dim, pressed && { opacity: press.small }]}
+        accessibilityRole="button" accessibilityState={{ disabled: qty >= max }} accessibilityLabel={sub('eateryOrderMore')}>
         <Ionicons name="add" size={18} color={colors.onPrimary} />
       </Pressable>
     </View>
@@ -81,19 +84,142 @@ function LineThumb({ photoPath }) {
   )
 }
 
-function BasketLine({ line, onQty, formatMoney, lang }) {
+// What a line says under the dish name. Turkish shows the exact text the restaurant will read (the contract's detail); any
+// other language shows its own labels in the same order. '' for a plain line.
+export function lineDetailText(line, lang) {
+  if (lang === 'Turkish') return line.detail || ''
+  const fill = (key, vars) => Object.keys(vars).reduce((txt, k) => txt.replace('{' + k + '}', () => vars[k]), t(key, lang))
+  return [
+    ...line.removals.map(o => fill('eateryOptWithout', { name: eateryOptionLabel(o, lang) })),
+    ...line.extras.map(({ opt, qty }) => (qty > 1 ? fill('eateryOptExtraLineN', { n: String(qty), name: eateryOptionLabel(opt, lang) }) : fill('eateryOptExtraLine', { name: eateryOptionLabel(opt, lang) }))),
+  ].join(', ')
+}
+
+function BasketLine({ line, onQty, onEdit, formatMoney, lang }) {
+  const detail = line.stale ? t('eateryOptStale', lang) : lineDetailText(line, lang)
+  const canEdit = eateryItemOptions(line.item).length > 0
   return (
     <View style={st.line}>
       <LineThumb photoPath={line.photoPath} />
       <View style={st.lineMain}>
         <Text style={st.lineName}>{line.name}</Text>
+        {!!detail && <Text style={[st.lineDetail, line.stale && st.lineStale]}>{detail}</Text>}
         <Text style={st.linePrice}>{formatMoney(line.price)}</Text>
+        {canEdit && (
+          <Pressable onPress={() => onEdit(line)} hitSlop={{ top: 6, bottom: 6 }} style={({ pressed }) => [st.lineEdit, pressed && { opacity: press.small }]}
+            accessibilityRole="button" accessibilityLabel={t('eateryOptEditA11y', lang).replace('{name}', () => line.name)}>
+            <Ionicons name="create-outline" size={16} color={colors.primaryDark} />
+            <Text style={st.lineEditText}>{t('eateryOptEdit', lang)}</Text>
+          </Pressable>
+        )}
         <View style={st.lineFoot}>
-          <QtyStepper id={line.id} name={line.name} qty={line.qty} onQty={onQty} lang={lang} />
+          <QtyStepper id={line.key} name={line.name} qty={line.qty} onQty={onQty} lang={lang} />
           <Text style={st.lineTotal}>{formatMoney(line.qty * line.price)}</Text>
         </View>
       </View>
     </View>
+  )
+}
+
+// ─── Per-dish options (eatery_item_options): the "Ekle" of a dish that has some, and the sheet behind it ───
+// A dish with options never gets the in-row stepper: every add goes through the sheet, which builds the line (dish + options).
+export function DishAddButton({ name, count, onPress, lang }) {
+  return (
+    <View style={st.row}>
+      {count > 0 && <Text style={st.inBasket} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(count))}</Text>}
+      <Pressable onPress={onPress} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
+        accessibilityRole="button" accessibilityLabel={t('eateryOrderAddA11y', lang).replace('{name}', () => name)}>
+        <Ionicons name="add" size={18} color={colors.primaryDark} />
+        <Text style={st.addText} numberOfLines={1}>{t('eateryOrderAdd', lang)}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+// Ticked = included (the default), unticked = removed. The label says which, for screen readers too.
+function RemoveRow({ label, included, onToggle, lang }) {
+  return (
+    <Pressable onPress={onToggle} style={({ pressed }) => [st.optRow, pressed && { opacity: press.small }]}
+      accessibilityRole="checkbox" accessibilityState={{ checked: included }}
+      accessibilityLabel={included ? label : `${label}, ${t('eateryOptRemoved', lang)}`}>
+      <Ionicons name={included ? 'checkbox' : 'square-outline'} size={24} color={included ? colors.primaryDark : colors.textSecondary} />
+      <Text style={[st.optLabel, !included && st.optLabelOff]}>{label}</Text>
+    </Pressable>
+  )
+}
+
+function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
+  return (
+    <View style={st.optRow}>
+      <View style={st.extraText}>
+        <Text style={st.optLabel}>{label}</Text>
+        <Text style={st.extraPrice}>+{priceText}</Text>
+      </View>
+      <QtyStepper id={label} name={label} qty={qty} min={0} max={max} onQty={(_, d) => onChange(qty + d)} lang={lang} />
+    </View>
+  )
+}
+
+// initial: { opts: [{ id, qty }], qty } of the line being edited (ids that no longer exist are ignored), or null for a new add.
+function SheetBody({ item, lang, initial, editing, onConfirm }) {
+  const options = eateryItemOptions(item)
+  const removals = options.filter(o => o.kind === 'remove')
+  const extras = options.filter(o => o.kind === 'extra')
+  const known = new Set(options.map(o => Number(o.id)))
+  const [removed, setRemoved] = useState(() => new Set((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'remove').map(o => o.id)))
+  const [extraQty, setExtraQty] = useState(() => Object.fromEntries((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'extra').map(o => [o.id, o.qty])))
+  const [qty, setQty] = useState(initial?.qty || 1)
+  const opts = [...removed].map(id => ({ id, qty: 1 })).concat(Object.entries(extraQty).filter(([, q]) => q > 0).map(([id, q]) => ({ id: Number(id), qty: q })))
+  const unit = resolveLineOptions(item, opts).unit
+  const price = formatPrice(Math.round(unit * qty * 100) / 100, item.currency, lang)
+  const { width } = useWindowDimensions()
+  const stacked = width < 380 || PixelRatio.getFontScale() > 1.15   // as OrderBar: the price moves to its own line instead of truncating
+  const toggle = id => setRemoved(r => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  return (
+    <>
+      <ScrollView style={st.sheetScroll} contentContainerStyle={st.sheetContent} showsVerticalScrollIndicator={false}>
+        {removals.length > 0 && (
+          <View>
+            <Text style={st.secHead} accessibilityRole="header">{t('eateryOptRemoveTitle', lang)}</Text>
+            <Text style={st.secHint}>{t('eateryOptRemoveHint', lang)}</Text>
+            {removals.map(o => <RemoveRow key={o.id} label={eateryOptionLabel(o, lang)} included={!removed.has(Number(o.id))} onToggle={() => toggle(Number(o.id))} lang={lang} />)}
+          </View>
+        )}
+        {extras.length > 0 && (
+          <View>
+            <Text style={st.secHead} accessibilityRole="header">{t('eateryOptExtraTitle', lang)}</Text>
+            {extras.map(o => (
+              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={formatPrice(o.price, item.currency, lang)} qty={extraQty[o.id] || 0}
+                max={Math.max(1, Number(o.max_qty) || 1)} onChange={q => setExtraQty(e => ({ ...e, [o.id]: q }))} lang={lang} />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+      <View style={st.sheetFoot}>
+        <View style={st.footQty}>
+          <Text style={st.optLabel}>{t('eateryOptQtyLabel', lang)}</Text>
+          <QtyStepper id={item.id} name={item.name} qty={qty} min={1} onQty={(_, d) => setQty(q => Math.min(MAX_QTY, Math.max(1, q + d)))} lang={lang} />
+        </View>
+        <View style={st.footHint}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+          <Text style={st.footHintText}>{t('eateryOptAllergy', lang)}</Text>
+        </View>
+        {stacked && <Text style={st.barSummary}>{price}</Text>}
+        <Button fullWidth icon="basket-outline" title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
+          accessibilityLabel={t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
+          onPress={() => onConfirm({ opts, qty })} />
+      </View>
+    </>
+  )
+}
+
+// visible: the sheet is open (the body unmounts, and so resets, when it closes). onConfirm({ opts, qty }); onClose = dismissed.
+export function DishOptionsSheet({ visible, lang, item, initial = null, editing = false, onClose, onConfirm }) {
+  if (!item) return null
+  return (
+    <BottomSheet visible={visible === true} onClose={onClose} title={item.name} lang={lang}>
+      <SheetBody item={item} lang={lang} initial={initial} editing={editing} onConfirm={onConfirm} />
+    </BottomSheet>
   )
 }
 
@@ -202,7 +328,7 @@ function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -252,8 +378,9 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
   }, [kbTop, reveal])
   const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
-  const msgKey = ageGate ? 'eateryOrderAdultOnly' : orderError ? ORDER_ERR_KEY[orderError] : null
-  const tone = !ageGate && ['generic', 'rate', 'account'].includes(orderError) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
+  const stale = lines.some(l => l.stale)   // an option that no longer exists: nothing is sent until that line is edited or removed
+  const msgKey = ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const tone = !ageGate && (stale || ['generic', 'rate', 'account'].includes(orderError)) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
   const ready = deliveryReady(delivery)
   const deliveryKey = ready ? null : delivery.mode === 'delivery' ? 'eateryDeliveryNeedAddress' : 'eateryDeliveryNeedChoose'
   const showSignIn = ageGate === 'guest' || (!ageGate && orderError === 'account')
@@ -282,8 +409,8 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
             <>
               <Card padding={space[12]}>
                 {lines.map((l, i) => (
-                  <View key={l.id} style={i > 0 && st.lineSep}>
-                    <BasketLine line={l} onQty={onQty} formatMoney={formatMoney} lang={lang} />
+                  <View key={l.key} style={i > 0 && st.lineSep}>
+                    <BasketLine line={l} onQty={onQty} onEdit={onEditLine} formatMoney={formatMoney} lang={lang} />
                   </View>
                 ))}
               </Card>
@@ -308,7 +435,7 @@ export function BasketPage({ partner, lang, open, lines, onQty, formatMoney, tot
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
             {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
-              disabled={!ready} disabledHint={!orderError && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
+              disabled={!ready || stale} disabledHint={!orderError && !stale && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
             <View accessibilityLiveRegion="polite">
               {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
             </View>
@@ -330,6 +457,21 @@ const st = StyleSheet.create({
   minus:     { borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
   plus:      { backgroundColor: colors.primary },
   qty:       { minWidth: 28, textAlign: 'center', ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary },
+  dim:       { opacity: 0.4 },
+  inBasket:  { ...type.small, fontFamily: font.semibold, color: colors.primaryDark, marginRight: space[8], flexShrink: 1 },
+  sheetScroll:{ flexGrow: 0, flexShrink: 1 },
+  sheetContent:{ gap: space[16], paddingBottom: space[12] },
+  sheetFoot: { flexShrink: 0, gap: space[8], paddingTop: space[8], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  footQty:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
+  secHead:   { ...type.rowTitle, color: colors.textPrimary },
+  secHint:   { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  footHint:  { flexDirection: 'row', alignItems: 'flex-start', gap: space[8] },
+  footHintText:{ ...type.small, color: colors.textSecondary, flex: 1 },
+  optRow:    { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[4] },
+  optLabel:  { flex: 1, ...type.body, color: colors.textPrimary },
+  optLabelOff:{ color: colors.textSecondary, textDecorationLine: 'line-through' },
+  extraText: { flex: 1 },
+  extraPrice:{ ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondary },
   bar:       { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },
   barSummary:{ ...type.rowTitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
   page:      { flex: 1, backgroundColor: colors.canvas },
@@ -341,9 +483,13 @@ const st = StyleSheet.create({
   line:      { flexDirection: 'row', alignItems: 'flex-start', gap: space[12], paddingVertical: space[8] },
   lineSep:   { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   lineMain:  { flex: 1 },
+  lineDetail:{ ...type.small, color: colors.textPrimary, marginTop: 2 },
+  lineStale: { color: colors.dangerInk },
+  lineEdit:  { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: space[4], minHeight: 32 },
+  lineEditText:{ ...type.small, fontFamily: font.semibold, color: colors.primaryDark },
   lineName:  { ...type.body, fontFamily: font.semibold, color: colors.textPrimary },
   linePrice: { ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondary, marginTop: 2 },
-  lineFoot:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: space[12], marginTop: space[4] },
+  lineFoot:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: space[12], marginTop: space[8] },
   lineTotal: { ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary, marginLeft: 'auto' },
   thumb:     { width: 56, height: 56, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbEmpty:{ backgroundColor: colors.soft, borderWidth: 0 },

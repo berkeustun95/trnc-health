@@ -199,7 +199,7 @@ async function readFlag(url) {
     // first of two disagreeing values would invent a definite answer.
     return { ok: res.status === 200, status: res.status, flag: seen.size === 1 ? [...seen][0] : null }
   } catch (e) {
-    return { ok:false, status:null, flag:null, error: e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : e.message }
+    return { ok:false, status:null, flag:null, error: e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : `${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''} · ${url}` }
   } finally { clearTimeout(timer) }
 }
 

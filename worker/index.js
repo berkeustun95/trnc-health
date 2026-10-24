@@ -57,7 +57,7 @@ const CSS = `*{box-sizing:border-box}body{margin:0;background:#F4F6F5;color:#1A2
 h2{margin:0 0 2px;font-size:20px}.meta{color:#55657A;font-size:14px;margin:2px 0}
 ul{list-style:none;margin:16px 0 0;padding:0;border-top:1px solid #E3E8E6}li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #E3E8E6}
 li span:last-child{white-space:nowrap;color:#55657A}.total{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-top:12px;color:#0A5E5D}
-.grey{opacity:.55}.seen{margin-top:14px;font-size:14px;color:#55657A}.note{margin:16px 4px 0;font-size:13px;color:#55657A}
+li span.d{display:block;white-space:normal;color:#55657A;font-size:13px;margin-top:2px}.grey{opacity:.55}.seen{margin-top:14px;font-size:14px;color:#55657A}.note{margin:16px 4px 0;font-size:13px;color:#55657A}
 .a{color:#0E7C7B;font-weight:700}.big{font-size:28px;font-weight:800;letter-spacing:.06em;color:#0A5E5D;margin:8px 0}.foot{margin-top:24px;text-align:center;font-size:12px}.foot a{color:#55657A}`
 
 function page(body, title, extraHead = '', script = '', nonce = '') {
@@ -84,13 +84,13 @@ if(j.status==='bot'){var a0=el('a','a','Sonucu göster');a0.href='?view=1';var p
 if(j.status==='not_found'){put(banner("ADA'da böyle bir sipariş yok",'No such order in ADA',true));return}
 if(j.status!=='ok'&&j.status!=='expired')return fail();
 var ex=j.status==='expired';
-var b=ex?banner('Süresi dolmuş','Expired',true):banner('✓ Bu sipariş ADA üzerinden geldi','This order came through ADA',false);
-var c=el('div','card'+(ex?' grey':''));
+var b=j.isTest===true?banner('TEST SİPARİŞİ — hazırlamayın','TEST ORDER — do not prepare',true):ex?banner('Süresi dolmuş','Expired',true):banner('✓ Bu sipariş ADA üzerinden geldi','This order came through ADA',false);
+var c=el('div','card'+((ex||j.isTest===true)?' grey':''));
 c.appendChild(el('h2',null,j.partner));
 var m=el('div','meta','Sipariş no: ');m.appendChild(el('b',null,j.orderNo));c.appendChild(m);
 c.appendChild(el('div','meta',j.time));
 var ul=el('ul');
-for(var i=0;i<j.lines.length;i++){var li=el('li');li.appendChild(el('span',null,j.lines[i].l));li.appendChild(el('span',null,j.lines[i].r));ul.appendChild(li)}
+for(var i=0;i<j.lines.length;i++){var li=el('li');var ls=el('span',null,j.lines[i].l);if(j.lines[i].d)ls.appendChild(el('span','d',j.lines[i].d));li.appendChild(ls);li.appendChild(el('span',null,j.lines[i].r));ul.appendChild(li)}
 c.appendChild(ul);
 var t=el('div','total');t.appendChild(el('span',null,'Toplam'));t.appendChild(el('span',null,j.total));c.appendChild(t);
 var s=el('div','seen',j.seenTr);s.appendChild(el('div','en',j.seenEn));c.appendChild(s);
@@ -151,10 +151,11 @@ function viewModel(code, r) {
   const first = fmtTime(r.first_viewed_at_before)
   return {
     status: r.status,
+    isTest: r.is_test === true,
     partner: String(r.partner_name ?? ''),
     orderNo: `${code.slice(0, 4)}-${code.slice(4)}`,
     time: fmtTime(r.created_at),
-    lines: (Array.isArray(r.lines) ? r.lines : []).map(l => ({ l: `${Number(l.qty)} × ${String(l.name ?? '')}`, r: fmtMoney(Number(l.qty) * Number(l.unit_price), cur) })),
+    lines: (Array.isArray(r.lines) ? r.lines : []).map(l => ({ l: `${Number(l.qty)} × ${String(l.name ?? '')}`, r: fmtMoney(Number(l.qty) * Number(l.unit_price), cur), ...(l.detail == null || l.detail === '' ? {} : { d: String(l.detail) }) })),
     total: fmtMoney(r.total, cur),
     seenTr: before > 0 ? `İlk görüntülenme: ${first} · ${before + 1} kez açıldı` : 'İlk kez görüntüleniyor',
     seenEn: before > 0 ? `First viewed ${first} · opened ${before + 1} times (including now)` : 'Viewed for the first time',
@@ -164,12 +165,14 @@ function viewModel(code, r) {
 function renderOrder(code, r) {
   const expired = r.status === 'expired'
   const v = viewModel(code, r)
-  const lines = v.lines.map(l => `<li><span>${esc(l.l)}</span><span>${esc(l.r)}</span></li>`).join('')
+  const lines = v.lines.map(l => `<li><span>${esc(l.l)}${l.d ? `<span class="d">${esc(l.d)}</span>` : ''}</span><span>${esc(l.r)}</span></li>`).join('')
   const seen = `${esc(v.seenTr)}<div class="en">${esc(v.seenEn)}</div>`
-  const banner = expired
+  const banner = v.isTest
+    ? `<div class="banner bad"><b>TEST SİPARİŞİ — hazırlamayın</b><div class="en">TEST ORDER — do not prepare</div></div>`
+    : expired
     ? `<div class="banner bad"><b>Süresi dolmuş</b><div class="en">Expired</div></div>`
     : `<div class="banner"><b>✓ Bu sipariş ADA üzerinden geldi</b><div class="en">This order came through ADA</div></div>`
-  const body = `${banner}<div class="card${expired ? ' grey' : ''}"><h2>${esc(r.partner_name)}</h2>
+  const body = `${banner}<div class="card${(expired || v.isTest) ? ' grey' : ''}"><h2>${esc(r.partner_name)}</h2>
 <div class="meta">Sipariş no: <b>${esc(v.orderNo)}</b></div>
 <div class="meta">${esc(v.time)}</div>
 <ul>${lines}</ul><div class="total"><span>Toplam</span><span>${esc(v.total)}</span></div>
