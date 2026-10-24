@@ -276,10 +276,15 @@ t('Pineapple +marulsuz, TNT +füme peynirsiz, Buffalo Nachos +buffalo sossuz',
   [g('Pineapple Chicken Burger', 'remove').at(-1), g('TNT Chicken Burger', 'remove').at(-1), g('Buffalo Nachos', 'remove').at(-1)], ['marulsuz', 'füme peynirsiz', 'buffalo sossuz'])
 t('renames: Nashville özel sossuz, Buffalo Chicken buffalo sossuz, Classic Nachos jalapeño turşusuz',
   [g('Nashville Tavuk Burger', 'remove')[1], g('Buffalo Chicken Burger', 'remove')[0], g('Crunchy Classic Nachos', 'remove')[0]], ['özel sossuz', 'buffalo sossuz', 'jalapeño turşusuz'])
-t('Express / BBQ / Trüf / Big Pork / Jalapeño Drip: köfte 250, dana bacon 90, hellim 85 (in that order)',
+t('Express / BBQ / Trüf / Big Pork / Jalapeño Drip: köfte 250 (max 2), dana bacon 90 (max 1), hellim 85 (max 1), in that order',
   ['Express Smash Burger', 'BBQ Smash Burger', 'Trüf Smash Burger', 'Big Pork Smash Burger', 'Jalapeño Drip Smash Burger']
-    .map(x => rows1.filter(r => r.dish === x && r.kind === 'extra').map(r => `${r.msg}:${r.price}`).join(',')),
-  Array(5).fill('köfte:250,dana bacon:90,hellim:85'))
+    .map(x => rows1.filter(r => r.dish === x && r.kind === 'extra').map(r => `${r.msg}:${r.price}x${r.qty}`).join(',')),
+  Array(5).fill('köfte:250x2,dana bacon:90x1,hellim:85x1'))
+t('max_qty per message over all 19 extras: köfte 2 (5 rows), dana bacon 1 (5), hellim 1 (6), eritilmiş peynir sos 1 (3); every removal 1',
+  [(await q(d36, `SELECT message_tr, min(max_qty)::int lo, max(max_qty)::int hi, count(*)::int n FROM public.eatery_item_options WHERE kind = 'extra' GROUP BY 1 ORDER BY 1`)),
+   (await q(d36, `SELECT count(*)::int n FROM public.eatery_item_options WHERE kind = 'remove' AND max_qty <> 1`))[0].n],
+  [[{ message_tr: 'dana bacon', lo: 1, hi: 1, n: 5 }, { message_tr: 'eritilmiş peynir sos', lo: 1, hi: 1, n: 3 }, { message_tr: 'hellim', lo: 1, hi: 1, n: 6 }, { message_tr: 'köfte', lo: 2, hi: 2, n: 5 }], 0])
+t('every extra is available (none left hand-disabled)', (await q(d36, `SELECT count(*)::int n FROM public.eatery_item_options WHERE kind = 'extra' AND NOT is_available`))[0].n, 0)
 t('Veggy Smash Burger: hellim 85 only (no köfte, no bacon)', rows1.filter(r => r.dish === 'Veggy Smash Burger' && r.kind === 'extra').map(r => `${r.msg}:${r.price}`), ['hellim:85'])
 t('three Nachos: eritilmiş peynir sos 110, own row', ['Crunchy Classic Nachos', 'Buffalo Nachos', 'Hot Honey Nachos'].map(x => rows1.filter(r => r.dish === x && r.kind === 'extra').map(r => `${r.msg}:${r.price}`).join()), Array(3).fill('eritilmiş peynir sos:110'))
 t('deleted for good: no tavuk tenders / burger peyniri / cheddar / jalapeño / domuz bacon EXTRA anywhere (positive control: 19 extras remain)',
@@ -325,7 +330,30 @@ t('verify_schema 1136 token AFTER apply: green; the 1135 token (ledger half only
   await d36.exec('ROLLBACK').catch(() => {}); await d36.exec('RESET ROLE').catch(() => {})
   t('a later price edit makes the re-run abort (neither state), nothing written', [r.ok, (r.msg || '').includes('neither the')], [false, true])
 }
+{
+  const d = await after1135(); await applyFile(d, F1136)
+  await d.exec(`UPDATE public.eatery_item_options SET is_available = false WHERE message_tr = 'hellim' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = 'Veggy Smash Burger')`)
+  const r = await applyFile(d, F1136); await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  t('re-run on a hand-disabled extra aborts (neither state)', [r.ok, (r.msg || '').includes('neither the')], [false, true])
+  const d2 = await after1135(); await applyFile(d2, F1136)
+  await d2.exec(`UPDATE public.eatery_item_options SET max_qty = 5 WHERE message_tr = 'köfte'`)
+  const r2 = await applyFile(d2, F1136); await d2.exec('ROLLBACK').catch(() => {}); await d2.exec('RESET ROLE').catch(() => {})
+  t('re-run after a max_qty edit aborts (neither state)', [r2.ok, (r2.msg || '').includes('neither the')], [false, true])
+}
 
+{
+  // the token notices each thing it pins (red-first): a wrong max_qty, a changed price, a disabled extra, a refused extra back, a 10th dish
+  const probe = async (name, sql) => {
+    const d = await after1135(); await applyFile(d, F1136)
+    const green = (await q(d, globalThis.TOK36)).map(r => r.ok)
+    await d.exec(sql)
+    t(`token 1136 turns red on: ${name} (green before: ${green})`, [green, (await q(d, globalThis.TOK36)).map(r => r.ok)], [[true], [false]])
+  }
+  await probe('köfte max_qty 1 on one dish', `UPDATE public.eatery_item_options SET max_qty = 1 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'köfte')`)
+  await probe('hellim price 80 on one dish', `UPDATE public.eatery_item_options SET price = 80 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'hellim')`)
+  await probe('an extra disabled by hand', `UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'extra')`)
+  await probe('a refused extra (cheddar) back', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT item_id, 'extra', label_i18n, 'cheddar', 10 FROM public.eatery_item_options WHERE message_tr = 'hellim' LIMIT 1`)
+}
 console.log('red-first mutants of 20261136 (each makes the apply FAIL, readable message):')
 await refused36('1135 not in the ledger', F1136, 'are not both in the ledger',
   async (d) => { await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql'`) })
@@ -333,6 +361,10 @@ await refused36('a 1135 row is missing', F1136, 'neither the',
   async (d) => { await d.exec(`DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options)`) })
 await refused36('a 1135 extra already priced by hand', F1136, 'neither the',
   async (d) => { await d.exec(`UPDATE public.eatery_item_options SET price = 25 WHERE kind = 'extra' AND message_tr = 'burger peyniri'`) })
+await refused36('a 1135 extra disabled by hand (is_available false) is never made visible silently', F1136, 'neither the',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'extra' AND message_tr = 'köfte')`) })
+await refused36('a 1135 removal disabled by hand', F1136, 'neither the',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'remove')`) })
 await refused36('a 1135 message hand-edited', F1136, 'neither the',
   async (d) => { await d.exec(`UPDATE public.eatery_item_options SET message_tr = 'turşu yok' WHERE message_tr = 'acı sossuz'`) })
 await refused36('a foreign extra row on a Crunchy dish', F1136, 'neither the',
@@ -356,7 +388,7 @@ await refused36('the write counts notice a DELETE that did not happen (AND false
   mutant36('r36nodel', [["WHERE o.item_id = i.id AND i.partner_id = c_id\n       AND NOT EXISTS", "WHERE o.item_id = i.id AND i.partner_id = c_id AND false\n       AND NOT EXISTS"]]), 'deleted 0 rows, expected')
 // the apply path is also guarded: break the write so the post-state notices (the write really is checked)
 await refused36('a zero price on a kept hidden extra is refused before any write',
-  mutant36('r36zero', [['"cheddar"], [["kofte", 250]', '"cheddar"], [["kofte", 0]']]), 'an extra without a positive price')
+  mutant36('r36zero', [['"cheddar"], [["kofte", 250, 2]', '"cheddar"], [["kofte", 0, 2]']]), 'an extra without a positive price')
 
 console.log(bad ? `\n${bad} FAILED` : '\nall green')
 process.exit(bad ? 1 : 0)

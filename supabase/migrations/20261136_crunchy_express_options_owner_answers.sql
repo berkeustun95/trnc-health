@@ -13,7 +13,8 @@
 --             Crunchy Classic / Buffalo / Hot Honey Nachos get ekstra eritilmiş peynir sos 110.
 --             DELETED (not hidden): ekstra tavuk tenders (burgers and Boxes), ekstra burger peyniri, ekstra cheddar, ekstra
 --             jalapeño. Big Pork's hidden "domuz bacon" extra is replaced by "dana bacon". No sauce extras on burgers.
--- All extras are max_qty 1: the owner gave prices, not limits (one UPDATE per dish when he does).
+-- max_qty: ekstra köfte 2 on the five smash burgers (Berke); dana bacon, hellim and eritilmiş peynir sos 1. Removals are always 1.
+-- A hand-disabled option (is_available false) is never made visible silently: pre-state and post-state both refuse it.
 --
 -- UPDATE vs DELETE + INSERT, decided per row (the app marks a basket line whose option ids vanished as "Seçenekler değişti -
 -- yeniden seçin", and orders keep a snapshot of the option, never a foreign key to its id):
@@ -84,13 +85,13 @@ DECLARE
     "aci_bal": {"rm":"acı balsız","l":{"English":"Hot honey","Turkish":"Acı bal","Arabic":"عسل حار","Russian":"Острый мёд","Greek":"Καυτερό μέλι","French":"Miel pimenté","Spanish":"Miel picante","German":"Scharfer Honig","Persian":"عسل تند"}},
     "kofte": {"ex":"köfte","l":{"English":"Smash patty","Turkish":"Smash köfte","Arabic":"قرص لحم سماش","Russian":"Смэш-котлета","Greek":"Smash μπιφτέκι","French":"Steak smash","Spanish":"Carne smash","German":"Smash-Patty","Persian":"پتی اسمش"}},
     "ozel_sos_plain": {"rm":"özel sossuz","l":{"English":"Special sauce","Turkish":"Özel sos","Arabic":"الصلصة الخاصة","Russian":"Фирменный соус","Greek":"Ειδική σάλτσα","French":"Sauce spéciale","Spanish":"Salsa especial","German":"Spezialsauce","Persian":"سس مخصوص"}},
-    "buffalo_sos": {"rm":"buffalo sossuz","l":{"English":"Buffalo sauce","Turkish":"Buffalo sos","Arabic":"صلصة بافلو","Russian":"Соус баффало","Greek":"Σάλτσα Buffalo","French":"Sauce buffalo","Spanish":"Salsa Buffalo","German":"Buffalo-Sauce","Persian":"سس بوفالو"}},
+    "buffalo_sos": {"rm":"buffalo sossuz","l":{"English":"Buffalo sauce","Turkish":"Buffalo sos","Arabic":"صلصة بافلو","Russian":"Соус баффало","Greek":"Σάλτσα Buffalo","French":"Sauce Buffalo","Spanish":"Salsa Buffalo","German":"Buffalo-Sauce","Persian":"سس بوفالو"}},
     "fume_peynir": {"rm":"füme peynirsiz","l":{"English":"Smoked cheese","Turkish":"Füme peynir","Arabic":"جبن مدخن","Russian":"Копчёный сыр","Greek":"Καπνιστό τυρί","French":"Fromage fumé","Spanish":"Queso ahumado","German":"Räucherkäse","Persian":"پنیر دودی"}},
-    "jalapeno_tursusu": {"rm":"jalapeño turşusuz","l":{"English":"Pickled jalapeño","Turkish":"Jalapeño turşusu","Arabic":"هالبينو مخلل","Russian":"Маринованный халапеньо","Greek":"Τουρσί χαλαπένιο","French":"Jalapeño mariné","Spanish":"Jalapeño en escabeche","German":"Eingelegte Jalapeños","Persian":"هالوپینوی ترشی"}},
+    "jalapeno_tursusu": {"rm":"jalapeño turşusuz","l":{"English":"Pickled jalapeño","Turkish":"Jalapeño turşusu","Arabic":"هالبينو مخلل","Russian":"Маринованный халапеньо","Greek":"Τουρσί χαλαπένιο","French":"Jalapeño mariné","Spanish":"Jalapeño en escabeche","German":"Eingelegte Jalapeños","Persian":"ترشی هالوپینو"}},
     "hellim": {"ex":"hellim","l":{"English":"Halloumi","Turkish":"Hellim","Arabic":"حلوم","Russian":"Халуми","Greek":"Χαλλούμι","French":"Halloumi","Spanish":"Halloumi","German":"Halloumi","Persian":"هالومی"}},
-    "eritilmis_peynir_sos": {"ex":"eritilmiş peynir sos","l":{"English":"Melted cheese sauce","Turkish":"Eritilmiş peynir sos","Arabic":"صلصة الجبن الذائب","Russian":"Соус из расплавленного сыра","Greek":"Σάλτσα λιωμένου τυριού","French":"Sauce au fromage fondu","Spanish":"Salsa de queso fundido","German":"Schmelzkäsesauce","Persian":"سس پنیر ذوب‌شده"}}
+    "eritilmis_peynir_sos": {"ex":"eritilmiş peynir sos","l":{"English":"Melted cheese sauce","Turkish":"Eritilmiş peynir sos","Arabic":"صلصة الجبن الذائب","Russian":"Соус из расплавленного сыра","Greek":"Σάλτσα λιωμένου τυριού","French":"Sauce au fromage fondu","Spanish":"Salsa de queso fundido","German":"Schmelzkäsesauce","Persian":"سس پنیر مذاب"}}
   }$t$::jsonb;
-  -- TARGET: [dish name, [removal keys in order], [[extra key, TL price] in order]]
+  -- TARGET: [dish name, [removal keys in order], [[extra key, TL price, optional max_qty (default 1)] in order]]
   v_dishes constant jsonb := $t$[
     ["Crunchy Burger", ["peynir", "coslow", "tursu", "marul", "ozel_sos"], []],
     ["Crunchy BBQ Chicken Burger", ["peynir", "cirtir_sogan", "bbq_sos", "tursu"], []],
@@ -102,11 +103,11 @@ DECLARE
     ["Hot Honey Glazed Chicken Burger", ["peynir", "tursu", "mayonez", "aci_bal_sos"], []],
     ["Cheeseme Chicken Burger", ["kasar_sos", "tursu", "marul", "mayonez"], []],
     ["TNT Chicken Burger", ["marul", "tursu", "peynir", "ranch", "fume_peynir"], []],
-    ["Express Smash Burger", ["sogan", "tursu", "ketcap", "mayonez", "cheddar"], [["kofte", 250], ["dana_bacon", 90], ["hellim", 85]]],
-    ["BBQ Smash Burger", ["cirtir_sogan", "bbq_sos", "mayonez", "dana_bacon", "cheddar", "tursu"], [["kofte", 250], ["dana_bacon", 90], ["hellim", 85]]],
-    ["Trüf Smash Burger", ["dana_bacon", "truf_mayo", "tursu"], [["kofte", 250], ["dana_bacon", 90], ["hellim", 85]]],
-    ["Big Pork Smash Burger", ["domuz_bacon", "smoked_mayo", "tursu", "peynir", "kirmizi_sogan"], [["kofte", 250], ["dana_bacon", 90], ["hellim", 85]]],
-    ["Jalapeño Drip Smash Burger", ["jalapeno_izgara", "gouda", "burger_sos"], [["kofte", 250], ["dana_bacon", 90], ["hellim", 85]]],
+    ["Express Smash Burger", ["sogan", "tursu", "ketcap", "mayonez", "cheddar"], [["kofte", 250, 2], ["dana_bacon", 90], ["hellim", 85]]],
+    ["BBQ Smash Burger", ["cirtir_sogan", "bbq_sos", "mayonez", "dana_bacon", "cheddar", "tursu"], [["kofte", 250, 2], ["dana_bacon", 90], ["hellim", 85]]],
+    ["Trüf Smash Burger", ["dana_bacon", "truf_mayo", "tursu"], [["kofte", 250, 2], ["dana_bacon", 90], ["hellim", 85]]],
+    ["Big Pork Smash Burger", ["domuz_bacon", "smoked_mayo", "tursu", "peynir", "kirmizi_sogan"], [["kofte", 250, 2], ["dana_bacon", 90], ["hellim", 85]]],
+    ["Jalapeño Drip Smash Burger", ["jalapeno_izgara", "gouda", "burger_sos"], [["kofte", 250, 2], ["dana_bacon", 90], ["hellim", 85]]],
     ["Crunchy Box", [], []],
     ["Crunchy Box XL", [], []],
     ["Crunchy Box XXL", [], []],
@@ -157,15 +158,15 @@ BEGIN
   SELECT jsonb_agg(jsonb_build_object('dish', dn.d->>0, 'kind', k.kind, 'key', k.key, 'ord', k.ord,
                                       'label', v_ing -> k.key -> 'l',
                                       'msg', v_ing -> k.key ->> (CASE k.kind WHEN 'remove' THEN 'rm' ELSE 'ex' END),
-                                      'price', k.price)
+                                      'price', k.price, 'qty', k.qty)
                    ORDER BY dn.n, k.kind DESC, k.ord)
     INTO v_rows
     FROM jsonb_array_elements(v_dishes) WITH ORDINALITY dn(d, n)
          CROSS JOIN LATERAL (
-           SELECT 'remove'::text AS kind, e.key, e.ord, NULL::numeric AS price
+           SELECT 'remove'::text AS kind, e.key, e.ord, NULL::numeric AS price, 1 AS qty
              FROM jsonb_array_elements_text(dn.d -> 1) WITH ORDINALITY e(key, ord)
            UNION ALL
-           SELECT 'extra'::text, e.v ->> 0, e.ord, (e.v ->> 1)::numeric
+           SELECT 'extra'::text, e.v ->> 0, e.ord, (e.v ->> 1)::numeric, coalesce((e.v ->> 2)::int, 1)
              FROM jsonb_array_elements(dn.d -> 2) WITH ORDINALITY e(v, ord)
          ) k;
   IF v_rows IS NULL THEN RAISE EXCEPTION 'the literal expands to no rows'; END IF;
@@ -194,7 +195,8 @@ BEGIN
   SELECT string_agg(r->>'dish' || ' / ' || (r->>'msg'), '; ') INTO v_bad
     FROM jsonb_array_elements(v_new) r
    WHERE (r->>'kind' = 'extra' AND (r->>'price' IS NULL OR (r->>'price')::numeric <= 0 OR (r->>'price')::numeric >= 1000000))
-      OR (r->>'kind' = 'remove' AND r->>'price' IS NOT NULL);
+      OR (r->>'kind' = 'remove' AND r->>'price' IS NOT NULL)
+      OR (r->>'qty')::int NOT BETWEEN 1 AND 10 OR (r->>'kind' = 'remove' AND (r->>'qty')::int <> 1);
   IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'literal: an extra without a positive price, or a removal with one: %. Nothing applied.', v_bad; END IF;
 
   SELECT jsonb_agg(jsonb_build_object('dish', dn.d->>0, 'kind', k.kind, 'msg', k.msg, 'ord', k.ord) ORDER BY dn.n, k.kind DESC, k.ord)
@@ -242,14 +244,15 @@ BEGIN
        SELECT 1 FROM jsonb_array_elements(v_oldrows) r
         WHERE NOT EXISTS (SELECT 1 FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
                            WHERE i.partner_id = c_id AND i.name = r->>'dish' AND o.kind = r->>'kind' AND o.message_tr = r->>'msg'
-                             AND o.sort_order IS NOT DISTINCT FROM (r->>'ord')::int AND o.price IS NULL AND o.max_qty = 1)) THEN
+                             AND o.sort_order IS NOT DISTINCT FROM (r->>'ord')::int AND o.price IS NULL AND o.max_qty = 1 AND o.is_available)) THEN
     v_mode := 'apply';
   ELSIF v_have = v_total AND NOT EXISTS (
        SELECT 1 FROM jsonb_array_elements(v_new) r
         WHERE NOT EXISTS (SELECT 1 FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
                            WHERE i.partner_id = c_id AND i.name = r->>'dish' AND o.kind = r->>'kind' AND o.message_tr = r->>'msg'
                              AND o.label_i18n IS NOT DISTINCT FROM r->'label' AND o.sort_order IS NOT DISTINCT FROM (r->>'ord')::int
-                             AND o.price IS NOT DISTINCT FROM (r->>'price')::numeric)) THEN
+                             AND o.price IS NOT DISTINCT FROM (r->>'price')::numeric
+                             AND o.max_qty = (r->>'qty')::int AND o.is_available)) THEN
     v_mode := 'noop';
   END IF;
   IF v_mode IS NULL THEN
@@ -257,7 +260,7 @@ BEGIN
       FROM jsonb_array_elements(v_oldrows) r
      WHERE NOT EXISTS (SELECT 1 FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
                         WHERE i.partner_id = c_id AND i.name = r->>'dish' AND o.kind = r->>'kind' AND o.message_tr = r->>'msg'
-                          AND o.sort_order IS NOT DISTINCT FROM (r->>'ord')::int AND o.price IS NULL AND o.max_qty = 1);
+                          AND o.sort_order IS NOT DISTINCT FROM (r->>'ord')::int AND o.price IS NULL AND o.max_qty = 1 AND o.is_available);
     RAISE EXCEPTION 'crunchy-express has % option rows: neither the % rows 20261135 wrote nor the % rows of this file (dishes differing from the 20261135 state: %). Nothing applied.',
       v_have, v_old_total, v_total, coalesce(v_bad, 'none');
   END IF;
@@ -294,16 +297,16 @@ BEGIN
 
     UPDATE public.eatery_item_options o
        SET label_i18n = r.r -> 'label', message_tr = r.r ->> 'msg', sort_order = (r.r ->> 'ord')::int,
-           price = (r.r ->> 'price')::numeric, max_qty = 1
+           price = (r.r ->> 'price')::numeric, max_qty = (r.r ->> 'qty')::int
       FROM public.eatery_menu_items i, jsonb_array_elements(v_new) r(r)
      WHERE o.item_id = i.id AND i.partner_id = c_id AND r.r ->> 'dish' = i.name AND r.r ->> 'kind' = o.kind AND r.r ->> 'src' = o.message_tr
        AND (o.label_i18n IS DISTINCT FROM r.r -> 'label' OR o.message_tr IS DISTINCT FROM r.r ->> 'msg'
             OR o.sort_order IS DISTINCT FROM (r.r ->> 'ord')::int OR o.price IS DISTINCT FROM (r.r ->> 'price')::numeric
-            OR o.max_qty IS DISTINCT FROM 1);
+            OR o.max_qty IS DISTINCT FROM (r.r ->> 'qty')::int);
     GET DIAGNOSTICS v_upd = ROW_COUNT;
 
     INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, max_qty, sort_order)
-    SELECT i.id, r.r ->> 'kind', r.r -> 'label', r.r ->> 'msg', (r.r ->> 'price')::numeric, 1, (r.r ->> 'ord')::int
+    SELECT i.id, r.r ->> 'kind', r.r -> 'label', r.r ->> 'msg', (r.r ->> 'price')::numeric, (r.r ->> 'qty')::int, (r.r ->> 'ord')::int
       FROM jsonb_array_elements(v_new) r(r)
       JOIN public.eatery_menu_items i ON i.partner_id = c_id AND i.name = r.r ->> 'dish'
      WHERE NOT EXISTS (SELECT 1 FROM public.eatery_item_options o WHERE o.item_id = i.id AND o.kind = r.r ->> 'kind' AND o.message_tr = r.r ->> 'msg');
@@ -320,7 +323,7 @@ BEGIN
      AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_new) r
                       WHERE r->>'dish' = i.name AND r->>'kind' = o.kind AND r->>'msg' = o.message_tr
                         AND o.label_i18n IS NOT DISTINCT FROM r->'label' AND o.sort_order IS NOT DISTINCT FROM (r->>'ord')::int
-                        AND o.price IS NOT DISTINCT FROM (r->>'price')::numeric AND o.max_qty = 1);
+                        AND o.price IS NOT DISTINCT FROM (r->>'price')::numeric AND o.max_qty = (r->>'qty')::int);
   IF v_n <> 0 THEN RAISE EXCEPTION 'after: % table rows that are not a row of the literal', v_n; END IF;
 
   SELECT string_agg(dish || '/' || kind || '=' || n, ',' ORDER BY dish, kind) INTO v_got
@@ -337,8 +340,8 @@ BEGIN
    WHERE i.partner_id = c_id AND o.kind = 'remove' AND (o.price IS NOT NULL OR o.max_qty IS DISTINCT FROM 1 OR NOT o.is_available);
   IF v_n <> 0 THEN RAISE EXCEPTION 'after: % removals with a price, a qty other than 1 or unavailable', v_n; END IF;
   SELECT count(*) INTO v_n FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
-   WHERE i.partner_id = c_id AND o.kind = 'extra' AND (o.price IS NULL OR o.price <= 0);
-  IF v_n <> 0 THEN RAISE EXCEPTION 'after: % extras without a positive price (none may stay hidden)', v_n; END IF;
+   WHERE i.partner_id = c_id AND o.kind = 'extra' AND (o.price IS NULL OR o.price <= 0 OR NOT o.is_available);
+  IF v_n <> 0 THEN RAISE EXCEPTION 'after: % extras without a positive price or disabled by hand (none may stay hidden)', v_n; END IF;
 
   SELECT count(*) INTO v_n FROM public.eatery_item_options WHERE id = ANY (v_kept);
   IF v_n IS DISTINCT FROM v_exp_kept THEN RAISE EXCEPTION 'after: % of the % option ids that must survive exist', v_n, v_exp_kept; END IF;
@@ -384,7 +387,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261136_crunchy_express_options_owner_answers.sql', '0f6368e039c0b12e2bedde7c1a61bd89e47bf15d9f8a619c700d41435f8a1ef7')
+VALUES ('20261136_crunchy_express_options_owner_answers.sql', '3f9494ddeb56c39a176dd9c8032b313f74873551078971dd5d6329f7a165c78a')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
