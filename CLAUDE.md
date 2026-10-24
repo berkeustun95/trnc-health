@@ -85,6 +85,14 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
   (he hands it over; log it). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json`.
+- ⚠ **One publisher at a time; Berke's go names the commit** (Berke, 2026-10-24). (1) Only ONE session publishes
+  production OTAs at a time: before `npm run ota`, read the latest production update per runtime
+  (`npx -y eas-cli@24.7.0 update:list --branch production --limit 5 --json --non-interactive`) and which session
+  made it; coordinate first if another session published recently or is mid-release. (2) No production OTA without
+  Berke's explicit go for THAT EXACT commit: `git log <previewed-commit>..HEAD` must show only approved release steps
+  (other sessions merge into main/feat/voice-input in between); publish a pinned detached SHA; quote his go + SHA in
+  the vault log. 2026-10-24: Logo v2 #172 rode along in OTA 01a16de1 unpreviewed; two sessions published the same
+  runtimes within an hour.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
   android --profile production`. **Play releases go through Code** (since 2026-10-09; the service account has
   "Release to production"): `fastlane supply --aab <aab> --track production` with `changelogs/<versionCode>.txt` in all 9
