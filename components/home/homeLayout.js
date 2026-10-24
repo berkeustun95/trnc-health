@@ -53,6 +53,11 @@ export const OLI_OVERHANG = 0
 //   guard exists because this is the class of bug that cost rounds 3 to 5.
 export const HERO_LOGO_H = 72
 
+// Same rule for the compact mark in RedesignHero's top row (the live Home): its own bake,
+// 1.75pt keyline at this height (assets/brand/v2/ada-logo-keyline-44.json). The 72pt asset
+// drawn here came out at ~0.6pt and vanished on the dark photos.
+export const HERO_LOGO_H_COMPACT = 44
+
 // Breathing room between the hero's lowest content and the highest thing Oli occupies.
 //
 // ⚠ IT CLEARS THE hitSlop, NOT THE PIXELS. 10 was enough to stop the mascot's ears
