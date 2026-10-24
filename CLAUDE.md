@@ -88,9 +88,11 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **One publisher at a time; Berke's go names the commit** (Berke, 2026-10-24). (1) Only ONE session publishes
   production OTAs at a time: before `npm run ota`, read the latest production update per runtime
   (`npx -y eas-cli@24.7.0 update:list --branch production --limit 5 --json --non-interactive`) and which session
-  made it; coordinate first if another session published recently or is mid-release. (2) No production OTA without
+  made it; coordinate first if another session published recently or is mid-release. Every production `--message`
+  starts with the publishing session's name in brackets (`npm run ota -- --message "[trnc-health-79] …"`): EAS shows
+  `berkeustun95` for every session, so the tag is the only way `update:list` tells them apart. (2) No production OTA without
   Berke's explicit go for THAT EXACT commit: `git log <previewed-commit>..HEAD` must show only approved release steps
-  (other sessions merge into main/feat/voice-input in between); publish a pinned detached SHA; quote his go + SHA in
+  (other sessions merge into main in between); publish a pinned detached SHA; quote his go + SHA in
   the vault log. 2026-10-24: Logo v2 #172 rode along in OTA 01a16de1 unpreviewed; two sessions published the same
   runtimes within an hour.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
@@ -357,11 +359,11 @@ before every production OTA, web deploy, flag flips, version bumps. One question
 **Branch ruleset `protect-release-lanes`** (2026-10-12): `main`, `feat/voice-input`, `release/**` need a pull
 request, no force-push, no deletion; only Berke's admin role bypasses (a Mac push prints "Bypassed rule
 violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal repo it counts as admin and bypasses.
-**Who merges** (Berke, 2026-10-23): Code on this Mac (`ada-claude-code[bot]`) merges its OWN PRs to `main` /
-`feat/voice-input` (`gh pr merge`, allowed in the Mac-only `.claude/settings.local.json`; no ruleset bypass, the
+**Who merges** (Berke, 2026-10-23): Code on this Mac (`ada-claude-code[bot]`) merges its OWN PRs to `main`
+(`gh pr merge`, allowed in the Mac-only `.claude/settings.local.json`; no ruleset bypass, the
 0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
 Berke's `production-db` approval.
-Sync PRs from `main` into a release branch (`feat/voice-input`, `release/**`) count as Mac Code's own PRs.
+Sync PRs from `main` into a release branch (`release/**`) count as Mac Code's own PRs.
 
 **Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
 team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
