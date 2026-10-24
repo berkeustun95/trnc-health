@@ -102,6 +102,7 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const Q = 'q1'
   B.changeQty(Q, B.lineKey(5, []), 1); B.changeQty(Q, B.lineKey(5, [{ id: 11, qty: 1 }]), 2); B.changeQty(Q, '6', 4)
   eq('store: keyed lines stay separate', B.getBasket(Q), { 5: 1, '5|11': 2, 6: 4 })
+  eq('dishUsesSheet: visible options / option lines / bare only', [B.dishUsesSheet({ 5: 2 }, 5, true), B.dishUsesSheet({ 5: 2 }, 5, false), B.dishUsesSheet({ 5: 1, '5|11': 2 }, 5, false), B.dishUsesSheet({ '5|11': 2 }, 5, false), B.dishUsesSheet({ '55|11': 2, 6: 1 }, 5, false), B.dishUsesSheet({}, 5, false)], [true, false, true, true, false, false])
   eq('dishQty: sums every line of one dish (and only that dish)', [B.dishQty(B.getBasket(Q), 5), B.dishQty(B.getBasket(Q), 6), B.dishQty(B.getBasket(Q), 7), B.dishKeys(B.getBasket(Q), 5)], [3, 4, 0, ['5', '5|11']])
   eq('store: the bin on a keyed line offers undo', [B.changeQty(Q, '5|11', -2), B.undo(Q).kind, B.getBasket(Q)['5|11']], ['removed', 'item', 2])
   eq('setLine: a new keyed line', [B.setLine(Q, null, '5|12', 1), B.getBasket(Q)['5|12']], [true, 1])

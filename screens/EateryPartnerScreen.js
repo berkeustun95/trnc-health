@@ -14,7 +14,7 @@ import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
-import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, dishUsesSheet, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
@@ -99,7 +99,7 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, onQty, onOptions }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   const row = (
@@ -117,7 +117,7 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
     <View>
       {row}
       <View style={s.itemOrder}>
-        {eateryItemOptions(item).length > 0
+        {sheet
           ? <DishAddButton name={item.name} count={qty} onPress={() => onOptions(item)} lang={lang} />
           : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={onQty} lang={lang} />}
       </View>
@@ -496,7 +496,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 </Text>
                 {sec.items.map(i => {
                   const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
-                    ordering={ordering} qty={dishQty(basket, i.id)} onQty={onQty} onOptions={openOptions} />
+                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} />
                   return i.id === focusId
                     ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
                     : <Fragment key={i.id}>{row}</Fragment>

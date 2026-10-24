@@ -128,7 +128,7 @@ function Expand({ open, reduce, children }) {
 
 // One "Yanına" line. A priced side is a 44pt toggle (the whole row): the plus adds one unit to the partner's basket, then
 // it reads "Eklendi" and a second tap takes that one unit off again. A side that cannot be ordered stays a plain line.
-function SideRow({ item, text, qty, orderable, lang, onToggle }) {
+function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle }) {
   if (!orderable) {
     return (
       <View style={st.sideRow}>
@@ -137,13 +137,14 @@ function SideRow({ item, text, qty, orderable, lang, onToggle }) {
       </View>
     )
   }
-  const added = qty > 0
+  const added = qty > 0 && !hasOpts   // a side with options only ever adds: the sheet builds another line, the row counts them
   return (
     <Pressable onPress={onToggle} style={({ pressed }) => [st.sideRow, st.sideTap, pressed && { opacity: press.small }]} accessibilityRole="button"
       accessibilityLabel={added ? t('eateryQuizSideRemoveA11y', lang).replace('{name}', () => item.name) : `${t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)}. ${text}`}>
       <Ionicons name={added ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={colors.primaryDark} />
       <Text style={st.sideText}>{text}</Text>
       {added && <Text style={st.sideAdded}>{t('eateryQuizSideAdded', lang)}</Text>}
+      {hasOpts && qty > 0 && <Text style={st.sideAdded}>{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
     </Pressable>
   )
 }
@@ -161,11 +162,11 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
   const sideOk = sideItems.map(i => canOrder && quizSideOrderable(i))
   const qty = dishQty(basket, item.id)
   const hasOpts = eateryItemOptions(item).length > 0
-  // A side that has options opens the sheet to add; once added, a second tap takes one unit off its first line.
+  // A side that has options always opens the sheet (another configured line); a plain side toggles one unit.
   const toggleSide = side => {
     const q = dishQty(basket, side.id)
-    if (q > 0) onQty(partner, dishKeys(basket, side.id)[0], -1)
-    else if (eateryItemOptions(side).length > 0) onOptions(partner, side)
+    if (eateryItemOptions(side).length > 0) onOptions(partner, side)
+    else if (q > 0) onQty(partner, dishKeys(basket, side.id)[0], -1)
     else onQty(partner, side.id, 1)
   }
   // The sides open once THIS dish is in the basket, and fold away when it goes back to 0 (sides already added stay).
@@ -211,7 +212,7 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
           <View style={st.side}>
             <Text style={st.sidesTitle} accessibilityRole="header">{t('eateryQuizSidesTitle', lang)}</Text>
             {sides.map((line, k) => (
-              <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={dishQty(basket, sideItems[k].id)} orderable={sideOk[k]} lang={lang}
+              <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={dishQty(basket, sideItems[k].id)} orderable={sideOk[k]} hasOpts={eateryItemOptions(sideItems[k]).length > 0} lang={lang}
                 onToggle={() => toggleSide(sideItems[k])} />
             ))}
           </View>

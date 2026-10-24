@@ -22,9 +22,12 @@ const MAX_QTY = 99
 const ORDER_ERR_KEY = { adult: 'eateryOrderAdultOnly', generic: 'eateryOrderErrGeneric', rate: 'eateryOrderErrRate', account: 'eateryOrderErrAccount', prices: 'eateryOrderErrPrices', items: 'eateryOrderErrItems' }
 
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
-export function QtyStepper({ id, name, qty, onQty, lang }) {
+// min / max: the options sheet's own bounds. Without min (every menu and basket row) nothing changes: the pill at 0 and the bin at 1.
+// With min it is always [−] n [+], the minus dimmed at min.
+export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY }) {
+  const bare = min == null
   const sub = key => t(key, lang).replace('{name}', () => name).replace('{qty}', () => String(qty))
-  if (qty < 1) {
+  if (bare && qty < 1) {
     return (
       <Pressable onPress={() => onQty(id, 1)} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
         accessibilityRole="button" accessibilityLabel={sub('eateryOrderAddA11y')}>
@@ -35,13 +38,13 @@ export function QtyStepper({ id, name, qty, onQty, lang }) {
   }
   return (
     <View style={st.row}>
-      <Pressable onPress={() => onQty(id, -1)} style={({ pressed }) => [st.round, st.minus, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={sub(qty === 1 ? 'eateryOrderRemove' : 'eateryOrderLess')}>
-        <Ionicons name={qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.primaryDark} />
+      <Pressable onPress={() => onQty(id, -1)} disabled={!bare && qty <= min} style={({ pressed }) => [st.round, st.minus, !bare && qty <= min && st.dim, pressed && { opacity: press.small }]}
+        accessibilityRole="button" accessibilityState={bare ? undefined : { disabled: qty <= min }} accessibilityLabel={sub(bare && qty === 1 ? 'eateryOrderRemove' : 'eateryOrderLess')}>
+        <Ionicons name={bare && qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.primaryDark} />
       </Pressable>
       <Text style={st.qty} accessible accessibilityLiveRegion="polite" accessibilityLabel={sub('eateryOrderQty')}>{qty}</Text>
-      <Pressable onPress={() => onQty(id, 1)} disabled={qty >= MAX_QTY} style={({ pressed }) => [st.round, st.plus, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityState={{ disabled: qty >= MAX_QTY }} accessibilityLabel={sub('eateryOrderMore')}>
+      <Pressable onPress={() => onQty(id, 1)} disabled={qty >= max} style={({ pressed }) => [st.round, st.plus, !bare && qty >= max && st.dim, pressed && { opacity: press.small }]}
+        accessibilityRole="button" accessibilityState={{ disabled: qty >= max }} accessibilityLabel={sub('eateryOrderMore')}>
         <Ionicons name="add" size={18} color={colors.onPrimary} />
       </Pressable>
     </View>
@@ -133,29 +136,12 @@ export function DishAddButton({ name, count, onPress, lang }) {
   )
 }
 
-function Stepper({ value, min, max, onChange, name, lang }) {
-  const sub = key => t(key, lang).replace('{name}', () => name).replace('{qty}', () => String(value))
-  return (
-    <View style={st.row}>
-      <Pressable onPress={() => onChange(value - 1)} disabled={value <= min} style={({ pressed }) => [st.round, st.minus, value <= min && st.dim, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityState={{ disabled: value <= min }} accessibilityLabel={sub('eateryOrderLess')}>
-        <Ionicons name="remove" size={18} color={colors.primaryDark} />
-      </Pressable>
-      <Text style={st.qty} accessible accessibilityLiveRegion="polite" accessibilityLabel={sub('eateryOrderQty')}>{value}</Text>
-      <Pressable onPress={() => onChange(value + 1)} disabled={value >= max} style={({ pressed }) => [st.round, st.plus, value >= max && st.dim, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityState={{ disabled: value >= max }} accessibilityLabel={sub('eateryOrderMore')}>
-        <Ionicons name="add" size={18} color={colors.onPrimary} />
-      </Pressable>
-    </View>
-  )
-}
-
 // Ticked = included (the default), unticked = removed. The label says which, for screen readers too.
 function RemoveRow({ label, included, onToggle, lang }) {
   return (
     <Pressable onPress={onToggle} style={({ pressed }) => [st.optRow, pressed && { opacity: press.small }]}
       accessibilityRole="checkbox" accessibilityState={{ checked: included }}
-      accessibilityLabel={`${label}, ${t(included ? 'eateryOptIncluded' : 'eateryOptRemoved', lang)}`}>
+      accessibilityLabel={included ? label : `${label}, ${t('eateryOptRemoved', lang)}`}>
       <Ionicons name={included ? 'checkbox' : 'square-outline'} size={24} color={included ? colors.primaryDark : colors.textSecondary} />
       <Text style={[st.optLabel, !included && st.optLabelOff]}>{label}</Text>
     </Pressable>
@@ -169,7 +155,7 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
         <Text style={st.optLabel}>{label}</Text>
         <Text style={st.extraPrice}>+{priceText}</Text>
       </View>
-      <Stepper value={qty} min={0} max={max} onChange={onChange} name={label} lang={lang} />
+      <QtyStepper id={label} name={label} qty={qty} min={0} max={max} onQty={(_, d) => onChange(qty + d)} lang={lang} />
     </View>
   )
 }
@@ -186,6 +172,8 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
   const opts = [...removed].map(id => ({ id, qty: 1 })).concat(Object.entries(extraQty).filter(([, q]) => q > 0).map(([id, q]) => ({ id: Number(id), qty: q })))
   const unit = resolveLineOptions(item, opts).unit
   const price = formatPrice(Math.round(unit * qty * 100) / 100, item.currency, lang)
+  const { width } = useWindowDimensions()
+  const stacked = width < 380 || PixelRatio.getFontScale() > 1.15   // as OrderBar: the price moves to its own line instead of truncating
   const toggle = id => setRemoved(r => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <>
@@ -206,14 +194,19 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
             ))}
           </View>
         )}
-        <Text style={st.secHint}>{t('eateryOptAllergy', lang)}</Text>
       </ScrollView>
       <View style={st.sheetFoot}>
         <View style={st.footQty}>
           <Text style={st.optLabel}>{t('eateryOptQtyLabel', lang)}</Text>
-          <Stepper value={qty} min={1} max={MAX_QTY} onChange={setQty} name={item.name} lang={lang} />
+          <QtyStepper id={item.id} name={item.name} qty={qty} min={1} onQty={(_, d) => setQty(q => Math.min(MAX_QTY, Math.max(1, q + d)))} lang={lang} />
         </View>
-        <Button fullWidth icon="basket-outline" title={t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
+        <View style={st.footHint}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+          <Text style={st.footHintText}>{t('eateryOptAllergy', lang)}</Text>
+        </View>
+        {stacked && <Text style={st.barSummary}>{price}</Text>}
+        <Button fullWidth icon="basket-outline" title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
+          accessibilityLabel={t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
           onPress={() => onConfirm({ opts, qty })} />
       </View>
     </>
@@ -472,6 +465,8 @@ const st = StyleSheet.create({
   footQty:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   secHead:   { ...type.rowTitle, color: colors.textPrimary },
   secHint:   { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  footHint:  { flexDirection: 'row', alignItems: 'flex-start', gap: space[8] },
+  footHintText:{ ...type.small, color: colors.textSecondary, flex: 1 },
   optRow:    { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[4] },
   optLabel:  { flex: 1, ...type.body, color: colors.textPrimary },
   optLabelOff:{ color: colors.textSecondary, textDecorationLine: 'line-through' },
@@ -494,7 +489,7 @@ const st = StyleSheet.create({
   lineEditText:{ ...type.small, fontFamily: font.semibold, color: colors.primaryDark },
   lineName:  { ...type.body, fontFamily: font.semibold, color: colors.textPrimary },
   linePrice: { ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondary, marginTop: 2 },
-  lineFoot:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: space[12], marginTop: space[4] },
+  lineFoot:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: space[12], marginTop: space[8] },
   lineTotal: { ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary, marginLeft: 'auto' },
   thumb:     { width: 56, height: 56, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbEmpty:{ backgroundColor: colors.soft, borderWidth: 0 },

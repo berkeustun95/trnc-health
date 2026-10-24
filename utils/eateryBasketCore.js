@@ -51,6 +51,10 @@ export function dishQty(basket, itemId) {
   return n
 }
 
+// True when one dish needs the options sheet for its Ekle: it has visible options, or the basket still holds an option line of it
+// (a dish that lost its options must not get a stepper whose minus only touches the bare key).
+export const dishUsesSheet = (basket, itemId, hasVisibleOptions) => hasVisibleOptions || dishKeys(basket, itemId).some(k => k !== String(itemId))
+
 // The keys of one dish's lines, in basket order.
 export const dishKeys = (basket, itemId) => Object.keys(basket || {}).filter(k => parseKey(k).itemId === String(itemId))
 
