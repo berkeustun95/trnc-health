@@ -39,7 +39,7 @@ export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
-    version: '1.4.0',
+    version: '1.4.1',
     orientation: 'portrait',
     icon: IS_PREVIEW ? './assets/brand/v2/preview-icon.png' : './assets/brand/v2/icon.png',
     splash: {
@@ -149,7 +149,7 @@ export default {
         'expo-notifications',
         {
           icon: './assets/brand/v2/notification-icon.png',
-          color: '#ffffff',
+          color: '#0E7C7B',
           defaultChannel: 'default',
           sounds: [],
         },
