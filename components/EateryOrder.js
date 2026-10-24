@@ -200,6 +200,7 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
           <Text style={st.optLabel}>{t('eateryOptQtyLabel', lang)}</Text>
           <QtyStepper id={item.id} name={item.name} qty={qty} min={1} onQty={(_, d) => setQty(q => Math.min(MAX_QTY, Math.max(1, q + d)))} lang={lang} />
         </View>
+        <Text style={st.footSub}>{t('eateryOptSeparateHint', lang)}</Text>
         <View style={st.footHint}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
           <Text style={st.footHintText}>{t('eateryOptAllergy', lang)}</Text>
@@ -466,6 +467,7 @@ const st = StyleSheet.create({
   secHead:   { ...type.rowTitle, color: colors.textPrimary },
   secHint:   { ...type.small, color: colors.textSecondary, marginTop: 2 },
   footHint:  { flexDirection: 'row', alignItems: 'flex-start', gap: space[8] },
+  footSub:   { ...type.small, color: colors.textSecondary },
   footHintText:{ ...type.small, color: colors.textSecondary, flex: 1 },
   optRow:    { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[4] },
   optLabel:  { flex: 1, ...type.body, color: colors.textPrimary },
