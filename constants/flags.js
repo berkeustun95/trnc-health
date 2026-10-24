@@ -113,6 +113,10 @@ export const SHOW_WIZARD_HEADINGS = false
 // additionally bypasses for an owner via ownsGarage. Each key is the module's
 // stable identifier, reused verbatim by the gate here, and (Slices 2-3) the
 // waitlist `module` column + its CHECK and the go-live notify RPC.
+// Branded boot splash ("compass gate", components/BootSplash.js). Off until Berke approves the
+// device recording and the Preview check.
+export const BOOT_SPLASH_LIVE = false
+
 export const MODULE_FLAGS = {
   // LIVE 2026-09-09 — PARTNER-ONLY. This is not the open directory the key originally
   // gated: the tile grid and the filterable list are gone, hs_select_public requires

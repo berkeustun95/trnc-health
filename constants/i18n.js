@@ -194,6 +194,8 @@ const translations = {
     // 97pt box at 360dp. The breadth message cannot fit here and lives at the
     // DESTINATION instead; npm run labels:check measures this string.
     stripNoticeTitle: "What's new in ADA",
+    splashTagline: 'North Cyprus Assistant',
+    splashHello: 'Hello!',
 
     // ─── First-run carousel ────────────────────────────────────────────────
     // Semantic names, NOT positional. The set these replaced was slide1Title…
@@ -2427,6 +2429,8 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: "ADA'da neler yeni?",
+    splashTagline: 'Kuzey Kıbrıs Asistanı',
+    splashHello: 'Merhaba!',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: "Kuzey Kıbrıs'ta yaşam için tek uygulama",

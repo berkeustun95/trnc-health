@@ -32,10 +32,11 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE, BOOT_SPLASH_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
+import BootSplash from './components/BootSplash'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
@@ -581,6 +582,7 @@ export default function App() {
   // opens it and clears this, so a later return to the Home tab does not reopen the list.
   const [openFacilityList, setOpenFacilityList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
+  const [bootSplashDone, setBootSplashDone] = useState(false)
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)
@@ -1817,7 +1819,8 @@ export default function App() {
     (profile.profile_completed_at == null ||
      (profile.profile_schema_version ?? 0) < CURRENT_PROFILE_SCHEMA_VERSION)
 
-  if (session === undefined || !fontsLoaded || onboarded === null) {
+  const bootReady = !(session === undefined || !fontsLoaded || onboarded === null)
+  if (!bootReady) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (onboarded === false) {
     content = <OnboardingScreen onComplete={completeOnboarding} />
@@ -3215,6 +3218,10 @@ export default function App() {
       />
       <EdgeSwipeStrip />
       {REDESIGN && fontsLoaded && <PermissionPrimer lang={lang} />}
+      {/* Last in the final return so it covers everything until it fades out. */}
+      {BOOT_SPLASH_LIVE && !bootSplashDone && (
+        <BootSplash ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
+      )}
     </SafeAreaProvider>
   )
 }
