@@ -153,6 +153,13 @@ eq('top-level companions = the top dish\'s', Q.quizMatch([C], { ...ANY, extra: [
   eq('side orderable: priced + available', [sauce, free, off].map(Q.quizSideOrderable), [true, false, false])
   eq('summary: count and total of the partner basket', Q.quizBasketSummary(P, { [main.id]: 2, [sauce.id]: 1, [free.id]: 3, [off.id]: 1 }), { count: 3, total: 1280, currency: 'TRY' })
   eq('summary: empty basket', Q.quizBasketSummary(P, {}).count, 0)
+  const ex = { id: 71, kind: 'extra', label_i18n: {}, message_tr: 'peynir', price: 30, max_qty: 2, sort_order: 0, is_available: true }
+  const rm = { id: 72, kind: 'remove', label_i18n: {}, message_tr: 'turşusuz', price: null, max_qty: 1, sort_order: 1, is_available: true }
+  const opt = dish('Opsiyonlu', { price: 100, eatery_item_options: [ex, rm] })
+  const PO = partner('opt', 2, [opt])
+  eq('summary: lines with options are priced with their extras, a removal is free, one dish across lines', Q.quizBasketSummary(PO, { [opt.id]: 1, [`${opt.id}|71x2`]: 1, [`${opt.id}|72`]: 2 }),
+    { count: 4, total: 100 + 160 + 200, currency: 'TRY' })
+  eq('summary: a line whose option vanished is still counted, at the base price', Q.quizBasketSummary(PO, { [`${opt.id}|99`]: 1 }).total, 100)
   const Q2 = partner('other', 1, [dish('Kebap', { price: 100 })])
   const one = pp => (pp === P ? { count: 1 } : { count: 2 })
   eq('bar: the partner last added to wins', Q.quizBarPartner([P, Q2], one, 'other').slug, 'other')
