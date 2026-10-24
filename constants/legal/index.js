@@ -68,7 +68,10 @@ import TERMS_TR   from './terms.tr.js'
 // rule: next date, or the actual ship date if later): Sepetim address book — up to 10 named delivery addresses with
 // a map pin and an optional phone for the delivery, kept in the app on the phone (Android backup disclosed), sent
 // only inside the WhatsApp message. Terms unchanged.
-export const LEGAL_VERSION = '2026-10-24'
+// Bumped 2026-10-24 -> 2026-10-25 (published 2026-10-24; strict next date for check-legal-live): per-dish options
+// (Yeme-İçme "malzeme çıkar / ekstra ekle") — the order record now includes the changes chosen for an item and their
+// prices. New policy-updated notice text. Terms unchanged (version line follows).
+export const LEGAL_VERSION = '2026-10-25'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue
