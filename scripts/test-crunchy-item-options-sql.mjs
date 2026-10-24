@@ -298,13 +298,18 @@ t('rename in place keeps the option id: Nashville / Buffalo Chicken / Classic Na
   [idOf(rows0, 'Nashville Tavuk Burger', 'remove', 'çıtır özel sossuz') === idOf(rows1, 'Nashville Tavuk Burger', 'remove', 'özel sossuz'),
    idOf(rows0, 'Buffalo Chicken Burger', 'remove', 'acı sossuz') === idOf(rows1, 'Buffalo Chicken Burger', 'remove', 'buffalo sossuz'),
    idOf(rows0, 'Crunchy Classic Nachos', 'remove', 'jalapeñosuz') === idOf(rows1, 'Crunchy Classic Nachos', 'remove', 'jalapeño turşusuz')], [true, true, true])
+t('Crunchy Burger coleslaw typo fix: same option id, message "coleslawsız", Turkish label "Coleslaw (lahana salatası)", sort_order unchanged; no "coslow" left anywhere',
+  [idOf(rows0, 'Crunchy Burger', 'remove', 'coslowsuz') === idOf(rows1, 'Crunchy Burger', 'remove', 'coleslawsız'), idOf(rows1, 'Crunchy Burger', 'remove', 'coleslawsız') !== undefined,
+   (await q(d36, `SELECT label_i18n ->> 'Turkish' tr, sort_order FROM public.eatery_item_options WHERE message_tr = 'coleslawsız'`)),
+   (await q(d36, `SELECT count(*)::int n FROM public.eatery_item_options WHERE message_tr ILIKE '%coslow%' OR label_i18n::text ILIKE '%coslow%'`))[0].n],
+  [true, true, [{ tr: 'Coleslaw (lahana salatası)', sort_order: 2 }], 0])
 t('hidden köfte / dana bacon extras keep their id when they become visible (BBQ Smash)',
   [idOf(rows0, 'BBQ Smash Burger', 'extra', 'köfte') === idOf(rows1, 'BBQ Smash Burger', 'extra', 'köfte'),
    idOf(rows0, 'BBQ Smash Burger', 'extra', 'dana bacon') === idOf(rows1, 'BBQ Smash Burger', 'extra', 'dana bacon')], [true, true])
 t('BBQ Chicken: the old barbekü soslu turşusuz id is gone and not reused (a held basket must re-choose)',
   [idOf(rows0, 'Crunchy BBQ Chicken Burger', 'remove', 'barbekü soslu turşusuz') !== undefined,
    rows1.some(r => r.id === idOf(rows0, 'Crunchy BBQ Chicken Burger', 'remove', 'barbekü soslu turşusuz'))], [true, false])
-t('ids that survive = 107 - 27 deleted extras (13 tenders, 9 burger peyniri, 2 cheddar, 2 jalapeño, 1 domuz bacon) - 1 barbekü soslu turşusuz = 79',
+t('ids that survive (the coleslaw row is among them) = 107 - 27 deleted extras (13 tenders, 9 burger peyniri, 2 cheddar, 2 jalapeño, 1 domuz bacon) - 1 barbekü soslu turşusuz = 79',
   rows0.filter(r => rows1.some(x => x.id === r.id)).length, 79)
 // labels
 const lab = await q(d36, `SELECT DISTINCT message_tr, label_i18n FROM public.eatery_item_options WHERE message_tr IN ('hellim','eritilmiş peynir sos','özel sossuz','buffalo sossuz','füme peynirsiz','jalapeño turşusuz') ORDER BY message_tr LIMIT 6`)
@@ -383,7 +388,7 @@ await refused36('a dish listed twice', mutant36('r36dup', [['["Hot Honey Nachos"
 await refused36('rename whose source is not a 1135 row', mutant36('r36ren', [['"remove", "çıtır özel sossuz"', '"remove", "çıtır özel sosssuz"']]), 'a rename whose source is not a 20261135 row')
 await refused36('the same extra twice on one dish', mutant36('r36dupx', [['[["hellim", 85]]]', '[["hellim", 85],["hellim", 80]]]']]), 'duplicate (dish, kind, message)')
 await refused36('the write counts notice an UPDATE that did not happen (AND false)',
-  mutant36('r36noupd', [["AND r.r ->> 'src' = o.message_tr\n       AND (o.label_i18n", "AND r.r ->> 'src' = o.message_tr AND false\n       AND (o.label_i18n"]]), 'inserted 20 rows, expected 17')
+  mutant36('r36noupd', [["AND r.r ->> 'src' = o.message_tr\n       AND (o.label_i18n", "AND r.r ->> 'src' = o.message_tr AND false\n       AND (o.label_i18n"]]), 'inserted 21 rows, expected 17')
 await refused36('the write counts notice a DELETE that did not happen (AND false)',
   mutant36('r36nodel', [["WHERE o.item_id = i.id AND i.partner_id = c_id\n       AND NOT EXISTS", "WHERE o.item_id = i.id AND i.partner_id = c_id AND false\n       AND NOT EXISTS"]]), 'deleted 0 rows, expected')
 // the apply path is also guarded: break the write so the post-state notices (the write really is checked)

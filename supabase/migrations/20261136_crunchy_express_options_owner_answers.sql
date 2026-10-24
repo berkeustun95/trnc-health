@@ -8,6 +8,7 @@
 --             never added, nothing to do). Pineapple Chicken Burger gains "marulsuz". Nashville: "çıtır özel sossuz" is now
 --             "özel sossuz". Buffalo Chicken Burger: "acı sossuz" is now "buffalo sossuz". TNT gains "füme peynirsiz".
 --             Crunchy Classic Nachos: "jalapeñosuz" is now "jalapeño turşusuz". Buffalo Nachos gains "buffalo sossuz".
+--             Crunchy Burger: typo fix, "coslowsuz" (label "Coslow") is now "coleslawsız" (label "Coleslaw"), same option id.
 --   EXTRAS    VISIBLE with prices: the five smash burgers (Express, BBQ, Trüf, Big Pork, Jalapeño Drip) get ekstra köfte 250,
 --             ekstra dana bacon 90, ekstra hellim 85 (hellim is a new ingredient); Veggy Smash Burger gets ekstra hellim 85 only;
 --             Crunchy Classic / Buffalo / Hot Honey Nachos get ekstra eritilmiş peynir sos 110.
@@ -18,7 +19,7 @@
 --
 -- UPDATE vs DELETE + INSERT, decided per row (the app marks a basket line whose option ids vanished as "Seçenekler değişti -
 -- yeniden seçin", and orders keep a snapshot of the option, never a foreign key to its id):
---   * the SAME ingredient under a better name (Nashville, Buffalo Chicken Burger, Nachos jalapeño turşusu) and a hidden
+--   * the SAME ingredient under a better name (Nashville, Buffalo Chicken Burger, Nachos jalapeño turşusu, Crunchy Burger coleslaw typo fix) and a hidden
 --     extra that becomes visible (köfte, dana bacon): UPDATE in place, the option id stays, so a held basket keeps working
 --     (post-state asserts every one of those ids survived).
 --   * the MEANING changed (BBQ Chicken's one "barbekü soslu turşusuz" cannot honestly become either of its two successors):
@@ -55,7 +56,7 @@ DECLARE
   -- key -> {l: label_i18n (nine languages), rm: removed form (Turkish), ex: ingredient after "+ekstra " (Turkish)}
   v_ing constant jsonb := $t${
     "peynir": {"rm":"peynirsiz","l":{"English":"Cheese","Turkish":"Peynir","Arabic":"الجبن","Russian":"Сыр","Greek":"Τυρί","French":"Fromage","Spanish":"Queso","German":"Käse","Persian":"پنیر"}},
-    "coslow": {"rm":"coslowsuz","l":{"English":"Coleslaw (cabbage salad)","Turkish":"Coslow (lahana salatası)","Arabic":"كولسلو (سلطة الكرنب)","Russian":"Коулслоу (капустный салат)","Greek":"Κόουλσλο (σαλάτα λάχανου)","French":"Coleslaw (salade de chou)","Spanish":"Coleslaw (ensalada de col)","German":"Coleslaw (Krautsalat)","Persian":"کول‌اسلا (سالاد کلم)"}},
+    "coleslaw": {"rm":"coleslawsız","l":{"English":"Coleslaw (cabbage salad)","Turkish":"Coleslaw (lahana salatası)","Arabic":"كولسلو (سلطة الكرنب)","Russian":"Коулслоу (капустный салат)","Greek":"Κόουλσλο (σαλάτα λάχανου)","French":"Coleslaw (salade de chou)","Spanish":"Coleslaw (ensalada de col)","German":"Coleslaw (Krautsalat)","Persian":"کول‌اسلا (سالاد کلم)"}},
     "tursu": {"rm":"turşusuz","l":{"English":"Pickles","Turkish":"Turşu","Arabic":"المخلل","Russian":"Маринованные огурцы","Greek":"Αγγουράκια τουρσί","French":"Cornichons","Spanish":"Pepinillos","German":"Gewürzgurken","Persian":"خیارشور"}},
     "marul": {"rm":"marulsuz","l":{"English":"Lettuce","Turkish":"Marul","Arabic":"الخس","Russian":"Листья салата","Greek":"Μαρούλι","French":"Laitue","Spanish":"Lechuga","German":"Kopfsalat","Persian":"کاهو"}},
     "ozel_sos": {"rm":"Crunchy özel sossuz","l":{"English":"Crunchy special sauce","Turkish":"Crunchy özel sos","Arabic":"صلصة كرانشي الخاصة","Russian":"Фирменный соус Crunchy","Greek":"Ειδική σάλτσα Crunchy","French":"Sauce spéciale Crunchy","Spanish":"Salsa especial Crunchy","German":"Crunchy-Spezialsauce","Persian":"سس مخصوص کرانچی"}},
@@ -93,7 +94,7 @@ DECLARE
   }$t$::jsonb;
   -- TARGET: [dish name, [removal keys in order], [[extra key, TL price, optional max_qty (default 1)] in order]]
   v_dishes constant jsonb := $t$[
-    ["Crunchy Burger", ["peynir", "coslow", "tursu", "marul", "ozel_sos"], []],
+    ["Crunchy Burger", ["peynir", "coleslaw", "tursu", "marul", "ozel_sos"], []],
     ["Crunchy BBQ Chicken Burger", ["peynir", "cirtir_sogan", "bbq_sos", "tursu"], []],
     ["Pineapple Chicken Burger", ["peynir", "ananasli_hardal", "tursu", "marul"], []],
     ["Nashville Tavuk Burger", ["nashville_sos", "ozel_sos_plain", "peynir", "tursu"], []],
@@ -145,7 +146,8 @@ DECLARE
   v_ren constant jsonb := $t$[
     ["Nashville Tavuk Burger", "remove", "çıtır özel sossuz", "ozel_sos_plain"],
     ["Buffalo Chicken Burger", "remove", "acı sossuz", "buffalo_sos"],
-    ["Crunchy Classic Nachos", "remove", "jalapeñosuz", "jalapeno_tursusu"]
+    ["Crunchy Classic Nachos", "remove", "jalapeñosuz", "jalapeno_tursusu"],
+    ["Crunchy Burger", "remove", "coslowsuz", "coleslaw"]
   ]$t$::jsonb;
   v_p public.eatery_partners%ROWTYPE;
   v_rows jsonb; v_new jsonb; v_oldrows jsonb;
@@ -387,7 +389,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261136_crunchy_express_options_owner_answers.sql', '3f9494ddeb56c39a176dd9c8032b313f74873551078971dd5d6329f7a165c78a')
+VALUES ('20261136_crunchy_express_options_owner_answers.sql', 'e9e2cb6b602e78e47cf2fa8efec116f1f92a0605f49986df586ae44468953e03')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
