@@ -18,16 +18,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   If a task seems to need a version bump, STOP and ask.
 
 ## ⚠ Standing warnings
-- ⚠ **main = 1.3.0 until 1.4.0 is live in BOTH stores; don't merge `feat/voice-input` early** (Berke,
-  2026-10-09). `feat/voice-input` holds 1.4.0 (version bump, `expo-speech-recognition`, RECORD_AUDIO, `VOICE_INPUT`
-  on); its store builds are made from that branch. Main stays the 1.3.0 OTA + fix lane: a 1.4.0 main would send every
-  `npm run ota` to a runtime nobody has yet. **Merge every new main fix into `feat/voice-input`** so 1.4.0 doesn't
-  miss it — a direct push to it (admin bypass of `protect-release-lanes`) only from Berke's Mac; on the Hermes server
-  always a PR (`ada-pr`). Merge `feat/voice-input` → main the day 1.4.0 is live in both stores. Vault `2026-10-08_ask-oli-voice-input.md`.
-  **The 1.4.0 store binaries (Android versionCode 25, iOS build 14) are built from `bdb674f` and do NOT contain the
-  Oteller tile / "Yurt · Emlak" (`feat/hotels-tile`, live on 1.3.0 by OTA `b28930ca`).** It reaches 1.4.0 only by a
-  runtime 1.4.0 production OTA from `feat/voice-input` (Preview → Berke's device check → OTA), ideally published
-  before the stores release 1.4.0 so first launches pick it up. Until then a 1.4.0 install shows the old Home.
+- ⚠ **main = 1.4.0 since 2026-10-24** (`feat/voice-input` merged, PR #180 `cc5f651`, the day 1.4.0 was live in both
+  stores: Play versionCode 25, iOS build 14). Every `npm run ota` from main goes to runtime 1.4.0 (`runtimeVersion` =
+  `appVersion`). 1.3.0 installs keep their last OTA (`c2f0f9b0`, from `2716d14`); a 1.3.0 fix ships only if still
+  needed, from a `release/1.3` branch cut from `963ff84` (last 1.3.0 main), same pattern as `release/1.1`; ask first.
+  `feat/voice-input` is no longer a lane: no syncs into it, no publishes from it. The 1.4.0 binaries (built from
+  `bdb674f`) lack the Oteller tile; the 1.4.0 production OTA `65092408` (`642c758`) carries it. Vault `2026-10-08_ask-oli-voice-input.md`.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
