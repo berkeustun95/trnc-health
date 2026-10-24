@@ -7,7 +7,7 @@
 // for one specific on-screen height. Nothing at runtime knows that. So:
 //
 //   • components/home/homeLayout.js  HERO_LOGO_H   — how tall it renders
-//   • assets/hero/ada-wordmark-keyline.json        — how tall it was baked FOR
+//   • assets/brand/v2/ada-logo-keyline.json        — how tall it was baked FOR
 //
 // If those drift, the keyline silently stops being 1pt: thicker if the render shrank,
 // thinner if it grew. Nothing errors, nothing looks obviously broken, and the result is
@@ -24,8 +24,8 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const LAYOUT   = 'components/home/homeLayout.js'
 const TOPBAR   = 'components/home/HomeTopBar.js'
-const MANIFEST = 'assets/hero/ada-wordmark-keyline.json'
-const ASSET    = 'assets/hero/ada-wordmark-keyline.png'
+const MANIFEST = 'assets/brand/v2/ada-logo-keyline.json'
+const ASSET    = 'assets/brand/v2/ada-logo-keyline.png'
 
 const problems = []
 const read = p => readFileSync(resolve(ROOT, p), 'utf8')
