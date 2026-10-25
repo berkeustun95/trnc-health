@@ -197,6 +197,7 @@ const translations = {
     // 97pt box at 360dp. The breadth message cannot fit here and lives at the
     // DESTINATION instead; npm run labels:check measures this string.
     stripNoticeTitle: "What's new in ADA",
+    splashTagline: 'North Cyprus Assistant',
 
     // ─── First-run carousel ────────────────────────────────────────────────
     // Semantic names, NOT positional. The set these replaced was slide1Title…
@@ -2451,6 +2452,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: "ADA'da neler yeni?",
+    splashTagline: 'Kuzey Kıbrıs Asistanı',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: "Kuzey Kıbrıs'ta yaşam için tek uygulama",
@@ -4679,6 +4681,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'ما الجديد في ADA؟',
+    splashTagline: 'مساعد شمال قبرص',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'تطبيق واحد للحياة في شمال قبرص',
@@ -6687,6 +6690,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Что нового в ADA',
+    splashTagline: 'Помощник Северного Кипра',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Одно приложение для жизни на Северном Кипре',
@@ -8703,6 +8707,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Τι νέο στο ADA',
+    splashTagline: 'Βοηθός Βόρειας Κύπρου',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Μία εφαρμογή για τη ζωή στη Βόρεια Κύπρο',
@@ -10705,6 +10710,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Quoi de neuf',
+    splashTagline: 'Assistant Chypre du Nord',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Une seule application pour vivre à Chypre du Nord',
@@ -12711,6 +12717,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Novedades en ADA',
+    splashTagline: 'Asistente del Norte de Chipre',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Una sola app para vivir en el norte de Chipre',
@@ -14714,6 +14721,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Neu in ADA',
+    splashTagline: 'Nordzypern-Assistent',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Eine App für das Leben in Nordzypern',
@@ -16717,6 +16725,7 @@ const translations = {
 
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'تازه‌های ADA',
+    splashTagline: 'دستیار قبرس شمالی',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'یک اپلیکیشن برای زندگی در قبرس شمالی',
