@@ -36,8 +36,7 @@ import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SEL
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
-import BootSplash from './components/BootSplash'
-import BootSplashWebp, { WEBP_SPLASH_AVAILABLE } from './components/BootSplashWebp'
+import BootSplash, { SPLASH_AVAILABLE } from './components/BootSplash'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
@@ -451,9 +450,6 @@ class BLErrorBoundary extends Component {
 const WX_COACH_WAIT_MS = 3000
 const WX_COACH_PENDING = '@trnc_coach_wx_pending'
 
-// The clip where expo-image is native (every 1.3.0 / 1.4.0 binary), the image gag elsewhere.
-const Splash = WEBP_SPLASH_AVAILABLE ? BootSplashWebp : BootSplash
-
 export default function App() {
   // ─── FOUR INTER WEIGHTS, AND TWO OF THEM ARE A BUG FIX ────────────────────
   //
@@ -589,7 +585,7 @@ export default function App() {
   const [bootSplashDone, setBootSplashDone] = useState(false)
   // While the boot splash is up, nothing may open over it: an RN Modal is its own native
   // window and draws above any View, so each launch-time sheet/notice below waits for this.
-  const splashUp = BOOT_SPLASH_LIVE && !bootSplashDone
+  const splashUp = BOOT_SPLASH_LIVE && SPLASH_AVAILABLE && !bootSplashDone
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)
@@ -3227,7 +3223,7 @@ export default function App() {
       {REDESIGN && fontsLoaded && <PermissionPrimer lang={lang} />}
       {/* Last in the final return so it covers everything until it fades out. */}
       {splashUp && (
-        <Splash ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
+        <BootSplash ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
       )}
     </SafeAreaProvider>
   )
