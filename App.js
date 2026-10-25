@@ -36,7 +36,7 @@ import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SEL
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
-import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON } from './components/BootSplash'
+import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
@@ -585,7 +585,15 @@ export default function App() {
   const [bootSplashDone, setBootSplashDone] = useState(false)
   // While the boot splash is up, nothing may open over it: an RN Modal is its own native
   // window and draws above any View, so each launch-time sheet/notice below waits for this.
-  const splashUp = SPLASH_ON && SPLASH_AVAILABLE && !bootSplashDone
+  // null until claimSplash() answers: the clip plays on the first cold start of the local day and
+  // after a new build or OTA; any other cold start skips it (false) and launches as before.
+  const [splashPlay, setSplashPlay] = useState(SPLASH_ON && SPLASH_AVAILABLE ? null : false)
+  useEffect(() => {
+    if (splashPlay !== null) return
+    const build = Updates.isEmbeddedLaunch ? `embedded-${Updates.runtimeVersion}` : Updates.updateId
+    claimSplash(build).then(setSplashPlay)
+  }, [])
+  const splashUp = splashPlay !== false && !bootSplashDone
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)
@@ -3223,7 +3231,7 @@ export default function App() {
       {REDESIGN && fontsLoaded && <PermissionPrimer lang={lang} />}
       {/* Last in the final return so it covers everything until it fades out. */}
       {splashUp && (
-        <BootSplash ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
+        <BootSplash play={splashPlay} ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
       )}
     </SafeAreaProvider>
   )
