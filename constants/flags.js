@@ -106,6 +106,10 @@ export const PROFILE_GATE_LIVE = true   // live 2026-09-02
 // EXPECTED_SCALARS is what stops that.
 export const SHOW_WIZARD_HEADINGS = false
 
+// Branded boot splash (Oli & Maki clip, components/BootSplash.js). Off until Berke checks it
+// on Preview (morph from the 1.4.1 native frame + cold start) and gives the go.
+export const BOOT_SPLASH_LIVE = false
+
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
 // list that reads as broken. false = gated (Coming Soon); flip to true via OTA to
@@ -113,10 +117,6 @@ export const SHOW_WIZARD_HEADINGS = false
 // additionally bypasses for an owner via ownsGarage. Each key is the module's
 // stable identifier, reused verbatim by the gate here, and (Slices 2-3) the
 // waitlist `module` column + its CHECK and the go-live notify RPC.
-// Branded boot splash ("compass gate", components/BootSplash.js). Off until Berke approves the
-// device recording and the Preview check.
-export const BOOT_SPLASH_LIVE = false
-
 export const MODULE_FLAGS = {
   // LIVE 2026-09-09 — PARTNER-ONLY. This is not the open directory the key originally
   // gated: the tile grid and the filterable list are gone, hs_select_public requires
