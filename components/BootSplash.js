@@ -5,6 +5,7 @@ import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { font, colors } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { BOOT_SPLASH_LIVE } from '../constants/flags'
 
 // ─── Boot splash: the Oli & Maki gate clip as an animated WebP (OTA stopgap) ──
 //
@@ -69,6 +70,9 @@ function useReduceMotion() {
 // launch, so App.js renders this only when the module exists, and the entry is require()d
 // inside a function, never at module scope (check-native-import-safety).
 export const SPLASH_AVAILABLE = !!requireOptionalNativeModule('ExpoImage')
+// On in ADA Preview before it is on for everyone: the Previewed code is then main itself, so the
+// "Nothing Previewed stays off main" lineage never waits on a flag commit (Berke 2026-10-25).
+export const SPLASH_ON = BOOT_SPLASH_LIVE || IS_PREVIEW
 let ExpoImage
 function loadExpoImage() {
   if (ExpoImage === undefined) ExpoImage = SPLASH_AVAILABLE ? require('expo-image').Image : null

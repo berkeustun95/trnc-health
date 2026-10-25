@@ -32,11 +32,11 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE, BOOT_SPLASH_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
-import BootSplash, { SPLASH_AVAILABLE } from './components/BootSplash'
+import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON } from './components/BootSplash'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
@@ -585,7 +585,7 @@ export default function App() {
   const [bootSplashDone, setBootSplashDone] = useState(false)
   // While the boot splash is up, nothing may open over it: an RN Modal is its own native
   // window and draws above any View, so each launch-time sheet/notice below waits for this.
-  const splashUp = BOOT_SPLASH_LIVE && SPLASH_AVAILABLE && !bootSplashDone
+  const splashUp = SPLASH_ON && SPLASH_AVAILABLE && !bootSplashDone
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)

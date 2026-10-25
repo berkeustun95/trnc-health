@@ -106,8 +106,8 @@ export const PROFILE_GATE_LIVE = true   // live 2026-09-02
 // EXPECTED_SCALARS is what stops that.
 export const SHOW_WIZARD_HEADINGS = false
 
-// Branded boot splash (Oli & Maki clip, components/BootSplash.js). Off until Berke checks it
-// on Preview (morph from the 1.4.1 native frame + cold start) and gives the go.
+// Branded boot splash (Oli & Maki clip, components/BootSplash.js). Always on in ADA Preview
+// (SPLASH_ON there); this flag turns it on for production users, after Berke's Preview check + go.
 export const BOOT_SPLASH_LIVE = false
 
 // Marketplace module gating. Each key is a module that is empty in prod today, so
