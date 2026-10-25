@@ -165,7 +165,7 @@ const EXPECTED_SCALARS = {
   WELCOME_VIDEO_LIVE:    false,
   // Boot splash for production users (Preview has it on via extra.appVariant). Flipped on device
   // for recordings, so baselined: a working-tree `true` must not ride out on an unrelated OTA.
-  BOOT_SPLASH_LIVE:      false,
+  BOOT_SPLASH_LIVE:      true,   // live 2026-10-25
   PROFILE_GATE_LIVE:     true,   // live 2026-09-02
   // Heading text in the profile wizard. Neither value is a launch — false ships the
   // headingless form, true ships the headed one — but it is compared on device by

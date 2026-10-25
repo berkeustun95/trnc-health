@@ -108,7 +108,7 @@ export const SHOW_WIZARD_HEADINGS = false
 
 // Branded boot splash (Oli & Maki clip, components/BootSplash.js). Always on in ADA Preview
 // (SPLASH_ON there); this flag turns it on for production users, after Berke's Preview check + go.
-export const BOOT_SPLASH_LIVE = false
+export const BOOT_SPLASH_LIVE = true   // live: Berke's go on this commit (2026-10-25)
 
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
