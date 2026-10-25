@@ -590,7 +590,9 @@ export default function App() {
   const [splashPlay, setSplashPlay] = useState(SPLASH_ON && SPLASH_AVAILABLE ? null : false)
   useEffect(() => {
     if (splashPlay !== null) return
-    const build = Updates.isEmbeddedLaunch ? `embedded-${Updates.runtimeVersion}` : Updates.updateId
+    // An embedded launch carries its build's own update id too: a new store build with the same
+    // version still counts as new.
+    const build = Updates.isEmbeddedLaunch ? `embedded-${Updates.runtimeVersion}-${Updates.updateId ?? ''}` : Updates.updateId
     claimSplash(build).then(setSplashPlay)
   }, [])
   const splashUp = splashPlay !== false && !bootSplashDone

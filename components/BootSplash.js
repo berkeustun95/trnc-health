@@ -166,7 +166,13 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
     return () => clearTimeout(timer)
   }, [ready, shownAt])
 
-  if (!play) return MORPH ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={H / 2} /> : null
+  // Undecided: look exactly like the native splash. With no morph to draw (Android < 12, a
+  // stage-A binary) that is its plain window colour, never the app underneath.
+  if (!play) {
+    return MORPH
+      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={H / 2} />
+      : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: NEW_NATIVE ? BG : colors.card }]} />
+  }
 
   // Cover the width (the arms run off the screen edge, as in the clip), gate at the
   // window's vertical centre.
