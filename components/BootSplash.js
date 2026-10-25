@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { font, colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { BOOT_SPLASH_LIVE } from '../constants/flags'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { BOOT_SPLASH_KEY, localDay, shouldPlaySplash, splashRecord } from '../utils/bootSplashDay'
 
 // ─── Boot splash: the Oli & Maki gate clip as an animated WebP (OTA stopgap) ──
 //
@@ -73,6 +75,19 @@ export const SPLASH_AVAILABLE = !!requireOptionalNativeModule('ExpoImage')
 // On in ADA Preview before it is on for everyone: the Previewed code is then main itself, so the
 // "Nothing Previewed stays off main" lineage never waits on a flag commit (Berke 2026-10-25).
 export const SPLASH_ON = BOOT_SPLASH_LIVE || IS_PREVIEW
+
+// Should this cold start play the clip? Records the play at once, so a launch killed mid-clip
+// does not replay it the same day. A storage failure skips: the launch is then exactly as before.
+export async function claimSplash(build) {
+  try {
+    const day = localDay()
+    if (!shouldPlaySplash(await AsyncStorage.getItem(BOOT_SPLASH_KEY), day, build)) return false
+    await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(day, build))
+    return true
+  } catch {
+    return false
+  }
+}
 let ExpoImage
 function loadExpoImage() {
   if (ExpoImage === undefined) ExpoImage = SPLASH_AVAILABLE ? require('expo-image').Image : null
@@ -91,7 +106,9 @@ const REDUCED_MIN = 1200
 // notice. Durations here are Berke's approved timings (2026-10-24), not motion tokens.
 const HARD_CAP = 4000
 
-export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
+// `play` is null while App is still asking claimSplash(): only the copy of the native frame shows,
+// so a skipped launch looks exactly like one without a splash.
+export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   const { width: W, height: H } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const reduce = useReduceMotion()
@@ -148,6 +165,14 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
     const timer = setTimeout(finish, Math.max(0, at - (Date.now() - shownAt)))
     return () => clearTimeout(timer)
   }, [ready, shownAt])
+
+  // Undecided: look exactly like the native splash. With no morph to draw (Android < 12, a
+  // stage-A binary) that is its plain window colour, never the app underneath.
+  if (!play) {
+    return MORPH
+      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={H / 2} />
+      : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: NEW_NATIVE ? BG : colors.card }]} />
+  }
 
   // Cover the width (the arms run off the screen edge, as in the clip), gate at the
   // window's vertical centre.
