@@ -3,7 +3,7 @@ import { View, Text, Image, Animated, Easing, StyleSheet, Platform, Accessibilit
 import { requireOptionalNativeModule } from 'expo'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { font } from '../constants/theme'
+import { font, colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 
 // ─── Boot splash: the Oli & Maki gate clip as an animated WebP (OTA stopgap) ──
@@ -15,7 +15,6 @@ import { t } from '../constants/i18n'
 // this is what OTA users get until then. Vault 2026-10-24_boot-splash.md.
 
 const BG = '#CBFAE8'
-const TEAL_DARK = '#0A5E5D'
 const CLIP = require('../assets/splash/gate-video.webp')
 const FIRST = require('../assets/splash/gate-video-first.jpg')
 const LAST = require('../assets/splash/gate-video-last.jpg')
@@ -29,6 +28,9 @@ const CLIP_H = 2560
 // clip's still gate. A binary that has the module (stage A; Expo Go) skips the morph.
 const devPath = __DEV__ ? process.env.EXPO_PUBLIC_SPLASH_PATH : undefined
 const NEW_NATIVE = devPath ? devPath === 'native' : !!requireOptionalNativeModule('ExpoSplashScreen')
+// Android before 12 draws no icon splash, and the geometry below was measured on Android 13
+// only: the morph is not drawn there.
+const MORPH = !NEW_NATIVE && (Platform.OS === 'ios' || Platform.Version >= 31)
 const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
 
 // 1.4.1 native frame. Android 12+: the v2 adaptive-icon foreground centred on white; the
@@ -43,7 +45,7 @@ const MORPH_IMAGE = Platform.OS === 'ios'
 
 function MorphFrame({ opacity, W, cx, cy }) {
   return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', opacity }]}>
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.card, opacity }]}>
       {Platform.OS === 'ios'
         ? <Image source={MORPH_IMAGE} fadeDuration={0} resizeMode="contain" style={{ position: 'absolute', left: 0, top: cy - W / 2, width: W, height: W }} />
         : <Image source={MORPH_IMAGE} fadeDuration={0} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy + MORPH_ANDROID_DY - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
@@ -80,6 +82,10 @@ const EXIT_MIN = 2400
 const EXIT_MAX = 2650
 const EXIT_FADE = 250
 const REDUCED_MIN = 1200
+// Whatever happens (the clip never decodes, onDisplay never fires), the splash is gone this
+// long after it mounts: while it is up it takes every touch and holds back the force-update
+// notice. Durations here are Berke's approved timings (2026-10-24), not motion tokens.
+const HARD_CAP = 4000
 
 export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
   const { width: W, height: H } = useWindowDimensions()
@@ -92,14 +98,29 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
   const [shownAt, setShownAt] = useState(null)
   const [firstShown, setFirstShown] = useState(false)
   const readyAt = useRef(null)
+  const done = useRef(false)
+  const [leaving, setLeaving] = useState(false)
+
+  const finish = () => {
+    if (done.current) return
+    done.current = true
+    setLeaving(true)
+    Animated.timing(exit, { toValue: 0, duration: EXIT_FADE, easing: Easing.in(Easing.cubic), useNativeDriver: true })
+      .start(() => onDone?.())
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(finish, HARD_CAP)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (ready && readyAt.current == null) readyAt.current = Date.now()
   }, [ready])
 
-  // Reduce Motion: no clip, the last frame + wordmark from the start.
+  // Reduce Motion: no clip, the last frame + wordmark; the clock starts when that frame is up.
   useEffect(() => {
-    if (reduce === true && shownAt == null) { word.setValue(1); setShownAt(Date.now()) }
+    if (reduce === true) word.setValue(1)
   }, [reduce])
 
   useEffect(() => {
@@ -120,10 +141,7 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
     const min = reduce ? REDUCED_MIN : EXIT_MIN
     const sinceShown = readyAt.current == null ? Infinity : readyAt.current - shownAt
     const at = Math.min(EXIT_MAX, Math.max(min, sinceShown))
-    const timer = setTimeout(() => {
-      Animated.timing(exit, { toValue: 0, duration: EXIT_FADE, easing: Easing.in(Easing.cubic), useNativeDriver: true })
-        .start(() => onDone?.())
-    }, Math.max(0, at - (Date.now() - shownAt)))
+    const timer = setTimeout(finish, Math.max(0, at - (Date.now() - shownAt)))
     return () => clearTimeout(timer)
   }, [ready, shownAt])
 
@@ -137,7 +155,14 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
   const s = Math.max(0.85, Math.min(1.1, W / 390))
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: BG, opacity: exit }]} accessible accessibilityLabel="ADA" importantForAccessibility="yes">
+    <Animated.View
+      style={[StyleSheet.absoluteFill, { backgroundColor: BG, opacity: exit }]}
+      pointerEvents={leaving ? 'none' : 'auto'}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`ADA, ${t('splashTagline', lang)}`}
+      importantForAccessibility="yes"
+    >
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
         {/* Decoding the clip takes ~0.6 s on the S20+; its first frames are this same still
             gate, so the still shows at once and the clip starts on top of it invisibly. */}
@@ -151,11 +176,12 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
             contentFit="cover"
             cachePolicy="none"
             onDisplay={() => setShownAt(t0 => t0 ?? Date.now())}
+            onError={() => setShownAt(t0 => t0 ?? Date.now())}
             style={{ position: 'absolute', left: 0, top, width: cw, height: ch }}
           />
         )}
         {reduce === true && (
-          <Image source={LAST} fadeDuration={0} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <Image source={LAST} fadeDuration={0} onLoad={() => setShownAt(t0 => t0 ?? Date.now())} onError={() => setShownAt(t0 => t0 ?? Date.now())} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
         <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: wordTop, alignItems: 'center', opacity: word }}>
           <Image source={WORDMARK} fadeDuration={0} style={{ width: 190 * s, height: 190 * s * 184 / 570 }} resizeMode="contain" />
@@ -166,11 +192,11 @@ export default function BootSplash({ ready, lang, fontsLoaded, onDone }) {
           )}
         </Animated.View>
       </View>
-      {!NEW_NATIVE && <MorphFrame opacity={morph} W={W} cx={W / 2} cy={H / 2} />}
+      {MORPH && <MorphFrame opacity={morph} W={W} cx={W / 2} cy={H / 2} />}
     </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
-  tagline: { marginTop: 8, color: TEAL_DARK, letterSpacing: 0.3, fontFamily: font.semibold },
+  tagline: { marginTop: 8, color: colors.primaryDark, letterSpacing: 0.3, fontFamily: font.semibold },
 })
