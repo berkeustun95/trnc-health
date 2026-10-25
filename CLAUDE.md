@@ -18,16 +18,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   If a task seems to need a version bump, STOP and ask.
 
 ## ⚠ Standing warnings
-- ⚠ **main = 1.3.0 until 1.4.0 is live in BOTH stores; don't merge `feat/voice-input` early** (Berke,
-  2026-10-09). `feat/voice-input` holds 1.4.0 (version bump, `expo-speech-recognition`, RECORD_AUDIO, `VOICE_INPUT`
-  on); its store builds are made from that branch. Main stays the 1.3.0 OTA + fix lane: a 1.4.0 main would send every
-  `npm run ota` to a runtime nobody has yet. **Merge every new main fix into `feat/voice-input`** so 1.4.0 doesn't
-  miss it — a direct push to it (admin bypass of `protect-release-lanes`) only from Berke's Mac; on the Hermes server
-  always a PR (`ada-pr`). Merge `feat/voice-input` → main the day 1.4.0 is live in both stores. Vault `2026-10-08_ask-oli-voice-input.md`.
-  **The 1.4.0 store binaries (Android versionCode 25, iOS build 14) are built from `bdb674f` and do NOT contain the
-  Oteller tile / "Yurt · Emlak" (`feat/hotels-tile`, live on 1.3.0 by OTA `b28930ca`).** It reaches 1.4.0 only by a
-  runtime 1.4.0 production OTA from `feat/voice-input` (Preview → Berke's device check → OTA), ideally published
-  before the stores release 1.4.0 so first launches pick it up. Until then a 1.4.0 install shows the old Home.
+- ⚠ **main = 1.4.0 since 2026-10-24** (`feat/voice-input` merged, PR #180 `cc5f651`, the day 1.4.0 was live in both
+  stores: Play versionCode 25, iOS build 14). Every `npm run ota` from main goes to runtime 1.4.0 (`runtimeVersion` =
+  `appVersion`). 1.3.0 installs keep their last OTA (`c2f0f9b0`, from `2716d14`); a 1.3.0 fix ships only if still
+  needed, from a `release/1.3` branch cut from `963ff84` (last 1.3.0 main), same pattern as `release/1.1`; ask first.
+  `feat/voice-input` is no longer a lane: no syncs into it, no publishes from it. The 1.4.0 binaries (built from
+  `bdb674f`) lack the Oteller tile; the 1.4.0 production OTA `65092408` (`642c758`) carries it. Vault `2026-10-08_ask-oli-voice-input.md`.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
@@ -89,6 +85,16 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
   (he hands it over; log it). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json`.
+- ⚠ **One publisher at a time; Berke's go names the commit** (Berke, 2026-10-24). (1) Only ONE session publishes
+  production OTAs at a time: before `npm run ota`, read the latest production update per runtime
+  (`npx -y eas-cli@24.7.0 update:list --branch production --limit 5 --json --non-interactive`) and which session
+  made it; coordinate first if another session published recently or is mid-release. Every production `--message`
+  starts with the publishing session's name in brackets (`npm run ota -- --message "[trnc-health-79] …"`): EAS shows
+  `berkeustun95` for every session, so the tag is the only way `update:list` tells them apart. (2) No production OTA without
+  Berke's explicit go for THAT EXACT commit: `git log <previewed-commit>..HEAD` must show only approved release steps
+  (other sessions merge into main in between); publish a pinned detached SHA; quote his go + SHA in
+  the vault log. 2026-10-24: Logo v2 #172 rode along in OTA 01a16de1 unpreviewed; two sessions published the same
+  runtimes within an hour.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
   android --profile production`. **Play releases go through Code** (since 2026-10-09; the service account has
   "Release to production"): `fastlane supply --aab <aab> --track production` with `changelogs/<versionCode>.txt` in all 9
@@ -353,11 +359,11 @@ before every production OTA, web deploy, flag flips, version bumps. One question
 **Branch ruleset `protect-release-lanes`** (2026-10-12): `main`, `feat/voice-input`, `release/**` need a pull
 request, no force-push, no deletion; only Berke's admin role bypasses (a Mac push prints "Bypassed rule
 violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal repo it counts as admin and bypasses.
-**Who merges** (Berke, 2026-10-23): Code on this Mac (`ada-claude-code[bot]`) merges its OWN PRs to `main` /
-`feat/voice-input` (`gh pr merge`, allowed in the Mac-only `.claude/settings.local.json`; no ruleset bypass, the
+**Who merges** (Berke, 2026-10-23): Code on this Mac (`ada-claude-code[bot]`) merges its OWN PRs to `main`
+(`gh pr merge`, allowed in the Mac-only `.claude/settings.local.json`; no ruleset bypass, the
 0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
 Berke's `production-db` approval.
-Sync PRs from `main` into a release branch (`feat/voice-input`, `release/**`) count as Mac Code's own PRs.
+Sync PRs from `main` into a release branch (`release/**`) count as Mac Code's own PRs.
 
 **Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
 team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
@@ -393,6 +399,10 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
   - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
   - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
+  - **Logo v2 native assets (wired 2026-10-24, first store build after 1.4.0)**: app icon, Android adaptive
+    foreground + themed (monochrome) icon, splash, notification icon and both Preview icons (`assets/brand/v2/`).
+    Check on device (Android: launcher, themed icons on, splash, a push) and in TestFlight (iOS: home screen,
+    splash) BEFORE submission. Old logo files stay until that release is out. Vault `2026-10-24_logo-v2-compass.md`.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.

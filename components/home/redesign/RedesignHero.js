@@ -10,6 +10,7 @@ import { weatherGroup, weatherLabelKey } from '../../../utils/facilityUtils'
 import { IconButton } from '../../ui'
 import HeroCreditSheet from '../HeroCreditSheet'
 import { rampLayers } from '../HomeHero'
+import { HERO_LOGO_H_COMPACT } from '../homeLayout'
 
 // The district photograph: ADA wordmark + frosted bell, and one row at the bottom — the
 // district chip with its photo-credit "i" on the left, the weather chip on the right (Home v3:
@@ -48,7 +49,7 @@ export const ROW_GAP = 8
 const TOP = rampLayers(0.32)
 const BOTTOM = rampLayers(0.35)
 const STEPS = TOP.length
-const LOGO = require('../../../assets/hero/ada-wordmark-keyline.png')
+const LOGO = require('../../../assets/brand/v2/ada-logo-keyline-44.png')
 
 const WEATHER_ION = {
   clear: 'sunny', partlyCloudy: 'partly-sunny', overcast: 'cloudy', fog: 'cloudy',
@@ -155,7 +156,7 @@ const s = StyleSheet.create({
   band:     { position: 'absolute', left: 0, right: 0 },
   topRow:   { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logo:     { width: 40, height: 44 },
+  logo:     { width: 36.5, height: HERO_LOGO_H_COMPACT },
   actions:  { flexDirection: 'row', gap: 8 },
   chipRow:  { position: 'absolute', left: 16, right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: ROW_GAP },
   chip:     { flexDirection: 'row', alignItems: 'center', gap: CHIP_GAP, flexShrink: 1,

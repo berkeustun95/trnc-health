@@ -146,7 +146,7 @@ export default function InsuranceDashboardScreen({ session, lang = 'English' }) 
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       {/* ── Header ─────────────────────────────────────────────── */}
       <View style={s.header}>
-        <Image source={require('../assets/adalogo.png')} style={s.headerLogo} resizeMode="contain" />
+        <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.headerLogo} resizeMode="contain" />
         <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
           <Text style={s.signOutText}>{t('signOut', lang)}</Text>
         </TouchableOpacity>

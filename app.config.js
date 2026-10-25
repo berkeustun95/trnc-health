@@ -39,11 +39,11 @@ export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
-    version: '1.3.0',
+    version: '1.4.1',
     orientation: 'portrait',
-    icon: IS_PREVIEW ? './assets/preview/icon.png' : './assets/icon.png',
+    icon: IS_PREVIEW ? './assets/brand/v2/preview-icon.png' : './assets/brand/v2/icon.png',
     splash: {
-      image: './assets/splash-icon.png',
+      image: './assets/brand/v2/splash-icon.png',
       resizeMode: 'contain',
       backgroundColor: '#FFFFFF',
     },
@@ -93,9 +93,9 @@ export default {
         },
       },
       adaptiveIcon: {
-        foregroundImage: IS_PREVIEW ? './assets/preview/android-icon-foreground.png' : './assets/android-icon-foreground.png',
+        foregroundImage: IS_PREVIEW ? './assets/brand/v2/preview-adaptive-icon.png' : './assets/brand/v2/adaptive-icon.png',
         backgroundColor: '#FFFFFF',
-        monochromeImage: './assets/android-icon-monochrome.png',
+        monochromeImage: './assets/brand/v2/monochrome-icon.png',
       },
       minSdkVersion: 24,
       permissions: [
@@ -130,15 +130,26 @@ export default {
           // If image messaging is dropped, set this to false. See
           // ~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md
           cameraPermission: 'ADA uses your camera so you can take photos for your messages.',
-          // false also puts RECORD_AUDIO in blockedPermissions. No audio anywhere in the app.
-          microphonePermission: false,
+          // microphonePermission deliberately UNSET: expo-speech-recognition below owns the
+          // mic string (one source). `false` here would block RECORD_AUDIO and delete it.
+        },
+      ],
+      [
+        'expo-speech-recognition',
+        {
+          // Ask Oli voice input (VOICE_INPUT). ADA keeps no audio (no recordingOptions.persist);
+          // the OS speech service may process it off-device where on-device is unavailable.
+          microphonePermission:
+            'ADA uses your microphone only when you tap the mic in Ask Oli, to turn what you say into text. ADA never records or stores audio.',
+          speechRecognitionPermission:
+            'ADA uses speech recognition to turn what you say into text in Ask Oli. Apple may process your speech to do this; ADA never records or stores audio.',
         },
       ],
       [
         'expo-notifications',
         {
-          icon: './assets/android-icon-monochrome.png',
-          color: '#ffffff',
+          icon: './assets/brand/v2/notification-icon.png',
+          color: '#0E7C7B',
           defaultChannel: 'default',
           sounds: [],
         },

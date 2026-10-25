@@ -60,6 +60,9 @@ const GUARDED = [
   // expo-image (2026-10-01, redesign): a native COMPONENT; components/ui/RemoteImage.js requires
   // it only when requireOptionalNativeModule('ExpoImage') finds it, else falls back to RN Image.
   'expo-image',
+  // expo-speech-recognition (Ask Oli voice, VOICE_INPUT): components/OliMic.js requires it only
+  // when requireOptionalNativeModule('ExpoSpeechRecognition') finds it, else the keyboard hint.
+  'expo-speech-recognition',
 ]
 
 const SKIP = new Set(['node_modules', '.git', 'assets', 'docs', 'web', 'supabase', 'scripts'])

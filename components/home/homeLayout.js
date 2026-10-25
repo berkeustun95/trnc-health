@@ -47,11 +47,16 @@ export const OLI_OVERHANG = 0
 // Height of the keylined wordmark on the hero.
 //
 // ⚠ TWO HALVES OF ONE NUMBER. The keyline is BAKED into the asset at a radius chosen for
-//   this exact render height (see assets/hero/ada-wordmark-keyline.json). Change this
+//   this exact render height (see assets/brand/v2/ada-logo-keyline.json). Change this
 //   without re-baking and the keyline is no longer 1pt on screen — thicker if the render
 //   shrinks, thinner if it grows. `npm run logo:check` fails when the two disagree; that
 //   guard exists because this is the class of bug that cost rounds 3 to 5.
 export const HERO_LOGO_H = 72
+
+// Same rule for the compact mark in RedesignHero's top row (the live Home): its own bake,
+// 1.75pt keyline at this height (assets/brand/v2/ada-logo-keyline-44.json). The 72pt asset
+// drawn here came out at ~0.6pt and vanished on the dark photos.
+export const HERO_LOGO_H_COMPACT = 44
 
 // Breathing room between the hero's lowest content and the highest thing Oli occupies.
 //
