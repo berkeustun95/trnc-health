@@ -14,7 +14,7 @@
 
 import {
   getAll, mapPropertyType, extractDeedType, cleanDescription, assertNoContact,
-  decodeEntities, htmlToText, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
+  decodeEntities, htmlToText, contactKinds, removedTail, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
 } from '../supabase/functions/_shared/novest-feed.mjs'
 import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
 
@@ -47,7 +47,7 @@ if (self) {
   // 2. The phone assert must fire on a body whose contact block used different wording,
   //    which is the exact way truncation-alone fails.
   try {
-    assertNoContact('self-test', cleanDescription('<p>Güzel daire</p><p>Hemen arayın 0533 834 67 70 numaradan</p>'))
+    assertNoContact('self-test', cleanDescription('<p>Güzel daire</p><p>Hemen arayın 0500 000 00 03 numaradan</p>'))
     fail('phone assert did NOT fire on an unmarked phone in prose')
   } catch { ok('phone assert fires when the İletişim marker is absent and the phone is in prose') }
   try {
@@ -95,6 +95,96 @@ if (self) {
     '<p>Yazın api.whatsapp.com/send?phone=905000000001 şimdi</p>', 'Yazın şimdi')
   strip('contact line, no marker',
     `<p>Güzel daire</p><p>Ad Soyad : ${P1}</p><p>Son satır</p>`, 'Güzel daire\nSon satır')
+  // THE FAIL-OPEN SHAPES (security review 2026-10-26). Each block below used to be STORED
+  //  with its contact data by the block-walk. Now each is either cut (block shapes) or refused.
+  const N1 = 'Ahmet Örnek', I1 = '+44 7700 900123'
+  const cutOk = (label, html, want = 'Güzel daire') => {
+    const got = cleanDescription(html)
+    let kinds = contactKinds(got)
+    ;(got === want && kinds.length === 0)
+      ? ok(`cut: ${label}`) : fail(`cut: ${label}\n        got    ${JSON.stringify(got)} kinds=${kinds}\n        wanted ${JSON.stringify(want)}`)
+  }
+  const refused = (label, html, kind) => {
+    const got = cleanDescription(html)
+    const kinds = contactKinds(got)
+    kinds.includes(kind) ? ok(`refused (${kind}): ${label}`) : fail(`refused: ${label} -> kinds=[${kinds}] wanted ${kind}\n        text ${JSON.stringify(got)}`)
+    try { assertNoContact('self-test', got); fail(`assertNoContact let it through: ${label}`) }
+    catch (e) { /Ahmet|Örnek|7700|0500|ahmet/.test(e.message) && fail(`refusal message leaks content: ${e.message}`) }
+  }
+  const BLK = inner => `<p>Güzel daire</p><p><b>İletişim :</b></p>${inner}`
+  cutOk('foreign phone', BLK(`<ul><li><b>${N1} : ${I1}</b></li></ul>`))
+  cutOk('name-only line, no colon', BLK(`<ul><li><b>${N1}</b></li></ul>`))
+  cutOk('Instagram handle', BLK('<ul><li><b>Instagram : @ahmet.emlak</b></li></ul>'))
+  cutOk('[at] e-mail', BLK(`<ul><li><b>${N1} : ahmet [at] example.com</b></li></ul>`))
+  cutOk('(at) e-mail', BLK(`<ul><li><b>${N1} : ahmet (at) example.com</b></li></ul>`))
+  cutOk('website line', '<p>Güzel daire</p><p>İletişim:</p><p>' + N1 + '</p><p>www.ahmetemlak.com</p>')
+  cutOk('footer after a name-only block', BLK(`<ul><li><b>${N1}</b></li></ul><p>Novest Property</p>`))
+  cutOk('name and phone on separate lines', '<p>Güzel daire</p><p>İletişim:</p><p>' + N1 + `</p><p>${P1}</p>`)
+  cutOk('name, span-split colon, phone on the next line', BLK(`<p>${N1}<span> : </span></p><p>${P1}</p>`))
+  cutOk('lowercase name', BLK(`<ul><li><b>ahmet örnek : ${P1}</b></li></ul>`))
+  cutOk('4+ word name', BLK(`<ul><li><b>Av. Mehmet Ali Can Örnek : ${P1}</b></li></ul>`))
+  cutOk('name, br-split', `<p>Güzel daire<br>İletişim:<br>${N1}<br>${P1}</p>`)
+  cutOk('national landline in the block', BLK('<ul><li><b>Ofis : 0212 000 00 01</b></li></ul>'))
+  // A price in the marker's tail makes it LISTING content, so the block is not cut: these
+  // must be refused, not stored.
+  const PRICED = tailHtml => `<p>Güzel daire</p><p>İletişim :</p>${tailHtml}<p>Fiyat: £250.000</p>`
+  refused('name-only line under an uncut marker', PRICED(`<p>${N1}</p>`), 'uncut-marker')
+  refused('website under an uncut marker', PRICED('<p>www.ahmetemlak.com</p>'), 'uncut-marker')
+  refused('footer line under an uncut marker', PRICED('<p>Novest Property</p>'), 'uncut-marker')
+  refused('@handle under an uncut marker', PRICED('<p>Instagram : @ahmet.emlak</p>'), 'handle')
+  refused('[at] e-mail under an uncut marker', PRICED('<p>ahmet [at] example.com</p>'), 'email-obfuscated')
+  refused('foreign phone under an uncut marker', PRICED(`<p>${I1}</p>`), 'phone')
+  const longProse = '<p>' + 'Girne merkezde denize yakın lüks daire havuzlu site. '.repeat(10) + '</p>'
+  refused('long tail (> TAIL_MAX) with a name-only line', `<p>Bilgi için ofisimiz açık.</p>${longProse}<p>${N1}</p>`, 'uncut-marker')
+  // Decision: a marker in prose with no contact-ish shape after it is content, not a leak.
+  strip('marker in long prose, no contact shape: text kept',
+    `<p>Bilgi için ofisimiz açık.</p>${longProse}<p>Fiyat: £250.000</p>`,
+    'Bilgi için ofisimiz açık.\n' + 'Girne merkezde denize yakın lüks daire havuzlu site. '.repeat(10).trim() + '\nFiyat: £250.000')
+  // "2+1" is not an international number, prices and areas are not phones.
+  const sizes = '3+1 125 m2 £200.000, 2+1 90m2 100.000 TL, 2+1 85.000 STG +1 120.000'
+  cutOk('2+1 / prices / areas are not phones', `<p>${sizes}</p>`, sizes)
+  cutOk('dotted phone in a block is cut, not read as a price', BLK('<ul><li><b>Ad Soyad : 0500.000.00.01</b></li></ul>'))
+
+  // ReDoS: 50 KB of adversarial input through the strip and the assert, each under 50 ms.
+  {
+    const n = 50000, word = ['Girne', 'merkezde', 'denize', 'yakın', 'lüks', 'daire,', 'havuzlu', 'site.', '2+1', '£250.000', '90m2']
+    let prose = ''; for (let i = 0; prose.length < n; i++) prose += word[i % word.length] + ' '
+    const inputs = {
+      letters: 'A' + 'a'.repeat(n),
+      'name : letters': 'Ahmet Örnek : ' + 'a'.repeat(n),
+      'name : dots': 'Ahmet Örnek : ' + 'a.'.repeat(n / 2),
+      'a@b chain': 'Ahmet : ' + 'a@b'.repeat(n / 3),
+      'email dots': 'Ahmet : a@' + 'b.'.repeat(n / 2) + '1',
+      'digit run': 'Ahmet : ' + '5 3'.repeat(n / 3),
+      'plus digits': '+' + '1 '.repeat(n / 2),
+      'zero digits': '0' + ' 0'.repeat(n / 2),
+      'name words': 'Aa '.repeat(n / 3) + 'x',
+      'wa dots': 'Ahmet : ' + 'wa.me'.repeat(n / 5),
+      'open paren': 'Ahmet (' + 'a'.repeat(n),
+      'many short lines': 'Ahmet : x\n'.repeat(n / 10),
+      'tags': '<p>'.repeat(n / 3),
+      'markers': 'İletişim '.repeat(n / 9),
+      'markers in lines': '<p>İletişim :</p>'.repeat(n / 17),
+      'long token': 'x'.repeat(n),
+      'long url': '<p>Site : https://example.com/' + 'a'.repeat(n) + '</p>',
+      'long bare domain': 'a'.repeat(n) + '.com',
+      'prose': `<p>${prose}</p>`,
+      'colon prose': ('<p>Konum : ' + prose.slice(0, 800) + '</p>').repeat(Math.ceil(n / 800)),
+      'base64 img': '<p><img src="data:image/png;base64,' + 'A'.repeat(n) + '"></p>',
+      'handles': '@a1 '.repeat(n / 4),
+      'ats': '[at]'.repeat(n / 4),
+    }
+    let slow = 0, worst = 0
+    for (const [k, html] of Object.entries(inputs)) {
+      const t0 = performance.now()
+      try { assertNoContact('self-test', cleanDescription(html)) } catch { /* a refusal is fine; the clock is the point */ }
+      const ms = performance.now() - t0
+      worst = Math.max(worst, ms)
+      if (process.env.TIMING_VERBOSE) console.log(`      ${k.padEnd(18)} ${ms.toFixed(1)} ms`)
+      if (ms >= 50) { slow++; fail(`timing: ${k} took ${ms.toFixed(0)} ms (limit 50)`) }
+    }
+    slow === 0 && ok(`timing: ${Object.keys(inputs).length} adversarial ${n / 1000} KB inputs, slowest ${worst.toFixed(1)} ms (< 50)`)
+  }
   const labels = '<p>Banyo Sayısı : 2</p><ul><li>Mutfak Dolapları :</li><li>Site Fasiliteleri :</li><li>Havuz</li><li>Site Fasiliteleri :</li></ul>'
   strip('feature labels (incl. empty-value) survive byte-for-byte', labels, htmlToText(labels))
   strip('feature labels survive in front of a real block',
@@ -186,7 +276,7 @@ const KNOWN_UNTAGGED = new Map([
 const untagged = p => ['property_type', 'property_status', 'property_state', 'property_city']
   .every(k => !(p[k] || []).length)
 
-let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = []
+let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = [], tailMax = 0, noCut = []
 for (const p of props) {
   const slugs = (p.property_type || []).map(i => T.get(i)?.slug).filter(Boolean)
   const t = mapPropertyType(slugs)
@@ -195,6 +285,9 @@ for (const p of props) {
   if (extractDeedType(p.content.rendered) === 'turkish') deed++
 
   const desc = cleanDescription(p.content.rendered)
+  const tail = removedTail(p.content.rendered)
+  tailMax = Math.max(tailMax, tail.length)
+  if (tail === '') noCut.push(p.id)
   const title = decodeEntities(p.title.rendered)
   try { assertNoContact(String(p.id), title, desc) } catch (e) { phoneLeaks.push(e.message) }
 
@@ -219,6 +312,7 @@ phoneLeaks.length
   : ok(`0/${props.length} listings leak a phone after the contact strip`)
 
 ok(`${deed}/${props.length} listings yield deed_type='turkish'`)
+console.log(`  contact cut: longest removed tail ${tailMax} plain chars (TAIL_MAX in novest-feed.mjs is the ceiling); listings with NO cut: ${noCut.length}`)
 
 // Reported as NEWS, not as a pass. The expected value today is 0; if it becomes
 // non-zero, Novest has started placing real pins and Slice 1's location_precision

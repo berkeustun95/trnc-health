@@ -9,7 +9,9 @@
 // check on the STORED result: it reads every source='novest' row, in ALL statuses (a
 // delisted row is still a stored row), and applies the exact detectors the importer uses.
 //
-//   RED (exit 1)      phone, e-mail, WhatsApp link, or a name:value contact line in a stored column
+//   RED (exit 1)      phone (TR or international), e-mail (also [at] / (at) spelled), @handle, WhatsApp
+//                     link, a name:value contact line, or an uncut marker (a marker word still followed by
+//                     a name-only line / website / handle) in a stored column
 //   ::warning::       a contact MARKER (İletişim, Bilgi için, Detaylı bilgi) and nothing else:
 //                     can be an ordinary sentence, but it is where the old strip cut
 //
@@ -30,7 +32,7 @@ import { contactKinds, CONTACT_MARKER } from '../supabase/functions/_shared/nove
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const COLUMNS = ['title', 'description', 'amenities', 'source_url']
-const KINDS = ['phone', 'email', 'whatsapp', 'contact-line']
+const KINDS = ['phone', 'email', 'email-obfuscated', 'handle', 'whatsapp', 'contact-line', 'uncut-marker']
 
 const asText = v => Array.isArray(v) ? v.join('\n') : String(v ?? '')
 
@@ -50,7 +52,11 @@ const PLANTED = {
   email: 'yazın ad.soyad@example.com adresinden',
   whatsapp: 'yazın wa.me/message/ABCDEF şimdi',
   'contact-line': 'Güzel daire\nAd Soyad : 0500 000 00 01',
+  'email-obfuscated': 'yazın ad.soyad [at] example.com adresinden',
+  handle: 'Instagram : @ornek.emlak',
+  'uncut-marker': 'Bilgi için ofisimiz açık.\nAhmet Örnek\nFiyat: £250.000',
 }
+const PLANTED_INTL = 'Hemen arayın +44 7700 900123 numaradan'
 
 // Every contact kind must be seen in its planted literal, and clean text must stay clean.
 export function positiveControl() {
@@ -58,8 +64,9 @@ export function positiveControl() {
   for (const k of KINDS) {
     if (!scanRow({ external_id: 'plant', description: PLANTED[k] }).some(f => f.kind === k)) bad.push(`${k} not flagged`)
   }
+  if (!scanRow({ external_id: 'plant', description: PLANTED_INTL }).some(f => f.kind === 'phone')) bad.push('international phone not flagged')
   if (!scanRow({ external_id: 'plant', description: 'Bilgi için ofisimiz açık.' }).some(f => f.kind === 'marker')) bad.push('marker not flagged')
-  if (scanRow({ external_id: 'plant', title: 'Girne 2+1 Daire', description: 'Banyo Sayısı : 2\nSite Fasiliteleri :\n£250.000', amenities: ['Havuz'], source_url: 'https://example.com/x' }).length) bad.push('clean text flagged')
+  if (scanRow({ external_id: 'plant', title: 'Girne 2+1 Daire', description: 'Banyo Sayısı : 2\nSite Fasiliteleri :\n£250.000\n3+1 125 m2, 2+1 90m2 100.000 TL', amenities: ['Havuz'], source_url: 'https://example.com/x' }).length) bad.push('clean text flagged')
   return bad
 }
 
@@ -74,6 +81,11 @@ if (process.argv.includes('--self')) {
   t('contact line in description', kinds({ description: PLANTED['contact-line'] }), ['phone:description', 'contact-line:description'])
   t('phone in an amenity', kinds({ amenities: ['Havuz', PLANTED.phone] }), ['phone:amenities'])
   t('whatsapp in source_url', kinds({ source_url: 'https://wa.me/message/ABCDEF' }), ['whatsapp:source_url'])
+  t('international phone', kinds({ description: PLANTED_INTL }), ['phone:description'])
+  t('[at] e-mail', kinds({ description: PLANTED['email-obfuscated'] }), ['email-obfuscated:description'])
+  t('@handle in an amenity', kinds({ amenities: ['Havuz', PLANTED.handle] }), ['handle:amenities'])
+  t('uncut marker + name-only line', kinds({ description: PLANTED['uncut-marker'] }), ['uncut-marker:description', 'marker:description'])
+  t('new kinds carry no matched text', JSON.stringify(['email-obfuscated', 'handle', 'uncut-marker'].flatMap(k => scanRow({ external_id: 'novest-1', description: PLANTED[k] }))).match(/ornek|Örnek|example/i), null)
   t('marker only', kinds({ description: 'Bilgi için ofisimiz açık.' }), ['marker:description'])
   t('feature labels stay clean', kinds({ description: 'Banyo Sayısı : 2\nMutfak Dolapları :\nSite Fasiliteleri :' }), [])
   t('null columns stay clean', kinds({ title: null, description: null, amenities: null }), [])
