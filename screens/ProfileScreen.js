@@ -97,7 +97,6 @@ function decode(base64) {
 // The requiredness rule mirrors profiles_completion_requires_fields_check exactly: it
 // bites only on a row whose profile_completed_at is set, which is why it is derived from
 // that column rather than from the role or from this screen's own opinion.
-const ROLE_KEY = { customer: 'roleCustomer', provider: 'roleProvider', organizer: 'roleOrganizer' }
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 // ─── One enrolment ──────────────────────────────────────────────────────────
 //
@@ -944,11 +943,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               </View>
             </TouchableOpacity>
             <Text style={s.emailText}>{session.user.email ?? t('guestLabel', lang)}</Text>
-            {ROLE_KEY[profile?.role ?? 'customer'] && (
-              <View style={s.rolePill}>
-                <Text style={s.rolePillText}>{t(ROLE_KEY[profile?.role ?? 'customer'], lang)}</Text>
-              </View>
-            )}
+            <View style={s.rolePill}>
+              {(profile?.role ?? 'customer') === 'customer'
+                ? <Text style={s.rolePillText}>{t('roleCustomer', lang)}</Text>
+                : <Text style={s.rolePillTextRaw}>{profile?.role}</Text>}
+            </View>
           </View>
 
           <Modal visible={showAvatarPicker} animationType="slide" transparent onRequestClose={() => setShowAvatarPicker(false)}>
@@ -1639,6 +1638,7 @@ const s = StyleSheet.create({
   emailText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 8 },
   rolePill:         { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.primaryLight },
   rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+  rolePillTextRaw:  { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'capitalize' },
 
   memberCard:       { backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 28, ...shadow },
   memberCardTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
