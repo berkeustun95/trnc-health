@@ -13,8 +13,8 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
-import { colors, shadow, radius, elevation, type } from '../constants/theme'
-import { Button, useTabBarFootprint } from '../components/ui'
+import { colors, shadow, radius, elevation, type, font, TAP } from '../constants/theme'
+import { Button, ConfirmDialog, useTabBarFootprint } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { t, dateLocale } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
@@ -97,6 +97,7 @@ function decode(base64) {
 // The requiredness rule mirrors profiles_completion_requires_fields_check exactly: it
 // bites only on a row whose profile_completed_at is set, which is why it is derived from
 // that column rather than from the role or from this screen's own opinion.
+const ROLE_KEY = { customer: 'roleCustomer', provider: 'roleProvider', organizer: 'roleOrganizer' }
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 // ─── One enrolment ──────────────────────────────────────────────────────────
 //
@@ -128,7 +129,7 @@ function EnrolmentRow({ row, lang, subjects, onEdit, onRemove, disabled }) {
       </TouchableOpacity>
       <TouchableOpacity onPress={onRemove} disabled={disabled} style={s.eduRowAction} accessibilityRole="button"
         accessibilityLabel={`${t('uiRemove', lang)}: ${instLabel}`}>
-        <Feather name="trash-2" size={16} color={disabled ? colors.textSecondary : colors.danger ?? '#C2410C'} />
+        <Feather name="trash-2" size={16} color={disabled ? colors.textSecondary : colors.danger} />
       </TouchableOpacity>
     </View>
   )
@@ -897,9 +898,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <Text style={{ fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 }}>
             {t('profileLoadError', lang)}
           </Text>
-          <TouchableOpacity onPress={onBack} style={{ marginTop: 20 }}>
-            <Text style={{ fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary }}>{t('back', lang)}</Text>
-          </TouchableOpacity>
+          <Button variant="text" title={t('back', lang)} onPress={onBack} style={{ marginTop: 20 }} />
         </View>
       </SafeAreaView>
     )
@@ -937,16 +936,19 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           )}
 
           <View style={s.avatarSection}>
-            <TouchableOpacity style={s.avatarWrap} onPress={() => { setAvatarError(null); setShowAvatarPicker(true) }} activeOpacity={0.8}>
+            <TouchableOpacity style={s.avatarWrap} onPress={() => { setAvatarError(null); setShowAvatarPicker(true) }} activeOpacity={0.8}
+              accessibilityRole="button" accessibilityLabel={t('chooseAvatar', lang)}>
               <Avatar avatarUrl={avatarUrl} initials={initials} size={80} textSize={28} />
               <View style={s.avatarEditBadge}>
                 <Feather name="edit-2" size={11} color="#fff" />
               </View>
             </TouchableOpacity>
             <Text style={s.emailText}>{session.user.email ?? t('guestLabel', lang)}</Text>
-            <View style={s.rolePill}>
-              <Text style={s.rolePillText}>{profile?.role ?? 'customer'}</Text>
-            </View>
+            {ROLE_KEY[profile?.role ?? 'customer'] && (
+              <View style={s.rolePill}>
+                <Text style={s.rolePillText}>{t(ROLE_KEY[profile?.role ?? 'customer'], lang)}</Text>
+              </View>
+            )}
           </View>
 
           <Modal visible={showAvatarPicker} animationType="slide" transparent onRequestClose={() => setShowAvatarPicker(false)}>
@@ -970,7 +972,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               <Text style={s.modalSub}>{t('orPickAvatar', lang)}</Text>
               <View style={s.presetGrid}>
                 {PRESET_AVATARS.map(av => (
-                  <TouchableOpacity key={av.id} style={[s.presetItem, avatarUrl === `preset:${av.id}` && s.presetItemActive]} onPress={() => savePresetAvatar(av.id)}>
+                  <TouchableOpacity key={av.id} style={[s.presetItem, avatarUrl === `preset:${av.id}` && s.presetItemActive]} onPress={() => savePresetAvatar(av.id)}
+                    accessibilityRole="button" accessibilityState={{ selected: avatarUrl === `preset:${av.id}` }}>
                     <View style={[s.presetCircle, { backgroundColor: av.bg }]}>
                       <Text style={s.presetEmoji}>{av.emoji}</Text>
                     </View>
@@ -998,7 +1001,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             <Text style={s.memberSub}>{t('discountQrSoon', lang)}</Text>
           </View>
 
-          <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setPersonalOpen)} activeOpacity={0.7}>
+          <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setPersonalOpen)} activeOpacity={0.7}
+            accessibilityRole="button" accessibilityState={{ expanded: personalOpen }} accessibilityLabel={t('personalInfo', lang)}>
             <Text style={s.accordionTitle}>{t('personalInfo', lang)}</Text>
             <Ionicons name={personalOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -1011,6 +1015,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 <TextInput
                   style={s.input}
                   value={form.first_name}
+                  textContentType="givenName" autoComplete="given-name"
                   onChangeText={set('first_name')}
                   autoCapitalize="words"
                   autoCorrect={false}
@@ -1023,6 +1028,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 <TextInput
                   style={s.input}
                   value={form.last_name}
+                  textContentType="familyName" autoComplete="family-name"
                   onChangeText={set('last_name')}
                   autoCapitalize="words"
                   autoCorrect={false}
@@ -1094,6 +1100,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   <TextInput
                     style={s.phoneInput}
                     value={form.phone}
+                    textContentType="telephoneNumber" autoComplete="tel"
                     onChangeText={set('phone')}
                     placeholder="555 000 00 00"
                     placeholderTextColor={colors.textSecondary}
@@ -1324,6 +1331,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   disabled={listingBusy || !enrolments?.length || !hasDisplayName || (!listingOn && !hasListableEnrolment)}
                   trackColor={{ true: colors.primary }}
                   thumbColor="#fff"
+                  accessibilityLabel={t('pgListingOptIn', lang)}
                 />
               </View>
               {/* ► "NO ENROLMENTS" AND "OPT-IN OFF" ARE THE SAME STATE TO THE DATABASE.
@@ -1426,6 +1434,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   disabled={marketingBusy}
                   trackColor={{ true: colors.primary }}
                   thumbColor="#fff"
+                  accessibilityLabel={t('pgMarketingOptIn', lang)}
                 />
               </View>
             </View>
@@ -1454,28 +1463,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           </TouchableOpacity>
           </>)}
 
-          <Modal visible={deleteConfirmVisible} animationType="fade" transparent onRequestClose={() => setDeleteConfirmVisible(false)}>
-            <View style={s.deleteModalBackdrop}>
-              <View style={s.deleteModalCard}>
-                <Text style={s.deleteModalTitle}>{t('deleteAccountTitle', lang)}</Text>
-                <Text style={s.deleteModalWarning}>{t('deleteAccountWarning', lang)}</Text>
-                {deleteError ? <Text style={s.deleteModalError}>{deleteError}</Text> : null}
-                <TouchableOpacity
-                  style={[s.deleteModalConfirmBtn, deleting && { opacity: 0.5 }]}
-                  onPress={deleteAccount}
-                  disabled={deleting}
-                >
-                  {deleting
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={s.deleteModalConfirmText}>{t('deleteAccountConfirmBtn', lang)}</Text>
-                  }
-                </TouchableOpacity>
-                <TouchableOpacity style={s.deleteModalCancelBtn} onPress={() => setDeleteConfirmVisible(false)} disabled={deleting}>
-                  <Text style={s.deleteModalCancelText}>{t('cancel', lang)}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+          <ConfirmDialog
+            visible={deleteConfirmVisible}
+            title={t('deleteAccountTitle', lang)}
+            message={t('deleteAccountWarning', lang)}
+            confirmLabel={t('deleteAccountConfirmBtn', lang)}
+            destructive
+            loading={deleting}
+            error={deleteError}
+            onConfirm={deleteAccount}
+            onCancel={() => { if (!deleting) setDeleteConfirmVisible(false) }}
+            lang={lang}
+          />
 
           {/* One shared SearchModal per field, replacing the two bespoke Modal+FlatList
               pickers this screen used to carry. The wizard already renders seven of these
@@ -1612,9 +1611,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 }
 
 const s = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: colors.bg },
+  safe:             { flex: 1, backgroundColor: colors.canvas },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container:        { paddingHorizontal: 20, paddingBottom: 48 },
+  container:        { paddingHorizontal: 16, paddingBottom: 48 },
   sectionHint:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18, marginBottom: 14 },
   fieldHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 6 },
   dobRow:           { flexDirection: 'row', gap: 8 },
@@ -1633,34 +1632,34 @@ const s = StyleSheet.create({
     paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...shadow,
   },
   footerBtnOff:     { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
-  kitFooter:        { flexShrink: 0, paddingHorizontal: 20, paddingTop: 8 },
+  kitFooter:        { flexShrink: 0, paddingHorizontal: 16, paddingTop: 8 },
   kitFooterBtn:     { ...elevation.floating },
   footerBtnText:    { color: '#fff', fontSize: 15.5, fontFamily: 'Inter_700Bold' },
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },
   avatarWrap:       { marginBottom: 12, position: 'relative' },
-  avatarEditBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.bg },
+  avatarEditBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.canvas },
   emailText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 8 },
   rolePill:         { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.primaryLight },
-  rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'capitalize' },
+  rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 
   memberCard:       { backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 28, ...shadow },
   memberCardTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  memberLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  memberLabel:      { ...type.meta, fontFamily: font.semibold, color: colors.onPrimary, marginBottom: 6 },
   memberId:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 2 },
-  memberSub:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.6)' },
+  memberSub:        { ...type.small, color: colors.onPrimary },
   qrPlaceholder:    { width: 48, height: 48, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   qrIcon:           { fontSize: 24, color: '#fff' },
 
-  sectionTitle:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14, marginTop: 4 },
+  sectionTitle:     { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginBottom: 14, marginTop: 4 },
   accordionHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4 },
-  accordionTitle:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  accordionTitle:   { ...type.rowTitle, color: colors.textPrimary },
   fieldGroup:       { marginBottom: 16 },
-  fieldLabel:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
-  input:            { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
-  pickerBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, backgroundColor: colors.surface },
+  fieldLabel:       { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginBottom: 7 },
+  input:            { borderWidth: 1.5, borderColor: colors.fieldBorder, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
+  pickerBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: colors.fieldBorder, borderRadius: 12, padding: 13, backgroundColor: colors.surface },
   pickerBtnText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  pickerBtnPlaceholder: { color: colors.border },
+  pickerBtnPlaceholder: { color: colors.textSecondary },
 
   blockedSection:   { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
   blockedRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10 },
@@ -1669,32 +1668,23 @@ const s = StyleSheet.create({
   blockedName:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   blockedHint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 3 },
   blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  unblockBtn:       { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primaryLight },
+  unblockBtn:       { paddingHorizontal: 12, minHeight: TAP, justifyContent: 'center', borderRadius: 8, backgroundColor: colors.primaryLight },
   unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
-  errorText:        { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12 },
+  errorText:        { fontFamily: 'Inter_400Regular', color: colors.dangerInk, fontSize: 13, marginBottom: 12 },
   marketingSection: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
   marketingRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
   marketingLabel:   { flex: 1, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   legalRow:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 16 },
   legalLink:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
   legalDot:         { fontSize: 13, color: colors.textSecondary },
-  signOutBtn:       { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center' },
-  signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.danger },
+  signOutBtn:       { borderWidth: 1.5, borderColor: colors.dangerInk, borderRadius: 12, padding: 15, alignItems: 'center' },
+  signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
   deleteAccountBtn: { alignItems: 'center', marginTop: 16, paddingVertical: 12 },
   deleteAccountText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
-  deleteModalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  deleteModalCard:        { backgroundColor: colors.bg, borderRadius: 20, padding: 24, width: '100%', maxWidth: 360 },
-  deleteModalTitle:       { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12, textAlign: 'center' },
-  deleteModalWarning:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  deleteModalError:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center', marginBottom: 12 },
-  deleteModalConfirmBtn:  { backgroundColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center', marginBottom: 10 },
-  deleteModalConfirmText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
-  deleteModalCancelBtn:   { alignItems: 'center', padding: 12 },
-  deleteModalCancelText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
   // Phone + country code
-  phoneRow:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface, overflow: 'hidden' },
-  ccBtn:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 14, borderRightWidth: 1.5, borderRightColor: colors.border },
+  phoneRow:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.fieldBorder, borderRadius: 12, backgroundColor: colors.surface, overflow: 'hidden' },
+  ccBtn:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 14, borderRightWidth: 1.5, borderRightColor: colors.fieldBorder },
   ccBtnText:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   phoneInput:       { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
 
@@ -1703,10 +1693,10 @@ const s = StyleSheet.create({
   modalSheet:       { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalHandle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 },
   modalTitle:       { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 16, textAlign: 'center' },
-  modalSub:         { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 14, textAlign: 'center' },
+  modalSub:         { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginTop: 20, marginBottom: 14, textAlign: 'center' },
   uploadBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14, padding: 14 },
   uploadBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
-  avatarErrText:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center', marginTop: 8 },
+  avatarErrText:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.dangerInk, textAlign: 'center', marginTop: 8 },
   presetGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
   presetItem:       { position: 'relative' },
   presetItemActive: {},
@@ -1718,20 +1708,19 @@ const s = StyleSheet.create({
 
   // ─── Education ─────────────────────────────────────────────────────────────
   eduSection:        { marginTop: 4 },
-  eduGroupLabel:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                       textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  eduGroupLabel:     { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginBottom: 8 },
   eduGroupLabelSpaced: { marginTop: 20 },
   eduLoading:        { alignSelf: 'flex-start', marginBottom: 8 },
   eduEmpty:          { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 4 },
-  eduRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10,
+  eduRow:            { flexDirection: 'row', alignItems: 'center', gap: 0, paddingVertical: 10,
                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   eduRowBody:        { flex: 1, gap: 2 },
   eduRowTitle:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   eduRowMeta:        { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
-  eduRowAction:      { padding: 8 },
+  eduRowAction:      { width: TAP, height: TAP, alignItems: 'center', justifyContent: 'center' },
   eduAddBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
                        borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary,
-                       paddingVertical: 10, justifyContent: 'center' },
+                       minHeight: TAP, justifyContent: 'center' },
   eduAddText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
   eduDraft:          { marginTop: 12, paddingTop: 12,
                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
@@ -1739,14 +1728,14 @@ const s = StyleSheet.create({
                        borderWidth: 1, borderColor: colors.border },
   eduConfirmText:    { fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginBottom: 12 },
   eduConfirmRow:     { flexDirection: 'row', gap: 10, marginTop: 4 },
-  eduCancelBtn:      { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
-                       paddingVertical: 11, alignItems: 'center' },
+  eduCancelBtn:      { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.fieldBorder,
+                       minHeight: TAP, justifyContent: 'center', alignItems: 'center' },
   eduCancelText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  eduRemoveBtn:      { flex: 1, borderRadius: radius.md, backgroundColor: colors.danger ?? '#C2410C',
-                       paddingVertical: 11, alignItems: 'center' },
+  eduRemoveBtn:      { flex: 1, borderRadius: radius.md, backgroundColor: colors.dangerInk,
+                       minHeight: TAP, justifyContent: 'center', alignItems: 'center' },
   eduRemoveText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   eduSaveBtn:        { flex: 1, borderRadius: radius.md, backgroundColor: colors.primary,
-                       paddingVertical: 11, alignItems: 'center' },
+                       minHeight: TAP, justifyContent: 'center', alignItems: 'center' },
   eduSaveText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.surface },
 
 })
