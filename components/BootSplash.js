@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, Animated, Easing, StyleSheet, Platform, AccessibilityInfo, useWindowDimensions } from 'react-native'
+import { View, Text, Image, Animated, Easing, StyleSheet, Platform, AccessibilityInfo, Dimensions, useWindowDimensions } from 'react-native'
 import { requireOptionalNativeModule } from 'expo'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -42,12 +42,11 @@ const NEW_NATIVE = VIDEO_PATH
 const MORPH = !NEW_NATIVE && (Platform.OS === 'ios' || Platform.Version >= 31)
 const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
 
-// 1.4.1 native frame. Android 12+: the v2 adaptive-icon foreground centred on white; the
-// 1024 px foreground draws 264 dp wide, centre 11 dp below the window centre (SM-G985F /
-// Android 13, measured 2026-10-24 on the old icon; same canvas). iOS: the v2 splash-icon.png,
+// 1.4.1 native frame. Android 12+: the v2 adaptive-icon foreground centred on white; it draws
+// 288 dp wide, centred on the SCREEN (SM-G985F / Android 13, measured 2026-10-26; the OEM icon
+// mask is not copied). The RN window is shorter than the screen there, hence `cy` below. iOS: the v2 splash-icon.png,
 // `contain`, a screen-width square. Goes away with stage A.
-const MORPH_ANDROID_W = 264
-const MORPH_ANDROID_DY = 11
+const MORPH_ANDROID_W = 288
 const MORPH_IMAGE = Platform.OS === 'ios'
   ? require('../assets/splash/morph-ios.png')
   : IS_PREVIEW ? require('../assets/splash/morph-android-preview.png') : require('../assets/splash/morph-android.png')
@@ -57,7 +56,7 @@ function MorphFrame({ opacity, W, cx, cy }) {
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.card, opacity }]}>
       {Platform.OS === 'ios'
         ? <Image source={MORPH_IMAGE} fadeDuration={0} resizeMode="contain" style={{ position: 'absolute', left: 0, top: cy - W / 2, width: W, height: W }} />
-        : <Image source={MORPH_IMAGE} fadeDuration={0} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy + MORPH_ANDROID_DY - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
+        : <Image source={MORPH_IMAGE} fadeDuration={0} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
     </Animated.View>
   )
 }
@@ -189,6 +188,9 @@ const CLIP_WATCHDOG = 1200
 export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   const { width: W, height: H } = useWindowDimensions()
   const insets = useSafeAreaInsets()
+  // Android's window height is shorter than the screen (779 vs 853 dp on the S20+) while the
+  // root draws full-screen; the native frame is centred on the screen.
+  const cy = Platform.OS === 'android' ? Dimensions.get('screen').height / 2 : H / 2
   const reduce = useReduceMotion()
   const ExpoImage = loadExpoImage()
   const morph = useRef(new Animated.Value(1)).current
@@ -257,7 +259,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   // stage-A binary) that is its plain window colour, never the app underneath.
   if (!play) {
     return MORPH
-      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={H / 2} />
+      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={cy} />
       : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: NEW_NATIVE ? BG : colors.card }]} />
   }
 
@@ -265,9 +267,9 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   // window's vertical centre.
   const cw = W
   const ch = W * CLIP_H / CLIP_W
-  const top = H / 2 - ch / 2
+  const top = cy - ch / 2
   // Below the gate: on the held frame Oli's ears fill the top of the screen.
-  const wordTop = Math.min(H / 2 + 130 * (W / 390), H - insets.bottom - 110)
+  const wordTop = Math.min(cy + 130 * (W / 390), 2 * cy - insets.bottom - 110)
   const s = Math.max(0.85, Math.min(1.1, W / 390))
 
   return (
@@ -311,7 +313,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
           )}
         </Animated.View>
       </View>
-      {MORPH && <MorphFrame opacity={morph} W={W} cx={W / 2} cy={H / 2} />}
+      {MORPH && <MorphFrame opacity={morph} W={W} cx={W / 2} cy={cy} />}
     </Animated.View>
   )
 }
