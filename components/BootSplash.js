@@ -3,7 +3,7 @@ import { View, Text, Image, Animated, Easing, StyleSheet, Platform, Accessibilit
 import { requireOptionalNativeModule } from 'expo'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { font, colors } from '../constants/theme'
+import { font, colors, motion } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { BOOT_SPLASH_LIVE } from '../constants/flags'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -40,6 +40,12 @@ const NEW_NATIVE = VIDEO_PATH
 // Android before 12 draws no icon splash, and the geometry below was measured on Android 13
 // only: the morph is not drawn there.
 const MORPH = !NEW_NATIVE && (Platform.OS === 'ios' || Platform.Version >= 31)
+// Android's native splash draws the gate 166 dp wide on every phone (the OS icon slot); the clip's
+// gate is 468/1080 of its width, so the first still grows from one to the other (measured 2026-10-26).
+const GROW = VIDEO_PATH && Platform.OS === 'android'
+const NATIVE_GATE_DP = 166
+const CLIP_GATE = 468 / 1080
+const FirstImage = GROW ? Animated.Image : Image
 const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
 
 // 1.4.1 native frame. Android 12+: the v2 adaptive-icon foreground centred on white; it draws
@@ -96,10 +102,12 @@ function hideNativeSplash() {
   nativeHidden = true
   try { Promise.resolve(require('expo-splash-screen').hideAsync()).catch(() => {}) } catch {}
 }
+// Native splash view fade-out; the grow waits it out so a smaller native gate never ghosts under a larger still.
+const NATIVE_FADE = 200
 function holdNativeSplash() {
   try {
     const SplashScreen = require('expo-splash-screen')
-    SplashScreen.setOptions({ fade: true, duration: 200 })
+    SplashScreen.setOptions({ fade: true, duration: NATIVE_FADE })
     Promise.resolve(SplashScreen.preventAutoHideAsync()).catch(() => {})
   } catch {}
 }
@@ -196,6 +204,9 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   const morph = useRef(new Animated.Value(1)).current
   const word = useRef(new Animated.Value(0)).current
   const exit = useRef(new Animated.Value(1)).current
+  const grow = useRef(new Animated.Value(GROW ? NATIVE_GATE_DP / (CLIP_GATE * W) : 1)).current
+  const [grown, setGrown] = useState(!GROW)
+  const growing = useRef(false)
   const [shownAt, setShownAt] = useState(null)
   const [firstShown, setFirstShown] = useState(false)
   const readyAt = useRef(null)
@@ -225,6 +236,14 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
     if (reduce === true) word.setValue(1)
   }, [reduce])
 
+  // The first still has drawn: the native splash fades out over it while it grows to the clip's gate.
+  const startGrow = () => {
+    if (!GROW || growing.current) return
+    growing.current = true
+    Animated.timing(grow, { toValue: 1, duration: motion.base, delay: NATIVE_FADE, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+      .start(() => setGrown(true))
+  }
+
   useEffect(() => {
     if (firstShown || shownAt != null) {
       Animated.timing(morph, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
@@ -232,12 +251,12 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   }, [firstShown, shownAt])
 
   // VIDEO_PATH only (the WebP path's timing is live behaviour): the still is up but the clip never
-  // reports a frame or an error, so start the clocks anyway.
+  // reports a frame or an error, so start the clocks anyway. Counted from the clip's mount (grown).
   useEffect(() => {
-    if (!VIDEO_PATH || !firstShown || shownAt != null || reduce !== false) return
+    if (!VIDEO_PATH || !firstShown || !grown || shownAt != null || reduce !== false) return
     const timer = setTimeout(() => setShownAt(t0 => t0 ?? Date.now()), CLIP_WATCHDOG)
     return () => clearTimeout(timer)
-  }, [firstShown, shownAt, reduce])
+  }, [firstShown, grown, shownAt, reduce])
 
   useEffect(() => {
     if (shownAt == null) return
@@ -291,9 +310,9 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
           <Image source={LAST} fadeDuration={0} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
         {reduce === false && !(VIDEO_PATH && leaving) && (
-          <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <FirstImage source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); startGrow(); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); startGrow(); if (HOLD_NATIVE) hideNativeSplash() }} style={[{ position: 'absolute', left: 0, top, width: cw, height: ch }, GROW && { transform: [{ scale: grow }] }]} />
         )}
-        {reduce === false && VIDEO_PATH && !leaving && (
+        {reduce === false && VIDEO_PATH && grown && !leaving && (
           <ClipVideo top={top} cw={cw} ch={ch} onShown={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} />
         )}
         {reduce === false && !VIDEO_PATH && (
