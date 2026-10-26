@@ -1467,11 +1467,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             visible={deleteConfirmVisible}
             title={t('deleteAccountTitle', lang)}
             message={t('deleteAccountWarning', lang)}
-            confirmLabel={t('deleteAccountConfirmBtn', lang)}
-            destructive
-            loading={deleting}
+            actions={[{ label: t('deleteAccountConfirmBtn', lang), onPress: deleteAccount, variant: 'danger', loading: deleting }]}
             error={deleteError}
-            onConfirm={deleteAccount}
             onCancel={() => { if (!deleting) setDeleteConfirmVisible(false) }}
             lang={lang}
           />
