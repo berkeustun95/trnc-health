@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
 import { t, tCount } from '../../../constants/i18n'
-import { press } from '../../../constants/theme'
+import { press, colors, radii, space, type, font } from '../../../constants/theme'
 import { closingSoonRange } from '../../../constants/duyurular'
 
 // ─── Home: Duyurular banner (Berke 2026-10-11) ──────────────────────────────
@@ -13,6 +13,7 @@ import { closingSoonRange } from '../../../constants/duyurular'
 // read to published, unexpired rows) and hides at 0 — and on a failed read, rather than
 // showing a number it does not have.
 
+// Duyurular palette (Berke 2026-10-15): no theme token; contrast 10.78 / 6.90 / 5.98.
 const TEAL = '#0B4544'
 const TEAL_LIGHT = '#A9D8D3'
 const PEACH = '#FDE9DA'
@@ -35,7 +36,7 @@ export default function DuyurularBanner({ lang, onPress }) {
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={press.card} accessibilityRole="button"
       accessibilityLabel={[t('menuDuyurular', lang), t('duyBannerSub', lang), pill].filter(Boolean).join(', ')}>
       <View style={s.icon}>
-        <Ionicons name="megaphone-outline" size={24} color="#FFFFFF" />
+        <Ionicons name="megaphone-outline" size={24} color={colors.onPrimary} />
       </View>
       <View style={s.text}>
         <Text style={s.title} numberOfLines={1}>{t('menuDuyurular', lang)}</Text>
@@ -54,14 +55,14 @@ export default function DuyurularBanner({ lang, onPress }) {
 }
 
 const s = StyleSheet.create({
-  card:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: TEAL, borderRadius: 18,
-              paddingHorizontal: 15, paddingVertical: 15 },
-  icon:     { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)',
+  card:     { flexDirection: 'row', alignItems: 'center', gap: space[12], backgroundColor: TEAL, borderRadius: radii.widget,
+              paddingHorizontal: space[16], paddingVertical: space[16] },
+  icon:     { width: 48, height: 48, borderRadius: radii.tile, backgroundColor: 'rgba(255,255,255,0.14)',
               alignItems: 'center', justifyContent: 'center' },
   text:     { flex: 1, gap: 2 },
-  title:    { fontFamily: 'Inter_700Bold', fontSize: 16, lineHeight: 21, color: '#FFFFFF' },
-  sub:      { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, color: TEAL_LIGHT },
-  pill:     { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 6, backgroundColor: PEACH, borderRadius: 999,
+  title:    { ...type.sheetTitle, color: colors.onPrimary },
+  sub:      { ...type.small, color: TEAL_LIGHT },
+  pill:     { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 6, backgroundColor: PEACH, borderRadius: radii.pill,
               paddingHorizontal: 8, paddingVertical: 3 },
-  pillText: { fontFamily: 'Inter_700Bold', fontSize: 12, lineHeight: 16, color: PEACH_INK },
+  pillText: { ...type.meta, fontFamily: font.bold, color: PEACH_INK },
 })
