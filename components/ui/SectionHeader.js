@@ -16,7 +16,7 @@ export default function SectionHeader({ title, action, onLongPress, style }) {
         <TouchableOpacity
           onPress={action.onPress}
           activeOpacity={press.small}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
           accessibilityRole="button"
           accessibilityLabel={action.accessibilityLabel || action.label}
         >
