@@ -398,7 +398,7 @@ function LivingCard({ lang }) {
       <LastReviewedTag text={t('essLivingLastReviewed', lang)} />
       <Block>
         <SectionTitle text={t('essLivingWaterTitle', lang)} />
-        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingWater1', lang)} />
+        <BulletRow iconName="water-outline" iconColor={colors.primary} text={t('essLivingWater1', lang)} />
         <BulletRow iconName="cube-outline" iconColor={colors.textSecondary} text={t('essLivingWater2', lang)} />
 
         <SectionTitle text={t('essLivingHoursTitle', lang)} />
@@ -409,7 +409,7 @@ function LivingCard({ lang }) {
         <SectionTitle text={t('essLivingCutsTitle', lang)} />
         <BulletRow iconName="flash-off-outline" iconColor={colors.danger} text={t('essLivingCuts1', lang)} />
         <BulletRow iconName="call-outline" iconColor={colors.primary} text={t('essLivingCuts2', lang)} />
-        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingCuts3', lang)} />
+        <BulletRow iconName="water-outline" iconColor={colors.primary} text={t('essLivingCuts3', lang)} />
         <BulletRow iconName="information-circle-outline" iconColor={colors.textSecondary} text={t('essLivingCuts4', lang)} />
 
         <SectionTitle text={t('essLivingJellyTitle', lang)} />
