@@ -36,11 +36,11 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Icon well: `CategoryIcon`, 52×52, radius `radii.tile` (16), background = the category's soft tint,
   icon = its ink, icon size `round(size × 0.46)`.
 - Category tints (`category` in theme.js), bg / ink:
-  health `#FBEAEC` / `#B83246` · explore `#F1EAFB` / `#6B3FB0` · homeLife `#FBF0E0` / `#92560C` · city `#E7EEFB` / `#2F55B5`.
+  health `#FBEAEC` / `#B83246` · explore `#F1EAFB` / `#6B3FB0` · homeLife `#FBF0E0` / `#92560C` · city `#F7FEE7` / `#4D7C0F` (olive).
 - Tile label: 11pt, `Inter_500Medium` (Medium, not SemiBold), `colors.tileInk`, centred, fixed
   two-line box `GRID_LABEL_HEIGHT` (`constants/homeModules.js`) so rows keep one rhythm in all 9 languages.
 - Panels: white, `radii.card` (20), `paddingVertical: 12`; panel title `type.rowTitle`, 8pt category dot.
-- "Yakında" badge: `colors.tileInk` pill, 9.5pt `Inter_600SemiBold`, white.
+- "Yakında" badge: `colors.primaryDark` pill, 9.5pt `Inter_600SemiBold`, white.
 - Guards: `npm run home:check`, `npm run labels:check` (fontScale 1.3).
 
 ## 4. Floating pill tab bar (`components/ui/FloatingTabBar.js`)
@@ -66,11 +66,7 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Black-alpha scrims and dark pills over photos (`MODULE_TINT`, `HEADER_SCRIM`, `PILL_ALPHA`) are photo
   treatment, not a colour, and stay.
 - `textPrimary` `#1A2B33` is ink, not a surface: allowed as text, never as a fill for large areas.
-- PENDING FIX (approved by Berke 2026-10-15, NOT done yet): `ModuleScreen` root `#22313A`
-  (`components/ui/ModuleScreen.js`, the ground shown before the photo paints) and `category.city` ink
-  `#2F55B5` (city panel dot + icons) are to be replaced with EXISTING theme colours. Do it only as its
-  own slice when Berke says go, with before/after screenshots for his approval. Until then: leave them,
-  and do not report them as new findings.
+- DONE: `ModuleScreen` ground → `colors.primaryDark` and `category.city` → olive shipped in PR #50 (2026-10-18); the remaining raw dark literals (Yakında badge, AdSlot caption bar, 2048 high tile, Newcomer Essentials driving/borders/water icons, ErrorBoundary text) moved to theme tokens in this branch (2026-10-26).
 - Partner brand colours (e.g. KKTCELL navy, kept via `brandInk`) are partner content, see §7.
 
 ## 7. Partner screens: restyle ADA's frame only
