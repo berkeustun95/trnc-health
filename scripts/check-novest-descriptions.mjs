@@ -10,10 +10,9 @@
 // delisted row is still a stored row), and applies the exact detectors the importer uses.
 //
 //   RED (exit 1)      phone (TR or international), e-mail (also [at] / (at) spelled), @handle, WhatsApp
-//                     link, a name:value contact line, or an uncut marker (a marker word still followed by
-//                     a name-only line / website / handle) in a stored column
-//   ::warning::       a contact MARKER (İletişim, Bilgi için, Detaylı bilgi) and nothing else:
-//                     can be an ordinary sentence, but it is where the old strip cut
+//                     link, a name:value contact line, or a contact MARKER word (İletişim, Bilgi için,
+//                     Detaylı bilgi) in a stored column: the import cuts at the first marker, so a
+//                     marker in stored text means the strip did not run on it
 //
 // Columns scanned: title, description, amenities (text[], joined), source_url. Those are
 // every column the importer fills from the partner's free text or URL.
@@ -32,7 +31,7 @@ import { contactKinds, CONTACT_MARKER } from '../supabase/functions/_shared/nove
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const COLUMNS = ['title', 'description', 'amenities', 'source_url']
-const KINDS = ['phone', 'email', 'email-obfuscated', 'handle', 'whatsapp', 'contact-line', 'uncut-marker']
+const KINDS = ['phone', 'email', 'email-obfuscated', 'handle', 'whatsapp', 'contact-line', 'marker']
 
 const asText = v => Array.isArray(v) ? v.join('\n') : String(v ?? '')
 
@@ -41,8 +40,9 @@ export function scanRow(row) {
   const out = []
   for (const column of COLUMNS) {
     const text = asText(row[column])
-    for (const kind of contactKinds(text)) out.push({ kind, id: row.external_id, column, length: text.length })
-    if (CONTACT_MARKER.test(text)) out.push({ kind: 'marker', id: row.external_id, column, length: text.length })
+    const kinds = contactKinds(text)
+    if (CONTACT_MARKER.test(text)) kinds.push('marker')
+    for (const kind of kinds) out.push({ kind, id: row.external_id, column, length: text.length })
   }
   return out
 }
@@ -54,7 +54,7 @@ const PLANTED = {
   'contact-line': 'Güzel daire\nAd Soyad : 0500 000 00 01',
   'email-obfuscated': 'yazın ad.soyad [at] example.com adresinden',
   handle: 'Instagram : @ornek.emlak',
-  'uncut-marker': 'Bilgi için ofisimiz açık.\nAhmet Örnek\nFiyat: £250.000',
+  marker: 'Bilgi için ofisimiz açık.',
 }
 const PLANTED_INTL = 'Hemen arayın +44 7700 900123 numaradan'
 
@@ -65,7 +65,6 @@ export function positiveControl() {
     if (!scanRow({ external_id: 'plant', description: PLANTED[k] }).some(f => f.kind === k)) bad.push(`${k} not flagged`)
   }
   if (!scanRow({ external_id: 'plant', description: PLANTED_INTL }).some(f => f.kind === 'phone')) bad.push('international phone not flagged')
-  if (!scanRow({ external_id: 'plant', description: 'Bilgi için ofisimiz açık.' }).some(f => f.kind === 'marker')) bad.push('marker not flagged')
   if (scanRow({ external_id: 'plant', title: 'Girne 2+1 Daire', description: 'Banyo Sayısı : 2\nSite Fasiliteleri :\n£250.000\n3+1 125 m2, 2+1 90m2 100.000 TL', amenities: ['Havuz'], source_url: 'https://example.com/x' }).length) bad.push('clean text flagged')
   return bad
 }
@@ -84,9 +83,9 @@ if (process.argv.includes('--self')) {
   t('international phone', kinds({ description: PLANTED_INTL }), ['phone:description'])
   t('[at] e-mail', kinds({ description: PLANTED['email-obfuscated'] }), ['email-obfuscated:description'])
   t('@handle in an amenity', kinds({ amenities: ['Havuz', PLANTED.handle] }), ['handle:amenities'])
-  t('uncut marker + name-only line', kinds({ description: PLANTED['uncut-marker'] }), ['uncut-marker:description', 'marker:description'])
-  t('new kinds carry no matched text', JSON.stringify(['email-obfuscated', 'handle', 'uncut-marker'].flatMap(k => scanRow({ external_id: 'novest-1', description: PLANTED[k] }))).match(/ornek|Örnek|example/i), null)
-  t('marker only', kinds({ description: 'Bilgi için ofisimiz açık.' }), ['marker:description'])
+  t('marker + name-only line', kinds({ description: 'Bilgi için ofisimiz açık.\nAhmet Örnek\nFiyat: £250.000' }), ['marker:description'])
+  t('new kinds carry no matched text', JSON.stringify(['email-obfuscated', 'handle', 'marker'].flatMap(k => scanRow({ external_id: 'novest-1', description: PLANTED[k] }))).match(/ornek|Örnek|example/i), null)
+  t('marker only is RED', kinds({ description: PLANTED.marker }), ['marker:description'])
   t('feature labels stay clean', kinds({ description: 'Banyo Sayısı : 2\nMutfak Dolapları :\nSite Fasiliteleri :' }), [])
   t('null columns stay clean', kinds({ title: null, description: null, amenities: null }), [])
   t('report carries no matched text', JSON.stringify(scanRow({ external_id: 'novest-1', description: PLANTED.phone })).includes('0500'), false)
@@ -97,7 +96,7 @@ if (process.argv.includes('--self')) {
 
 const control = positiveControl()
 if (control.length) { console.error(`✗ positive control failed (${control.join('; ')}) — the scanner cannot see what it must; not reading prod.`); process.exit(1) }
-console.log(`positive control: all ${KINDS.length} contact kinds + marker flagged on planted literals, clean text stays clean`)
+console.log(`positive control: all ${KINDS.length} kinds (incl. marker) flagged on planted literals, clean text stays clean`)
 
 if (existsSync(resolve(ROOT, '.env'))) {
   for (const line of readFileSync(resolve(ROOT, '.env'), 'utf8').split('\n')) {
@@ -127,12 +126,10 @@ for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1
 console.log(`Novest text: scanned ${rows.length} of ${total} row(s) (${Object.entries(byStatus).map(([s, n]) => `${s} ${n}`).join(', ')}) x ${COLUMNS.length} column(s): ${COLUMNS.join(', ')}`)
 
 const findings = rows.flatMap(scanRow)
-const red = findings.filter(f => f.kind !== 'marker')
-const markers = findings.filter(f => f.kind === 'marker')
+const red = findings
 for (const f of findings) console.log(`  · ${f.kind.padEnd(12)} ${f.id}  ${f.column} (length ${f.length})`)
-if (markers.length) console.log(`::warning title=Novest contact marker in stored text::${markers.length} stored column(s) contain a contact marker word with no contact data (ids in the log above)`)
 if (red.length) {
   console.error(`\n✗ ${red.length} stored column(s) carry contact data (kinds: ${[...new Set(red.map(f => f.kind))].join(', ')}). See the ids above; fix in the importer, then re-sync the listing.`)
   process.exit(1)
 }
-console.log(markers.length ? '✓ no contact data stored (marker words only).' : '✓ no contact data stored.')
+console.log('✓ no contact data stored.')

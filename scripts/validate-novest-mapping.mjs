@@ -14,7 +14,7 @@
 
 import {
   getAll, mapPropertyType, extractDeedType, cleanDescription, assertNoContact,
-  decodeEntities, htmlToText, contactKinds, removedTail, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
+  decodeEntities, htmlToText, contactKinds, contactCutReport, removedTail, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
 } from '../supabase/functions/_shared/novest-feed.mjs'
 import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
 
@@ -22,6 +22,91 @@ const self = process.argv.includes('--self')
 let failures = 0
 const fail = (...m) => { failures++; console.error('  ✗ ' + m.join(' ')) }
 const ok   = (...m) => console.log('  ✓ ' + m.join(' '))
+
+// ─── The fixed reference: de75db2's cleanDescription, copied verbatim ─────────────────
+// The first-marker cut that production stored before the contact work. It must NEVER change
+// (that is the point of copying it): the new strip is only allowed to DELETE characters from
+// this output. isSubsequence(newClean(x), oldClean(x)) is the invariant "nothing the old strip
+// removed is ever stored", asserted on every fixture, probe and live listing.
+const OLD_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
+function oldClean(html) {
+  const text = decodeEntities(html)
+  const m = OLD_MARKER.exec(text)
+  const cut = m ? text.slice(0, m.index) : text
+  return String(cut)
+    .replace(/<\/(?:p|div|ul|h[1-6])>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+}
+function isSubsequence(sub, full) {
+  let i = 0
+  for (let j = 0; j < full.length && i < sub.length; j++) if (full[j] === sub[i]) i++
+  return i === sub.length
+}
+const subseqInputs = []   // every html a fixture feeds cleanDescription, re-checked at the end of --self
+const SUBSEQ_PROBES = [
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz - Satış Danışmanı</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz, Novest</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz / Mehmet Kaya</li></ul><p>120 m2</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz</li></ul><p>120 m2</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>ahmet yılmaz</li></ul><p>120 m2</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Av Mehmet Ali Can Örnek Yılmaz</li></ul><p>120 m2</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz (TL ofis)</li></ul>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet Yılmaz</p><p>Fiyat £250.000</p><p>Detaylı bilgi için ofisimize gelin, 120 m2 showroom.</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet Yılmaz</p><p>Fiyat £250.000</p><p>Bilgi için ofisimiz açık.</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet Yılmaz - Danışman</p><p>Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. </p>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet Yılmaz</p><p>Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. Ofisimiz hafta içi her gün açıktır, randevu ile görüşme yapılır. </p>",
+  "<p>Güzel daire</p><p>Іletişim :</p><ul><li>Ahmet Yılmaz</li></ul>",
+  "<p>Güzel daire</p><p>Iletişim :</p><ul><li>Ahmet Yılmaz</li></ul>",
+  "<p>Güzel daire</p><p>ILETISIM :</p><ul><li>Ahmet Yılmaz</li></ul>",
+  "<p>Güzel daire</p><p>İrtibat :</p><ul><li>Ahmet Yılmaz</li></ul>",
+  "<p>Güzel daire</p><p>Contact :</p><ul><li>Ahmet Yılmaz</li></ul>",
+  "<p>Güzel daire</p><p>İleti​şim :</p><ul><li>Ahmet Yılmaz</li></ul>",
+  "<p>Güzel daire</p><p>Arayın 0533​111​22​33</p>",
+  "<p>Güzel daire</p><p>Arayın ０５３３ １１１ ２２ ３３</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet&nbsp;Yılmaz</p><p>£1</p>",
+  "<p>Güzel daire</p><p>Arayın 0533/111 22 33</p>",
+  "<p>Güzel daire</p><p>Arayın (0533) 111 22 33</p>",
+  "<p>Güzel daire</p><p>Arayın 44 7700 900123</p>",
+  "<p>Güzel daire</p><p>Arayın 90 533 111 2233</p>",
+  "<p>Güzel daire</p><p>ahmet [dot] yilmaz [at] gmail [dot] com</p>",
+  "<p>Güzel daire</p><p>ahmet at gmail dot com</p>",
+  "<p>Güzel daire</p><p>ahmet(AT)gmail.com</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Satış danışmanımız Ahmet Yılmaz size yardımcı olacaktır.</p><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim : Ahmet Yılmaz Satış Danışmanı Novest Emlak Girne Ofisi</p><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>Detaylı bilgi için Ahmet Yılmaz ile ofisimizde görüşebilirsiniz lütfen.</p><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet Yılmaz ve Mehmet Kaya, Novest Emlak Girne ofisi</p><p>Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. </p>",
+  "<p>Güzel daire</p><p>Bilgi için Ahmet Yılmaz Bey ile Girne ofisimizde görüşün</p><p>Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. Girne merkezde denize yakın lüks daire havuzlu site. </p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : Satış Danışmanı</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : 2</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : mevcut</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : £250.000</li></ul>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz 120 m2</li></ul>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz £1</li></ul>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : 0533 111</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet : 111 22 33</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>bilgi için ahmet yılmaz</p><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>Güzel daire. İletişim Ahmet Yılmaz</p><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li><li>0533 111 22 33</li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : +44 7700 900123</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : 0533 111 22 33 / +44 7700 900123</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Tel: 0533 111 22 33</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : ahmet [at] example.com</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : 0533 111 22 33</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>ahmet yılmaz : 0533 111 22 33</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Av. Mehmet Ali Can Yılmaz : 0533 111 22 33</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Instagram : @ahmet.emlak</b></li></ul>",
+  "<p>Güzel daire</p><p>İletişim:</p><p>Ahmet Yılmaz</p><p>www.ahmetemlak.com</p>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><p>Ahmet Yılmaz<span> : </span></p><p>0533 111 22 33</p>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li></ul><p>Novest Property</p>",
+  "<p>Güzel daire<br>İletişim:<br>Ahmet Yılmaz<br>0533 111 22 33</p>",
+]
 
 // ─── Guards prove themselves first ───────────────────────────────────────────
 if (self) {
@@ -59,6 +144,7 @@ if (self) {
   //     compares cleanDescription() with the exact text it must produce.
   const P1 = '0500 000 00 01', P2 = '0500 000 00 02'
   const strip = (label, html, want) => {
+    subseqInputs.push(html)
     const got = cleanDescription(html)
     got === want ? ok(`strip: ${label}`) : fail(`strip: ${label}\n        got    ${JSON.stringify(got)}\n        wanted ${JSON.stringify(want)}`)
   }
@@ -71,9 +157,14 @@ if (self) {
   strip('block with names and no numbers (22217 shape)',
     '<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ad Soyad :</b></li><li><b>Ad Soyad</b> :</li></ul>',
     'Güzel daire')
-  strip('mid-text marker + price, then block (21016 shape): prose kept, block removed',
-    `<p>Villa metni.</p><p>Detaylı bilgi ve satış için bize iletişime geçin.</p><p>Fiyat: £250.000</p><p><b>İletişim :</b></p><ul><li><b>Ad Soyad : ${P1}</b></li></ul>`,
-    'Villa metni.\nDetaylı bilgi ve satış için bize iletişime geçin.\nFiyat: £250.000')
+  const flagOf = html => contactCutReport(html).flagged
+  const V21016 = `<p>Villa metni.</p><p>Detaylı bilgi ve satış için bize iletişime geçin.</p><p>Fiyat: £250.000</p><p><b>İletişim :</b></p><ul><li><b>Ad Soyad : ${P1}</b></li></ul>`
+  strip('21016 shape: cut at the FIRST marker (as the old strip), and FLAGGED', V21016, 'Villa metni.')
+  flagOf(V21016) === 'cut-with-content' ? ok('flag: 21016 shape is flagged cut-with-content') : fail('flag: 21016 shape not flagged:', flagOf(V21016))
+  const STD = `<p>Güzel daire</p><ul><li>90M2</li></ul><p><b>İletişim :</b></p><ul><li><b>Ad Soyad : ${P1}</b></li></ul>`
+  flagOf(STD) === null && contactCutReport(STD).cut ? ok('flag: a standard trailing block is cut and NOT flagged') : fail('flag: standard block', JSON.stringify(contactCutReport(STD)))
+  JSON.stringify(contactCutReport('<p>Güzel daire</p>')) === '{"cut":false,"flagged":null}' ? ok('flag: no marker -> no cut, no flag') : fail('flag: no-marker report wrong')
+  !JSON.stringify(contactCutReport(V21016)).includes('Villa') ? ok('flag: the report carries no text') : fail('flag: report carries text')
   strip('block with bare phone lines under a bare marker (22419/22426 shape)',
     `<p>Güzel daire</p><ul><li>£100.000</li></ul><p><b>İletişim : </b></p><ul><li><b>${P1}</b></li></ul>`,
     'Güzel daire\n• £100.000')
@@ -83,9 +174,10 @@ if (self) {
   strip('marker line with name and phone, hashtags after (18029 shape)',
     `<div>Güzel bina £ 1.000.000</div><div>İletişim 📞 Ad Soyad : ${P1}</div><div>#Kibris #Satilik</div>`,
     'Güzel bina £ 1.000.000')
-  strip('marker mid-text with NO block after: text unchanged',
-    '<p>Bilgi için ofisimizi ziyaret edin.</p><p>Fiyat: £250.000</p><ul><li>90M2</li></ul>',
-    'Bilgi için ofisimizi ziyaret edin.\nFiyat: £250.000\n• 90M2')
+  strip('marker mid-text with NO block after: still cut at the first marker (as the old strip)',
+    '<p>Güzel daire</p><p>Bilgi için ofisimizi ziyaret edin.</p><p>Fiyat: £250.000</p><ul><li>90M2</li></ul>',
+    'Güzel daire')
+  flagOf('<p>Güzel daire</p><p>Bilgi için ofisimizi ziyaret edin.</p><p>Fiyat: £250.000</p>') === 'cut-with-content' ? ok('flag: marker in prose with a price after it is flagged') : fail('flag: prose marker not flagged')
   strip('e-mail, no marker',
     '<p>Bize e-posta ile ulaşın ad.soyad@example.com adresinden.</p>',
     'Bize e-posta ile ulaşın adresinden.')
@@ -99,6 +191,7 @@ if (self) {
   //  with its contact data by the block-walk. Now each is either cut (block shapes) or refused.
   const N1 = 'Ahmet Örnek', I1 = '+44 7700 900123'
   const cutOk = (label, html, want = 'Güzel daire') => {
+    subseqInputs.push(html)
     const got = cleanDescription(html)
     let kinds = contactKinds(got)
     ;(got === want && kinds.length === 0)
@@ -125,36 +218,46 @@ if (self) {
   cutOk('4+ word name', BLK(`<ul><li><b>Av. Mehmet Ali Can Örnek : ${P1}</b></li></ul>`))
   cutOk('name, br-split', `<p>Güzel daire<br>İletişim:<br>${N1}<br>${P1}</p>`)
   cutOk('national landline in the block', BLK('<ul><li><b>Ofis : 0212 000 00 01</b></li></ul>'))
-  // A price in the marker's tail makes it LISTING content, so the block is not cut: these
-  // must be refused, not stored.
+  // Every marker is cut, so none of these shapes can be stored: the name, site, handle and number
+  // after the first marker go with it. cutFlagged: cut to the text before the marker AND flagged.
+  const cutFlagged = (label, html, want = 'Güzel daire') => {
+    cutOk(label, html, want)
+    flagOf(html) === 'cut-with-content' ? ok(`flagged: ${label}`) : fail(`flagged: ${label} -> ${flagOf(html)}`)
+  }
   const PRICED = tailHtml => `<p>Güzel daire</p><p>İletişim :</p>${tailHtml}<p>Fiyat: £250.000</p>`
-  refused('name-only line under an uncut marker', PRICED(`<p>${N1}</p>`), 'uncut-marker')
-  refused('website under an uncut marker', PRICED('<p>www.ahmetemlak.com</p>'), 'uncut-marker')
-  refused('footer line under an uncut marker', PRICED('<p>Novest Property</p>'), 'uncut-marker')
-  refused('@handle under an uncut marker', PRICED('<p>Instagram : @ahmet.emlak</p>'), 'handle')
-  refused('[at] e-mail under an uncut marker', PRICED('<p>ahmet [at] example.com</p>'), 'email-obfuscated')
-  refused('foreign phone under an uncut marker', PRICED(`<p>${I1}</p>`), 'phone')
+  cutFlagged('name-only line under a priced marker', PRICED(`<p>${N1}</p>`))
+  cutFlagged('website under a priced marker', PRICED('<p>www.ahmetemlak.com</p>'))
+  cutFlagged('footer line under a priced marker', PRICED('<p>Novest Property</p>'))
+  cutFlagged('@handle under a priced marker', PRICED('<p>Instagram : @ahmet.emlak</p>'))
+  cutFlagged('[at] e-mail under a priced marker', PRICED('<p>ahmet [at] example.com</p>'))
+  cutFlagged('foreign phone under a priced marker', PRICED(`<p>${I1}</p>`))
   const longProse = '<p>' + 'Girne merkezde denize yakın lüks daire havuzlu site. '.repeat(10) + '</p>'
-  refused('long tail (> TAIL_MAX) with a name-only line', `<p>Bilgi için ofisimiz açık.</p>${longProse}<p>${N1}</p>`, 'uncut-marker')
-  // B2 (security re-review 2026-10-26): under an uncut marker ANY short non-listing line is refused.
+  cutFlagged('long tail (> TAIL_MAX) with a name-only line', `<p>Güzel daire</p><p>Bilgi için ofisimiz açık.</p>${longProse}<p>${N1}</p>`)
   const tok = '<p>Fiyat: £250.000</p>'
   const UM = inner => `<p>Güzel daire</p><p>İletişim :</p>${inner}${tok}`
-  refused('two markers, name between them (tails nest)',
-    `<p>Güzel daire</p><p>İletişim :</p><p>${N1}</p><p>Fiyat £250.000</p><p>Detaylı bilgi için ofisimize gelin, 120 m2 showroom.</p>`, 'uncut-marker')
-  refused('name - title', UM(`<ul><li>${N1} - Satış Danışmanı</li></ul>`), 'uncut-marker')
-  refused('name, agency', UM(`<ul><li>${N1}, Novest</li></ul>`), 'uncut-marker')
-  refused('two names with a slash', UM(`<ul><li>${N1} / Mehmet Kaya</li></ul>`), 'uncut-marker')
-  refused('name (office)', UM(`<ul><li>${N1} (TL ofis)</li></ul>`), 'uncut-marker')
-  refused('6-word name', UM('<ul><li>Av Mehmet Ali Can Örnek Yılmaz</li></ul>'), 'uncut-marker')
-  refused('capitalised name on the marker line', `<p>Güzel daire</p><p>İletişim : ${N1} - Danışman</p>${tok}`, 'uncut-marker')
-  {
-    const got = cleanDescription(UM('<p>Banyo Sayısı : 2</p><p>Havuz : Var</p>'))
-    contactKinds(got).includes('uncut-marker') ? fail('feature-label lines under a marker were refused') : ok('feature-label lines (digits / known word) under a marker pass')
+  cutFlagged('two markers, name between them',
+    `<p>Güzel daire</p><p>İletişim :</p><p>${N1}</p><p>Fiyat £250.000</p><p>Detaylı bilgi için ofisimize gelin, 120 m2 showroom.</p>`)
+  cutFlagged('name - title', UM(`<ul><li>${N1} - Satış Danışmanı</li></ul>`))
+  cutFlagged('name, agency', UM(`<ul><li>${N1}, Novest</li></ul>`))
+  cutFlagged('two names with a slash', UM(`<ul><li>${N1} / Mehmet Kaya</li></ul>`))
+  cutFlagged('name (office)', UM(`<ul><li>${N1} (TL ofis)</li></ul>`))
+  cutFlagged('6-word name', UM('<ul><li>Av Mehmet Ali Can Örnek Yılmaz</li></ul>'))
+  cutFlagged('capitalised name on the marker line', `<p>Güzel daire</p><p>İletişim : ${N1} - Danışman</p>${tok}`)
+  cutFlagged('name : 2 (feature-label shape)', UM(`<ul><li>${N1} : 2</li></ul>`))
+  cutFlagged('partial phone as a value', UM(`<ul><li>${N1} : 0533 111</li></ul>`))
+  cutFlagged('a long prose line naming a person', UM(`<p>Satış danışmanımız ${N1} size yardımcı olacaktır, ofisimiz Girne merkezde.</p>`))
+  // What is NOT cut still must not carry contact data: these shapes are refused by assertNoContact.
+  const refusedText = (label, text, kind) => {
+    const kinds = contactKinds(text)
+    kinds.includes(kind) ? ok(`refused (${kind}): ${label}`) : fail(`refused: ${label} -> kinds=[${kinds}] wanted ${kind}`)
+    try { assertNoContact('self-test', text); fail(`assertNoContact let it through: ${label}`) }
+    catch (e) { /Ahmet|Örnek|7700|0500|ahmet/.test(e.message) && fail(`refusal message leaks content: ${e.message}`) }
   }
-  // Decision: a marker in prose with no contact-ish shape after it is content, not a leak.
-  strip('marker in long prose, no contact shape: text kept',
-    `<p>Bilgi için ofisimiz açık.</p>${longProse}<p>Fiyat: £250.000</p>`,
-    'Bilgi için ofisimiz açık.\n' + 'Girne merkezde denize yakın lüks daire havuzlu site. '.repeat(10).trim() + '\nFiyat: £250.000')
+  refusedText('@handle with no marker', cleanDescription('<p>Güzel daire</p><p>Instagram : @ahmet.emlak</p>'), 'handle')
+  refusedText('[at] e-mail with no marker', cleanDescription('<p>Güzel daire ahmet [at] example.com</p>'), 'email-obfuscated')
+  refusedText('foreign phone in prose with no marker', cleanDescription(`<p>Güzel daire ${I1} arayın</p>`), 'phone')
+  contactKinds(cleanDescription(UM('<p>Banyo Sayısı : 2</p><p>Havuz : Var</p>'))).length === 0
+    ? ok('feature-label lines before a cut never trip the detectors') : fail('feature labels tripped')
   // "2+1" is not an international number, prices and areas are not phones.
   const sizes = '3+1 125 m2 £200.000, 2+1 90m2 100.000 TL, 2+1 85.000 STG +1 120.000'
   cutOk('2+1 / prices / areas are not phones', `<p>${sizes}</p>`, sizes)
@@ -192,6 +295,7 @@ if (self) {
     let slow = 0, worst = 0
     for (const [k, html] of Object.entries(inputs)) {
       const t0 = performance.now()
+      subseqInputs.push(html)
       try { assertNoContact('self-test', cleanDescription(html)) } catch { /* a refusal is fine; the clock is the point */ }
       const ms = performance.now() - t0
       worst = Math.max(worst, ms)
@@ -262,6 +366,15 @@ if (self) {
   mapPropertyType(['komple-bina']) === 'commercial'
     ? ok('type: komple-bina -> commercial') : fail('type: komple-bina ->', mapPropertyType(['komple-bina']))
 
+  // THE INVARIANT: nothing the old strip removed is ever stored.
+  {
+    const all = [...new Set([...subseqInputs, ...SUBSEQ_PROBES])]
+    let bad = 0
+    for (const html of all) if (!isSubsequence(cleanDescription(html), oldClean(html))) { bad++; fail(`subsequence broken (input #${all.indexOf(html)}, ${html.length} chars)`) }
+    bad === 0 && ok(`subsequence: newClean(x) is a subsequence of oldClean(x) for ${all.length} inputs (${subseqInputs.length} fixture/timing + ${SUBSEQ_PROBES.length} probe)`)
+    isSubsequence('ab', 'a-b') && !isSubsequence('ba', 'a-b') ? ok('subsequence: checker control (accepts a deletion, rejects an insertion/reorder)') : fail('subsequence checker broken')
+  }
+
   console.log(failures ? `\nSELF-TEST FAILED (${failures})\n` : '\nself-test clean — every guard refused its counter-example\n')
   if (failures) process.exit(1)
 }
@@ -291,7 +404,7 @@ const KNOWN_UNTAGGED = new Map([
 const untagged = p => ['property_type', 'property_status', 'property_state', 'property_city']
   .every(k => !(p[k] || []).length)
 
-let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = [], tailMax = 0, noCut = []
+let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = [], tailMax = 0, noCut = [], flagged = [], notSubseq = [], refusedLive = 0
 for (const p of props) {
   const slugs = (p.property_type || []).map(i => T.get(i)?.slug).filter(Boolean)
   const t = mapPropertyType(slugs)
@@ -301,10 +414,13 @@ for (const p of props) {
 
   const desc = cleanDescription(p.content.rendered)
   const tail = removedTail(p.content.rendered)
-  tailMax = Math.max(tailMax, tail.length)
   if (tail === '') noCut.push(p.id)
   const title = decodeEntities(p.title.rendered)
-  try { assertNoContact(String(p.id), title, desc) } catch (e) { phoneLeaks.push(e.message) }
+  try { assertNoContact(String(p.id), title, desc) } catch (e) { phoneLeaks.push(e.message); refusedLive++ }
+  const rep = contactCutReport(p.content.rendered)
+  if (rep.flagged) flagged.push(`${p.id} ${rep.flagged}`)
+  else tailMax = Math.max(tailMax, tail.length)
+  if (!isSubsequence(desc, oldClean(p.content.rendered))) notSubseq.push(p.id)
 
   const lat = num(meta(p, 'houzez_geolocation_lat'))
   const lng = num(meta(p, 'houzez_geolocation_long'))
@@ -327,7 +443,12 @@ phoneLeaks.length
   : ok(`0/${props.length} listings leak a phone after the contact strip`)
 
 ok(`${deed}/${props.length} listings yield deed_type='turkish'`)
-console.log(`  contact cut: longest removed tail ${tailMax} plain chars (TAIL_MAX in novest-feed.mjs is the ceiling); listings with NO cut: ${noCut.length}`)
+notSubseq.length
+  ? fail(`${notSubseq.length} listing(s) store text the old strip removed (not a subsequence of the old output): ${notSubseq.join(', ')}`)
+  : ok(`subsequence: ${props.length}/${props.length} live listings' cleaned text is a subsequence of the old strip's output`)
+console.log(`  refused by assertNoContact: ${refusedLive} of ${props.length} live listings`)
+console.log(`  flagged cuts (cut-with-content): ${flagged.length}${flagged.length ? ' — ' + flagged.join(', ') : ''}`)
+console.log(`  contact cut: longest UNFLAGGED removed tail ${tailMax} plain chars (TAIL_MAX in novest-feed.mjs is the ceiling); listings with NO cut: ${noCut.length}`)
 
 // Reported as NEWS, not as a pass. The expected value today is 0; if it becomes
 // non-zero, Novest has started placing real pins and Slice 1's location_precision

@@ -25,7 +25,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
-  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoContact,
+  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
   num, int, meta, mapPropertyType, extractDeedType, coordsInCyprus,
   INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../_shared/novest-feed.mjs'
@@ -121,6 +121,7 @@ Deno.serve(async () => {
     // ── Map ─────────────────────────────────────────────────────────────────
     const rows: Record<string, any>[] = []
     const skipped: string[] = []
+    const flagged: string[] = []   // ids + kind only: a cut that removed more than a short contact block
 
     for (const p of feed) {
       const typeSlugs = (p.property_type || []).map((i: number) => T.get(i)?.slug).filter(Boolean)
@@ -147,6 +148,8 @@ Deno.serve(async () => {
 
       const title = decodeEntities(p.title.rendered).trim()
       const description = cleanDescription(p.content.rendered) || null
+      const cutFlag = contactCutReport(p.content.rendered).flagged
+      if (cutFlag) flagged.push(`${p.id}: ${cutFlag}`)
 
       // Throws -> the listing is skipped, never stored. A missing listing is a smaller
       // failure than a partner's private mobile number published inside it.
@@ -268,7 +271,7 @@ Deno.serve(async () => {
     return new Response(JSON.stringify({
       ok: true, feed: feed.length, imported: rows.length,
       inserts: inserts.length, updates: updates.length, unchanged,
-      relist: relist.length, delist: delist.length, skipped, log,
+      relist: relist.length, delist: delist.length, skipped, flagged, log,
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (e) {

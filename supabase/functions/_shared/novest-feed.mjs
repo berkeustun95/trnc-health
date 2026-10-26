@@ -89,30 +89,29 @@ export function decodeEntities(s) {
 // C2: no per-property agent surfaces anywhere in ADA, so these come out BEFORE storing,
 // never at render — a stored phone is a leak whatever the UI does with it.
 //
-// SAFETY FIRST (2026-10-26): whatever the old first-marker cut removed is still removed,
-// unless it is positively LISTING CONTENT. An attempt to recognise the block's shape (a
-// "block walk") failed open on every shape it did not know (foreign number, bare name,
-// @handle, footer line), so the cut is decided by what the tail LOOKS LIKE instead:
+// THE RULE (2026-10-26): the text from the FIRST contact marker (İletişim, Bilgi için, Detaylı
+// bilgi) to the end is ALWAYS cut, exactly as the original strip did (the cut starts at the
+// beginning of the marker's line, so a dangling "•" goes too). Nothing the original strip removed
+// is ever stored: cleanDescription() is the original output with characters DELETED, and
+// validate-novest-mapping.mjs asserts that subsequence relation on every fixture and every live
+// listing. Shape cannot tell a feature label from a person's name, so no rule here ever decides to
+// KEEP text the original removed.
 //
-//  1. For each marker (İletişim, Bilgi için, Detaylı bilgi) in order, the TAIL is the plain
-//     text from that marker to the end. The EARLIEST marker whose tail is short (TAIL_MAX)
-//     and holds no listing-content token (currency, m2, a price) is the cut. A marker whose
-//     tail carries "Fiyat: £250.000" is not a block start, so the sentence and the price in
-//     front of the real block survive (21016).
-//  2. Anywhere in the text: e-mail addresses, WhatsApp links and whole contact lines
-//     (name : phone/e-mail/WhatsApp) are removed. A name-shaped line with an EMPTY or other
-//     value is a feature label ("Banyo Sayısı : 2", "Site Fasiliteleri :") and stays.
+// What the cut cannot judge is whether it removed a contact block or listing content. It reports
+// that instead: contactCutReport() flags a cut whose tail is long (> TAIL_MAX plain chars) or holds
+// a listing token (currency, m2, a price), i.e. the first marker did not open a short trailing
+// block ("cut-with-content", e.g. 21016, whose price is also the structured price column). A
+// flagged cut is still a cut; the flag is for a human (sync-novest response, importer and
+// validator output; ids and kind only).
 //
-// A marker that did NOT cut leaves its tail in the text. The strip never throws (the Edge
-// Function calls it outside its try); contactKinds() below reports 'uncut-marker' and
-// assertNoContact() refuses the row. The rule is ALL-OR-NOTHING PER TAIL, read from the first
-// marker left in the text: the row is refused when any line other than the marker line is
-// SHORT (<= 6 words) and is neither a listing-token line (currency, m2, price) nor a
-// "Label : value" feature line with a listing value, or when any line holds a URL, @handle
-// or [at] e-mail. A marker followed only by longer prose is kept: the sentence is content.
+// Also removed anywhere in the text: e-mail addresses, WhatsApp links and whole contact lines
+// (name : phone/e-mail/WhatsApp). A name-shaped line with an EMPTY or other value is a feature
+// label ("Banyo Sayısı : 2", "Site Fasiliteleri :") and stays.
 //
-// TRUNCATION IS NOT THE GUARD. assertNoContact() is the part that survives a new wording,
-// and the same detectors run daily over what is stored (scripts/check-novest-descriptions.mjs).
+// The strip never throws (the Edge Function calls it outside its try). assertNoContact() refuses a
+// row that still carries a phone, e-mail, @handle, [at] e-mail, WhatsApp link or contact line, and
+// the same detectors run daily over what is stored (scripts/check-novest-descriptions.mjs), where a
+// marker word in stored text is RED too: with this strip it cannot legitimately be there.
 export const CONTACT_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
 
 // TRNC/TR mobiles: 05xx xxx xx xx, with or without +90, and any separator run; the (0392)
@@ -137,8 +136,6 @@ export const WHATSAPP_RE =
 // Refusal-only shapes (removing them would only hide a leak we could not otherwise see).
 export const HANDLE_RE = /(?<![\p{L}\p{N}._%+\-@])@[A-Za-z0-9_][A-Za-z0-9._]{2,29}/u
 export const OBFUSCATED_EMAIL_RE = /[\[({<]\s{0,2}(?:at|@)\s{0,2}[\])}>]/i
-const URL_RE = new RegExp(
-  String.raw`(?:https?:\/\/|www\.)[^\s<>"')\]]{1,200}|(?<![\p{L}\p{N}@.\-])[\p{L}\p{N}\-]{2,63}\.(?:com|net|org|info|biz|eu|cy|tr|io|me|co|uk)(?:\.[a-z]{2})?(?![\p{L}\p{N}])`, 'iu')
 
 const NAME_COLON =
   "^[\\s•·*\\-–]*\\p{Lu}[\\p{L}'’.\\-]*(?:\\s+\\p{L}[\\p{L}'’.\\-]*){0,3}(?:\\s*\\([^)]{0,60}\\))?\\s*:(?!\\/\\/)\\s*"
@@ -153,12 +150,9 @@ const MAY_BE_WHATSAPP = /wa\.me|whatsapp/i   // cheap prefilter: the real regex 
 const isContactLine = line => line.length <= LINE_MAX && CONTACT_LINE_RE.test(line)
 
 const globalOf = re => new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')
-const MARKER_G = globalOf(CONTACT_MARKER)
 
-const LEADING_BULLET = /^[\s•·*\-–]+/
-
-// What a marker's tail may still contain and be a contact block: nothing the listing is about.
-// TAIL_MAX: the longest tail the cut removes from the live feed is 104 plain
+// A flagged cut: the tail the first marker opens is longer than TAIL_MAX plain characters or holds a
+// listing token. TAIL_MAX: the longest tail the cut removes from the live feed is 104 plain
 // characters (measured 2026-10-26 by validate-novest-mapping.mjs, "longest removed tail" line: 104).
 const TAIL_MAX = 300
 const RAW_TAIL_MAX = 4000   // tags inflate raw length; beyond this the tail cannot qualify
@@ -166,44 +160,6 @@ const LISTING_CURRENCY = /[£$€₺]|(?<![\p{L}\p{N}])(?:TL|GBP|STG|EUR|USD)(?!
 const LISTING_AREA = /(?<!\p{L})m[2²](?!\p{N})|metrekare/iu
 const LISTING_PRICE = /(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?![\d]|[.\-\s]\d)/
 const hasListingToken = s => LISTING_CURRENCY.test(s) || LISTING_AREA.test(s) || LISTING_PRICE.test(s)
-
-// True when the text from the FIRST marker still left in `s` (tails nest, so that tail covers
-// every later marker) holds anything that could be contact data. All or nothing per tail: the
-// marker line aside, ANY short line (<= SHORT_WORDS words) is a possible name / office / agency
-// unless it carries a listing token or is a "Label : value" feature line with a listing value;
-// a URL, @handle or [at] e-mail on any line also refuses. Longer prose lines pass here (the
-// phone / e-mail / handle detectors still run on them). Extra refusals are accepted, a leak is not.
-const SHORT_WORDS = 6
-const LISTING_VALUE = /^(?:\d[\d\s+.,\/-]{0,30}|var|yok|evet|hayır|mevcut|yes|no)$/iu
-// Under an uncut marker a bare "TL" / "£" is not a listing token ("Ahmet Yılmaz (TL ofis)"): a currency
-// must touch a number, or the line must hold an area / dotted price.
-const CUR = String.raw`(?:[£$€₺]|(?<![\p{L}\p{N}])(?:TL|GBP|STG|EUR|USD)(?![\p{L}\p{N}]))`
-const NUMBERED_CURRENCY = new RegExp(String.raw`\d\s{0,2}${CUR}|${CUR}\s{0,2}\d`, 'u')
-const tailListingToken = s => NUMBERED_CURRENCY.test(s) || LISTING_AREA.test(s) || LISTING_PRICE.test(s)
-const wordCount = s => (s.match(/\S+/g) || []).length
-function listingLabelLine(line) {
-  const m = /^([^:]{1,60}):\s*(.{1,120})$/u.exec(line)
-  if (!m) return false
-  const value = m[2].trim()
-  return LISTING_VALUE.test(value) || tailListingToken(value)
-}
-function uncutMarkerTail(s) {
-  const first = s.search(MARKER_G)
-  if (first < 0) return false
-  const lines = s.slice(first).split('\n', 400)
-  const rest = lines[0].replace(MARKER_G, '').replace(/^[^\p{L}\p{N}]+/u, '').trim()
-  lines[0] = rest
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(LEADING_BULLET, '').trim()
-    if (line.length === 0) continue
-    if (line.length <= LINE_MAX && (URL_RE.test(line) || HANDLE_RE.test(line) || OBFUSCATED_EMAIL_RE.test(line))) return true
-    if (wordCount(line) > SHORT_WORDS || tailListingToken(line) || listingLabelLine(line)) continue
-    // the marker line's own remainder is prose ("ofisimiz açık.") unless it is capitalised like a name
-    if (i === 0 && !/^\p{Lu}/u.test(line.replace(/\s*:\s*$/, ''))) continue
-    return true
-  }
-  return false
-}
 
 // Which kinds of contact data are in `text`. Names only — never the matched strings, so a
 // caller can log the result in a public run.
@@ -217,7 +173,6 @@ export function contactKinds(text) {
   if (at && HANDLE_RE.test(s)) kinds.push('handle')
   if (MAY_BE_WHATSAPP.test(s) && WHATSAPP_RE.test(s)) kinds.push('whatsapp')
   if (s.includes(':') && s.split('\n').some(isContactLine)) kinds.push('contact-line')
-  if (uncutMarkerTail(s)) kinds.push('uncut-marker')
   return kinds
 }
 
@@ -238,33 +193,38 @@ function segmentsOf(text) {
   return segs
 }
 
-function blockCutIndex(text) {
-  const cuts = []
-  for (const s of segmentsOf(text)) {
-    let first = true
-    for (const m of s.raw.matchAll(MARKER_G)) {
-      const atStart = first && plainOf(s.raw.slice(0, m.index)) === ''
-      first = false
-      cuts.push(atStart ? s.start : s.start + s.tokLen + m.index)
-    }
-  }
-  // A later marker's tail is a SUFFIX of an earlier one's, so "short and token-free" holds for
-  // a suffix of the markers: walk from the last one back, and the earliest that still
-  // qualifies is the cut. Also bounds the work: only markers near the end are ever measured.
-  let best = -1
-  for (let i = cuts.length - 1; i >= 0; i--) {
-    if (text.length - cuts[i] > RAW_TAIL_MAX) break
-    const tail = plainOf(text.slice(cuts[i]))
-    if (tail.length > TAIL_MAX || hasListingToken(tail)) break
-    best = cuts[i]
-  }
-  return best
+// Where the cut starts: the FIRST marker in the text, moved back to the start of its segment when
+// nothing but tags and whitespace precedes it there (so "<li><b>İletişim" leaves no dangling "•").
+function cutIndex(text) {
+  const m = CONTACT_MARKER.exec(text)
+  if (!m) return -1
+  const segs = segmentsOf(text)
+  let s = segs[0]
+  for (const g of segs) { if (g.start > m.index) break; s = g }
+  if (m.index < s.start + s.tokLen) return s.start
+  return plainOf(text.slice(s.start + s.tokLen, m.index)) === '' ? s.start : m.index
+}
+
+// Did the first marker open a short trailing contact block (true), or is the tail long / does it
+// carry listing content (false)?
+function opensTrailingBlock(text, cut) {
+  if (text.length - cut > RAW_TAIL_MAX) return false
+  const tail = plainOf(text.slice(cut))
+  return tail.length <= TAIL_MAX && !hasListingToken(tail)
+}
+
+// { cut, flagged } — no text. flagged is 'cut-with-content' when a cut removed a tail that is not a
+// short token-free block, else null.
+export function contactCutReport(html) {
+  const text = decodeEntities(html)
+  const cut = cutIndex(text)
+  return { cut: cut >= 0, flagged: cut >= 0 && !opensTrailingBlock(text, cut) ? 'cut-with-content' : null }
 }
 
 // Plain text that the marker cut removes ('' when nothing is cut). For the validator's TAIL_MAX report.
 export function removedTail(html) {
   const text = decodeEntities(html)
-  const i = blockCutIndex(text)
+  const i = cutIndex(text)
   return i < 0 ? '' : plainOf(text.slice(i))
 }
 
@@ -278,7 +238,7 @@ function dropContactLines(text) {
 
 export function stripContactBlock(html) {
   let text = decodeEntities(html)
-  const cut = blockCutIndex(text)
+  const cut = cutIndex(text)
   if (cut >= 0) text = text.slice(0, cut)
   text = dropContactLines(text)
   if (text.includes('@')) text = text.replace(globalOf(EMAIL_RE), '')
