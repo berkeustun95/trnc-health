@@ -51,7 +51,8 @@ export const SOURCES = [
   rss({ key: 'meb-iod', name: 'İlköğretim Dairesi', institution: 'İlköğretim Dairesi', url: 'https://iod.mebnet.net/feed/', category: 'egitim', rank: 2 }),
   html({ key: 'meb-yobis', name: 'YOBİS — Yükseköğrenim duyuruları', institution: 'Milli Eğitim Bakanlığı', url: 'https://yobis.mebnet.net/', parser: 'yobis', category: 'egitim', rank: 2 }),
   rss({ key: 'yodak', name: 'YÖDAK — Duyurular', institution: 'YÖDAK', url: 'https://yodak.gov.ct.tr/haberler/duyurular.html?format=feed&type=rss', category: 'egitim', crawl_delay_s: 15, rank: 3 }),
-  html({ key: 'genclik', name: 'Gençlik Dairesi', institution: 'Gençlik Dairesi', url: 'http://genclik.gov.ct.tr/HABERLER', parser: 'easydnn', category: 'egitim', crawl_delay_s: 5, rank: 3 }),
+  html({ key: 'genclik', name: 'Gençlik Dairesi', institution: 'Gençlik Dairesi', url: 'http://genclik.gov.ct.tr/HABERLER', parser: 'easydnn', category: 'egitim', crawl_delay_s: 5, rank: 3,
+    active: false }),   // paused 2026-10-26: HTTP 503 for 104+ runs; weekly recheck (duyurular-paused-recheck)
   html({ key: 'euburs', name: 'AB Burs Programı', institution: 'AB Burs Programı', url: 'https://www.euburs.eu/announcements', parser: 'euburs', category: 'egitim' }),
   rss({ key: 'akun-munhal', name: 'Akdeniz Karpaz Üniversitesi — Münhal', institution: 'Akdeniz Karpaz Üniversitesi', url: 'https://akun.edu.tr/category/munhal/feed/', category: 'egitim', filter_mode: 'all', region: 'lefkosa' }),
   rss({ key: 'akun-duyurular', name: 'Akdeniz Karpaz Üniversitesi — Duyurular', institution: 'Akdeniz Karpaz Üniversitesi', url: 'https://akun.edu.tr/category/duyurular/feed/', category: 'egitim', region: 'lefkosa' }),
@@ -62,7 +63,8 @@ export const SOURCES = [
   rss({ key: 'itu-kktc-oim', name: 'İTÜ-KKTC — Öğrenci İşleri', institution: 'İTÜ-KKTC', url: 'https://oim.kktc.itu.edu.tr/index.php/en/announcements?format=feed&type=rss', category: 'egitim' }),
   html({ key: 'asbu-kktc', name: 'ASBÜ KKTC — Duyurular', institution: 'Ankara Sosyal Bilimler Üniversitesi KKTC', url: 'https://kktc.asbu.edu.tr/tr/duyurular', parser: 'asbu', category: 'egitim' }),
   html({ key: 'emu-duyurular', name: 'DAÜ — Duyurular', institution: 'Doğu Akdeniz Üniversitesi', url: 'https://www.emu.edu.tr/duyurular', parser: 'emu', category: 'egitim', crawl_delay_s: 5, region: 'gazimagusa' }),
-  html({ key: 'gau-duyurular', name: 'GAÜ — Duyurular', institution: 'Girne Amerikan Üniversitesi', url: 'https://www.gau.edu.tr/servisler/duyurular', parser: 'gau', category: 'egitim', region: 'girne' }),
+  html({ key: 'gau-duyurular', name: 'GAÜ — Duyurular', institution: 'Girne Amerikan Üniversitesi', url: 'https://www.gau.edu.tr/servisler/duyurular', parser: 'gau', category: 'egitim', region: 'girne',
+    active: false }),   // paused 2026-10-26: HTTP 500 for 179+ runs; weekly recheck (duyurular-paused-recheck)
 
   // ─── İhaleler ────────────────────────────────────────────────────────────
   { key: 'ted-tcc', name: 'TED — AB Kıbrıs Türk Toplumu Yardım Programı', institution: 'Avrupa Birliği', url: 'https://api.ted.europa.eu/v3/notices/search',

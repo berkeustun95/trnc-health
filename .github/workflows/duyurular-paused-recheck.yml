@@ -1,0 +1,46 @@
+# ─── Duyurular: weekly recheck of paused sources (read-only) ─────────────────
+#
+# A source set active:false in scripts/duyurular/sources.mjs because its site is down on their
+# side (gau-duyurular, genclik: 2026-10-26) is fetched once a week with its own parser. If one
+# answers 200 WITH items, this opens an issue "Source back up: <name>" (GitHub emails it).
+# It never reactivates anything: that stays a reviewed edit of sources.mjs.
+# No secrets, no environment: nothing here touches the database.
+#
+#   gh workflow run duyurular-paused-recheck
+
+name: duyurular-paused-recheck
+
+on:
+  schedule:
+    # Mondays 06:00 UTC = 09:00 TRNC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+jobs:
+  recheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Check paused sources
+        run: node scripts/check-duyurular-paused.mjs --out=back.txt
+      - name: Open an issue per source that is back (once; an open issue is not duplicated)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while IFS=$'\t' read -r key name; do
+            [ -n "$key" ] || continue
+            title="Source back up: $name"
+            if gh issue list --state open --search "\"$title\" in:title" --json title --jq '.[].title' | grep -qxF "$title"; then
+              echo "already open: $title"; continue
+            fi
+            gh issue create --title "$title" --body "\`$key\` answered HTTP 200 with announcements in run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID.
+
+          It is still paused (\`active: false\` in \`scripts/duyurular/sources.mjs\`). To resume fetching, remove that line by PR."
+          done < back.txt
