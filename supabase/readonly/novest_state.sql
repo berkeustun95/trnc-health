@@ -16,6 +16,19 @@
 -- (PHONE_RE, CONTACT_MARKER). The Turkish İ is spelled out in the marker alternation; ~* is not used for it.
 -- Unicode spaces (U+00A0, U+2000-U+200B, U+202F, U+205F, U+3000, U+FEFF) are normalised to ' ' before
 -- matching: JS \s matches them, a Postgres ARE \s may not.
+-- agent_name is a HASH MATCH, so the two real agents' names are not written in this public repo.
+-- Every pair or triple of consecutive words (letters A-Za-zÇĞİIÖŞÜçğıöşüâîû, separated only by whitespace,
+-- exactly like the old \s+) in each scanned cell is canonicalised: İ, I and ı all become i, then lower(),
+-- single spaces. The old regex had no word boundaries, so for pairs the first word is also tried as every
+-- suffix (up to 20 chars) and the second as every prefix (up to 20 chars); triples are matched whole.
+-- sha256 of the UTF-8 bytes (hex) is looked up in the digest list in agent_digests below.
+-- That folds the old regex's İ/I and ı/i spelling variants into one digest per person.
+-- The match is slightly wider than the old regex: case-insensitive and ı/i-insensitive. The control digest
+-- only counts on the synthetic control rows (is_control), never on a real listing. The masked
+-- length printed for a hit is the canonical length (whitespace runs collapsed). Honest limit: names are low
+-- entropy, so a digest in a public list can be dictionary-guessed; the names are public on the partner's own
+-- site anyway, the point is only to keep them out of this repo and its logs.
+-- The control digest is a FICTIONAL name, so control_flagged.agent_name still proves the hash path works.
 -- Positive control: one synthetic segment PER KIND goes through the SAME cells/kinds/hits path;
 -- control_flagged says whether each kind is flagged by its OWN segment and must be all true, otherwise
 -- THIS FILE is wrong (a clean hits_by_kind then means nothing).
@@ -48,7 +61,7 @@ ctl(kind, txt) as (values
   ('email',    'x@example.com'),
   ('whatsapp', 'wa.me'),
   ('marker',   'İletişim'),
-  ('agent_name', 'Ahmet Ulutekin'),
+  ('agent_name', 'Zeynep Karaoglu'),
   ('agent_name_heuristic', 'Deneme Kişi : ')
 ),
 rows_in as (
@@ -68,7 +81,6 @@ kinds(kind, re, flags) as (values
   ('email',    '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}', 'g'),
   ('whatsapp', 'wa\.me|whatsapp|api\.whatsapp', 'gi'),
   ('marker',   'İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi', 'g'),
-  ('agent_name', 'Ahmet\s+Ulutekin|[İI]smail\s+Pirgal[ıi]', 'g'),
   ('agent_name_heuristic', '[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\s*:', 'g')
 ),
 hits as (
@@ -76,7 +88,35 @@ hits as (
     from cells c cross join kinds k
          cross join lateral regexp_matches(c.val, k.re, k.flags) m
 ),
-real_hits as (select * from hits where ctl is null),
+agent_digests(digest, is_control) as (values
+  ('35b3dae4c186a223f20e1e191b43ba3a222c47d0a6088f8da5c058bc08993e08', true),  -- control digest (fictional name)
+  ('eb8c64460d429b08864a622e089f28ca7bff7451dafbb1dc28c4f20ab11e6645', false),
+  ('f7f6ec6225e0c0195dbd980568b5ea8880e7fd07ff06963a69a08583ce6a32bc', false)
+),
+name_runs as (
+  select c.external_id, c.ctl, c.col, regexp_split_to_array(r[1], E'\\s+') as a
+    from cells c
+         cross join lateral regexp_matches(c.val, '[A-Za-zÇĞİIÖŞÜçğıöşüâîû]+(?:\s+[A-Za-zÇĞİIÖŞÜçğıöşüâîû]+)+', 'g') r
+),
+name_cands as (
+  select x.external_id, x.ctl, x.col, array_to_string(x.a[i:i + 2], ' ') as cand
+    from name_runs x
+         cross join lateral generate_series(1, cardinality(x.a) - 2) i
+  union all
+  select x.external_id, x.ctl, x.col, right(x.a[i], k) || ' ' || left(x.a[i + 1], m)
+    from name_runs x
+         cross join lateral generate_series(1, cardinality(x.a) - 1) i
+         cross join lateral generate_series(1, least(length(x.a[i]), 20)) k
+         cross join lateral generate_series(1, least(length(x.a[i + 1]), 20)) m
+),
+name_hits as (
+  select n.external_id, n.ctl, n.col, 'agent_name'::text as kind, n.cand as hit
+    from name_cands n join agent_digests d
+      on d.digest = encode(sha256(convert_to(lower(translate(n.cand, 'İIı', 'iii')), 'UTF8')), 'hex')
+   where d.is_control = (n.ctl is not null)
+),
+all_hits as (select * from hits union all select * from name_hits),
+real_hits as (select * from all_hits where ctl is null),
 act as (select * from nov where status = 'active'),
 vis as (select a.id, a.external_id from act a where exists (select 1 from public.property_images i where i.property_id = a.id)),
 hid as (select a.external_id from act a where a.id not in (select id from vis)),
@@ -121,13 +161,13 @@ select json_build_object(
                     from pg_policies where schemaname = 'public' and tablename = 'properties' and policyname = 'props_hide_photoless_novest'),
   'hits_by_kind', (select coalesce(json_object_agg(kind, n), '{}'::json) from (select kind, count(*) n from real_hits group by kind) s),
   'listings_with_hits', (select count(distinct external_id) from real_hits),
-  'agent_name_heuristic_note', 'agent_name_heuristic = Capitalised Word + Capitalised Word + optional spaces + colon; a HEURISTIC, expect false positives; agent_name = baseline literal list',
+  'agent_name_heuristic_note', 'agent_name_heuristic = Capitalised Word + Capitalised Word + optional spaces + colon; a HEURISTIC, expect false positives; agent_name = sha256 digest list (hash match, no names in repo)',
   'hits_truncated', (select count(*) from real_hits) > 400,
   'hits', (select coalesce(json_agg(json_build_object('external_id', external_id, 'column', col, 'kind', kind,
               'masked', case when kind in ('agent_name', 'agent_name_heuristic', 'email') then '…' || length(hit)
                                   else left(hit, 3) || '…' || length(hit) end) order by external_id, col, kind), '[]'::json)
              from (select * from real_hits order by external_id, col, kind limit 400) h),
-  'control_flagged', (select json_object_agg(k.kind, exists (select 1 from hits h where h.ctl = k.kind and h.kind = k.kind)) from kinds k),
+  'control_flagged', (select json_object_agg(k.kind, exists (select 1 from all_hits h where h.ctl = k.kind and h.kind = k.kind)) from (select kind from kinds union select 'agent_name') k),
   'cut_off', json_build_object(
     'count', (select count(*) from cut),
     'of_active_with_description', (select count(*) from desc_act),
