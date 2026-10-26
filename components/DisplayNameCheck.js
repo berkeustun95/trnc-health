@@ -132,8 +132,8 @@ export function NameFeedback({ state, lang, onPick }) {
 
 const s = StyleSheet.create({
   okRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 7 },
-  ok: { color: colors.success, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  err: { color: colors.danger, fontSize: 13, marginTop: 7, lineHeight: 19 },
+  ok: { color: colors.primaryDark, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  err: { color: colors.dangerInk, fontSize: 13, marginTop: 7, lineHeight: 19 },
   muted: { color: colors.textSecondary, fontSize: 13, marginTop: 7 },
   link: { color: colors.primary, fontSize: 13, fontFamily: 'Inter_700Bold', marginTop: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
