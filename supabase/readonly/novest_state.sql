@@ -4,7 +4,7 @@
 --
 -- READ-ONLY: one SELECT, no writes. THE RUN LOG IS PUBLIC: no full phone, e-mail, name, link or
 -- cron `command` text is ever selected. Phone / e-mail / whatsapp / marker hits are masked as
--- left(hit,3) || '…' || length(hit); agent-name hits print only '…' || length(hit) (no letters).
+-- left(hit,3) || '…' || length(hit); e-mail and agent-name hits print only '…' || length(hit) (no letters).
 -- cron command is only tested with LIKE and never returned. net._http_response is NOT read (it has no
 -- job column, so it could misattribute a response, and a permission error would abort the report).
 --
@@ -124,7 +124,7 @@ select json_build_object(
   'agent_name_heuristic_note', 'agent_name_heuristic = Capitalised Word + Capitalised Word + optional spaces + colon; a HEURISTIC, expect false positives; agent_name = baseline literal list',
   'hits_truncated', (select count(*) from real_hits) > 400,
   'hits', (select coalesce(json_agg(json_build_object('external_id', external_id, 'column', col, 'kind', kind,
-              'masked', case when kind in ('agent_name', 'agent_name_heuristic') then '…' || length(hit)
+              'masked', case when kind in ('agent_name', 'agent_name_heuristic', 'email') then '…' || length(hit)
                                   else left(hit, 3) || '…' || length(hit) end) order by external_id, col, kind), '[]'::json)
              from (select * from real_hits order by external_id, col, kind limit 400) h),
   'control_flagged', (select json_object_agg(k.kind, exists (select 1 from hits h where h.ctl = k.kind and h.kind = k.kind)) from kinds k),
