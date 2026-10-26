@@ -104,9 +104,12 @@ export function decodeEntities(s) {
 //     value is a feature label ("Banyo Sayısı : 2", "Site Fasiliteleri :") and stays.
 //
 // A marker that did NOT cut leaves its tail in the text. The strip never throws (the Edge
-// Function calls it outside its try); contactKinds() below reports 'uncut-marker' when that
-// tail still has a contact-ish SHAPE, and assertNoContact() refuses the row. A marker in
-// prose with no such shape is kept: the sentence is content, not a leak.
+// Function calls it outside its try); contactKinds() below reports 'uncut-marker' and
+// assertNoContact() refuses the row. The rule is ALL-OR-NOTHING PER TAIL, read from the first
+// marker left in the text: the row is refused when any line other than the marker line is
+// SHORT (<= 6 words) and is neither a listing-token line (currency, m2, price) nor a
+// "Label : value" feature line with a listing value, or when any line holds a URL, @handle
+// or [at] e-mail. A marker followed only by longer prose is kept: the sentence is content.
 //
 // TRUNCATION IS NOT THE GUARD. assertNoContact() is the part that survives a new wording,
 // and the same detectors run daily over what is stored (scripts/check-novest-descriptions.mjs).
@@ -152,8 +155,6 @@ const isContactLine = line => line.length <= LINE_MAX && CONTACT_LINE_RE.test(li
 const globalOf = re => new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')
 const MARKER_G = globalOf(CONTACT_MARKER)
 
-// A line that is only a name: 2-5 words, the first capitalised, no digits, optional colon.
-const NAME_ONLY_RE = /^\p{Lu}[\p{L}'’.\-]*(?:\s+\p{L}[\p{L}'’.\-]*){1,4}$/u
 const LEADING_BULLET = /^[\s•·*\-–]+/
 
 // What a marker's tail may still contain and be a contact block: nothing the listing is about.
@@ -166,18 +167,40 @@ const LISTING_AREA = /(?<!\p{L})m[2²](?!\p{N})|metrekare/iu
 const LISTING_PRICE = /(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?![\d]|[.\-\s]\d)/
 const hasListingToken = s => LISTING_CURRENCY.test(s) || LISTING_AREA.test(s) || LISTING_PRICE.test(s)
 
-// True when the text after the LAST marker still has a contact-ish shape: a name-only line,
-// a URL / website, an @handle or [at] e-mail (phones and e-mails are their own kinds).
+// True when the text from the FIRST marker still left in `s` (tails nest, so that tail covers
+// every later marker) holds anything that could be contact data. All or nothing per tail: the
+// marker line aside, ANY short line (<= SHORT_WORDS words) is a possible name / office / agency
+// unless it carries a listing token or is a "Label : value" feature line with a listing value;
+// a URL, @handle or [at] e-mail on any line also refuses. Longer prose lines pass here (the
+// phone / e-mail / handle detectors still run on them). Extra refusals are accepted, a leak is not.
+const SHORT_WORDS = 6
+const LISTING_VALUE = /^(?:\d[\d\s+.,\/-]{0,30}|var|yok|evet|hayır|mevcut|yes|no)$/iu
+// Under an uncut marker a bare "TL" / "£" is not a listing token ("Ahmet Yılmaz (TL ofis)"): a currency
+// must touch a number, or the line must hold an area / dotted price.
+const CUR = String.raw`(?:[£$€₺]|(?<![\p{L}\p{N}])(?:TL|GBP|STG|EUR|USD)(?![\p{L}\p{N}]))`
+const NUMBERED_CURRENCY = new RegExp(String.raw`\d\s{0,2}${CUR}|${CUR}\s{0,2}\d`, 'u')
+const tailListingToken = s => NUMBERED_CURRENCY.test(s) || LISTING_AREA.test(s) || LISTING_PRICE.test(s)
+const wordCount = s => (s.match(/\S+/g) || []).length
+function listingLabelLine(line) {
+  const m = /^([^:]{1,60}):\s*(.{1,120})$/u.exec(line)
+  if (!m) return false
+  const value = m[2].trim()
+  return LISTING_VALUE.test(value) || tailListingToken(value)
+}
 function uncutMarkerTail(s) {
-  let idx = -1
-  for (const m of s.matchAll(MARKER_G)) idx = m.index
-  if (idx < 0) return false
-  const lines = s.slice(idx).split('\n', 400)
-  lines[0] = lines[0].replace(MARKER_G, '').replace(/^[^\p{L}\p{N}]+/u, '')
-  for (const raw of lines) {
-    const line = raw.replace(LEADING_BULLET, '').replace(/\s*:\s*$/, '').trim()
-    if (line.length === 0 || line.length > LINE_MAX) continue
-    if (NAME_ONLY_RE.test(line) || URL_RE.test(line) || HANDLE_RE.test(line) || OBFUSCATED_EMAIL_RE.test(line)) return true
+  const first = s.search(MARKER_G)
+  if (first < 0) return false
+  const lines = s.slice(first).split('\n', 400)
+  const rest = lines[0].replace(MARKER_G, '').replace(/^[^\p{L}\p{N}]+/u, '').trim()
+  lines[0] = rest
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(LEADING_BULLET, '').trim()
+    if (line.length === 0) continue
+    if (line.length <= LINE_MAX && (URL_RE.test(line) || HANDLE_RE.test(line) || OBFUSCATED_EMAIL_RE.test(line))) return true
+    if (wordCount(line) > SHORT_WORDS || tailListingToken(line) || listingLabelLine(line)) continue
+    // the marker line's own remainder is prose ("ofisimiz açık.") unless it is capitalised like a name
+    if (i === 0 && !/^\p{Lu}/u.test(line.replace(/\s*:\s*$/, ''))) continue
+    return true
   }
   return false
 }

@@ -136,6 +136,21 @@ if (self) {
   refused('foreign phone under an uncut marker', PRICED(`<p>${I1}</p>`), 'phone')
   const longProse = '<p>' + 'Girne merkezde denize yakın lüks daire havuzlu site. '.repeat(10) + '</p>'
   refused('long tail (> TAIL_MAX) with a name-only line', `<p>Bilgi için ofisimiz açık.</p>${longProse}<p>${N1}</p>`, 'uncut-marker')
+  // B2 (security re-review 2026-10-26): under an uncut marker ANY short non-listing line is refused.
+  const tok = '<p>Fiyat: £250.000</p>'
+  const UM = inner => `<p>Güzel daire</p><p>İletişim :</p>${inner}${tok}`
+  refused('two markers, name between them (tails nest)',
+    `<p>Güzel daire</p><p>İletişim :</p><p>${N1}</p><p>Fiyat £250.000</p><p>Detaylı bilgi için ofisimize gelin, 120 m2 showroom.</p>`, 'uncut-marker')
+  refused('name - title', UM(`<ul><li>${N1} - Satış Danışmanı</li></ul>`), 'uncut-marker')
+  refused('name, agency', UM(`<ul><li>${N1}, Novest</li></ul>`), 'uncut-marker')
+  refused('two names with a slash', UM(`<ul><li>${N1} / Mehmet Kaya</li></ul>`), 'uncut-marker')
+  refused('name (office)', UM(`<ul><li>${N1} (TL ofis)</li></ul>`), 'uncut-marker')
+  refused('6-word name', UM('<ul><li>Av Mehmet Ali Can Örnek Yılmaz</li></ul>'), 'uncut-marker')
+  refused('capitalised name on the marker line', `<p>Güzel daire</p><p>İletişim : ${N1} - Danışman</p>${tok}`, 'uncut-marker')
+  {
+    const got = cleanDescription(UM('<p>Banyo Sayısı : 2</p><p>Havuz : Var</p>'))
+    contactKinds(got).includes('uncut-marker') ? fail('feature-label lines under a marker were refused') : ok('feature-label lines (digits / known word) under a marker pass')
+  }
   // Decision: a marker in prose with no contact-ish shape after it is content, not a leak.
   strip('marker in long prose, no contact shape: text kept',
     `<p>Bilgi için ofisimiz açık.</p>${longProse}<p>Fiyat: £250.000</p>`,
