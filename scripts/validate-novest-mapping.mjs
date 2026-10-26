@@ -13,8 +13,8 @@
 // decoration — three of the towing module's checks were green while parsing nothing.
 
 import {
-  getAll, mapPropertyType, extractDeedType, cleanDescription, assertNoPhone,
-  decodeEntities, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
+  getAll, mapPropertyType, extractDeedType, cleanDescription, assertNoContact,
+  decodeEntities, htmlToText, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
 } from '../supabase/functions/_shared/novest-feed.mjs'
 import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
 
@@ -47,13 +47,67 @@ if (self) {
   // 2. The phone assert must fire on a body whose contact block used different wording,
   //    which is the exact way truncation-alone fails.
   try {
-    assertNoPhone('self-test', cleanDescription('<p>Güzel daire</p><p>Ara: 0533 834 67 70</p>'))
-    fail('phone assert did NOT fire on an unmarked contact line')
-  } catch { ok('phone assert fires when the İletişim marker is absent') }
+    assertNoContact('self-test', cleanDescription('<p>Güzel daire</p><p>Hemen arayın 0533 834 67 70 numaradan</p>'))
+    fail('phone assert did NOT fire on an unmarked phone in prose')
+  } catch { ok('phone assert fires when the İletişim marker is absent and the phone is in prose') }
   try {
-    assertNoPhone('self-test', 'Yenikent Bölgesinde Satılık 2+1 Daire')
+    assertNoContact('self-test', 'Yenikent Bölgesinde Satılık 2+1 Daire')
     ok('phone assert stays quiet on a clean string')
   } catch (e) { fail('phone assert false-positived on clean text:', e.message) }
+
+  // 2b. THE CONTACT STRIP, one fixture per shape (fictional names and numbers only). Each
+  //     compares cleanDescription() with the exact text it must produce.
+  const P1 = '0500 000 00 01', P2 = '0500 000 00 02'
+  const strip = (label, html, want) => {
+    const got = cleanDescription(html)
+    got === want ? ok(`strip: ${label}`) : fail(`strip: ${label}\n        got    ${JSON.stringify(got)}\n        wanted ${JSON.stringify(want)}`)
+  }
+  strip('standard block, 1 agent',
+    `<p>Güzel daire</p><ul><li>90M2</li></ul><p><b>İletişim :</b></p><ul><li><b>Ad Soyad : ${P1}</b></li></ul>`,
+    'Güzel daire\n• 90M2')
+  strip('standard block, 2 agents',
+    `<p>Güzel daire</p><ul><li>90M2</li></ul><p><b>İletişim :</b></p><ul><li><b>Ad Soyad : ${P1}</b></li><li><b>Ad Soyad : ${P2}</b></li></ul>`,
+    'Güzel daire\n• 90M2')
+  strip('block with names and no numbers (22217 shape)',
+    '<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ad Soyad :</b></li><li><b>Ad Soyad</b> :</li></ul>',
+    'Güzel daire')
+  strip('mid-text marker + price, then block (21016 shape): prose kept, block removed',
+    `<p>Villa metni.</p><p>Detaylı bilgi ve satış için bize iletişime geçin.</p><p>Fiyat: £250.000</p><p><b>İletişim :</b></p><ul><li><b>Ad Soyad : ${P1}</b></li></ul>`,
+    'Villa metni.\nDetaylı bilgi ve satış için bize iletişime geçin.\nFiyat: £250.000')
+  strip('block with bare phone lines under a bare marker (22419/22426 shape)',
+    `<p>Güzel daire</p><ul><li>£100.000</li></ul><p><b>İletişim : </b></p><ul><li><b>${P1}</b></li></ul>`,
+    'Güzel daire\n• £100.000')
+  strip('marker line carries the name, phone on the next line (22249 shape)',
+    `<div>Fiyat: 100.000 STG</div><div></div><div>İletişim: Ad Soyad</div><div>${P1}</div>`,
+    'Fiyat: 100.000 STG')
+  strip('marker line with name and phone, hashtags after (18029 shape)',
+    `<div>Güzel bina £ 1.000.000</div><div>İletişim 📞 Ad Soyad : ${P1}</div><div>#Kibris #Satilik</div>`,
+    'Güzel bina £ 1.000.000')
+  strip('marker mid-text with NO block after: text unchanged',
+    '<p>Bilgi için ofisimizi ziyaret edin.</p><p>Fiyat: £250.000</p><ul><li>90M2</li></ul>',
+    'Bilgi için ofisimizi ziyaret edin.\nFiyat: £250.000\n• 90M2')
+  strip('e-mail, no marker',
+    '<p>Bize e-posta ile ulaşın ad.soyad@example.com adresinden.</p>',
+    'Bize e-posta ile ulaşın adresinden.')
+  strip('wa.me link, no marker',
+    '<p>Yazın https://wa.me/905000000001 şimdi</p>', 'Yazın şimdi')
+  strip('WhatsApp link without scheme, no marker',
+    '<p>Yazın api.whatsapp.com/send?phone=905000000001 şimdi</p>', 'Yazın şimdi')
+  strip('contact line, no marker',
+    `<p>Güzel daire</p><p>Ad Soyad : ${P1}</p><p>Son satır</p>`, 'Güzel daire\nSon satır')
+  const labels = '<p>Banyo Sayısı : 2</p><ul><li>Mutfak Dolapları :</li><li>Site Fasiliteleri :</li><li>Havuz</li><li>Site Fasiliteleri :</li></ul>'
+  strip('feature labels (incl. empty-value) survive byte-for-byte', labels, htmlToText(labels))
+  strip('feature labels survive in front of a real block',
+    `${labels}<p><b>İletişim :</b></p><ul><li>Ad Soyad : ${P1}</li></ul>`, htmlToText(labels))
+  const deedHtml = `<ul><li>Türk Koçanlı</li></ul><p>İletişim :</p><ul><li>Ad Soyad : ${P1}</li></ul>`
+  extractDeedType(deedHtml) === 'turkish' ? ok('deed still read in front of a block') : fail('deed lost in front of a block')
+  // NBSP inside a phone in prose: not a contact line, so nothing strips it — the assert must refuse.
+  const nb = cleanDescription('<p>Bizi 0500\u00a0000\u00a000\u00a001 numarasından arayın</p>')
+  try { assertNoContact('self-test', nb); fail('NBSP-separated phone was NOT refused') }
+  catch (e) { /phone/.test(e.message) && !/0500/.test(e.message) ? ok('NBSP-separated phone is refused (message names the kind, not the number)') : fail('refusal wrong:', e.message) }
+  for (const [kind, text] of [['email', 'yaz ad.soyad@example.com'], ['whatsapp', 'bak wa.me/message/ABCDEF']]) {
+    try { assertNoContact('self-test', text); fail(`${kind} was NOT refused`) } catch { ok(`${kind} is refused`) }
+  }
 
   // 3. num() must reject rather than coerce. Number('') === 0 is the bug this prevents.
   for (const bad of ['', '  ', 'yok', 'N/A', '130.000 GBP', null, undefined, '12a'])
@@ -142,7 +196,7 @@ for (const p of props) {
 
   const desc = cleanDescription(p.content.rendered)
   const title = decodeEntities(p.title.rendered)
-  try { assertNoPhone(String(p.id), title, desc) } catch (e) { phoneLeaks.push(e.message) }
+  try { assertNoContact(String(p.id), title, desc) } catch (e) { phoneLeaks.push(e.message) }
 
   const lat = num(meta(p, 'houzez_geolocation_lat'))
   const lng = num(meta(p, 'houzez_geolocation_long'))

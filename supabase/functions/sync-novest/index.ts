@@ -25,7 +25,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
-  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoPhone,
+  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoContact,
   num, int, meta, mapPropertyType, extractDeedType, coordsInCyprus,
   INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../_shared/novest-feed.mjs'
@@ -150,7 +150,7 @@ Deno.serve(async () => {
 
       // Throws -> the listing is skipped, never stored. A missing listing is a smaller
       // failure than a partner's private mobile number published inside it.
-      try { assertNoPhone(String(p.id), title, description) }
+      try { assertNoContact(String(p.id), title, description) }
       catch (e) { skipped.push(`${p.id}: ${(e as Error).message}`); continue }
 
       if (coordsInCyprus(num(meta(p, 'houzez_geolocation_lat')), num(meta(p, 'houzez_geolocation_long')))) {

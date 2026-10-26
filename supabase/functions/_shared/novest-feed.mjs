@@ -82,32 +82,127 @@ export function decodeEntities(s) {
 //
 // Every body ends with a contact block:
 //     <p><b>İletişim :</b></p>
-//     <ul><li><b>Ahmet Ulutekin : 0542 861 04 30</b></li>
-//         <li><b>İsmail Pirgalı : 0533 834 67 70</b></li></ul>
+//     <ul><li><b>Ad Soyad : 05xx xxx xx xx</b></li>
+//         <li><b>Ad Soyad : 05xx xxx xx xx</b></li></ul>
+// (one or two agents; a block can also carry names with no number at all)
 //
 // C2: no per-property agent surfaces anywhere in ADA, so these come out BEFORE storing,
 // never at render — a stored phone is a leak whatever the UI does with it.
 //
-// Measured across all 91 live listings on 2026-08-24:
-//   • 91/91 carry an İletişim marker (spellings: 'İletişim' x90, 'iletişim' x1)
-//   • ZERO listings have a phone-shaped string anywhere BEFORE the marker
-//   • 60 listings carry one phone, 31 carry two — the block is plural
+// Two rules, in this order (2026-10-26):
 //
-// TRUNCATION ALONE IS NOT THE GUARD. It works today and fails SILENTLY the day they
-// write "Bilgi için" instead. assertNoPhone() below is the part that survives that, and
-// it refuses the row rather than storing a leak. Same discipline as the towing checks:
-// a guard nobody has watched refuse something is not a guard.
-const CONTACT_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
+//  1. A marker (İletişim, Bilgi için, Detaylı bilgi) cuts the text ONLY when it opens a
+//     TRAILING CONTACT BLOCK: every non-empty line after it is a contact line (a name, a
+//     colon, then a phone / e-mail / WhatsApp link / nothing). A marker followed by anything
+//     else — "Fiyat: £…", prose — is not a block start and the text is kept. The old
+//     first-marker cut silently dropped the sentence AND the price line of a listing that
+//     says "Detaylı bilgi ve satış için bize iletişime geçin." before its price.
+//  2. Anywhere in the text: e-mail addresses, WhatsApp links and whole contact lines
+//     (name : phone/e-mail/WhatsApp) are removed. A name-shaped line with an EMPTY or other
+//     value outside a block is a feature label ("Banyo Sayısı : 2", "Site Fasiliteleri :")
+//     and stays.
+//
+// TRUNCATION IS NOT THE GUARD. assertNoContact() below is the part that survives a new
+// wording, and it refuses the row rather than storing a leak. The same detectors run daily
+// over what is stored (scripts/check-novest-descriptions.mjs).
+export const CONTACT_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
 
 // TRNC/TR mobiles: 05xx xxx xx xx, with or without +90, and any separator run.
 // Also catches the (0392) landline shape used elsewhere in the feed's prose.
 export const PHONE_RE =
   /(?:\+?90[\s.\-]?)?\(?0?\s?(?:5\d{2}|392|533|542|548)\)?[\s.\-]?\d{3}[\s.\-]?\d{2}[\s.\-]?\d{2}/
 
+export const EMAIL_RE = /[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}\-]+(?:\.[\p{L}\p{N}\-]+)*\.\p{L}{2,}/u
+
+export const WHATSAPP_RE =
+  /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com|(?:www\.|web\.|chat\.)?whatsapp\.com)(?:\/[^\s<>"')\]]*)?/i
+
+const NAME_COLON =
+  "^[\\s•·*\\-–]*\\p{Lu}[\\p{L}'’.\\-]*(?:\\s+\\p{L}[\\p{L}'’.\\-]*){0,3}(?:\\s*\\([^)]*\\))?\\s*:(?!\\/\\/)\\s*"
+const NAME_COLON_RE = new RegExp(NAME_COLON, 'u')
+
+// A whole line: name-shaped, a colon, and a phone / e-mail / WhatsApp value somewhere after.
+export const CONTACT_LINE_RE =
+  new RegExp(`${NAME_COLON}.*?(?:${PHONE_RE.source}|${EMAIL_RE.source}|${WHATSAPP_RE.source}).*$`, 'u')
+
+const globalOf = re => new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')
+const VALUES_G = [PHONE_RE, EMAIL_RE, WHATSAPP_RE].map(globalOf)
+const BLOCK_LEFTOVER = /^[\s/,;|&+\-–()·.]*(?:whatsapp|wp|tel|gsm|mobil)?[\s/,;|&+\-–()·.]*$/i
+const MARKER_TAIL_MAX = 120   // a marker "line" longer than this is a paragraph, never a block header
+
+// Which kinds of contact data are in `text`. Names only — never the matched strings, so a
+// caller can log the result in a public run.
+export function contactKinds(text) {
+  const s = String(text ?? '')
+  const kinds = []
+  if (PHONE_RE.test(s)) kinds.push('phone')
+  if (EMAIL_RE.test(s)) kinds.push('email')
+  if (WHATSAPP_RE.test(s)) kinds.push('whatsapp')
+  if (s.split('\n').some(l => CONTACT_LINE_RE.test(l.trim()))) kinds.push('contact-line')
+  return kinds
+}
+
+// Line-ish segments of tag-bearing text. Each starts at its leading boundary token (tokLen
+// long), so a segment can be cut out whole, bullet and all.
+const BOUNDARY = /<\/(?:p|div|ul|ol|li|h[1-6])\s*>|<(?:li|p|div|ul|ol|h[1-6])(?:\s[^>]*)?>|<br\s*\/?>|\r?\n/gi
+const plainOf = raw => raw.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+
+function segmentsOf(text) {
+  const segs = []
+  let start = 0, tokLen = 0
+  for (const m of text.matchAll(BOUNDARY)) {
+    segs.push({ start, tokLen, end: m.index })
+    start = m.index; tokLen = m[0].length
+  }
+  segs.push({ start, tokLen, end: text.length })
+  for (const s of segs) { s.raw = text.slice(s.start + s.tokLen, s.end); s.plain = plainOf(s.raw) }
+  return segs
+}
+
+function stripValues(s) {
+  let out = s
+  for (const re of VALUES_G) out = out.replace(re, ' ')
+  return out
+}
+
+// A line that may sit inside a trailing contact block: name : value, a bare phone / e-mail /
+// WhatsApp line, or hashtags (18029 ends its block with "#Tag #Tag").
+function isBlockLine(plain) {
+  if (/^(?:#\S+\s*)+$/u.test(plain)) return true
+  const m = NAME_COLON_RE.exec(plain)
+  if (m) return BLOCK_LEFTOVER.test(stripValues(plain.slice(m[0].length)))
+  const rest = stripValues(plain)
+  return rest !== plain.replace(/\s+/g, ' ') && BLOCK_LEFTOVER.test(rest)
+}
+
+function cutTrailingBlock(text) {
+  const segs = segmentsOf(text)
+  let L = segs.length
+  while (L > 0 && (segs[L - 1].plain === '' || isBlockLine(segs[L - 1].plain))) L--
+  for (let i = Math.max(0, L - 1); i < segs.length; i++) {
+    const s = segs[i]
+    const m = CONTACT_MARKER.exec(s.plain)
+    if (!m || s.plain.length - m.index > MARKER_TAIL_MAX) continue
+    const rawM = CONTACT_MARKER.exec(s.raw)
+    const before = rawM ? plainOf(s.raw.slice(0, rawM.index)) : ''
+    return text.slice(0, before === '' ? s.start : s.start + s.tokLen + (rawM ? rawM.index : 0))
+  }
+  return text
+}
+
+function dropContactLines(text) {
+  return segmentsOf(text).map(s => {
+    if (!CONTACT_LINE_RE.test(s.plain)) return text.slice(s.start, s.end)
+    const tok = text.slice(s.start, s.start + s.tokLen)
+    return /^<li/i.test(tok) ? '' : tok
+  }).join('')
+}
+
 export function stripContactBlock(html) {
-  const text = decodeEntities(html)
-  const m = CONTACT_MARKER.exec(text)
-  return m ? text.slice(0, m.index) : text
+  let text = cutTrailingBlock(decodeEntities(html))
+  text = dropContactLines(text)
+  for (const re of [EMAIL_RE, WHATSAPP_RE]) text = text.replace(globalOf(re), '')
+  return text
 }
 
 // <li> -> a bullet line. The source uses one <li> per fact ("90M2", "2+1",
@@ -130,11 +225,12 @@ export function cleanDescription(html) {
 }
 
 // Throws. The caller drops the row rather than storing it — a listing missing from ADA
-// is a smaller failure than a partner's private mobile number published in it.
-export function assertNoPhone(label, ...fields) {
+// is a smaller failure than a partner's private contact published in it. The message names
+// the KIND only: callers print it into public run logs.
+export function assertNoContact(label, ...fields) {
   for (const f of fields) {
-    const hit = PHONE_RE.exec(String(f ?? ''))
-    if (hit) throw new Error(`${label}: a phone-shaped string survived the contact strip — ${JSON.stringify(hit[0])}`)
+    const kinds = contactKinds(f)
+    if (kinds.length) throw new Error(`${label}: ${kinds.join('+')} survived the contact strip`)
   }
 }
 

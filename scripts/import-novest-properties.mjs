@@ -47,7 +47,7 @@ import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 import {
-  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoPhone,
+  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoContact,
   num, int, meta, metaArray, mapPropertyType, extractDeedType, coordsInCyprus,
   INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../supabase/functions/_shared/novest-feed.mjs'
@@ -181,7 +181,7 @@ function toRow(p, ctx) {
 
   // Throws -> caller drops the row. A listing missing from ADA is a smaller failure than
   // a partner's private mobile published inside it.
-  assertNoPhone(label, title, description)
+  assertNoContact(label, title, description)
 
   // Reported, never written. All 91 carry the Houzez Miami default today; if this ever
   // fires, Novest has started placing real pins and that is a decision, not an import.
