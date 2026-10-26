@@ -284,10 +284,16 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
         {/* Decoding the clip takes ~0.6 s on the S20+; its first frames are this same still
             gate, so the still shows at once and the clip starts on top of it invisibly. */}
-        {reduce === false && (
+        {/* VIDEO_PATH: a TextureView inside a fading parent composites over black on Android
+            (measured 2026-10-26). LAST sits under FIRST + the clip, decoded early; on exit they
+            unmount so only LAST + wordmark + BG fade (the clip holds this frame once it ends). */}
+        {VIDEO_PATH && reduce === false && (
+          <Image source={LAST} fadeDuration={0} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+        )}
+        {reduce === false && !(VIDEO_PATH && leaving) && (
           <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
-        {reduce === false && VIDEO_PATH && (
+        {reduce === false && VIDEO_PATH && !leaving && (
           <ClipVideo top={top} cw={cw} ch={ch} onShown={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} />
         )}
         {reduce === false && !VIDEO_PATH && (
