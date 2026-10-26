@@ -63,6 +63,9 @@ const GUARDED = [
   // expo-speech-recognition (Ask Oli voice, VOICE_INPUT): components/OliMic.js requires it only
   // when requireOptionalNativeModule('ExpoSpeechRecognition') finds it, else the keyboard hint.
   'expo-speech-recognition',
+  // expo-video, expo-splash-screen, expo-system-ui (native splash, 1.4.2): added after the 1.4.1
+  // binaries shipped, so a top-level import would crash those on an OTA. require() in a function.
+  'expo-video', 'expo-splash-screen', 'expo-system-ui',
 ]
 
 const SKIP = new Set(['node_modules', '.git', 'assets', 'docs', 'web', 'supabase', 'scripts'])
