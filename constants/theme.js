@@ -113,7 +113,7 @@ export const gameColors = {
     512:  { bg: '#2E9E5B', text: '#FFFFFF' },
     1024: { bg: '#0E7C7B', text: '#FFFFFF' },
     2048: { bg: '#7C3AED', text: '#FFFFFF' },
-    high: { bg: '#1A2B33', text: '#FFFFFF' },   // >= 4096
+    high: { bg: colors.primaryDark, text: '#FFFFFF' },   // >= 4096
   },
 
   // Sudoku selection/peer highlights — no token equivalents.

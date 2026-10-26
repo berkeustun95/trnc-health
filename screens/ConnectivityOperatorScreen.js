@@ -324,7 +324,7 @@ const s = StyleSheet.create({
 
   tagRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   tag:           { backgroundColor: '#F0F4F6', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  tagText:       { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#4A5B66' },
+  tagText:       { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
   // 1080x420 = 2.571:1. aspectRatio rather than a fixed height so the artwork is never
   // cropped or letterboxed on a narrow device.
