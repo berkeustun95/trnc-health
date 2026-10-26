@@ -16,7 +16,9 @@
 #
 # PRUNE (removes images Novest dropped from a listing's gallery). OFF by default and NEVER on the
 # schedule: --prune is passed only when inputs.prune == 'true' AND the event is workflow_dispatch
-# (scripts/check-novest-prune.mjs asserts that line). Turning it on for cron, and the first applying
+# (scripts/check-novest-prune.mjs runs the real Mirror step in bash with node stubbed, over all
+# event x prune x apply combinations, and asserts that; mirror-novest-images.mjs refuses --prune in CI
+# unless it is a workflow_dispatch with prune=true). Turning it on for cron, and the first applying
 # prune, are Berke's call. Without apply=true a prune run only PRINTS the plan.
 #
 #   gh workflow run novest-images -f prune=true                # dry prune: prints what it would remove

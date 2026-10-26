@@ -48,7 +48,8 @@ import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { SOURCE, get, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { planPrune } from './lib/novest-prune-plan.mjs'
+import { planPrune, pruneRefusal, parseImageUrl } from './lib/novest-prune-plan.mjs'
+import { readAllRows } from './lib/read-all-rows.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -79,8 +80,9 @@ const dry = args.includes('--dry')
 const limitArg = args.indexOf('--limit')
 const prune = args.includes('--prune')
 const LIMIT = limitArg !== -1 ? Number(args[limitArg + 1]) : Infinity
-if (prune && process.env.GITHUB_EVENT_NAME === 'schedule') {
-  console.error('REFUSED: --prune never runs from the schedule.')
+const refusal = pruneRefusal({ prune, env: process.env })
+if (refusal) {
+  console.error(`REFUSED: ${refusal}`)
   process.exit(1)
 }
 prodWriteGuard({ wouldWrite: !dry, workflow: 'novest-images', dryHint: 'node scripts/mirror-novest-images.mjs --dry' })
@@ -150,10 +152,12 @@ const { data: props, error: pErr } = await supabase
 if (pErr) fail(`Reading properties failed: ${pErr.message}`)
 if (!props.length) fail(`No ${SOURCE} listings in the database. Run import-novest-properties.mjs first.`)
 
-const { data: haveImages, error: iErr } = await supabase
-  .from('property_images').select('property_id,source_url,is_primary')
-  .in('property_id', props.map(p => p.id))
-if (iErr) fail(`Reading property_images failed: ${iErr.message}`)
+let haveImages
+try {
+  haveImages = (await readAllRows((a, b) => supabase.from('property_images')
+    .select('property_id,source_url,is_primary', { count: 'exact' })
+    .in('property_id', props.map(p => p.id)).order('id').range(a, b))).rows
+} catch (e) { fail(`Reading property_images failed: ${e.message}`) }
 
 // THE RESUME KEY — (property_id, source_url), NOT source_url alone.
 //
@@ -244,22 +248,22 @@ const pendingCount = pending.reduce((m, j) => m.set(j.prop.external_id, (m.get(j
 // Returns true when it finished cleanly. Dry: prints the plan, deletes nothing.
 async function runPrune(incomplete, incoming = new Map()) {
   console.log('\n── prune ──')
-  const rows = []
-  let exact = null
-  for (let from = 0; ; from += 1000) {
-    const { data, error, count } = await supabase.from('property_images')
-      .select('id,property_id,url,sort_order,is_primary', { count: 'exact' })
-      .in('property_id', props.map(p => p.id)).order('id').range(from, from + 999)
-    if (error) { console.log(`  PRUNE ABORTED: reading property_images failed. Nothing deleted.`); return false }
-    exact = count
-    rows.push(...data)
-    if (data.length < 1000) break
-  }
-  if (rows.length !== exact) { console.log(`  PRUNE ABORTED: read ${rows.length} image rows, expected ${exact}. Nothing deleted.`); return false }
+  let rows, exact
+  try {
+    ;({ rows, exact } = await readAllRows((a, b) => supabase.from('property_images')
+      .select('id,property_id,url,source_url,sort_order,is_primary', { count: 'exact' })
+      .in('property_id', props.map(p => p.id)).order('id').range(a, b)))
+  } catch (e) { console.log(`  PRUNE ABORTED: reading property_images failed (${e.message}). Nothing deleted.`); return false }
 
-  const plan = planPrune({ listings: props, images: rows, feed: feedRefs, incomplete, incoming })
+  const served = new Map()
+  for (const [ext, ids] of feedRefs) {
+    served.set(ext, new Set(ids.filter(id => media.has(id)).map(id => pickVariant(media.get(id)).url)))
+  }
+  const offPattern = rows.filter(r => !parseImageUrl(r.url)).length
+  const plan = planPrune({ listings: props, images: rows, feed: feedRefs, incomplete, incoming, served })
   const sk = plan.skipped
   console.log(`  image rows read     ${String(rows.length).padStart(4)}  (count exact ${exact})`)
+  console.log(`  rows off the /partner/novest/<ext>/<4+ digits>.<ext> pattern  ${offPattern}  (never removed)`)
   console.log(`  listings checked    ${String(plan.checked).padStart(4)}`)
   console.log(`  rows would-remove   ${String(plan.removals.length).padStart(4)}`)
   console.log(`  skipped: last-photo ${sk.lastPhoto.length} · mirror-incomplete ${sk.mirrorIncomplete.length} · not in feed ${sk.notInFeed.length} · not active ${sk.notActive.length} · unrecognised rows ${sk.unrecognised.length}`)
@@ -322,9 +326,12 @@ if (dry) {
 //
 // Lowest sort_order wins, which is the same fallback Slice 3 already applies at render.
 {
-  const { data: cur, error } = await supabase.from('property_images')
-    .select('id,property_id,sort_order,is_primary').in('property_id', props.map(p => p.id))
-  if (error) fail(`primary repair read failed: ${error.message}`)
+  let cur
+  try {
+    cur = (await readAllRows((a, b) => supabase.from('property_images')
+      .select('id,property_id,sort_order,is_primary', { count: 'exact' })
+      .in('property_id', props.map(p => p.id)).order('id').range(a, b))).rows
+  } catch (e) { fail(`primary repair read failed: ${e.message}`) }
   const grouped = cur.reduce((a, i) => ((a[i.property_id] ??= []).push(i), a), {})
   const repairs = Object.values(grouped)
     .filter(g => g.length && !g.some(i => i.is_primary))

@@ -5,7 +5,10 @@
 //   node scripts/check-novest-prune.mjs
 //   node scripts/check-novest-prune.mjs --planner <alt.mjs>   # red-first: run against a broken copy
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, writeFileSync, chmodSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -14,6 +17,12 @@ const pi = process.argv.indexOf('--planner')
 const { planPrune } = await import(pi !== -1
   ? pathToFileURL(resolve(process.argv[pi + 1])).href
   : './lib/novest-prune-plan.mjs')
+
+const { pruneRefusal, parseImageUrl } = await import('./lib/novest-prune-plan.mjs')
+const rai = process.argv.indexOf('--reader')
+const { readAllRows } = await import(rai !== -1
+  ? pathToFileURL(resolve(process.argv[rai + 1])).href
+  : './lib/read-all-rows.mjs')
 
 const U = (ext, media, e = 'jpg') => `https://x.supabase.co/storage/v1/object/public/property-images/partner/novest/${ext}/${media}.${e}`
 let img = 0
@@ -33,71 +42,71 @@ const t = (name, got, want) => {
 // 1. media dropped from the feed is removed; the rest stays
 {
   const p = planPrune({ listings: [L('A', 'novest-1')],
-    images: [row('A', 'novest-1', '10', 0, true), row('A', 'novest-1', '11', 1), row('A', 'novest-1', '12', 2)],
-    feed: feedOf({ 'novest-1': ['10', '12'] }) })
-  t('removed media is planned, referenced media is kept', ids(p.removals), '11')
+    images: [row('A', 'novest-1', '1010', 0, true), row('A', 'novest-1', '1011', 1), row('A', 'novest-1', '1012', 2)],
+    feed: feedOf({ 'novest-1': ['1010', '1012'] }) })
+  t('removed media is planned, referenced media is kept', ids(p.removals), '1011')
   t('  plan carries id, sort_order, is_primary, path', p.removals[0] && [p.removals[0].external_id, p.removals[0].sort_order, p.removals[0].is_primary, p.removals[0].path],
-    ['novest-1', 1, false, 'partner/novest/novest-1/11.jpg'])
+    ['novest-1', 1, false, 'partner/novest/novest-1/1011.jpg'])
   t('  no reassignment when the primary stays', p.reassign.length, 0)
 }
 // 2. still referenced but not served by /media (a 404) is NOT removed. The planner sees only refs.
 {
   const p = planPrune({ listings: [L('A', 'novest-20111')],
-    images: [row('A', 'novest-20111', '1', 0, true), row('A', 'novest-20111', '2', 1), row('A', 'novest-20111', '3', 2)],
-    feed: feedOf({ 'novest-20111': ['1', '2', '3'] }) })   // 3 is still referenced (its /media 404s today): keep the row
+    images: [row('A', 'novest-20111', '1001', 0, true), row('A', 'novest-20111', '1002', 1), row('A', 'novest-20111', '1003', 2)],
+    feed: feedOf({ 'novest-20111': ['1001', '1002', '1003'] }) })   // 3 is still referenced (its /media 404s today): keep the row
   t('referenced-but-unserved media: nothing removed', p.removals.length, 0)
 }
 // 3. last photo: pruning would leave zero rows -> listing skipped entirely
 {
   const p = planPrune({ listings: [L('A', 'novest-2')],
-    images: [row('A', 'novest-2', '20', 0, true), row('A', 'novest-2', '21', 1)],
-    feed: feedOf({ 'novest-2': ['99'] }) })
+    images: [row('A', 'novest-2', '1020', 0, true), row('A', 'novest-2', '1021', 1)],
+    feed: feedOf({ 'novest-2': ['1099'] }) })
   t('would-be photoless listing: no removals, listed as lastPhoto', [p.removals.length, p.skipped.lastPhoto], [0, ['novest-2']])
 }
 // 3b. dry only: photos the mirror will add first make the same listing prunable (dry == what apply does)
 {
-  const rows = [row('A', 'novest-2b', '20', 0, true), row('A', 'novest-2b', '21', 1)]
-  const p = planPrune({ listings: [L('A', 'novest-2b')], images: rows, feed: feedOf({ 'novest-2b': ['98', '99'] }), incoming: new Map([['novest-2b', 2]]) })
+  const rows = [row('A', 'novest-2b', '1020', 0, true), row('A', 'novest-2b', '1021', 1)]
+  const p = planPrune({ listings: [L('A', 'novest-2b')], images: rows, feed: feedOf({ 'novest-2b': ['1098', '1099'] }), incoming: new Map([['novest-2b', 2]]) })
   t('incoming mirror photos lift the last-photo skip (dry mirrors apply)', [p.removals.length, p.skipped.lastPhoto.length], [2, 0])
   t('  and plans a primary reassignment to a new photo (null id)', p.reassign.map(r => r.image_id), [null])
 }
 // 4. primary removed -> lowest remaining sort_order becomes primary
 {
-  const rows = [row('A', 'novest-3', '30', 0, true), row('A', 'novest-3', '31', 1), row('A', 'novest-3', '32', 2)]
-  const p = planPrune({ listings: [L('A', 'novest-3')], images: rows, feed: feedOf({ 'novest-3': ['31', '32'] }) })
-  t('primary removal: reassign to lowest remaining sort_order', [ids(p.removals), p.reassign.map(r => r.image_id)], ['30', [rows[1].id]])
+  const rows = [row('A', 'novest-3', '1030', 0, true), row('A', 'novest-3', '1031', 1), row('A', 'novest-3', '1032', 2)]
+  const p = planPrune({ listings: [L('A', 'novest-3')], images: rows, feed: feedOf({ 'novest-3': ['1031', '1032'] }) })
+  t('primary removal: reassign to lowest remaining sort_order', [ids(p.removals), p.reassign.map(r => r.image_id)], ['1030', [rows[1].id]])
 }
 // 5. unrecognised url, or an external_id segment that is not the listing's: never touched
 {
   const p = planPrune({ listings: [L('A', 'novest-4')],
-    images: [row('A', 'novest-4', '40', 0, true), row('A', 'novest-4', '', 1, false, 'https://elsewhere.example/a.jpg'),
-             row('A', 'novest-4', '41', 2, false, U('novest-OTHER', '41')), row('A', 'novest-4', '42', 3, false, U('novest-4', '42', ''))],
-    feed: feedOf({ 'novest-4': ['40'] }) })
+    images: [row('A', 'novest-4', '1040', 0, true), row('A', 'novest-4', '', 1, false, 'https://elsewhere.example/a.jpg'),
+             row('A', 'novest-4', '1041', 2, false, U('novest-OTHER', '1041')), row('A', 'novest-4', '1042', 3, false, U('novest-4', '1042', ''))],
+    feed: feedOf({ 'novest-4': ['1040'] }) })
   t('unrecognised / foreign-segment rows are not removed', p.removals.length, 0)
   t('  and are reported as unrecognised', p.skipped.unrecognised.length, 3)
 }
 // 6. delisted listing skipped entirely
 {
   const p = planPrune({ listings: [L('A', 'novest-5', 'delisted'), L('B', 'novest-6')],
-    images: [row('A', 'novest-5', '50', 0, true), row('A', 'novest-5', '51', 1), row('B', 'novest-6', '60', 0, true)],
-    feed: feedOf({ 'novest-5': ['50'], 'novest-6': ['60'] }) })
+    images: [row('A', 'novest-5', '1050', 0, true), row('A', 'novest-5', '1051', 1), row('B', 'novest-6', '1060', 0, true)],
+    feed: feedOf({ 'novest-5': ['1050'], 'novest-6': ['1060'] }) })
   t('delisted listing: not checked, nothing removed', [p.removals.length, p.checked, p.skipped.notActive], [0, 1, ['novest-5']])
 }
 // 7. the same media id on two listings: dropping it from one never touches the other
 {
   const p = planPrune({ listings: [L('A', 'novest-7'), L('B', 'novest-8')],
-    images: [row('A', 'novest-7', '70', 0, true), row('A', 'novest-7', '77', 1), row('B', 'novest-8', '80', 0, true), row('B', 'novest-8', '77', 1)],
-    feed: feedOf({ 'novest-7': ['70'], 'novest-8': ['80', '77'] }) })
-  t('shared media id: only the listing that dropped it loses the row', p.removals.map(r => `${r.external_id}/${r.media_id}`), ['novest-7/77'])
+    images: [row('A', 'novest-7', '1070', 0, true), row('A', 'novest-7', '1077', 1), row('B', 'novest-8', '1080', 0, true), row('B', 'novest-8', '1077', 1)],
+    feed: feedOf({ 'novest-7': ['1070'], 'novest-8': ['1080', '1077'] }) })
+  t('shared media id: only the listing that dropped it loses the row', p.removals.map(r => `${r.external_id}/${r.media_id}`), ['novest-7/1077'])
 }
 // 8. floors
 {
   const mk = (n, nListings) => {
     const listings = [], images = [], feed = {}
     for (let i = 0; i < nListings; i++) {
-      const e = `novest-f${i}`; listings.push(L(`P${i}`, e)); feed[e] = ['1']
-      images.push(row(`P${i}`, e, '1', 0, true))
-      for (let j = 0; j < n; j++) images.push(row(`P${i}`, e, String(100 + j), j + 1))
+      const e = `novest-f${i}`; listings.push(L(`P${i}`, e)); feed[e] = ['1001']
+      images.push(row(`P${i}`, e, '1001', 0, true))
+      for (let j = 0; j < n; j++) images.push(row(`P${i}`, e, String(1100 + j), j + 1))
     }
     return { listings, images, feed: feedOf(feed) }
   }
@@ -116,19 +125,101 @@ const t = (name, got, want) => {
 // 9. mirror incomplete for the listing -> skipped, even though media was dropped
 {
   const p = planPrune({ listings: [L('A', 'novest-9')],
-    images: [row('A', 'novest-9', '90', 0, true), row('A', 'novest-9', '91', 1)],
-    feed: feedOf({ 'novest-9': ['90'] }), incomplete: new Set(['novest-9']) })
+    images: [row('A', 'novest-9', '1090', 0, true), row('A', 'novest-9', '1091', 1)],
+    feed: feedOf({ 'novest-9': ['1090'] }), incomplete: new Set(['novest-9']) })
   t('mirror failed/pending for the listing: skipped', [p.removals.length, p.skipped.mirrorIncomplete], [0, ['novest-9']])
 }
 
-// ─── Workflow wiring: the schedule can never prune ───────────────────────────
+// 10. legacy `{n}.{ext}` rows
 {
-  const wf = readFileSync(resolve(ROOT, '.github/workflows/novest-images.yml'), 'utf8')
-  const line = wf.split('\n').find(l => l.includes('--prune') && !l.trim().startsWith('#')) ?? ''
-  t('workflow passes --prune only for prune==true AND workflow_dispatch',
-    /"\$IN_PRUNE" = "true"/.test(line) && /"\$GITHUB_EVENT_NAME" = "workflow_dispatch"/.test(line), true)
-  const sched = wf.split('\n').filter(l => !l.trim().startsWith('#') && /schedule/.test(l) && /--prune/.test(l))
-  t('no line pairs schedule with --prune', sched.length, 0)
+  const legacy = U('novest-L', '3')                                   // small index, not a media id
+  t('small integers are never parsed as media ids', [parseImageUrl(legacy), parseImageUrl(U('novest-L', '999')), parseImageUrl(U('novest-L', '1000'))?.mediaId], [null, null, '1000'])
+  // 4+ digit path that is NOT referenced, but its source_url is exactly what the mirror would fetch for referenced media 9999
+  const served = new Map([['novest-L', new Set(['https://novest.example/wp/9999-1536.jpg'])]])
+  const mk = () => [
+    { ...row('A', 'novest-L', '5555', 0, true), source_url: 'https://novest.example/wp/9999-1536.jpg' },   // old path, live media behind it
+    { ...row('A', 'novest-L', '6666', 1), source_url: 'https://novest.example/wp/gone.jpg' },
+    { ...row('A', 'novest-L', '7777', 2), source_url: null },
+    row('A', 'novest-L', '9999', 3)]
+  const p = planPrune({ listings: [L('A', 'novest-L')], images: mk(), feed: feedOf({ 'novest-L': ['9999'] }), served })
+  t('row whose source_url is a served URL of a referenced media is kept (path irrelevant)', p.removals.map(r => r.media_id).sort(), ['6666', '7777'])
+  const p2 = planPrune({ listings: [L('A', 'novest-L')], images: [row('A', 'novest-L', '', 0, true, legacy), { ...row('A', 'novest-L', '', 1, false, legacy), source_url: 'https://novest.example/wp/9999-1536.jpg' }, row('A', 'novest-L', '9999', 2)], feed: feedOf({ 'novest-L': ['9999'] }), served })
+  t('legacy small-integer path rows are never removed', [p2.removals.length, p2.skipped.unrecognised.length], [0, 2])
+}
+
+// 11. pagination: the server caps a response at 1000 rows; a stub client behaves like PostgREST
+{
+  const mkStub = (total, cap = 1000, countOverride) => {
+    const all = Array.from({ length: total }, (_, i) => ({ id: i }))
+    return (from, to) => Promise.resolve({ data: all.slice(from, Math.min(to + 1, from + cap)), error: null, count: countOverride ?? total })
+  }
+  const r = await readAllRows(mkStub(2350))
+  t('2350 rows with a 1000-row cap are all read', [r.rows.length, r.exact, new Set(r.rows.map(x => x.id)).size], [2350, 2350, 2350])
+  t('exactly 1000 rows (boundary) are read once', (await readAllRows(mkStub(1000))).rows.length, 1000)
+  t('zero rows is a valid read', (await readAllRows(mkStub(0))).rows.length, 0)
+  let msg = null
+  try { await readAllRows(mkStub(2350, 1000, 2400)) } catch (e) { msg = e.message }
+  t('rows received != exact count fails', msg, 'read 2350 rows, expected 2400')
+  let msg2 = null
+  try { await readAllRows(() => Promise.resolve({ data: null, error: { message: 'boom' }, count: null })) } catch (e) { msg2 = e.message }
+  t('a read error fails', msg2, 'boom')
+}
+
+// 12. the script-side guard
+{
+  const env = (o) => ({ GITHUB_ACTIONS: 'true', ...o })
+  const R = (prune, o) => pruneRefusal({ prune, env: o }) !== null
+  t('guard: dispatch + IN_PRUNE=true allowed', R(true, env({ GITHUB_EVENT_NAME: 'workflow_dispatch', IN_PRUNE: 'true' })), false)
+  t('guard: dispatch + IN_PRUNE=false refused', R(true, env({ GITHUB_EVENT_NAME: 'workflow_dispatch', IN_PRUNE: 'false' })), true)
+  t('guard: dispatch + IN_PRUNE unset refused', R(true, env({ GITHUB_EVENT_NAME: 'workflow_dispatch' })), true)
+  t('guard: schedule refused', R(true, env({ GITHUB_EVENT_NAME: 'schedule', IN_PRUNE: 'true' })), true)
+  t('guard: push refused', R(true, env({ GITHUB_EVENT_NAME: 'push', IN_PRUNE: 'true' })), true)
+  t('guard: local (not CI) is allowed', R(true, {}), false)
+  t('guard: no --prune never refuses', R(false, env({ GITHUB_EVENT_NAME: 'schedule' })), false)
+  const src = readFileSync(resolve(ROOT, 'scripts/mirror-novest-images.mjs'), 'utf8')
+  t('mirror script calls pruneRefusal before prodWriteGuard', /pruneRefusal\(\{ prune, env: process\.env \}\)[\s\S]*?prodWriteGuard\(\{/.test(src), true)
+}
+
+// ─── Workflow wiring: execute the real Mirror step ───────────────────────────
+// The run: block is parsed out of the YAML and run in bash with `node` stubbed to echo its args.
+{
+  const require = createRequire(import.meta.url)
+  let yaml
+  try { yaml = require('js-yaml') } catch { console.log('  ✗ js-yaml is not installed (npm ci)'); process.exit(1) }
+  const doc = yaml.load(readFileSync(resolve(ROOT, '.github/workflows/novest-images.yml'), 'utf8'))
+  const steps = doc.jobs.run.steps
+  const mirror = steps.filter(s => s.name === 'Mirror')
+  t('exactly one step named Mirror', mirror.length, 1)
+  const run = mirror[0]?.run ?? ''
+  t('no other step touches the mirror script or --prune', steps.filter(s => s !== mirror[0] && /--prune|mirror-novest-images/.test(s.run ?? '')).length, 0)
+  t('job env wires IN_PRUNE / IN_APPLY / IN_LIMIT from the inputs', [doc.jobs.run.env.IN_PRUNE, doc.jobs.run.env.IN_APPLY, doc.jobs.run.env.IN_LIMIT], ['${{ inputs.prune }}', '${{ inputs.apply }}', '${{ inputs.limit }}'])
+  t('on: schedule is cron-only, dispatch has the prune input', [Object.keys(doc.on).sort(), doc.on.workflow_dispatch.inputs.prune.default], [['schedule', 'workflow_dispatch'], false])
+  const pruneLines = run.split('\n').filter(l => !l.trim().startsWith('#') && l.includes('--prune'))
+  t('exactly one line of the Mirror step mentions --prune', pruneLines.length, 1)
+  t('exactly one node invocation, of the mirror script', run.split('\n').filter(l => /\bnode\b/.test(l)).length, 1)
+
+  const dir = mkdtempSync(resolve(tmpdir(), 'novest-wf-'))
+  writeFileSync(resolve(dir, 'node'), '#!/bin/bash\necho "ARGS:$*"\n')
+  chmodSync(resolve(dir, 'node'), 0o755)
+  let wrong = []
+  for (const ev of ['schedule', 'workflow_dispatch', 'push'])
+    for (const pr of ['', 'false', 'true'])
+      for (const ap of ['', 'false', 'true']) {
+        const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], {
+          env: { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: ev, IN_PRUNE: pr, IN_APPLY: ap, IN_LIMIT: '' }, encoding: 'utf8' })
+        const argv = (/^ARGS:(.*)$/m.exec(r.stdout ?? '')?.[1] ?? 'NO-NODE-CALL').trim().split(/\s+/)
+        const hasPrune = argv.includes('--prune'), hasDry = argv.includes('--dry')
+        const wantPrune = ev === 'workflow_dispatch' && pr === 'true'
+        const wantDry = !(ap === 'true' || ev === 'schedule')
+        const problems = []
+        if (r.status !== 0) problems.push(`exit ${r.status}`)
+        if (hasPrune !== wantPrune) problems.push(`--prune ${hasPrune}, wanted ${wantPrune}`)
+        if (hasDry !== wantDry) problems.push(`--dry ${hasDry}, wanted ${wantDry}`)
+        if (hasPrune && !hasDry && !(ap === 'true' && ev === 'workflow_dispatch' && pr === 'true')) problems.push('applying prune without apply=true')
+        if (ev === 'schedule' && hasPrune) problems.push('schedule pruned')
+        if (problems.length) wrong.push(`${ev}/prune=${pr || '-'}/apply=${ap || '-'}: ${problems.join('; ')} [${argv.join(' ')}]`)
+      }
+  t('all 27 event x prune x apply combinations behave', wrong, [])
 }
 
 console.log(bad ? `\n${bad} check(s) FAILED` : '\nall checks passed')

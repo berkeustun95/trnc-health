@@ -12,7 +12,18 @@ export const MISSING_FROM_FEED_MAX = 0.20   // abort when MORE than this share o
 export const REMOVAL_SHARE_MAX = 0.15       // abort when removals exceed max(REMOVAL_FLOOR, this share of all rows)
 export const REMOVAL_FLOOR = 10
 
-const PATH_RE = /\/object\/public\/property-images\/(partner\/novest\/([^/?#]+)\/(\d+)\.[A-Za-z0-9]+)$/
+// Media ids are 4+ digits. The legacy `{n}.{ext}` paths (n = a small index) must never parse as a media id.
+const PATH_RE = /\/object\/public\/property-images\/(partner\/novest\/([^/?#]+)\/(\d{4,})\.[A-Za-z0-9]+)$/
+
+// --prune may run in CI only from a manual dispatch that asked for it. Returns a refusal text or null.
+export function pruneRefusal({ prune, env }) {
+  if (!prune) return null
+  if (env.GITHUB_EVENT_NAME === 'schedule') return '--prune never runs from the schedule.'
+  if (env.GITHUB_ACTIONS === 'true' && !(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.IN_PRUNE === 'true')) {
+    return '--prune in CI needs a workflow_dispatch run with prune=true.'
+  }
+  return null
+}
 
 export function parseImageUrl(url) {
   const m = PATH_RE.exec(String(url ?? ''))
@@ -23,9 +34,12 @@ export function parseImageUrl(url) {
 // images   : [{ id, property_id, url, sort_order, is_primary }]   (every novest property_images row)
 // feed     : Map<external_id, string[]>               (media ids per listing, from the live feed)
 // incomplete : Set<external_id>                       (mirror jobs failed / not yet done for the listing)
+// served   : Map<external_id, Set<url>>               (the source_url pickVariant would fetch for every media id the
+//                                                       listing still references; a row holding one is never removed,
+//                                                       whatever its path looks like)
 // incoming   : Map<external_id, n>                    (DRY ONLY: photos the mirror step would add first, so a
 //                                                       dry plan shows what the applying run would remove)
-export function planPrune({ listings, images, feed, incomplete = new Set(), incoming = new Map() }) {
+export function planPrune({ listings, images, feed, incomplete = new Set(), incoming = new Map(), served = new Map() }) {
   const byProp = new Map()
   for (const r of images) (byProp.get(r.property_id) ?? byProp.set(r.property_id, []).get(r.property_id)).push(r)
 
@@ -56,6 +70,7 @@ export function planPrune({ listings, images, feed, incomplete = new Set(), inco
         plan.skipped.unrecognised.push({ external_id: l.external_id, sort_order: r.sort_order })
         continue
       }
+      if (r.source_url && served.get(l.external_id)?.has(r.source_url)) continue
       if (!refs.has(p.mediaId)) remove.push({ r, p })
     }
     if (!remove.length) continue
