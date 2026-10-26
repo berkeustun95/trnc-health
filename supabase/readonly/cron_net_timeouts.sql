@@ -16,14 +16,17 @@ select json_build_object(
       'end', to_char(d.end_time at time zone 'utc', 'MM-DD HH24:MI:SS.US')
     ) order by d.start_time), '[]'::json)
     from cron.job_run_details d left join cron.job j on j.jobid = d.jobid
-    where d.start_time >= timestamptz '2026-10-26 14:55+00' and d.start_time < timestamptz '2026-10-26 15:10+00'
-      and (j.command ilike '%net.http_%' or d.status <> 'succeeded')),
+    where d.start_time >= timestamptz '2026-10-26 14:55+00' and d.start_time < timestamptz '2026-10-26 15:10+00'),
   'responses_window', (select coalesce(json_agg(json_build_object(
       'id', r.id, 'status_code', r.status_code, 'timed_out', r.timed_out, 'error_msg', r.error_msg,
       'created', to_char(r.created at time zone 'utc', 'MM-DD HH24:MI:SS.US')
     ) order by r.id), '[]'::json)
     from net._http_response r
     where r.created >= timestamptz '2026-10-26 14:55+00' and r.created < timestamptz '2026-10-26 15:10+00'),
+  'pg_net_callers_in_functions', (select coalesce(json_agg(json_build_object(
+      'schema', n.nspname, 'fn', p.proname, 'sets_timeout', p.prosrc ~* 'timeout_milliseconds') order by n.nspname, p.proname), '[]'::json)
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where p.prosrc ilike '%net.http_%' and n.nspname not in ('net','pg_catalog','information_schema')),
   'queue_now', (select count(*) from net.http_request_queue),
   'timeouts_7d_by_minute', (select coalesce(json_agg(x order by x.m), '[]'::json) from (
       select to_char(date_trunc('minute', r.created at time zone 'utc'), 'MM-DD HH24:MI') as m,
