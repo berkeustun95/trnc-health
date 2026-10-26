@@ -107,6 +107,9 @@ function holdNativeSplash() {
 if (HOLD_NATIVE) {
   holdNativeSplash()
   setTimeout(hideNativeSplash, SAFETY_MS)
+} else if (VIDEO_PATH) {
+  // Flag off: iOS re-shows the native splash on an RN reload and a prior preventAutoHide persists.
+  hideNativeSplash()
 }
 
 // Should this cold start play the clip? Records the play at once, so a launch killed mid-clip
@@ -179,6 +182,7 @@ const REDUCED_MIN = 1200
 // long after it mounts: while it is up it takes every touch and holds back the force-update
 // notice. Durations here are Berke's approved timings (2026-10-24), not motion tokens.
 const HARD_CAP = 4000
+const CLIP_WATCHDOG = 1200
 
 // `play` is null while App is still asking claimSplash(): only the copy of the native frame shows,
 // so a skipped launch looks exactly like one without a splash.
@@ -224,6 +228,14 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
       Animated.timing(morph, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
     }
   }, [firstShown, shownAt])
+
+  // VIDEO_PATH only (the WebP path's timing is live behaviour): the still is up but the clip never
+  // reports a frame or an error, so start the clocks anyway.
+  useEffect(() => {
+    if (!VIDEO_PATH || !firstShown || shownAt != null || reduce !== false) return
+    const timer = setTimeout(() => setShownAt(t0 => t0 ?? Date.now()), CLIP_WATCHDOG)
+    return () => clearTimeout(timer)
+  }, [firstShown, shownAt, reduce])
 
   useEffect(() => {
     if (shownAt == null) return
@@ -271,10 +283,10 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
         {/* Decoding the clip takes ~0.6 s on the S20+; its first frames are this same still
             gate, so the still shows at once and the clip starts on top of it invisibly. */}
         {reduce === false && (
-          <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
         {reduce === false && VIDEO_PATH && (
-          <ClipVideo top={top} cw={cw} ch={ch} onShown={() => setShownAt(t0 => t0 ?? Date.now())} />
+          <ClipVideo top={top} cw={cw} ch={ch} onShown={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} />
         )}
         {reduce === false && !VIDEO_PATH && (
           <ExpoImage
@@ -288,7 +300,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
           />
         )}
         {reduce === true && (
-          <Image source={LAST} fadeDuration={0} onLoad={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => setShownAt(t0 => t0 ?? Date.now())} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <Image source={LAST} fadeDuration={0} onLoad={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
         <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: wordTop, alignItems: 'center', opacity: word }}>
           <Image source={WORDMARK} fadeDuration={0} style={{ width: 190 * s, height: 190 * s * 184 / 570 }} resizeMode="contain" />
