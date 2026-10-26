@@ -22,7 +22,7 @@
 -- single spaces. The old regex had no word boundaries, so for pairs the first word is also tried as every
 -- suffix (up to 20 chars) and the second as every prefix (up to 20 chars); triples are matched whole.
 -- sha256 of the UTF-8 bytes (hex) is looked up in the digest list in agent_digests below.
--- That folds the spelling variants of the old regex ([İI]smail, Pirgal[ıi]) into one digest per person.
+-- That folds the old regex's İ/I and ı/i spelling variants into one digest per person.
 -- The match is slightly wider than the old regex: case-insensitive and ı/i-insensitive. The control digest
 -- only counts on the synthetic control rows (is_control), never on a real listing. The masked
 -- length printed for a hit is the canonical length (whitespace runs collapsed). Honest limit: names are low
