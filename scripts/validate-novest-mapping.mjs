@@ -47,11 +47,29 @@ function oldClean(html) {
     .replace(/\n{2,}/g, '\n')
     .trim()
 }
+const OLD_DEED = /^[-\s]*Türk\s+Koçan(?:lı)?[\s.]*$/i
+function oldDeed(html) {
+  const text = decodeEntities(html)
+  const m0 = OLD_MARKER.exec(text)
+  const cut = m0 ? text.slice(0, m0.index) : text
+  for (const m of cut.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
+    const t = decodeEntities(m[1].replace(/<[^>]+>/g, '')).trim()
+    if (OLD_DEED.test(t)) return 'turkish'
+  }
+  return null
+}
 function isSubsequence(sub, full) {
   let i = 0
   for (let j = 0; j < full.length && i < sub.length; j++) if (full[j] === sub[i]) i++
   return i === sub.length
 }
+const DEED_PROBES = [
+  '<li>Türk a@b.com Koçanlı</li>',
+  '<li>Türk wa.me/1 Koçanlı</li>',
+  '<li>Türk <br>Ali : 0500 000 00 03<br>Koçanlı</li>',
+  '<ul><li>Türk Koçanlı</li>İletişim : x</ul>',
+  '<ul><li>Türk Koçanlı</li></ul><p>İletişim :</p>',
+]
 const subseqInputs = []   // every html a fixture feeds cleanDescription, re-checked at the end of --self
 const SUBSEQ_PROBES = [
   "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz - Satış Danışmanı</li></ul><p>Fiyat: £250.000</p>",
@@ -312,6 +330,12 @@ if (self) {
   strip('feature labels (incl. empty-value) survive byte-for-byte', labels, htmlToText(labels))
   strip('feature labels survive in front of a real block',
     `${labels}<p><b>İletişim :</b></p><ul><li>Ad Soyad : ${P1}</li></ul>`, htmlToText(labels))
+  {
+    const SHAPES = ['<p>İletişim :</p><p>Ali</p><ul><li>120 m2</li><li>250.000</li></ul>', '<p>İletişim :</p><p>Ali</p><p>120 m2</p><p>250.000</p>']
+    const STD2 = '<p>Güzel daire</p><p>İletişim :</p><ul><li>Ad Soyad : 0500 000 00 01</li></ul>'
+    SHAPES.every(h => contactCutReport(h).flagged === 'cut-with-content') ? ok('flag: adjacent <li>/<p> facts (120 m2 / 250.000) are not fused, both flag') : fail('flag: fused facts missed', SHAPES.map(h => contactCutReport(h).flagged).join())
+    contactCutReport(STD2).flagged === null ? ok('flag: standard block still unflagged') : fail('flag: standard block flagged')
+  }
   const deedHtml = `<ul><li>Türk Koçanlı</li></ul><p>İletişim :</p><ul><li>Ad Soyad : ${P1}</li></ul>`
   extractDeedType(deedHtml) === 'turkish' ? ok('deed still read in front of a block') : fail('deed lost in front of a block')
   // NBSP inside a phone in prose: not a contact line, so nothing strips it — the assert must refuse.
@@ -376,6 +400,9 @@ if (self) {
     let bad = 0
     for (const html of all) if (!isSubsequence(cleanDescription(html), oldClean(html))) { bad++; fail(`subsequence broken (input #${all.indexOf(html)}, ${html.length} chars)`) }
     bad === 0 && ok(`subsequence: newClean(x) is a subsequence of oldClean(x) for ${all.length} inputs (${subseqInputs.length} fixture/timing + ${SUBSEQ_PROBES.length} probe)`)
+    let dbad = 0
+    for (const html of [...all, ...DEED_PROBES]) if (extractDeedType(html) !== oldDeed(html)) { dbad++; fail(`deed differs from the original cut (${html.length} chars)`) }
+    dbad === 0 && ok(`deed: extractDeedType(x) equals the original-cut reference for ${all.length + DEED_PROBES.length} inputs`)
     isSubsequence('ab', 'a-b') && !isSubsequence('ba', 'a-b') ? ok('subsequence: checker control (accepts a deletion, rejects an insertion/reorder)') : fail('subsequence checker broken')
   }
 
@@ -408,13 +435,14 @@ const KNOWN_UNTAGGED = new Map([
 const untagged = p => ['property_type', 'property_status', 'property_state', 'property_city']
   .every(k => !(p[k] || []).length)
 
-let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = [], tailMax = 0, noCut = [], flagged = [], notSubseq = [], refusedLive = 0
+let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = [], tailMax = 0, noCut = [], flagged = [], notSubseq = [], refusedLive = 0, deedDiffLive = []
 for (const p of props) {
   const slugs = (p.property_type || []).map(i => T.get(i)?.slug).filter(Boolean)
   const t = mapPropertyType(slugs)
   t ? typed++ : untyped.push(p.id)
 
   if (extractDeedType(p.content.rendered) === 'turkish') deed++
+  if (extractDeedType(p.content.rendered) !== oldDeed(p.content.rendered)) deedDiffLive.push(p.id)
 
   const desc = cleanDescription(p.content.rendered)
   const tail = removedTail(p.content.rendered)
@@ -447,6 +475,7 @@ phoneLeaks.length
   : ok(`0/${props.length} listings leak a phone after the contact strip`)
 
 ok(`${deed}/${props.length} listings yield deed_type='turkish'`)
+deedDiffLive.length ? fail(`deed_type differs from the original cut for: ${deedDiffLive.join(', ')}`) : ok(`deed: ${props.length}/${props.length} live listings equal the original-cut reference`)
 notSubseq.length
   ? fail(`${notSubseq.length} listing(s) store text the old strip removed (not a subsequence of the old output): ${notSubseq.join(', ')}`)
   : ok(`subsequence: ${props.length}/${props.length} live listings' cleaned text is a subsequence of the old strip's output`)

@@ -182,8 +182,9 @@ export function contactKinds(text) {
 // long), so a segment can be cut out whole, bullet and all.
 const BOUNDARY = /<\/(?:p|div|ul|ol|li|h[1-6])\s*>|<(?:li|p|div|ul|ol|h[1-6])(?:\s[^>]{0,200})?>|<br\s*\/?>|\r?\n/gi
 // LOCAL tag shape (no `<` inside, bounded): a stray `<` must not swallow text up to some later `>`,
-// and must not make this quadratic. Decisions only; the stored text never passes through it.
-const plainOf = raw => raw.replace(/<[^<>]{0,500}>/g, '').replace(/\s+/g, ' ').trim()
+// and must not make this quadratic. Tags become a space so adjacent <li> facts ("120 m2" / "250.000")
+// do not fuse into one token. Decisions only; the stored text never passes through it.
+const plainOf = raw => raw.replace(/<[^<>]{0,500}>/g, ' ').replace(/\s+/g, ' ').trim()
 
 function segmentsOf(text) {
   const segs = []
@@ -230,24 +231,6 @@ export function removedTail(html) {
   const text = decodeEntities(html)
   const i = cutIndex(text)
   return i < 0 ? '' : plainOf(text.slice(i))
-}
-
-function dropContactLines(text) {
-  return segmentsOf(text).map(s => {
-    if (!isContactLine(s.plain)) return text.slice(s.start, s.end)
-    const tok = text.slice(s.start, s.start + s.tokLen)
-    return /^<li/i.test(tok) ? '' : tok
-  }).join('')
-}
-
-export function stripContactBlock(html) {
-  let text = decodeEntities(html)
-  const cut = cutIndex(text)
-  if (cut >= 0) text = text.slice(0, cut)
-  text = dropContactLines(text)
-  if (text.includes('@')) text = text.replace(globalOf(EMAIL_RE), '')
-  if (MAY_BE_WHATSAPP.test(text)) text = text.replace(globalOf(WHATSAPP_RE), '')
-  return text
 }
 
 // <li> -> a bullet line. The source uses one <li> per fact ("90M2", "2+1",
@@ -430,7 +413,11 @@ export const FEATURE_TO_COLUMN = {
 const DEED_TURKISH = /^[-\s]*Türk\s+Koçan(?:lı)?[\s.]*$/i
 
 export function extractDeedType(html) {
-  const cut = stripContactBlock(html)
+  // Deed extraction keeps the ORIGINAL cut (decode, first marker, slice): the same one production
+  // used before the contact work, so a contact line or address can never change what it reads.
+  const text = decodeEntities(html)
+  const m0 = CONTACT_MARKER.exec(text)
+  const cut = m0 ? text.slice(0, m0.index) : text
   for (const m of cut.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
     const t = decodeEntities(m[1].replace(/<[^>]+>/g, '')).trim()
     if (DEED_TURKISH.test(t)) return 'turkish'
