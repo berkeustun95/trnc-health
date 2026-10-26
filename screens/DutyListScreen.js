@@ -177,15 +177,17 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 // Redesign duty card: the LIVE app's layout (Berke, 2026-10-01: "cards are too tall") in the new
 // card style — 93% white, radius 20, elevation.card, kit type tokens. No icon well. Equal for every
 // pharmacy. Row 1 name + hours pill · row 2 region chip + straight-line distance · row 3 address
-// (one line; the full address is its accessibility label) · row 4 the NUMBER on a solid teal
+// (one line; the whole info block is one screen-reader stop) · row 4 the NUMBER on a solid teal
 // button + Yol Tarifi outlined, 44pt. Directions URL unchanged (name + address + country search).
 // Measured at 320dp (Inter Bold 14): the number needs 0.86 scale, "Cómo llegar" 0.78 — both above
 // their minimumFontScale; English uses the short "Directions" ("Get Directions" needed 0.66).
 function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
   const region = showRegionBadge && item.region ? regionLabel(item.region, lang) : null
   const dist = item._dist != null ? `${item._dist.toFixed(1)} km ${t('dutyStraightLine', lang)}` : null
+  const infoLabel = [item.name, `${item.open_from}–${item.open_until}`, region, dist, item.address].filter(Boolean).join(', ')
   return (
     <View style={r.pCard}>
+      <View accessible accessibilityLabel={infoLabel}>
       <View style={r.pTop}>
         <Text style={r.pName} numberOfLines={2}>{item.name}</Text>
         <View style={r.pHours}><Text style={r.pHoursText} numberOfLines={1}>{item.open_from}–{item.open_until}</Text></View>
@@ -198,8 +200,9 @@ function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
         </View>
       ) : null}
       {item.address ? (
-        <Text style={r.pAddress} numberOfLines={1} accessibilityLabel={item.address}>{item.address}</Text>
+        <Text style={r.pAddress} numberOfLines={1}>{item.address}</Text>
       ) : null}
+      </View>
       <View style={r.pActions}>
         {item.phone ? (
           <TouchableOpacity style={[r.pBtn, r.pCall]} activeOpacity={0.8}
@@ -230,7 +233,7 @@ function MesaryaNoteRedesign({ lang }) {
 
 function DutyChip({ text, active, chevron, onPress }) {
   return (
-    <TouchableOpacity style={[r.chip, active && r.chipOn]} onPress={onPress} activeOpacity={0.8}
+    <TouchableOpacity style={[r.chip, active && r.chipOn]} onPress={onPress} activeOpacity={0.8} hitSlop={{ top: 4, bottom: 4 }}
       accessibilityRole="button" accessibilityState={{ selected: active }}>
       <Text style={[r.chipText, active && r.chipTextOn]} numberOfLines={1}>{text}</Text>
       {chevron ? <Feather name="chevron-down" size={14} color={active ? C.primaryDark : C.textSecondary} /> : null}
@@ -428,7 +431,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       <ModuleScreen topic="duty">
       <SafeAreaView style={r.safe} edges={['top']}>
         <KitHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={dateLabel} lang={lang} />
-        {!loading && !empty ? (
+        {loading || !empty ? (
           <FilterBar>
             <DutyChip text={t('filterAll', lang)} active={region == null} onPress={() => setRegion(null)} />
             <DutyChip text={region ? regionLabel(region, lang) : t('dutyPickRegion', lang)} active={region != null} chevron onPress={() => setSheetOpen(true)} />
