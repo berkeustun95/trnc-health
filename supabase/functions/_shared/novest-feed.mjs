@@ -82,32 +82,155 @@ export function decodeEntities(s) {
 //
 // Every body ends with a contact block:
 //     <p><b>İletişim :</b></p>
-//     <ul><li><b>Ahmet Ulutekin : 0542 861 04 30</b></li>
-//         <li><b>İsmail Pirgalı : 0533 834 67 70</b></li></ul>
+//     <ul><li><b>Ad Soyad : 05xx xxx xx xx</b></li>
+//         <li><b>Ad Soyad : 05xx xxx xx xx</b></li></ul>
+// (one or two agents; a block can also carry names with no number at all)
 //
 // C2: no per-property agent surfaces anywhere in ADA, so these come out BEFORE storing,
 // never at render — a stored phone is a leak whatever the UI does with it.
 //
-// Measured across all 91 live listings on 2026-08-24:
-//   • 91/91 carry an İletişim marker (spellings: 'İletişim' x90, 'iletişim' x1)
-//   • ZERO listings have a phone-shaped string anywhere BEFORE the marker
-//   • 60 listings carry one phone, 31 carry two — the block is plural
+// THE RULE (2026-10-26): the text from the FIRST contact marker (İletişim, Bilgi için, Detaylı
+// bilgi) to the end is ALWAYS cut, exactly as the original strip did (the cut starts at the
+// marker; a dangling bare "•" left by a cut inside an <li> is dropped). GUARANTEED, by construction:
+// cleanDescription() is de75db2's output (same decode, cut and htmlToText) with characters only
+// DELETED, so what it returns is a subsequence of that output; validate-novest-mapping.mjs asserts
+// the relation on every fixture, fuzz probe and live listing. NOT guaranteed: that no contact data
+// survives (assertNoContact refuses what the detectors can see) or that the cut removed only a
+// contact block (the flag below). Shape cannot tell a feature label from a person's name, so no rule here ever decides to
+// KEEP text the original removed.
 //
-// TRUNCATION ALONE IS NOT THE GUARD. It works today and fails SILENTLY the day they
-// write "Bilgi için" instead. assertNoPhone() below is the part that survives that, and
-// it refuses the row rather than storing a leak. Same discipline as the towing checks:
-// a guard nobody has watched refuse something is not a guard.
-const CONTACT_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
+// What the cut cannot judge is whether it removed a contact block or listing content. It reports
+// that instead: contactCutReport() flags a cut whose tail is long (> TAIL_MAX plain chars) or holds
+// a listing token (currency, m2, a price), i.e. the first marker did not open a short trailing
+// block ("cut-with-content", e.g. 21016, whose price is also the structured price column). A
+// flagged cut is still a cut; the flag is for a human (sync-novest response, importer and
+// validator output; ids and kind only).
+//
+// Also removed anywhere in the text: e-mail addresses, WhatsApp links and whole contact lines
+// (name : phone/e-mail/WhatsApp). A name-shaped line with an EMPTY or other value is a feature
+// label ("Banyo Sayısı : 2", "Site Fasiliteleri :") and stays.
+//
+// The strip never throws (the Edge Function calls it outside its try). assertNoContact() refuses a
+// row that still carries a phone, e-mail, @handle, [at] e-mail, WhatsApp link or contact line, and
+// the same detectors run daily over what is stored (scripts/check-novest-descriptions.mjs), where a
+// marker word in stored text is RED too: with this strip it cannot legitimately be there.
+export const CONTACT_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
 
-// TRNC/TR mobiles: 05xx xxx xx xx, with or without +90, and any separator run.
-// Also catches the (0392) landline shape used elsewhere in the feed's prose.
-export const PHONE_RE =
-  /(?:\+?90[\s.\-]?)?\(?0?\s?(?:5\d{2}|392|533|542|548)\)?[\s.\-]?\d{3}[\s.\-]?\d{2}[\s.\-]?\d{2}/
+// TRNC/TR mobiles: 05xx xxx xx xx, with or without +90, and any separator run; the (0392)
+// landline shape; any international number (+CC …, 00CC …, 8-15 digits; not "2+1 …"); and a
+// generic national 0-prefixed 10-11 digit number (0212 …). Every quantifier is bounded.
+export const PHONE_RE = new RegExp([
+  String.raw`(?:\+?90[\s.\-]?)?\(?0?\s?(?:5\d{2}|392|533|542|548)\)?[\s.\-]?\d{3}[\s.\-]?\d{2}[\s.\-]?\d{2}`,
+  String.raw`(?<![\p{L}\p{N}])\+[\s.\-()]{0,2}\d(?:[\s.\-()]{0,2}\d){7,14}`,
+  String.raw`(?<![\p{L}\p{N}.,])00[\s.\-]?\d(?:[\s.\-()]{0,2}\d){7,13}`,
+  String.raw`(?<![\p{N}.,])0(?:[\s.\-()]{0,2}\d){9,10}(?!\p{N})`,
+].join('|'), 'u')
 
-export function stripContactBlock(html) {
-  const text = decodeEntities(html)
+// The local part is anchored at the start of its token (lookbehind) instead of capped at 64:
+// an uncapped, unanchored local part is retried from every character of a long run (3 s on
+// 5 KB); anchored it is scanned once per token. An over-long local part is removed whole.
+export const EMAIL_RE =
+  /(?<![\p{L}\p{N}._%+\-])[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}\-]{1,63}(?:\.[\p{L}\p{N}\-]{1,63}){0,10}\.\p{L}{2,24}/u
+
+export const WHATSAPP_RE =
+  /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com|(?:www\.|web\.|chat\.)?whatsapp\.com)(?:\/[^\s<>"')\]]{0,200})?/i
+
+// Refusal-only shapes (removing them would only hide a leak we could not otherwise see).
+export const HANDLE_RE = /(?<![\p{L}\p{N}._%+\-@])@[A-Za-z0-9_][A-Za-z0-9._]{2,29}/u
+export const OBFUSCATED_EMAIL_RE = /[\[({<]\s{0,2}(?:at|@)\s{0,2}[\])}>]/i
+
+const NAME_COLON =
+  "^[\\s•·*\\-–]*\\p{Lu}[\\p{L}'’.\\-]*(?:\\s+\\p{L}[\\p{L}'’.\\-]*){0,3}(?:\\s*\\([^)]{0,60}\\))?\\s*:(?!\\/\\/)\\s*"
+
+// A whole line: name-shaped, a colon, and a phone / e-mail / WhatsApp value somewhere after.
+// Only ever tested on a line of at most LINE_MAX characters (see isContactLine).
+export const CONTACT_LINE_RE =
+  new RegExp(`${NAME_COLON}[^\\n]{0,200}?(?:${PHONE_RE.source}|${EMAIL_RE.source}|${WHATSAPP_RE.source})[^\\n]*$`, 'u')
+
+const LINE_MAX = 300
+const MAY_BE_WHATSAPP = /wa\.me|whatsapp/i   // cheap prefilter: the real regex only runs when this hits
+const isContactLine = line => line.length <= LINE_MAX && CONTACT_LINE_RE.test(line)
+
+const globalOf = re => new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')
+
+// A flagged cut: the tail the first marker opens is longer than TAIL_MAX plain characters or holds a
+// listing token. TAIL_MAX: the longest tail the cut removes from the live feed is 104 plain
+// characters (measured 2026-10-26 by validate-novest-mapping.mjs, "longest removed tail" line: 104).
+const TAIL_MAX = 300
+const RAW_TAIL_MAX = 4000   // tags inflate raw length; beyond this the tail cannot qualify
+const LISTING_CURRENCY = /[£$€₺]|(?<![\p{L}\p{N}])(?:TL|GBP|STG|EUR|USD)(?![\p{L}\p{N}])/u
+const LISTING_AREA = /(?<!\p{L})m[2²](?!\p{N})|metrekare/iu
+const LISTING_PRICE = /(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?![\d]|[.\-\s]\d)/
+const hasListingToken = s => LISTING_CURRENCY.test(s) || LISTING_AREA.test(s) || LISTING_PRICE.test(s)
+
+// Which kinds of contact data are in `text`. Names only — never the matched strings, so a
+// caller can log the result in a public run.
+export function contactKinds(text) {
+  const s = String(text ?? '')
+  const kinds = []
+  const at = s.includes('@')
+  if (/\d/.test(s) && PHONE_RE.test(s)) kinds.push('phone')
+  if (at && EMAIL_RE.test(s)) kinds.push('email')
+  if (/[\[({<]/.test(s) && OBFUSCATED_EMAIL_RE.test(s)) kinds.push('email-obfuscated')
+  if (at && HANDLE_RE.test(s)) kinds.push('handle')
+  if (MAY_BE_WHATSAPP.test(s) && WHATSAPP_RE.test(s)) kinds.push('whatsapp')
+  if (s.includes(':') && s.split('\n').some(isContactLine)) kinds.push('contact-line')
+  return kinds
+}
+
+// Line-ish segments of tag-bearing text. Each starts at its leading boundary token (tokLen
+// long), so a segment can be cut out whole, bullet and all.
+const BOUNDARY = /<\/(?:p|div|ul|ol|li|h[1-6])\s*>|<(?:li|p|div|ul|ol|h[1-6])(?:\s[^>]{0,200})?>|<br\s*\/?>|\r?\n/gi
+// LOCAL tag shape (no `<` inside, bounded): a stray `<` must not swallow text up to some later `>`,
+// and must not make this quadratic. Tags become a space so adjacent <li> facts ("120 m2" / "250.000")
+// do not fuse into one token. Decisions only; the stored text never passes through it.
+const plainOf = raw => raw.replace(/<[^<>]{0,500}>/g, ' ').replace(/\s+/g, ' ').trim()
+
+function segmentsOf(text) {
+  const segs = []
+  let start = 0, tokLen = 0
+  for (const m of text.matchAll(BOUNDARY)) {
+    segs.push({ start, tokLen, end: m.index })
+    start = m.index; tokLen = m[0].length
+  }
+  segs.push({ start, tokLen, end: text.length })
+  for (const s of segs) { s.raw = text.slice(s.start + s.tokLen, s.end); s.plain = plainOf(s.raw) }
+  return segs
+}
+
+// Where the cut starts: the FIRST marker in the text, moved back to the start of its segment when
+// nothing but tags and whitespace precedes it there (so "<li><b>İletişim" leaves no dangling "•").
+function cutIndex(text) {
   const m = CONTACT_MARKER.exec(text)
-  return m ? text.slice(0, m.index) : text
+  if (!m) return -1
+  const segs = segmentsOf(text)
+  let s = segs[0]
+  for (const g of segs) { if (g.start > m.index) break; s = g }
+  if (m.index < s.start + s.tokLen) return s.start
+  return plainOf(text.slice(s.start + s.tokLen, m.index)) === '' ? s.start : m.index
+}
+
+// Did the first marker open a short trailing contact block (true), or is the tail long / does it
+// carry listing content (false)?
+function opensTrailingBlock(text, cut) {
+  if (text.length - cut > RAW_TAIL_MAX) return false
+  const tail = plainOf(text.slice(cut))
+  return tail.length <= TAIL_MAX && !hasListingToken(tail)
+}
+
+// { cut, flagged } — no text. flagged is 'cut-with-content' when a cut removed a tail that is not a
+// short token-free block, else null.
+export function contactCutReport(html) {
+  const text = decodeEntities(html)
+  const cut = cutIndex(text)
+  return { cut: cut >= 0, flagged: cut >= 0 && !opensTrailingBlock(text, cut) ? 'cut-with-content' : null }
+}
+
+// Plain text that the marker cut removes ('' when nothing is cut). For the validator's TAIL_MAX report.
+export function removedTail(html) {
+  const text = decodeEntities(html)
+  const i = cutIndex(text)
+  return i < 0 ? '' : plainOf(text.slice(i))
 }
 
 // <li> -> a bullet line. The source uses one <li> per fact ("90M2", "2+1",
@@ -125,16 +248,29 @@ export function htmlToText(html) {
     .trim()
 }
 
+// The stored text. Built from the ORIGINAL output and nothing else: step 1 is literally de75db2's
+// cleanDescription (same decode, same first-marker cut, same htmlToText), and every later step only
+// deletes characters of that string, so the result is a subsequence of it. The raw HTML is never
+// re-cut or re-scanned here: htmlToText's `<[^>]+>` is non-local (a stray `<` hides text up to the
+// next `>`), so deleting markup before it could bring hidden text back.
 export function cleanDescription(html) {
-  return htmlToText(stripContactBlock(html))
+  const text = decodeEntities(html)
+  const m = CONTACT_MARKER.exec(text)
+  let out = htmlToText(m ? text.slice(0, m.index) : text)
+  out = out.replace(/(?:^|\n)•$/, '')
+  out = out.split('\n').filter(line => !isContactLine(line)).join('\n')
+  if (out.includes('@')) out = out.replace(globalOf(EMAIL_RE), '')
+  if (MAY_BE_WHATSAPP.test(out)) out = out.replace(globalOf(WHATSAPP_RE), '')
+  return out.replace(/ {2,}/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{2,}/g, '\n').trim()
 }
 
 // Throws. The caller drops the row rather than storing it — a listing missing from ADA
-// is a smaller failure than a partner's private mobile number published in it.
-export function assertNoPhone(label, ...fields) {
+// is a smaller failure than a partner's private contact published in it. The message names
+// the KIND only: callers print it into public run logs.
+export function assertNoContact(label, ...fields) {
   for (const f of fields) {
-    const hit = PHONE_RE.exec(String(f ?? ''))
-    if (hit) throw new Error(`${label}: a phone-shaped string survived the contact strip — ${JSON.stringify(hit[0])}`)
+    const kinds = contactKinds(f)
+    if (kinds.length) throw new Error(`${label}: ${kinds.join('+')} survived the contact strip`)
   }
 }
 
@@ -277,7 +413,11 @@ export const FEATURE_TO_COLUMN = {
 const DEED_TURKISH = /^[-\s]*Türk\s+Koçan(?:lı)?[\s.]*$/i
 
 export function extractDeedType(html) {
-  const cut = stripContactBlock(html)
+  // Deed extraction keeps the ORIGINAL cut (decode, first marker, slice): the same one production
+  // used before the contact work, so a contact line or address can never change what it reads.
+  const text = decodeEntities(html)
+  const m0 = CONTACT_MARKER.exec(text)
+  const cut = m0 ? text.slice(0, m0.index) : text
   for (const m of cut.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
     const t = decodeEntities(m[1].replace(/<[^>]+>/g, '')).trim()
     if (DEED_TURKISH.test(t)) return 'turkish'

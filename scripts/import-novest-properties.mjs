@@ -47,7 +47,7 @@ import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 import {
-  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoPhone,
+  SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
   num, int, meta, metaArray, mapPropertyType, extractDeedType, coordsInCyprus,
   INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../supabase/functions/_shared/novest-feed.mjs'
@@ -178,10 +178,12 @@ function toRow(p, ctx) {
 
   const title = decodeEntities(p.title.rendered).trim()
   const description = cleanDescription(p.content.rendered) || null
+  const cutFlag = contactCutReport(p.content.rendered).flagged
+  if (cutFlag) ctx.flagged.push(`${id}: ${cutFlag}`)
 
   // Throws -> caller drops the row. A listing missing from ADA is a smaller failure than
   // a partner's private mobile published inside it.
-  assertNoPhone(label, title, description)
+  assertNoContact(label, title, description)
 
   // Reported, never written. All 91 carry the Houzez Miami default today; if this ever
   // fires, Novest has started placing real pins and that is a decision, not an import.
@@ -292,7 +294,7 @@ const [types, statuses, states, cities, features] = await Promise.all([
 const byId = list => new Map(list.map(t => [t.id, t]))
 const ctx = {
   types: byId(types), statuses: byId(statuses), states: byId(states),
-  cities: byId(cities), features: byId(features), coordsInBox: [],
+  cities: byId(cities), features: byId(features), coordsInBox: [], flagged: [],
 }
 console.log(`  types ${types.length} · statuses ${statuses.length} · states ${states.length} · cities ${cities.length} · features ${features.length}`)
 
@@ -373,6 +375,11 @@ if (delist.length) {
   console.log('\n  DELISTING:')
   for (const r of delist) console.log(`    ${r.external_id}`)
 }
+if (ctx.flagged.length) {
+  console.log(`\n  ⚠ ${ctx.flagged.length} flagged cut(s) — the first contact marker opened more than a short block (ids and kind only):`)
+  for (const f of ctx.flagged) console.log(`      ${f}`)
+}
+
 if (ctx.coordsInBox.length) {
   console.log(`\n  ⚠ ${ctx.coordsInBox.length} listing(s) now carry coordinates INSIDE the Cyprus box.`)
   console.log('    These are NOT imported. Slice 1 fixed feed rows at location_precision=\'area\';')
