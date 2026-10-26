@@ -91,10 +91,12 @@ export function decodeEntities(s) {
 //
 // THE RULE (2026-10-26): the text from the FIRST contact marker (İletişim, Bilgi için, Detaylı
 // bilgi) to the end is ALWAYS cut, exactly as the original strip did (the cut starts at the
-// beginning of the marker's line, so a dangling "•" goes too). Nothing the original strip removed
-// is ever stored: cleanDescription() is the original output with characters DELETED, and
-// validate-novest-mapping.mjs asserts that subsequence relation on every fixture and every live
-// listing. Shape cannot tell a feature label from a person's name, so no rule here ever decides to
+// marker; a dangling bare "•" left by a cut inside an <li> is dropped). GUARANTEED, by construction:
+// cleanDescription() is de75db2's output (same decode, cut and htmlToText) with characters only
+// DELETED, so what it returns is a subsequence of that output; validate-novest-mapping.mjs asserts
+// the relation on every fixture, fuzz probe and live listing. NOT guaranteed: that no contact data
+// survives (assertNoContact refuses what the detectors can see) or that the cut removed only a
+// contact block (the flag below). Shape cannot tell a feature label from a person's name, so no rule here ever decides to
 // KEEP text the original removed.
 //
 // What the cut cannot judge is whether it removed a contact block or listing content. It reports
@@ -179,7 +181,9 @@ export function contactKinds(text) {
 // Line-ish segments of tag-bearing text. Each starts at its leading boundary token (tokLen
 // long), so a segment can be cut out whole, bullet and all.
 const BOUNDARY = /<\/(?:p|div|ul|ol|li|h[1-6])\s*>|<(?:li|p|div|ul|ol|h[1-6])(?:\s[^>]{0,200})?>|<br\s*\/?>|\r?\n/gi
-const plainOf = raw => raw.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+// LOCAL tag shape (no `<` inside, bounded): a stray `<` must not swallow text up to some later `>`,
+// and must not make this quadratic. Decisions only; the stored text never passes through it.
+const plainOf = raw => raw.replace(/<[^<>]{0,500}>/g, '').replace(/\s+/g, ' ').trim()
 
 function segmentsOf(text) {
   const segs = []
@@ -261,8 +265,20 @@ export function htmlToText(html) {
     .trim()
 }
 
+// The stored text. Built from the ORIGINAL output and nothing else: step 1 is literally de75db2's
+// cleanDescription (same decode, same first-marker cut, same htmlToText), and every later step only
+// deletes characters of that string, so the result is a subsequence of it. The raw HTML is never
+// re-cut or re-scanned here: htmlToText's `<[^>]+>` is non-local (a stray `<` hides text up to the
+// next `>`), so deleting markup before it could bring hidden text back.
 export function cleanDescription(html) {
-  return htmlToText(stripContactBlock(html))
+  const text = decodeEntities(html)
+  const m = CONTACT_MARKER.exec(text)
+  let out = htmlToText(m ? text.slice(0, m.index) : text)
+  out = out.replace(/(?:^|\n)•$/, '')
+  out = out.split('\n').filter(line => !isContactLine(line)).join('\n')
+  if (out.includes('@')) out = out.replace(globalOf(EMAIL_RE), '')
+  if (MAY_BE_WHATSAPP.test(out)) out = out.replace(globalOf(WHATSAPP_RE), '')
+  return out.replace(/ {2,}/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{2,}/g, '\n').trim()
 }
 
 // Throws. The caller drops the row rather than storing it — a listing missing from ADA

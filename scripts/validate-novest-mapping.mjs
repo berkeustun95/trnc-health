@@ -25,9 +25,13 @@ const ok   = (...m) => console.log('  ✓ ' + m.join(' '))
 
 // ─── The fixed reference: de75db2's cleanDescription, copied verbatim ─────────────────
 // The first-marker cut that production stored before the contact work. It must NEVER change
-// (that is the point of copying it): the new strip is only allowed to DELETE characters from
-// this output. isSubsequence(newClean(x), oldClean(x)) is the invariant "nothing the old strip
-// removed is ever stored", asserted on every fixture, probe and live listing.
+// (that is the point of copying it). What is GUARANTEED, and by construction: cleanDescription(x)
+// runs this very pipeline (same decode, same first-marker cut, same htmlToText) and then only
+// DELETES characters of its output (a trailing bare bullet, whole contact lines, e-mail and
+// WhatsApp matches, blank-line collapse), so the stored text is a subsequence of this output. This
+// file asserts that on every fixture, fuzz probe and live listing. NOT guaranteed: that no contact
+// data survives (assertNoContact refuses what the detectors see), or that a cut removed only a
+// contact block (contactCutReport flags the long / listing-token tails for a human).
 const OLD_MARKER = /İletişim|iletişim|İLETİŞİM|Iletisim|Bilgi\s+için|Detaylı\s+bilgi/
 function oldClean(html) {
   const text = decodeEntities(html)
@@ -67,13 +71,13 @@ const SUBSEQ_PROBES = [
   "<p>Güzel daire</p><p>İrtibat :</p><ul><li>Ahmet Yılmaz</li></ul>",
   "<p>Güzel daire</p><p>Contact :</p><ul><li>Ahmet Yılmaz</li></ul>",
   "<p>Güzel daire</p><p>İleti​şim :</p><ul><li>Ahmet Yılmaz</li></ul>",
-  "<p>Güzel daire</p><p>Arayın 0533​111​22​33</p>",
-  "<p>Güzel daire</p><p>Arayın ０５３３ １１１ ２２ ３３</p>",
+  "<p>Güzel daire</p><p>Arayın 0500​000​00​03</p>",
+  "<p>Güzel daire</p><p>Arayın ０５００ ０００ ００ ０３</p>",
   "<p>Güzel daire</p><p>İletişim :</p><p>Ahmet&nbsp;Yılmaz</p><p>£1</p>",
-  "<p>Güzel daire</p><p>Arayın 0533/111 22 33</p>",
-  "<p>Güzel daire</p><p>Arayın (0533) 111 22 33</p>",
+  "<p>Güzel daire</p><p>Arayın 0500/000 00 03</p>",
+  "<p>Güzel daire</p><p>Arayın (0500) 000 00 03</p>",
   "<p>Güzel daire</p><p>Arayın 44 7700 900123</p>",
-  "<p>Güzel daire</p><p>Arayın 90 533 111 2233</p>",
+  "<p>Güzel daire</p><p>Arayın 90 500 000 0003</p>",
   "<p>Güzel daire</p><p>ahmet [dot] yilmaz [at] gmail [dot] com</p>",
   "<p>Güzel daire</p><p>ahmet at gmail dot com</p>",
   "<p>Güzel daire</p><p>ahmet(AT)gmail.com</p>",
@@ -88,24 +92,24 @@ const SUBSEQ_PROBES = [
   "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : £250.000</li></ul>",
   "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz 120 m2</li></ul>",
   "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz £1</li></ul>",
-  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : 0533 111</li></ul><p>Fiyat: £250.000</p>",
-  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet : 111 22 33</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet Yılmaz : 0500 000</li></ul><p>Fiyat: £250.000</p>",
+  "<p>Güzel daire</p><p>İletişim :</p><ul><li>Ahmet : 000 00 03</li></ul><p>Fiyat: £250.000</p>",
   "<p>Güzel daire</p><p>bilgi için ahmet yılmaz</p><p>Fiyat: £250.000</p>",
   "<p>Güzel daire</p><p>Güzel daire. İletişim Ahmet Yılmaz</p><p>Fiyat: £250.000</p>",
   "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li></ul>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li><li>0533 111 22 33</li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li><li>0500 000 00 03</li></ul>",
   "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : +44 7700 900123</b></li></ul>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : 0533 111 22 33 / +44 7700 900123</b></li></ul>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Tel: 0533 111 22 33</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : 0500 000 00 03 / +44 7700 900123</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Tel: 0500 000 00 03</b></li></ul>",
   "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : ahmet [at] example.com</b></li></ul>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : 0533 111 22 33</b></li></ul>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>ahmet yılmaz : 0533 111 22 33</b></li></ul>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Av. Mehmet Ali Can Yılmaz : 0533 111 22 33</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz : 0500 000 00 03</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>ahmet yılmaz : 0500 000 00 03</b></li></ul>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Av. Mehmet Ali Can Yılmaz : 0500 000 00 03</b></li></ul>",
   "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Instagram : @ahmet.emlak</b></li></ul>",
   "<p>Güzel daire</p><p>İletişim:</p><p>Ahmet Yılmaz</p><p>www.ahmetemlak.com</p>",
-  "<p>Güzel daire</p><p><b>İletişim :</b></p><p>Ahmet Yılmaz<span> : </span></p><p>0533 111 22 33</p>",
+  "<p>Güzel daire</p><p><b>İletişim :</b></p><p>Ahmet Yılmaz<span> : </span></p><p>0500 000 00 03</p>",
   "<p>Güzel daire</p><p><b>İletişim :</b></p><ul><li><b>Ahmet Yılmaz</b></li></ul><p>Novest Property</p>",
-  "<p>Güzel daire<br>İletişim:<br>Ahmet Yılmaz<br>0533 111 22 33</p>",
+  "<p>Güzel daire<br>İletişim:<br>Ahmet Yılmaz<br>0500 000 00 03</p>",
 ]
 
 // ─── Guards prove themselves first ───────────────────────────────────────────
@@ -244,7 +248,7 @@ if (self) {
   cutFlagged('6-word name', UM('<ul><li>Av Mehmet Ali Can Örnek Yılmaz</li></ul>'))
   cutFlagged('capitalised name on the marker line', `<p>Güzel daire</p><p>İletişim : ${N1} - Danışman</p>${tok}`)
   cutFlagged('name : 2 (feature-label shape)', UM(`<ul><li>${N1} : 2</li></ul>`))
-  cutFlagged('partial phone as a value', UM(`<ul><li>${N1} : 0533 111</li></ul>`))
+  cutFlagged('partial phone as a value', UM(`<ul><li>${N1} : 0500 000</li></ul>`))
   cutFlagged('a long prose line naming a person', UM(`<p>Satış danışmanımız ${N1} size yardımcı olacaktır, ofisimiz Girne merkezde.</p>`))
   // What is NOT cut still must not carry contact data: these shapes are refused by assertNoContact.
   const refusedText = (label, text, kind) => {
