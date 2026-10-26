@@ -194,6 +194,8 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
 ## How I want you to work
 - Make MINIMAL changes; no unrelated refactors. Say it's done, explain shortly — don't ask to proceed.
 - One bounded task at a time. If scope is unclear, ask.
+- **Provider accounts are out of scope** (provider, home_service_provider and every other non-customer provider
+  role): never change how they look or behave without Berke's explicit ask (Berke, 2026-10-26).
 - Match the data-fetch pattern: query Supabase → useState → render.
 - **Ask for ONE item per message** (an ID, a query result, a decision) and wait.
 - **Push the working branch after EVERY slice**, feature branches too ("push to git" still = main).
