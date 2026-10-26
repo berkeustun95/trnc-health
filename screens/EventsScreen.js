@@ -29,7 +29,7 @@ import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
   RemoteImage,
 } from '../components/ui'
-import { colors as C, category as CAT, type, radii, elevation } from '../constants/theme'
+import { colors as C, category as CAT, type, radii, elevation, listBottomPad } from '../constants/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -402,6 +402,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
                       activeOpacity={0.9}
                       onPress={() => setViewerIndex(index)}
                       accessibilityRole="imagebutton"
+                      accessibilityLabel={images.length > 1 ? `${event.title}, ${index + 1}/${images.length}` : event.title}
                     >
                       <RemoteImage
                         source={{ uri: item }}
@@ -442,7 +443,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
           data={[{ key: 'detail' }]}
           keyExtractor={i => i.key}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: listBottomPad(insets) }}
           ListFooterComponent={adSlot}
           renderItem={() => (
             <View>
@@ -910,7 +911,7 @@ const legacy = StyleSheet.create({
   detailImage:        { width: SCREEN_W, backgroundColor: colors.bg },
   detailImageFallback:{ height: 200, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' },
   dotRow:             { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 },
-  dot:                { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  dot:                { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.fieldBorder },
   dotActive:          { backgroundColor: colors.primary, width: 18 },
   detailBody:         { padding: 20 },
   detailTitle:        { fontSize: 24, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, marginBottom: 20, lineHeight: 30 },
