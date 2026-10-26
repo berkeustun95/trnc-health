@@ -25,6 +25,17 @@ export function pruneRefusal({ prune, env }) {
   return null
 }
 
+const OBJ_RE = /\/object\/public\/property-images\/(.+)$/
+
+// Storage objects safe to delete after `deleted` rows are gone: a path still referenced by ANY row that
+// remains (two rows can share one object) is never returned.
+export function deletablePaths(allRows, deleted) {
+  const gone = new Set(deleted.map(d => d.image_id ?? d.id))
+  const kept = new Set()
+  for (const r of allRows) if (!gone.has(r.id)) { const m = OBJ_RE.exec(String(r.url ?? '')); if (m) kept.add(m[1]) }
+  return [...new Set(deleted.map(d => d.path))].filter(p => !kept.has(p))
+}
+
 export function parseImageUrl(url) {
   const m = PATH_RE.exec(String(url ?? ''))
   return m ? { path: m[1], externalId: m[2], mediaId: m[3] } : null
@@ -89,6 +100,8 @@ export function planPrune({ listings, images, feed, incomplete = new Set(), inco
       plan.reassign.push({ external_id: l.external_id, property_id: l.id, image_id: next?.id ?? null, sort_order: next?.sort_order ?? null })
     }
   }
+
+  plan.objectPaths = deletablePaths(images, plan.removals)
 
   const cap = Math.max(REMOVAL_FLOOR, Math.floor(REMOVAL_SHARE_MAX * images.length))
   if (plan.removals.length > cap) {

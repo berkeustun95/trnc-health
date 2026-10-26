@@ -16,7 +16,8 @@
 #
 # PRUNE (removes images Novest dropped from a listing's gallery). OFF by default and NEVER on the
 # schedule: --prune is passed only when inputs.prune == 'true' AND the event is workflow_dispatch
-# (scripts/check-novest-prune.mjs runs the real Mirror step in bash with node stubbed, over all
+# (the offline self-test step runs on dispatches only, so a lock refresh dropping the transitive js-yaml
+# can never stop the scheduled add-only mirror; scripts/check-novest-prune.mjs runs the real Mirror step in bash with node stubbed, over all
 # event x prune x apply combinations, and asserts that; mirror-novest-images.mjs refuses --prune in CI
 # unless it is a workflow_dispatch with prune=true). Turning it on for cron, and the first applying
 # prune, are Berke's call. Without apply=true a prune run only PRINTS the plan.
@@ -72,6 +73,7 @@ jobs:
           done
           [ -z "$IN_LIMIT" ] || [[ "$IN_LIMIT" =~ ^[1-9][0-9]*$ ]] || { echo "::error::limit must be a positive integer"; exit 1; }
       - name: Prune planner self-test (offline)
+        if: github.event_name == 'workflow_dispatch'
         run: node scripts/check-novest-prune.mjs
       - name: Mirror
         run: |

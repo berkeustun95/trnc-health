@@ -48,7 +48,7 @@ import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { SOURCE, get, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { planPrune, pruneRefusal, parseImageUrl } from './lib/novest-prune-plan.mjs'
+import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
 import { readAllRows } from './lib/read-all-rows.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -253,7 +253,7 @@ async function runPrune(incomplete, incoming = new Map()) {
     ;({ rows, exact } = await readAllRows((a, b) => supabase.from('property_images')
       .select('id,property_id,url,source_url,sort_order,is_primary', { count: 'exact' })
       .in('property_id', props.map(p => p.id)).order('id').range(a, b)))
-  } catch (e) { console.log(`  PRUNE ABORTED: reading property_images failed (${e.message}). Nothing deleted.`); return false }
+  } catch { console.log('  PRUNE ABORTED: reading property_images failed. Nothing deleted.'); return false }
 
   const served = new Map()
   for (const [ext, ids] of feedRefs) {
@@ -297,7 +297,7 @@ async function runPrune(incomplete, incoming = new Map()) {
     const { error } = await supabase.from('property_images').update({ is_primary: true }).eq('id', a.image_id)
     if (error) { bad++; console.log(`  primary reassign FAILED  ${a.external_id}`) }
   }
-  const paths = [...new Set(deleted.map(d => d.path))]
+  const paths = deletablePaths(rows, deleted)
   for (let i = 0; i < paths.length; i += 50) {
     const batch = paths.slice(i, i + 50)
     const { error } = await supabase.storage.from(BUCKET).remove(batch)

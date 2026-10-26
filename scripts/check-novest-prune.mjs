@@ -18,7 +18,7 @@ const { planPrune } = await import(pi !== -1
   ? pathToFileURL(resolve(process.argv[pi + 1])).href
   : './lib/novest-prune-plan.mjs')
 
-const { pruneRefusal, parseImageUrl } = await import('./lib/novest-prune-plan.mjs')
+const { pruneRefusal, parseImageUrl, deletablePaths } = await import('./lib/novest-prune-plan.mjs')
 const rai = process.argv.indexOf('--reader')
 const { readAllRows } = await import(rai !== -1
   ? pathToFileURL(resolve(process.argv[rai + 1])).href
@@ -157,12 +157,29 @@ const t = (name, got, want) => {
   t('2350 rows with a 1000-row cap are all read', [r.rows.length, r.exact, new Set(r.rows.map(x => x.id)).size], [2350, 2350, 2350])
   t('exactly 1000 rows (boundary) are read once', (await readAllRows(mkStub(1000))).rows.length, 1000)
   t('zero rows is a valid read', (await readAllRows(mkStub(0))).rows.length, 0)
+  for (const cap of [500, 1000]) {
+    let got
+    try { const rc = await readAllRows(mkStub(2350, cap)); got = [rc.rows.length, new Set(rc.rows.map(x => x.id)).size] } catch (e) { got = e.message }
+    t(`server cap ${cap}: all 2350 rows read, no dupes`, got, [2350, 2350])
+  }
   let msg = null
   try { await readAllRows(mkStub(2350, 1000, 2400)) } catch (e) { msg = e.message }
   t('rows received != exact count fails', msg, 'read 2350 rows, expected 2400')
   let msg2 = null
   try { await readAllRows(() => Promise.resolve({ data: null, error: { message: 'boom' }, count: null })) } catch (e) { msg2 = e.message }
   t('a read error fails', msg2, 'boom')
+}
+
+// 11b. a storage object still referenced by a row that remains is never deleted
+{
+  const shared = U('novest-S', '5000')
+  const mk = () => [row('A', 'novest-S', '5000', 0, true, shared), row('A', 'novest-S', '5000', 1, false, shared), row('A', 'novest-S', '5001', 2), row('A', 'novest-S', '1111', 3)]
+  const imgs = mk()
+  const p = planPrune({ listings: [L('A', 'novest-S')], images: imgs, feed: feedOf({ 'novest-S': ['5001', '1111'] }) })
+  t('both rows of a shared path removed -> object deleted', [p.removals.length, p.objectPaths], [2, ['partner/novest/novest-S/5000.jpg']])
+  const p2 = planPrune({ listings: [L('A', 'novest-S')], images: imgs, feed: feedOf({ 'novest-S': ['5001', '1111'] }) })
+  const oneKept = deletablePaths(imgs, p2.removals.slice(0, 1))
+  t('two rows share a path, one remains -> object not in the delete list', oneKept, [])
 }
 
 // 12. the script-side guard
@@ -177,6 +194,13 @@ const t = (name, got, want) => {
   t('guard: local (not CI) is allowed', R(true, {}), false)
   t('guard: no --prune never refuses', R(false, env({ GITHUB_EVENT_NAME: 'schedule' })), false)
   const src = readFileSync(resolve(ROOT, 'scripts/mirror-novest-images.mjs'), 'utf8')
+  t('mirror passes `served` to planPrune', /planPrune\(\{[^}]*\bserved\b[^}]*\}\)/.test(src), true)
+  const calls = src.split('readAllRows(').length - 1
+  const okCalls = [...src.matchAll(/await readAllRows\(([\s\S]*?\.range\(a, b\)\))/g)].filter(m => m[1].includes("{ count: 'exact' }") && m[1].includes(".order('id')")).length
+  t('every readAllRows( call site has count exact and .order(\'id\')', [calls, okCalls], [3, 3])
+  t('haveImages / primary-repair catch blocks call fail(', [/haveImages = \(await readAllRows(?:(?!catch)[\s\S])*?\} catch \(e\) \{ fail\(/.test(src), /cur = \(await readAllRows(?:(?!catch)[\s\S])*?\} catch \(e\) \{ fail\(/.test(src)], [true, true])
+  t('prune abort line prints no error text', /PRUNE ABORTED: reading property_images failed\.? Nothing/.test(src) && !/PRUNE ABORTED: reading[^\n]*\$\{e/.test(src), true)
+  t('mirror deletes storage via deletablePaths', src.includes('deletablePaths(rows, deleted)'), true)
   t('mirror script calls pruneRefusal before prodWriteGuard', /pruneRefusal\(\{ prune, env: process\.env \}\)[\s\S]*?prodWriteGuard\(\{/.test(src), true)
 }
 
