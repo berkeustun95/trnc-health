@@ -9,16 +9,20 @@ import { BOOT_SPLASH_LIVE } from '../constants/flags'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { BOOT_SPLASH_KEY, localDay, shouldPlaySplash, splashRecord } from '../utils/bootSplashDay'
 
-// ─── Boot splash: the Oli & Maki gate clip as an animated WebP (OTA stopgap) ──
+// ─── Boot splash: the Oli & Maki gate clip, played ONCE ───────────────────────
 //
 // Berke's 2.4 s clip (ada-splash-final.mp4), colour-corrected to a constant #CBFAE8 and
-// extended top and bottom to phone height (gate at the vertical centre), played ONCE through
-// expo-image, which is native in every binary that receives this OTA. The final splash is the
-// same clip through expo-video plus a matching native splash (stage A, next native build);
-// this is what OTA users get until then. Vault 2026-10-24_boot-splash.md.
+// extended top and bottom to phone height (gate at the vertical centre). Two paths:
+// - VIDEO_PATH (a binary with expo-splash-screen + expo-video, 1.4.2+): the native splash (mint
+//   + gate) is held until this component's first still has drawn, then the mp4 plays through
+//   expo-video. Every way out of the native splash is bounded, see hideNativeSplash().
+// - Otherwise (every shipped binary before 1.4.2): the same clip as an animated WebP through
+//   expo-image, native in every binary that receives an OTA, behind a "morph" frame.
+// Vault 2026-10-24_boot-splash.md.
 
 const BG = '#CBFAE8'
 const CLIP = require('../assets/splash/gate-video.webp')
+const VIDEO = require('../assets/splash/gate-video.mp4')
 const FIRST = require('../assets/splash/gate-video-first.jpg')
 const LAST = require('../assets/splash/gate-video-last.jpg')
 const WORDMARK = require('../assets/splash/wordmark.png')
@@ -28,9 +32,11 @@ const CLIP_H = 2560
 // ─── Which first frame ──────────────────────────────────────────────────────
 // No shipped binary has expo-splash-screen yet, so the native splash hides on the first JS
 // frame and this one starts as a copy of it ("morph", Berke 2026-10-23), then fades into the
-// clip's still gate. A binary that has the module (stage A; Expo Go) skips the morph.
+// clip's still gate. A binary that has the modules (1.4.2; Expo Go) skips the morph.
 const devPath = __DEV__ ? process.env.EXPO_PUBLIC_SPLASH_PATH : undefined
-const NEW_NATIVE = devPath ? devPath === 'native' : !!requireOptionalNativeModule('ExpoSplashScreen')
+const HAS_VIDEO_MODULES = !!requireOptionalNativeModule('ExpoSplashScreen') && !!requireOptionalNativeModule('ExpoVideo')
+const VIDEO_PATH = devPath ? devPath === 'native' : HAS_VIDEO_MODULES
+const NEW_NATIVE = VIDEO_PATH
 // Android before 12 draws no icon splash, and the geometry below was measured on Android 13
 // only: the morph is not drawn there.
 const MORPH = !NEW_NATIVE && (Platform.OS === 'ios' || Platform.Version >= 31)
@@ -70,28 +76,96 @@ function useReduceMotion() {
 
 // expo-image is native from 1.3.0; requiring its entry where it is missing kills the app at
 // launch, so App.js renders this only when the module exists, and the entry is require()d
-// inside a function, never at module scope (check-native-import-safety).
-export const SPLASH_AVAILABLE = !!requireOptionalNativeModule('ExpoImage')
+// inside a function, never at module scope (check-native-import-safety). The video path needs
+// expo-video and expo-splash-screen instead, not expo-image.
+const HAS_IMAGE = !!requireOptionalNativeModule('ExpoImage')
+export const SPLASH_AVAILABLE = VIDEO_PATH || HAS_IMAGE
 // On in ADA Preview before it is on for everyone: the Previewed code is then main itself, so the
 // "Nothing Previewed stays off main" lineage never waits on a flag commit (Berke 2026-10-25).
 export const SPLASH_ON = BOOT_SPLASH_LIVE || IS_PREVIEW
+
+// ─── Native splash hold (VIDEO_PATH only) ───────────────────────────────────
+// Held from module eval until this component has drawn its own first frame. A held native
+// splash covers every touch, so every way out is bounded: the first still drawn, finish() (itself
+// capped by HARD_CAP once mounted), a skipped launch (claimSplash false), and SAFETY_MS from module
+// eval for the cases where nothing mounts (claimSplash hangs, play never resolves).
+const HOLD_NATIVE = SPLASH_ON && VIDEO_PATH
+const SAFETY_MS = 5000
+let nativeHidden = false
+function hideNativeSplash() {
+  if (nativeHidden) return
+  nativeHidden = true
+  try { Promise.resolve(require('expo-splash-screen').hideAsync()).catch(() => {}) } catch {}
+}
+function holdNativeSplash() {
+  try {
+    const SplashScreen = require('expo-splash-screen')
+    SplashScreen.setOptions({ fade: true, duration: 200 })
+    Promise.resolve(SplashScreen.preventAutoHideAsync()).catch(() => {})
+  } catch {}
+}
+if (HOLD_NATIVE) {
+  holdNativeSplash()
+  setTimeout(hideNativeSplash, SAFETY_MS)
+}
 
 // Should this cold start play the clip? Records the play at once, so a launch killed mid-clip
 // does not replay it the same day. A storage failure skips: the launch is then exactly as before.
 export async function claimSplash(build) {
   try {
     const day = localDay()
-    if (!shouldPlaySplash(await AsyncStorage.getItem(BOOT_SPLASH_KEY), day, build)) return false
+    if (!shouldPlaySplash(await AsyncStorage.getItem(BOOT_SPLASH_KEY), day, build)) {
+      // BootSplash is never mounted for a skipped launch, so release the native splash here.
+      if (HOLD_NATIVE) hideNativeSplash()
+      return false
+    }
     await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(day, build))
     return true
   } catch {
+    if (HOLD_NATIVE) hideNativeSplash()
     return false
   }
 }
 let ExpoImage
 function loadExpoImage() {
-  if (ExpoImage === undefined) ExpoImage = SPLASH_AVAILABLE ? require('expo-image').Image : null
+  if (ExpoImage === undefined) ExpoImage = !VIDEO_PATH && HAS_IMAGE ? require('expo-image').Image : null
   return ExpoImage
+}
+let ExpoVideo
+function loadExpoVideo() {
+  if (ExpoVideo === undefined) ExpoVideo = require('expo-video')
+  return ExpoVideo
+}
+
+// Defined outside BootSplash so a re-render never remounts the player. Created only for a
+// playing, non-Reduce-Motion launch. The player and view hold the last frame after the end.
+function ClipVideo({ top, cw, ch, onShown }) {
+  const { useVideoPlayer, VideoView } = loadExpoVideo()
+  const player = useVideoPlayer(VIDEO, p => {
+    p.muted = true
+    p.loop = false
+    p.audioMixingMode = 'mixWithOthers'
+    p.showNowPlayingNotification = false
+    p.staysActiveInBackground = false
+    p.play()
+  })
+  useEffect(() => {
+    const sub = player.addListener('statusChange', ({ status }) => { if (status === 'error') onShown() })
+    return () => sub.remove()
+  }, [player])
+  return (
+    <VideoView
+      player={player}
+      contentFit="cover"
+      nativeControls={false}
+      allowsPictureInPicture={false}
+      allowsFullscreen={false}
+      surfaceType="textureView"
+      onFirstFrameRender={onShown}
+      pointerEvents="none"
+      style={{ position: 'absolute', left: 0, top, width: cw, height: ch }}
+    />
+  )
 }
 
 // ms from the clip's first displayed frame. The clip runs 2.39 s and holds its last frame.
@@ -125,6 +199,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   const finish = () => {
     if (done.current) return
     done.current = true
+    if (HOLD_NATIVE) hideNativeSplash()
     setLeaving(true)
     Animated.timing(exit, { toValue: 0, duration: EXIT_FADE, easing: Easing.in(Easing.cubic), useNativeDriver: true })
       .start(() => onDone?.())
@@ -196,9 +271,12 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
         {/* Decoding the clip takes ~0.6 s on the S20+; its first frames are this same still
             gate, so the still shows at once and the clip starts on top of it invisibly. */}
         {reduce === false && (
-          <Image source={FIRST} fadeDuration={0} onLoad={() => setFirstShown(true)} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
-        {reduce === false && (
+        {reduce === false && VIDEO_PATH && (
+          <ClipVideo top={top} cw={cw} ch={ch} onShown={() => setShownAt(t0 => t0 ?? Date.now())} />
+        )}
+        {reduce === false && !VIDEO_PATH && (
           <ExpoImage
             source={CLIP}
             autoplay
@@ -210,7 +288,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
           />
         )}
         {reduce === true && (
-          <Image source={LAST} fadeDuration={0} onLoad={() => setShownAt(t0 => t0 ?? Date.now())} onError={() => setShownAt(t0 => t0 ?? Date.now())} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <Image source={LAST} fadeDuration={0} onLoad={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => setShownAt(t0 => t0 ?? Date.now())} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
         <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: wordTop, alignItems: 'center', opacity: word }}>
           <Image source={WORDMARK} fadeDuration={0} style={{ width: 190 * s, height: 190 * s * 184 / 570 }} resizeMode="contain" />
