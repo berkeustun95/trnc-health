@@ -7,12 +7,20 @@
 # (pg_cron 05:00 / 15:00 UTC) imports new listings, but a listing with no property_images
 # row is hidden from users (props_hide_photoless_novest, 20261068). While this was
 # manual-only, 8 listings published 6–8 Oct sat hidden until 11 Oct. Safe unattended:
-# inserts only, never deletes, resumable, a no-op when nothing is due. Any failed image
+# the SCHEDULED run inserts only (it never prunes, see PRUNE below), resumable, a no-op when nothing is due. Any failed image
 # exits non-zero, so GitHub emails.
 #
 #   gh workflow run novest-images                              # dry
 #   gh workflow run novest-images -f apply=true                # mirror everything due
 #   gh workflow run novest-images -f apply=true -f limit=20    # first 20
+#
+# PRUNE (removes images Novest dropped from a listing's gallery). OFF by default and NEVER on the
+# schedule: --prune is passed only when inputs.prune == 'true' AND the event is workflow_dispatch
+# (scripts/check-novest-prune.mjs asserts that line). Turning it on for cron, and the first applying
+# prune, are Berke's call. Without apply=true a prune run only PRINTS the plan.
+#
+#   gh workflow run novest-images -f prune=true                # dry prune: prints what it would remove
+#   gh workflow run novest-images -f apply=true -f prune=true  # applying prune (Berke's go first)
 
 name: novest-images
 
@@ -30,6 +38,10 @@ on:
         description: 'Optional: only the first N properties'
         type: string
         default: ''
+      prune:
+        description: 'Also remove images Novest dropped (prints the plan only unless apply is also true)'
+        type: boolean
+        default: false
 
 concurrency: { group: prod-novest, cancel-in-progress: false }
 
@@ -45,6 +57,7 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_APPLY: ${{ inputs.apply }}
       IN_LIMIT: ${{ inputs.limit }}
+      IN_PRUNE: ${{ inputs.prune }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -56,9 +69,12 @@ jobs:
             [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
           done
           [ -z "$IN_LIMIT" ] || [[ "$IN_LIMIT" =~ ^[1-9][0-9]*$ ]] || { echo "::error::limit must be a positive integer"; exit 1; }
+      - name: Prune planner self-test (offline)
+        run: node scripts/check-novest-prune.mjs
       - name: Mirror
         run: |
           args=()
+          [ "$IN_PRUNE" = "true" ] && [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && args+=(--prune)
           [ "$IN_APPLY" = "true" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ] || args+=(--dry)
           [ -z "$IN_LIMIT" ] || args+=(--limit "$IN_LIMIT")
           node scripts/mirror-novest-images.mjs "${args[@]}"
