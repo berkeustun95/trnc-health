@@ -12,7 +12,9 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-10-25
+export default `ADA – North Cyprus Assistant (Android package com.berkeustun95.ada), published on Google Play by P&D Digital, operated by Astarte Digital Trading Ltd. (TRNC, company no. MŞ29454).
+
+Version: 2026-10-25
 Last updated: October 24, 2026
 
 WHO WE ARE
