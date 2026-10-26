@@ -305,9 +305,10 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
             gate, so the still shows at once and the clip starts on top of it invisibly. */}
         {/* VIDEO_PATH: a TextureView inside a fading parent composites over black on Android
             (measured 2026-10-26). LAST sits under FIRST + the clip, decoded early; on exit they
-            unmount so only LAST + wordmark + BG fade (the clip holds this frame once it ends). */}
+            unmount so only LAST + wordmark + BG fade (the clip holds this frame once it ends).
+            LAST is invisible until grown: FIRST starts shrunk and LAST's edges would show around it. */}
         {VIDEO_PATH && reduce === false && (
-          <Image source={LAST} fadeDuration={0} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
+          <Image source={LAST} fadeDuration={0} style={[{ position: 'absolute', left: 0, top, width: cw, height: ch }, !grown && { opacity: 0 }]} />
         )}
         {reduce === false && !(VIDEO_PATH && leaving) && (
           <FirstImage source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); startGrow(); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); startGrow(); if (HOLD_NATIVE) hideNativeSplash() }} style={[{ position: 'absolute', left: 0, top, width: cw, height: ch }, GROW && { transform: [{ scale: grow }] }]} />
