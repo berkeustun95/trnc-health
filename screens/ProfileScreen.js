@@ -1622,7 +1622,7 @@ const s = StyleSheet.create({
   pageTitle:        { ...type.pageTitle, color: colors.textPrimary, paddingTop: 8, marginBottom: 16 },
   footer: {
     flexShrink: 0, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
-    borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg,
+    borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas,
   },
   footerBtn: {
     backgroundColor: colors.primary, borderRadius: radius.md,
@@ -1666,7 +1666,7 @@ const s = StyleSheet.create({
   blockedHint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 3 },
   blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   unblockBtn:       { paddingHorizontal: 12, minHeight: TAP, justifyContent: 'center', borderRadius: 8, backgroundColor: colors.primaryLight },
-  unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
+  unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   errorText:        { fontFamily: 'Inter_400Regular', color: colors.dangerInk, fontSize: 13, marginBottom: 12 },
   marketingSection: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
   marketingRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
