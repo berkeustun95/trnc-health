@@ -10,3 +10,8 @@ google-play-service-account.json
 # silence it. Left alone deliberately: an untracked 62 MB directory SHOULD show up in
 # `git status`, and a marker that says "the tree is not clean" is telling the truth.
 vendor/
+
+# Seed media for the eatery import scripts (20.9 MB) and the store-listing backup (8.2 MB).
+# Neither is imported by app code or read by the eas-build-pre-install scripts; upload weight only.
+data/eatery/
+fastlane/metadata-backup/
