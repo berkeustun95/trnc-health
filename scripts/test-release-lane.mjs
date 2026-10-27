@@ -59,7 +59,12 @@ const prOnLane = f => { // a PR branch based on the lane tip with one -x copy of
 }
 
 const tests = [
-  ['copies: valid -x picks plus a PR merge on a release lane Preview are accepted, copy → original printed', f => { releaseLane(f); prOnLane(f); const r = preview(f); return r.applies && r.ok && r.copies.length === 2 && r.copies.every(c => c.pick && c.original) }],
+  ['copies: valid -x picks plus a PR merge on a release lane Preview are accepted, copy → original printed', f => { releaseLane(f); prOnLane(f); const r = preview(f); return r.applies && r.ok && r.copies.length === 2 && r.copies.every(c => c.pick && c.original) && r.merges.length === 1 && r.merges[0].merge.includes('Merge pull request #2') && r.merges[0].second }],
+  ['copies: a PR merge whose second parent carries a hand-written commit is refused, the commit named (merge shape alone is not enough)', f => {
+    releaseLane(f); const tip = f.g('rev-parse', 'HEAD'); f.g('checkout', '-qb', 'pr'); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'smuggled by hand'); f.g('checkout', '-q', 'release/1.4')
+    f.g('merge', '-q', '--no-ff', '-m', 'Merge pull request #3', 'pr'); void tip
+    const r = preview(f); return r.applies && !r.ok && r.merges.length === 1 && r.failures.some(m => m.includes('smuggled by hand') && m.includes('no "(cherry picked'))
+  }],
   ['copies: a hand-written commit on the lane is refused, named', f => { releaseLane(f); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'hand-written'); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('hand-written') && m.includes('no "(cherry picked')) }],
   ['copies: a pick whose original is not in HEAD is refused', f => { f.g('checkout', '-qb', 'release/1.4', f.base); f.g('checkout', '-qb', 'side'); f.w('a.txt', 'one\ntwo\nthree\nside\n'); f.g('commit', '-qam', 'side work'); const side = f.g('rev-parse', 'HEAD'); f.g('checkout', '-q', 'release/1.4'); f.g('cherry-pick', '-x', side); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('is not on HEAD')) }],
   ['copies: a patch-id mismatch (trailer kept, patch edited) is refused', f => { releaseLane(f); f.w('a.txt', 'one\ntwo\nthree\nfour\nEVIL\n'); f.g('commit', '-q', '--amend', '--no-edit', '-a'); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('different result') || (m.includes('patch-id') && m.includes('differs'))) }],

@@ -154,7 +154,8 @@ for (const v of views) {
   else if (!known(v.commit)) missing.push(`? ${v.commit.slice(0, 7)} ${label}\n      commit not in this clone, even after a fetch`)
   else if (!isAncestor(v.commit) && laneOnMain(v.commit)) onMainLane.push(`· ${v.commit.slice(0, 7)} ${label}`)
   else if (!isAncestor(v.commit) && (copies = assessLaneCopies({ cwd: ROOT, preview: v.commit })).ok) {
-    viaCopies.push(`· ${v.commit.slice(0, 7)} ${label}\n` + copies.copies.map(x => `      ${x.pick}  ←  ${x.original}`).join('\n'))
+    viaCopies.push(`· ${v.commit.slice(0, 7)} ${label}\n` + copies.copies.map(x => `      ${x.pick}  ←  ${x.original}`).join('\n') +
+      copies.merges.map(m => `\n      PR merge ${m.merge}  (second parent ${m.second})`).join(''))
   } else if (!isAncestor(v.commit)) {
     const { work, samePatch } = missingWork(v.commit)
     for (const c of samePatch) excused.set(c, git('log', '-1', '--format=%h %s', c))
