@@ -9,13 +9,14 @@
 //   (b) EAS: channel "preview" maps ONLY to branch(es) named "preview" — never production's branch;
 //   (c) the config this publish resolves (APP_VARIANT=preview) is the Preview variant;
 //   (d) tracked files are clean (eas update ships the WORKING TREE) and HEAD contains origin/main
-//       ("Nothing Previewed stays off main", CLAUDE.md);
+//       ("Nothing Previewed stays off main", CLAUDE.md) — or is a proven release/* lane (lib/release-lane.mjs);
 //   (e) the EAS preview environment carries the Supabase URL + key (names only, never values).
 // No override flag.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assessReleaseLane, describeLane } from './lib/release-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -57,8 +58,11 @@ try {
   try { sh('git', ['fetch', '-q', 'origin', 'main']) } catch { /* checked below */ }
   let contains = false
   try { sh('git', ['merge-base', '--is-ancestor', 'origin/main', 'HEAD']); contains = true } catch { /* no */ }
-  if (!contains) problems.push('HEAD does not contain origin/main — publish Preview only from a branch that contains main')
-  row(!dirty && contains, 'tree', `${dirty ? 'tracked files MODIFIED' : 'clean'} · HEAD ${sh('git', ['rev-parse', '--short', 'HEAD'])} ${contains ? 'contains' : 'LACKS'} origin/main`)
+  // release/* lane: proven from git to be reviewed picks of main (scripts/lib/release-lane.mjs)
+  const lane = contains ? null : assessReleaseLane({ cwd: ROOT })
+  if (!contains && !lane.exempt) problems.push('HEAD does not contain origin/main — publish Preview only from a branch that contains main' + (lane.releaseBranch ? `\n      ${describeLane(lane).join('\n      ')}` : ''))
+  row(!dirty && (contains || lane.exempt), 'tree', `${dirty ? 'tracked files MODIFIED' : 'clean'} · HEAD ${sh('git', ['rev-parse', '--short', 'HEAD'])} ${contains ? 'contains' : lane.exempt ? 'lacks (release lane, exempt)' : 'LACKS'} origin/main`)
+  if (lane?.exempt) console.log(describeLane(lane).map(l => `    ${l}`).join('\n'))
 }
 // (e)
 try {
