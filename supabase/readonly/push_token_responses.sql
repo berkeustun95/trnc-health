@@ -12,7 +12,7 @@ select json_build_object(
   'with_push_token', (select count(*) from net._http_response
                        where content like '%ExponentPushToken[%' or content like '%ExpoPushToken[%'),
   'with_push_token_by_hour', (select coalesce(json_agg(json_build_object('hour_utc', h, 'n', n) order by h), '[]'::json)
-                               from (select to_char(date_trunc('hour', created) at time zone 'utc', 'MM-DD HH24:00') h, count(*) n
+                               from (select to_char(date_trunc('hour', created at time zone 'utc'), 'MM-DD HH24:00') h, count(*) n
                                        from net._http_response
                                       where content like '%ExponentPushToken[%' or content like '%ExpoPushToken[%'
                                       group by 1) t),
