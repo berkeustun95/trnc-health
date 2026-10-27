@@ -77,6 +77,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   it bundles the WORKING TREE, so an uncommitted `MODULE_FLAGS.x: true` ships to every user. The
   wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
+- **`release/*` lane exemption** (`scripts/lib/release-lane.mjs`, `npm run release-lane:test`): `ota:preview`'s "contains origin/main" and the Preview-lineage check are waived only on a `release/*` branch of a DIFFERENT runtime than main whose every non-merge commit is a `cherry-pick -x` of a commit on main touching the same paths (merge originals via `-m 1`): an exact blob match where the pre-image matches main's; where a file diverged, a verbatim `git patch-id` (diff pinned to -U3, no `GIT_DIFF_OPTS`) plus each hunk's pre-image occurring exactly once in the lane file, printed as "file diverged"; clean tree, merges only as PR merges whose tree equals the PR head; read from git, no flag, picks printed. Anything else still needs HEAD ⊇ main.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
