@@ -9,9 +9,12 @@
 //   (a) HEAD's runtime (app.config.js version, policy appVersion) differs from origin/main's
 //   (b) base = merge-base(HEAD, origin/main) is an ancestor of origin/main
 //   (c) every non-merge commit in base..HEAD has a "(cherry picked from commit <sha>)" trailer whose
-//       sha is an ancestor of origin/main AND whose `git patch-id --stable` equals the pick's
-//       (a merge original, picked with -m 1, is compared as `git diff <orig>^1 <orig>`); merge commits
-//       in base..HEAD must be clean (no evil merge: empty combined diff)
+//       sha is an ancestor of origin/main AND whose `git patch-id --verbatim` (whitespace
+//       counts) equals the pick's (a merge original, picked with -m 1, is compared as
+//       `git diff <orig>^1 <orig>`); at least one pick must be proven (an empty proof is no exemption).
+//       A merge in base..HEAD is accepted ONLY as a GitHub PR merge: exactly 2 parents, first parent an
+//       ancestor of the second (PR branch based on the lane tip), tree == second parent's tree — so all
+//       content comes from the second parent's non-merge commits, which (c) checks
 //   (d) the tracked tree is clean (eas update ships the WORKING TREE)
 import { execFileSync } from 'node:child_process'
 
@@ -33,9 +36,9 @@ function runtimeAt(cwd, ref) {
 }
 
 function patchId(cwd, a, b) {
-  const diff = raw(cwd, ['diff', '--no-ext-diff', '--no-color', a, b])
+  const diff = raw(cwd, ['diff', '--no-ext-diff', '--no-textconv', '--binary', '--no-color', a, b])
   if (!diff) return null
-  return raw(cwd, ['patch-id', '--stable'], diff).split(' ')[0] || null
+  return raw(cwd, ['patch-id', '--verbatim'], diff).split(' ')[0] || null
 }
 
 function branchNames(cwd) {
@@ -64,8 +67,11 @@ export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
     try { base = git(cwd, 'merge-base', 'HEAD', mainRef) } catch { return refuse(`HEAD and ${mainRef} share no merge-base`) }
     if (!succeeds(cwd, 'merge-base', '--is-ancestor', base, mainRef)) return refuse(`merge-base ${base.slice(0, 7)} is not an ancestor of ${mainRef}`) // (b)
 
-    for (const c of lines(git(cwd, 'rev-list', '--merges', `${base}..HEAD`))) { // no evil merges
-      if (git(cwd, 'show', '--cc', '--format=', c)) refuse(`merge commit ${short(cwd, c)} carries changes of its own (non-empty combined diff)`)
+    for (const c of lines(git(cwd, 'rev-list', '--merges', `${base}..HEAD`))) { // PR merges only
+      const ps = git(cwd, 'log', '-1', '--format=%P', c).split(' ').filter(Boolean)
+      if (ps.length !== 2) { refuse(`merge commit ${short(cwd, c)} has ${ps.length} parents — only 2-parent PR merges are accepted`); continue }
+      if (!succeeds(cwd, 'merge-base', '--is-ancestor', ps[0], ps[1])) { refuse(`merge commit ${short(cwd, c)}: first parent is not an ancestor of the second (not a PR branch based on the lane tip)`); continue }
+      if (git(cwd, 'rev-parse', `${c}^{tree}`) !== git(cwd, 'rev-parse', `${ps[1]}^{tree}`)) refuse(`merge commit ${short(cwd, c)}: tree differs from its second parent's (changes of its own)`)
     }
     for (const c of lines(git(cwd, 'rev-list', '--no-merges', '--reverse', `${base}..HEAD`))) { // (c)
       const label = short(cwd, c)
@@ -80,9 +86,11 @@ export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
       const mine = patchId(cwd, `${c}^`, c)
       const theirs = patchId(cwd, `${orig}^1`, orig)
       if (!mine || !theirs) { refuse(`${label}: empty patch, no patch-id to compare`); continue }
-      if (mine !== theirs) { refuse(`${label}: patch-id ${mine.slice(0, 10)} differs from original ${short(cwd, orig)} (${theirs.slice(0, 10)})`); continue }
+      if (mine !== theirs) { refuse(`${label}: verbatim patch-id ${mine.slice(0, 10)} differs from original ${short(cwd, orig)} (${theirs.slice(0, 10)})`); continue }
       res.picks.push({ pick: label, original: short(cwd, orig), patchId: mine })
     }
+
+    if (res.picks.length === 0 && res.refusals.length === 0) refuse(`no cherry-picks between ${base.slice(0, 7)} and HEAD — an empty proof is not an exemption`)
 
     const dirty = git(cwd, 'status', '--porcelain', '--untracked-files=no') // (d)
     if (dirty) refuse(`tracked files are modified:\n      ${dirty.split('\n').join('\n      ')}`)
@@ -95,8 +103,8 @@ export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
 
 export function describeLane(res, mainRef = 'origin/main') {
   if (res.exempt) {
-    return [`release-lane exemption APPLIES to ${res.branch}: runtime ${res.headRuntime} (${mainRef} is ${res.mainRuntime}), every non-merge commit is a cherry-pick of a commit on ${mainRef} with an identical patch-id:`,
-      ...res.picks.map(p => `    ${p.pick}\n      ← ${p.original}  [patch-id ${p.patchId.slice(0, 10)}]`)]
+    return [`release-lane exemption APPLIES to ${res.branch}: runtime ${res.headRuntime} (${mainRef} is ${res.mainRuntime}), every non-merge commit is a cherry-pick of a commit on ${mainRef} with an identical verbatim patch-id:`,
+      ...res.picks.map(p => `    ${p.pick}\n      ← ${p.original}  [verbatim patch-id ${p.patchId.slice(0, 10)}]`)]
   }
   return [`release-lane exemption NOT applied to ${res.branch ?? '?'}:`, ...res.refusals.map(r => `    ${r}`)]
 }
