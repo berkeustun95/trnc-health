@@ -11,7 +11,10 @@
 //   (c) every non-merge commit in base..HEAD has a "(cherry picked from commit <sha>)" trailer whose
 //       sha is an ancestor of origin/main AND whose `git patch-id --verbatim` (whitespace
 //       counts) equals the pick's (a merge original, picked with -m 1, is compared as
-//       `git diff <orig>^1 <orig>`); at least one pick must be proven (an empty proof is no exemption).
+//       `git diff <orig>^1 <orig>`), AND the pick touches exactly the paths the original touched. patch-id drops
+//       line numbers, so it is only the proof for a file whose pre-image DIFFERS between the lane and main;
+//       for a path whose pre-image (mode+blob at <pick>^ vs <orig>^1) is identical the post-image must be
+//       identical too (exact, no patch-id). At least one pick must be proven (an empty proof is no exemption).
 //       A merge in base..HEAD is accepted ONLY as a GitHub PR merge: exactly 2 parents, first parent an
 //       ancestor of the second (PR branch based on the lane tip), tree == second parent's tree — so all
 //       content comes from the second parent's non-merge commits, which (c) checks
@@ -39,6 +42,18 @@ function patchId(cwd, a, b) {
   const diff = raw(cwd, ['diff', '--no-ext-diff', '--no-textconv', '--binary', '--no-color', a, b])
   if (!diff) return null
   return raw(cwd, ['patch-id', '--verbatim'], diff).split(' ')[0] || null
+}
+
+// path → { oldMode, newMode, oldSha, newSha } for a..b, renames split into delete+add (raw output, no textconv)
+function treeChanges(cwd, a, b) {
+  const tok = raw(cwd, ['diff-tree', '--raw', '-z', '--no-renames', '--no-abbrev', '-r', a, b]).split('\0')
+  const out = new Map()
+  for (let i = 0; i + 1 < tok.length; i += 2) {
+    const m = tok[i].match(/^:(\d+) (\d+) ([0-9a-f]+) ([0-9a-f]+) /)
+    if (!m) continue
+    out.set(tok[i + 1], { pre: `${m[1]} ${m[3]}`, post: `${m[2]} ${m[4]}` })
+  }
+  return out
 }
 
 function branchNames(cwd) {
@@ -83,11 +98,23 @@ export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
       const parents = git(cwd, 'log', '-1', '--format=%P', c).split(' ').filter(Boolean)
       const origParents = git(cwd, 'log', '-1', '--format=%P', orig).split(' ').filter(Boolean)
       if (parents.length !== 1 || origParents.length === 0) { refuse(`${label}: pick or original has no usable parent for a patch`); continue }
+      const myChanges = treeChanges(cwd, `${c}^`, c), origChanges = treeChanges(cwd, `${orig}^1`, orig)
+      const onlyPick = [...myChanges.keys()].filter(p => !origChanges.has(p)), onlyOrig = [...origChanges.keys()].filter(p => !myChanges.has(p))
+      if (onlyPick.length || onlyOrig.length) { refuse(`${label}: touches different files than original ${short(cwd, orig)} (extra: ${onlyPick.join(', ') || '-'}; missing: ${onlyOrig.join(', ') || '-'})`); continue }
+      const exact = [], diverged = []
+      let bad = null
+      for (const [p, mc] of myChanges) {
+        const oc = origChanges.get(p)
+        if (mc.pre !== oc.pre) diverged.push(p)
+        else if (mc.post !== oc.post) { bad = p; break }
+        else exact.push(p)
+      }
+      if (bad) { refuse(`${label}: ${bad} has the same pre-image as on main but a different result than original ${short(cwd, orig)}`); continue }
       const mine = patchId(cwd, `${c}^`, c)
       const theirs = patchId(cwd, `${orig}^1`, orig)
       if (!mine || !theirs) { refuse(`${label}: empty patch, no patch-id to compare`); continue }
       if (mine !== theirs) { refuse(`${label}: verbatim patch-id ${mine.slice(0, 10)} differs from original ${short(cwd, orig)} (${theirs.slice(0, 10)})`); continue }
-      res.picks.push({ pick: label, original: short(cwd, orig), patchId: mine })
+      res.picks.push({ pick: label, original: short(cwd, orig), patchId: mine, exact, diverged })
     }
 
     if (res.picks.length === 0 && res.refusals.length === 0) refuse(`no cherry-picks between ${base.slice(0, 7)} and HEAD — an empty proof is not an exemption`)
@@ -104,7 +131,8 @@ export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
 export function describeLane(res, mainRef = 'origin/main') {
   if (res.exempt) {
     return [`release-lane exemption APPLIES to ${res.branch}: runtime ${res.headRuntime} (${mainRef} is ${res.mainRuntime}), every non-merge commit is a cherry-pick of a commit on ${mainRef} with an identical verbatim patch-id:`,
-      ...res.picks.map(p => `    ${p.pick}\n      ← ${p.original}  [verbatim patch-id ${p.patchId.slice(0, 10)}]`)]
+      ...res.picks.map(p => `    ${p.pick}\n      ← ${p.original}  [verbatim patch-id ${p.patchId.slice(0, 10)}]` +
+        p.exact.map(f => `\n      exact (same pre-image, same result): ${f}`).join('') + p.diverged.map(f => `\n      patch-id only, file diverged: ${f}`).join(''))]
   }
   return [`release-lane exemption NOT applied to ${res.branch ?? '?'}:`, ...res.refusals.map(r => `    ${r}`)]
 }
