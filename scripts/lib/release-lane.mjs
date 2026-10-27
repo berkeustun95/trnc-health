@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process'
 const RELEASE_BRANCH = /^release\/.+/
 // Every git call runs with a pinned environment: the publisher's GIT_DIFF_OPTS / system config must not change what a diff (and so a patch-id) contains.
 const PINNED_ENV = (() => { const e = { ...process.env, GIT_CONFIG_NOSYSTEM: '1' }; delete e.GIT_DIFF_OPTS; delete e.GIT_EXTERNAL_DIFF; return e })()
-const raw = (cwd, args, input, encoding = 'utf8') => execFileSync('git', ['--literal-pathspecs', '-c', 'diff.context=3', '-c', 'diff.interHunkContext=0', ...args], { cwd, encoding, input, env: PINNED_ENV, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 27 })
+const raw = (cwd, args, input, encoding = 'utf8') => execFileSync('git', ['--literal-pathspecs', '-c', 'diff.context=3', '-c', 'diff.interHunkContext=0', '-c', 'diff.suppressBlankEmpty=false', '-c', 'core.bigFileThreshold=512m', '-c', 'diff.indentHeuristic=true', ...args], { cwd, encoding, input, env: PINNED_ENV, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 27 })
 const DIFF_PIN = ['--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '-U3', '--inter-hunk-context=0', '--diff-algorithm=myers', '--src-prefix=a/', '--dst-prefix=b/']
 const git = (cwd, ...args) => raw(cwd, args).trim()
 const succeeds = (cwd, ...args) => { try { raw(cwd, args); return true } catch { return false } }
