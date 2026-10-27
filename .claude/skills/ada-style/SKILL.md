@@ -27,6 +27,8 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
   `elevation.card` only (the two are 1.09:1). Never add a second background surface.
 - Order (`screens/HomeScreen.js` renderHubRedesign): `RedesignHero` photo band → `OliBar` → widgets
   (duty / event, `Widgets.js`) → `DuyurularBanner` → favourites → the four `ServicePanels` → bottom ad slot.
+- Event banner (`EventBanner`): date line + title in ONE dark band at the TOP of the card (Berke approved
+  the partner-visible change 2026-10-15): at the first scroll position the card's lower part is under the tab bar.
 - Fonts: Inter only today. `TILE_FONT_MANROPE` (Manrope tile labels) and `HOME_POLISH_LIVE` (Playfair
   section headers, unmerged `02c68bd`) are OFF-FLAG EXPERIMENTS. If either ships, this file must be
   updated in the same PR.
@@ -47,7 +49,8 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - White (`colors.card`), `radii.pill`, `elevation.tabBar`, height 64 (`TAB_BAR_H`), inset 24 each side,
   12 above the bottom inset. Active tab: `colors.primaryLight` pill, label `type.small` SemiBold in
   `colors.primaryDark`; inactive icon `colors.textSecondary`.
-- A canvas fade sits under it. Content scrolling under it pads with `useTabBarFootprint()` / `TabBarPad`.
+- A canvas fade sits under it: one stretched PNG (`assets/oli-scenes/canvas-fade.png`), never stepped
+  views (they band over dark photos). Content scrolling under it pads with `useTabBarFootprint()` / `TabBarPad`.
 - It is drawn on Home's tabs only, not on module screens.
 
 ## 5. Module screens: full-screen photo behind see-through cards (`components/ui/ModuleScreen.js`)
