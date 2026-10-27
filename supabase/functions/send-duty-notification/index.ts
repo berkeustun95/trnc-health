@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { pushOutcome, RUN_DEADLINE_MS, sendBatch } from './push.ts'
 
@@ -104,13 +105,19 @@ serve(async () => {
     return new Response(JSON.stringify({ message: 'No duty pharmacies for today', date: today }), { status: 200 })
   }
 
-  const { data: profiles, error: profilesError } = await supabase
-    .from('profiles')
-    .select('id, push_token, preferred_language')
+  // Paged + count-verified (page.ts): a plain select stops silently at PostgREST max-rows (1000).
+  const { rows: profiles, error: profilesError } = await readAllById<{ id: string; push_token: string | null; preferred_language: string | null }>(
+    (after) => {
+      let q = supabase.from('profiles').select('id, push_token, preferred_language', { count: 'exact' }).order('id').limit(1000)
+      if (after) q = q.gt('id', after)
+      return q
+    },
+  )
 
   if (profilesError) {
+    console.error('profiles read failed:', profilesError)
     await finishRun(supabase, runId, { outcome: 'profiles_query_failed', pharmacies: duties.length })
-    return new Response(JSON.stringify({ error: profilesError.message }), { status: 500 })
+    return new Response(JSON.stringify({ error: 'profiles read failed' }), { status: 500 })
   }
 
   if (!profiles?.length) {
