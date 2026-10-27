@@ -76,6 +76,32 @@ function chainFrom(text, start) {
 
 const stripComments = s => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
 
+// Same text with every COMMENT blanked to spaces (newlines kept), so offsets line up with the original and a
+// commented-out `.from('profiles').select(` cannot match. String literals are skipped, so `'https://x'` survives.
+// The original text is still searched for `unpaged-ok:` (that marker lives in a comment).
+export function blankComments(text) {
+  let out = '', i = 0, q = null
+  while (i < text.length) {
+    const ch = text[i], nx = text[i + 1]
+    if (q) {
+      out += ch
+      if (ch === '\\') { out += nx ?? ''; i += 2; continue }
+      if (ch === q) q = null
+      i++
+    } else if (ch === '/' && nx === '/') {
+      while (i < text.length && text[i] !== '\n') { out += ' '; i++ }
+    } else if (ch === '/' && nx === '*') {
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) { out += text[i] === '\n' ? '\n' : ' '; i++ }
+      if (i < text.length) { out += '  '; i += 2 }
+    } else {
+      if (ch === "'" || ch === '"' || ch === '`') q = ch
+      out += ch
+      i++
+    }
+  }
+  return out
+}
+
 // The callee names of every call whose ARGUMENT LIST contains `index` (innermost first). A completed earlier statement
 // (`const a = await readAllRows(p)`) is a matched pair and never counts; only an UNCLOSED `(` before `index` does.
 // So a helper only exempts a read that sits inside its arguments, not one on the next line.
@@ -105,7 +131,8 @@ function ownResultNames(text, index) {
   return props.data && props.count ? { rows: props.data, count: props.count } : null
 }
 
-export function scanText(text, file = '<memory>', tables = GROWING) {
+export function scanText(original, file = '<memory>', tables = GROWING) {
+  const text = blankComments(original)
   const findings = []
   FROM.lastIndex = 0
   let m
@@ -115,21 +142,22 @@ export function scanText(text, file = '<memory>', tables = GROWING) {
     const lineStart = text.lastIndexOf('\n', m.index) + 1
     const line = text.slice(0, m.index).split('\n').length
     const chain = chainFrom(text, m.index)
+    const chainOriginal = original.slice(m.index, m.index + chain.length)
     // comment block directly above (up to 3 lines, stopping at a blank line)
     let aboveStart = lineStart
     for (let k = 0; k < 3 && aboveStart > 0; k++) {
       const prev = text.lastIndexOf('\n', aboveStart - 2) + 1
-      if (text.slice(prev, aboveStart).trim() === '') break
+      if (text.slice(prev, aboveStart).trim() === '' && original.slice(prev, aboveStart).trim() === '') break
       aboveStart = prev
     }
-    const above = text.slice(aboveStart, lineStart)
-    if (/unpaged-ok:\s*\S/.test(chain) || /unpaged-ok:\s*\S/.test(above)) continue
+    const above = original.slice(aboveStart, lineStart)
+    if (/unpaged-ok:[ \t]*\S/.test(chainOriginal) || /unpaged-ok:[ \t]*\S/.test(above)) continue
 
-    const code = stripComments(chain)
+    const code = chain
     const lim = code.match(/\.limit\(\s*([^)]*?)\s*\)/)
-    const insideHelper = enclosingCallees(stripComments(text.slice(0, m.index)), stripComments(text.slice(0, m.index)).length).some(n => HELPERS.test(n))
+    const insideHelper = enclosingCallees(text, m.index).some(n => HELPERS.test(n))
     const own = ownResultNames(text, m.index)
-    const after = stripComments(text.slice(m.index + chain.length, m.index + chain.length + 500))
+    const after = text.slice(m.index + chain.length, m.index + chain.length + 500)
     const countCompared = own && /count\s*:\s*['"`]exact['"`]/.test(chain) && !/head\s*:\s*true/.test(chain) &&
       new RegExp(`(\\b${own.rows}\\.length\\s*(!==?|<)\\s*${own.count}\\b|\\b${own.count}\\s*(!==?|>)\\s*${own.rows}\\.length)`).test(after)
     const ok =
@@ -196,6 +224,15 @@ function selfTest() {
   t('REVIEW red: a .maybeSingle() on the previous line exempts nothing', n(`const a = await sb.from('x').select('y').maybeSingle()\nconst { data } = await sb.from('profiles').select('id')`), 1)
   t('REVIEW red: comparing ANOTHER array to count does not make the read guarded', n(`const { data, count } = await sb.from('hotels').select('id', { count: 'exact' })\nif (other.length !== count) fail('x')`), 1)
   t('REVIEW red: a helper in an earlier, finished argument list', n(`foo(readAllRows(p), 1)\nconst { data } = await sb.from('profiles').select('id')`), 1)
+  t('QA red 1: a finished readAllResult statement above', n(`const a = await readAllResult((x, y) => sb.from('events').select('id',{count:'exact'}).order('id').range(x, y))\nconst b = await sb.from('profiles').select('id')`), 1)
+  t('QA red 2: a finished .range statement above', n(`const a = await sb.from('events').select('id').range(0,9)\nconst b = await sb.from('profiles').select('id')`), 1)
+  t('QA red 3: a helper NAME mentioned earlier, then unrelated statements', n(`const x = readAllRows\nconst y = 1\nfoo(y)\nconst r = await sb.from('profiles').select('id')`), 1)
+  t('a commented-out read is not flagged (line and block comments)', n(`// const r = await sb.from('profiles').select('id')\n/* sb.from('events').select('id') */\nconst ok = 1`), 0)
+  t('  ...a URL string with // does not hide a read after it', n(`const u = 'https://x.y'; const r = await sb.from('profiles').select('id')`), 1)
+  t('unpaged-ok WITH a reason still exempts', n(`// unpaged-ok: bounded by .in() of one page\nconst r = await sb.from('profiles').select('id').in('id', ids)`), 0)
+  t('unpaged-ok with an EMPTY reason is rejected', n(`// unpaged-ok:\nconst r = await sb.from('profiles').select('id')`), 1)
+  t('unpaged-ok: followed by a NEWLINE then more comment is still empty', n(`// unpaged-ok:\n// see above\nconst r = await sb.from('profiles').select('id')`), 1)
+  t('unpaged-ok: with only spaces after is rejected', n(`// unpaged-ok:   \nconst r = await sb.from('profiles').select('id')`), 1)
   // GREEN: each of these must pass (positive controls: the guard is not just refusing everything)
   t('.range loop', n(`await sb.from('profiles').select('id', { count: 'exact' }).order('id').range(a, b)`), 0)
   t('wrapped in readAllResult', n(`await readAllResult((a, b) => sb\n  .from('events').select('id', { count: 'exact' }).order('id').range(a, b))`), 0)
