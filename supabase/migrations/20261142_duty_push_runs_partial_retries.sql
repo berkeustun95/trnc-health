@@ -4,7 +4,7 @@
 --
 -- 2026-10-27 15:00 UTC run: one Expo batch of 100 got HTTP 503 and was never retried (push_ok 10 of 110).
 -- The function now retries a batch ONLY when Expo explicitly did not process it (HTTP 503 or 429), up to 3 times
--- inside a hard run deadline. It never retries a timeout, any other thrown fetch, HTTP 500/502/504 or a 200
+-- inside a soft run deadline (every batch's first attempt is always sent; the deadline only gates retries). It never retries a timeout, any other thrown fetch, HTTP 500/502/504 or a 200
 -- (all of which may have been accepted: a retry could double-push).
 --
 -- The outcome is BATCH-level (push.ts pushOutcome), not ticket-level:
@@ -122,7 +122,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261142_duty_push_runs_partial_retries.sql', '80808dff9666f871733a413c38910a29046fb01681fc2663c853dbf53c9129af')
+VALUES ('20261142_duty_push_runs_partial_retries.sql', 'e2748b7a556af1c7e3ceec4c0ca8dfd174042b3d390eaf214bf19b527f505dbd')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
