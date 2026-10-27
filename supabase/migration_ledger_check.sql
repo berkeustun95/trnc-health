@@ -256,7 +256,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261138_app_versions_ios_latest_141.sql', '40e026f5e3702d90c91dc44400aa95397e2841eeed88f5f0f5304b94a0488f68'),
   ('20261139_duty_push_places_refresh_cron_timeout.sql', '578f05a7c013dc9a02c35281d518f6138c717c3d0cf2a56b56019f2c24fcb4ca'),
   ('20261141_duty_push_runs.sql', '735871baf962d3654c9201a254c5c7ac4d0b10f047f7f3e086b30ded19ddaf12'),
-  ('20261142_duty_push_runs_partial_retries.sql', 'fe9a25a5cfee536d7f0ff636f216a08d7b2670e032f10363455e6e66f144fb72')
+  ('20261142_duty_push_runs_partial_retries.sql', '80808dff9666f871733a413c38910a29046fb01681fc2663c853dbf53c9129af')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

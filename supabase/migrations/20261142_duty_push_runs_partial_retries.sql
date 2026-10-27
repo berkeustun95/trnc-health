@@ -3,11 +3,14 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- 2026-10-27 15:00 UTC run: one Expo batch of 100 got HTTP 503 and was never retried (push_ok 10 of 110).
--- The function now retries a batch Expo did not accept (HTTP 5xx / 429 / thrown fetch) up to 3 times, and
--- records the outcome honestly:
---   sent         every ticket ok, or only error tickets (accepted batches are never retried)
---   partial      0 < push_ok < push_attempted
---   push_failed  push_ok = 0 while something was attempted
+-- The function now retries a batch ONLY when Expo explicitly did not process it (HTTP 503 or 429), up to 3 times
+-- inside a hard run deadline. It never retries a timeout, any other thrown fetch, HTTP 500/502/504 or a 200
+-- (all of which may have been accepted: a retry could double-push).
+--
+-- The outcome is BATCH-level (push.ts pushOutcome), not ticket-level:
+--   sent         every batch was accepted (HTTP 200); error tickets inside it (dead tokens) do not matter
+--   partial      at least one batch accepted AND at least one not accepted after retries
+--   push_failed  something was attempted and no batch was accepted
 -- push_retries = number of retry requests made across the run (counts only, like every other column).
 --
 -- Access is unchanged: RLS on, zero policies, service_role only (asserted again below, column level included,
@@ -32,7 +35,7 @@ ALTER TABLE public.duty_push_runs ADD CONSTRAINT duty_push_runs_outcome_check CH
   'running','sent','partial','no_duties','no_profiles','duty_query_failed','profiles_query_failed','push_failed']::text[]));
 
 COMMENT ON COLUMN public.duty_push_runs.push_retries IS
-  'Retry requests made for batches Expo did not accept (HTTP 5xx / 429 / thrown fetch). Accepted batches are never retried. 20261142.';
+  'Retry requests made for batches Expo answered 503 or 429 (it did not process them). Timeouts, other thrown fetches, HTTP 500/502/504 and accepted (200) batches are never retried. 20261142.';
 
 DO $$
 DECLARE
@@ -119,7 +122,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261142_duty_push_runs_partial_retries.sql', 'fe9a25a5cfee536d7f0ff636f216a08d7b2670e032f10363455e6e66f144fb72')
+VALUES ('20261142_duty_push_runs_partial_retries.sql', '80808dff9666f871733a413c38910a29046fb01681fc2663c853dbf53c9129af')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

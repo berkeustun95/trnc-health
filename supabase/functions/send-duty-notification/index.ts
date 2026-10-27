@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { pushOutcome, sendBatch } from './push.ts'
+import { pushOutcome, RUN_DEADLINE_MS, sendBatch } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -172,10 +172,11 @@ serve(async () => {
   let batchesAccepted = 0
   let batchesFailed = 0
   for (let i = 0; i < messages.length; i += 100) {
+    const remainingBatches = Math.ceil((messages.length - i - 100) / 100)
     const r = await sendBatch(messages.slice(i, i + 100), {
       fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
-      now: Date.now, random: Math.random, runStartedAt,
-    })
+      now: Date.now, random: Math.random, deadlineAt: runStartedAt + RUN_DEADLINE_MS,
+    }, Math.max(0, remainingBatches))
     pushOk += r.ok
     pushRetries += r.retries
     if (r.accepted) batchesAccepted++
