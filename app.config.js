@@ -120,25 +120,29 @@ export default {
     },
     plugins: [
       '@react-native-community/datetimepicker',
-      // Native splash = the gate clip's mint + its first frame (assets/splash). Every value is set:
-      // the props path defaults differ from the legacy one (imageWidth 100, no fullscreen).
-      // Android 12+ draws the icon on a 288 dp canvas (gate 166 dp); iOS shows the frame full-bleed.
+      // Native splash = the 1.4.1 look: the v2 logo on white. BootSplash.js draws an identical frame
+      // (MorphFrame) and cross-fades it into the clip's first still. Every value is set: the props
+      // path defaults differ from the legacy one (imageWidth 100, no fullscreen).
+      // iOS: legacy launch screen, a full-screen image view with scaleAspectFit (a screen-width square).
+      // Android 12+: splash-icon.png in a 288 dp slot, masked to a 192 dp circle (no icon background);
+      // its logo reaches 0.3256 of the canvas (93.8 dp), inside the 96 dp mask (the adaptive foreground
+      // reaches 0.3904 = 112 dp and would lose the tail).
       // No dark variant: userInterfaceStyle is light. No expo-video entry: its props would add
       // UIBackgroundModes audio / a mediaPlayback service.
       [
         'expo-splash-screen',
         {
-          backgroundColor: '#CBFAE8',
+          backgroundColor: '#FFFFFF',
           android: {
-            image: './assets/splash/native-gate-android.png',
+            image: './assets/brand/v2/splash-icon.png',
             imageWidth: 288,
-            backgroundColor: '#CBFAE8',
+            backgroundColor: '#FFFFFF',
           },
           ios: {
-            image: './assets/splash/native-gate-ios.png',
-            resizeMode: 'cover',
+            image: './assets/brand/v2/splash-icon.png',
+            resizeMode: 'contain',
             enableFullScreenImage_legacy: true,
-            backgroundColor: '#CBFAE8',
+            backgroundColor: '#FFFFFF',
           },
         },
       ],

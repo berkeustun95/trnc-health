@@ -3,7 +3,7 @@ import { View, Text, Image, Animated, Easing, StyleSheet, Platform, Accessibilit
 import { requireOptionalNativeModule } from 'expo'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { font, colors, motion } from '../constants/theme'
+import { font, colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { BOOT_SPLASH_LIVE } from '../constants/flags'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -32,37 +32,36 @@ const CLIP_H = 2560
 // ─── Which first frame ──────────────────────────────────────────────────────
 // No shipped binary has expo-splash-screen yet, so the native splash hides on the first JS
 // frame and this one starts as a copy of it ("morph", Berke 2026-10-23), then fades into the
-// clip's still gate. A binary that has the modules (1.4.2; Expo Go) skips the morph.
+// clip's still gate. A binary that has the modules (1.4.2; Expo Go) draws the same morph, now over
+// ITS native frame (the v2 logo on white, like 1.4.1), then fades it into the clip's still gate.
 const devPath = __DEV__ ? process.env.EXPO_PUBLIC_SPLASH_PATH : undefined
 const HAS_VIDEO_MODULES = !!requireOptionalNativeModule('ExpoSplashScreen') && !!requireOptionalNativeModule('ExpoVideo')
 const VIDEO_PATH = devPath ? devPath === 'native' : HAS_VIDEO_MODULES
-const NEW_NATIVE = VIDEO_PATH
-// Android before 12 draws no icon splash, and the geometry below was measured on Android 13
-// only: the morph is not drawn there.
-const MORPH = !NEW_NATIVE && (Platform.OS === 'ios' || Platform.Version >= 31)
-// Android's native splash draws the gate 166 dp wide on every phone (the OS icon slot); the clip's
-// gate is 468/1080 of its width, so the first still grows from one to the other (measured 2026-10-26).
-const GROW = VIDEO_PATH && Platform.OS === 'android'
-const NATIVE_GATE_DP = 166
-const CLIP_GATE = 468 / 1080
-const FirstImage = GROW ? Animated.Image : Image
+// WebP path: Android before 12 draws no icon splash, and the geometry below was measured on Android
+// 13 only, so no morph there. VIDEO_PATH: the plugin's white + splash-icon.png frame is drawn on
+// iOS and on every Android (androidx core-splashscreen draws the same icon below 12; unmeasured).
+const MORPH = VIDEO_PATH || Platform.OS === 'ios' || Platform.Version >= 31
 const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
 
 // 1.4.1 native frame. Android 12+: the v2 adaptive-icon foreground centred on white; it draws
 // 288 dp wide, centred on the SCREEN (SM-G985F / Android 13, measured 2026-10-26; the OEM icon
 // mask is not copied). The RN window is shorter than the screen there, hence `cy` below. iOS: the v2 splash-icon.png,
 // `contain`, a screen-width square. Goes away with stage A.
+// 1.4.2 (VIDEO_PATH): the plugin draws splash-icon.png on white on both platforms (iOS legacy full-screen
+// image view, contain; Android 288 dp slot, centred on the screen), and morph-ios@3x.png is that
+// file downscaled, so it serves both, Android just drawn 288 dp wide. There is no gate in the native
+// frame to match: this frame replaces it and the morph fade carries the logo into the clip's gate.
 const MORPH_ANDROID_W = 288
-const MORPH_IMAGE = Platform.OS === 'ios'
+const MORPH_IMAGE = VIDEO_PATH || Platform.OS === 'ios'
   ? require('../assets/splash/morph-ios.png')
   : IS_PREVIEW ? require('../assets/splash/morph-android-preview.png') : require('../assets/splash/morph-android.png')
 
-function MorphFrame({ opacity, W, cx, cy }) {
+function MorphFrame({ opacity, W, cx, cy, onLoad }) {
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.card, opacity }]}>
       {Platform.OS === 'ios'
-        ? <Image source={MORPH_IMAGE} fadeDuration={0} resizeMode="contain" style={{ position: 'absolute', left: 0, top: cy - W / 2, width: W, height: W }} />
-        : <Image source={MORPH_IMAGE} fadeDuration={0} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
+        ? <Image source={MORPH_IMAGE} fadeDuration={0} onLoad={onLoad} onError={onLoad} resizeMode="contain" style={{ position: 'absolute', left: 0, top: cy - W / 2, width: W, height: W }} />
+        : <Image source={MORPH_IMAGE} fadeDuration={0} onLoad={onLoad} onError={onLoad} style={{ position: 'absolute', left: cx - MORPH_ANDROID_W / 2, top: cy - MORPH_ANDROID_W / 2, width: MORPH_ANDROID_W, height: MORPH_ANDROID_W }} />}
     </Animated.View>
   )
 }
@@ -90,7 +89,8 @@ export const SPLASH_AVAILABLE = VIDEO_PATH || HAS_IMAGE
 export const SPLASH_ON = BOOT_SPLASH_LIVE || IS_PREVIEW
 
 // ─── Native splash hold (VIDEO_PATH only) ───────────────────────────────────
-// Held from module eval until this component has drawn its own first frame. A held native
+// Held from module eval until this component has drawn its own first frame (the MorphFrame copy of
+// the native frame, so the swap is invisible). A held native
 // splash covers every touch, so every way out is bounded: the first still drawn, finish() (itself
 // capped by HARD_CAP once mounted), a skipped launch (claimSplash false), and SAFETY_MS from module
 // eval for the cases where nothing mounts (claimSplash hangs, play never resolves).
@@ -102,12 +102,10 @@ function hideNativeSplash() {
   nativeHidden = true
   try { Promise.resolve(require('expo-splash-screen').hideAsync()).catch(() => {}) } catch {}
 }
-// Native splash view fade-out; the grow waits it out so a smaller native gate never ghosts under a larger still.
-const NATIVE_FADE = 200
 function holdNativeSplash() {
   try {
     const SplashScreen = require('expo-splash-screen')
-    SplashScreen.setOptions({ fade: true, duration: NATIVE_FADE })
+    SplashScreen.setOptions({ fade: true, duration: 200 })
     Promise.resolve(SplashScreen.preventAutoHideAsync()).catch(() => {})
   } catch {}
 }
@@ -204,9 +202,6 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   const morph = useRef(new Animated.Value(1)).current
   const word = useRef(new Animated.Value(0)).current
   const exit = useRef(new Animated.Value(1)).current
-  const grow = useRef(new Animated.Value(GROW ? NATIVE_GATE_DP / (CLIP_GATE * W) : 1)).current
-  const [grown, setGrown] = useState(!GROW)
-  const growing = useRef(false)
   const [shownAt, setShownAt] = useState(null)
   const [firstShown, setFirstShown] = useState(false)
   const readyAt = useRef(null)
@@ -222,6 +217,8 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
       .start(() => onDone?.())
   }
 
+  const releaseNative = HOLD_NATIVE ? hideNativeSplash : undefined
+
   useEffect(() => {
     const timer = setTimeout(finish, HARD_CAP)
     return () => clearTimeout(timer)
@@ -236,14 +233,6 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
     if (reduce === true) word.setValue(1)
   }, [reduce])
 
-  // The first still has drawn: the native splash fades out over it while it grows to the clip's gate.
-  const startGrow = () => {
-    if (!GROW || growing.current) return
-    growing.current = true
-    Animated.timing(grow, { toValue: 1, duration: motion.base, delay: NATIVE_FADE, easing: Easing.out(Easing.cubic), useNativeDriver: true })
-      .start(() => setGrown(true))
-  }
-
   useEffect(() => {
     if (firstShown || shownAt != null) {
       Animated.timing(morph, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
@@ -251,12 +240,12 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   }, [firstShown, shownAt])
 
   // VIDEO_PATH only (the WebP path's timing is live behaviour): the still is up but the clip never
-  // reports a frame or an error, so start the clocks anyway. Counted from the clip's mount (grown).
+  // reports a frame or an error, so start the clocks anyway.
   useEffect(() => {
-    if (!VIDEO_PATH || !firstShown || !grown || shownAt != null || reduce !== false) return
+    if (!VIDEO_PATH || !firstShown || shownAt != null || reduce !== false) return
     const timer = setTimeout(() => setShownAt(t0 => t0 ?? Date.now()), CLIP_WATCHDOG)
     return () => clearTimeout(timer)
-  }, [firstShown, grown, shownAt, reduce])
+  }, [firstShown, shownAt, reduce])
 
   useEffect(() => {
     if (shownAt == null) return
@@ -278,8 +267,8 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   // stage-A binary) that is its plain window colour, never the app underneath.
   if (!play) {
     return MORPH
-      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={cy} />
-      : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: NEW_NATIVE ? BG : colors.card }]} />
+      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={cy} onLoad={releaseNative} />
+      : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
   }
 
   // Cover the width (the arms run off the screen edge, as in the clip), gate at the
@@ -305,15 +294,14 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
             gate, so the still shows at once and the clip starts on top of it invisibly. */}
         {/* VIDEO_PATH: a TextureView inside a fading parent composites over black on Android
             (measured 2026-10-26). LAST sits under FIRST + the clip, decoded early; on exit they
-            unmount so only LAST + wordmark + BG fade (the clip holds this frame once it ends).
-            LAST is invisible until grown: FIRST starts shrunk and LAST's edges would show around it. */}
+            unmount so only LAST + wordmark + BG fade (the clip holds this frame once it ends). */}
         {VIDEO_PATH && reduce === false && (
-          <Image source={LAST} fadeDuration={0} style={[{ position: 'absolute', left: 0, top, width: cw, height: ch }, !grown && { opacity: 0 }]} />
+          <Image source={LAST} fadeDuration={0} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
         {reduce === false && !(VIDEO_PATH && leaving) && (
-          <FirstImage source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); startGrow(); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); startGrow(); if (HOLD_NATIVE) hideNativeSplash() }} style={[{ position: 'absolute', left: 0, top, width: cw, height: ch }, GROW && { transform: [{ scale: grow }] }]} />
+          <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top, width: cw, height: ch }} />
         )}
-        {reduce === false && VIDEO_PATH && grown && !leaving && (
+        {reduce === false && VIDEO_PATH && !leaving && (
           <ClipVideo top={top} cw={cw} ch={ch} onShown={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} />
         )}
         {reduce === false && !VIDEO_PATH && (
@@ -339,7 +327,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
           )}
         </Animated.View>
       </View>
-      {MORPH && <MorphFrame opacity={morph} W={W} cx={W / 2} cy={cy} />}
+      {MORPH && <MorphFrame opacity={morph} W={W} cx={W / 2} cy={cy} onLoad={releaseNative} />}
     </Animated.View>
   )
 }
