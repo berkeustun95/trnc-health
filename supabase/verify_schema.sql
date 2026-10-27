@@ -49,6 +49,8 @@ WITH report AS (
     ('1115_eatery_partners','eatery_photos'),
     -- WhatsApp order proof (1125): registered ahead of the apply; red until it runs.
     ('20261125_eatery_orders','eatery_orders'),
+    -- Duty push run log (20261141): registered ahead of the apply; red until it runs.
+    ('20261141_duty_push_runs','duty_push_runs'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers'),
     -- Per-dish options (1134): registered ahead of the apply; red until it runs.
@@ -231,6 +233,18 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders','client_id'),
     ('20261125_eatery_orders','eatery_orders','created_as_guest'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261141_duty_push_runs','duty_push_runs','id'),
+    ('20261141_duty_push_runs','duty_push_runs','started_at'),
+    ('20261141_duty_push_runs','duty_push_runs','finished_at'),
+    ('20261141_duty_push_runs','duty_push_runs','duty_date'),
+    ('20261141_duty_push_runs','duty_push_runs','outcome'),
+    ('20261141_duty_push_runs','duty_push_runs','pharmacies'),
+    ('20261141_duty_push_runs','duty_push_runs','notified'),
+    ('20261141_duty_push_runs','duty_push_runs','notif_batches_failed'),
+    ('20261141_duty_push_runs','duty_push_runs','push_attempted'),
+    ('20261141_duty_push_runs','duty_push_runs','push_ok'),
+    ('20261141_duty_push_runs','duty_push_runs','push_errors'),
+    ('20261141_duty_push_runs','duty_push_runs','error_kinds'),
     ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
     ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
     ('20261132_eatery_orders_is_test','order_testers','added_at'),
@@ -766,6 +780,11 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_expires_check'),
     ('20261125_eatery_orders','eatery_orders_view_count_check'),
     ('20261125_eatery_orders','eatery_orders_client_id_check'),
+    ('20261141_duty_push_runs','duty_push_runs_pkey'),
+    ('20261141_duty_push_runs','duty_push_runs_outcome_check'),
+    ('20261141_duty_push_runs','duty_push_runs_counts_check'),
+    ('20261141_duty_push_runs','duty_push_runs_error_kinds_check'),
+    ('20261141_duty_push_runs','duty_push_runs_finished_check'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers_pkey'),
     ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
@@ -1208,6 +1227,7 @@ WITH report AS (
     -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
     ('1049_walking_legs','idx_walking_legs_to_place_id'),
     ('1051_app_versions','idx_app_update_events_created_at'),
+    ('20261141_duty_push_runs','idx_duty_push_runs_started_at'),
     ('1070_live_scores','matches_kickoff_idx'),
     ('1070_live_scores','matches_league_idx'),
     ('1070_live_scores','api_request_log_at_idx'),
@@ -5120,6 +5140,21 @@ WITH report AS (
       OR ((SELECT count(*) FROM public.duty_list WHERE duty_date = '2026-10-17' AND region = 'Lefkoşa'
             AND name IN ('HÜSEYİN SAKALLI ECZANESİ', 'HÜSEYİN KERİM SAKALLI ECZANESİ')) = 1
           AND NOT EXISTS (SELECT 1 FROM public.duty_list WHERE duty_date = '2026-10-17' AND name = 'İSMET ECZANESİ'))
+    -- 20261141: duty_push_runs is service_role-only. RLS on, ZERO policies, no anon/authenticated privilege at table or column
+    --     level (pg_attribute, so the token never names a column that does not exist yet), service_role keeps it (positive
+    --     control), the 12 columns exist, and the outcome vocabulary and the ok+errors<=attempted rule are in force.
+    UNION ALL SELECT '20261141_duty_push_runs','duty_push_runs: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes, 12 columns, outcome + counts CHECKs',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.duty_push_runs')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'duty_push_runs') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
+                                  OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
+               AND has_table_privilege('service_role', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped) = 12, false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%duty_query_failed%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%push_attempted%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_counts_check'), false)
   ) z
 
   UNION ALL
@@ -5219,6 +5254,8 @@ FROM (VALUES
   -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
   -- clear of the three purges above it.
   ('1051_app_versions','purge-app-update-events'),
+  -- 90-day retention on duty_push_runs (20261141): counts only, but still a log that must not grow forever.
+  ('20261141_duty_push_runs','purge-duty-push-runs'),
   ('1093_checkins_google_places','purge-google-places-cache'),
   ('1093_checkins_google_places','google-places-refresh'),
   -- Replaces duty-notif-mtwf / -thu-sat / -sun (UTC, inline key). Ticks every 30 min; sends
