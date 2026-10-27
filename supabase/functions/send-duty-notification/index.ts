@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { readAllById } from './page.ts'
+import { profileReadKinds, readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { pushOutcome, RUN_DEADLINE_MS, sendBatch } from './push.ts'
 
@@ -168,13 +168,10 @@ serve(async () => {
   let pushOk = 0
   let pushErrCount = 0
   const errorKinds: Record<string, number> = Object.create(null)
-  // Counts only. Written straight into error_kinds, NOT via bump(): these are not failed pushes and must not
-  // touch push_errors (push_ok + push_errors <= push_attempted).
-  if (profilesShortBy) {
-    errorKinds.profiles_count_mismatch = profilesShortBy
-    console.error('profiles read still short after a re-read; sending to the rows read')
-  }
-  if (profilesCountUnverified) errorKinds.profiles_count_unverified = 1
+  // Counts only; merged straight into error_kinds, NOT via bump(): these are not failed pushes and must not touch
+  // push_errors (push_ok + push_errors <= push_attempted). profileReadKinds is unit-tested (page_test.ts).
+  Object.assign(errorKinds, profileReadKinds({ shortBy: profilesShortBy, countUnverified: profilesCountUnverified }))
+  if (profilesShortBy) console.error('profiles read still short after a re-read; sending to the rows read')
   const bump = (kind: string, n = 1) => {
     pushErrCount += n
     // At most 20 distinct keys; the rest fold into 'other'.

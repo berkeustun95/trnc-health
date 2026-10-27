@@ -1,5 +1,6 @@
-// deno test supabase/functions/send-duty-notification/page_test.ts
-import { type Page, readAllById } from './page.ts'
+// deno test --allow-read=supabase/functions/send-duty-notification supabase/functions/send-duty-notification/page_test.ts
+// (the wiring test reads index.ts as text)
+import { type Page, profileReadKinds, readAllById } from './page.ts'
 
 type Row = { id: string }
 const table = (n: number): Row[] => Array.from({ length: n }, (_, i) => ({ id: String(i).padStart(6, '0') }))
@@ -73,4 +74,21 @@ Deno.test('a missing exact count is not a refusal: rows are returned, flagged un
   let n = 0
   const r = await readAllById(async (): Promise<Page<Row>> => ({ data: n++ === 0 ? table(3) : [], error: null, count: null }))
   eq([r.error, r.rows.length, r.countUnverified], [null, 3, true], 'unverified')
+})
+
+Deno.test('profileReadKinds: mismatch and unverified land in error_kinds as counts; a clean read adds nothing', () => {
+  eq(profileReadKinds({ shortBy: 1500 }), { profiles_count_mismatch: 1500 }, 'mismatch')
+  eq(profileReadKinds({ countUnverified: true }), { profiles_count_unverified: 1 }, 'unverified')
+  eq(profileReadKinds({ shortBy: 3, countUnverified: true }), { profiles_count_mismatch: 3, profiles_count_unverified: 1 }, 'both')
+  eq(profileReadKinds({}), {}, 'clean')
+  eq(profileReadKinds({ shortBy: 0 }), {}, 'zero shortfall is not a mismatch')
+})
+
+Deno.test('index.ts wiring: the run merges profileReadKinds(...) into errorKinds and not through bump()', async () => {
+  const src = await Deno.readTextFile(new URL('./index.ts', import.meta.url))
+  const m = src.match(/Object\.assign\(errorKinds, profileReadKinds\(\{ shortBy: profilesShortBy, countUnverified: profilesCountUnverified \}\)\)/)
+  eq(m !== null, true, 'the merge line exists')
+  eq(src.indexOf('Object.assign(errorKinds') > src.indexOf('const errorKinds'), true, 'after errorKinds is declared')
+  eq(/bump\(\s*['"]profiles_count/.test(src), false, 'never via bump (would inflate push_errors)')
+  eq(src.includes('shortBy: profilesShortBy, countUnverified: profilesCountUnverified } = await readAllById'), true, 'both come from the readAllById result')
 })

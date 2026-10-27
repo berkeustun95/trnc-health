@@ -63,3 +63,12 @@ export async function readAllById<T extends { id: string }>(
   if (rows.length === 0) return { rows: [], error: `read 0 of ${expected} rows`, reads: readsDone }
   return { rows, error: null, shortBy: (expected as number) - rows.length, reads: readsDone }
 }
+
+// The error_kinds entries for a profiles read (counts only). Kept pure so the wiring is testable. These are NOT failed
+// pushes: they must be merged into error_kinds directly, never through the push-error counter.
+export function profileReadKinds(r: { shortBy?: number; countUnverified?: boolean }): Record<string, number> {
+  const kinds: Record<string, number> = {}
+  if (r.shortBy) kinds.profiles_count_mismatch = r.shortBy
+  if (r.countUnverified) kinds.profiles_count_unverified = 1
+  return kinds
+}
