@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { sendBatch } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -42,10 +43,6 @@ function getDutyBody(lang: string, duties: { name: string; phone?: string; open_
 // finished at the end (both timestamps from this function's clock, so finished_at >= started_at holds). Logging must never block or fail a push: a missing table (function deployed
 // before the migration) or any error is logged and ignored.
 const MAX_ERROR_KINDS = 20
-const KIND_RE = /^[A-Za-z0-9_]{1,64}$/
-function errorKind(k: unknown): string {
-  return typeof k === 'string' && KIND_RE.test(k) ? k : 'other'
-}
 
 async function startRun(supabase: any, dutyDate: string): Promise<number | null> {
   try {
@@ -75,6 +72,7 @@ async function finishRun(supabase: any, id: number | null, patch: Record<string,
 }
 
 serve(async () => {
+  const runStartedAt = Date.now()
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -170,50 +168,27 @@ serve(async () => {
     errorKinds[key] = (errorKinds[key] ?? 0) + n
   }
 
+  let pushRetries = 0
   for (let i = 0; i < messages.length; i += 100) {
-    const batch = messages.slice(i, i + 100)
-    try {
-      const res = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
-        },
-        body: JSON.stringify(batch),
-      })
-
-      if (!res.ok) {
-        // Never log or return Expo's body or messages: for DeviceNotRegistered they embed the push token.
-        console.error('Expo push batch failed: HTTP', res.status)
-        bump(`http_${res.status}`, batch.length)
-      } else {
-        const json = await res.json()
-        const tickets: any[] = Array.isArray(json.data) ? json.data : []
-        for (const r of tickets) {
-          if (r.status === 'ok') {
-            pushOk++
-          } else {
-            bump(errorKind(r.details?.error ?? 'unknown'))
-          }
-        }
-        if (tickets.length < batch.length) bump('no_ticket', batch.length - tickets.length)
-      }
-    } catch (e) {
-      console.error('Expo push batch threw:', e instanceof Error ? e.name : 'unknown')
-      bump('fetch_failed', batch.length)
-    }
+    const r = await sendBatch(messages.slice(i, i + 100), {
+      fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+      now: Date.now, random: Math.random, runStartedAt,
+    })
+    pushOk += r.ok
+    pushRetries += r.retries
+    for (const [kind, n] of Object.entries(r.kinds)) bump(kind, n)
   }
 
   const pushFailed = messages.length > 0 && pushOk === 0
   await finishRun(supabase, runId, {
-    outcome: pushFailed ? 'push_failed' : 'sent',
+    outcome: pushFailed ? 'push_failed' : pushOk < messages.length ? 'partial' : 'sent',
     pharmacies: duties.length,
     notified,
     notif_batches_failed: notifBatchesFailed,
     push_attempted: messages.length,
     push_ok: pushOk,
     push_errors: pushErrCount,
+    push_retries: pushRetries,
     error_kinds: errorKinds,
   })
 
@@ -226,6 +201,7 @@ serve(async () => {
       pushed: messages.length,
       pushOk,
       pushErrorCount: pushErrCount,
+      pushRetries,
       errorKinds,
     }),
     { status: pushFailed ? 502 : 200, headers: { 'Content-Type': 'application/json' } }

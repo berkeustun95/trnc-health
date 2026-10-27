@@ -974,6 +974,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('duty_push_runs', 'push_ok', true, '0', 'integer'),
     ('duty_push_runs', 'push_errors', true, '0', 'integer'),
     ('duty_push_runs', 'error_kinds', true, '''{}''::jsonb', 'jsonb'),
+    ('duty_push_runs', 'push_retries', true, '0', 'integer'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1104,8 +1105,9 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('duty_push_runs_counts_check', '0', 'notif_batches_failed|notified|pharmacies|push_attempted|push_errors|push_ok'),
     ('duty_push_runs_error_kinds_check', 'object', 'error_kinds'),
     ('duty_push_runs_finished_check', '', 'finished_at|started_at'),
-    ('duty_push_runs_outcome_check', 'duty_query_failed|no_duties|no_profiles|profiles_query_failed|push_failed|running|sent', 'outcome'),
+    ('duty_push_runs_outcome_check', 'duty_query_failed|no_duties|no_profiles|partial|profiles_query_failed|push_failed|running|sent', 'outcome'),
     ('duty_push_runs_pkey', '', 'id'),
+    ('duty_push_runs_retries_check', '0', 'push_retries'),
     ('duty_schedule_facility_id_fkey', '', 'facility_id|id'),
     ('duty_schedule_pkey', '', 'id'),
     ('eatery_item_options_item_id_fkey', '', 'id|item_id'),

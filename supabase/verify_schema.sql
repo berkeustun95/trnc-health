@@ -245,6 +245,8 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs','push_ok'),
     ('20261141_duty_push_runs','duty_push_runs','push_errors'),
     ('20261141_duty_push_runs','duty_push_runs','error_kinds'),
+    -- 20261142: registered ahead of the apply; red until it runs.
+    ('20261142_duty_push_runs_partial_retries','duty_push_runs','push_retries'),
     ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
     ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
     ('20261132_eatery_orders_is_test','order_testers','added_at'),
@@ -785,6 +787,7 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs_counts_check'),
     ('20261141_duty_push_runs','duty_push_runs_error_kinds_check'),
     ('20261141_duty_push_runs','duty_push_runs_finished_check'),
+    ('20261142_duty_push_runs_partial_retries','duty_push_runs_retries_check'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers_pkey'),
     ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
@@ -5143,7 +5146,7 @@ WITH report AS (
     -- 20261141: duty_push_runs is service_role-only. RLS on, ZERO policies, no anon/authenticated privilege at table or column
     --     level (pg_attribute, so the token never names a column that does not exist yet), service_role keeps it (positive
     --     control), the 12 columns exist, and the outcome vocabulary and the ok+errors<=attempted rule are in force.
-    UNION ALL SELECT '20261141_duty_push_runs','duty_push_runs: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes, 12 columns, outcome + counts CHECKs',
+    UNION ALL SELECT '20261141_duty_push_runs','duty_push_runs: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes, 13 columns (12 + push_retries from 20261142), outcome (incl. partial, push_failed) + counts CHECKs',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.duty_push_runs')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'duty_push_runs') = 0
       AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -5152,8 +5155,8 @@ WITH report AS (
                                 AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
                                   OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
                AND has_table_privilege('service_role', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE'), false)
-      AND COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped) = 12, false)
-      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%duty_query_failed%' AND pg_get_constraintdef(oid) LIKE '%push_failed%' AND pg_get_constraintdef(oid) LIKE '%profiles_query_failed%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
+      AND COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped) = 13, false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%duty_query_failed%' AND pg_get_constraintdef(oid) LIKE '%push_failed%' AND pg_get_constraintdef(oid) LIKE '%partial%' AND pg_get_constraintdef(oid) LIKE '%profiles_query_failed%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
       AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%push_attempted%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_counts_check'), false)
   ) z
 
