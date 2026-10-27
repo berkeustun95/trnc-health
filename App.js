@@ -433,8 +433,8 @@ class BLErrorBoundary extends Component {
           </View>
         ) : (
         <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
-          <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24 }}>Please go back and try again.</Text>
+          <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 }}>Something went wrong</Text>
+          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>Please go back and try again.</Text>
           <TouchableOpacity onPress={() => this.setState({ hasError: false })} style={{ padding: 14, backgroundColor: '#0E7C7B', borderRadius: 12 }}>
             <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold' }}>Go Back</Text>
           </TouchableOpacity>
@@ -3272,7 +3272,7 @@ const styles = StyleSheet.create({
   filterContent:    { gap: 8, paddingRight: 4, alignItems: 'center' },
   filterChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: '#C8D3DC', backgroundColor: colors.cardBg, alignSelf: 'flex-start' },
   filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
-  filterChipText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#1A2B33' },
+  filterChipText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   filterChipTextActive: { fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   favScreenTitle:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   noFavText:        { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32, marginTop: 8 },

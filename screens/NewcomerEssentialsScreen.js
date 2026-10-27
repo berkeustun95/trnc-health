@@ -18,11 +18,11 @@ import {
 } from '../components/ui'
 
 const CARDS = [
-  { id: 'driving',   icon: 'car-outline',       color: '#185FA5', bg: '#EAF2FB', labelKey: 'essCardDriving'   },
+  { id: 'driving',   icon: 'car-outline',       color: category.city.ink, bg: category.city.bg, labelKey: 'essCardDriving'   },
   { id: 'currency',  icon: 'cash-outline',       color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'essCardCurrency'  },
   { id: 'holidays',  icon: 'flag-outline',       color: '#D1495B', bg: '#FAEAEC', labelKey: 'essCardHolidays'  },
   { id: 'ports',     icon: 'airplane-outline',   color: '#FF8552', bg: '#FFF0EB', labelKey: 'essCardPorts'     },
-  { id: 'borders',   icon: 'git-branch-outline', color: '#64748B', bg: '#F1F5F9', labelKey: 'essCardBorders'   },
+  { id: 'borders',   icon: 'git-branch-outline', color: colors.textSecondary, bg: colors.soft, labelKey: 'essCardBorders'   },
   { id: 'embassies', icon: 'business-outline',   color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'essCardEmbassies' },
   { id: 'living',    icon: 'bulb-outline',       color: '#C77800', bg: '#FBF1D9', labelKey: 'essCardLiving'    },
 ]
@@ -117,9 +117,9 @@ function DrivingCard({ lang }) {
         <BulletRow iconName="wine-outline" iconColor={colors.danger} text={t('essDrivingAlcohol', lang)} />
 
         <SectionTitle text={t('essDrivingPlatesTitle', lang)} />
-        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate1', lang)} />
-        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate2', lang)} />
-        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate3', lang)} />
+        <BulletRow iconName="car-outline" iconColor={category.city.ink} text={t('essDrivingPlate1', lang)} />
+        <BulletRow iconName="car-outline" iconColor={category.city.ink} text={t('essDrivingPlate2', lang)} />
+        <BulletRow iconName="car-outline" iconColor={category.city.ink} text={t('essDrivingPlate3', lang)} />
       </Block>
     </ScrollView>
   )
@@ -398,7 +398,7 @@ function LivingCard({ lang }) {
       <LastReviewedTag text={t('essLivingLastReviewed', lang)} />
       <Block>
         <SectionTitle text={t('essLivingWaterTitle', lang)} />
-        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingWater1', lang)} />
+        <BulletRow iconName="water-outline" iconColor={colors.primary} text={t('essLivingWater1', lang)} />
         <BulletRow iconName="cube-outline" iconColor={colors.textSecondary} text={t('essLivingWater2', lang)} />
 
         <SectionTitle text={t('essLivingHoursTitle', lang)} />
@@ -409,7 +409,7 @@ function LivingCard({ lang }) {
         <SectionTitle text={t('essLivingCutsTitle', lang)} />
         <BulletRow iconName="flash-off-outline" iconColor={colors.danger} text={t('essLivingCuts1', lang)} />
         <BulletRow iconName="call-outline" iconColor={colors.primary} text={t('essLivingCuts2', lang)} />
-        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingCuts3', lang)} />
+        <BulletRow iconName="water-outline" iconColor={colors.primary} text={t('essLivingCuts3', lang)} />
         <BulletRow iconName="information-circle-outline" iconColor={colors.textSecondary} text={t('essLivingCuts4', lang)} />
 
         <SectionTitle text={t('essLivingJellyTitle', lang)} />

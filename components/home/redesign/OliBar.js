@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, AppState, AccessibilityInfo, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { radii, press } from '../../../constants/theme'
+import { radii, press, colors, font } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
 
 // ─── The Oli bar, "full scene" (Home v3, option B) ───────────────────────────
@@ -135,7 +135,7 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
         <Text style={s.title} numberOfLines={1} maxFontSizeMultiplier={cap}>{title}</Text>
         <View style={s.pill}>
           <Text style={s.pillText} numberOfLines={1} maxFontSizeMultiplier={cap}>{pill}</Text>
-          <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+          <Ionicons name="arrow-forward" size={14} color={colors.onPrimary} />
         </View>
       </View>
 
@@ -153,12 +153,13 @@ const s = StyleSheet.create({
   fill:      { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   glow:      { position: 'absolute', width: GLOW_SIZE, height: GLOW_SIZE },
   text:      { position: 'absolute', top: 0, bottom: 0, left: 0, paddingLeft: TEXT_LEFT, justifyContent: 'center', gap: 10 },
-  title:     { fontSize: 20, lineHeight: 26, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  // No type token fits; hero:check and labels:check measure the text zone against these numbers.
+  title:     { fontSize: 20, lineHeight: 26, fontFamily: font.bold, color: colors.onPrimary },
   pill:      { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4,
                paddingHorizontal: PILL_PAD, paddingVertical: 6, borderRadius: radii.pill,
                backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
-  pillText:  { fontSize: 13, lineHeight: 17, fontFamily: 'Inter_500Medium', color: '#FFFFFF', flexShrink: 1 },
+  pillText:  { fontSize: 13, lineHeight: 17, fontFamily: font.medium, color: colors.onPrimary, flexShrink: 1 },
   dots:      { position: 'absolute', bottom: DOTS_BOTTOM, width: DOT, flexDirection: 'column', gap: 3 },
   dot:       { width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: `rgba(255,255,255,${DOT_ALPHA})` },
-  dotOn:     { height: DOT_ON, backgroundColor: '#FFFFFF' },
+  dotOn:     { height: DOT_ON, backgroundColor: colors.onPrimary },
 })
