@@ -10,7 +10,10 @@ import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { assessReleaseLane } = await import(process.env.RELEASE_LANE_LIB ? pathToFileURL(resolve(process.env.RELEASE_LANE_LIB)).href : './lib/release-lane.mjs')
+const libUrl = process.env.RELEASE_LANE_LIB ? pathToFileURL(resolve(process.env.RELEASE_LANE_LIB)).href : new URL('./lib/release-lane.mjs', import.meta.url).href
+const { assessReleaseLane } = await import(libUrl)
+// The lib pins its environment at import, so an env-dependent case must start a fresh process that has the variable BEFORE the import.
+const assessWithEnv = (cwd, env) => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `const { assessReleaseLane } = await import(${JSON.stringify(libUrl)}); console.log(JSON.stringify(assessReleaseLane({ cwd: ${JSON.stringify(cwd)} })))`], { encoding: 'utf8', env: { ...process.env, ...env } }))
 
 const cfg = v => `module.exports = { expo: {\n  version: '${v}',\n  runtimeVersion: { policy: 'appVersion' },\n} }\n`
 const root = mkdtempSync(join(tmpdir(), 'release-lane-'))
@@ -87,9 +90,16 @@ const tests = [
     const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('s.js'))
   }],
   ['K1: relocated hunk in a diverged file is refused with git config diff.context=0', f => { f.g('config', 'diff.context', '0'); const r = relocated(f, false); return !r.exempt && r.refusals.some(m => m.includes('verbatim patch-id') && m.includes('differs')) }],
-  ['K1: relocated hunk in a diverged file is refused with GIT_DIFF_OPTS=--unified=0 in the environment', f => {
-    process.env.GIT_DIFF_OPTS = '--unified=0'
-    try { const r = relocated(f, false); return !r.exempt && r.refusals.some(m => m.includes('verbatim patch-id') && m.includes('differs')) } finally { delete process.env.GIT_DIFF_OPTS }
+  ['K1: relocated hunk in a diverged file is refused with GIT_DIFF_OPTS=--unified=0 in the environment (fresh process)', f => {
+    relocated(f, false); const r = assessWithEnv(f.dir, { GIT_DIFF_OPTS: '--unified=0' }); return !r.exempt && r.refusals.some(m => m.includes('verbatim patch-id') && m.includes('differs'))
+  }],
+  ['a valid diverged pick with a blank context line stays exempt under global diff.suppressBlankEmpty=true (fresh process)', f => {
+    const gc = join(root, `gc${n}`); writeFileSync(gc, '[diff]\n\tsuppressBlankEmpty = true\n')
+    const file = (head, ins) => `function ${head}() {\n  guard()\n  x()\n\n  y()\n  z()\n${ins}  q()\n\n  r()\n}\n`
+    f.g('checkout', '-q', 'main'); f.w('s.js', file('admin', '')); f.g('add', '.'); f.g('commit', '-qm', 'add s'); const addS = f.g('rev-parse', 'HEAD')
+    f.w('s.js', file('admin2', '')); f.g('commit', '-qam', 'rename'); f.w('s.js', file('admin2', '  return\n')); f.g('commit', '-qam', 'ins'); const orig = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
+    f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', addS); f.g('cherry-pick', '-x', orig)
+    const r = assessWithEnv(f.dir, { GIT_CONFIG_GLOBAL: gc }); return r.exempt && r.picks.some(p => p.diverged.includes('s.js'))
   }],
   ['R1: relocated hunk whose 3-line context is duplicated in a diverged file is refused (pre-image occurs twice)', f => { const r = relocated(f, true); return !r.exempt && r.refusals.some(m => m.includes('s.js') && m.includes('occurs 2 times')) }],
   ['a diverged file whose hunk lands once in its own spot is exempt (positive control for R1)', f => {
