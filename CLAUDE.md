@@ -177,9 +177,9 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
 - ⚠ `fastlane supply init` overwrites the folder: snapshot into `fastlane/metadata-backup/android`.
 - Ruby 2.6, gems in `vendor/bundle` (`bundle install` once); compare files as UTF-8 (`LC_ALL=en_US.UTF-8`).
 - **Play developer account ID `7054171312151082560`.** Reports bucket = `gs://pubsite_prod_7054171312151082560`
-  (probe 2026-10-20: 403 for the service account; `pubsite_prod_rev_<id>` is 404, does not exist). The service account
-  needs "View app information and download bulk reports (read-only)" to read `reviews/` and `stats/ratings/`; confirm
-  via Console → Download reports → Copy Cloud Storage URI once a report exists.
+  (CONFIRMED 2026-10-27: 200 for `ada-fastlane@ada-app-499617` after Berke granted "View app information and download
+  bulk reports (read-only)"; `pubsite_prod_rev_<id>` is 404, does not exist). `stats/ratings/` and `reviews/` stay empty
+  until Play generates its first monthly report.
   Reviews API = last 7 days, text reviews only. iOS reviews: ASC `customerReviews` (app `6783996527`). Vault
   `2026-10-20_store-reviews-pull.md`.
 
