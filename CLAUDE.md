@@ -18,12 +18,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   If a task seems to need a version bump, STOP and ask.
 
 ## ⚠ Standing warnings
-- ⚠ **main = 1.4.0 since 2026-10-24** (`feat/voice-input` merged, PR #180 `cc5f651`, the day 1.4.0 was live in both
-  stores: Play versionCode 25, iOS build 14). Every `npm run ota` from main goes to runtime 1.4.0 (`runtimeVersion` =
-  `appVersion`). 1.3.0 installs keep their last OTA (`c2f0f9b0`, from `2716d14`); a 1.3.0 fix ships only if still
-  needed, from a `release/1.3` branch cut from `963ff84` (last 1.3.0 main), same pattern as `release/1.1`; ask first.
-  `feat/voice-input` is no longer a lane: no syncs into it, no publishes from it. The 1.4.0 binaries (built from
-  `bdb674f`) lack the Oteller tile; the 1.4.0 production OTA `65092408` (`642c758`) carries it. Vault `2026-10-08_ask-oli-voice-input.md`.
+- ⚠ **Lanes (Berke, 2026-10-27): main = 1.4.1 OTA lane; `feat/native-splash-1.4.2` = 1.4.2 lane** (native splash:
+  expo-video / expo-splash-screen / expo-system-ui). Merge every main fix into it; 1.4.2 store builds come from it; it merges
+  into main only when 1.4.2 is live in BOTH stores; never OTA from it. `release/1.4` stays the 1.4.0 lane.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
