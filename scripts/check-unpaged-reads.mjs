@@ -61,8 +61,11 @@ const HELPERS = /\b(readAllRows|readAllResult|readAllById|fetchAll)\b/
 // depth 0 whose next non-blank line does not continue the chain with `.`.
 function chainFrom(text, start) {
   let depth = 0
+  let q = null // inside a string literal: its parens/brackets/braces do not count (blankComments does the same)
   for (let i = start; i < text.length; i++) {
     const ch = text[i]
+    if (q) { if (ch === '\\') i++; else if (ch === q) q = null; continue }
+    if (ch === "'" || ch === '"' || ch === '`') { q = ch; continue }
     if (ch === '(' || ch === '[' || ch === '{') depth++
     else if (ch === ')' || ch === ']' || ch === '}') { if (--depth < 0) return text.slice(start, i) }
     else if (ch === ';' && depth === 0) return text.slice(start, i)
@@ -80,13 +83,24 @@ const stripComments = s => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\
 // commented-out `.from('profiles').select(` cannot match. String literals are skipped, so `'https://x'` survives.
 // The original text is still searched for `unpaged-ok:` (that marker lives in a comment).
 export function blankComments(text) {
-  let out = '', i = 0, q = null
+  // modes: 'code', or a string quote; a template literal can nest code in ${ } (tracked with a stack, so
+  // `a ${b ? `c` : d}` does not desynchronise the scanner and swallow the comments after it)
+  let out = '', i = 0
+  const stack = [] // entries: { mode: 'tpl' } | { mode: 'code', braces: n } for ${ } bodies
+  let mode = 'code', q = null, braces = 0
   while (i < text.length) {
     const ch = text[i], nx = text[i + 1]
-    if (q) {
+    if (mode === 'str') {
       out += ch
       if (ch === '\\') { out += nx ?? ''; i += 2; continue }
-      if (ch === q) q = null
+      if (ch === q) mode = stack.length ? 'tpl-or-code' : 'code'
+      i++
+      if (mode === 'tpl-or-code') mode = 'code'
+    } else if (mode === 'tpl') {
+      out += ch
+      if (ch === '\\') { out += nx ?? ''; i += 2; continue }
+      if (ch === '`') { mode = stack.length ? stack.pop().back : 'code'; i++; continue }
+      if (ch === '$' && nx === '{') { out += '{'; stack.push({ back: 'tpl', braces }); braces = 0; mode = 'code'; i += 2; continue }
       i++
     } else if (ch === '/' && nx === '/') {
       while (i < text.length && text[i] !== '\n') { out += ' '; i++ }
@@ -94,7 +108,13 @@ export function blankComments(text) {
       while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) { out += text[i] === '\n' ? '\n' : ' '; i++ }
       if (i < text.length) { out += '  '; i += 2 }
     } else {
-      if (ch === "'" || ch === '"' || ch === '`') q = ch
+      if (ch === "'" || ch === '"') { mode = 'str'; q = ch }
+      else if (ch === '`') mode = 'tpl'
+      else if (ch === '{') braces++
+      else if (ch === '}') {
+        if (braces === 0 && stack.length) { const e = stack.pop(); braces = e.braces; mode = e.back; out += ch; i++; continue }
+        braces--
+      }
       out += ch
       i++
     }
@@ -143,15 +163,25 @@ export function scanText(original, file = '<memory>', tables = GROWING) {
     const line = text.slice(0, m.index).split('\n').length
     const chain = chainFrom(text, m.index)
     const chainOriginal = original.slice(m.index, m.index + chain.length)
-    // comment block directly above (up to 3 lines, stopping at a blank line)
-    let aboveStart = lineStart
-    for (let k = 0; k < 3 && aboveStart > 0; k++) {
+    // The `unpaged-ok:` marker counts only (1) on the read's own line or inside its chain, or (2) in the run of PURE
+    // comment lines directly above the statement (a `//` line; the first code line stops the walk). A trailing
+    // comment on some other statement's line, or a marker above an EARLIER read, exempts nothing here.
+    const startsDot = (a, b) => /^\s*\./.test(text.slice(a, b))
+    let top = lineStart // top of the statement: hop over continuation lines (`  .from(` under `const x = await sb`)
+    for (let k = 0; k < 4 && startsDot(top, text.indexOf('\n', top) === -1 ? text.length : text.indexOf('\n', top)) && top > 0; k++) {
+      top = text.lastIndexOf('\n', top - 2) + 1
+    }
+    let aboveStart = top
+    for (let k = 0; k < 6 && aboveStart > 0; k++) {
       const prev = text.lastIndexOf('\n', aboveStart - 2) + 1
-      if (text.slice(prev, aboveStart).trim() === '' && original.slice(prev, aboveStart).trim() === '') break
+      const orig = original.slice(prev, aboveStart).trim()
+      if (!orig.startsWith('//')) break // a code line, a blank line, or a block comment: stop
       aboveStart = prev
     }
-    const above = original.slice(aboveStart, lineStart)
-    if (/unpaged-ok:[ \t]*\S/.test(chainOriginal) || /unpaged-ok:[ \t]*\S/.test(above)) continue
+    const above = original.slice(aboveStart, top)
+    const ownLine = original.slice(lineStart, m.index)
+    const marker = /unpaged-ok:[ \t]*\S/
+    if (marker.test(chainOriginal) || marker.test(ownLine) || marker.test(above)) continue
 
     const code = chain
     const lim = code.match(/\.limit\(\s*([^)]*?)\s*\)/)
@@ -233,6 +263,13 @@ function selfTest() {
   t('unpaged-ok with an EMPTY reason is rejected', n(`// unpaged-ok:\nconst r = await sb.from('profiles').select('id')`), 1)
   t('unpaged-ok: followed by a NEWLINE then more comment is still empty', n(`// unpaged-ok:\n// see above\nconst r = await sb.from('profiles').select('id')`), 1)
   t('unpaged-ok: with only spaces after is rejected', n(`// unpaged-ok:   \nconst r = await sb.from('profiles').select('id')`), 1)
+  t('REVIEW red: a trailing unpaged-ok on an UNRELATED statement above exempts nothing', n(`const x = 1 // unpaged-ok: unrelated\nconst r = await sb.from('profiles').select('id')`), 1)
+  t('REVIEW red: one unpaged-ok exempts only the FIRST read after it', n(`// unpaged-ok: this one is bounded\nconst a = await sb.from('events').select('id')\nconst r = await sb.from('profiles').select('id')`), 1)
+  t('REVIEW red: a ( inside a string does not swallow a later .range', n(`const a = await sb.from('profiles').select('id, note(')\nfoo.bar(1).range(0, 9)`), 1)
+  t('unpaged-ok above a multi-line statement head still works', n(`// unpaged-ok: bounded alarm query\nconst { data } = await sb\n  .from('events')\n  .select('id')`), 0)
+  t('unpaged-ok trailing on the read\'s own line works', n(`const r = await sb.from('profiles').select('id') // unpaged-ok: one page of ids`), 0)
+  t('a nested template literal does not desynchronise comment blanking', n("const m = `a ${x ? `b` : 'c'} d`\n// const r = await sb.from('profiles').select('id')\nconst ok = 1"), 0)
+  t('  ...nor hide a real read after it', n("const m = `a ${x ? `b` : 'c'} d`\nconst r = await sb.from('profiles').select('id')"), 1)
   // GREEN: each of these must pass (positive controls: the guard is not just refusing everything)
   t('.range loop', n(`await sb.from('profiles').select('id', { count: 'exact' }).order('id').range(a, b)`), 0)
   t('wrapped in readAllResult', n(`await readAllResult((a, b) => sb\n  .from('events').select('id', { count: 'exact' }).order('id').range(a, b))`), 0)
