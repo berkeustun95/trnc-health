@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, type } from '../../../constants/theme'
+import { colors, type, radii, font } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../../constants/regions'
 import { resolveHero } from '../../../constants/homeHero'
@@ -130,7 +130,7 @@ export default function RedesignHero({
               <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={chipCap}>{landmark}</Text>
             </>
           )}
-          {!!credit && <Ionicons name="information-circle-outline" size={INFO_ICON} color="#FFFFFF" />}
+          {!!credit && <Ionicons name="information-circle-outline" size={INFO_ICON} color={colors.onPrimary} />}
         </TouchableOpacity>
         {/* Icon + temperature only; the condition is in the label and the weather sheet. No
             weather yet (loading, or the call failed — weatherData stays null) → no chip. */}
@@ -138,7 +138,7 @@ export default function RedesignHero({
           <TouchableOpacity ref={weatherRef} collapsable={false} style={[s.chip, s.wxChip]} onPress={onOpenWeather}
             hitSlop={{ top: 8, bottom: 8 }} accessibilityRole="button"
             accessibilityLabel={[t('homeWeatherTitle', lang), temp, cond].filter(Boolean).join(', ')}>
-            <Ionicons name={WEATHER_ION[weatherGroup(cur.symbol)] || 'thermometer'} size={WX_ICON} color="#FFFFFF" />
+            <Ionicons name={WEATHER_ION[weatherGroup(cur.symbol)] || 'thermometer'} size={WX_ICON} color={colors.onPrimary} />
             <Text style={s.chipText} maxFontSizeMultiplier={chipCap}>{temp}</Text>
           </TouchableOpacity>
         )}
@@ -151,7 +151,7 @@ export default function RedesignHero({
 
 const s = StyleSheet.create({
   hero:     { overflow: 'hidden', backgroundColor: colors.border,
-              borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+              borderBottomLeftRadius: radii.sheet, borderBottomRightRadius: radii.sheet },
   photo:    { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   band:     { position: 'absolute', left: 0, right: 0 },
   topRow:   { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
@@ -162,7 +162,7 @@ const s = StyleSheet.create({
   chip:     { flexDirection: 'row', alignItems: 'center', gap: CHIP_GAP, flexShrink: 1,
               backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`, borderRadius: 999,
               paddingHorizontal: CHIP_PAD, paddingVertical: 6 },
-  chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 0 },
-  chipLandmark: { fontFamily: 'Inter_500Medium', flexShrink: 1 },
+  chipText: { ...type.meta, fontFamily: font.semibold, color: colors.onPrimary, flexShrink: 0 },
+  chipLandmark: { fontFamily: font.medium, flexShrink: 1 },
   wxChip:   { flexShrink: 0, paddingHorizontal: WX_PAD, gap: 4 },
 })

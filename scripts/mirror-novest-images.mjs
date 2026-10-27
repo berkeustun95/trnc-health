@@ -5,6 +5,15 @@
 //   node scripts/mirror-novest-images.mjs
 //   node scripts/mirror-novest-images.mjs --limit 20
 //
+// PRUNE (removes images Novest dropped from a listing's gallery) is opt-in and OFF in the
+// schedule — the scheduled run only ever mirrors:
+//   gh workflow run novest-images -f prune=true                # dry prune: prints the plan, deletes nothing
+//   gh workflow run novest-images -f apply=true -f prune=true  # applying prune (Berke's go first)
+// --prune runs AFTER the mirror step of the same invocation; with --dry it only prints. Rules and
+// floors: scripts/lib/novest-prune-plan.mjs, proven offline by scripts/check-novest-prune.mjs.
+// Per row it deletes the property_images ROW first, then the storage object (a failed object delete
+// leaves an invisible orphan, never a broken image).
+//
 // RESUMABLE BY CONSTRUCTION. Run it, kill it, run it again — it picks up where it
 // stopped and never duplicates. ~712 images across 88 listings is a long first run and
 // it WILL be interrupted, so resumption is the primary design constraint, not a nicety.
@@ -37,8 +46,10 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
-import { SOURCE, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
+import { SOURCE, get, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
+import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
+import { readAllRows, readAllResult } from './lib/read-all-rows.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -67,7 +78,13 @@ const VARIANTS = ['1536x1536', '2048x2048']
 const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 const limitArg = args.indexOf('--limit')
+const prune = args.includes('--prune')
 const LIMIT = limitArg !== -1 ? Number(args[limitArg + 1]) : Infinity
+const refusal = pruneRefusal({ prune, env: process.env })
+if (refusal) {
+  console.error(`REFUSED: ${refusal}`)
+  process.exit(1)
+}
 prodWriteGuard({ wouldWrite: !dry, workflow: 'novest-images', dryHint: 'node scripts/mirror-novest-images.mjs --dry' })
 
 // Polite to a partner's shared host. Sequential-ish: 4 in flight, each spaced.
@@ -130,15 +147,17 @@ async function politeFetch(url) {
 
 // ─── Gather ──────────────────────────────────────────────────────────────────
 
-const { data: props, error: pErr } = await supabase
-  .from('properties').select('id,external_id').eq('source', SOURCE)
+const { data: props, error: pErr } = await readAllResult((a, b) => supabase
+  .from('properties').select('id,external_id,status', { count: 'exact' }).eq('source', SOURCE).order('id').range(a, b))
 if (pErr) fail(`Reading properties failed: ${pErr.message}`)
 if (!props.length) fail(`No ${SOURCE} listings in the database. Run import-novest-properties.mjs first.`)
 
-const { data: haveImages, error: iErr } = await supabase
-  .from('property_images').select('property_id,source_url,is_primary')
-  .in('property_id', props.map(p => p.id))
-if (iErr) fail(`Reading property_images failed: ${iErr.message}`)
+let haveImages
+try {
+  haveImages = (await readAllRows((a, b) => supabase.from('property_images')
+    .select('property_id,source_url,is_primary', { count: 'exact' })
+    .in('property_id', props.map(p => p.id)).order('id').range(a, b))).rows
+} catch (e) { fail(`Reading property_images failed: ${e.message}`) }
 
 // THE RESUME KEY — (property_id, source_url), NOT source_url alone.
 //
@@ -156,12 +175,19 @@ console.log(`\n${props.length} listing(s) · ${done.size} image(s) already mirro
 console.log('fetching the feed for media ids…')
 const feed = await getAll('/properties', { orderby: 'modified', order: 'desc' })
 const byExternalId = new Map(props.map(p => [p.external_id, p]))
+if (prune) {
+  // A partial read would make every missing listing look "dropped". getAll throws on a failed page;
+  // this also compares what we got with what the feed says it holds.
+  const { total } = await get('/properties', { per_page: 1 })
+  if (!total || total !== feed.length) fail(`PRUNE ABORTED: feed read is partial or unverifiable (received ${feed.length}, feed reports ${total}). Nothing deleted.`)
+}
 
 // featured_media FIRST and deduped: it is the primary, and for 71 of 91 listings it is
 // NOT in fave_property_images — but for the other 20 it is, and uploading it twice would
 // violate property_images_primary_unique on the second insert.
 const jobs = []
 const perListing = new Map()
+const feedRefs = new Map()               // external_id -> media ids, for --prune
 for (const p of feed) {
   const prop = byExternalId.get(`${SOURCE}-${p.id}`)
   if (!prop) continue                       // skipped at import (21853, 21924, 17947)
@@ -169,6 +195,7 @@ for (const p of feed) {
   if (p.featured_media) ids.push(String(p.featured_media))
   for (const m of metaArray(p, 'fave_property_images')) if (!ids.includes(String(m))) ids.push(String(m))
   perListing.set(prop.external_id, ids.length)
+  feedRefs.set(prop.external_id, ids)
   ids.forEach((mediaId, i) => jobs.push({ prop, mediaId, sortOrder: i, isPrimary: false }))
 }
 
@@ -213,7 +240,78 @@ console.log(`  to mirror          ${String(pending.length).padStart(4)}`)
 // Not returned by /media: deleted, or private on their side (401 rest_forbidden, e.g. novest-20111).
 if (missingMedia.length) console.log(`  media not served   ${String(missingMedia.length).padStart(4)}   ${missingMedia.slice(0, 10).join(', ')}`)
 
-if (dry) { console.log('\n(dry) nothing written.'); process.exit(0) }
+// Dry shows what the APPLYING run would do: it mirrors first, so count the pending photos as present.
+// An applying run still skips any listing whose mirror fails (dry is a superset, never a subset).
+const pendingCount = pending.reduce((m, j) => m.set(j.prop.external_id, (m.get(j.prop.external_id) ?? 0) + 1), new Map())
+
+// ─── PRUNE (opt-in) ──────────────────────────────────────────────────────────
+// Returns true when it finished cleanly. Dry: prints the plan, deletes nothing.
+async function runPrune(incomplete, incoming = new Map()) {
+  console.log('\n── prune ──')
+  let rows, exact
+  try {
+    ;({ rows, exact } = await readAllRows((a, b) => supabase.from('property_images')
+      .select('id,property_id,url,source_url,sort_order,is_primary', { count: 'exact' })
+      .in('property_id', props.map(p => p.id)).order('id').range(a, b)))
+  } catch { console.log('  PRUNE ABORTED: reading property_images failed. Nothing deleted.'); return false }
+
+  const served = new Map()
+  for (const [ext, ids] of feedRefs) {
+    served.set(ext, new Set(ids.filter(id => media.has(id)).map(id => pickVariant(media.get(id)).url)))
+  }
+  const offPattern = rows.filter(r => !parseImageUrl(r.url)).length
+  const plan = planPrune({ listings: props, images: rows, feed: feedRefs, incomplete, incoming, served })
+  const sk = plan.skipped
+  console.log(`  image rows read     ${String(rows.length).padStart(4)}  (count exact ${exact})`)
+  console.log(`  rows off the /partner/novest/<ext>/<4+ digits>.<ext> pattern  ${offPattern}  (never removed)`)
+  console.log(`  listings checked    ${String(plan.checked).padStart(4)}`)
+  console.log(`  rows would-remove   ${String(plan.removals.length).padStart(4)}`)
+  console.log(`  skipped: last-photo ${sk.lastPhoto.length} · mirror-incomplete ${sk.mirrorIncomplete.length} · not in feed ${sk.notInFeed.length} · not active ${sk.notActive.length} · unrecognised rows ${sk.unrecognised.length}`)
+  for (const r of plan.removals) console.log(`  remove  ${r.external_id}  media=${r.media_id}  sort=${r.sort_order}  primary=${r.is_primary}  ${r.path}`)
+  for (const e of sk.lastPhoto) console.log(`  skip (last photo)        ${e}`)
+  for (const e of sk.mirrorIncomplete) console.log(`  skip (mirror incomplete) ${e}`)
+  for (const e of sk.notInFeed) console.log(`  skip (not in feed)       ${e}`)
+  for (const u of sk.unrecognised) console.log(`  unrecognised row         ${u.external_id}  sort=${u.sort_order}`)
+  for (const r of plan.reassign) console.log(`  primary -> ${r.image_id === null ? 'a newly mirrored photo' : `sort=${r.sort_order}`}  ${r.external_id}`)
+  if (plan.abort.length) {
+    for (const a of plan.abort) console.log(`  PRUNE ABORTED: ${a}. Nothing deleted.`)
+    return false
+  }
+  if (dry) {
+    if (incoming.size) console.log(`  note: ${incoming.size} listing(s) have photos still to mirror; the applying run mirrors them first and skips pruning any listing whose mirror fails`)
+    console.log('\n(dry) prune: nothing deleted.')
+    return true
+  }
+
+  let bad = 0
+  const deleted = []
+  for (const r of plan.removals) {
+    const { data, error } = await supabase.from('property_images').delete()
+      .eq('id', r.image_id).eq('property_id', r.property_id).select('id')
+    if (error || data?.length !== 1) { bad++; console.log(`  row delete FAILED  ${r.external_id}  media=${r.media_id}`); continue }
+    deleted.push(r)
+  }
+  for (const a of plan.reassign) {
+    const primaryGone = deleted.some(d => d.property_id === a.property_id && d.is_primary)
+    if (!primaryGone) continue
+    const { error } = await supabase.from('property_images').update({ is_primary: true }).eq('id', a.image_id)
+    if (error) { bad++; console.log(`  primary reassign FAILED  ${a.external_id}`) }
+  }
+  const paths = deletablePaths(rows, deleted)
+  for (let i = 0; i < paths.length; i += 50) {
+    const batch = paths.slice(i, i + 50)
+    const { error } = await supabase.storage.from(BUCKET).remove(batch)
+    if (error) { bad += batch.length; for (const b of batch) console.log(`  object delete FAILED (orphan, invisible)  ${b}`) }
+  }
+  console.log(`\n  pruned ${deleted.length}/${plan.removals.length} row(s); ${bad} failure(s)`)
+  return bad === 0
+}
+
+if (dry) {
+  console.log('\n(dry) nothing written.')
+  if (prune) process.exit(await runPrune(new Set(), pendingCount) ? 0 : 1)
+  process.exit(0)
+}
 
 // ─── REPAIR: a listing with images but no primary ────────────────────────────
 //
@@ -228,9 +326,12 @@ if (dry) { console.log('\n(dry) nothing written.'); process.exit(0) }
 //
 // Lowest sort_order wins, which is the same fallback Slice 3 already applies at render.
 {
-  const { data: cur, error } = await supabase.from('property_images')
-    .select('id,property_id,sort_order,is_primary').in('property_id', props.map(p => p.id))
-  if (error) fail(`primary repair read failed: ${error.message}`)
+  let cur
+  try {
+    cur = (await readAllRows((a, b) => supabase.from('property_images')
+      .select('id,property_id,sort_order,is_primary', { count: 'exact' })
+      .in('property_id', props.map(p => p.id)).order('id').range(a, b))).rows
+  } catch (e) { fail(`primary repair read failed: ${e.message}`) }
   const grouped = cur.reduce((a, i) => ((a[i.property_id] ??= []).push(i), a), {})
   const repairs = Object.values(grouped)
     .filter(g => g.length && !g.some(i => i.is_primary))
@@ -245,12 +346,16 @@ if (dry) { console.log('\n(dry) nothing written.'); process.exit(0) }
     : '\n  primaries: every listing with images has one')
 }
 
-if (!pending.length) { console.log('\nnothing to mirror — every image is already mirrored.\n'); process.exit(0) }
+if (!pending.length) {
+  console.log('\nnothing to mirror — every image is already mirrored.\n')
+  process.exit(prune && !(await runPrune(new Set())) ? 1 : 0)
+}
 
 // ─── Mirror ──────────────────────────────────────────────────────────────────
 
 const work = pending.slice(0, LIMIT)
 let uploaded = 0, failedJobs = []
+const mirroredKeys = new Set()
 let cursor = 0
 
 async function worker() {
@@ -281,6 +386,7 @@ async function worker() {
       if (rowErr) throw new Error(`row: ${rowErr.message}`)
 
       uploaded++
+      mirroredKeys.add(`${j.prop.external_id}|${j.mediaId}`)
       process.stdout.write(`\r  mirrored ${uploaded}/${work.length}  (${variant})            `)
     } catch (e) {
       failedJobs.push(`${j.prop.external_id}/${j.mediaId}: ${e.message}`)
@@ -297,5 +403,8 @@ if (failedJobs.length) {
   for (const f of failedJobs.slice(0, 15)) console.log(`    ${f}`)
 }
 console.log(`\n── done ──\n  ${uploaded} image(s) mirrored this run\n`)
+// Anything pending that is not mirrored now (failed, or past --limit) blocks pruning of its listing.
+const incomplete = new Set(pending.filter(j => !mirroredKeys.has(`${j.prop.external_id}|${j.mediaId}`)).map(j => j.prop.external_id))
+const pruneOk = prune ? await runPrune(incomplete) : true
 // Non-zero so a scheduled run with failures goes red and emails; the rest are already written.
-if (failedJobs.length) process.exit(1)
+if (failedJobs.length || !pruneOk) process.exit(1)

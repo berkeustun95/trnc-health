@@ -21,6 +21,16 @@
 // (e.g. the version bump) are subtracted by SHA. Work that reached the lane only through a merge's
 // second parent (a fix branch) is NOT excused, so it must be on main too. Counts are always printed.
 //
+// A release/* lane (scripts/lib/release-lane.mjs: only proven cherry-picks of main, different runtime) is
+// DELIBERATELY behind main, so there the check runs the other way round: a Preview not in HEAD is excused
+// when its commit, or every non-merge commit under it, is on origin/main. Printed, never silent. A Preview
+// that is neither in HEAD nor on main still refuses.
+//
+// From a NON-release HEAD (main), a Preview built on an origin/release/* lane is contained when EVERY commit in
+// `preview --not HEAD` is a PR merge (2 parents, first an ancestor of the second, tree == second's) or a non-merge
+// `cherry-pick -x` whose original is in HEAD, proven by release-lane.mjs's provePick unweakened (same paths, exact blob or
+// verbatim patch-id + hunk pre-images once). Each accepted copy → original is printed; a failing commit is named with its reason.
+//
 // Unknown is a refusal: EAS unreachable, a group with no commit, or a commit this clone cannot
 // find after one fetch. A Preview deliberately dropped by Berke passes only with
 // PREVIEW_LINEAGE_OVERRIDE=1, which he hands over; the missing commits are printed either way.
@@ -29,6 +39,7 @@ import { promisify } from 'node:util'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assessReleaseLane, describeLane, assessLaneCopies } from './lib/release-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -123,19 +134,37 @@ if (views.some(v => isNewer(v.g.runtimeVersion))) {
 
 const head = git('rev-parse', '--short', 'HEAD')
 const missing = [], viaMerge = []
+let laneRes = null // computed once, on the first Preview HEAD lacks
+const onMainLane = [], viaCopies = []
+const laneOnMain = c => {
+  if (!laneRes) {
+    try { git('fetch', '-q', 'origin', 'main') } catch { /* origin/main may be stale; the exemption then judges what it has */ }
+    laneRes = assessReleaseLane({ cwd: ROOT })
+    if (laneRes.releaseBranch) console.log('\n  ' + describeLane(laneRes).join('\n  '))
+  }
+  if (!laneRes.exempt) return false
+  const under = lines(git('rev-list', '--no-merges', c, '--not', 'HEAD'))
+  return under.every(x => { try { git('merge-base', '--is-ancestor', x, 'origin/main'); return true } catch { return false } })
+}
+let copies = null
 for (const v of views) {
   const label = `${v.g.group.slice(0, 8)} ${v.g.runtimeVersion} ${v.g.message.replace(/\s*\([^)]*ago by [^)]*\)$/, '').slice(0, 90)}`
   if (v.error) missing.push(`? ${label}\n      EAS view failed: ${v.error}`)
   else if (!v.commit) missing.push(`? ${label}\n      records no git commit`)
   else if (!known(v.commit)) missing.push(`? ${v.commit.slice(0, 7)} ${label}\n      commit not in this clone, even after a fetch`)
-  else if (!isAncestor(v.commit)) {
+  else if (!isAncestor(v.commit) && laneOnMain(v.commit)) onMainLane.push(`· ${v.commit.slice(0, 7)} ${label}`)
+  else if (!isAncestor(v.commit) && (copies = assessLaneCopies({ cwd: ROOT, preview: v.commit })).ok) {
+    viaCopies.push(`· ${v.commit.slice(0, 7)} ${label}\n` + copies.copies.map(x => `      ${x.pick}  ←  ${x.original}`).join('\n') +
+      copies.merges.map(m => `\n      PR merge ${m.merge}  (second parent ${m.second})`).join(''))
+  } else if (!isAncestor(v.commit)) {
     const { work, samePatch } = missingWork(v.commit)
     for (const c of samePatch) excused.set(c, git('log', '-1', '--format=%h %s', c))
     if (isNewer(v.g.runtimeVersion)) {
       const left = work.filter(c => !laneSet.has(c))
       console.log(`  ${v.g.group.slice(0, 8)} ${v.g.runtimeVersion}: ${work.length + samePatch.length} commit(s) not in HEAD, ${samePatch.length} same patch in HEAD (excluded), ${work.length - left.length} on ${NEXT_LANE} first-parent (excluded), ${left.length} missing`)
       if (left.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      group ${v.g.group}, runtime ${v.g.runtimeVersion}: ${left.length} commit(s) neither in HEAD nor on ${NEXT_LANE} first-parent:\n` + left.map(c => `        ${git('log', '-1', '--format=%h %s', c)}`).join('\n'))
-    } else if (work.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      ${work.length} commit(s) not in HEAD, e.g. ${work.slice(0, 3).map(c => c.slice(0, 7)).join(' ')}`)
+    } else if (work.length) missing.push(`✗ ${v.commit.slice(0, 7)} ${label}\n      ${work.length} commit(s) not in HEAD, e.g. ${work.slice(0, 3).map(c => c.slice(0, 7)).join(' ')}` +
+      (copies?.applies ? `\n      on a release/* lane, but not every commit under it is a proven copy of a commit in HEAD:\n` + copies.failures.map(f => `        ${f}`).join('\n') : ''))
     else viaMerge.push(`· ${v.commit.slice(0, 7)} ${label}`)
   }
 }
@@ -144,6 +173,8 @@ const nNew = views.filter(v => isNewer(v.g.runtimeVersion)).length
 const scope = `${views.length - nNew} on ${series}.x and ${nNew} on newer runtimes`
 console.log(`\nPreview lineage: ${scope} checked against HEAD ${head}`)
 if (excused.size) console.log(`  same patch already in HEAD under another SHA (excused):\n    ${[...excused.values()].join('\n    ')}`)
+if (onMainLane.length) console.log(`  release lane: on origin/main, the lane is deliberately behind (excused):\n    ${onMainLane.join('\n    ')}`)
+if (viaCopies.length) console.log(`  release/* lane Preview: every commit under it not in HEAD is a proven cherry-pick -x copy of one in HEAD (or a PR merge):\n    ${viaCopies.join('\n    ')}`)
 if (viaMerge.length) console.log(`  merge commit not in HEAD, but every commit under it is:\n    ${viaMerge.join('\n    ')}`)
 if (missing.length) refuse([`${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
 console.log(`  ✓ every checked Preview commit is contained in HEAD (newer runtimes: or on ${NEXT_LANE} first-parent)\n`)

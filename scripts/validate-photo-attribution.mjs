@@ -187,6 +187,7 @@ for (const [want, name, src] of [
   [false, 'look-alike column name',              "supabase.from('places').select('id, photo_credits, photo_attribution_old')"],
   [false, 'identifier not declared here',        "import { C } from './x'\nsupabase.from('places').select(C)"],
   [false, 'template with interpolation',         "const C = `id, ${extra}, photo_credits, photo_attribution`\nsupabase.from('places').select(C)"],
+  // unpaged-ok: a test fixture string, not a query
   [false, 'anchor absent',                       "supabase.from('events').select('photo_credits, photo_attribution')"],
 ]) {
   const got = coverage(src).ok

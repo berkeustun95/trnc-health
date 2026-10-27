@@ -77,6 +77,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   it bundles the WORKING TREE, so an uncommitted `MODULE_FLAGS.x: true` ships to every user. The
   wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
+- **`release/*` lane exemption** (`scripts/lib/release-lane.mjs`, `npm run release-lane:test`): `ota:preview`'s "contains origin/main" and the Preview-lineage check are waived only on a `release/*` branch of a DIFFERENT runtime than main whose every non-merge commit is a `cherry-pick -x` of a commit on main touching the same paths (merge originals via `-m 1`): an exact blob match where the pre-image matches main's; where a file diverged, a verbatim `git patch-id` (diff pinned to -U3, no `GIT_DIFF_OPTS`) plus each hunk's pre-image occurring exactly once in the lane file, printed as "file diverged"; clean tree, merges only as PR merges whose tree equals the PR head; read from git, no flag, picks printed. Anything else still needs HEAD ⊇ main.
+- **Preview-lineage and `release/*` Previews:** from a non-release HEAD (main), a Preview built on an `origin/release/*` lane counts as contained only if every commit in `preview --not HEAD` is a PR merge or a `cherry-pick -x` copy of a commit in HEAD, proven by the same `provePick` as above (printed copy → original); anything else refuses and names the commit.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
@@ -175,6 +177,12 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
   `--changes_not_sent_for_review true` and send from Console.
 - ⚠ `fastlane supply init` overwrites the folder: snapshot into `fastlane/metadata-backup/android`.
 - Ruby 2.6, gems in `vendor/bundle` (`bundle install` once); compare files as UTF-8 (`LC_ALL=en_US.UTF-8`).
+- **Play developer account ID `7054171312151082560`.** Reports bucket = `gs://pubsite_prod_7054171312151082560`
+  (CONFIRMED 2026-10-27: 200 for `ada-fastlane@ada-app-499617` after Berke granted "View app information and download
+  bulk reports (read-only)"; `pubsite_prod_rev_<id>` is 404, does not exist). `stats/ratings/` and `reviews/` stay empty
+  until Play generates its first monthly report.
+  Reviews API = last 7 days, text reviews only. iOS reviews: ASC `customerReviews` (app `6783996527`). Vault
+  `2026-10-20_store-reviews-pull.md`.
 
 ## Compliance (Google Play, declared mixed-audience app)
 - ⚠ **Category Travel & Local, Health declaration "no health features" — do not re-tick it,** even
@@ -194,6 +202,8 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
 ## How I want you to work
 - Make MINIMAL changes; no unrelated refactors. Say it's done, explain shortly — don't ask to proceed.
 - One bounded task at a time. If scope is unclear, ask.
+- **Provider accounts are out of scope** (provider, home_service_provider and every other non-customer provider
+  role): never change how they look or behave without Berke's explicit ask (Berke, 2026-10-26).
 - Match the data-fetch pattern: query Supabase → useState → render.
 - **Ask for ONE item per message** (an ID, a query result, a decision) and wait.
 - **Push the working branch after EVERY slice**, feature branches too ("push to git" still = main).

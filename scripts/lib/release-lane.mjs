@@ -1,0 +1,208 @@
+// ─── Release-lane exemption: may this HEAD publish without containing origin/main? ──────────────
+//
+// Used by check-ota-preview-target.mjs and check-preview-lineage.mjs (which also reuses provePick/assessLaneCopies for a Preview built on a release lane, HEAD = main). A release/* lane (release/1.4)
+// is a RUNTIME behind main: it carries only reviewed picks of main's merge commits, so "HEAD contains
+// origin/main" can never hold there and "Nothing Previewed stays off main" is checked the other way
+// round (everything on the lane is provably on main). Every condition is read from git — never a
+// flag or env var. All of them must hold:
+//   (0) the branch is release/*  (detached: an origin/release/* ref points at HEAD)
+//   (a) HEAD's runtime (app.config.js version, policy appVersion) differs from origin/main's
+//   (b) base = merge-base(HEAD, origin/main) is an ancestor of origin/main
+//   (c) every non-merge commit in base..HEAD has a "(cherry picked from commit <sha>)" trailer whose
+//       sha is an ancestor of origin/main AND whose `git patch-id --verbatim` (whitespace
+//       counts) equals the pick's (a merge original, picked with -m 1, is compared as
+//       `git diff <orig>^1 <orig>`), AND the pick touches exactly the paths the original touched. patch-id drops
+//       line numbers, so it is only the proof for a file whose pre-image DIFFERS between the lane and main;
+//       for a path whose pre-image (mode+blob at <pick>^ vs <orig>^1) is identical the post-image must be
+//       identical too (exact, no patch-id); for a diverged file the patch-id (diff pinned: -U3, no GIT_DIFF_OPTS) is paired with R1: each hunk of
+//       the original's diff has its pre-image (context + removed lines) exactly once in <pick>^:<path>. At least one pick must be proven (an empty proof is no exemption).
+//       A merge in base..HEAD is accepted ONLY as a GitHub PR merge: exactly 2 parents, first parent an
+//       ancestor of the second (PR branch based on the lane tip), tree == second parent's tree — so all
+//       content comes from the second parent's non-merge commits, which (c) checks
+//   (d) the tracked tree is clean (eas update ships the WORKING TREE)
+import { execFileSync } from 'node:child_process'
+
+const RELEASE_BRANCH = /^release\/.+/
+// Every git call runs with a pinned environment: the publisher's GIT_DIFF_OPTS / system config must not change what a diff (and so a patch-id) contains.
+const PINNED_ENV = (() => { const e = { ...process.env, GIT_CONFIG_NOSYSTEM: '1' }; delete e.GIT_DIFF_OPTS; delete e.GIT_EXTERNAL_DIFF; return e })()
+const raw = (cwd, args, input, encoding = 'utf8') => execFileSync('git', ['--literal-pathspecs', '-c', 'diff.context=3', '-c', 'diff.interHunkContext=0', '-c', 'diff.suppressBlankEmpty=false', '-c', 'core.bigFileThreshold=512m', '-c', 'diff.indentHeuristic=true', ...args], { cwd, encoding, input, env: PINNED_ENV, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 27 })
+const DIFF_PIN = ['--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '-U3', '--inter-hunk-context=0', '--diff-algorithm=myers', '--src-prefix=a/', '--dst-prefix=b/']
+const git = (cwd, ...args) => raw(cwd, args).trim()
+const succeeds = (cwd, ...args) => { try { raw(cwd, args); return true } catch { return false } }
+const lines = s => s.split('\n').filter(Boolean)
+const short = (cwd, c) => git(cwd, 'log', '-1', '--format=%h %s', c)
+
+function runtimeAt(cwd, ref) {
+  let cfg
+  try { cfg = raw(cwd, ['show', `${ref}:app.config.js`]) } catch { return { error: `cannot read app.config.js at ${ref}` } }
+  const version = (cfg.match(/^\s*version:\s*'([^']+)'/m) || [])[1]
+  const policy = /runtimeVersion:\s*\{\s*policy:\s*'appVersion'/.test(cfg)
+  if (!version) return { error: `no version in app.config.js at ${ref}` }
+  if (!policy) return { error: `runtimeVersion policy at ${ref} is not appVersion — runtime unknown` }
+  return { version }
+}
+
+function patchId(cwd, a, b) {
+  const diff = raw(cwd, ['diff', ...DIFF_PIN, '--binary', a, b])
+  if (!diff) return null
+  return raw(cwd, ['patch-id', '--verbatim'], diff).split(' ')[0] || null
+}
+
+// R1: every hunk of origPre..orig for `path` has its pre-image (context + removed lines, in order) exactly once in the pick's parent blob.
+// → null if proven, else a refusal reason. Byte-faithful (latin1), line terminators included.
+function hunkPreImagesOnce(cwd, pickParent, origParent, orig, path) {
+  const diff = raw(cwd, ['diff', ...DIFF_PIN, origParent, orig, '--', path], undefined, 'latin1')
+  if (/^(Binary files |GIT binary patch)/m.test(diff)) return 'binary file diverged — its hunks cannot be checked'
+  let file
+  try { file = raw(cwd, ['show', `${pickParent}:${path}`], undefined, 'latin1') } catch { return 'absent at the pick\'s parent' }
+  const fl = file.match(/[^\n]*\n|[^\n]+$/g) || []
+  const hunks = []
+  let cur = null, last = null
+  for (const l of diff.split(/(?<=\n)/)) {
+    if (l.startsWith('@@')) { cur = []; hunks.push(cur); last = null; continue }
+    if (!cur) continue
+    if (l.startsWith('\\')) { if (last !== null && cur[last] !== undefined) cur[last] = cur[last].replace(/\n$/, ''); continue }
+    if (l[0] === ' ' || l[0] === '-') { cur.push(l.slice(1)); last = cur.length - 1 } else last = null
+  }
+  if (!hunks.length) return null // mode-only change: nothing to locate
+  for (const [i, pre] of hunks.entries()) {
+    if (!pre.length) return `hunk ${i + 1} has no pre-image to locate`
+    let count = 0
+    for (let at = 0; at + pre.length <= fl.length; at++) if (pre.every((l, k) => fl[at + k] === l)) count++
+    if (count !== 1) return `hunk ${i + 1}/${hunks.length} pre-image occurs ${count} times (must be exactly once)`
+  }
+  return null
+}
+
+// path → { oldMode, newMode, oldSha, newSha } for a..b, renames split into delete+add (raw output, no textconv)
+function treeChanges(cwd, a, b) {
+  const tok = raw(cwd, ['diff-tree', '--raw', '-z', '--no-renames', '--no-abbrev', '-r', a, b]).split('\0')
+  const out = new Map()
+  for (let i = 0; i + 1 < tok.length; i += 2) {
+    const m = tok[i].match(/^:(\d+) (\d+) ([0-9a-f]+) ([0-9a-f]+) /)
+    if (!m) continue
+    out.set(tok[i + 1], { pre: `${m[1]} ${m[3]}`, post: `${m[2]} ${m[4]}` })
+  }
+  return out
+}
+
+function branchNames(cwd) {
+  const name = git(cwd, 'rev-parse', '--abbrev-ref', 'HEAD')
+  if (name !== 'HEAD') return [name]
+  return lines(git(cwd, 'for-each-ref', '--points-at', 'HEAD', '--format=%(refname:strip=3)', 'refs/remotes/origin/release/'))
+}
+
+// A merge is accepted ONLY as a GitHub PR merge. → null if it is one, else a refusal reason.
+function prMergeRefusal(cwd, c) {
+  const ps = git(cwd, 'log', '-1', '--format=%P', c).split(' ').filter(Boolean)
+  if (ps.length !== 2) return `merge commit ${short(cwd, c)} has ${ps.length} parents — only 2-parent PR merges are accepted`
+  if (!succeeds(cwd, 'merge-base', '--is-ancestor', ps[0], ps[1])) return `merge commit ${short(cwd, c)}: first parent is not an ancestor of the second (not a PR branch based on the lane tip)`
+  if (git(cwd, 'rev-parse', `${c}^{tree}`) !== git(cwd, 'rev-parse', `${ps[1]}^{tree}`)) return `merge commit ${short(cwd, c)}: tree differs from its second parent's (changes of its own)`
+  return null
+}
+
+// The per-commit proof (c): is non-merge commit `c` a verbatim `cherry-pick -x` of a commit on `mainRef`?
+// → { pick: {pick, original, patchId, exact, diverged} } or { refusal }. `mainRef` is origin/main for a lane, HEAD for the Preview-lineage check.
+export function provePick(cwd, c, mainRef) {
+  const label = short(cwd, c)
+  const no = refusal => ({ refusal })
+  const trailer = [...git(cwd, 'log', '-1', '--format=%B', c).matchAll(/\(cherry picked from commit ([0-9a-f]{40})\)/g)].pop()
+  if (!trailer) return no(`${label}: no "(cherry picked from commit …)" trailer`)
+  const orig = trailer[1]
+  if (!succeeds(cwd, 'cat-file', '-e', `${orig}^{commit}`)) return no(`${label}: trailer ${orig.slice(0, 7)} is not a commit in this clone`)
+  if (!succeeds(cwd, 'merge-base', '--is-ancestor', orig, mainRef)) return no(`${label}: original ${orig.slice(0, 7)} is not on ${mainRef}`)
+  const parents = git(cwd, 'log', '-1', '--format=%P', c).split(' ').filter(Boolean)
+  const origParents = git(cwd, 'log', '-1', '--format=%P', orig).split(' ').filter(Boolean)
+  if (parents.length !== 1 || origParents.length === 0) return no(`${label}: pick or original has no usable parent for a patch`)
+  const myChanges = treeChanges(cwd, `${c}^`, c), origChanges = treeChanges(cwd, `${orig}^1`, orig)
+  const onlyPick = [...myChanges.keys()].filter(p => !origChanges.has(p)), onlyOrig = [...origChanges.keys()].filter(p => !myChanges.has(p))
+  if (onlyPick.length || onlyOrig.length) return no(`${label}: touches different files than original ${short(cwd, orig)} (extra: ${onlyPick.join(', ') || '-'}; missing: ${onlyOrig.join(', ') || '-'})`)
+  const exact = [], diverged = []
+  let bad = null
+  for (const [p, mc] of myChanges) {
+    const oc = origChanges.get(p)
+    if (mc.pre !== oc.pre) diverged.push(p)
+    else if (mc.post !== oc.post) { bad = p; break }
+    else exact.push(p)
+  }
+  if (bad) return no(`${label}: ${bad} has the same pre-image as on main but a different result than original ${short(cwd, orig)}`)
+  for (const p of diverged) { const why = hunkPreImagesOnce(cwd, `${c}^`, `${orig}^1`, orig, p); if (why) return no(`${label}: diverged ${p}: ${why}`) }
+  const mine = patchId(cwd, `${c}^`, c)
+  const theirs = patchId(cwd, `${orig}^1`, orig)
+  if (!mine || !theirs) return no(`${label}: empty patch, no patch-id to compare`)
+  if (mine !== theirs) return no(`${label}: verbatim patch-id ${mine.slice(0, 10)} differs from original ${short(cwd, orig)} (${theirs.slice(0, 10)})`)
+  return { pick: { pick: label, original: short(cwd, orig), patchId: mine, exact, diverged } }
+}
+
+// Preview-lineage (check-preview-lineage.mjs): HEAD is NOT a release lane and a Preview commit `preview` is missing from it.
+// → { applies:false } unless HEAD is a non-release branch AND an origin/release/* ref contains `preview`; else
+//   { applies:true, ok, copies[{pick, original}], merges[{merge, second}], failures[] }. ok = every commit in `preview --not HEAD` is a proven -x copy
+//   of a commit in HEAD (provePick with mainRef = HEAD, nothing weakened) or a PR merge (prMergeRefusal; accepted merges are returned in merges[], the commits under their second parent are in this same rev-list and so proven or refused individually). Pure git reads.
+export function assessLaneCopies({ cwd, preview }) {
+  try {
+    if (branchNames(cwd).some(n => RELEASE_BRANCH.test(n))) return { applies: false }
+    if (!lines(git(cwd, 'for-each-ref', '--contains', preview, '--format=%(refname)', 'refs/remotes/origin/release/')).length) return { applies: false }
+    const res = { applies: true, ok: false, copies: [], merges: [], failures: [] }
+    const under = lines(git(cwd, 'rev-list', preview, '--not', 'HEAD'))
+    for (const c of under) {
+      const isMerge = git(cwd, 'log', '-1', '--format=%P', c).split(' ').filter(Boolean).length > 1
+      if (isMerge) {
+        const why = prMergeRefusal(cwd, c)
+        if (why) res.failures.push(why); else res.merges.push({ merge: short(cwd, c), second: short(cwd, `${c}^2`) })
+        continue
+      }
+      const r = provePick(cwd, c, 'HEAD')
+      if (r.refusal) res.failures.push(r.refusal); else res.copies.push({ pick: r.pick.pick, original: r.pick.original })
+    }
+    res.ok = under.length > 0 && res.failures.length === 0
+    return res
+  } catch (e) {
+    return { applies: true, ok: false, copies: [], failures: [`could not assess the release-lane copies (${String(e.message).split('\n')[0]})`] }
+  }
+}
+
+// → { exempt, releaseBranch, refusals[], picks[{pick, original, patchId}], headRuntime, mainRuntime }
+export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
+  const res = { exempt: false, releaseBranch: false, refusals: [], picks: [], branch: null, headRuntime: null, mainRuntime: null }
+  const refuse = m => { res.refusals.push(m); return res }
+  try {
+    const names = branchNames(cwd)
+    res.branch = names.join(', ')
+    const releaseNames = names.filter(n => RELEASE_BRANCH.test(n)) // (0)
+    res.releaseBranch = releaseNames.length > 0
+    if (!res.releaseBranch) return refuse(`branch "${res.branch}" is not release/* — the exemption is for release lanes only`)
+
+    const head = runtimeAt(cwd, 'HEAD'), main = runtimeAt(cwd, mainRef)
+    if (head.error || main.error) return refuse(head.error || main.error)
+    res.headRuntime = head.version; res.mainRuntime = main.version
+    if (head.version === main.version) return refuse(`HEAD's runtime ${head.version} equals ${mainRef}'s — same runtime, so HEAD must contain main`) // (a)
+
+    let base
+    try { base = git(cwd, 'merge-base', 'HEAD', mainRef) } catch { return refuse(`HEAD and ${mainRef} share no merge-base`) }
+    if (!succeeds(cwd, 'merge-base', '--is-ancestor', base, mainRef)) return refuse(`merge-base ${base.slice(0, 7)} is not an ancestor of ${mainRef}`) // (b)
+
+    for (const c of lines(git(cwd, 'rev-list', '--merges', `${base}..HEAD`))) { const why = prMergeRefusal(cwd, c); if (why) refuse(why) } // PR merges only
+    for (const c of lines(git(cwd, 'rev-list', '--no-merges', '--reverse', `${base}..HEAD`))) { // (c)
+      const r = provePick(cwd, c, mainRef)
+      if (r.refusal) refuse(r.refusal); else res.picks.push(r.pick)
+    }
+
+    if (res.picks.length === 0 && res.refusals.length === 0) refuse(`no cherry-picks between ${base.slice(0, 7)} and HEAD — an empty proof is not an exemption`)
+
+    const dirty = git(cwd, 'status', '--porcelain', '--untracked-files=no') // (d)
+    if (dirty) refuse(`tracked files are modified:\n      ${dirty.split('\n').join('\n      ')}`)
+  } catch (e) {
+    refuse(`could not assess the release lane (${String(e.message).split('\n')[0]})`)
+  }
+  res.exempt = res.refusals.length === 0
+  return res
+}
+
+export function describeLane(res, mainRef = 'origin/main') {
+  if (res.exempt) {
+    return [`release-lane exemption APPLIES to ${res.branch}: runtime ${res.headRuntime} (${mainRef} is ${res.mainRuntime}), every non-merge commit is a cherry-pick of a commit on ${mainRef} with an identical verbatim patch-id:`,
+      ...res.picks.map(p => `    ${p.pick}\n      ← ${p.original}  [verbatim patch-id ${p.patchId.slice(0, 10)}]` +
+        p.exact.map(f => `\n      exact (same pre-image, same result): ${f}`).join('') + p.diverged.map(f => `\n      file diverged (patch-id + every hunk pre-image found once): ${f}`).join(''))]
+  }
+  return [`release-lane exemption NOT applied to ${res.branch ?? '?'}:`, ...res.refusals.map(r => `    ${r}`)]
+}

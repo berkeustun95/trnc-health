@@ -1918,7 +1918,7 @@ const s = StyleSheet.create({
   filterContent:      { gap: 8, paddingRight: 4, alignItems: 'center' },
   filterChip:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: '#C8D3DC', backgroundColor: colors.cardBg },
   filterChipActive:   { borderColor: colors.primary, backgroundColor: colors.primary },
-  filterChipText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#1A2B33' },
+  filterChipText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   filterChipTextActive: { color: '#FFFFFF' },
 
   // Duty banner (in facility list view)

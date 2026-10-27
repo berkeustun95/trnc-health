@@ -103,9 +103,9 @@ const s = StyleSheet.create({
   labelBox: { height: LABEL_BOX, alignSelf: 'stretch', marginTop: 8, overflow: 'hidden' },
   // Medium (500) — final (Berke, 2026-10-01). check-tile-labels reads this family to pick its font.
   label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_500Medium', color: colors.tileInk, textAlign: 'center' },
-  // "Yakında": white on tileInk, 8.61:1. Sits over the icon's top edge so the label box —
+  // "Yakında": white on primaryDark, 7.58:1. Sits over the icon's top edge so the label box —
   // the 68pt budget above — is untouched.
   soon:     { position: 'absolute', top: -7, alignSelf: 'center', paddingHorizontal: 6, height: 16,
-              borderRadius: 8, backgroundColor: colors.tileInk, justifyContent: 'center' },
+              borderRadius: 8, backgroundColor: colors.primaryDark, justifyContent: 'center' },
   soonText: { fontSize: 9.5, lineHeight: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
 })

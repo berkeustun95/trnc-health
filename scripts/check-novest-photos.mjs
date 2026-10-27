@@ -11,8 +11,9 @@
 // If the policy is ever dropped, photo-less cards reappear and this goes red. Some can never have one — the partner's own
 // media 404 (novest-20111: all six references dead) — so a FEW are expected and are
 // listed as a ::warning::, not a failure. The run FAILS only when more than 10% of live
-// listings have none: that is a mirror pass that stopped running (novest-images is
-// manual; sync-novest adds listings without images), not a partner gap.
+// listings have none: that is a mirror pass that stopped running (novest-images runs on
+// schedule at 05:20 / 15:20 UTC and APPLIES, add-only, since 2026-10-11; sync-novest adds
+// listings without images), not a partner gap.
 //
 // Paged with count:'exact' compared to rows received: property_images is ~850 rows and
 // PostgREST's max-rows (1000) would truncate a single read silently.
