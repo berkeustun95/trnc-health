@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Image, StyleSheet, useWindowDimensions } from 'react-native'
-import { StatusBar } from 'expo-status-bar'
+import SplashStatusBar from '../SplashStatusBar'
 
 // The photo-led ground (Welcome A, onboarding), round 2 (Berke's device check: "a foggy blur,
 // nothing recognisable"). The photo must read as a PHOTO:
@@ -62,7 +62,7 @@ export default function PhotoFade({ photo, focus = { x: 0.5, y: 0.5, zoom: 1 }, 
       const { width: w, height: h } = e.nativeEvent.layout
       if (!box || Math.round(w) !== box.w || Math.round(h) !== box.h) setBox({ w: Math.round(w), h: Math.round(h) })
     }}>
-      <StatusBar style="light" />
+      <SplashStatusBar style="light" />
       {!!photo && (
         <View style={[s_.photoZone, { height: boundary }]}>
           <Image source={photo} style={{ position: 'absolute', left, top: topY, width: iw, height: ih }}

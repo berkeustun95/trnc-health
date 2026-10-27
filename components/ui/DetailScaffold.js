@@ -5,7 +5,7 @@ import { colors, category as CAT, type, radii, elevation } from '../../constants
 import { t } from '../../constants/i18n'
 import IconButton from './IconButton'
 import RemoteImage from './RemoteImage'
-import { StatusBar } from 'expo-status-bar'
+import SplashStatusBar from '../SplashStatusBar'
 import ContactBar from './ContactBar'
 
 // The detail screen pattern (S4, from the event detail): a photo (or the category ground when
@@ -30,7 +30,7 @@ export default function DetailScaffold({
   const c = CAT[tag?.category] || CAT.city
   return (
     <View style={s.root}>
-      <StatusBar style="light" />
+      <SplashStatusBar style="light" />
       <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
         <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: c.bg }]}>
           {photo
