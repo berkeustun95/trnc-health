@@ -663,6 +663,7 @@ const legacyS = StyleSheet.create({
     marginBottom: 16,
   },
   lastReviewedText: {
+    flexShrink: 1,
     fontSize: 12,
     color: colors.accent,
     fontFamily: 'Inter_500Medium',
@@ -817,7 +818,7 @@ const redesignS = StyleSheet.create({
                       backgroundColor: category.city.bg, borderRadius: radii.md },
   lastReviewedTag:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: category.city.bg, borderRadius: radii.pill,
                       paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start', marginBottom: 12 },
-  lastReviewedText: { fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: category.city.ink },
+  lastReviewedText: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: category.city.ink },
   crossingNote:     { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 10 },
   crossingNoteText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary },
   hoursNote:        { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary, marginTop: 0, marginBottom: 4 },
