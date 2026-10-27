@@ -252,6 +252,7 @@ async function attemptSource(src) {
 
     let known = new Set()
     if (APPLY && candidates.length) {
+      // unpaged-ok: bounded by the candidate list of ONE source fetch (the .in() set), far below 1000
       const { data, error } = await db.from('announcements').select('official_url').in('official_url', candidates.map(c => c.url))
       if (error) throw new Error(`known-url read: ${error.code}`)
       known = new Set(data.map(d => d.official_url))

@@ -49,7 +49,7 @@ import sharp from 'sharp'
 import { SOURCE, get, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
-import { readAllRows } from './lib/read-all-rows.mjs'
+import { readAllRows, readAllResult } from './lib/read-all-rows.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -147,8 +147,8 @@ async function politeFetch(url) {
 
 // ─── Gather ──────────────────────────────────────────────────────────────────
 
-const { data: props, error: pErr } = await supabase
-  .from('properties').select('id,external_id,status').eq('source', SOURCE)
+const { data: props, error: pErr } = await readAllResult((a, b) => supabase
+  .from('properties').select('id,external_id,status', { count: 'exact' }).eq('source', SOURCE).order('id').range(a, b))
 if (pErr) fail(`Reading properties failed: ${pErr.message}`)
 if (!props.length) fail(`No ${SOURCE} listings in the database. Run import-novest-properties.mjs first.`)
 

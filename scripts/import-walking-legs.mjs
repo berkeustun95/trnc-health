@@ -36,6 +36,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
+import { readAllResult } from './lib/read-all-rows.mjs'
 import { metresBetween } from '../constants/walkingRoutes.js'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
@@ -83,7 +84,8 @@ if (re) fail(`Reading routes: ${re.message}`)
 
 let existing = new Map(), tableReady = true
 {
-  const { data, error } = await db.from('walking_legs').select('from_place_id, to_place_id, path')
+  const { data, error } = await readAllResult((a, b) => db.from('walking_legs').select('from_place_id, to_place_id, path', { count: 'exact' })
+    .order('from_place_id').order('to_place_id').range(a, b))
   if (error) {
     tableReady = false
     if (!dry) fail(`walking_legs is not readable (${error.message}). Apply 20261049_walking_legs.sql first.`)

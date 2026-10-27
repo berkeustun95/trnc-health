@@ -51,6 +51,7 @@
 // verdict, and what the probe actually read — so the log can be audited without
 // re-running anything.
 import { createClient } from '@supabase/supabase-js'
+import { readAllResult } from './lib/read-all-rows.mjs'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
@@ -204,9 +205,9 @@ async function readFlag(url) {
 }
 
 const nowIso = new Date().toISOString()
-const { data: rows, error } = await sb.from('events')
-  .select('external_id,title,start_date,status,source,ticket_url')
-  .eq('source', SOURCE).eq('status','approved').gte('start_date', nowIso).order('start_date')
+const { data: rows, error } = await readAllResult((a, b) => sb.from('events')
+  .select('external_id,title,start_date,status,source,ticket_url', { count: 'exact' })
+  .eq('source', SOURCE).eq('status','approved').gte('start_date', nowIso).order('start_date').order('id').range(a, b))
 if (error) fail(`read failed: ${error.message}`)
 
 const eligible = rows.filter(r => !feedIds.has(r.external_id))

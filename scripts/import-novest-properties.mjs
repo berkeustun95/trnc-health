@@ -45,6 +45,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { readAllResult } from './lib/read-all-rows.mjs'
 
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
@@ -320,8 +321,8 @@ for (const p of feed) {
 // ─── Diff against the database ───────────────────────────────────────────────
 let existing = []
 if (!offline) {
-  const { data, error: readErr } = await supabase
-    .from('properties').select('external_id,status,content_hash').eq('source', SOURCE)
+  const { data, error: readErr } = await readAllResult((a, b) => supabase
+    .from('properties').select('external_id,status,content_hash', { count: 'exact' }).eq('source', SOURCE).order('id').range(a, b))
   if (readErr) fail(`Reading existing ${SOURCE} rows failed: ${readErr.message}`)
   existing = data ?? []
 }

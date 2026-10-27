@@ -24,6 +24,7 @@
 // would keep working while only one stayed right.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { readAllResult } from '../_shared/read-all-rows.mjs'
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
   num, int, meta, mapPropertyType, extractDeedType, coordsInCyprus,
@@ -188,11 +189,12 @@ Deno.serve(async () => {
     }
 
     // ── Diff ────────────────────────────────────────────────────────────────
-    const { data: existing, error: readErr } = await supabase
-      .from('properties').select('external_id,status,content_hash').eq('source', SOURCE)
+    const { data: existing, error: readErr } = await readAllResult((a: number, b: number) => supabase
+      .from('properties').select('external_id,status,content_hash', { count: 'exact' }).eq('source', SOURCE).order('id').range(a, b))
     if (readErr) throw new Error(`read failed: ${readErr.message}`)
 
-    const prev = new Map((existing ?? []).map(r => [r.external_id, r]))
+    type ExistingRow = { external_id: string; status: string; content_hash: string | null }
+    const prev = new Map(((existing ?? []) as ExistingRow[]).map(r => [r.external_id, r] as const))
     const presentIds = rows.map(r => r.external_id)
     const presentSet = new Set(presentIds)
 

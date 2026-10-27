@@ -20,6 +20,13 @@ node scripts/check-module-flags.mjs || {
   exit 1
 }
 
+# No unpaged supabase-js read of a user- or content-growing table (PostgREST max-rows 1000 truncates silently).
+# See the header of scripts/check-unpaged-reads.mjs for the list and its blind spots.
+node scripts/check-unpaged-reads.mjs || {
+  echo "  push blocked: page the read (readAllRows / .range with count) or add '// unpaged-ok: <reason>'." >&2
+  exit 1
+}
+
 # Eatery partner guard, offline half: flag pairing, eateryPreview import rule, redesign.js gates.
 # No network and no .env here; the DB half runs by hand (npm run eatery:check) and in npm run ota.
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partners.mjs --offline || {
