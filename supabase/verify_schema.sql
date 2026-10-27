@@ -5258,6 +5258,7 @@ FROM (VALUES
   ('20261141_duty_push_runs','purge-duty-push-runs'),
   ('1093_checkins_google_places','purge-google-places-cache'),
   ('1093_checkins_google_places','google-places-refresh'),
+  -- Re-created by 20261139 with a 60 s pg_net timeout (same schedule, Vault key, body); same for duty-push below.
   -- Replaces duty-notif-mtwf / -thu-sat / -sun (UTC, inline key). Ticks every 30 min; sends
   -- only when duty_push_due() says the TRNC-local slot is today's send time.
   ('1103_duty_push_famagusta','duty-push'),
@@ -5300,6 +5301,18 @@ SELECT '20261132_eatery_orders_is_test', 'eatery-orders-retention: schedule 40 *
                     AND btrim(command) = 'DELETE FROM public.eatery_orders WHERE created_at < now() - interval ''30 days'' OR (is_test AND created_at < now() - interval ''24 hours'')') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 1139: duty-push and google-places-refresh wait 60 s for pg_net's reply (the 5 s default logged a timeout 2026-10-26 15:00Z) ───
+SELECT '20261139_duty_push_places_refresh_cron_timeout', 'duty-push + google-places-refresh: schedule, Vault key, 60 s timeout, original gate/body kept',
+       CASE WHEN (SELECT count(*) FROM cron.job WHERE active
+                    AND ((jobname = 'duty-push' AND schedule = '0,30 * * * *' AND command LIKE '%public.duty_push_due()%')
+                      OR (jobname = 'google-places-refresh' AND schedule = '21 3 * * *' AND command LIKE '%"action":"refresh"%'))
+                    AND command LIKE '%timeout_milliseconds := 60000%'
+                    AND command LIKE '%vault.decrypted_secrets%'
+                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 2
+              THEN 'OK'
+            ELSE 'MISSING 60 s TIMEOUT OR WRONG SCHEDULE/COMMAND ← FIX' END
 ORDER BY status ASC, migration;
 
 
