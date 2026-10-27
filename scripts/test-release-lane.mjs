@@ -32,6 +32,17 @@ function fixture() {
   g('update-ref', 'refs/remotes/origin/main', 'main')
   return { dir, g, w, base, merge }
 }
+// Diverged-file fixture: main has s.js (v0) → v1 (first line renamed, so the lane's pre-image differs) → orig (inserts `return` in pub()).
+// The lane picks only v0 and then carries the insert in admin() instead, under orig's trailer. adminZ differs from pub's z so -U3 contexts differ; same = identical blocks.
+function relocated(f, same) {
+  const blk = (z, ins) => `  x()\n  y()\n  ${z}\n${ins}  q()\n  r()\n  s()\n`
+  const file = (head, a, b) => `function ${head}() {\n  guard()\n${blk(same ? 'z()' : 'z2()', a)}}\n\nfunction pub() {\n  open()\n${blk('z()', b)}}\n`
+  f.g('checkout', '-q', 'main'); f.w('s.js', file('admin', '', '')); f.g('add', '.'); f.g('commit', '-qm', 'add s'); const addS = f.g('rev-parse', 'HEAD')
+  f.w('s.js', file('admin2', '', '')); f.g('commit', '-qam', 'rename')
+  f.w('s.js', file('admin2', '', '  return\n')); f.g('commit', '-qam', 'early return in pub'); const orig = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
+  f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', addS); f.w('s.js', file('admin', '  return\n', '')); f.g('commit', '-qam', `x\n\n(cherry picked from commit ${orig})`)
+  return assessReleaseLane({ cwd: f.dir })
+}
 const releaseLane = f => { f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', '-m', '1', f.merge) }
 
 const tests = [
@@ -74,6 +85,19 @@ const tests = [
     f.w('s.js', file('', '  return\n')); f.g('commit', '-qam', 'early return in pub'); const orig = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
     f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', addS); f.w('s.js', file('  return\n', '')); f.g('commit', '-qam', `x\n\n(cherry picked from commit ${orig})`)
     const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('s.js'))
+  }],
+  ['K1: relocated hunk in a diverged file is refused with git config diff.context=0', f => { f.g('config', 'diff.context', '0'); const r = relocated(f, false); return !r.exempt && r.refusals.some(m => m.includes('verbatim patch-id') && m.includes('differs')) }],
+  ['K1: relocated hunk in a diverged file is refused with GIT_DIFF_OPTS=--unified=0 in the environment', f => {
+    process.env.GIT_DIFF_OPTS = '--unified=0'
+    try { const r = relocated(f, false); return !r.exempt && r.refusals.some(m => m.includes('verbatim patch-id') && m.includes('differs')) } finally { delete process.env.GIT_DIFF_OPTS }
+  }],
+  ['R1: relocated hunk whose 3-line context is duplicated in a diverged file is refused (pre-image occurs twice)', f => { const r = relocated(f, true); return !r.exempt && r.refusals.some(m => m.includes('s.js') && m.includes('occurs 2 times')) }],
+  ['a diverged file whose hunk lands once in its own spot is exempt (positive control for R1)', f => {
+    const file = (head, ins) => `function ${head}() {\n  guard()\n  x()\n  y()\n  z()\n${ins}  q()\n  r()\n  s()\n}\n`
+    f.g('checkout', '-q', 'main'); f.w('s.js', file('admin', '')); f.g('add', '.'); f.g('commit', '-qm', 'add s'); const addS = f.g('rev-parse', 'HEAD')
+    f.w('s.js', file('admin2', '')); f.g('commit', '-qam', 'rename'); f.w('s.js', file('admin2', '  return\n')); f.g('commit', '-qam', 'ins'); const orig = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
+    f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', addS); f.g('cherry-pick', '-x', orig)
+    const r = assessReleaseLane({ cwd: f.dir }); return r.exempt && r.picks.some(p => p.diverged.includes('s.js'))
   }],
   ['a binary swapped under a kept trailer is refused', f => {
     f.g('checkout', '-q', 'main'); writeFileSync(join(f.dir, 'i.bin'), Buffer.from([0, 1, 2, 3])); f.g('add', '.'); f.g('commit', '-qm', 'add bin'); f.g('update-ref', 'refs/remotes/origin/main', 'main')

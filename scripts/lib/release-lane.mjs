@@ -14,7 +14,8 @@
 //       `git diff <orig>^1 <orig>`), AND the pick touches exactly the paths the original touched. patch-id drops
 //       line numbers, so it is only the proof for a file whose pre-image DIFFERS between the lane and main;
 //       for a path whose pre-image (mode+blob at <pick>^ vs <orig>^1) is identical the post-image must be
-//       identical too (exact, no patch-id). At least one pick must be proven (an empty proof is no exemption).
+//       identical too (exact, no patch-id); for a diverged file the patch-id (diff pinned: -U3, no GIT_DIFF_OPTS) is paired with R1: each hunk of
+//       the original's diff has its pre-image (context + removed lines) exactly once in <pick>^:<path>. At least one pick must be proven (an empty proof is no exemption).
 //       A merge in base..HEAD is accepted ONLY as a GitHub PR merge: exactly 2 parents, first parent an
 //       ancestor of the second (PR branch based on the lane tip), tree == second parent's tree — so all
 //       content comes from the second parent's non-merge commits, which (c) checks
@@ -22,7 +23,10 @@
 import { execFileSync } from 'node:child_process'
 
 const RELEASE_BRANCH = /^release\/.+/
-const raw = (cwd, args, input) => execFileSync('git', args, { cwd, encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 27 })
+// Every git call runs with a pinned environment: the publisher's GIT_DIFF_OPTS / system config must not change what a diff (and so a patch-id) contains.
+const PINNED_ENV = (() => { const e = { ...process.env, GIT_CONFIG_NOSYSTEM: '1' }; delete e.GIT_DIFF_OPTS; delete e.GIT_EXTERNAL_DIFF; return e })()
+const raw = (cwd, args, input, encoding = 'utf8') => execFileSync('git', ['--literal-pathspecs', '-c', 'diff.context=3', '-c', 'diff.interHunkContext=0', ...args], { cwd, encoding, input, env: PINNED_ENV, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 27 })
+const DIFF_PIN = ['--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '-U3', '--inter-hunk-context=0', '--diff-algorithm=myers', '--src-prefix=a/', '--dst-prefix=b/']
 const git = (cwd, ...args) => raw(cwd, args).trim()
 const succeeds = (cwd, ...args) => { try { raw(cwd, args); return true } catch { return false } }
 const lines = s => s.split('\n').filter(Boolean)
@@ -39,9 +43,35 @@ function runtimeAt(cwd, ref) {
 }
 
 function patchId(cwd, a, b) {
-  const diff = raw(cwd, ['diff', '--no-ext-diff', '--no-textconv', '--binary', '--no-color', a, b])
+  const diff = raw(cwd, ['diff', ...DIFF_PIN, '--binary', a, b])
   if (!diff) return null
   return raw(cwd, ['patch-id', '--verbatim'], diff).split(' ')[0] || null
+}
+
+// R1: every hunk of origPre..orig for `path` has its pre-image (context + removed lines, in order) exactly once in the pick's parent blob.
+// → null if proven, else a refusal reason. Byte-faithful (latin1), line terminators included.
+function hunkPreImagesOnce(cwd, pickParent, origParent, orig, path) {
+  const diff = raw(cwd, ['diff', ...DIFF_PIN, origParent, orig, '--', path], undefined, 'latin1')
+  if (/^(Binary files |GIT binary patch)/m.test(diff)) return 'binary file diverged — its hunks cannot be checked'
+  let file
+  try { file = raw(cwd, ['show', `${pickParent}:${path}`], undefined, 'latin1') } catch { return 'absent at the pick\'s parent' }
+  const fl = file.match(/[^\n]*\n|[^\n]+$/g) || []
+  const hunks = []
+  let cur = null, last = null
+  for (const l of diff.split(/(?<=\n)/)) {
+    if (l.startsWith('@@')) { cur = []; hunks.push(cur); last = null; continue }
+    if (!cur) continue
+    if (l.startsWith('\\')) { if (last !== null && cur[last] !== undefined) cur[last] = cur[last].replace(/\n$/, ''); continue }
+    if (l[0] === ' ' || l[0] === '-') { cur.push(l.slice(1)); last = cur.length - 1 } else last = null
+  }
+  if (!hunks.length) return null // mode-only change: nothing to locate
+  for (const [i, pre] of hunks.entries()) {
+    if (!pre.length) return `hunk ${i + 1} has no pre-image to locate`
+    let count = 0
+    for (let at = 0; at + pre.length <= fl.length; at++) if (pre.every((l, k) => fl[at + k] === l)) count++
+    if (count !== 1) return `hunk ${i + 1}/${hunks.length} pre-image occurs ${count} times (must be exactly once)`
+  }
+  return null
 }
 
 // path → { oldMode, newMode, oldSha, newSha } for a..b, renames split into delete+add (raw output, no textconv)
@@ -110,6 +140,9 @@ export function assessReleaseLane({ cwd, mainRef = 'origin/main' }) {
         else exact.push(p)
       }
       if (bad) { refuse(`${label}: ${bad} has the same pre-image as on main but a different result than original ${short(cwd, orig)}`); continue }
+      let unlocated = null
+      for (const p of diverged) { const why = hunkPreImagesOnce(cwd, `${c}^`, `${orig}^1`, orig, p); if (why) { unlocated = `${p}: ${why}`; break } }
+      if (unlocated) { refuse(`${label}: diverged ${unlocated}`); continue }
       const mine = patchId(cwd, `${c}^`, c)
       const theirs = patchId(cwd, `${orig}^1`, orig)
       if (!mine || !theirs) { refuse(`${label}: empty patch, no patch-id to compare`); continue }
@@ -132,7 +165,7 @@ export function describeLane(res, mainRef = 'origin/main') {
   if (res.exempt) {
     return [`release-lane exemption APPLIES to ${res.branch}: runtime ${res.headRuntime} (${mainRef} is ${res.mainRuntime}), every non-merge commit is a cherry-pick of a commit on ${mainRef} with an identical verbatim patch-id:`,
       ...res.picks.map(p => `    ${p.pick}\n      ← ${p.original}  [verbatim patch-id ${p.patchId.slice(0, 10)}]` +
-        p.exact.map(f => `\n      exact (same pre-image, same result): ${f}`).join('') + p.diverged.map(f => `\n      patch-id only, file diverged: ${f}`).join(''))]
+        p.exact.map(f => `\n      exact (same pre-image, same result): ${f}`).join('') + p.diverged.map(f => `\n      file diverged (patch-id + every hunk pre-image found once): ${f}`).join(''))]
   }
   return [`release-lane exemption NOT applied to ${res.branch ?? '?'}:`, ...res.refusals.map(r => `    ${r}`)]
 }
