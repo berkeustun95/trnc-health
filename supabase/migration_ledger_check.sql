@@ -255,7 +255,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261137_crunchy_express_bigpork_pork_bacon.sql', '8eda1e29e28d35190d89093036d086357cd77bbb48354d1ac0e181496e735495'),
   ('20261138_app_versions_ios_latest_141.sql', '40e026f5e3702d90c91dc44400aa95397e2841eeed88f5f0f5304b94a0488f68'),
   ('20261139_duty_push_places_refresh_cron_timeout.sql', '578f05a7c013dc9a02c35281d518f6138c717c3d0cf2a56b56019f2c24fcb4ca'),
-  ('20261141_duty_push_runs.sql', 'bc7ce69c4e8974d4c18443dea1354ecff4e9b3940b5e6d47cd8f62c90ed89234')
+  ('20261141_duty_push_runs.sql', '735871baf962d3654c9201a254c5c7ac4d0b10f047f7f3e086b30ded19ddaf12')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

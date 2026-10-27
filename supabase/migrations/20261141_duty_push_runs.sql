@@ -29,6 +29,8 @@
 --   Apply this FIRST, then deploy the function. The function tolerates a missing table (logs and
 --   carries on), so the reverse order loses logging only, never pushes.
 
+SET ROLE postgres;
+
 BEGIN;
 
 SET LOCAL lock_timeout = '5s';
@@ -47,7 +49,7 @@ CREATE TABLE IF NOT EXISTS public.duty_push_runs (
   push_errors          int         NOT NULL DEFAULT 0,
   error_kinds          jsonb       NOT NULL DEFAULT '{}'::jsonb,
   CONSTRAINT duty_push_runs_pkey PRIMARY KEY (id),
-  CONSTRAINT duty_push_runs_outcome_check CHECK (outcome = ANY (ARRAY['running','sent','no_duties','no_profiles','duty_query_failed']::text[])),
+  CONSTRAINT duty_push_runs_outcome_check CHECK (outcome = ANY (ARRAY['running','sent','no_duties','no_profiles','duty_query_failed','profiles_query_failed','push_failed']::text[])),
   CONSTRAINT duty_push_runs_counts_check CHECK (
     pharmacies >= 0 AND notified >= 0 AND notif_batches_failed >= 0
     AND push_attempted >= 0 AND push_ok >= 0 AND push_errors >= 0
@@ -91,8 +93,12 @@ DECLARE
   v_sched    text;
   v_cmd      text;
   v_before   int;
+  v_pf       text := 'unset';
 BEGIN
   IF v_t IS NULL THEN RAISE EXCEPTION 'duty_push_runs is not visible to this block'; END IF;
+  IF (SELECT relowner::regrole::text FROM pg_class WHERE oid = v_t) IS DISTINCT FROM 'postgres' THEN
+    RAISE EXCEPTION 'duty_push_runs is owned by %, expected postgres (SET ROLE postgres missing?)', (SELECT relowner::regrole::text FROM pg_class WHERE oid = v_t);
+  END IF;
   IF (SELECT relrowsecurity FROM pg_class WHERE oid = v_t) IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'RLS is not enabled on duty_push_runs';
   END IF;
@@ -132,6 +138,11 @@ BEGIN
     UPDATE public.duty_push_runs SET outcome = 'sent', finished_at = now(), push_attempted = 2, push_ok = 1,
            push_errors = 1, error_kinds = '{"DeviceNotRegistered":1}'::jsonb
      WHERE duty_date = date '2999-12-31';
+    BEGIN
+      INSERT INTO public.duty_push_runs (outcome) VALUES ('push_failed');
+      v_pf := 'accepted';
+    EXCEPTION WHEN check_violation THEN v_pf := 'REJECTED';
+    END;
     SELECT count(*) INTO v_svc_rows FROM public.duty_push_runs WHERE outcome = 'sent' AND push_errors = 1 AND duty_date = date '2999-12-31';
     RESET ROLE;
 
@@ -168,6 +179,7 @@ BEGIN
   END;
   RESET ROLE;
 
+  IF v_pf        IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'outcome push_failed was % — a total push failure could not be recorded', v_pf; END IF;
   IF v_svc_rows  IS DISTINCT FROM 1        THEN RAISE EXCEPTION 'service_role insert+update+select returned % rows, expected 1', v_svc_rows; END IF;
   IF v_anon_ins  IS DISTINCT FROM 'denied' THEN RAISE EXCEPTION 'anon INSERT into duty_push_runs was %', v_anon_ins; END IF;
   IF v_auth_sel  IS DISTINCT FROM 'denied' THEN RAISE EXCEPTION 'authenticated SELECT on duty_push_runs was %', v_auth_sel; END IF;
@@ -189,7 +201,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261141_duty_push_runs.sql', 'bc7ce69c4e8974d4c18443dea1354ecff4e9b3940b5e6d47cd8f62c90ed89234')
+VALUES ('20261141_duty_push_runs.sql', '735871baf962d3654c9201a254c5c7ac4d0b10f047f7f3e086b30ded19ddaf12')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

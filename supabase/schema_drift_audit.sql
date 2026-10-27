@@ -1104,7 +1104,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('duty_push_runs_counts_check', '0', 'notif_batches_failed|notified|pharmacies|push_attempted|push_errors|push_ok'),
     ('duty_push_runs_error_kinds_check', 'object', 'error_kinds'),
     ('duty_push_runs_finished_check', '', 'finished_at|started_at'),
-    ('duty_push_runs_outcome_check', 'duty_query_failed|no_duties|no_profiles|running|sent', 'outcome'),
+    ('duty_push_runs_outcome_check', 'duty_query_failed|no_duties|no_profiles|profiles_query_failed|push_failed|running|sent', 'outcome'),
     ('duty_push_runs_pkey', '', 'id'),
     ('duty_schedule_facility_id_fkey', '', 'facility_id|id'),
     ('duty_schedule_pkey', '', 'id'),

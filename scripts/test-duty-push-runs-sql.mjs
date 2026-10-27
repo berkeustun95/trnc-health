@@ -69,8 +69,10 @@ await refused('RLS off', mutant('rls', 'ALTER TABLE public.duty_push_runs ENABLE
 await refused('authenticated granted SELECT', mutant('grant', 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.duty_push_runs TO service_role;', 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.duty_push_runs TO service_role;\nGRANT SELECT ON public.duty_push_runs TO authenticated;'), 'holds SELECT')
 await refused('a policy added', mutant('pol', 'CREATE INDEX IF NOT EXISTS', 'ALTER TABLE public.duty_push_runs ENABLE ROW LEVEL SECURITY;\nCREATE POLICY p ON public.duty_push_runs FOR SELECT TO authenticated USING (true);\nCREATE INDEX IF NOT EXISTS'), 'ZERO policies')
 await refused('service_role grant dropped', mutant('svc', 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.duty_push_runs TO service_role;', 'REVOKE ALL ON TABLE public.duty_push_runs FROM service_role;'), 'service_role lost')
-await refused('outcome vocabulary widened', mutant('out', "'no_profiles','duty_query_failed'", "'no_profiles','duty_query_failed','banana'"), "outcome 'banana'")
+await refused('outcome vocabulary widened', mutant('out', "'profiles_query_failed','push_failed'", "'profiles_query_failed','push_failed','banana'"), "outcome 'banana'")
 await refused('ok+errors<=attempted dropped', mutant('cnt', 'AND push_ok + push_errors <= push_attempted', ''), 'push_ok > push_attempted')
+await refused('push_failed dropped from the outcome CHECK', mutant('pf', ",'push_failed']", "]"), 'push_failed')
+await refused('SET ROLE postgres removed (owner would differ in prod; here: owner assertion text present)', mutant('own', 'SET ROLE postgres;\n\nBEGIN;', "CREATE ROLE zz SUPERUSER;\nSET ROLE zz;\n\nBEGIN;"), 'owned by')
 await refused('retention widened to 900 days', mutant('ret', "interval '90 days'", "interval '900 days'"), 'purge-duty-push-runs')
 
 {

@@ -41,6 +41,7 @@ function getDutyBody(lang: string, duties: { name: string; phone?: string; open_
 // duty_push_runs (20261141): one counts-only summary row per invocation, written at start and
 // finished at the end (both timestamps from this function's clock, so finished_at >= started_at holds). Logging must never block or fail a push: a missing table (function deployed
 // before the migration) or any error is logged and ignored.
+const MAX_ERROR_KINDS = 20
 const KIND_RE = /^[A-Za-z0-9_]{1,64}$/
 function errorKind(k: unknown): string {
   return typeof k === 'string' && KIND_RE.test(k) ? k : 'other'
@@ -105,9 +106,14 @@ serve(async () => {
     return new Response(JSON.stringify({ message: 'No duty pharmacies for today', date: today }), { status: 200 })
   }
 
-  const { data: profiles } = await supabase
+  const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('id, push_token, preferred_language')
+
+  if (profilesError) {
+    await finishRun(supabase, runId, { outcome: 'profiles_query_failed', pharmacies: duties.length })
+    return new Response(JSON.stringify({ error: profilesError.message }), { status: 500 })
+  }
 
   if (!profiles?.length) {
     await finishRun(supabase, runId, { outcome: 'no_profiles', pharmacies: duties.length })
@@ -154,13 +160,14 @@ serve(async () => {
       }
     })
 
-  const pushErrors: string[] = []
   let pushOk = 0
   let pushErrCount = 0
-  const errorKinds: Record<string, number> = {}
+  const errorKinds: Record<string, number> = Object.create(null)
   const bump = (kind: string, n = 1) => {
     pushErrCount += n
-    errorKinds[kind] = (errorKinds[kind] ?? 0) + n
+    // At most 20 distinct keys; the rest fold into 'other'.
+    const key = kind in errorKinds || Object.keys(errorKinds).length < MAX_ERROR_KINDS ? kind : 'other'
+    errorKinds[key] = (errorKinds[key] ?? 0) + n
   }
 
   for (let i = 0; i < messages.length; i += 100) {
@@ -177,35 +184,30 @@ serve(async () => {
       })
 
       if (!res.ok) {
-        const errText = await res.text()
-        console.error('Expo push batch failed:', errText)
-        pushErrors.push(errText)
+        // Never log or return Expo's body or messages: for DeviceNotRegistered they embed the push token.
+        console.error('Expo push batch failed: HTTP', res.status)
         bump(`http_${res.status}`, batch.length)
       } else {
         const json = await res.json()
         const tickets: any[] = Array.isArray(json.data) ? json.data : []
-        const batchErrors: string[] = []
         for (const r of tickets) {
           if (r.status === 'ok') {
             pushOk++
           } else {
             bump(errorKind(r.details?.error ?? 'unknown'))
-            if (r.status === 'error') batchErrors.push(`${r.details?.error ?? 'unknown'}: ${r.message ?? ''}`)
           }
         }
         if (tickets.length < batch.length) bump('no_ticket', batch.length - tickets.length)
-        if (batchErrors.length) console.error('Expo push errors:', batchErrors)
-        pushErrors.push(...batchErrors)
       }
     } catch (e) {
-      console.error('Expo push batch threw:', String(e))
-      pushErrors.push(String(e))
+      console.error('Expo push batch threw:', e instanceof Error ? e.name : 'unknown')
       bump('fetch_failed', batch.length)
     }
   }
 
+  const pushFailed = messages.length > 0 && pushOk === 0
   await finishRun(supabase, runId, {
-    outcome: 'sent',
+    outcome: pushFailed ? 'push_failed' : 'sent',
     pharmacies: duties.length,
     notified,
     notif_batches_failed: notifBatchesFailed,
@@ -217,13 +219,15 @@ serve(async () => {
 
   return new Response(
     JSON.stringify({
-      ok: true,
+      ok: !pushFailed,
       date: today,
       pharmacies: duties.map(d => d.name),
       notified: profiles.length,
       pushed: messages.length,
-      pushErrors: pushErrors.length ? pushErrors : undefined,
+      pushOk,
+      pushErrorCount: pushErrCount,
+      errorKinds,
     }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
+    { status: pushFailed ? 502 : 200, headers: { 'Content-Type': 'application/json' } }
   )
 })

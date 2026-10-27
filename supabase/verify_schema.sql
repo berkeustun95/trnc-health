@@ -5153,7 +5153,7 @@ WITH report AS (
                                   OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
                AND has_table_privilege('service_role', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE'), false)
       AND COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped) = 12, false)
-      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%duty_query_failed%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%duty_query_failed%' AND pg_get_constraintdef(oid) LIKE '%push_failed%' AND pg_get_constraintdef(oid) LIKE '%profiles_query_failed%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
       AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%push_attempted%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_counts_check'), false)
   ) z
 
