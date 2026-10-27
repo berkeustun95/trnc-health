@@ -29,13 +29,13 @@ const CARDS = [
 
 // Seeded June 2026 — flag each field for Berke's sign-off before ship.
 const CROSSINGS = [
-  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   region: 'Walled city centre, Nicosia',   type: 'pedestrian', hours: 'open24h',  lat: 35.175211,  lng: 33.3614882 },
-  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            region: 'UN buffer zone, Old Nicosia',   type: 'pedestrian', hours: 'open24h',  lat: 35.1795082, lng: 33.3562422, noteKey: 'essBordersLedrapalaceNote' },
-  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', region: 'Northwestern Nicosia',          type: 'vehicle',    hours: 'open24h',  lat: 35.1817756, lng: 33.3232731 },
-  { id: 'beyarmudu',    north: 'Beyarmudu',  south: 'Pergamos',       region: 'East of Nicosia',               type: 'vehicle',    hours: 'limited'  },
-  { id: 'deryneia',     north: 'Deryneia',   south: null,             region: 'Near Famagusta / east',         type: 'vehicle',    hours: 'limited',  lat: 35.071544,  lng: 33.9604703 },
-  { id: 'bostanci',     north: 'Bostancı',   south: 'Astromeritis',   region: 'Northwestern district',         type: 'vehicle',    hours: 'open24h',  lat: 35.1461323, lng: 33.035077  },
-  { id: 'yesilirmak',   north: 'Yeşilırmak', south: 'Kato Pyrgos',    region: 'Western coast',                 type: 'vehicle',    hours: 'limited'  },
+  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   regionKey: 'essBordersRegionLokmaci',   type: 'pedestrian', hours: 'open24h',  lat: 35.175211,  lng: 33.3614882 },
+  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            regionKey: 'essBordersRegionLedrapalace',   type: 'pedestrian', hours: 'open24h',  lat: 35.1795082, lng: 33.3562422, noteKey: 'essBordersLedrapalaceNote' },
+  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', regionKey: 'essBordersRegionMetehan',          type: 'vehicle',    hours: 'open24h',  lat: 35.1817756, lng: 33.3232731 },
+  { id: 'beyarmudu',    north: 'Beyarmudu',  south: 'Pergamos',       regionKey: 'essBordersRegionBeyarmudu',               type: 'vehicle',    hours: 'limited'  },
+  { id: 'deryneia',     north: 'Deryneia',   south: null,             regionKey: 'essBordersRegionDeryneia',         type: 'vehicle',    hours: 'limited',  lat: 35.071544,  lng: 33.9604703 },
+  { id: 'bostanci',     north: 'Bostancı',   south: 'Astromeritis',   regionKey: 'essBordersRegionBostanci',         type: 'vehicle',    hours: 'open24h',  lat: 35.1461323, lng: 33.035077  },
+  { id: 'yesilirmak',   north: 'Yeşilırmak', south: 'Kato Pyrgos',    regionKey: 'essBordersRegionYesilirmak',                 type: 'vehicle',    hours: 'limited'  },
 ]
 
 // Coordinates land in step 2 — buttons render only when lat+lng are present.
@@ -50,11 +50,11 @@ const PORTS = [
 
 // Source: TRNC MFA (mfa.gov.ct.tr) — seeded June 2026, flag for Berke's sign-off.
 const OFFICES = [
-  { id: 'usa',       name: 'USA',                          address: 'Şerif Arzık Street No:6, Köşklüçiftlik, Lefkoşa',     phone: '+90 392 227 39 30' },
-  { id: 'uk',        name: 'UK',                           address: 'Mehmet Akif Avenue No:29, Köşklüçiftlik, Lefkoşa',    phone: '+90 392 228 38 61' },
-  { id: 'germany',   name: 'Germany',                      address: '28 Kasım Street No:15, Köşklüçiftlik, Lefkoşa',      phone: '+90 392 227 51 61' },
-  { id: 'australia', name: 'Australia',                    address: 'Güner Türkmen Street No:20, Köşklüçiftlik, Lefkoşa', phone: '+90 392 227 73 32' },
-  { id: 'france',    name: 'France (cultural/info office)', address: 'Köşklüçiftlik, Lefkoşa',                             phone: '+90 392 228 33 28' },
+  { id: 'usa',       nameKey: 'essEmbOfficeUsaName', addressKey: 'essEmbOfficeUsaAddress',     phone: '+90 392 227 39 30' },
+  { id: 'uk',        nameKey: 'essEmbOfficeUkName', addressKey: 'essEmbOfficeUkAddress',    phone: '+90 392 228 38 61' },
+  { id: 'germany',   nameKey: 'essEmbOfficeGermanyName', addressKey: 'essEmbOfficeGermanyAddress',      phone: '+90 392 227 51 61' },
+  { id: 'australia', nameKey: 'essEmbOfficeAustraliaName', addressKey: 'essEmbOfficeAustraliaAddress', phone: '+90 392 227 73 32' },
+  { id: 'france',    nameKey: 'essEmbOfficeFranceName', addressKey: 'essEmbOfficeFranceAddress',                             phone: '+90 392 228 33 28' },
 ]
 
 const FIXED_HOLIDAYS = [
@@ -242,7 +242,7 @@ function BordersCard({ lang }) {
             <ListCard
               key={c.id}
               title={c.south != null ? `${c.north} / ${c.south}` : c.north}
-              subtitle={c.region}
+              subtitle={t(c.regionKey, lang)}
               leading={{ icon: 'git-branch-outline', category: 'city' }}
               meta={[
                 { icon: c.type === 'pedestrian' ? 'walk-outline' : 'car-outline', text: t(typeKey, lang) },
@@ -266,7 +266,7 @@ function BordersCard({ lang }) {
             <Text style={s.crossingName}>
               {c.north}{c.south != null ? <Text> <Text style={s.crossingSlash}>/</Text> {c.south}</Text> : null}
             </Text>
-            <Text style={s.crossingRegion}>{c.region}</Text>
+            <Text style={s.crossingRegion}>{t(c.regionKey, lang)}</Text>
             <View style={s.crossingBadges}>
               <View style={[s.badge, { backgroundColor: typeBg }]}>
                 <Text style={[s.badgeText, { color: typeColor }]}>{t(typeKey, lang)}</Text>
@@ -347,11 +347,11 @@ function AddressRow({ text }) {
   )
 }
 
-function OfficeRow({ office }) {
+function OfficeRow({ office, lang }) {
   return (
     <View style={s.embassyBlock}>
-      <Text style={s.embassyTitle}>{office.name}</Text>
-      <AddressRow text={office.address} />
+      <Text style={s.embassyTitle}>{t(office.nameKey, lang)}</Text>
+      <AddressRow text={t(office.addressKey, lang)} />
       <PhoneRow phone={office.phone} last />
     </View>
   )
@@ -382,7 +382,7 @@ function EmbassiesCard({ lang }) {
       </View>
 
       <SectionTitle text={t('essEmbOtherTitle', lang)} />
-      {OFFICES.map(o => <OfficeRow key={o.id} office={o} />)}
+      {OFFICES.map(o => <OfficeRow key={o.id} office={o} lang={lang} />)}
       <Block style={{ marginTop: 4 }}>
         <Text style={s.embassyOtherNote}>{t('essEmbOtherNote', lang)}</Text>
       </Block>
