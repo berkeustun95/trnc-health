@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const libUrl = process.env.RELEASE_LANE_LIB ? pathToFileURL(resolve(process.env.RELEASE_LANE_LIB)).href : new URL('./lib/release-lane.mjs', import.meta.url).href
-const { assessReleaseLane } = await import(libUrl)
+const { assessReleaseLane, assessLaneCopies } = await import(libUrl)
 // The lib pins its environment at import, so an env-dependent case must start a fresh process that has the variable BEFORE the import.
 const assessWithEnv = (cwd, env) => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `const { assessReleaseLane } = await import(${JSON.stringify(libUrl)}); console.log(JSON.stringify(assessReleaseLane({ cwd: ${JSON.stringify(cwd)} })))`], { encoding: 'utf8', env: { ...process.env, ...env } }))
 
@@ -48,7 +48,42 @@ function relocated(f, same) {
 }
 const releaseLane = f => { f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', '-m', '1', f.merge) }
 
+// Preview-lineage copies: HEAD = main (non-release); the lane commit is published as origin/release/1.4 and Previewed.
+const preview = f => { const tip = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/release/1.4', tip); f.g('checkout', '-q', 'main'); return assessLaneCopies({ cwd: f.dir, preview: tip }) }
+const prOnLane = f => { // a PR branch based on the lane tip with one -x copy of a new main commit, merged --no-ff
+  const tip = f.g('rev-parse', 'HEAD')
+  f.g('checkout', '-qb', 'pr'); f.w('b.txt', 'five\n'); f.g('add', '.'); f.g('commit', '-qm', 'pick source'); f.g('checkout', '-q', 'main'); f.g('cherry-pick', '-x', 'pr')
+  const orig = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
+  f.g('checkout', '-q', 'pr'); f.g('reset', '-q', '--hard', tip); f.g('cherry-pick', '-x', orig)
+  f.g('checkout', '-q', 'release/1.4'); f.g('merge', '-q', '--no-ff', '-m', 'Merge pull request #2', 'pr')
+}
+
 const tests = [
+  ['copies: valid -x picks plus a PR merge on a release lane Preview are accepted, copy → original printed', f => { releaseLane(f); prOnLane(f); const r = preview(f); return r.applies && r.ok && r.copies.length === 2 && r.copies.every(c => c.pick && c.original) && r.merges.length === 1 && r.merges[0].merge.includes('Merge pull request #2') && r.merges[0].second }],
+  ['copies: a PR merge whose second parent carries a hand-written commit is refused, the commit named (merge shape alone is not enough)', f => {
+    releaseLane(f); const tip = f.g('rev-parse', 'HEAD'); f.g('checkout', '-qb', 'pr'); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'smuggled by hand'); f.g('checkout', '-q', 'release/1.4')
+    f.g('merge', '-q', '--no-ff', '-m', 'Merge pull request #3', 'pr'); void tip
+    const r = preview(f); return r.applies && !r.ok && r.merges.length === 1 && r.failures.some(m => m.includes('smuggled by hand') && m.includes('no "(cherry picked'))
+  }],
+  ['copies: a hand-written commit on the lane is refused, named', f => { releaseLane(f); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'hand-written'); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('hand-written') && m.includes('no "(cherry picked')) }],
+  ['copies: a pick whose original is not in HEAD is refused', f => { f.g('checkout', '-qb', 'release/1.4', f.base); f.g('checkout', '-qb', 'side'); f.w('a.txt', 'one\ntwo\nthree\nside\n'); f.g('commit', '-qam', 'side work'); const side = f.g('rev-parse', 'HEAD'); f.g('checkout', '-q', 'release/1.4'); f.g('cherry-pick', '-x', side); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('is not on HEAD')) }],
+  ['copies: a patch-id mismatch (trailer kept, patch edited) is refused', f => { releaseLane(f); f.w('a.txt', 'one\ntwo\nthree\nfour\nEVIL\n'); f.g('commit', '-q', '--amend', '--no-edit', '-a'); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('different result') || (m.includes('patch-id') && m.includes('differs'))) }],
+  ['copies: a relocated hunk in a diverged file (verbatim patch-id differs) is refused', f => { relocated(f, false); const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('verbatim patch-id') && m.includes('differs')) }],
+  ['copies: a reverting merge on the lane is refused', f => {
+    releaseLane(f); const merge = f.g('commit-tree', `${f.base}^{tree}`, '-p', 'HEAD', '-p', f.base, '-m', 'Merge revert'); f.g('reset', '-q', '--hard', merge)
+    const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('not an ancestor of the second'))
+  }],
+  ['copies: an evil merge with changes of its own is refused', f => {
+    releaseLane(f); const tip = f.g('rev-parse', 'HEAD'); f.g('checkout', '-qb', 'pr'); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'pr work'); f.g('checkout', '-q', 'release/1.4')
+    f.g('merge', '-q', '--no-ff', '--no-commit', 'pr'); f.w('smuggled.txt', 's\n'); f.g('add', '.'); f.g('commit', '-qm', 'Merge sneaky'); void tip
+    const r = preview(f); return r.applies && !r.ok && r.failures.some(m => m.includes('tree differs'))
+  }],
+  ['copies: a Preview on a branch that is no origin/release/* lane does not apply (missing commits stay missing as before)', f => {
+    f.g('checkout', '-qb', 'feat/unrelated', f.base); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'unreviewed'); const tip = f.g('rev-parse', 'HEAD'); f.g('checkout', '-q', 'main')
+    return assessLaneCopies({ cwd: f.dir, preview: tip }).applies === false
+  }],
+  ['copies: from a release/* HEAD the copies rule does not apply', f => { releaseLane(f); const tip = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/release/1.4', tip); return assessLaneCopies({ cwd: f.dir, preview: tip }).applies === false }],
+
   ['a valid lane is exempt, lists the pick', f => { releaseLane(f); const r = assessReleaseLane({ cwd: f.dir }); return r.exempt && r.picks.length === 1 && r.refusals.length === 0 }],
   ['a detached HEAD at origin/release/* is exempt', f => { releaseLane(f); f.g('update-ref', 'refs/remotes/origin/release/1.4', 'HEAD'); f.g('checkout', '-q', '--detach'); return assessReleaseLane({ cwd: f.dir }).exempt }],
   ['a non-cherry-pick commit on the lane is refused', f => { releaseLane(f); f.w('b.txt', 'x\n'); f.g('add', '.'); f.g('commit', '-qm', 'hand-written'); const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('hand-written') && m.includes('no "(cherry picked')) }],
