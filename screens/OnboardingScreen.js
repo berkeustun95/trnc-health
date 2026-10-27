@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, type, radii } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
-import { StatusBar } from 'expo-status-bar'
+import SplashStatusBar from '../components/SplashStatusBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PhotoFade, { PHOTO_GLASS, CONTENT_MAX_W } from '../components/ui/PhotoFade'
 import { Button } from '../components/ui'
@@ -539,7 +539,7 @@ function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isL
   return (
     <View style={{ flex: 1, backgroundColor: '#083A39' }}
       onLayout={e => { const w = Math.round(e.nativeEvent.layout.width); if (w > 0 && w !== pageW) setPageW(w) }}>
-      <StatusBar style="light" />
+      <SplashStatusBar style="light" />
       <FlatList
         key={pageW}
         initialScrollIndex={index}

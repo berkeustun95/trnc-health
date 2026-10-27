@@ -3,6 +3,7 @@ import { View, Text, Image, Animated, Easing, StyleSheet, Platform, Accessibilit
 import { requireOptionalNativeModule } from 'expo'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { StatusBar } from 'expo-status-bar'
 import { font, colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { BOOT_SPLASH_LIVE } from '../constants/flags'
@@ -277,10 +278,17 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
 
   // Undecided: look exactly like the native splash. With no morph to draw (Android < 12, a
   // stage-A binary) that is its plain window colour, never the app underneath.
+  // Dark status-bar icons on the white splash until it unmounts after the exit fade; the screen
+  // underneath (Onboarding sets "light") is held dark through `splashUp` in App.js meanwhile.
   if (!play) {
-    return MORPH
-      ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={cy} onLoad={releaseNative} />
-      : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
+    return (
+      <>
+        <StatusBar style="dark" />
+        {MORPH
+          ? <MorphFrame opacity={1} W={W} cx={W / 2} cy={cy} onLoad={releaseNative} />
+          : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />}
+      </>
+    )
   }
 
   // Cover the width (the arms run off the screen edge, as in the clip), gate at the
@@ -301,6 +309,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
       accessibilityLabel={`ADA, ${t('splashTagline', lang)}`}
       importantForAccessibility="yes"
     >
+      <StatusBar style="dark" />
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
         {/* Scaled about the clip's centre (= the native logo's centre) from startScale to 1. */}
         <Animated.View style={{ position: 'absolute', left: 0, top, width: cw, height: ch, transform: [{ scale: zoom }] }}>

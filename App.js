@@ -137,6 +137,7 @@ import { ConfirmDialog } from './components/ui'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
+import { SplashUpContext } from './components/SplashStatusBar'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -2974,6 +2975,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+     <SplashUpContext.Provider value={splashUp}>
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
       </View>
@@ -3235,6 +3237,7 @@ export default function App() {
       {splashUp && (
         <BootSplash play={splashPlay} ready={bootReady} lang={lang} fontsLoaded={fontsLoaded} onDone={() => setBootSplashDone(true)} />
       )}
+     </SplashUpContext.Provider>
     </SafeAreaProvider>
   )
 }

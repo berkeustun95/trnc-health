@@ -45,7 +45,7 @@ import LocationOffRow from '../components/LocationOffRow'
 import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
 import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
-import { StatusBar } from 'expo-status-bar'
+import SplashStatusBar from '../components/SplashStatusBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
@@ -985,7 +985,7 @@ export default function HomeScreen({
     const wxPhoto = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
     return (
       <>
-        <StatusBar style={overCanvas ? 'dark' : 'light'} />
+        <SplashStatusBar style={overCanvas ? 'dark' : 'light'} />
         <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
           scrollEventThrottle={32}
           onScroll={e => {
