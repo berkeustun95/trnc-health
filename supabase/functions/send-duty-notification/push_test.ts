@@ -83,37 +83,50 @@ Deno.test('503 x4: three retries then all errors, not accepted', async () => {
   eq([out.accepted, out.errors, out.retries, r.calls(), r.sleeps, { ...out.kinds }], [false, 100, 3, 4, [1000, 2000, 4000], { http_503: 100 }], 'result')
 })
 
-Deno.test('each attempt timeout is min(10 s, deadline - now - reserve)', async () => {
+Deno.test('first attempt is ALWAYS sent with the full 10 s, even past the deadline', async () => {
   const r = rig(['hang'], { startAt: 50_000 })
-  await sendBatch(batch, r.deps)
-  eq(r.timeouts, [3000], '55 s deadline - 50 s - 2 s reserve')
+  const out = await sendBatch(batch, r.deps)
+  eq([r.timeouts, r.calls(), { ...out.kinds }], [[10_000], 1, { timeout: 100 }], '50 s in')
+  const late = rig(['hang'], { startAt: 90_000 })
+  await sendBatch(batch, late.deps)
+  eq([late.timeouts, late.calls()], [[10_000], 1], 'well past the deadline')
 })
 
-Deno.test('two batches: slow 503 on batch 1 (retried within room), then batch 2 hangs: total < 60 s', async () => {
+Deno.test('a retry is refused when it would push past the deadline; the first attempt still happened', async () => {
+  const r = rig([r503, () => okTickets(100)], { startAt: 52_000 })
+  const out = await sendBatch(batch, r.deps)
+  // 52 s + 1 s sleep leaves no time before 55 s - 2 s reserve
+  eq([out.retries, r.calls(), out.accepted, { ...out.kinds }], [0, 1, false, { http_503: 100 }], 'result')
+  const ok = rig([r503, () => okTickets(100)], { startAt: 30_000 })
+  const o2 = await sendBatch(batch, ok.deps)
+  eq([o2.retries, o2.accepted], [1, true], 'early enough: retried')
+})
+
+Deno.test('a retry gets min(10 s, deadline - now - reserve) as its timeout', async () => {
+  const r = rig([r503, 'hang'], { startAt: 38_000 })
+  await sendBatch(batch, r.deps)
+  eq(r.timeouts, [10_000, 10_000], '38 s + 1 s sleep: 55 - 39 - 2 = 14 s, capped at 10 s')
+  const r2 = rig([r503, 'hang'], { startAt: 43_000 })
+  await sendBatch(batch, r2.deps)
+  eq(r2.timeouts, [10_000, 9_000], '43 s + 1 s sleep: 55 - 44 - 2 = 9 s, clipped')
+})
+
+Deno.test('two batches: slow 503s on batch 1 (retried within room), then batch 2 hangs: batch 2 is sent', async () => {
   const slow503: Step = { spend: 9_000, res: r503 }
   const r = rig([slow503, slow503, slow503, slow503, 'hang'])
   const b1 = await sendBatch(batch, r.deps, 1)
   const b2 = await sendBatch(batch, r.deps, 0)
   console.log('total ms', r.clock(), 'b1', JSON.stringify({ ...b1.kinds }), 'b2', JSON.stringify({ ...b2.kinds }))
-  if (r.clock() >= 60_000) throw new Error('run exceeded 60 s: ' + r.clock())
-  eq(b2.accepted, false, 'batch 2 hung')
-  // batch 1 must have left room for batch 2's first attempt: it was sent, with a positive timeout
-  if (b2.kinds.deadline) throw new Error('batch 2 was starved by batch 1 retries')
+  eq({ ...b2.kinds }, { timeout: 100 }, 'batch 2 got its first attempt')
+  if (r.clock() >= 60_000) throw new Error('normal-shaped run exceeded 60 s: ' + r.clock())
 })
 
-Deno.test('six batches, all hang: total < 60 s, later batches counted as deadline', async () => {
-  const r = rig(['hang', 'hang', 'hang', 'hang', 'hang', 'hang'])
+Deno.test('6 hanging batches: all attempted once, 60 s; a 7th is attempted too (never skipped)', async () => {
+  const r = rig(['hang', 'hang', 'hang', 'hang', 'hang', 'hang', 'hang'])
   const kinds: Array<Record<string, number>> = []
-  for (let i = 0; i < 6; i++) kinds.push({ ...(await sendBatch(batch, r.deps, 5 - i)).kinds })
-  console.log('total ms', r.clock(), JSON.stringify(kinds))
-  if (r.clock() >= 60_000) throw new Error('run exceeded 60 s: ' + r.clock())
-  eq(kinds.slice(0, 5).every((k) => k.timeout === 100), true, 'first five timed out')
-  eq(kinds[5], { timeout: 100 }, 'sixth got a shortened timeout')
-  // a seventh and eighth have no time left at all and are not sent
-  const r7 = rig(['hang', 'hang', 'hang', 'hang', 'hang', 'hang'], { startAt: 0 })
-  for (let i = 0; i < 6; i++) await sendBatch(batch, r7.deps, 7 - i)
-  const late = await sendBatch(batch, r7.deps, 0)
-  eq([{ ...late.kinds }, r7.calls()], [{ deadline: 100 }, 6], 'seventh batch not sent')
+  for (let i = 0; i < 7; i++) kinds.push({ ...(await sendBatch(batch, r.deps, 6 - i)).kinds })
+  console.log('total ms', r.clock())
+  eq([r.calls(), kinds.every((k) => k.timeout === 100 && !k.deadline), r.timeouts.every((t) => t === 10_000)], [7, true, true], 'all 7 attempted once, 10 s each')
 })
 
 Deno.test('outcome is batch-level: error tickets do not make a run partial', () => {

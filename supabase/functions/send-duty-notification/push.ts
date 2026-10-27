@@ -11,16 +11,18 @@
 //   - ANY other thrown fetch: Deno gives no stable way to tell "DNS failure / refused before anything was sent"
 //     from "reset mid-request" (only free-text TypeError messages). Counted `fetch_failed`.
 //
-// TIME: one hard run deadline (deadlineAt). Every attempt's timeout is min(10 s, deadline - now - reserve). A retry
-// is allowed only if its delay + its attempt timeout still leave room for one full first attempt per REMAINING batch.
-// Once the deadline is reached, batches are not sent at all: counted `deadline` (better than a timed-out half-send).
+// TIME: a batch's FIRST attempt is always sent, with the full 10 s timeout, even past the deadline (Berke: never skip a
+// batch's first attempt; the deadline only limits RETRIES). One soft run deadline (deadlineAt) gates retries: a retry is
+// allowed only if its sleep + its own attempt timeout (min(10 s, deadline - now - reserve)) still fit, and still leave room
+// for one full first attempt per REMAINING batch. 60 s is pg_net's wait for the HTTP reply (20261139), not a platform
+// limit: a run that exceeds it loses only the saved response body, never the pushes.
 // Nothing here logs or returns Expo's body or messages (for DeviceNotRegistered they embed the push token).
 
 export const PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 export const RETRY_BASE_DELAYS_MS = [1000, 2000, 4000]
 export const ATTEMPT_TIMEOUT_MS = 10_000
-// One hard run deadline (index.ts passes runStart + RUN_DEADLINE_MS) leaves room for finishRun and the response
-// under the platform's 60 s limit; RESERVE_MS is that room. Below MIN_ATTEMPT_MS an attempt is not worth sending.
+// Soft run deadline (index.ts passes runStart + RUN_DEADLINE_MS): it only gates RETRIES. RESERVE_MS is kept free for
+// finishRun and the response; a retry with under MIN_ATTEMPT_MS left is not worth sending.
 export const RUN_DEADLINE_MS = 55_000
 export const RESERVE_MS = 2_000
 export const MIN_ATTEMPT_MS = 1_000
@@ -70,16 +72,10 @@ export async function sendBatch(batch: unknown[], d: SendDeps, remainingBatches 
     out.errors += n
     out.kinds[kind] = (out.kinds[kind] ?? 0) + n
   }
-  const timeoutLeft = () => Math.min(ATTEMPT_TIMEOUT_MS, d.deadlineAt - d.now() - RESERVE_MS)
   const makeSignal = d.makeSignal ?? ((ms: number) => AbortSignal.timeout(ms))
 
+  let timeout = ATTEMPT_TIMEOUT_MS
   for (let attempt = 0; ; attempt++) {
-    const timeout = timeoutLeft()
-    if (timeout < MIN_ATTEMPT_MS) {
-      console.error('Expo push batch not sent: run deadline')
-      fail('deadline', batch.length)
-      return out
-    }
     let kind: string
     let wait = 0
     try {
@@ -132,6 +128,7 @@ export async function sendBatch(batch: unknown[], d: SendDeps, remainingBatches 
       return out
     }
     console.error('Expo push batch will retry:', kind, 'attempt', attempt + 1)
+    timeout = nextTimeout
     await d.sleep(delay)
     out.retries++
   }
