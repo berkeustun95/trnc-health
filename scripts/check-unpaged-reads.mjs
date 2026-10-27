@@ -40,6 +40,11 @@
 //   - whether a `.range(` loop actually advances (the paging helpers are unit-tested separately);
 //   - a table that is NOT on the list but has grown: the list is a judgement, extend it when a table becomes large;
 //   - SQL inside Postgres (functions, cron): max-rows applies only to PostgREST, so it is not affected.
+//   - regex literals: the comment blanker has no JS lexer, so a regex containing a quote, followed on the same
+//     line by a string with `//` (e.g. `const re = /"/; const u = "http://x"; <read>`), opens a fake string and
+//     blanks the rest of that line as a comment, hiding a read there (false negative, review 2026-10-27);
+//   - an inner template literal closing inside `${ }` (e.g. `${ `b` + "`" }`) can de-sync the blanker; the known
+//     case over-reports (a commented-out read is flagged), the safe direction.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { resolve, dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
