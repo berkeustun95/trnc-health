@@ -1,5 +1,5 @@
 // deno test supabase/functions/send-duty-notification/push_test.ts
-import { sendBatch, type SendDeps } from './push.ts'
+import { pushOutcome, sendBatch, type SendDeps } from './push.ts'
 
 const batch = Array.from({ length: 100 }, (_, i) => ({ to: `ExponentPushToken[t${i}]` }))
 const okTickets = (n: number, errs: string[] = []) =>
@@ -41,11 +41,42 @@ Deno.test('429 with Retry-After honoured; a 4xx other than 429 is not retried', 
   eq([o2.errors, o2.retries, r2.calls(), { ...o2.kinds }], [100, 0, 1, { http_400: 100 }], '400')
 })
 
-Deno.test('thrown fetch is retried; three retries max, then all counted as errors', async () => {
-  const boom = () => { throw new TypeError('network down') }
-  const r = rig([boom, boom, boom, boom])
+Deno.test('timeout is NOT retried (Expo may have accepted it): exactly 1 attempt, counted timeout', async () => {
+  const tmo = () => { throw new DOMException('signal timed out', 'TimeoutError') }
+  const r = rig([tmo, () => okTickets(100)])
   const out = await sendBatch(batch, r.deps)
-  eq([out.ok, out.errors, out.retries, r.calls(), r.sleeps, { ...out.kinds }], [0, 100, 3, 4, [1000, 2000, 4000], { fetch_failed: 100 }], 'result')
+  eq([out.accepted, out.ok, out.errors, out.retries, r.calls(), { ...out.kinds }], [false, 0, 100, 0, 1, { timeout: 100 }], 'timeout')
+  const ab = () => { throw new DOMException('aborted', 'AbortError') }
+  const r2 = rig([ab, () => okTickets(100)])
+  const o2 = await sendBatch(batch, r2.deps)
+  eq([o2.retries, r2.calls(), { ...o2.kinds }], [0, 1, { timeout: 100 }], 'abort')
+})
+
+Deno.test('a thrown fetch is never retried (cannot tell pre-send from mid-request)', async () => {
+  const r = rig([() => { throw new TypeError('error sending request: tcp connect error') }, () => okTickets(100)])
+  const out = await sendBatch(batch, r.deps)
+  eq([out.accepted, out.retries, r.calls(), { ...out.kinds }], [false, 0, 1, { fetch_failed: 100 }], 'result')
+})
+
+Deno.test('503 x4: three retries then all errors, not accepted', async () => {
+  const f = () => new Response('x', { status: 503 })
+  const r = rig([f, f, f, f])
+  const out = await sendBatch(batch, r.deps)
+  eq([out.accepted, out.errors, out.retries, r.calls(), r.sleeps, { ...out.kinds }], [false, 100, 3, 4, [1000, 2000, 4000], { http_503: 100 }], 'result')
+})
+
+Deno.test('outcome is batch-level: error tickets do not make a run partial', () => {
+  eq(pushOutcome(110, 2, 0), 'sent', 'all batches accepted (even with dead-token tickets)')
+  eq(pushOutcome(110, 1, 1), 'partial', 'one accepted, one not')
+  eq(pushOutcome(110, 0, 2), 'push_failed', 'none accepted')
+  eq(pushOutcome(0, 0, 0), 'sent', 'nothing to send')
+})
+
+Deno.test('accepted flag: 200 with error tickets is accepted; 503 is not', async () => {
+  const a = await sendBatch(batch, rig([() => okTickets(100, ['DeviceNotRegistered'])]).deps)
+  eq([a.accepted, a.errors], [true, 1], '200 with a dead token')
+  const b = await sendBatch(batch, rig([() => new Response('x', { status: 400 })]).deps)
+  eq(b.accepted, false, '400')
 })
 
 Deno.test('budget exhausted: remaining retries skipped and counted as errors', async () => {

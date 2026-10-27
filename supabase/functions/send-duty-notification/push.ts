@@ -1,11 +1,14 @@
 // Expo push sending with a bounded retry, kept free of remote imports so `deno test` runs it offline.
 //
 // RETRY RULE (the whole point): retry a batch ONLY when Expo cannot have accepted it:
-//   - HTTP 5xx or 429 (rejected before any ticket), or
-//   - a thrown fetch (network error / our per-attempt timeout, before a response).
-// NEVER retry HTTP 200, even when some tickets are errors (DeviceNotRegistered...): those messages were
-// accepted and a retry would double-push. A 200 whose body cannot be parsed is also not retried.
-// Known residual risk: a thrown fetch can be a timeout AFTER Expo accepted the batch; Berke accepted that.
+//   - HTTP 5xx or 429: Expo answered that it did not take the batch.
+// NEVER retry (Berke: "only retry batches Expo didn't accept, so nobody gets a double push"):
+//   - HTTP 200, even when some tickets are errors (DeviceNotRegistered...): accepted, a retry would double-push.
+//     A 200 whose body cannot be parsed is likewise not retried.
+//   - a timeout / abort (our 10 s AbortSignal.timeout): the request was sent, Expo may have accepted it. Counted 'timeout'.
+//   - ANY other thrown fetch. Deno gives no stable, documented way to tell "DNS failure / connection refused before
+//     anything was sent" from "connection reset mid-request" (only free-text TypeError messages), so a thrown fetch
+//     is never retried; counted 'fetch_failed'.
 // Nothing here logs or returns Expo's body or messages (for DeviceNotRegistered they embed the push token).
 
 export const PUSH_URL = 'https://exp.host/--/api/v2/push/send'
@@ -19,10 +22,21 @@ export function errorKind(k: unknown): string {
 }
 
 export interface BatchResult {
+  // true only for HTTP 200 with a parseable body: Expo took the batch (its tickets may still be errors).
+  accepted: boolean
   ok: number
   errors: number
   retries: number
   kinds: Record<string, number>
+}
+
+// Run outcome is BATCH-level: error tickets inside an accepted batch (dead tokens) are not delivery failures.
+//   push_failed = something was attempted and no batch was accepted
+//   partial     = at least one batch accepted AND at least one not accepted after retries
+export function pushOutcome(messages: number, batchesAccepted: number, batchesFailed: number): 'sent' | 'partial' | 'push_failed' {
+  if (messages > 0 && batchesAccepted === 0) return 'push_failed'
+  if (batchesAccepted > 0 && batchesFailed > 0) return 'partial'
+  return 'sent'
 }
 
 export interface SendDeps {
@@ -43,7 +57,7 @@ function retryAfterMs(res: Response): number {
 
 export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchResult> {
   const budget = d.budgetMs ?? RETRY_BUDGET_MS
-  const out: BatchResult = { ok: 0, errors: 0, retries: 0, kinds: Object.create(null) }
+  const out: BatchResult = { accepted: false, ok: 0, errors: 0, retries: 0, kinds: Object.create(null) }
   const fail = (kind: string, n: number) => {
     out.errors += n
     out.kinds[kind] = (out.kinds[kind] ?? 0) + n
@@ -68,6 +82,7 @@ export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchRes
             else fail(errorKind(r.details?.error ?? 'unknown'), 1)
           }
           if (tickets.length < batch.length) fail('no_ticket', batch.length - tickets.length)
+          out.accepted = true
         } catch {
           fail('bad_response', batch.length)
         }
@@ -82,8 +97,10 @@ export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchRes
       }
       wait = retryAfterMs(res)
     } catch (e) {
-      kind = 'fetch_failed'
-      console.error('Expo push batch threw:', e instanceof Error ? e.name : 'unknown')
+      const name = e instanceof Error ? e.name : 'unknown'
+      console.error('Expo push batch threw:', name)
+      fail(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'fetch_failed', batch.length)
+      return out
     }
 
     if (attempt >= RETRY_BASE_DELAYS_MS.length) {

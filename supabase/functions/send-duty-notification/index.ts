@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sendBatch } from './push.ts'
+import { pushOutcome, sendBatch } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -169,6 +169,8 @@ serve(async () => {
   }
 
   let pushRetries = 0
+  let batchesAccepted = 0
+  let batchesFailed = 0
   for (let i = 0; i < messages.length; i += 100) {
     const r = await sendBatch(messages.slice(i, i + 100), {
       fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
@@ -176,12 +178,16 @@ serve(async () => {
     })
     pushOk += r.ok
     pushRetries += r.retries
+    if (r.accepted) batchesAccepted++
+    else batchesFailed++
     for (const [kind, n] of Object.entries(r.kinds)) bump(kind, n)
   }
 
-  const pushFailed = messages.length > 0 && pushOk === 0
+  // Batch-level, not ticket-level: error tickets (dead tokens) are not delivery failures.
+  const outcome = pushOutcome(messages.length, batchesAccepted, batchesFailed)
+  const pushFailed = outcome === 'push_failed'
   await finishRun(supabase, runId, {
-    outcome: pushFailed ? 'push_failed' : pushOk < messages.length ? 'partial' : 'sent',
+    outcome: outcome,
     pharmacies: duties.length,
     notified,
     notif_batches_failed: notifBatchesFailed,
