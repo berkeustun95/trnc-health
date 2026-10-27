@@ -136,17 +136,21 @@ export function provePick(cwd, c, mainRef) {
 
 // Preview-lineage (check-preview-lineage.mjs): HEAD is NOT a release lane and a Preview commit `preview` is missing from it.
 // → { applies:false } unless HEAD is a non-release branch AND an origin/release/* ref contains `preview`; else
-//   { applies:true, ok, copies[{pick, original}], failures[] }. ok = every commit in `preview --not HEAD` is a proven -x copy
-//   of a commit in HEAD (provePick with mainRef = HEAD, nothing weakened) or a PR merge (prMergeRefusal). Pure git reads.
+//   { applies:true, ok, copies[{pick, original}], merges[{merge, second}], failures[] }. ok = every commit in `preview --not HEAD` is a proven -x copy
+//   of a commit in HEAD (provePick with mainRef = HEAD, nothing weakened) or a PR merge (prMergeRefusal; accepted merges are returned in merges[], the commits under their second parent are in this same rev-list and so proven or refused individually). Pure git reads.
 export function assessLaneCopies({ cwd, preview }) {
   try {
     if (branchNames(cwd).some(n => RELEASE_BRANCH.test(n))) return { applies: false }
     if (!lines(git(cwd, 'for-each-ref', '--contains', preview, '--format=%(refname)', 'refs/remotes/origin/release/')).length) return { applies: false }
-    const res = { applies: true, ok: false, copies: [], failures: [] }
+    const res = { applies: true, ok: false, copies: [], merges: [], failures: [] }
     const under = lines(git(cwd, 'rev-list', preview, '--not', 'HEAD'))
     for (const c of under) {
       const isMerge = git(cwd, 'log', '-1', '--format=%P', c).split(' ').filter(Boolean).length > 1
-      if (isMerge) { const why = prMergeRefusal(cwd, c); if (why) res.failures.push(why); continue }
+      if (isMerge) {
+        const why = prMergeRefusal(cwd, c)
+        if (why) res.failures.push(why); else res.merges.push({ merge: short(cwd, c), second: short(cwd, `${c}^2`) })
+        continue
+      }
       const r = provePick(cwd, c, 'HEAD')
       if (r.refusal) res.failures.push(r.refusal); else res.copies.push({ pick: r.pick.pick, original: r.pick.original })
     }
