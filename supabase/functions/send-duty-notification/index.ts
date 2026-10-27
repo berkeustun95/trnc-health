@@ -38,6 +38,42 @@ function getDutyBody(lang: string, duties: { name: string; phone?: string; open_
   return template.replace('{count}', String(duties.length))
 }
 
+// duty_push_runs (20261141): one counts-only summary row per invocation, written at start and
+// finished at the end (both timestamps from this function's clock, so finished_at >= started_at holds). Logging must never block or fail a push: a missing table (function deployed
+// before the migration) or any error is logged and ignored.
+const MAX_ERROR_KINDS = 20
+const KIND_RE = /^[A-Za-z0-9_]{1,64}$/
+function errorKind(k: unknown): string {
+  return typeof k === 'string' && KIND_RE.test(k) ? k : 'other'
+}
+
+async function startRun(supabase: any, dutyDate: string): Promise<number | null> {
+  try {
+    const { data, error } = await supabase.from('duty_push_runs').insert({ duty_date: dutyDate, started_at: new Date().toISOString() }).select('id').maybeSingle()
+    if (error) {
+      console.error('duty_push_runs start failed', error.message)
+      return null
+    }
+    return data?.id ?? null
+  } catch (e) {
+    console.error('duty_push_runs start threw', String(e))
+    return null
+  }
+}
+
+async function finishRun(supabase: any, id: number | null, patch: Record<string, unknown>): Promise<void> {
+  if (id == null) return
+  try {
+    const { error } = await supabase
+      .from('duty_push_runs')
+      .update({ ...patch, finished_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) console.error('duty_push_runs finish failed', error.message)
+  } catch (e) {
+    console.error('duty_push_runs finish threw', String(e))
+  }
+}
+
 serve(async () => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -51,6 +87,8 @@ serve(async () => {
     return new Response(JSON.stringify({ error: `unexpected TRNC date format: ${today}` }), { status: 500 })
   }
 
+  const runId = await startRun(supabase, today)
+
   const { data: duties, error: dutyError } = await supabase
     .from('duty_list')
     .select('name, phone, region, open_from, open_until')
@@ -59,18 +97,26 @@ serve(async () => {
     .order('name')
 
   if (dutyError) {
+    await finishRun(supabase, runId, { outcome: 'duty_query_failed' })
     return new Response(JSON.stringify({ error: dutyError.message }), { status: 500 })
   }
 
   if (!duties?.length) {
+    await finishRun(supabase, runId, { outcome: 'no_duties' })
     return new Response(JSON.stringify({ message: 'No duty pharmacies for today', date: today }), { status: 200 })
   }
 
-  const { data: profiles } = await supabase
+  const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('id, push_token, preferred_language')
 
+  if (profilesError) {
+    await finishRun(supabase, runId, { outcome: 'profiles_query_failed', pharmacies: duties.length })
+    return new Response(JSON.stringify({ error: profilesError.message }), { status: 500 })
+  }
+
   if (!profiles?.length) {
+    await finishRun(supabase, runId, { outcome: 'no_profiles', pharmacies: duties.length })
     return new Response(JSON.stringify({ message: 'No profiles found' }), { status: 200 })
   }
 
@@ -87,8 +133,13 @@ serve(async () => {
     }
   })
 
+  let notified = 0
+  let notifBatchesFailed = 0
   for (let i = 0; i < notifRows.length; i += 500) {
-    const { error: insertError } = await supabase.from('notifications').insert(notifRows.slice(i, i + 500))
+    const batch = notifRows.slice(i, i + 500)
+    const { error: insertError } = await supabase.from('notifications').insert(batch)
+    if (insertError) notifBatchesFailed++
+    else notified += batch.length
     // Not fatal: the pushes below still go out. But a failed insert used to vanish, and the
     // likeliest one is deploying this before 20261066 (column "type" does not exist).
     if (insertError) console.error('notifications insert failed', insertError.message)
@@ -109,42 +160,74 @@ serve(async () => {
       }
     })
 
-  const pushErrors: string[] = []
+  let pushOk = 0
+  let pushErrCount = 0
+  const errorKinds: Record<string, number> = Object.create(null)
+  const bump = (kind: string, n = 1) => {
+    pushErrCount += n
+    // At most 20 distinct keys; the rest fold into 'other'.
+    const key = kind in errorKinds || Object.keys(errorKinds).length < MAX_ERROR_KINDS ? kind : 'other'
+    errorKinds[key] = (errorKinds[key] ?? 0) + n
+  }
 
   for (let i = 0; i < messages.length; i += 100) {
-    const res = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-      },
-      body: JSON.stringify(messages.slice(i, i + 100)),
-    })
+    const batch = messages.slice(i, i + 100)
+    try {
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        body: JSON.stringify(batch),
+      })
 
-    if (!res.ok) {
-      const errText = await res.text()
-      console.error('Expo push batch failed:', errText)
-      pushErrors.push(errText)
-    } else {
-      const json = await res.json()
-      const batchErrors = (json.data ?? [])
-        .filter((r: any) => r.status === 'error')
-        .map((r: any) => `${r.details?.error ?? 'unknown'}: ${r.message ?? ''}`)
-      if (batchErrors.length) console.error('Expo push errors:', batchErrors)
-      pushErrors.push(...batchErrors)
+      if (!res.ok) {
+        // Never log or return Expo's body or messages: for DeviceNotRegistered they embed the push token.
+        console.error('Expo push batch failed: HTTP', res.status)
+        bump(`http_${res.status}`, batch.length)
+      } else {
+        const json = await res.json()
+        const tickets: any[] = Array.isArray(json.data) ? json.data : []
+        for (const r of tickets) {
+          if (r.status === 'ok') {
+            pushOk++
+          } else {
+            bump(errorKind(r.details?.error ?? 'unknown'))
+          }
+        }
+        if (tickets.length < batch.length) bump('no_ticket', batch.length - tickets.length)
+      }
+    } catch (e) {
+      console.error('Expo push batch threw:', e instanceof Error ? e.name : 'unknown')
+      bump('fetch_failed', batch.length)
     }
   }
 
+  const pushFailed = messages.length > 0 && pushOk === 0
+  await finishRun(supabase, runId, {
+    outcome: pushFailed ? 'push_failed' : 'sent',
+    pharmacies: duties.length,
+    notified,
+    notif_batches_failed: notifBatchesFailed,
+    push_attempted: messages.length,
+    push_ok: pushOk,
+    push_errors: pushErrCount,
+    error_kinds: errorKinds,
+  })
+
   return new Response(
     JSON.stringify({
-      ok: true,
+      ok: !pushFailed,
       date: today,
       pharmacies: duties.map(d => d.name),
       notified: profiles.length,
       pushed: messages.length,
-      pushErrors: pushErrors.length ? pushErrors : undefined,
+      pushOk,
+      pushErrorCount: pushErrCount,
+      errorKinds,
     }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
+    { status: pushFailed ? 502 : 200, headers: { 'Content-Type': 'application/json' } }
   )
 })
