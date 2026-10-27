@@ -46,8 +46,28 @@ const tests = [
   ['an evil merge (changes only in the merge) is refused', f => {
     releaseLane(f); f.w('smuggled.txt', 's\n'); f.g('add', '.')
     const merge = f.g('commit-tree', f.g('write-tree'), '-p', 'HEAD', '-p', f.base, '-m', 'Merge sneaky'); f.g('reset', '-q', '--hard', merge)
-    const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('combined diff'))
+    const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('not an ancestor of the second') || m.includes('tree differs'))
   }],
+  ['a reverting merge (tree == second parent, second parent is the base) is refused', f => {
+    releaseLane(f)
+    const merge = f.g('commit-tree', `${f.base}^{tree}`, '-p', 'HEAD', '-p', f.base, '-m', 'Merge revert'); f.g('reset', '-q', '--hard', merge)
+    const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('not an ancestor of the second'))
+  }],
+  ['a PR-style merge (first parent ancestor of second, tree == second) is accepted', f => {
+    releaseLane(f); const tip = f.g('rev-parse', 'HEAD')
+    f.g('checkout', '-qb', 'pr'); f.w('b.txt', 'five\n'); f.g('add', '.'); f.g('commit', '-qm', 'pick source'); f.g('checkout', '-q', 'main'); f.g('cherry-pick', '-x', 'pr')
+    const orig = f.g('rev-parse', 'HEAD'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
+    f.g('checkout', '-q', 'pr'); f.g('reset', '-q', '--hard', tip); f.g('cherry-pick', '-x', orig)
+    f.g('checkout', '-q', 'release/1.4'); f.g('merge', '-q', '--no-ff', '-m', 'Merge pull request #2', 'pr')
+    const r = assessReleaseLane({ cwd: f.dir }); return r.exempt && r.picks.length === 2
+  }],
+  ['a whitespace-only edit in a string literal under a kept trailer is refused', f => {
+    f.g('checkout', '-q', 'main'); f.w('c.js', "const k = 'adminonly'\n"); f.g('add', '.'); f.g('commit', '-qm', 'add c'); f.g('update-ref', 'refs/remotes/origin/main', 'main')
+    const orig = f.g('rev-parse', 'HEAD'); f.g('checkout', '-qb', 'release/1.4', f.base); f.g('cherry-pick', '-x', orig)
+    f.w('c.js', "const k = 'ad minonly'\n"); f.g('commit', '-q', '--amend', '--no-edit', '-a')
+    const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('differs'))
+  }],
+  ['an empty lane (HEAD == base) is refused', f => { f.g('checkout', '-qb', 'release/1.4', f.base); const r = assessReleaseLane({ cwd: f.dir }); return !r.exempt && r.refusals.some(m => m.includes('empty proof')) }],
 ]
 
 let failed = 0
