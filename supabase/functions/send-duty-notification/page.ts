@@ -54,7 +54,14 @@ export async function readAllById<T extends { id: string }>(
   for (let read = 1; read <= 2; read++) {
     readsDone = read
     last = await readOnce(fetchPage, maxPages)
-    if (last.error) return { rows: [], error: last.error, reads: read }
+    if (last.error) {
+      // A failed RE-read after a short but non-empty first read must not cost everyone the push: send what the
+      // first read got and record the shortfall. A first-read error (or a 0-row first read) still refuses.
+      if (read === 2 && best && best.rows.length > 0 && best.expected != null) {
+        return { rows: best.rows, error: null, shortBy: best.expected - best.rows.length, reads: 2 }
+      }
+      return { rows: [], error: last.error, reads: read }
+    }
     if (last.expected == null) return { rows: last.rows, error: null, countUnverified: true, reads: read }
     if (last.rows.length >= last.expected) return { rows: last.rows, error: null, reads: read }
     if (best == null || last.rows.length > best.rows.length) best = last

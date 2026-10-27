@@ -71,6 +71,7 @@ if (clear.length) {
   const { data, error: e } = await svc.from('hotels').update({ hotelrunner_url: null }).in('id', clear.map(r => r.id)).select('id')
   if (e || data.length !== clear.length) fail(`clear: ${e?.message ?? `${data.length} of ${clear.length} rows`}`)
 }
+// unpaged-ok: read-back of hotels that carry a HotelRunner link (a few dozen); more than 1000 would also fail the exact-count read above
 const { data: after, error: e2 } = await svc.from('hotels').select('name,hotelrunner_url').not('hotelrunner_url', 'is', null)
 if (e2) fail(e2.message)
 const drift = after.filter(h => want.get(h.name) !== h.hotelrunner_url).length + [...want.keys()].filter(n => !after.some(h => h.name === n)).length

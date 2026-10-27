@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
+import { readAllResult } from './lib/read-all-rows.mjs'
 import { SOURCE, AGENCY_ID, PHONE_RE } from '../supabase/functions/_shared/novest-feed.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -33,10 +34,10 @@ const key = serviceRoleKey()   // repo secret in CI (daily-health workflow); no 
 const supabase = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, key,
   { auth: { persistSession: false, autoRefreshToken: false } })
 
-const { data: rows, error } = await supabase
+const { data: rows, error } = await readAllResult((a, b) => supabase
   .from('properties')
-  .select('id,external_id,source,status,agency_id,agent_id,location_precision,latitude,longitude,title,description,price,currency,property_type,intent,amenities,last_seen_at,content_hash')
-  .eq('source', SOURCE)
+  .select('id,external_id,source,status,agency_id,agent_id,location_precision,latitude,longitude,title,description,price,currency,property_type,intent,amenities,last_seen_at,content_hash', { count: 'exact' })
+  .eq('source', SOURCE).order('id').range(a, b))
 if (error) { console.error('read failed:', error.message); process.exit(1) }
 
 let failed = 0
@@ -118,9 +119,9 @@ check(9, 'last_seen_at stamped on every row',
   `${countWhere(r => r.last_seen_at === null)} unstamped`)
 
 // ── IMAGE INVARIANTS ─────────────────────────────────────────────────────────
-const { data: imgs, error: iErr } = await supabase
-  .from('property_images').select('property_id,url,source_url,is_primary,sort_order')
-  .in('property_id', rows.map(r => r.id))
+const { data: imgs, error: iErr } = await readAllResult((a, b) => supabase
+  .from('property_images').select('property_id,url,source_url,is_primary,sort_order', { count: 'exact' })
+  .in('property_id', rows.map(r => r.id)).order('id').range(a, b))
 if (iErr) { console.error('image read failed:', iErr.message); process.exit(1) }
 
 console.log('')

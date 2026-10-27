@@ -63,6 +63,26 @@ Deno.test('a profile deleted mid-read (count drops by one) does not block the se
   eq([r.error, r.rows.length, r.shortBy], [null, 1499, 1], 'one missing, still sent')
 })
 
+Deno.test('a query error on the RE-read after a short non-empty first read: send the first read, shortBy set', async () => {
+  let call = 0
+  const all = table(2500)
+  const r = await readAllById(async (after): Promise<Page<Row>> => {
+    call++
+    if (call > 3) return { data: null, error: { message: 'boom on re-read' }, count: null } // read 1 = 3 calls (1000+1000+... then empty)
+    const rows = all.filter((x) => after == null || x.id > after).slice(0, 1000)
+    return { data: call === 2 ? [] : rows, error: null, count: 2500 } // read 1 stops after one page: 1000 of 2500
+  })
+  eq([r.error, r.rows.length, r.shortBy, r.reads], [null, 1000, 1500, 2], 'first read delivered')
+})
+
+Deno.test('a first-read error, or a 0-row first read, still refuses', async () => {
+  const bad = await readAllById(async () => ({ data: null, error: { message: 'boom' }, count: null }))
+  eq([bad.rows.length, bad.error], [0, 'boom'], 'first-read error')
+  let n = 0
+  const zeroThenErr = await readAllById(async (): Promise<Page<Row>> => (n++ === 0 ? { data: [], error: null, count: 900 } : { data: null, error: { message: 'x' }, count: null }))
+  eq([zeroThenErr.rows.length, zeroThenErr.error !== null], [0, true], '0-row first read then error')
+})
+
 Deno.test('a real query error is an error (the only refusal); so is zero rows with a positive count', async () => {
   const bad = await readAllById(async () => ({ data: null, error: { message: 'boom' }, count: null }))
   eq([bad.rows.length, bad.error], [0, 'boom'], 'error')

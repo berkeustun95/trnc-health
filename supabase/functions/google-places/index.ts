@@ -76,6 +76,7 @@ async function claim(uid: string, kind: string, cost = 1) {
 
 async function refresh(key: string) {
   const cut = new Date(Date.now() - REFRESH_AFTER_DAYS * 86400e3).toISOString()
+  // unpaged-ok: explicitly bounded by .limit(REFRESH_BATCH) below (a batch, not a full read)
   const { data: due, error } = await admin.from('google_place_pins')
     .select('google_place_id').lt('fetched_at', cut).order('fetched_at').limit(REFRESH_BATCH)
   if (error) { console.error('google-places: refresh read failed'); return json(502, { error: 'db' }) }
