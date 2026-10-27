@@ -10,14 +10,15 @@
 // WHAT IT FLAGS: `.from('<table>')` immediately followed by `.select(` for a table in GROWING below, unless the whole
 // chain (and the wrapper call it sits in) carries one of:
 //   .range(                              a paging loop
-//   readAllRows / readAllResult /        the repo's paging helpers (scripts/lib/read-all-rows.mjs,
+//   readAllRows / readAllResult /        the repo's paging helpers, but only when the read sits INSIDE the helper's
+//                                        argument list (a helper call on the line above exempts nothing) (scripts/lib/read-all-rows.mjs,
 //   readAllById / fetchAll               send-duty-notification/page.ts, check-notify-health.mjs fetchAll: all compare
 //                                        the exact count to the rows received and refuse a shortfall)
 //   .limit(N)  with a LITERAL N <= 1000 bounded by the caller (.limit(1) newest-row probes)
 //   .maybeSingle() / .single()           at most one row
 //   head: true                           a count, no rows
 //   count: 'exact' + a comparison        a single read that asks for the exact count and, right after, compares it to the
-//                                        rows received (`rows.length !== count` -> refuse): principle 12 applied inline
+//                                        the read's OWN rows received (`rows.length !== count` for the `const { data: rows, count }` of that same call): principle 12 applied inline
 //   .eq('id', …)                         primary-key lookup, at most one row
 //   // unpaged-ok: <reason>              on the statement or the line above, for a table that is bounded for a reason
 //                                        you can state (the reason is the review).
@@ -75,6 +76,35 @@ function chainFrom(text, start) {
 
 const stripComments = s => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
 
+// The callee names of every call whose ARGUMENT LIST contains `index` (innermost first). A completed earlier statement
+// (`const a = await readAllRows(p)`) is a matched pair and never counts; only an UNCLOSED `(` before `index` does.
+// So a helper only exempts a read that sits inside its arguments, not one on the next line.
+function enclosingCallees(text, index, limit = 1500) {
+  const out = []
+  let depth = 0
+  for (let i = index - 1; i >= Math.max(0, index - limit); i--) {
+    const ch = text[i]
+    if (ch === ')' || ch === ']' || ch === '}') depth++
+    else if (ch === '(' || ch === '[' || ch === '{') {
+      if (depth > 0) { depth--; continue }
+      if (ch === '(') {
+        const name = text.slice(Math.max(0, i - 60), i).match(/([A-Za-z_$][\w$.]*)\s*$/)
+        out.push(name ? name[1].split('.').pop() : '')
+      } else if (ch === '{') break // an enclosing block: a new statement scope, nothing above applies
+    }
+  }
+  return out
+}
+
+// `const { data: rows, count: n } = await sb` directly before the `.from(`: the read's OWN rows/count variable names.
+function ownResultNames(text, index) {
+  const before = text.slice(Math.max(0, index - 300), index)
+  const m = before.match(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*await\s+[\w.$]+\s*$/)
+  if (!m) return null
+  const props = Object.fromEntries(m[1].split(',').map(x => x.trim()).filter(Boolean).map(x => { const [k, v] = x.split(':').map(y => y.trim()); return [k, v || k] }))
+  return props.data && props.count ? { rows: props.data, count: props.count } : null
+}
+
 export function scanText(text, file = '<memory>', tables = GROWING) {
   const findings = []
   FROM.lastIndex = 0
@@ -85,30 +115,29 @@ export function scanText(text, file = '<memory>', tables = GROWING) {
     const lineStart = text.lastIndexOf('\n', m.index) + 1
     const line = text.slice(0, m.index).split('\n').length
     const chain = chainFrom(text, m.index)
-    const prefix = text.slice(lineStart, m.index)
-    // the statement may sit inside a wrapper opened on an earlier line: look back to the start of the statement
-    let back = lineStart
-    for (let k = 0; k < 3; k++) {
-      const prev = text.lastIndexOf('\n', back - 2) + 1
-      if (!/^\s*(const|let|var|await|return|\w+\()/.test(text.slice(prev, back)) && !/[(,=>]\s*$/.test(text.slice(prev, back).trimEnd())) break
-      back = prev
-    }
-    const wrapper = text.slice(back, lineStart) + prefix
+    // comment block directly above (up to 3 lines, stopping at a blank line)
     let aboveStart = lineStart
-    for (let k = 0; k < 3 && aboveStart > 0; k++) aboveStart = text.lastIndexOf('\n', aboveStart - 2) + 1
-    const above = text.slice(aboveStart, lineStart) // the 3 lines above (the comment may precede `const x = await sb`)
-    if (/unpaged-ok:\s*\S/.test(chain) || /unpaged-ok:\s*\S/.test(above) || /unpaged-ok:\s*\S/.test(wrapper)) continue
-    const after = stripComments(text.slice(m.index + chain.length, m.index + chain.length + 500))
-    const countCompared = /count\s*:\s*['"`]exact['"`]/.test(chain) && !/head\s*:\s*true/.test(chain) &&
-      /(\.length\s*(!==?|<)\s*count\b|\bcount\s*(!==?|>)\s*\w+\.length)/.test(after)
-    const code = stripComments(wrapper + chain)
+    for (let k = 0; k < 3 && aboveStart > 0; k++) {
+      const prev = text.lastIndexOf('\n', aboveStart - 2) + 1
+      if (text.slice(prev, aboveStart).trim() === '') break
+      aboveStart = prev
+    }
+    const above = text.slice(aboveStart, lineStart)
+    if (/unpaged-ok:\s*\S/.test(chain) || /unpaged-ok:\s*\S/.test(above)) continue
+
+    const code = stripComments(chain)
     const lim = code.match(/\.limit\(\s*([^)]*?)\s*\)/)
+    const insideHelper = enclosingCallees(stripComments(text.slice(0, m.index)), stripComments(text.slice(0, m.index)).length).some(n => HELPERS.test(n))
+    const own = ownResultNames(text, m.index)
+    const after = stripComments(text.slice(m.index + chain.length, m.index + chain.length + 500))
+    const countCompared = own && /count\s*:\s*['"`]exact['"`]/.test(chain) && !/head\s*:\s*true/.test(chain) &&
+      new RegExp(`(\\b${own.rows}\\.length\\s*(!==?|<)\\s*${own.count}\\b|\\b${own.count}\\s*(!==?|>)\\s*${own.rows}\\.length)`).test(after)
     const ok =
-      /\.range\(/.test(code) || HELPERS.test(code) ||
+      /\.range\(/.test(code) || insideHelper ||
       /\.(maybeSingle|single)\(/.test(code) || /head\s*:\s*true/.test(code) ||
       /\.eq\(\s*['"`]id['"`]/.test(code) || countCompared ||
       (lim && /^\d+$/.test(lim[1]) && Number(lim[1]) <= 1000)
-    if (!ok) findings.push({ file, line, table, why: lim ? `.limit(${lim[1]}) is not a literal <= 1000` : 'no paging, no helper, no single-row/limit/head, no unpaged-ok' })
+    if (!ok) findings.push({ file, line, table, why: lim ? `.limit(${lim[1]}) is not a literal <= 1000` : 'no paging, no helper around it, no single-row/limit/head, no unpaged-ok' })
   }
   return findings
 }
@@ -160,7 +189,13 @@ function selfTest() {
   t('double-quoted and template-literal names', n(`sb.from("push_log").select('*'); sb.from(\`hotels\`).select('*')`), 2)
   t('count requested but never compared is still unpaged', n(`const { data, count } = await sb.from('hotels').select('id', { count: 'exact' })\nconsole.log(data.length)`), 1)
   t('count compared to rows received (inline principle 12)', n(`const { data, error, count } = await sb.from('hotels').select('id', { count: 'exact' })\nif (error) fail(error)\nif (data.length !== count) fail('partial')`), 0)
+  t('  ...with renamed variables', n(`const { data: existing, error, count: total } = await supabase.from('hotels')\n  .select('id', { count: 'exact' }).eq('source', S)\nif (total !== existing.length) fail('partial')`), 0)
   t('count without head is still a row read', n(`await sb.from('properties').select('id', { count: 'exact' }).eq('source', S)`), 1)
+  t('REVIEW red: a helper call on the previous line exempts nothing', n(`const a = await readAllRows(p)\nconst { data } = await sb.from('profiles').select('id')`), 1)
+  t('REVIEW red: a .limit(1) on the previous line exempts nothing', n(`const a = await sb.from('x').select('y').limit(1)\nconst { data } = await sb.from('profiles').select('id')`), 1)
+  t('REVIEW red: a .maybeSingle() on the previous line exempts nothing', n(`const a = await sb.from('x').select('y').maybeSingle()\nconst { data } = await sb.from('profiles').select('id')`), 1)
+  t('REVIEW red: comparing ANOTHER array to count does not make the read guarded', n(`const { data, count } = await sb.from('hotels').select('id', { count: 'exact' })\nif (other.length !== count) fail('x')`), 1)
+  t('REVIEW red: a helper in an earlier, finished argument list', n(`foo(readAllRows(p), 1)\nconst { data } = await sb.from('profiles').select('id')`), 1)
   // GREEN: each of these must pass (positive controls: the guard is not just refusing everything)
   t('.range loop', n(`await sb.from('profiles').select('id', { count: 'exact' }).order('id').range(a, b)`), 0)
   t('wrapped in readAllResult', n(`await readAllResult((a, b) => sb\n  .from('events').select('id', { count: 'exact' }).order('id').range(a, b))`), 0)

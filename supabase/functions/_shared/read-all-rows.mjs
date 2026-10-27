@@ -1,3 +1,6 @@
+// ⚠ OFFSET paging: a concurrent delete between pages can hide one row (the rows after it shift down by one). Don't use
+// this for callers that act on ABSENCE ("not in the table => treat as new / delist / cancel") without a fail-safe.
+// The duty push uses keyset paging for that reason (send-duty-notification/page.ts).
 // Read every row of a PostgREST query. The server caps a response at its max-rows (1000, but it
 // can be set lower), so a plain select silently truncates. `page(from, to)` returns the query for one
 // range, built WITH { count: 'exact' } and an ORDER BY on a unique column. Pages advance by the rows
