@@ -40,6 +40,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
+import { readAllResult } from './lib/read-all-rows.mjs'
 import sharp from 'sharp'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
@@ -379,10 +380,10 @@ const supabase = createClient(SUPABASE_URL, serviceRoleKey(), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const { data: existing, error: readErr } = await supabase
+const { data: existing, error: readErr } = await readAllResult((a, b) => supabase
   .from('events')
-  .select(`id, external_id, status, ${MUTABLE.join(', ')}`)
-  .eq('source', SOURCE)
+  .select(`id, external_id, status, ${MUTABLE.join(', ')}`, { count: 'exact' })
+  .eq('source', SOURCE).order('id').range(a, b))
 
 if (readErr) {
   // An auth failure here almost always means the Keychain holds a truncated or
@@ -518,6 +519,7 @@ if (!dry && !writeError) {
 // script must not make on its own.
 let statusAlarm = null
 if (!dry && !writeError) {
+  // unpaged-ok: alarm query, expected to return 0 rows (status IS NULL); truncation could only understate a non-zero finding
   const { data: bad, error: stErr } = await supabase
     .from('events')
     .select('external_id, title, status')
@@ -677,11 +679,11 @@ const imageFailures = []
 const imageSizes = []   // { title, before, after } for the weight report
 
 if (!writeError) {
-  const { data: toMirror, error: mirrorReadErr } = await supabase
+  const { data: toMirror, error: mirrorReadErr } = await readAllResult((a, b) => supabase
     .from('events')
-    .select('id, external_id, title, images, source_image_url')
+    .select('id, external_id, title, images, source_image_url', { count: 'exact' })
     .eq('source', SOURCE)
-    .not('source_image_url', 'is', null)
+    .not('source_image_url', 'is', null).order('id').range(a, b))
 
   if (mirrorReadErr) {
     imageFailures.push({ title: '(could not list rows)', error: mirrorReadErr.message })

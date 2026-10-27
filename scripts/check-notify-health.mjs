@@ -47,6 +47,7 @@ import { serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
+import { readAllResult } from './lib/read-all-rows.mjs'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -313,11 +314,16 @@ async function run() {
   }
 
   // ── push_log, once 20260923 is live ──
-  const { data: pushRows, error: pushErr } = await sb
-    .from('push_log').select('kind, request_id').gte('sent_at', since)
+  const { data: pushRows, error: pushErr } = await readAllResult((a, b) => sb
+    .from('push_log').select('kind, request_id', { count: 'exact' }).gte('sent_at', since).order('id').range(a, b))
   console.log('')
-  if (pushErr) {
+  if (pushErr && /does not exist|could not find the table|schema cache/i.test(pushErr.message)) {
     console.log(`  ${c.d('push_log not present yet (20260923 not applied) — in-app rows only above')}`)
+  } else if (pushErr) {
+    // A truncation (rows received !== exact count), a permission error or anything else is NOT "not applied":
+    // exit 2 = could not measure, never a quiet note (see the truncation header above).
+    console.error(c.r(`  push_log read FAILED: ${pushErr.message}`))
+    process.exit(2)
   } else {
     const by = {}
     for (const p of pushRows ?? []) {

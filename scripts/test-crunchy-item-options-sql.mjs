@@ -7,7 +7,10 @@
 //   (positive control); the verify_schema token is red before / green after and never errors;
 //   RED-FIRST: a renamed dish, a missing dictionary message, a duplicated dish, a partial state, a foreign row and an
 //   inactive partner each make the apply FAIL with the readable message (anchor asserted present first).
-// 20261136 section (bottom): applies on the 1135 state, per-dish before/after, ids kept, re-run writes nothing, token, red-first mutants.
+// 20261136 section: applies on the 1135 state, per-dish before/after, ids kept, re-run writes nothing, red-first mutants. Its verify_schema token is
+//   ledger-only since 20261137 (one count, one owner); the row-count token and its red-first probes live in the 20261137 section.
+// 20261137 section (bottom): Big Pork's dana bacon extra -> domuz bacon by DELETE + INSERT on the 1136 state; before/after rows, one id replaced,
+//   re-run writes nothing, the 1137 token (red before / green after / red on each drift), red-first mutants.
 // Not wired into package.json / pre-push / CI, like its siblings: run by hand.
 //
 //   node scripts/test-crunchy-item-options-sql.mjs
@@ -22,6 +25,8 @@ const F1135 = M('20261135_crunchy_express_item_options.sql')
 const SQL = readFileSync(F1135, 'utf8')
 const F1136 = M('20261136_crunchy_express_options_owner_answers.sql')
 const SQL36 = readFileSync(F1136, 'utf8')
+const F1137 = M('20261137_crunchy_express_bigpork_pork_bacon.sql')
+const SQL37 = readFileSync(F1137, 'utf8')
 const PRIOR = readFileSync(M('20261115_eatery_partners.sql'), 'utf8')
 const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners'), b = PRIOR.indexOf('-- ─── Storage bucket')
 const s0 = PRIOR.indexOf('-- ─── Seed: Crunchy Express, INACTIVE'), s1 = PRIOR.indexOf('-- ─── contact_events: module')
@@ -240,9 +245,9 @@ const rows0 = await dishRows(d36)
 const st0 = await state(d36)
 const sec0 = await q(d36, `SELECT i.section, count(*) FILTER (WHERE o.kind = 'remove')::int rm, count(*) FILTER (WHERE o.kind = 'extra')::int ex FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id GROUP BY 1 ORDER BY 1`)
 t('1135 state: 107 rows (73 removals + 34 hidden extras)', [rows0.length, rows0.filter(r => r.kind === 'remove').length, rows0.filter(r => r.kind === 'extra' && r.price == null).length], [107, 73, 34])
-t('verify_schema 1136 token BEFORE apply: no error, red', await (async () => {
+t('verify_schema 1136 token (ledger half only) BEFORE apply: no error, red', await (async () => {
   const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
-  const i0 = VS.indexOf("    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers'"), i1 = VS.indexOf('    -- ── 1134: per-dish options')
+  const i0 = VS.indexOf("    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers'"), i1 = VS.indexOf('    -- 1137 Big Pork')
   if (i0 < 0 || i1 < i0) return 'token anchors missing'
   globalThis.TOK36 = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS.slice(i0, i1)}) z`
   try { return (await q(d36, globalThis.TOK36)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] } })(), [false])
@@ -328,7 +333,7 @@ const stA = await state(d36)
 t('1136 applies a SECOND time (re-runnable)', await applyFile(d36, F1136), { ok: true, msg: null })
 const stB = await state(d36)
 t('re-apply wrote nothing: rows, ids, identity sequence, menu all identical', [stB.opts, stB.opts_md5, stB.seq, stB.menu_md5], [stA.opts, stA.opts_md5, stA.seq, stA.menu_md5])
-t('verify_schema 1136 token AFTER apply: green; the 1135 token (ledger half only) still green', [(await q(d36, globalThis.TOK36)).map(r => r.ok), (await q(d36, globalThis.TOK)).map(r => r.ok)], [[true], [true]])
+t('verify_schema 1136 token (ledger half only) AFTER apply: green; the 1135 token (ledger half only) still green', [(await q(d36, globalThis.TOK36)).map(r => r.ok), (await q(d36, globalThis.TOK)).map(r => r.ok)], [[true], [true]])
 {
   await d36.exec(`UPDATE public.eatery_item_options SET price = 99 WHERE message_tr = 'hellim'`)
   const r = await applyFile(d36, F1136)
@@ -346,19 +351,7 @@ t('verify_schema 1136 token AFTER apply: green; the 1135 token (ledger half only
   t('re-run after a max_qty edit aborts (neither state)', [r2.ok, (r2.msg || '').includes('neither the')], [false, true])
 }
 
-{
-  // the token notices each thing it pins (red-first): a wrong max_qty, a changed price, a disabled extra, a refused extra back, a 10th dish
-  const probe = async (name, sql) => {
-    const d = await after1135(); await applyFile(d, F1136)
-    const green = (await q(d, globalThis.TOK36)).map(r => r.ok)
-    await d.exec(sql)
-    t(`token 1136 turns red on: ${name} (green before: ${green})`, [green, (await q(d, globalThis.TOK36)).map(r => r.ok)], [[true], [false]])
-  }
-  await probe('köfte max_qty 1 on one dish', `UPDATE public.eatery_item_options SET max_qty = 1 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'köfte')`)
-  await probe('hellim price 80 on one dish', `UPDATE public.eatery_item_options SET price = 80 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'hellim')`)
-  await probe('an extra disabled by hand', `UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'extra')`)
-  await probe('a refused extra (cheddar) back', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT item_id, 'extra', label_i18n, 'cheddar', 10 FROM public.eatery_item_options WHERE message_tr = 'hellim' LIMIT 1`)
-}
+// (the token's row-count probes moved to the 20261137 section with the counts)
 console.log('red-first mutants of 20261136 (each makes the apply FAIL, readable message):')
 await refused36('1135 not in the ledger', F1136, 'are not both in the ledger',
   async (d) => { await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql'`) })
@@ -394,6 +387,158 @@ await refused36('the write counts notice a DELETE that did not happen (AND false
 // the apply path is also guarded: break the write so the post-state notices (the write really is checked)
 await refused36('a zero price on a kept hidden extra is refused before any write',
   mutant36('r36zero', [['"cheddar"], [["kofte", 250, 2]', '"cheddar"], [["kofte", 0, 2]']]), 'an extra without a positive price')
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 20261137 — Big Pork's priced extra becomes pork bacon, applied on the 1136 state
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n20261137_crunchy_express_bigpork_pork_bacon — on the 1136 state')
+const NAME37 = '20261137_crunchy_express_bigpork_pork_bacon.sql'
+const BP = 'Big Pork Smash Burger'
+const after1136 = async () => { const d = await after1135(); const r = await applyFile(d, F1136); if (!r.ok) throw new Error('1136: ' + r.msg); return d }
+const mutant37 = (name, pairs) => {
+  let text = SQL37
+  for (const [from, to] of pairs) {
+    const n = text.split(from).length - 1
+    if (n !== 1) { bad++; console.log(`  ✗ ${name}: anchor ${JSON.stringify(from.slice(0, 70))} found ${n}x`); return null }
+    text = text.replace(from, () => to)
+  }
+  const p = join(dir, name.replace(/\W+/g, '_') + '.sql'); writeFileSync(p, text); return p
+}
+const led37 = async (d) => (await q(d, `SELECT count(*)::int n FROM public.schema_migrations_applied WHERE filename = '${NAME37}'`))[0].n
+const refused37 = async (name, file, wantMsg, prep = async () => {}) => {
+  if (!file) return
+  const d = await after1136(); await prep(d)
+  const before = await state(d)
+  const r = await applyFile(d, file)
+  t(`${name}: apply FAILS with "${wantMsg}"`, [r.ok, (r.msg || '').includes(wantMsg)], [false, true])
+  console.log(`      ${r.ok ? '(applied!)' : r.msg}`)
+  await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  const after = await state(d)
+  t(`${name}: nothing written (option rows ${before.opts} -> ${after.opts}, md5 equal; the identity sequence may skip a number on a rolled-back INSERT), no ledger row`,
+    [after.opts_md5, await led37(d)], [before.opts_md5, 0])
+}
+const VS37 = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
+{
+  const i0 = VS37.indexOf("    UNION ALL SELECT '20261137_crunchy_express_bigpork_pork_bacon'"), i1 = VS37.indexOf('    -- ── 1134: per-dish options')
+  if (i0 < 0 || i1 < i0) throw new Error('1137 token anchors missing')
+  globalThis.TOK37 = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS37.slice(i0, i1)}) z`
+}
+const tok37 = async (d) => { try { return (await q(d, globalThis.TOK37)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] } }
+const bpRows = (rows) => rows.filter(r => r.dish === BP).map(r => `${r.kind === 'remove' ? '-' : '+'}${r.msg}${r.price != null ? ' ' + r.price + 'x' + r.qty : ''} (ord ${r.ord}, id ${r.id})`)
+
+const d37 = await after1136()
+const b0 = await dishRows(d37), s0b = await state(d37)
+const bpLabel0 = (await q(d37, `SELECT message_tr, label_i18n ->> 'English' en FROM public.eatery_item_options WHERE kind = 'extra' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}') ORDER BY sort_order`))
+console.log('  Big Pork BEFORE:'); for (const x of bpRows(b0)) console.log('    ' + x)
+console.log('  Big Pork extra labels BEFORE:', JSON.stringify(bpLabel0))
+t('1136 state: 96 rows; Big Pork extras köfte 250 / dana bacon 90 / hellim 85', [b0.length, b0.filter(r => r.dish === BP && r.kind === 'extra').map(r => `${r.msg}:${r.price}`)], [96, ['köfte:250', 'dana bacon:90', 'hellim:85']])
+t('verify_schema 1137 token BEFORE apply: no error, red', await tok37(d37), [false])
+t('verify_schema 1137 token with the table MISSING (prod before 1134): no error, red', await (async () => { const d = await freshDb(FIXTURE); return tok37(d) })(), [false])
+t('verify_schema 1136 token (ledger half only) is green on the 1136 state', (await q(d37, globalThis.TOK36)).map(r => r.ok), [true])
+
+const r37 = await applyFile(d37, F1137)
+console.log('  apply:', r37.ok ? 'ok' : r37.msg)
+t('1137 applies cleanly on the 1136 state (in-file asserts green)', r37, { ok: true, msg: null })
+if (!r37.ok) process.exit(1)
+const b1 = await dishRows(d37), s1b = await state(d37)
+console.log('  Big Pork AFTER:'); for (const x of bpRows(b1)) console.log('    ' + x)
+const bpLabel1 = (await q(d37, `SELECT message_tr, label_i18n ->> 'English' en, label_i18n ->> 'Turkish' tr FROM public.eatery_item_options WHERE kind = 'extra' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}') ORDER BY sort_order`))
+console.log('  Big Pork extra labels AFTER:', JSON.stringify(bpLabel1))
+t('Big Pork extras after: köfte 250 x2 / domuz bacon 90 x1 / hellim 85 x1 in that order, label "Pork bacon"',
+  [b1.filter(r => r.dish === BP && r.kind === 'extra').map(r => `${r.msg}:${r.price}x${r.qty}@${r.ord}`), bpLabel1.map(x => x.en)],
+  [['köfte:250x2@1', 'domuz bacon:90x1@2', 'hellim:85x1@3'], ['Smash patty', 'Pork bacon', 'Halloumi']])
+t('Big Pork has no dana bacon extra; its removals (incl. domuz baconsız) are identical rows, ids included',
+  [b1.some(r => r.dish === BP && r.kind === 'extra' && r.msg === 'dana bacon'), JSON.stringify(b1.filter(r => r.dish === BP && r.kind === 'remove')) === JSON.stringify(b0.filter(r => r.dish === BP && r.kind === 'remove'))], [false, true])
+{
+  const oldIds = new Set(b0.map(r => r.id)), newIds = new Set(b1.map(r => r.id))
+  const gone = [...oldIds].filter(i => !newIds.has(i)), fresh = [...newIds].filter(i => !oldIds.has(i)), kept = [...oldIds].filter(i => newIds.has(i))
+  const goneRow = b0.find(r => r.id === gone[0]), freshRow = b1.find(r => r.id === fresh[0])
+  console.log(`  ids: gone ${JSON.stringify(gone)} (${goneRow?.dish} / ${goneRow?.msg}), new ${JSON.stringify(fresh)} (${freshRow?.dish} / ${freshRow?.msg}), kept ${kept.length}`)
+  t('exactly one option id gone (Big Pork dana bacon), exactly one new (Big Pork domuz bacon, fresh id above the old max), 95 kept',
+    [gone.length, fresh.length, kept.length, goneRow && `${goneRow.dish}/${goneRow.msg}`, freshRow && `${freshRow.dish}/${freshRow.msg}`, fresh[0] > Math.max(...oldIds)],
+    [1, 1, 95, `${BP}/dana bacon`, `${BP}/domuz bacon`, true])
+}
+const kinds37 = await q(d37, `SELECT kind, count(*)::int n, count(DISTINCT item_id)::int dishes FROM public.eatery_item_options GROUP BY kind ORDER BY kind DESC`)
+t('counts unchanged: 77 removals on 19 dishes, 19 extras on 9 dishes (96 rows)', kinds37, [{ kind: 'remove', n: 77, dishes: 19 }, { kind: 'extra', n: 19, dishes: 9 }])
+t('dana bacon 90 extra on exactly the other four smash burgers; domuz bacon on Big Pork only',
+  [(await q(d37, `SELECT i.name FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE o.kind = 'extra' AND o.message_tr = 'dana bacon' AND o.price = 90 ORDER BY i.name COLLATE "C"`)).map(r => r.name),
+   (await q(d37, `SELECT i.name FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE o.message_tr = 'domuz bacon'`)).map(r => r.name)],
+  [['BBQ Smash Burger', 'Express Smash Burger', 'Jalapeño Drip Smash Burger', 'Trüf Smash Burger'], [BP]])
+t('every other option row identical (id, label, price, qty, order): 95 rows',
+  JSON.stringify(b1.filter(r => !(r.dish === BP && r.kind === 'extra' && r.msg === 'domuz bacon'))) === JSON.stringify(b0.filter(r => !(r.dish === BP && r.kind === 'extra' && r.msg === 'dana bacon'))), true)
+t('menu untouched, sequence advanced by exactly 1 (one insert)', [s1b.items, s1b.opts, s1b.menu_md5 === s0b.menu_md5, s1b.seq - s0b.seq], [46, 96, true, 1])
+t('every label still valid (nine full-English-name keys, none "tr"/"en")',
+  (await q(d37, `SELECT count(*)::int n FROM public.eatery_item_options WHERE NOT public.eatery_option_label_valid(label_i18n) OR label_i18n ? 'tr' OR label_i18n ? 'en'`))[0].n, 0)
+{
+  const anon = await asRole(d37, 'anon', null, `SELECT o.message_tr, o.price::float8 price FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name = '${BP}' AND o.kind = 'extra' ORDER BY o.sort_order`)
+  t('anon reads Big Pork\'s 3 extras incl. domuz bacon 90', anon.rows, [{ message_tr: 'köfte', price: 250 }, { message_tr: 'domuz bacon', price: 90 }, { message_tr: 'hellim', price: 85 }])
+  const w = await asRole(d37, 'anon', null, `UPDATE public.eatery_item_options SET price = 1`)
+  t('anon cannot write (positive control: the SELECT above worked)', w.ok, false)
+}
+t('verify_schema 1137 token AFTER apply: green; 1136 and 1135 tokens (ledger only) still green', [await tok37(d37), (await q(d37, globalThis.TOK36)).map(r => r.ok), (await q(d37, globalThis.TOK)).map(r => r.ok)], [[true], [true], [true]])
+{
+  const stA = await state(d37)
+  t('1137 applies a SECOND time (noop)', await applyFile(d37, F1137), { ok: true, msg: null })
+  const stB = await state(d37)
+  t('re-apply wrote nothing: rows, ids, identity sequence, menu all identical', [stB.opts, stB.opts_md5, stB.seq, stB.menu_md5], [stA.opts, stA.opts_md5, stA.seq, stA.menu_md5])
+}
+
+// the token notices each thing it pins (red-first: green before, red after)
+{
+  const probe37 = async (name, sql) => {
+    const d = await after1136(); await applyFile(d, F1137)
+    const green = await tok37(d)
+    await d.exec(sql)
+    t(`token 1137 turns red on: ${name} (green before: ${green})`, [green, await tok37(d)], [[true], [false]])
+  }
+  await probe37('(c) the inserted domuz bacon row priced 95', `UPDATE public.eatery_item_options SET price = 95 WHERE message_tr = 'domuz bacon'`)
+  await probe37('köfte max_qty 1 on one dish', `UPDATE public.eatery_item_options SET max_qty = 1 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'köfte')`)
+  await probe37('hellim price 80 on one dish', `UPDATE public.eatery_item_options SET price = 80 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'hellim')`)
+  await probe37('an extra disabled by hand', `UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'extra')`)
+  await probe37('a refused extra (cheddar) back', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT item_id, 'extra', label_i18n, 'cheddar', 10 FROM public.eatery_item_options WHERE message_tr = 'hellim' LIMIT 1`)
+  await probe37('dana bacon back on Big Pork (5 dana bacon extras)', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, sort_order) SELECT i.id, 'extra', (SELECT label_i18n FROM public.eatery_item_options WHERE message_tr = 'dana bacon' LIMIT 1), 'dana bacon', 90, 4 FROM public.eatery_menu_items i WHERE i.name = '${BP}'`)
+  await probe37('domuz bacon on a second dish (2 domuz bacon extras)', `UPDATE public.eatery_item_options SET message_tr = 'domuz bacon' WHERE id = (SELECT o.id FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name = 'BBQ Smash Burger' AND o.message_tr = 'dana bacon')`)
+  await probe37('a removal deleted (76 removals)', `DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'remove')`)
+}
+{
+  const d = await after1136()
+  await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '${NAME37}'`)
+  t('token 1137 is red on the 1136 state even though no row drift exists (ledger half)', await tok37(d), [false])
+}
+
+console.log('red-first mutants of 20261137 (each makes the apply FAIL, readable message):')
+await refused37('1136 not in the ledger', F1137, 'are not all in the ledger',
+  async (d) => { await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '20261136_crunchy_express_options_owner_answers.sql'`) })
+await refused37('(b) Big Pork dana bacon price hand-edited to 95', F1137, 'are neither the 20261136 state nor the 20261137 state',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET price = 95 WHERE message_tr = 'dana bacon' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}')`) })
+await refused37('(b) Big Pork dana bacon hand-disabled (is_available false)', F1137, 'are neither the 20261136 state nor the 20261137 state',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET is_available = false WHERE message_tr = 'dana bacon' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}')`) })
+await refused37('(b) Big Pork hellim hand-disabled', F1137, 'are neither the 20261136 state nor the 20261137 state',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET is_available = false WHERE message_tr = 'hellim' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}')`) })
+await refused37('Big Pork dana bacon label hand-edited', F1137, 'are neither the 20261136 state nor the 20261137 state',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET label_i18n = jsonb_set(label_i18n, '{English}', '"Bacon"') WHERE message_tr = 'dana bacon' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}')`) })
+await refused37('a foreign extra on Big Pork (the 96-row guard fires first)', F1137, 'expected 96 (77 + 19)',
+  async (d) => { await d.exec(`INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, sort_order) SELECT id, 'extra', (SELECT label_i18n FROM public.eatery_item_options LIMIT 1), 'sucuk', 10, 4 FROM public.eatery_menu_items WHERE name = '${BP}'`) })
+await refused37('a mixed Big Pork state (domuz bacon AND dana bacon rows, hellim gone)', F1137, 'are neither the 20261136 state nor the 20261137 state',
+  async (d) => { await d.exec(`UPDATE public.eatery_item_options SET message_tr = 'domuz bacon', label_i18n = (SELECT label_i18n FROM public.eatery_item_options WHERE message_tr = 'hellim' LIMIT 1) WHERE message_tr = 'hellim' AND item_id = (SELECT id FROM public.eatery_menu_items WHERE name = '${BP}')`) })
+await refused37('another dish\'s option row missing (95 rows)', F1137, 'expected 96 (77 + 19)',
+  async (d) => { await d.exec(`DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'remove')`) })
+await refused37('partner not live', F1137, 'missing or not active',
+  async (d) => { await d.exec(`UPDATE public.eatery_partners SET is_active = false WHERE id = '${CID}'`) })
+await refused37('Big Pork removed from the menu', F1137, 'matches 0 menu items',
+  async (d) => { await d.exec(`DELETE FROM public.eatery_menu_items WHERE partner_id = '${CID}' AND name = '${BP}'`) })
+await refused37('a dictionary label with 8 languages', mutant37('r37lang', [['"Persian":"بیکن گوشت خوک"', '"Farsi":"بیکن گوشت خوک"']]), 'is not nine full-English-name languages')
+await refused37('a dictionary label with an ISO code key', mutant37('r37iso', [['"English":"Pork bacon"', '"en":"Pork bacon"']]), 'is not nine full-English-name languages')
+await refused37('successor key equals the replaced key (Big Pork keeps dana_bacon in the target)',
+  mutant37('r37same', [['["kofte", 250, 2], ["domuz_bacon", 90, 1]', '["kofte", 250, 2], ["dana_bacon", 90, 1]']]), 'the replaced extra and its successor are the same key')
+await refused37('a zero price in the target', mutant37('r37zero', [['["domuz_bacon", 90, 1]', '["domuz_bacon", 0, 1]']]), 'an extra without a dictionary entry, a positive price')
+await refused37('(a) the INSERT writes the dana bacon message (Big Pork keeps dana bacon): the in-file post-state raises',
+  mutant37('r37keep', [["v_lab -> (v_e_new ->> 0) -> 'l', v_lab -> (v_e_new ->> 0) ->> 'ex',", "v_lab -> (v_e_new ->> 0) -> 'l', v_lab -> (v_e_old ->> 0) ->> 'ex',"]]), 'after: ')
+await refused37('(a) the INSERT writes the dana_bacon label and message',
+  mutant37('r37keep2', [["VALUES (v_bp, 'extra', v_lab -> (v_e_new ->> 0) -> 'l', v_lab -> (v_e_new ->> 0) ->> 'ex',", "VALUES (v_bp, 'extra', v_lab -> (v_e_old ->> 0) -> 'l', v_lab -> (v_e_old ->> 0) ->> 'ex',"]]), 'after: ')
+await refused37('the write counts notice a DELETE that did not happen (AND false)',
+  mutant37('r37nodel', [["WHERE o.item_id = v_bp AND o.kind = 'extra' AND o.message_tr = v_lab -> (v_e_old ->> 0) ->> 'ex'\n    RETURNING", "WHERE o.item_id = v_bp AND o.kind = 'extra' AND o.message_tr = v_lab -> (v_e_old ->> 0) ->> 'ex' AND false\n    RETURNING"]]), 'deleted 0 rows, expected 1')
 
 console.log(bad ? `\n${bad} FAILED` : '\nall green')
 process.exit(bad ? 1 : 0)

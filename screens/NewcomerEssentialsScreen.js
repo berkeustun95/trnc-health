@@ -18,24 +18,24 @@ import {
 } from '../components/ui'
 
 const CARDS = [
-  { id: 'driving',   icon: 'car-outline',       color: '#185FA5', bg: '#EAF2FB', labelKey: 'essCardDriving'   },
+  { id: 'driving',   icon: 'car-outline',       color: category.city.ink, bg: category.city.bg, labelKey: 'essCardDriving'   },
   { id: 'currency',  icon: 'cash-outline',       color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'essCardCurrency'  },
   { id: 'holidays',  icon: 'flag-outline',       color: '#D1495B', bg: '#FAEAEC', labelKey: 'essCardHolidays'  },
   { id: 'ports',     icon: 'airplane-outline',   color: '#FF8552', bg: '#FFF0EB', labelKey: 'essCardPorts'     },
-  { id: 'borders',   icon: 'git-branch-outline', color: '#64748B', bg: '#F1F5F9', labelKey: 'essCardBorders'   },
+  { id: 'borders',   icon: 'git-branch-outline', color: colors.textSecondary, bg: colors.soft, labelKey: 'essCardBorders'   },
   { id: 'embassies', icon: 'business-outline',   color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'essCardEmbassies' },
   { id: 'living',    icon: 'bulb-outline',       color: '#C77800', bg: '#FBF1D9', labelKey: 'essCardLiving'    },
 ]
 
 // Seeded June 2026 — flag each field for Berke's sign-off before ship.
 const CROSSINGS = [
-  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   region: 'Walled city centre, Nicosia',   type: 'pedestrian', hours: 'open24h',  lat: 35.175211,  lng: 33.3614882 },
-  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            region: 'UN buffer zone, Old Nicosia',   type: 'pedestrian', hours: 'open24h',  lat: 35.1795082, lng: 33.3562422, noteKey: 'essBordersLedrapalaceNote' },
-  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', region: 'Northwestern Nicosia',          type: 'vehicle',    hours: 'open24h',  lat: 35.1817756, lng: 33.3232731 },
-  { id: 'beyarmudu',    north: 'Beyarmudu',  south: 'Pergamos',       region: 'East of Nicosia',               type: 'vehicle',    hours: 'limited'  },
-  { id: 'deryneia',     north: 'Deryneia',   south: null,             region: 'Near Famagusta / east',         type: 'vehicle',    hours: 'limited',  lat: 35.071544,  lng: 33.9604703 },
-  { id: 'bostanci',     north: 'Bostancı',   south: 'Astromeritis',   region: 'Northwestern district',         type: 'vehicle',    hours: 'open24h',  lat: 35.1461323, lng: 33.035077  },
-  { id: 'yesilirmak',   north: 'Yeşilırmak', south: 'Kato Pyrgos',    region: 'Western coast',                 type: 'vehicle',    hours: 'limited'  },
+  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   regionKey: 'essBordersRegionLokmaci',   type: 'pedestrian', hours: 'open24h',  lat: 35.175211,  lng: 33.3614882 },
+  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            regionKey: 'essBordersRegionLedrapalace',   type: 'pedestrian', hours: 'open24h',  lat: 35.1795082, lng: 33.3562422, noteKey: 'essBordersLedrapalaceNote' },
+  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', regionKey: 'essBordersRegionMetehan',          type: 'vehicle',    hours: 'open24h',  lat: 35.1817756, lng: 33.3232731 },
+  { id: 'beyarmudu',    north: 'Beyarmudu',  south: 'Pergamos',       regionKey: 'essBordersRegionBeyarmudu',               type: 'vehicle',    hours: 'limited'  },
+  { id: 'deryneia',     north: 'Deryneia',   south: null,             regionKey: 'essBordersRegionDeryneia',         type: 'vehicle',    hours: 'limited',  lat: 35.071544,  lng: 33.9604703 },
+  { id: 'bostanci',     north: 'Bostancı',   south: 'Astromeritis',   regionKey: 'essBordersRegionBostanci',         type: 'vehicle',    hours: 'open24h',  lat: 35.1461323, lng: 33.035077  },
+  { id: 'yesilirmak',   north: 'Yeşilırmak', south: 'Kato Pyrgos',    regionKey: 'essBordersRegionYesilirmak',                 type: 'vehicle',    hours: 'limited'  },
 ]
 
 // Coordinates land in step 2 — buttons render only when lat+lng are present.
@@ -50,11 +50,11 @@ const PORTS = [
 
 // Source: TRNC MFA (mfa.gov.ct.tr) — seeded June 2026, flag for Berke's sign-off.
 const OFFICES = [
-  { id: 'usa',       name: 'USA',                          address: 'Şerif Arzık Street No:6, Köşklüçiftlik, Lefkoşa',     phone: '+90 392 227 39 30' },
-  { id: 'uk',        name: 'UK',                           address: 'Mehmet Akif Avenue No:29, Köşklüçiftlik, Lefkoşa',    phone: '+90 392 228 38 61' },
-  { id: 'germany',   name: 'Germany',                      address: '28 Kasım Street No:15, Köşklüçiftlik, Lefkoşa',      phone: '+90 392 227 51 61' },
-  { id: 'australia', name: 'Australia',                    address: 'Güner Türkmen Street No:20, Köşklüçiftlik, Lefkoşa', phone: '+90 392 227 73 32' },
-  { id: 'france',    name: 'France (cultural/info office)', address: 'Köşklüçiftlik, Lefkoşa',                             phone: '+90 392 228 33 28' },
+  { id: 'usa',       nameKey: 'essEmbOfficeUsaName', addressKey: 'essEmbOfficeUsaAddress',     phone: '+90 392 227 39 30' },
+  { id: 'uk',        nameKey: 'essEmbOfficeUkName', addressKey: 'essEmbOfficeUkAddress',    phone: '+90 392 228 38 61' },
+  { id: 'germany',   nameKey: 'essEmbOfficeGermanyName', addressKey: 'essEmbOfficeGermanyAddress',      phone: '+90 392 227 51 61' },
+  { id: 'australia', nameKey: 'essEmbOfficeAustraliaName', addressKey: 'essEmbOfficeAustraliaAddress', phone: '+90 392 227 73 32' },
+  { id: 'france',    nameKey: 'essEmbOfficeFranceName', addressKey: 'essEmbOfficeFranceAddress',                             phone: '+90 392 228 33 28' },
 ]
 
 const FIXED_HOLIDAYS = [
@@ -117,9 +117,9 @@ function DrivingCard({ lang }) {
         <BulletRow iconName="wine-outline" iconColor={colors.danger} text={t('essDrivingAlcohol', lang)} />
 
         <SectionTitle text={t('essDrivingPlatesTitle', lang)} />
-        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate1', lang)} />
-        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate2', lang)} />
-        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate3', lang)} />
+        <BulletRow iconName="car-outline" iconColor={category.city.ink} text={t('essDrivingPlate1', lang)} />
+        <BulletRow iconName="car-outline" iconColor={category.city.ink} text={t('essDrivingPlate2', lang)} />
+        <BulletRow iconName="car-outline" iconColor={category.city.ink} text={t('essDrivingPlate3', lang)} />
       </Block>
     </ScrollView>
   )
@@ -242,7 +242,7 @@ function BordersCard({ lang }) {
             <ListCard
               key={c.id}
               title={c.south != null ? `${c.north} / ${c.south}` : c.north}
-              subtitle={c.region}
+              subtitle={t(c.regionKey, lang)}
               leading={{ icon: 'git-branch-outline', category: 'city' }}
               meta={[
                 { icon: c.type === 'pedestrian' ? 'walk-outline' : 'car-outline', text: t(typeKey, lang) },
@@ -266,7 +266,7 @@ function BordersCard({ lang }) {
             <Text style={s.crossingName}>
               {c.north}{c.south != null ? <Text> <Text style={s.crossingSlash}>/</Text> {c.south}</Text> : null}
             </Text>
-            <Text style={s.crossingRegion}>{c.region}</Text>
+            <Text style={s.crossingRegion}>{t(c.regionKey, lang)}</Text>
             <View style={s.crossingBadges}>
               <View style={[s.badge, { backgroundColor: typeBg }]}>
                 <Text style={[s.badgeText, { color: typeColor }]}>{t(typeKey, lang)}</Text>
@@ -347,11 +347,11 @@ function AddressRow({ text }) {
   )
 }
 
-function OfficeRow({ office }) {
+function OfficeRow({ office, lang }) {
   return (
     <View style={s.embassyBlock}>
-      <Text style={s.embassyTitle}>{office.name}</Text>
-      <AddressRow text={office.address} />
+      <Text style={s.embassyTitle}>{t(office.nameKey, lang)}</Text>
+      <AddressRow text={t(office.addressKey, lang)} />
       <PhoneRow phone={office.phone} last />
     </View>
   )
@@ -382,7 +382,7 @@ function EmbassiesCard({ lang }) {
       </View>
 
       <SectionTitle text={t('essEmbOtherTitle', lang)} />
-      {OFFICES.map(o => <OfficeRow key={o.id} office={o} />)}
+      {OFFICES.map(o => <OfficeRow key={o.id} office={o} lang={lang} />)}
       <Block style={{ marginTop: 4 }}>
         <Text style={s.embassyOtherNote}>{t('essEmbOtherNote', lang)}</Text>
       </Block>
@@ -398,7 +398,7 @@ function LivingCard({ lang }) {
       <LastReviewedTag text={t('essLivingLastReviewed', lang)} />
       <Block>
         <SectionTitle text={t('essLivingWaterTitle', lang)} />
-        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingWater1', lang)} />
+        <BulletRow iconName="water-outline" iconColor={colors.primary} text={t('essLivingWater1', lang)} />
         <BulletRow iconName="cube-outline" iconColor={colors.textSecondary} text={t('essLivingWater2', lang)} />
 
         <SectionTitle text={t('essLivingHoursTitle', lang)} />
@@ -409,7 +409,7 @@ function LivingCard({ lang }) {
         <SectionTitle text={t('essLivingCutsTitle', lang)} />
         <BulletRow iconName="flash-off-outline" iconColor={colors.danger} text={t('essLivingCuts1', lang)} />
         <BulletRow iconName="call-outline" iconColor={colors.primary} text={t('essLivingCuts2', lang)} />
-        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingCuts3', lang)} />
+        <BulletRow iconName="water-outline" iconColor={colors.primary} text={t('essLivingCuts3', lang)} />
         <BulletRow iconName="information-circle-outline" iconColor={colors.textSecondary} text={t('essLivingCuts4', lang)} />
 
         <SectionTitle text={t('essLivingJellyTitle', lang)} />
@@ -663,6 +663,7 @@ const legacyS = StyleSheet.create({
     marginBottom: 16,
   },
   lastReviewedText: {
+    flexShrink: 1,
     fontSize: 12,
     color: colors.accent,
     fontFamily: 'Inter_500Medium',
@@ -817,7 +818,7 @@ const redesignS = StyleSheet.create({
                       backgroundColor: category.city.bg, borderRadius: radii.md },
   lastReviewedTag:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: category.city.bg, borderRadius: radii.pill,
                       paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start', marginBottom: 12 },
-  lastReviewedText: { fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: category.city.ink },
+  lastReviewedText: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: category.city.ink },
   crossingNote:     { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 10 },
   crossingNoteText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary },
   hoursNote:        { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary, marginTop: 0, marginBottom: 4 },

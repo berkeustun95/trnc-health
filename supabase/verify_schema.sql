@@ -49,6 +49,8 @@ WITH report AS (
     ('1115_eatery_partners','eatery_photos'),
     -- WhatsApp order proof (1125): registered ahead of the apply; red until it runs.
     ('20261125_eatery_orders','eatery_orders'),
+    -- Duty push run log (20261141): registered ahead of the apply; red until it runs.
+    ('20261141_duty_push_runs','duty_push_runs'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers'),
     -- Per-dish options (1134): registered ahead of the apply; red until it runs.
@@ -231,6 +233,20 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders','client_id'),
     ('20261125_eatery_orders','eatery_orders','created_as_guest'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
+    ('20261141_duty_push_runs','duty_push_runs','id'),
+    ('20261141_duty_push_runs','duty_push_runs','started_at'),
+    ('20261141_duty_push_runs','duty_push_runs','finished_at'),
+    ('20261141_duty_push_runs','duty_push_runs','duty_date'),
+    ('20261141_duty_push_runs','duty_push_runs','outcome'),
+    ('20261141_duty_push_runs','duty_push_runs','pharmacies'),
+    ('20261141_duty_push_runs','duty_push_runs','notified'),
+    ('20261141_duty_push_runs','duty_push_runs','notif_batches_failed'),
+    ('20261141_duty_push_runs','duty_push_runs','push_attempted'),
+    ('20261141_duty_push_runs','duty_push_runs','push_ok'),
+    ('20261141_duty_push_runs','duty_push_runs','push_errors'),
+    ('20261141_duty_push_runs','duty_push_runs','error_kinds'),
+    -- 20261142: registered ahead of the apply; red until it runs.
+    ('20261142_duty_push_runs_partial_retries','duty_push_runs','push_retries'),
     ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
     ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
     ('20261132_eatery_orders_is_test','order_testers','added_at'),
@@ -766,6 +782,12 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders_expires_check'),
     ('20261125_eatery_orders','eatery_orders_view_count_check'),
     ('20261125_eatery_orders','eatery_orders_client_id_check'),
+    ('20261141_duty_push_runs','duty_push_runs_pkey'),
+    ('20261141_duty_push_runs','duty_push_runs_outcome_check'),
+    ('20261141_duty_push_runs','duty_push_runs_counts_check'),
+    ('20261141_duty_push_runs','duty_push_runs_error_kinds_check'),
+    ('20261141_duty_push_runs','duty_push_runs_finished_check'),
+    ('20261142_duty_push_runs_partial_retries','duty_push_runs_retries_check'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers_pkey'),
     ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
@@ -1208,6 +1230,7 @@ WITH report AS (
     -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
     ('1049_walking_legs','idx_walking_legs_to_place_id'),
     ('1051_app_versions','idx_app_update_events_created_at'),
+    ('20261141_duty_push_runs','idx_duty_push_runs_started_at'),
     ('1070_live_scores','matches_kickoff_idx'),
     ('1070_live_scores','matches_league_idx'),
     ('1070_live_scores','api_request_log_at_idx'),
@@ -4092,19 +4115,27 @@ WITH report AS (
     --     (73 removals, 34 hidden extras) moved to 1136 below (one count, one owner). Never an error, red until applied.
     UNION ALL SELECT '20261135_crunchy_express_item_options','20261135 (Crunchy per-dish options, first load) is in the ledger; the row counts live in the 20261136 token',
       EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261135_crunchy_express_item_options.sql')
-    -- 1136 Crunchy options, the owner's answers (data). Red until applied, never an error: query_to_xml runs the counts at run
-    --     time, behind to_regclass, so the token parses even before 20261134 created the table. Rows only: 77 removals on 19
-    --     dishes, 19 extras on 9 dishes, every extra at the owner's price and max_qty (the (message, price, max_qty) triples are
-    --     pinned, so a later price change turns this red: that migration retires this token), none of the refused extras left.
-    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers','crunchy-express has 77 removal options on 19 dishes and 19 priced extras on 9 dishes (köfte 250 x2 max, dana bacon 90, hellim 85, eritilmiş peynir sos 110, all max 1 but köfte; 0 hidden; no tenders / burger peyniri / cheddar / jalapeño / domuz bacon extra), once 1136 is applied',
+    -- 1136 Crunchy options, the owner's answers (data). ONLY its own half is left: the file is in the ledger. The counts it once
+    --     asserted (77 removals / 19 extras, the extras' triples) moved to 1137 below (one count, one owner).
+    UNION ALL SELECT '20261136_crunchy_express_options_owner_answers','20261136 (Crunchy options, the owner''s answers) is in the ledger; the row counts live in the 20261137 token',
       EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261136_crunchy_express_options_owner_answers.sql')
+    -- 1137 Big Pork's priced extra is pork bacon (data). Red until applied, never an error: query_to_xml runs the counts at run
+    --     time, behind to_regclass, so the token parses even before 20261134 created the table. Rows only: 77 removals on 19
+    --     dishes, 19 extras on 9 dishes, every extra one of five (message, price, max_qty) triples (a later price change turns
+    --     this red: that migration retires this token), 4 dana bacon extras, exactly 1 domuz bacon extra and it is on Big Pork
+    --     Smash Burger, none of the refused extras left, no unpriced extra.
+    UNION ALL SELECT '20261137_crunchy_express_bigpork_pork_bacon','crunchy-express has 77 removal options on 19 dishes and 19 priced extras on 9 dishes (köfte 250 x2, dana bacon 90 on 4 dishes, domuz bacon 90 on Big Pork Smash Burger only, hellim 85, eritilmiş peynir sos 110; 0 hidden; no tenders / burger peyniri / cheddar / jalapeño extra), once 1137 is applied',
+      EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261137_crunchy_express_bigpork_pork_bacon.sql')
       AND COALESCE(CASE WHEN to_regclass('public.eatery_item_options') IS NULL THEN false ELSE
         (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '77'
         AND (xpath('/row/c/text()', query_to_xml('SELECT count(DISTINCT i.id) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''remove''', false, true, '')))[1]::text = '19'
         AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.price > 0', false, true, '')))[1]::text = '19'
         AND (xpath('/row/c/text()', query_to_xml('SELECT count(DISTINCT i.id) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra''', false, true, '')))[1]::text = '9'
-        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.is_available AND (o.message_tr, o.price, o.max_qty) IN ((''köfte'', 250, 2), (''dana bacon'', 90, 1), (''hellim'', 85, 1), (''eritilmiş peynir sos'', 110, 1))', false, true, '')))[1]::text = '19'
-        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND (o.price IS NULL OR o.message_tr IN (''tavuk tenders'', ''burger peyniri'', ''cheddar'', ''jalapeño'', ''domuz bacon''))', false, true, '')))[1]::text = '0'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.is_available AND (o.message_tr, o.price, o.max_qty) IN ((''köfte'', 250, 2), (''dana bacon'', 90, 1), (''domuz bacon'', 90, 1), (''hellim'', 85, 1), (''eritilmiş peynir sos'', 110, 1))', false, true, '')))[1]::text = '19'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.message_tr = ''dana bacon''', false, true, '')))[1]::text = '4'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.message_tr = ''domuz bacon'' AND i.name = ''Big Pork Smash Burger''', false, true, '')))[1]::text = '1'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND o.message_tr = ''domuz bacon''', false, true, '')))[1]::text = '1'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = ''crunchy-express'' AND o.kind = ''extra'' AND (o.price IS NULL OR o.message_tr IN (''tavuk tenders'', ''burger peyniri'', ''cheddar'', ''jalapeño''))', false, true, '')))[1]::text = '0'
         END, false)
     -- ── 1134: per-dish options + create/verify v2. Same discipline as the blocks below: only to_regclass / to_regprocedure /
     --    catalogs and COALESCE around every bool_and / subquery, red until applied, never an error. It sits ABOVE the 1132 and
@@ -5112,6 +5143,34 @@ WITH report AS (
       OR ((SELECT count(*) FROM public.duty_list WHERE duty_date = '2026-10-17' AND region = 'Lefkoşa'
             AND name IN ('HÜSEYİN SAKALLI ECZANESİ', 'HÜSEYİN KERİM SAKALLI ECZANESİ')) = 1
           AND NOT EXISTS (SELECT 1 FROM public.duty_list WHERE duty_date = '2026-10-17' AND name = 'İSMET ECZANESİ'))
+    -- 20261141: duty_push_runs is service_role-only. RLS on, ZERO policies, no anon/authenticated privilege at table or column
+    --     level (pg_attribute, so the token never names a column that does not exist yet), service_role keeps it (positive
+    --     control), the 12 columns exist, and the outcome vocabulary and the ok+errors<=attempted rule are in force.
+    UNION ALL SELECT '20261141_duty_push_runs','duty_push_runs: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes, its 12 columns exist, outcome CHECK carries duty_query_failed / profiles_query_failed / push_failed, counts CHECK',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.duty_push_runs')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'duty_push_runs') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
+                                  OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
+               AND has_table_privilege('service_role', to_regclass('public.duty_push_runs'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped
+                      AND a.attname IN ('id','started_at','finished_at','duty_date','outcome','pharmacies','notified','notif_batches_failed','push_attempted','push_ok','push_errors','error_kinds')) = 12, false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%duty_query_failed%' AND pg_get_constraintdef(oid) LIKE '%push_failed%' AND pg_get_constraintdef(oid) LIKE '%profiles_query_failed%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%push_attempted%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_counts_check'), false)
+
+  UNION ALL
+  -- 20261142: duty_push_runs gains push_retries and the outcome 'partial'. Registered ahead of the apply; RED UNTIL IT RUNS.
+  --     Its own facts only (one count, one owner): 13 columns in all, the outcome CHECK carries partial, the push_retries
+  --     CHECK exists, and access is unchanged (no anon/authenticated privilege on the table or ANY column, so the new one too).
+  SELECT '20261142_duty_push_runs_partial_retries','duty_push_runs: 13 columns, outcome CHECK carries partial, push_retries >= 0 CHECK, no client privilege on any column',
+    COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped) = 13, false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%partial%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_outcome_check'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%push_retries%' FROM pg_constraint WHERE conrelid = to_regclass('public.duty_push_runs') AND conname = 'duty_push_runs_retries_check'), false)
+    AND COALESCE(NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped
+                              AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
+                                OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))), false)
   ) z
 
   UNION ALL
@@ -5211,8 +5270,11 @@ FROM (VALUES
   -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
   -- clear of the three purges above it.
   ('1051_app_versions','purge-app-update-events'),
+  -- 90-day retention on duty_push_runs (20261141): counts only, but still a log that must not grow forever.
+  ('20261141_duty_push_runs','purge-duty-push-runs'),
   ('1093_checkins_google_places','purge-google-places-cache'),
   ('1093_checkins_google_places','google-places-refresh'),
+  -- Re-created by 20261139 with a 60 s pg_net timeout (same schedule, Vault key, body); same for duty-push below.
   -- Replaces duty-notif-mtwf / -thu-sat / -sun (UTC, inline key). Ticks every 30 min; sends
   -- only when duty_push_due() says the TRNC-local slot is today's send time.
   ('1103_duty_push_famagusta','duty-push'),
@@ -5255,6 +5317,18 @@ SELECT '20261132_eatery_orders_is_test', 'eatery-orders-retention: schedule 40 *
                     AND btrim(command) = 'DELETE FROM public.eatery_orders WHERE created_at < now() - interval ''30 days'' OR (is_test AND created_at < now() - interval ''24 hours'')') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 1139: duty-push and google-places-refresh wait 60 s for pg_net's reply (the 5 s default logged a timeout 2026-10-26 15:00Z) ───
+SELECT '20261139_duty_push_places_refresh_cron_timeout', 'duty-push + google-places-refresh: schedule, Vault key, 60 s timeout, original gate/body kept',
+       CASE WHEN (SELECT count(*) FROM cron.job WHERE active
+                    AND ((jobname = 'duty-push' AND schedule = '0,30 * * * *' AND command LIKE '%public.duty_push_due()%')
+                      OR (jobname = 'google-places-refresh' AND schedule = '21 3 * * *' AND command LIKE '%"action":"refresh"%'))
+                    AND command LIKE '%timeout_milliseconds := 60000%'
+                    AND command LIKE '%vault.decrypted_secrets%'
+                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 2
+              THEN 'OK'
+            ELSE 'MISSING 60 s TIMEOUT OR WRONG SCHEDULE/COMMAND ← FIX' END
 ORDER BY status ASC, migration;
 
 

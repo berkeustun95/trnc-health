@@ -211,10 +211,11 @@ const s = StyleSheet.create({
   //   into artwork an advertiser controls — that was the requirement, and a dark bar
   //   satisfies it exactly as a bare caption did, while actually being readable.
   //
-  // textPrimary (#1A2B33) rather than pure black: it is the app's own ink colour, so the
-  // bar reads as part of ADA's furniture rather than as a foreign black box.
+  // primaryDark (ADA teal) rather than black or ink: it is the app's own furniture, so the
+  // bar reads as part of ADA rather than as a foreign dark box. White text on it is 7.58:1,
+  // and it stays opaque so contrast is constant.
   inlineCaptionBar: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.primaryDark,
   },
   inlineCaption: {
     fontSize: 10,

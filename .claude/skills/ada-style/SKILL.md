@@ -27,6 +27,8 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
   `elevation.card` only (the two are 1.09:1). Never add a second background surface.
 - Order (`screens/HomeScreen.js` renderHubRedesign): `RedesignHero` photo band → `OliBar` → widgets
   (duty / event, `Widgets.js`) → `DuyurularBanner` → favourites → the four `ServicePanels` → bottom ad slot.
+- Event banner (`EventBanner`): date line + title in ONE dark band at the TOP of the card (Berke approved
+  the partner-visible change 2026-10-15): at the first scroll position the card's lower part is under the tab bar.
 - Fonts: Inter only today. `TILE_FONT_MANROPE` (Manrope tile labels) and `HOME_POLISH_LIVE` (Playfair
   section headers, unmerged `02c68bd`) are OFF-FLAG EXPERIMENTS. If either ships, this file must be
   updated in the same PR.
@@ -36,18 +38,19 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Icon well: `CategoryIcon`, 52×52, radius `radii.tile` (16), background = the category's soft tint,
   icon = its ink, icon size `round(size × 0.46)`.
 - Category tints (`category` in theme.js), bg / ink:
-  health `#FBEAEC` / `#B83246` · explore `#F1EAFB` / `#6B3FB0` · homeLife `#FBF0E0` / `#92560C` · city `#E7EEFB` / `#2F55B5`.
+  health `#FBEAEC` / `#B83246` · explore `#F1EAFB` / `#6B3FB0` · homeLife `#FBF0E0` / `#92560C` · city `#F7FEE7` / `#4D7C0F` (olive).
 - Tile label: 11pt, `Inter_500Medium` (Medium, not SemiBold), `colors.tileInk`, centred, fixed
   two-line box `GRID_LABEL_HEIGHT` (`constants/homeModules.js`) so rows keep one rhythm in all 9 languages.
 - Panels: white, `radii.card` (20), `paddingVertical: 12`; panel title `type.rowTitle`, 8pt category dot.
-- "Yakında" badge: `colors.tileInk` pill, 9.5pt `Inter_600SemiBold`, white.
+- "Yakında" badge: `colors.primaryDark` pill, 9.5pt `Inter_600SemiBold`, white.
 - Guards: `npm run home:check`, `npm run labels:check` (fontScale 1.3).
 
 ## 4. Floating pill tab bar (`components/ui/FloatingTabBar.js`)
 - White (`colors.card`), `radii.pill`, `elevation.tabBar`, height 64 (`TAB_BAR_H`), inset 24 each side,
   12 above the bottom inset. Active tab: `colors.primaryLight` pill, label `type.small` SemiBold in
   `colors.primaryDark`; inactive icon `colors.textSecondary`.
-- A canvas fade sits under it. Content scrolling under it pads with `useTabBarFootprint()` / `TabBarPad`.
+- A canvas fade sits under it: one stretched PNG (`assets/oli-scenes/canvas-fade.png`), never stepped
+  views (they band over dark photos). Content scrolling under it pads with `useTabBarFootprint()` / `TabBarPad`.
 - It is drawn on Home's tabs only, not on module screens.
 
 ## 5. Module screens: full-screen photo behind see-through cards (`components/ui/ModuleScreen.js`)
@@ -66,11 +69,7 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Black-alpha scrims and dark pills over photos (`MODULE_TINT`, `HEADER_SCRIM`, `PILL_ALPHA`) are photo
   treatment, not a colour, and stay.
 - `textPrimary` `#1A2B33` is ink, not a surface: allowed as text, never as a fill for large areas.
-- PENDING FIX (approved by Berke 2026-10-15, NOT done yet): `ModuleScreen` root `#22313A`
-  (`components/ui/ModuleScreen.js`, the ground shown before the photo paints) and `category.city` ink
-  `#2F55B5` (city panel dot + icons) are to be replaced with EXISTING theme colours. Do it only as its
-  own slice when Berke says go, with before/after screenshots for his approval. Until then: leave them,
-  and do not report them as new findings.
+- DONE: `ModuleScreen` ground → `colors.primaryDark` and `category.city` → olive shipped in PR #50 (2026-10-18); the remaining raw dark literals (Yakında badge, AdSlot caption bar, 2048 high tile, Newcomer Essentials driving/borders/water icons, ErrorBoundary text) moved to theme tokens in this branch (2026-10-26).
 - Partner brand colours (e.g. KKTCELL navy, kept via `brandInk`) are partner content, see §7.
 
 ## 7. Partner screens: restyle ADA's frame only
