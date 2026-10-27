@@ -106,7 +106,7 @@ serve(async () => {
   }
 
   // Paged + count-verified (page.ts): a plain select stops silently at PostgREST max-rows (1000).
-  const { rows: profiles, error: profilesError } = await readAllById<{ id: string; push_token: string | null; preferred_language: string | null }>(
+  const { rows: profiles, error: profilesError, shortBy: profilesShortBy, countUnverified: profilesCountUnverified } = await readAllById<{ id: string; push_token: string | null; preferred_language: string | null }>(
     (after) => {
       let q = supabase.from('profiles').select('id, push_token, preferred_language', { count: 'exact' }).order('id').limit(1000)
       if (after) q = q.gt('id', after)
@@ -168,6 +168,13 @@ serve(async () => {
   let pushOk = 0
   let pushErrCount = 0
   const errorKinds: Record<string, number> = Object.create(null)
+  // Counts only. Written straight into error_kinds, NOT via bump(): these are not failed pushes and must not
+  // touch push_errors (push_ok + push_errors <= push_attempted).
+  if (profilesShortBy) {
+    errorKinds.profiles_count_mismatch = profilesShortBy
+    console.error('profiles read still short after a re-read; sending to the rows read')
+  }
+  if (profilesCountUnverified) errorKinds.profiles_count_unverified = 1
   const bump = (kind: string, n = 1) => {
     pushErrCount += n
     // At most 20 distinct keys; the rest fold into 'other'.

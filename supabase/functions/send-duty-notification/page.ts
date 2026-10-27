@@ -6,9 +6,12 @@
 //
 // HOW: pages by `id > lastId ORDER BY id`, not offset/range, so a row inserted or deleted mid-run cannot shift a
 // later page and skip someone. The page size is whatever the server returns (max-rows may be below our limit), so the
-// loop ends on an EMPTY page, never on a short one. The exact count is taken from the first page and the read is
-// refused if fewer rows arrive than that. (Rows inserted after the first page may or may not be seen; rows deleted
-// during the read can make a false refusal: both are rare and a refusal is loud, a silent short list is not.)
+// loop ends on an EMPTY page, never on a short one. The exact count comes from the first page.
+//
+// A MISMATCH DOES NOT REFUSE (this is a delivery job: refusing means everyone misses the day's push). On a short read
+// the whole read is repeated once; if it is still short the rows read are RETURNED with `shortBy` set, and the caller
+// records it. Only a real query error (or a read that returned nothing although the count says there are rows) is an
+// error. A count that never arrives is returned as `countUnverified`.
 
 export interface Page<T> {
   data: T[] | null
@@ -18,28 +21,45 @@ export interface Page<T> {
 
 export type PageFetcher<T> = (afterId: string | null) => PromiseLike<Page<T>>
 
-export async function readAllById<T extends { id: string }>(
-  fetchPage: PageFetcher<T>,
-  maxPages = 1000,
-): Promise<{ rows: T[]; error: string | null }> {
+export interface ReadResult<T> {
+  rows: T[]
+  error: string | null
+  shortBy?: number
+  countUnverified?: boolean
+  reads?: number
+}
+
+async function readOnce<T extends { id: string }>(fetchPage: PageFetcher<T>, maxPages: number) {
   const rows: T[] = []
   let after: string | null = null
   let expected: number | null = null
   for (let page = 0; page < maxPages; page++) {
     const { data, error, count } = await fetchPage(after)
-    if (error) return { rows: [], error: error.message }
-    if (page === 0) {
-      if (count == null) return { rows: [], error: 'no exact count returned: cannot verify the read is complete' }
-      expected = count
-    }
-    if (!data || data.length === 0) {
-      if (expected != null && rows.length < expected) {
-        return { rows: [], error: `TRUNCATED: received ${rows.length} of ${expected} rows` }
-      }
-      return { rows, error: null }
-    }
+    if (error) return { error: error.message, rows: [] as T[], expected }
+    if (page === 0) expected = count
+    if (!data || data.length === 0) return { error: null, rows, expected }
     rows.push(...data)
     after = data[data.length - 1].id
   }
-  return { rows: [], error: `gave up after ${maxPages} pages` }
+  return { error: `gave up after ${maxPages} pages`, rows: [] as T[], expected }
+}
+
+export async function readAllById<T extends { id: string }>(
+  fetchPage: PageFetcher<T>,
+  maxPages = 1000,
+): Promise<ReadResult<T>> {
+  let last: Awaited<ReturnType<typeof readOnce<T>>> | null = null
+  let best: typeof last = null
+  let readsDone = 0
+  for (let read = 1; read <= 2; read++) {
+    readsDone = read
+    last = await readOnce(fetchPage, maxPages)
+    if (last.error) return { rows: [], error: last.error, reads: read }
+    if (last.expected == null) return { rows: last.rows, error: null, countUnverified: true, reads: read }
+    if (last.rows.length >= last.expected) return { rows: last.rows, error: null, reads: read }
+    if (best == null || last.rows.length > best.rows.length) best = last
+  }
+  const { rows, expected } = best!   // the fuller of the two reads
+  if (rows.length === 0) return { rows: [], error: `read 0 of ${expected} rows`, reads: readsDone }
+  return { rows, error: null, shortBy: (expected as number) - rows.length, reads: readsDone }
 }

@@ -32,17 +32,45 @@ Deno.test('server max-rows BELOW our limit (500): still all rows (ends on an emp
 
 Deno.test('exactly 1000 and 0 rows are handled', async () => {
   eq((await readAllById(server(table(1000), 1000).fetchPage)).rows.length, 1000, '1000')
-  eq((await readAllById(server(table(0), 1000).fetchPage)), { rows: [], error: null }, 'empty')
+  eq((await readAllById(server(table(0), 1000).fetchPage)).rows.length, 0, 'empty')
 })
 
-Deno.test('a truncated read is REFUSED, not returned short (red-first: the old plain select would have passed 1000 of 2500)', async () => {
-  const r = await readAllById(server(table(2500), 1000, { dropAfterCall: 1 }).fetchPage)
-  eq([r.rows.length, r.error], [0, 'TRUNCATED: received 1000 of 2500 rows'], 'refused')
+Deno.test('a short read is re-read ONCE, then SENT to the rows read with the shortfall recorded (never refused)', async () => {
+  const srv = server(table(2500), 1000, { dropAfterCall: 1 })
+  const r = await readAllById(srv.fetchPage)
+  // read 1: page 1 (1000 rows) then the server stops = 1000 of 2500. Re-read: pages 2.. return nothing (calls > 1).
+  eq([r.error, r.rows.length, r.shortBy, r.reads], [null, 1000, 1500, 2], 'delivered to what was read')
 })
 
-Deno.test('a missing exact count is refused; a query error is passed on', async () => {
-  const noCount = await readAllById(async () => ({ data: table(3), error: null, count: null }))
-  eq(noCount.error !== null, true, 'no count')
+Deno.test('a transient shortfall is healed by the single re-read', async () => {
+  let call = 0
+  const all = table(2500)
+  const r = await readAllById(async (after): Promise<Page<Row>> => {
+    call++
+    const rows = all.filter((x) => after == null || x.id > after).slice(0, 1000)
+    // the FIRST read loses its last page (a mid-read hiccup); the re-read is clean
+    return { data: call === 3 ? [] : rows, error: null, count: 2500 }
+  })
+  eq([r.error, r.rows.length, r.shortBy, r.reads], [null, 2500, undefined, 2], 'healed')
+})
+
+Deno.test('a profile deleted mid-read (count drops by one) does not block the send', async () => {
+  const all = table(1500)
+  const r = await readAllById(async (after): Promise<Page<Row>> => ({
+    data: all.filter((x) => (after == null || x.id > after) && x.id !== '000700').slice(0, 1000), error: null, count: 1500,
+  }))
+  eq([r.error, r.rows.length, r.shortBy], [null, 1499, 1], 'one missing, still sent')
+})
+
+Deno.test('a real query error is an error (the only refusal); so is zero rows with a positive count', async () => {
   const bad = await readAllById(async () => ({ data: null, error: { message: 'boom' }, count: null }))
   eq([bad.rows.length, bad.error], [0, 'boom'], 'error')
+  const none = await readAllById(async () => ({ data: [], error: null, count: 900 }))
+  eq([none.rows.length, none.error], [0, 'read 0 of 900 rows'], 'zero of nine hundred')
+})
+
+Deno.test('a missing exact count is not a refusal: rows are returned, flagged unverified', async () => {
+  let n = 0
+  const r = await readAllById(async (): Promise<Page<Row>> => ({ data: n++ === 0 ? table(3) : [], error: null, count: null }))
+  eq([r.error, r.rows.length, r.countUnverified], [null, 3, true], 'unverified')
 })
