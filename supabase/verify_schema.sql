@@ -193,8 +193,8 @@ WITH report AS (
     ('1115_eatery_partners','eatery_partners','updated_at'),
     -- 1121: an adult-only partner's Home slide keeps the 18+ gate (utils/stripSlides.js).
     ('1121_eatery_partners_adult_only','eatery_partners','adult_only'),
-    -- 20261143: how a partner takes orders (whatsapp basket | phone). NOT NULL, no DEFAULT: the H token asserts both.
-    ('20261143_eatery_order_method','eatery_partners','order_method'),
+    -- 20261144: how a partner takes orders (whatsapp basket | phone). NOT NULL, no DEFAULT: the H token asserts both.
+    ('20261144_eatery_order_method','eatery_partners','order_method'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -820,8 +820,8 @@ WITH report AS (
     ('20261134_eatery_item_options','eatery_item_options_price_check'),
     ('20261134_eatery_item_options','eatery_item_options_max_qty_check'),
     ('20261134_eatery_item_options','eatery_item_options_remove_shape_check'),
-    -- 20261143: its allowed set (whatsapp, phone) is an H token.
-    ('20261143_eatery_order_method','eatery_partners_order_method_check'),
+    -- 20261144: its allowed set (whatsapp, phone) is an H token.
+    ('20261144_eatery_order_method','eatery_partners_order_method_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -4132,11 +4132,11 @@ WITH report AS (
                     WHERE p.slug = 'crunchy-express'
                       AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
                         OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
-    -- ── 1143: eatery_partners.order_method + create_eatery_order refuses phone partners. Same discipline as the blocks below:
+    -- ── 1144: eatery_partners.order_method + create_eatery_order refuses phone partners. Same discipline as the blocks below:
     --    only to_regclass / to_regprocedure / catalogs, COALESCE around every subquery, red until applied, never an error.
     --    It sits OUTSIDE every other migration's slice on purpose (the 1134 / 1132 / 1125 / 1135-1137 probes cut their own).
-    --    One count, one owner: the create COMMENT now ends `20261143.`, so the 1134 token no longer asserts its `20261134.` suffix.
-    UNION ALL SELECT '20261143_eatery_order_method','eatery_partners.order_method: text NOT NULL, NO default (every seed states its method); the CHECK allows exactly whatsapp + phone and is validated; no column-level ACL',
+    --    One count, one owner: the create COMMENT now ends `20261144.`, so the 1134 token no longer asserts its `20261134.` suffix.
+    UNION ALL SELECT '20261144_eatery_order_method','eatery_partners.order_method: text NOT NULL, NO default (every seed states its method); the CHECK allows exactly whatsapp + phone and is validated; no column-level ACL',
       COALESCE((SELECT a.atttypid = 'text'::regtype AND a.attnotnull FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_method' AND NOT a.attisdropped), false)
       AND NOT EXISTS (SELECT 1 FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
                        WHERE d.adrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_method')
@@ -4145,7 +4145,7 @@ WITH report AS (
                            AND (SELECT count(DISTINCT m[1]) FROM regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m) = 2
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_order_method_check'), false)
       AND COALESCE((SELECT NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_method' AND a.attacl IS NOT NULL)), false)
-    UNION ALL SELECT '20261143_eatery_order_method','create_eatery_order body: p.order_method selected, unconditional order_not_supported refusal (no previewer clause) AFTER partner_unavailable and BEFORE the adult_only / order_requires_account checks; the 1134 options + 1132 test shapes survive; COMMENT ends 20261143.',
+    UNION ALL SELECT '20261144_eatery_order_method','create_eatery_order body: p.order_method selected, unconditional order_not_supported refusal (no previewer clause) AFTER partner_unavailable and BEFORE the adult_only / order_requires_account checks; the 1134 options + 1132 test shapes survive; COMMENT ends 20261144.',
       COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%p.adult_only, p.order_method INTO v_partner%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%IF v_partner.order_method IS DISTINCT FROM ''whatsapp'' THEN%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%MESSAGE = ''order_not_supported''%'
@@ -4160,7 +4160,7 @@ WITH report AS (
       AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id']::text[] FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')), false)
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
       AND COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%order_not_supported%'
-           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%20261143.', false)
+           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%20261144.', false)
     -- 1135 Crunchy per-dish options (data). ONLY its own half is left: the file is in the ledger. The counts it once asserted
     --     (73 removals, 34 hidden extras) moved to 1136 below (one count, one owner). Never an error, red until applied.
     UNION ALL SELECT '20261135_crunchy_express_item_options','20261135 (Crunchy per-dish options, first load) is in the ledger; the row counts live in the 20261136 token',
@@ -4254,9 +4254,9 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
            AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%'
            AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%option_id%', false)
-    UNION ALL SELECT '20261134_eatery_item_options','COMMENTs: create (lists option_unavailable, keeps the NOT test orders sentence; its 20261134. suffix is owned by the 20261143 token) / verify (lines carry detail) / the table / the helper carry the 20261134 text',
+    UNION ALL SELECT '20261134_eatery_item_options','COMMENTs: create (lists option_unavailable, keeps the NOT test orders sentence; its 20261134. suffix is owned by the 20261144 token) / verify (lines carry detail) / the table / the helper carry the 20261134 text',
       COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%option_unavailable%'
-           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%NOT test orders%', false) -- 20261143:supersede (the create COMMENT's `20261134.` suffix half moved to the 20261143 token: one count, one owner)
+           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%NOT test orders%', false) -- 20261144:supersede (the create COMMENT's `20261134.` suffix half moved to the 20261144 token: one count, one owner)
       AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%detail%'
            AND obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%20261134.', false)
       AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%20261134.', false)

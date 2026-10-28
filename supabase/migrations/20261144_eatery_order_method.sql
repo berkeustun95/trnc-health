@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261143 — Yeme-İçme: eatery_partners.order_method ('whatsapp' | 'phone') + create_eatery_order refuses phone partners
+-- 20261144 — Yeme-İçme: eatery_partners.order_method ('whatsapp' | 'phone') + create_eatery_order refuses phone partners
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- SCHEMA + RPC ONLY. No partner row is created here (a separate data migration seeds the second partner).
@@ -45,7 +45,7 @@
 -- still orders (plain, and inactive + Preview key), the older refusals keep their order, the CHECK / NOT NULL / no
 -- DEFAULT reject, and anon / authenticated cannot write the column while service_role can.
 --
--- Apply: gh workflow run supabase-migrate -f file=20261143_eatery_order_method.sql (dry), then -f apply=true
+-- Apply: gh workflow run supabase-migrate -f file=20261144_eatery_order_method.sql (dry), then -f apply=true
 -- (Berke approves production-db). The workflow refuses a feature-branch ref, so the dry run works only after this
 -- file is merged to main. ADDs a column => ends with NOTIFY pgrst (after COMMIT and RESET ROLE).
 -- Re-runnable: a second apply accepts the already-changed column, CHECK and body.
@@ -72,7 +72,7 @@ BEGIN
      OR to_regprocedure('public.is_previewer()') IS NULL OR to_regprocedure('public.is_order_tester(uuid)') IS NULL THEN
     RAISE EXCEPTION 'pre-state: eatery_partners / eatery_item_options / order functions / is_previewer() / is_order_tester() missing';
   END IF;
-  v_done := EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261143_eatery_order_method.sql');
+  v_done := EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261144_eatery_order_method.sql');
 
   -- Column: absent, or already exactly this (text NOT NULL, no DEFAULT, the named CHECK).
   SELECT count(*) INTO v_cols FROM information_schema.columns
@@ -125,12 +125,12 @@ BEGIN
     RAISE EXCEPTION 'pre-state: create_eatery_order carries the refusal but the column or the select is not this file''s. Nothing applied.';
   END IF;
   IF v_done AND NOT v_has_ref THEN
-    RAISE EXCEPTION 'pre-state: 20261143 is in the ledger but create_eatery_order lacks the refusal';
+    RAISE EXCEPTION 'pre-state: 20261144 is in the ledger but create_eatery_order lacks the refusal';
   END IF;
 
   -- verify_eatery_order: capture its fingerprint; the post-state compares (this file does not touch it).
   v_vdef := pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)'));
-  PERFORM set_config('ada.v20261143_verify_md5', md5(v_vdef), true);
+  PERFORM set_config('ada.v20261144_verify_md5', md5(v_vdef), true);
 
   SELECT array_agg(policyname::text ORDER BY policyname) INTO v_names FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_partners';
   IF v_names IS DISTINCT FROM ARRAY['eatery_partners_select_active','eatery_partners_select_preview'] THEN
@@ -152,7 +152,7 @@ BEGIN
   IF v_null IS DISTINCT FROM 0 THEN
     RAISE EXCEPTION 'backfill left % partner(s) without an order_method: %. Nothing applied.', v_null, v_rows;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261143_eatery_order_method.sql')
+  IF NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261144_eatery_order_method.sql')
      AND NOT EXISTS (SELECT 1 FROM public.eatery_partners WHERE slug = 'crunchy-express' AND order_method IS NOT DISTINCT FROM 'whatsapp') THEN
     RAISE EXCEPTION 'crunchy-express is not whatsapp after the first-apply backfill. Nothing applied.';
   END IF;
@@ -167,7 +167,7 @@ ALTER TABLE public.eatery_partners ADD  CONSTRAINT eatery_partners_order_method_
   CHECK (order_method IN ('whatsapp','phone'));
 
 COMMENT ON COLUMN public.eatery_partners.order_method IS
-  'How a customer orders from this restaurant. whatsapp = the in-app basket that sends a WhatsApp order (the server records it via create_eatery_order). phone = call to order: no basket in the app, and create_eatery_order refuses it (order_not_supported). NOT NULL, no DEFAULT: every partner seed must state its method. Writes: service_role only. 20261143.';
+  'How a customer orders from this restaurant. whatsapp = the in-app basket that sends a WhatsApp order (the server records it via create_eatery_order). phone = call to order: no basket in the app, and create_eatery_order refuses it (order_not_supported). NOT NULL, no DEFAULT: every partner seed must state its method. Writes: service_role only. 20261144.';
 
 -- ─── (2) create_eatery_order: the 20261134 body + the order_method refusal ──
 CREATE OR REPLACE FUNCTION public.create_eatery_order(p_partner uuid, p_items jsonb, p_client_id text DEFAULT NULL)
@@ -215,7 +215,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'partner_unavailable';
   END IF;
 
-  -- 20261143: a phone-only restaurant has no basket. Unconditional: the ADA Preview key does not bypass it, so a
+  -- 20261144: a phone-only restaurant has no basket. Unconditional: the ADA Preview key does not bypass it, so a
   -- phone partner can never gain an order row, even while it is being previewed.
   IF v_partner.order_method IS DISTINCT FROM 'whatsapp' THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'order_not_supported';
@@ -381,7 +381,7 @@ ALTER FUNCTION public.create_eatery_order(uuid, jsonb, text) OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.create_eatery_order(uuid, jsonb, text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.create_eatery_order(uuid, jsonb, text) TO authenticated;
 COMMENT ON FUNCTION public.create_eatery_order(uuid, jsonb, text) IS
-  'Records a WhatsApp order and returns {code, lines, total, currency, expires_at}. Prices come from eatery_menu_items and eatery_item_options, never the client. A p_items element may carry "opts" [{id, qty}]: removals (qty 1, free) and priced extras; the stored line then also holds base_price, options and a Turkish detail. authenticated only (guests included unless the partner sets order_requires_account). 5/user/h counts ALL orders including test orders; 60/partner/h counts guest-session orders that are NOT test orders. is_test is derived by the server (ADA Preview key header, or a listed order tester who is not a guest), never a parameter; test orders are deleted after 24 h. A partner whose order_method is not whatsapp (phone = call to order) is refused for everyone, the Preview key included. Errors: SQLSTATE P0001, MESSAGE = not_authenticated | partner_unavailable | order_not_supported | adult_only (DETAIL guest/no_dob/under_18) | order_requires_account | invalid_items | invalid_client_id | item_unavailable | option_unavailable | mixed_currency | rate_limited | code_generation_failed. 20261143.';
+  'Records a WhatsApp order and returns {code, lines, total, currency, expires_at}. Prices come from eatery_menu_items and eatery_item_options, never the client. A p_items element may carry "opts" [{id, qty}]: removals (qty 1, free) and priced extras; the stored line then also holds base_price, options and a Turkish detail. authenticated only (guests included unless the partner sets order_requires_account). 5/user/h counts ALL orders including test orders; 60/partner/h counts guest-session orders that are NOT test orders. is_test is derived by the server (ADA Preview key header, or a listed order tester who is not a guest), never a parameter; test orders are deleted after 24 h. A partner whose order_method is not whatsapp (phone = call to order) is refused for everyone, the Preview key included. Errors: SQLSTATE P0001, MESSAGE = not_authenticated | partner_unavailable | order_not_supported | adult_only (DETAIL guest/no_dob/under_18) | order_requires_account | invalid_items | invalid_client_id | item_unavailable | option_unavailable | mixed_currency | rate_limited | code_generation_failed. 20261144.';
 
 -- ─── Assertions (inside the transaction; a failure rolls the file back) ─────
 DO $$
@@ -465,14 +465,14 @@ BEGIN
   IF v_names IS DISTINCT FROM ARRAY['p_partner','p_items','p_client_id']::text[] THEN RAISE EXCEPTION 'create_eatery_order argument names are %', v_names; END IF;
   SELECT count(*) INTO v_n FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'create_eatery_order';
   IF v_n IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'expected exactly one create_eatery_order, found %', v_n; END IF;
-  IF md5(pg_get_functiondef('public.verify_eatery_order(text)'::regprocedure)) IS DISTINCT FROM current_setting('ada.v20261143_verify_md5', true) THEN
+  IF md5(pg_get_functiondef('public.verify_eatery_order(text)'::regprocedure)) IS DISTINCT FROM current_setting('ada.v20261144_verify_md5', true) THEN
     RAISE EXCEPTION 'verify_eatery_order changed during this file (it must not)';
   END IF;
   IF obj_description('public.create_eatery_order(uuid,jsonb,text)'::regprocedure, 'pg_proc') NOT LIKE '%order_not_supported%'
      OR obj_description('public.create_eatery_order(uuid,jsonb,text)'::regprocedure, 'pg_proc') NOT LIKE '%option_unavailable%'
      OR obj_description('public.create_eatery_order(uuid,jsonb,text)'::regprocedure, 'pg_proc') NOT LIKE '%NOT test orders%'
-     OR obj_description('public.create_eatery_order(uuid,jsonb,text)'::regprocedure, 'pg_proc') NOT LIKE '%20261143.' THEN
-    RAISE EXCEPTION 'create_eatery_order COMMENT is not the 20261143 text';
+     OR obj_description('public.create_eatery_order(uuid,jsonb,text)'::regprocedure, 'pg_proc') NOT LIKE '%20261144.' THEN
+    RAISE EXCEPTION 'create_eatery_order COMMENT is not the 20261144 text';
   END IF;
 
   -- Owner, DEFINER, search_path, EXECUTE grantees: derived from the catalog (authenticated only; not PUBLIC, not anon).
@@ -492,7 +492,7 @@ END $$;
 -- ─── Behaviour proof (throwaway partners and rows; a sentinel rolls everything back) ───
 DO $$
 DECLARE
-  c_key constant text := 'zz-20261143-probe-key-not-a-secret';
+  c_key constant text := 'zz-20261144-probe-key-not-a-secret';
   v_ids jsonb := '{}'::jsonb;
   v_saved jsonb := '{}'::jsonb;
   s record; k record;
@@ -506,7 +506,7 @@ BEGIN
   SELECT count(*) INTO v_pre_keys FROM private.preview_key_hashes;
 
   BEGIN
-    INSERT INTO private.preview_key_hashes (hash, label) VALUES (encode(sha256(convert_to(c_key, 'UTF8')), 'hex'), 'zz probe 1143');
+    INSERT INTO private.preview_key_hashes (hash, label) VALUES (encode(sha256(convert_to(c_key, 'UTF8')), 'hex'), 'zz probe 1144');
 
     -- Seven throwaway partners; every INSERT states its method (NOT NULL, no default).
     FOR k IN SELECT * FROM (VALUES
@@ -642,7 +642,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261143_eatery_order_method.sql', 'c299398aaff23d92a1a9c992d514979e5cb86250f32db64b6f860d086944e4ad')
+VALUES ('20261144_eatery_order_method.sql', '40ede101828e90625b35178e4f3fe695aadf569e7ee9871ce11d47aeffec4f05')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

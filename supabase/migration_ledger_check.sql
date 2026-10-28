@@ -259,7 +259,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261141_duty_push_runs.sql', '735871baf962d3654c9201a254c5c7ac4d0b10f047f7f3e086b30ded19ddaf12'),
   ('20261142_duty_push_runs_partial_retries.sql', 'e2748b7a556af1c7e3ceec4c0ca8dfd174042b3d390eaf214bf19b527f505dbd'),
   ('20261143_partner_booking_requests.sql', '5cad4703c8d39a566d58d92ac3be4ded5551c3b83e3ba04223ccd384eb95dff0'),
-  ('20261143_eatery_order_method.sql', 'c299398aaff23d92a1a9c992d514979e5cb86250f32db64b6f860d086944e4ad')
+  ('20261144_eatery_order_method.sql', '40ede101828e90625b35178e4f3fe695aadf569e7ee9871ce11d47aeffec4f05')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

@@ -1,13 +1,13 @@
-// 20261143_eatery_order_method.sql against the PGlite harness (PostgreSQL 18; prod is older — see supabase/CLAUDE.md).
+// 20261144_eatery_order_method.sql against the PGlite harness (PostgreSQL 18; prod is older — see supabase/CLAUDE.md).
 // Fixture: the SAME fixture text as scripts/test-eatery-orders-sql.mjs (sliced out of that file, not retyped) + the Crunchy
 // Express seed row of 20261115 (the file's backfill target) + the 20261120 preview-key policies, then the REAL 20261125,
-// 20261132 and 20261134 files. The 1143 file's own probes do the role work; this script adds
-//   (a) "identical except": pg_get_functiondef of create after 1134 vs after 1143, line-diffed, only the listed lines
+// 20261132 and 20261134 files. The 1144 file's own probes do the role work; this script adds
+//   (a) "identical except": pg_get_functiondef of create after 1134 vs after 1144, line-diffed, only the listed lines
 //       differ; verify_eatery_order byte-identical; owner / DEFINER / search_path / ACL identical;
 //   (b) the data: crunchy-express = whatsapp, the column text NOT NULL no default, a re-apply writes nothing and survives a
 //       second partner (seeded after the first apply), a phone partner cannot order;
 //   (c) RED-FIRST mutants of the file (every anchor asserted present, the apply must FAIL with the expected message);
-//   (d) the verify_schema.sql 1143 H token block + the B / E registrations: never error before 1143, false before, true after.
+//   (d) the verify_schema.sql 1144 H token block + the B / E registrations: never error before 1144, false before, true after.
 // Not wired into package.json / pre-push / CI, like its siblings: run by hand.
 //
 //   node scripts/test-eatery-order-method-sql.mjs
@@ -19,8 +19,8 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const M = (n) => fileURLToPath(new URL(`../supabase/migrations/${n}`, import.meta.url))
 const F1125 = M('20261125_eatery_orders.sql'), F1132 = M('20261132_eatery_orders_is_test.sql'), F1134 = M('20261134_eatery_item_options.sql')
-const F1143 = M('20261143_eatery_order_method.sql')
-const SQL = readFileSync(F1143, 'utf8')
+const F1144 = M('20261144_eatery_order_method.sql')
+const SQL = readFileSync(F1144, 'utf8')
 const PRIOR = readFileSync(M('20261115_eatery_partners.sql'), 'utf8')
 const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners'), b = PRIOR.indexOf('-- ─── Storage bucket')
 const s0 = PRIOR.indexOf('-- ─── Seed: Crunchy Express, INACTIVE'), s1 = PRIOR.indexOf('-- ─── contact_events: module')
@@ -70,7 +70,7 @@ const refused = async (name, p, wantMsg, { seed = '' } = {}) => {
   table.push([name, r.ok ? 'GREEN (BAD)' : hit ? 'RED (as expected)' : 'RED, wrong message', r.ok ? '' : r.msg.slice(0, 110)])
 }
 
-console.log('20261143_eatery_order_method — real files on the 20261115-state fixture (+ Crunchy seed row, + 1120 policies), 1125 / 1132 / 1134 applied first')
+console.log('20261144_eatery_order_method — real files on the 20261115-state fixture (+ Crunchy seed row, + 1120 policies), 1125 / 1132 / 1134 applied first')
 
 // ── green ──
 const db = await after1134()
@@ -82,10 +82,10 @@ const meta = async (d) => q(d, `SELECT p.proname, pg_get_userbyid(p.proowner) o,
   FROM pg_proc p WHERE p.proname IN ('create_eatery_order','verify_eatery_order') AND p.pronamespace = 'public'::regnamespace ORDER BY 1`)
 const d1 = await defs(db), m1 = await meta(db)
 
-// verify_schema tokens: the 1143 block is cut between its own header and the 1135 comment that follows it.
+// verify_schema tokens: the 1144 block is cut between its own header and the 1135 comment that follows it.
 const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
-const i43 = VS.indexOf('    -- ── 1143: eatery_partners.order_method'), i35 = VS.indexOf('    -- 1135 Crunchy per-dish options (data).')
-if (i43 < 0 || i35 < i43) throw new Error('verify_schema 1143 token anchors missing')
+const i43 = VS.indexOf('    -- ── 1144: eatery_partners.order_method'), i35 = VS.indexOf('    -- 1135 Crunchy per-dish options (data).')
+if (i43 < 0 || i35 < i43) throw new Error('verify_schema 1144 token anchors missing')
 const tokq = (s) => `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${s}) z`
 const T43 = tokq(VS.slice(i43, i35))
 const tokens = async (d, label, sql, want) => {
@@ -97,24 +97,24 @@ const tokens = async (d, label, sql, want) => {
 }
 // Registered B / E rows exist in the file (the harness has no verify_schema QUERY 1, so the text is the evidence here).
 t('verify_schema registers B order_method and E eatery_partners_order_method_check',
-  [VS.includes("('20261143_eatery_order_method','eatery_partners','order_method')"), VS.includes("('20261143_eatery_order_method','eatery_partners_order_method_check')")], [true, true])
-await tokens(db, '1143 tokens BEFORE 1143 (must not error; red is fine)', T43, false)
+  [VS.includes("('20261144_eatery_order_method','eatery_partners','order_method')"), VS.includes("('20261144_eatery_order_method','eatery_partners_order_method_check')")], [true, true])
+await tokens(db, '1144 tokens BEFORE 1144 (must not error; red is fine)', T43, false)
 
-const first = await applyFile(db, F1143)
-t('1143 applies cleanly on the 1134 state (in-file probes green)', first, { ok: true, msg: null })
+const first = await applyFile(db, F1144)
+t('1144 applies cleanly on the 1134 state (in-file probes green)', first, { ok: true, msg: null })
 if (!first.ok) process.exit(1)
-t('1143 applies a SECOND time (re-runnable, ledger row present)', await applyFile(db, F1143), { ok: true, msg: null })
+t('1144 applies a SECOND time (re-runnable, ledger row present)', await applyFile(db, F1144), { ok: true, msg: null })
 t('ledger row written', (await q(db, `SELECT filename FROM public.schema_migrations_applied ORDER BY 1`)).map(r => r.filename),
-  ['20261125_eatery_orders.sql', '20261132_eatery_orders_is_test.sql', '20261134_eatery_item_options.sql', '20261143_eatery_order_method.sql'])
-await tokens(db, '1143 tokens AFTER 1143', T43, true)
-// The OLDER tokens that read create_eatery_order / its COMMENT must still be green on a post-1143 database (the sibling probes stop at 1134).
+  ['20261125_eatery_orders.sql', '20261132_eatery_orders_is_test.sql', '20261134_eatery_item_options.sql', '20261144_eatery_order_method.sql'])
+await tokens(db, '1144 tokens AFTER 1144', T43, true)
+// The OLDER tokens that read create_eatery_order / its COMMENT must still be green on a post-1144 database (the sibling probes stop at 1134).
 {
   const i34 = VS.indexOf('    -- ── 1134: per-dish options'), i32 = VS.indexOf('    -- ── 1132: server-marked TEST orders'),
     i25 = VS.indexOf('    -- ── 1125: WhatsApp order proof.'), i19 = VS.indexOf("    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2")
   if (i34 < 0 || i32 < i34 || i25 < i32 || i19 < i25) throw new Error('verify_schema 1134 / 1132 / 1125 token anchors missing')
   const old = async (label, s) => {
     const rows = (await db.query(tokq(s))).rows
-    t(`verify_schema ${label} AFTER 1143: ${rows.length} tokens, all true`, [rows.length > 0, rows.every(r => r.ok === true)], [true, true])
+    t(`verify_schema ${label} AFTER 1144: ${rows.length} tokens, all true`, [rows.length > 0, rows.every(r => r.ok === true)], [true, true])
     if (rows.some(r => r.ok !== true)) console.log(rows.filter(r => r.ok !== true).map(r => '      ' + r.object.slice(0, 110)).join('\n'))
   }
   await old('1134 tokens', VS.slice(i34, i32)); await old('1132 tokens', VS.slice(i32, i25)); await old('1125 tokens', VS.slice(i25, i19))
@@ -144,7 +144,7 @@ const lineDiff = (x, y) => {
 t('create_eatery_order: exactly the v_partner select changed (one line out, one in) and the refusal block was added', lineDiff(d1.create, d2.create), {
   removed: [`  SELECT p.id, p.is_active, p.order_requires_account, p.adult_only INTO v_partner`],
   added: [`  SELECT p.id, p.is_active, p.order_requires_account, p.adult_only, p.order_method INTO v_partner`,
-    `  -- 20261143: a phone-only restaurant has no basket. Unconditional: the ADA Preview key does not bypass it, so a`,
+    `  -- 20261144: a phone-only restaurant has no basket. Unconditional: the ADA Preview key does not bypass it, so a`,
     `  -- phone partner can never gain an order row, even while it is being previewed.`,
     `  IF v_partner.order_method IS DISTINCT FROM 'whatsapp' THEN`,
     `    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'order_not_supported';`,
@@ -156,7 +156,7 @@ t('create: argument names unchanged', (await q(db, `SELECT proargnames FROM pg_p
 // ── (b) re-apply after a second partner exists (the 20261144 situation) ──
 {
   await db.exec(`INSERT INTO public.eatery_partners (slug, name, category, order_method) VALUES ('zz-second', 'zz second', 'cafe', 'phone')`)
-  t('re-apply with a second (phone) partner present is accepted', await applyFile(db, F1143), { ok: true, msg: null })
+  t('re-apply with a second (phone) partner present is accepted', await applyFile(db, F1144), { ok: true, msg: null })
   t('the second partner kept its method; crunchy kept whatsapp', await q(db, `SELECT slug, order_method FROM public.eatery_partners ORDER BY slug`),
     [{ slug: 'crunchy-express', order_method: 'whatsapp' }, { slug: 'zz-second', order_method: 'phone' }])
   await db.exec(`DELETE FROM public.eatery_partners WHERE slug = 'zz-second'`)
@@ -165,7 +165,7 @@ t('create: argument names unchanged', (await q(db, `SELECT proargnames FROM pg_p
 // ── pre-state ──
 {
   const d = await freshDb(FIXTURE)
-  const r = await applyFile(d, F1143)
+  const r = await applyFile(d, F1144)
   t('pre-state: refuses without 20261134 in the ledger', [r.ok, (r.msg || '').includes('20261134_eatery_item_options.sql is not in the ledger')], [false, true])
   table.push(['1134 not applied', r.ok ? 'GREEN (BAD)' : 'RED (as expected)', (r.msg || '').slice(0, 110)])
 }
@@ -204,7 +204,7 @@ await refused('backfill sets the wrong method', mutant('wrongm', [[`SET order_me
 {
   const d = await after1134()
   await d.exec(`INSERT INTO public.eatery_partners (slug, name, category) VALUES ('zz-extra', 'zz extra', 'cafe')`)
-  const r = await applyFile(d, F1143)
+  const r = await applyFile(d, F1144)
   const hit = !r.ok && (r.msg || '').includes('expected exactly {crunchy-express}')
   t('pre-state: a second partner before the first apply is refused, and the message prints what is there', [r.ok, hit], [false, true])
   console.log(`      ${r.msg}`)
@@ -213,7 +213,7 @@ await refused('backfill sets the wrong method', mutant('wrongm', [[`SET order_me
 {
   const d = await after1134()
   await d.exec(`DELETE FROM public.eatery_partners WHERE slug = 'crunchy-express'`)
-  const r = await applyFile(d, F1143)
+  const r = await applyFile(d, F1144)
   const hit = !r.ok && (r.msg || '').includes('expected exactly {crunchy-express}')
   t('pre-state: no crunchy-express row is refused', [r.ok, hit], [false, true])
   table.push(['no crunchy row on first apply', hit ? 'RED (as expected)' : 'WRONG', (r.msg || '').slice(0, 110)])
@@ -225,7 +225,7 @@ await refused('backfill sets the wrong method', mutant('wrongm', [[`SET order_me
   const drift = def.replace('v_test := public.is_previewer() OR public.is_order_tester(v_uid);', 'v_test := false;')
   if (drift === def) { bad++; console.log('  ✗ drift anchor missing') }
   await d.exec(drift)
-  const r = await applyFile(d, F1143)
+  const r = await applyFile(d, F1144)
   const hit = !r.ok && (r.msg || '').includes('create_eatery_order is not the 20261134 body')
   t('pre-state: a drifted live body (no test derivation) is refused, not overwritten', [r.ok, hit], [false, true])
   table.push(['drifted live body', hit ? 'RED (as expected)' : 'WRONG', (r.msg || '').slice(0, 110)])
