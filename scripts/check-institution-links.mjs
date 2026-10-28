@@ -100,16 +100,16 @@ if (fileIdx !== -1) {
       if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
     }
   }
-  const { EXPO_PUBLIC_SUPABASE_URL: URL, EXPO_PUBLIC_SUPABASE_ANON_KEY: KEY, ADA_TEST_EMAIL, ADA_TEST_PASSWORD } = process.env
-  if (!URL || !KEY || !ADA_TEST_EMAIL || !ADA_TEST_PASSWORD) {
-    console.error(c.r('\n  EXPO_PUBLIC_SUPABASE_URL/_ANON_KEY and ADA_TEST_EMAIL/_PASSWORD are required.'))
+  const { EXPO_PUBLIC_SUPABASE_URL: URL, EXPO_PUBLIC_SUPABASE_ANON_KEY: KEY, QA_TEST_EMAIL, QA_TEST_PASSWORD } = process.env
+  if (!URL || !KEY || !QA_TEST_EMAIL || !QA_TEST_PASSWORD) {
+    console.error(c.r('\n  EXPO_PUBLIC_SUPABASE_URL/_ANON_KEY and QA_TEST_EMAIL/_PASSWORD are required.'))
     console.error(c.d('  institutions is readable only TO authenticated: as anon every read is 0 rows,'))
     console.error(c.d('  which would print "no links to check". Refusing rather than lie.\n'))
     process.exit(1)
   }
 
   const supabase = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { error: authErr } = await supabase.auth.signInWithPassword({ email: ADA_TEST_EMAIL, password: ADA_TEST_PASSWORD })
+  const { error: authErr } = await supabase.auth.signInWithPassword({ email: QA_TEST_EMAIL, password: QA_TEST_PASSWORD })
   if (authErr) { console.error(c.r(`\n  sign-in failed: ${authErr.message}\n`)); process.exit(1) }
 
   const countryIdx = process.argv.indexOf('--country')

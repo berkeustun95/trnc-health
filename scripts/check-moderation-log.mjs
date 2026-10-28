@@ -47,8 +47,8 @@ for (const line of readFileSync(resolve(ROOT, '.env'), 'utf8').split('\n')) {
 }
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL
 const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
-const TEST_EMAIL = process.env.ADA_TEST_EMAIL
-const TEST_PASSWORD = process.env.ADA_TEST_PASSWORD
+const TEST_EMAIL = process.env.QA_TEST_EMAIL
+const TEST_PASSWORD = process.env.QA_TEST_PASSWORD
 if (!URL_ || !KEY) { console.error('  missing EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY'); process.exit(1) }
 
 let failed = 0, skipped = 0
@@ -113,7 +113,7 @@ const run = async () => {
 
   console.log('\n  ── end to end: a rejection leaves a record ────────────────────────────')
   if (!TEST_EMAIL || !TEST_PASSWORD) {
-    skip('self-report writes a row (proved via hit_count)', 'set ADA_TEST_EMAIL / ADA_TEST_PASSWORD in .env')
+    skip('self-report writes a row (proved via hit_count)', 'set QA_TEST_EMAIL / QA_TEST_PASSWORD in .env')
     skip('matched_term cannot be forged by the client', 'same')
     skip('a non-rejection is refused', 'same')
     skip('the author cannot read their own rejection', 'same')

@@ -164,10 +164,10 @@ if (!URL || !KEY) {
 //   that; it needs a policy review, not a probe. Re-check if duty_list's policy changes.
 const supabase = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 
-const TEST_EMAIL = process.env.ADA_TEST_EMAIL
-const TEST_PASSWORD = process.env.ADA_TEST_PASSWORD
+const TEST_EMAIL = process.env.QA_TEST_EMAIL
+const TEST_PASSWORD = process.env.QA_TEST_PASSWORD
 if (!TEST_EMAIL || !TEST_PASSWORD) {
-  console.error(c.r('\n  ADA_TEST_EMAIL / ADA_TEST_PASSWORD missing.'))
+  console.error(c.r('\n  QA_TEST_EMAIL / QA_TEST_PASSWORD missing.'))
   console.error(c.d('  duty_list is readable only TO authenticated, so without them this'))
   console.error(c.d('  script can only read as anon — which returns 0 rows whatever the'))
   console.error(c.d('  table holds. Refusing to report roster health rather than lie.'))
