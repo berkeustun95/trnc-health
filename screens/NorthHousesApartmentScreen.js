@@ -105,8 +105,8 @@ function FormField({ label, children }) {
 // it. The row for our own table is sent fire-and-forget, NOT awaited, and carries NO name or phone:
 //   - no .select(): the table has no SELECT policy, so RETURNING would make the insert fail;
 //   - supabase queries are lazy thenables: the .then() is what actually sends it;
-//   - errors are swallowed: the table is not applied in production yet, and a failed insert must
-//     never block WhatsApp.
+//   - errors are swallowed: a failed insert must never block WhatsApp. ADA Preview talks to the
+//     PRODUCTION project, so a Preview send is a real row (20261143 applied 2026-10-28).
 function RequestForm({ apartment, building, lang, onFieldFocus }) {
   const [ci, setCi] = useState('')
   const [co, setCo] = useState('')

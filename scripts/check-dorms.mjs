@@ -898,6 +898,9 @@ if (existsSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'))) {
   check(/import \{ NORTH_HOUSES_FORM \} from '\.\.\/constants\/redesign'/.test(apt), `NorthHousesApartmentScreen must import NORTH_HOUSES_FORM from constants/redesign`)
   check((apt.match(/\{NORTH_HOUSES_FORM && \(/g) || []).length === 1, `NorthHousesApartmentScreen must render the form behind exactly one \`{NORTH_HOUSES_FORM && (\``)
   check(!/NORTH_HOUSES_FORM_PROTO|NORTH_HOUSES_LIVE/.test(apt), `NorthHousesApartmentScreen reads a raw flag; it must go through constants/redesign.js`)
+  const acc = strip(readFileSync(resolve(ROOT, 'screens/AccommodationScreen.js'), 'utf8'))
+  check(/import \{ NORTH_HOUSES \} from '\.\.\/constants\/redesign'/.test(acc) && /daily_rental: NORTH_HOUSES \}/.test(acc) && !/NORTH_HOUSES_LIVE/.test(acc),
+    `AccommodationScreen must gate the Günlük Kiralık tab on NORTH_HOUSES from constants/redesign, never the raw NORTH_HOUSES_LIVE`)
   // The gate itself: production can only reach the form through __DEV__ (folded) or an appVariant it never carries.
   const rd = strip(readFileSync(resolve(ROOT, 'constants/redesign.js'), 'utf8'))
   check(rd.includes("export const NORTH_HOUSES_FORM = ((typeof __DEV__ !== 'undefined' && __DEV__) && NORTH_HOUSES_FORM_PROTO) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)"),
