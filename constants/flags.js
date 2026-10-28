@@ -409,14 +409,16 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 //      EXPECTED_SCALARS in scripts/check-module-flags.mjs), then Preview, then OTA.
 export const NORTH_HOUSES_LIVE = false
 
-// Dev-only prototype of North Houses' booking-request form on the apartment screen. A developer's
-// own build gets a form; production never does.
+// Prototype of North Houses' booking-request form on the apartment screen. A developer's own build
+// gets it with this flipped; ADA Preview gets it via NORTH_HOUSES_FORM_PREVIEW (constants/redesign.js);
+// production never does.
 //
-// ⚠ UNREACHABLE IN PRODUCTION, NOT MERELY DEFAULTED OFF. NorthHousesApartmentScreen reads it as
-//   `__DEV__ && NORTH_HOUSES_FORM_PROTO`, so a release bundle constant-folds the whole branch away
-//   (the PREVIEW_PENDING_PARTNERS reasoning). Two independent guards, on purpose: the fold protects
-//   USERS, the EXPECTED_SCALARS baseline protects the REPO — a working-tree flip cannot be pushed or
-//   ride out on `npm run ota`, which bundles the working tree and never runs a release fold.
+// ⚠ GATED, NOT FOLDED (since 2026-10-29). The form code now SHIPS in the production bundle: the screen
+//   reads NORTH_HOUSES_FORM = (__DEV__ && this) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW), and
+//   IS_PREVIEW_BUILD is a runtime read of extra.appVariant, which only APP_VARIANT=preview sets — a
+//   production build or `npm run ota` never carries it (the EATERY_PREVIEW_DATA posture). The
+//   EXPECTED_SCALARS baseline still protects the REPO: a working-tree flip cannot be pushed or ride
+//   out on `npm run ota`.
 //
 // NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. Shipping the form for real is its own
 // decision (the table, the privacy wording, a flag of its own), not this boolean turning true.

@@ -238,8 +238,8 @@ const EXPECTED_SCALARS = {
   // Günlük Kiralık (North Houses). Dark until the partner's written OK, a content re-check and the
   // Turkish device pass; a working-tree true would put an unlisted partner's tab in front of every user.
   NORTH_HOUSES_LIVE:     false,
-  // Dev-only form prototype (read as `__DEV__ && NORTH_HOUSES_FORM_PROTO`). A release bundle folds it
-  // away, but `eas update` bundles the working tree: baselined so a local flip cannot ride an OTA.
+  // Form prototype. Dev reads `__DEV__ && NORTH_HOUSES_FORM_PROTO`; ADA Preview has its own switch
+  // (NORTH_HOUSES_FORM_PREVIEW, constants/redesign.js). Baselined so a local flip cannot ride an OTA.
   NORTH_HOUSES_FORM_PROTO: false,
   LIVE_SCORES_LIVE:      false,  // hidden 2026-10-06 (provider account suspended); was live 2026-10-04
   // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a

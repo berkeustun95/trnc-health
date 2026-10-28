@@ -28,7 +28,8 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE, NORTH_HOUSES_LIVE } from '../constants/flags'
+import { DORMS_LIVE } from '../constants/flags'
+import { NORTH_HOUSES } from '../constants/redesign'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
 
@@ -76,7 +77,7 @@ const PAGE = 20
 // All config, in constants/dorms.js. Tabs are derived from the flags, never read straight
 // off the config, so a dark tab can neither render nor be landed on. Module scope is
 // correct: both are constant for a given bundle.
-const LIVE_TABS      = { dorm: DORMS_LIVE, daily_rental: NORTH_HOUSES_LIVE }
+const LIVE_TABS      = { dorm: DORMS_LIVE, daily_rental: NORTH_HOUSES }
 const TABS           = accomTabs(LIVE_TABS)
 const LANDING_TAB    = accomLandingTab(LIVE_TABS)
 const SEGMENTS       = ACCOM_SEGMENTS

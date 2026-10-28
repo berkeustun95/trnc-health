@@ -8,7 +8,7 @@ import { colors, radii, type, TAP } from '../constants/theme'
 import { PILL_ALPHA } from '../components/ui/ModuleScreen'
 import { REDESIGN } from '../constants/redesign'
 import { t, LANG_CODES } from '../constants/i18n'
-import { NORTH_HOUSES_FORM_PROTO } from '../constants/flags'
+import { NORTH_HOUSES_FORM } from '../constants/redesign'
 import {
   NORTH_HOUSES, nhBuilding, nhWaMessage, nhWaUrl, nhWebsiteUrl,
   nhValidateRequest, nhRequestMessage, nhFormatDateInput,
@@ -23,7 +23,8 @@ import { supabase } from '../lib/supabase'
 // map link, and two ways out — WhatsApp (primary) and the apartment's own page on their site.
 // A free listing: no deal band, no code, no ad slot. Config: constants/dailyRentals.js.
 //
-// The form at the foot is a DEV-ONLY prototype, rendered only when `__DEV__ && NORTH_HOUSES_FORM_PROTO`.
+// The form at the foot is a prototype, rendered only when NORTH_HOUSES_FORM (constants/redesign.js): dev with
+// NORTH_HOUSES_FORM_PROTO flipped, or ADA Preview. Production never sets appVariant, so never renders it.
 
 const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
@@ -287,7 +288,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
             </TouchableOpacity>
           </Card>
 
-          {__DEV__ && NORTH_HOUSES_FORM_PROTO && (
+          {NORTH_HOUSES_FORM && (
             <RequestForm apartment={apartment} building={building} lang={lang} onFieldFocus={revealField} />
           )}
 
