@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../components/BackButton'
 import { Card, ScreenHeader } from '../components/ui'
 import { colors, radii, type, TAP } from '../constants/theme'
+import { PILL_ALPHA } from '../components/ui/ModuleScreen'
 import { REDESIGN } from '../constants/redesign'
 import { t, LANG_CODES } from '../constants/i18n'
 import { NORTH_HOUSES_FORM_PROTO } from '../constants/flags'
@@ -318,13 +319,13 @@ const s = StyleSheet.create({
   navTitle:    { flex: 1, textAlign: 'center', ...type.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   navSpacer:   { width: 40 },
 
-  counter:     { position: 'absolute', right: 12, bottom: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: 'rgba(26,43,51,0.72)' },
+  counter:     { position: 'absolute', right: 12, bottom: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
   counterText: { ...type.meta, color: '#FFFFFF' },
 
   body:        { paddingHorizontal: 16, paddingTop: 16 },
   titleBlock:  { marginBottom: 12 },
-  kicker:      { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 },
-  title:       { fontSize: 22, lineHeight: 28, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  kicker:      { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, letterSpacing: 0.3, marginBottom: 4 },
+  title:       { ...type.detailTitle, color: colors.textPrimary },
   chipWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.sm, backgroundColor: colors.card },
   chipText:    { ...type.meta, color: colors.textPrimary },

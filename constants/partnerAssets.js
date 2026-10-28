@@ -156,9 +156,10 @@ export const PARTNER_ASSETS = {
   'kktcell/yenihat':          require('../assets/partners/kktcell/kktcell-yenihat.png'),  // 533x600
 
   // ─── North Houses (Günlük Kiralık) ───────────────────────────────────────
-  // Logo and photos are the partner's own, from northcyprusbnb.com (2026-10-28), listed with the
-  // partner's written OK (see NORTH_HOUSES_LIVE in constants/flags.js). Photos are 1024 px on the long
-  // edge, metadata-free, in the site's gallery order, 8 per apartment: `<apartment key>-NN`. Six are
+  // Logo and photos are the partner's own, from northcyprusbnb.com (2026-10-28); the partner's written
+  // OK is still PENDING (precondition 1 of NORTH_HOUSES_LIVE in constants/flags.js). Photos are 1024 px
+  // on the long edge and carry only dimension/colour-space EXIF, an empty IPTC block and an sRGB ICC
+  // profile (no GPS, camera or date). Site gallery order, 8 per apartment: `<apartment key>-NN`. Six are
   // portraits (768x1024): NorthHousesApartmentScreen shows those whole (contain), never cropped.
   'northhouses/logo': require('../assets/partners/northhouses/logo.png'),
   'northhouses/y1-01': require('../assets/partners/northhouses/y1-01.jpg'),

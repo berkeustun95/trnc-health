@@ -42,7 +42,7 @@ function ApartmentCard({ apartment, lang, onPress }) {
   const building = nhBuilding(apartment.buildingId)
   const typeLabel = apartment.kind === 'studio' ? t('nhTypeStudio', lang) : '2+1'
   return (
-    <Card padding={0} onPress={onPress} style={s.aptCard} accessibilityLabel={t(apartment.nameKey, lang)}>
+    <Card padding={0} onPress={onPress} style={s.aptCard} accessibilityLabel={`${t(apartment.nameKey, lang)}, ${building?.name}, ${fill(t('nhGuestsUpTo', lang), apartment.guests)}, ${fill(t('nhFromNight', lang), apartment.price)}`}>
       {!!cover && (
         <Image source={cover} style={s.aptPhoto} resizeMode="cover" accessible={false} />
       )}
@@ -152,7 +152,7 @@ const s = StyleSheet.create({
   aptCard:      { marginBottom: 12, overflow: 'hidden' },
   aptPhoto:     { width: '100%', aspectRatio: CARD_PHOTO_ASPECT, backgroundColor: colors.soft },
   aptBody:      { padding: 14, gap: 6 },
-  aptName:      { ...type.rowTitle, fontSize: 16, lineHeight: 22, color: colors.textPrimary },
+  aptName:      { ...type.sheetTitle, color: colors.textPrimary },
   metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText:     { flex: 1, ...type.small, color: colors.textSecondary },
   aptFoot:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 },
