@@ -8691,7 +8691,7 @@ const translations = {
     eateryOrderUndo: "Отменить",
     eateryTestNumberHint: "Предпросмотр: звонки и WhatsApp идут на тестовый номер",
     eateryOrderByPhone: "Заказать по телефону",
-    eateryPricePending: "Цена скоро будет",
+    eateryPricePending: "Цена скоро появится",
     eateryOrderAddA11y: "Добавить в заказ: {name}",
     eateryOrderMore: "{name}: ещё одна",
     eateryOrderLess: "{name}: на одну меньше",
