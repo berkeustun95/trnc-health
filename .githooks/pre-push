@@ -46,6 +46,13 @@ node scripts/check-secrets.mjs || {
   exit 1
 }
 
+# EAS uses .easignore INSTEAD of .gitignore for the build upload: a rule missing there sends
+# that gitignored file (.env, keystores) with every build (found 2026-10-28).
+node scripts/check-easignore.mjs || {
+  echo "  push blocked: copy the missing .gitignore rule(s) into .easignore."
+  exit 1
+}
+
 # Migration-number guard. Blocks a push where one migration prefix is taken by two
 # different files on ANY local or origin/* branch (or the working tree). The old rule,
 # `ls supabase/migrations | tail -1`, sees one branch — which is how 20261046 had to skip
