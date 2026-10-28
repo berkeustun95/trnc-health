@@ -37,6 +37,12 @@
 --   is STABLE and cannot live in a CHECK (same reason MIN_SIGNUP_AGE is a trigger), and a time-relative
 --   policy would reject a legitimate request on a clock/time-zone edge. Past-dated rows are accepted.
 --
+-- ─── contact_events: NO change needed ───────────────────────────────────────
+--   The app's tap log for this partner writes only ('accommodation', <partner uuid>, 'whatsapp'|'website'|'maps'),
+--   including the booking form's send (whatsapp). The LIVE constraints already allow all of it: module_check
+--   includes 'accommodation'; action_check includes 'whatsapp', 'website', 'maps' (pg_get_constraintdef, read via
+--   supabase-readonly run 40766172213, supabase/probe_contact_events_writes.sql, 2026-10-28).
+--
 -- Apply: gh workflow run supabase-migrate -f file=20261143_partner_booking_requests.sql (dry), then -f apply=true
 -- (Berke approves production-db). Creates a table ⇒ ends with NOTIFY pgrst (after COMMIT and RESET ROLE).
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -119,6 +125,8 @@ DECLARE
   v_before   int;
   v_seen     int;
   v_seen_pg  int;
+  v_admin    uuid;
+  v_admin_seen int := -1;
   v_auth_sel int := -1;
   v_anon_ins text := 'unset';
   v_upd      text := 'unset';
@@ -282,6 +290,23 @@ BEGIN
   -- postgres sees exactly the one positive-control row; then it is deleted so the file is re-runnable
   SELECT count(*) INTO v_seen FROM public.partner_booking_requests WHERE guests = 7 AND apartment = 'yasemin-2plus1' AND created_at = now();
   SELECT count(*) INTO v_seen_pg FROM public.partner_booking_requests WHERE guests = 8 AND apartment = 'yasemin-2plus1' AND created_at = now();
+  -- LIVE positive control for the admin SELECT policy: act as a real admin (read-only lookup, profiles is never written)
+  -- and require the probe rows to be visible. Without it `USING (false)` or a broken is_admin() would pass every check above.
+  SELECT id INTO v_admin FROM public.profiles WHERE role = 'admin' ORDER BY id LIMIT 1;
+  IF v_admin IS NULL THEN
+    RAISE NOTICE 'admin SELECT positive control SKIPPED: no profiles row with role = admin on this database';
+  ELSE
+    PERFORM set_config('request.jwt.claims',
+      json_build_object('sub', v_admin, 'role', 'authenticated', 'is_anonymous', false)::text, true);
+    SET LOCAL ROLE authenticated;
+    SELECT count(*) INTO v_admin_seen FROM public.partner_booking_requests
+      WHERE guests IN (7, 8) AND apartment = 'yasemin-2plus1' AND created_at = now();
+    RESET ROLE;
+    IF v_admin_seen IS DISTINCT FROM 2 THEN
+      RAISE EXCEPTION 'admin SELECT (positive control): admin % sees % of the 2 probe rows', v_admin, v_admin_seen;
+    END IF;
+    RAISE NOTICE 'admin SELECT positive control: ok (2 probe rows visible to an admin)';
+  END IF;
   DELETE FROM public.partner_booking_requests WHERE guests IN (7, 8) AND apartment = 'yasemin-2plus1' AND created_at = now();
 
   IF v_anon_ins IS DISTINCT FROM 'denied' THEN RAISE EXCEPTION 'anon INSERT was %', v_anon_ins; END IF;
@@ -309,7 +334,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261143_partner_booking_requests.sql', '082a4ad8dace3366bfcb77a243bd1e12bc4687bf0e9bbabd11b13ac2b1464f7f')
+VALUES ('20261143_partner_booking_requests.sql', '5cad4703c8d39a566d58d92ac3be4ded5551c3b83e3ba04223ccd384eb95dff0')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

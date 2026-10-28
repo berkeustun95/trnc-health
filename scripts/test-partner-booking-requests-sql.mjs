@@ -1,6 +1,6 @@
 // 20261143_partner_booking_requests.sql against the PGlite harness (PostgreSQL 18; prod is an older major,
 // see supabase/CLAUDE.md). Only dependency outside the file: public.is_admin(), stubbed to read the JWT
-// claim `app_admin` (so an admin session is a real positive control for the SELECT policy).
+// JWT sub against a minimal profiles(id, role) table (so an admin session is a real positive control for the SELECT policy).
 //
 //   node scripts/test-partner-booking-requests-sql.mjs
 import { fileURLToPath } from 'node:url'
@@ -11,8 +11,13 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261143_partner_booking_requests.sql', import.meta.url))
 const SQL = readFileSync(FILE, 'utf8')
-const FIXTURE = `CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE AS $$
-  SELECT coalesce((nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'app_admin')::boolean, false) $$;`
+const ADMIN_ID = 'a0000000-0000-4000-8000-000000000001'
+const FIXTURE_FN = `CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid AND role = 'admin') $$;`
+const FIXTURE_PROFILES = `CREATE TABLE public.profiles (id uuid PRIMARY KEY, role text NOT NULL);`
+const FIXTURE_ADMIN = `INSERT INTO public.profiles VALUES ('${ADMIN_ID}', 'admin'), ('c0000000-0000-4000-8000-000000000001', 'customer');`
+const FIXTURE = FIXTURE_PROFILES + FIXTURE_ADMIN + FIXTURE_FN
+const FIXTURE_NO_ADMIN = FIXTURE_PROFILES + `INSERT INTO public.profiles VALUES ('c0000000-0000-4000-8000-000000000001', 'customer');` + FIXTURE_FN
 
 let bad = 0
 const t = (name, got, want) => {
@@ -25,9 +30,9 @@ const mutant = (name, from, to) => {
   if (!SQL.includes(from)) { bad++; console.log(`  ✗ ${name}: anchor missing`); return null }
   const p = join(dir, name.replace(/\W+/g, '_') + '.sql'); writeFileSync(p, SQL.replace(from, to)); return p
 }
-const refused = async (name, p, extra, wantMsg) => {
+const refused = async (name, p, extra, wantMsg, fixture = FIXTURE) => {
   if (!p) return
-  const d = await freshDb(FIXTURE); if (extra) await d.exec(extra)
+  const d = await freshDb(fixture); if (extra) await d.exec(extra)
   const r = await applyFile(d, p)
   t(`${name} refused`, r.ok, false)
   t(`  message mentions "${wantMsg}"`, (r.msg || '').includes(wantMsg), true)
@@ -54,7 +59,7 @@ for (const r of await q(`SELECT conname, pg_get_constraintdef(oid) d FROM pg_con
 for (const r of await q(`SELECT policyname, cmd, permissive, roles::text, qual, with_check FROM pg_policies WHERE tablename='partner_booking_requests' ORDER BY 1`)) console.log(`    policy ${r.policyname}: ${r.cmd} ${r.permissive} ${r.roles} qual=${r.qual} check=${r.with_check}`)
 
 const guest = { sub: 'c0000000-0000-4000-8000-000000000001', role: 'authenticated', is_anonymous: true }
-const admin = { sub: 'a0000000-0000-4000-8000-000000000001', role: 'authenticated', app_admin: true }
+const admin = { sub: ADMIN_ID, role: 'authenticated' }
 const ins = `INSERT INTO public.partner_booking_requests (partner, apartment, check_in, check_out, guests) VALUES ('north_houses','yasemin-2plus1-plus', current_date+10, current_date+12, 4)`
 t('guest insert (no RETURNING) ok', (await as(db, 'authenticated', guest, ins)).ok, true)
 t('guest insert WITH RETURNING fails (SELECT policy) — client must not use .select()', (await as(db, 'authenticated', guest, ins + ' RETURNING id')).ok, false)
@@ -76,6 +81,19 @@ await refused('anon granted INSERT',
   mutant('anon-ins', "GRANT SELECT ON public.partner_booking_requests TO authenticated;", "GRANT SELECT ON public.partner_booking_requests TO authenticated;\nGRANT INSERT (partner, apartment, check_in, check_out, guests) ON public.partner_booking_requests TO anon;"), '', 'anon')
 await refused('select policy opened to everyone',
   mutant('select-open', "USING ((select public.is_admin()));", "USING (true);"), '', 'non-admin SELECT returned')
+await refused('select policy USING (false): admin positive control must catch it',
+  mutant('select-false', "USING ((select public.is_admin()));", "USING (false);"), '', 'admin SELECT (positive control)')
+{
+  const run = async (fixture) => {
+    const d = await freshDb(fixture); const notices = []
+    try { await d.exec(SQL.replace(/^NOTIFY pgrst.*$/m, ''), { onNotice: n => notices.push(n.message) }); return { ok: true, notices } }
+    catch (e) { return { ok: false, notices, msg: String(e.message || e).split('\n')[0] } }
+  }
+  const withAdmin = await run(FIXTURE)
+  t('admin present: applies and the live admin control runs', [withAdmin.ok, withAdmin.notices.some(n => n.includes('admin SELECT positive control: ok'))], [true, true])
+  const noAdmin = await run(FIXTURE_NO_ADMIN)
+  t('no admin exists: applies, with the SKIPPED notice', [noAdmin.ok, noAdmin.notices.some(n => n.includes('admin SELECT positive control SKIPPED'))], [true, true])
+}
 await refused('RLS guests bound dropped (table CHECK still there): policy layer must be caught',
   mutant('guests-rls', "AND guests BETWEEN 1 AND 12\n  );", "AND guests > 0\n  );"), '', 'reached CHECK, policy let it through')
 await refused('table guests CHECK dropped (policy still there): CHECK layer must be caught',

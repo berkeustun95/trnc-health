@@ -258,7 +258,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261140_app_versions_android_latest_141.sql', '751f40be6d04dfcce6744f30eace7461d15954fef72771f134c9eeccd9851d61'),
   ('20261141_duty_push_runs.sql', '735871baf962d3654c9201a254c5c7ac4d0b10f047f7f3e086b30ded19ddaf12'),
   ('20261142_duty_push_runs_partial_retries.sql', 'e2748b7a556af1c7e3ceec4c0ca8dfd174042b3d390eaf214bf19b527f505dbd'),
-  ('20261143_partner_booking_requests.sql', '082a4ad8dace3366bfcb77a243bd1e12bc4687bf0e9bbabd11b13ac2b1464f7f')
+  ('20261143_partner_booking_requests.sql', '5cad4703c8d39a566d58d92ac3be4ded5551c3b83e3ba04223ccd384eb95dff0')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
