@@ -13,6 +13,8 @@ import AccommodationListInlineSlot from '../components/ads/AccommodationListInli
 import AccommodationListBottomSlot from '../components/ads/AccommodationListBottomSlot'
 import PropertyDetailScreen from './PropertyDetailScreen'
 import DormPartnerScreen from './DormPartnerScreen'
+import NorthHousesTab from './NorthHousesTab'
+import NorthHousesApartmentScreen from './NorthHousesApartmentScreen'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../constants/theme'
@@ -26,7 +28,7 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE } from '../constants/flags'
+import { DORMS_LIVE, NORTH_HOUSES_LIVE } from '../constants/flags'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
 
@@ -74,7 +76,7 @@ const PAGE = 20
 // All config, in constants/dorms.js. Tabs are derived from the flags, never read straight
 // off the config, so a dark tab can neither render nor be landed on. Module scope is
 // correct: both are constant for a given bundle.
-const LIVE_TABS      = { dorm: DORMS_LIVE }
+const LIVE_TABS      = { dorm: DORMS_LIVE, daily_rental: NORTH_HOUSES_LIVE }
 const TABS           = accomTabs(LIVE_TABS)
 const LANDING_TAB    = accomLandingTab(LIVE_TABS)
 const SEGMENTS       = ACCOM_SEGMENTS
@@ -118,6 +120,7 @@ function intentLabel(intent, lang) {
 
 function tabLabel(tab, lang) {
   if (tab === 'dorm') return t('accomDorms', lang)
+  if (tab === 'daily_rental') return t('nhTab', lang)
   return t('accomTabProperty', lang)
 }
 
@@ -135,7 +138,7 @@ function TabBar({ tab, onChange, lang }) {
       {TABS.map(item => {
         const active = tab === item.id
         return (
-          <TouchableOpacity key={item.id} style={[cs.tabSeg, active && cs.tabSegActive]}
+          <TouchableOpacity key={item.id} style={[cs.tabSeg, TABS.length > 2 && cs.tabSegTight, active && cs.tabSegActive]}
             onPress={() => onChange(item.id)} activeOpacity={0.85}
             accessibilityRole="tab" accessibilityState={{ selected: active }}>
             <Text style={[cs.tabSegText, active && cs.tabSegTextActive]}
@@ -426,6 +429,7 @@ export default function AccommodationScreen({
   onAdNavigate, lang, onClose,
   onOpenProperty, selectedProperty, onCloseProperty,
   onOpenDorm, selectedDorm, onCloseDorm,
+  onOpenRental, selectedRental, onCloseRental,
 }) {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
@@ -461,6 +465,9 @@ export default function AccommodationScreen({
   // pagination. Switching tabs never touches Emlak's intent or filters, so coming back to
   // Emlak finds the list exactly as it was left.
   const isDorm = tab === 'dorm'
+  // Günlük Kiralık is config too (constants/dailyRentals.js): its body is NorthHousesTab, and like
+  // Yurtlar it never queries `properties`.
+  const isRental = tab === 'daily_rental'
   // Bottom inset for the Emlak/Yurtlar list: the SafeAreaView pads only the top (edge-to-edge).
   const insets = useSafeAreaInsets()
 
@@ -519,6 +526,10 @@ export default function AccommodationScreen({
     // reach .eq('intent', 'dorm') against a CHECK constraint that has never heard of it —
     // the guarantee is structural rather than a filter somebody has to remember.
     // `done` is set so onEndReached cannot start a page that does not exist.
+    if (isRental) {
+      setLoading(false); setLoadingMore(false); setLoadError(false); setMoreError(false); setDone(true)
+      return
+    }
     if (isDorm) {
       setItems(DORM_PARTNERS)
       setTotal(DORM_PARTNERS.length)
@@ -544,7 +555,7 @@ export default function AccommodationScreen({
       setMoreError(true)
     }
     if (pageNum === 0) setLoading(false); else setLoadingMore(false)
-  }, [buildQuery, isDorm])
+  }, [buildQuery, isDorm, isRental])
 
   // Any filter or sort change resets to page 0 and fetches ONE page — not the whole
   // table, which is what this screen used to do on every keystroke.
@@ -706,7 +717,9 @@ export default function AccommodationScreen({
           column shares space with the header and tabs. */}
       <View style={cs.panes}>
       <View style={StyleSheet.absoluteFill}>
-      {loading ? (
+      {isRental ? (
+        <NorthHousesTab lang={lang} onOpenApartment={onOpenRental} bottomPad={listBottomPad(insets)} />
+      ) : loading ? (
         REDESIGN
           ? <View style={cs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={280} style={{ marginBottom: 12 }} />)}</View>
           : <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
@@ -854,6 +867,14 @@ export default function AccommodationScreen({
         </View>
       )}
 
+      {selectedRental && (
+        <View style={cs.detailOverlay}>
+          <OffPhoto>
+            <NorthHousesApartmentScreen apartment={selectedRental} lang={lang} onBack={onCloseRental} />
+          </OffPhoto>
+        </View>
+      )}
+
       {selectedProperty && (
         <View style={cs.detailOverlay}>
           <OffPhoto>
@@ -928,6 +949,8 @@ const legacyCs = StyleSheet.create({
                          padding: 3, borderRadius: 14, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border },
   tabSeg:              { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 11 },
   tabSegActive:        { backgroundColor: colors.primary },
+  // Three tabs (Günlük Kiralık live): each segment is a third wide, so the label gets the padding back.
+  tabSegTight:         { paddingHorizontal: 4 },
   tabSegText:          { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
   tabSegTextActive:    { fontFamily: 'Inter_700Bold', color: '#fff' },
   // The promoted marker. `position: 'absolute'` is the requirement, not the styling

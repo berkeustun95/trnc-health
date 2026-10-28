@@ -28,7 +28,8 @@
 
 // ─── THE TOP TABS AND THE EMLAK CHIP ROW, AS DATA ────────────────────────────
 //
-// The module opens with top tabs — Yurtlar | Emlak (Oteller was the first tab from 2026-09-29
+// The module opens with top tabs — Yurtlar | Günlük Kiralık | Emlak (Günlük Kiralık, the North Houses
+// daily-rental partner, is gated and NOT promoted; Oteller was the first tab from 2026-09-29
 // until 2026-10-09, when it moved to its own Home tile and screen) — and Emlak keeps its own intent chip row. Yurtlar
 // was a fifth chip in that row until 2026-09-29; it is a TAB now, because it is not a
 // filter on `properties` at all (no query, no filters, no sort).
@@ -40,6 +41,7 @@
 // AccommodationScreen so it never changes the tab's size.
 export const ACCOM_TABS = [
   { id: 'dorm', promoted: true, gated: true },
+  { id: 'daily_rental', gated: true },
   { id: 'property' },
 ]
 

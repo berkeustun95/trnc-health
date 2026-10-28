@@ -26,7 +26,7 @@
 // locale. The day somebody writes the copy this guard goes RED, and graduating the key
 // becomes a deliberate act somebody reviews — which is the whole point. Same two-direction
 // shape for assets: wired, or declared owed.
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -34,7 +34,12 @@ import {
   DORM_PARTNERS, PENDING_KEYS, GALLERY_ORDER, SECTION_ORDER, COLLAPSIBLE,
   dormDeal, dormSections, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
-import { t, LANG_CODES } from '../constants/i18n.js'
+import { t, hasOwnTranslation, LANG_CODES } from '../constants/i18n.js'
+import {
+  NORTH_HOUSES, NH_BUILDINGS, NH_APARTMENTS, NH_SLUGS, NH_FROM_PRICE,
+  nhWaMessage, nhWaUrl, nhWebsiteUrl, nhRequestMessage, nhParseDate, nhNights, nhFormatDateInput,
+  nhValidateRequest, NH_MAX_NIGHTS, NH_MAX_GUESTS,
+} from '../constants/dailyRentals.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -728,6 +733,181 @@ for (const p of DORM_PARTNERS) {
   }
 }
 
+
+// ─── 5. NORTH HOUSES (Günlük Kiralık) — a copy of the dorm shape, guarded on its own ─────────────
+//
+// constants/dailyRentals.js is config-only like dorms.js (no table behind it), so this is its
+// whole schema. The tab assertions are here too: the existing ones above stay exactly as they
+// were (dark / dorm-live / hotel cases are still `dorm,property`, because daily_rental is not
+// in the flags they pass).
+const tabIds = live => accomTabs(live).map(s => s.id).join(',')
+check(tabIds({ dorm: true, daily_rental: true }) === 'dorm,daily_rental,property',
+  `tabs with both live are not Yurtlar | Günlük Kiralık | Emlak: ${tabIds({ dorm: true, daily_rental: true })}`)
+check(accomLandingTab({ dorm: true, daily_rental: true }) === 'dorm',
+  `landing with both live is ${accomLandingTab({ dorm: true, daily_rental: true })}, expected dorm`)
+check(tabIds({ dorm: false, daily_rental: true }) === 'daily_rental,property'
+  && accomLandingTab({ dorm: false, daily_rental: true }) === 'daily_rental',
+  `with only daily_rental live the tabs are [${tabIds({ dorm: false, daily_rental: true })}] landing ${accomLandingTab({ dorm: false, daily_rental: true })}`)
+check(tabIds({ daily_rental: true, hotel: true }) === 'daily_rental,property',
+  `daily_rental with hotel live is [${tabIds({ daily_rental: true, hotel: true })}] — Oteller must not come back as a tab`)
+check(tabIds({ dorm: false, daily_rental: false }) === 'property', `dark tabs are [${tabIds({ dorm: false, daily_rental: false })}], expected property only`)
+check(ACCOM_TABS.find(x => x.id === 'daily_rental')?.promoted !== true, `daily_rental must NOT be promoted (no accent dot)`)
+
+// Partner identity.
+check(UUID_RE.test(NORTH_HOUSES.id), `North Houses id is not a lowercase uuid: ${NORTH_HOUSES.id}`)
+check(!DORM_PARTNERS.some(p => p.id === NORTH_HOUSES.id), `North Houses id collides with a dorm partner`)
+// ⚠ the DB CHECK in partner_booking_requests (20261143) names exactly this value.
+check(NORTH_HOUSES.slug === 'north_houses', `partner slug is ${NORTH_HOUSES.slug}; the DB CHECK says north_houses`)
+check(/^\+\d{10,15}$/.test(NORTH_HOUSES.phone), `phone is not +digits: ${NORTH_HOUSES.phone}`)
+check(/^https:\/\//.test(NORTH_HOUSES.website), `website must be https`)
+check(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(NORTH_HOUSES.email), `email malformed`)
+
+// The seven apartments: EXACTLY these slugs (= the DB CHECK on partner_booking_requests.apartment).
+const NH_EXPECTED_SLUGS = [
+  'yasemin-2plus1', 'yasemin-2plus1-plus', 'lefkosa-gunluk-kiralik-studio-daire',
+  'lefkosa-gunluk-kiralik-studio-daire-dereboyu', 'lefkosa-gunluk-kiralik-daire-2-yatak-odali',
+  'lefkosa-gunluk-kiralik-daire-iki-yatak-odali', 'north-houses-aladag-sk-kucuk-kaymakli-lefkosa',
+]
+check(NH_APARTMENTS.length === 7, `expected exactly 7 apartments, found ${NH_APARTMENTS.length}`)
+check([...NH_SLUGS].sort().join('|') === [...NH_EXPECTED_SLUGS].sort().join('|'),
+  `apartment slugs differ from the DB CHECK list.\n    config:   ${NH_SLUGS.join(', ')}\n    expected: ${NH_EXPECTED_SLUGS.join(', ')}`)
+check(new Set(NH_SLUGS).size === NH_SLUGS.length && new Set(NH_APARTMENTS.map(a => a.key)).size === NH_APARTMENTS.length,
+  `duplicate apartment slug or key`)
+check(NH_BUILDINGS.length === 4, `expected 4 buildings, found ${NH_BUILDINGS.length}`)
+for (const b of NH_BUILDINGS) {
+  check(/^https:\/\/(maps\.app\.goo\.gl|share\.google)\//.test(b.mapUrl || ''), `building ${b.id}: mapUrl is not the partner's own short link: ${b.mapUrl}`)
+  check(!!b.name && !!b.blurbKey, `building ${b.id}: name or blurbKey missing`)
+}
+const nhAssetSrc = readFileSync(resolve(ROOT, 'constants/partnerAssets.js'), 'utf8')
+const nhAssetWired = key => new RegExp(`^\\s*'${key.replace(/[/\-]/g, m => '\\' + m)}'\\s*:\\s*require\\('([^']+)'\\)`, 'm').exec(nhAssetSrc)
+const nhKeys = new Set(['nhTagline', 'nhHeroSub', 'nhWaHours', 'nhPriceNote', 'nhCheckTitle', 'nhCheckIn', 'nhCheckOut', 'nhCheckLate'])
+for (const k of ['taglineKey', 'heroSubKey', 'waHoursKey', 'priceNoteKey', 'checkTitleKey', 'checkInKey', 'checkOutKey', 'checkLateKey']) {
+  check(!!NORTH_HOUSES[k], `NORTH_HOUSES.${k} missing`)
+  if (NORTH_HOUSES[k]) nhKeys.add(NORTH_HOUSES[k])
+}
+const nhLogo = nhAssetWired(NORTH_HOUSES.logo)
+check(!!nhLogo, `logo asset ${NORTH_HOUSES.logo} is not wired in partnerAssets.js`)
+let nhPhotos = 0
+for (const b of NH_BUILDINGS) nhKeys.add(b.blurbKey)
+for (const a of NH_APARTMENTS) {
+  check(!!nhBuildingById(a.buildingId), `${a.slug}: buildingId ${a.buildingId} is not one of the four buildings`)
+  check(a.kind === 'studio' || a.kind === 'twoPlusOne', `${a.slug}: kind ${a.kind}`)
+  check((a.kind === 'studio') === (a.bedrooms == null), `${a.slug}: studios carry no bedroom count, 2+1s do (kind ${a.kind}, bedrooms ${a.bedrooms})`)
+  check(Number.isInteger(a.price) && a.price > 0 && Number.isInteger(a.guests) && a.guests >= 1 && a.guests <= NH_MAX_GUESTS
+    && Number.isInteger(a.minNights) && a.minNights >= 1, `${a.slug}: price / guests / minNights out of range`)
+  check(a.photos.length === 8, `${a.slug}: expected 8 photos, found ${a.photos.length}`)
+  nhKeys.add(a.nameKey); nhKeys.add(a.descKey)
+  for (const k of a.amenityKeys) nhKeys.add(k)
+  check(new Set(a.amenityKeys).size === a.amenityKeys.length, `${a.slug}: duplicate amenity key`)
+  for (const key of a.photos) {
+    const m = nhAssetWired(key)
+    check(!!m, `${a.slug}: photo ${key} is not wired in partnerAssets.js`)
+    if (m) { nhPhotos++; check(existsSync(resolve(ROOT, 'constants', m[1])), `${a.slug}: ${key} -> ${m[1]} is not on disk`) }
+  }
+}
+check(NH_FROM_PRICE === 35, `from-price is ${NH_FROM_PRICE}; the site's hero says €35`)
+
+function nhBuildingById(id) { return NH_BUILDINGS.find(b => b.id === id) }
+
+// ⚠ NO COORDINATES ANYWHERE IN THE CONFIG: we store the partner's own map links and nothing we
+// resolved. Walks every object and array in the module, so a nested `coords` is found too.
+const NH_COORD_KEY = /^(lat|lng|lon|long|latitude|longitude|coords?|coordinates)$/i
+let nhWalked = 0
+const nhWalk = (v, path) => {
+  if (Array.isArray(v)) return v.forEach((x, i) => nhWalk(x, `${path}[${i}]`))
+  if (v && typeof v === 'object') {
+    for (const [k, x] of Object.entries(v)) {
+      nhWalked++
+      check(!NH_COORD_KEY.test(k), `constants/dailyRentals.js: ${path}.${k} is a coordinate field — North Houses stores NO coordinates`)
+      nhWalk(x, `${path}.${k}`)
+    }
+  }
+}
+nhWalk(NORTH_HOUSES, 'NORTH_HOUSES'); nhWalk(NH_BUILDINGS, 'NH_BUILDINGS'); nhWalk(NH_APARTMENTS, 'NH_APARTMENTS')
+check(nhWalked > 100, `CONTROL: the coordinate walk visited only ${nhWalked} keys — it is not walking the config`)
+
+// The WhatsApp texts: Turkish, say where the guest came from, and carry NO code / source line /
+// discount. The apartment names are the TURKISH ones, resolved here the way the screen does.
+const NH_BAD_WA = /kod|ada-|indirim|discount|kaynak|promo/i
+let nhMessages = 0
+for (const a of NH_APARTMENTS) {
+  const nameTr = t(a.nameKey, 'Turkish'), bName = nhBuildingById(a.buildingId)?.name || ''
+  const msgs = [
+    nhWaMessage(nameTr, bName),
+    nhRequestMessage({ aptNameTr: nameTr, buildingName: bName, checkIn: '2026-11-12', checkOut: '2026-11-15', guests: 2, name: 'Ayşe', phone: '+90 555 000 0000' }),
+  ]
+  for (const m of msgs) {
+    nhMessages++
+    check(m.startsWith('Merhaba, ADA uygulamasından yazıyorum.'), `${a.slug}: WhatsApp text does not open as the ADA lead-in: ${m.slice(0, 60)}`)
+    check(m.includes(`"${nameTr}"`) && m.includes(bName), `${a.slug}: WhatsApp text omits the Turkish apartment name or the building`)
+    check(!NH_BAD_WA.test(m), `${a.slug}: WhatsApp text contains a code / source / discount word: ${JSON.stringify(m)}`)
+  }
+  check(nhWaUrl(msgs[0]).startsWith('https://wa.me/905338470666?text='), `${a.slug}: wa.me URL is wrong`)
+  const en = nhWebsiteUrl(a, 'en'), tr = nhWebsiteUrl(a, 'tr')
+  check(en.startsWith(`https://www.northcyprusbnb.com/apartments/${a.slug}?`) && tr.startsWith(`https://www.northcyprusbnb.com/tr/daireler/${a.slug}?`),
+    `${a.slug}: website URLs are not the EN /apartments/ and TR /tr/daireler/ pages: ${en} | ${tr}`)
+  const q = new URL(en).searchParams
+  check(q.get('utm_source') === 'ada' && q.get('utm_medium') === 'app' && q.get('utm_campaign') === 'north_houses' && q.get('utm_content') === a.slug,
+    `${a.slug}: utm parameters wrong: ${en}`)
+}
+
+// The form's bounds, probed at both edges (the DB's: ≤ 90 nights, guests 1..12, a real date).
+check(nhParseDate('31.02.2026') === null && nhParseDate('12.11.2026') === '2026-11-12' && nhParseDate('2026-11-12') === null,
+  `nhParseDate: a non-date was accepted or a real one refused`)
+check(nhFormatDateInput('12112026') === '12.11.2026' && nhFormatDateInput('1211') === '12.11', `nhFormatDateInput does not insert the dots`)
+const nhReq = (ci, co, g) => nhValidateRequest({ checkInText: ci, checkOutText: co, guestsText: g, name: 'Ayşe', phone: '555 000 0000' })
+check(nhReq('01.01.2027', '02.01.2027', '1').ok, `1 night / 1 guest was refused`)
+check(nhReq('01.01.2027', '01.04.2027', '12').ok && nhNights('2027-01-01', '2027-04-01') === 90, `exactly ${NH_MAX_NIGHTS} nights / 12 guests was refused`)
+check(!nhReq('01.01.2027', '02.04.2027', '2').datesOk, `91 nights was accepted`)
+check(!nhReq('02.01.2027', '02.01.2027', '2').datesOk && !nhReq('03.01.2027', '02.01.2027', '2').datesOk, `check_out <= check_in was accepted`)
+check(!nhReq('01.01.2027', '02.01.2027', '0').guestsOk && !nhReq('01.01.2027', '02.01.2027', '13').guestsOk && !nhReq('01.01.2027', '02.01.2027', '').guestsOk,
+  `guests 0 / 13 / empty was accepted`)
+check(!nhValidateRequest({ checkInText: '01.01.2027', checkOutText: '02.01.2027', guestsText: '2', name: '', phone: '555 000 0000' }).ok, `an empty name was accepted`)
+
+// i18n: every nh* key in ALL nine locales (read from the table, never t(): see section 3), non-empty,
+// referenced by something, and every key the config references exists.
+const nhTableKeys = [...KEYSETS.en].filter(k => k.startsWith('nh'))
+check(nhTableKeys.length > 60, `CONTROL: only ${nhTableKeys.length} nh* keys found in the en table`)
+const nhUseSrc = ['constants/dailyRentals.js', 'screens/NorthHousesTab.js', 'screens/NorthHousesApartmentScreen.js', 'screens/AccommodationScreen.js']
+  .map(f => (existsSync(resolve(ROOT, f)) ? readFileSync(resolve(ROOT, f), 'utf8') : '')).join('\n')
+for (const key of new Set([...nhKeys, ...nhTableKeys])) {
+  const gone = missingIn(key)
+  check(gone.length === 0, `i18n: ${key} is absent from ${gone.join(', ')} — t() would serve the ENGLISH string there`)
+  for (const l of LANGS) {
+    const v = hasOwnTranslation(key, l) ? t(key, l) : ''
+    check(typeof v === 'string' && v.trim().length > 0 && v !== key, `i18n: ${key} is empty in ${l}`)
+    if (/\{n\}/.test(t(key, 'English'))) check(v.includes('{n}'), `i18n: ${key} lost its {n} placeholder in ${l}`)
+  }
+  check(nhUseSrc.includes(key), `i18n: ${key} is in the table but nothing references it (dead key)`)
+}
+
+// The screens, as text (they import react-native, so Node cannot): no map, no ad slot, no deal
+// language, the form behind the literal `__DEV__ && NORTH_HOUSES_FORM_PROTO`, and an insert that
+// asks for nothing back and never carries a name or a phone.
+const strip = src => src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|\s)\/\/.*$/, '')).join('\n')
+const nhScreenFiles = ['screens/NorthHousesTab.js', 'screens/NorthHousesApartmentScreen.js']
+for (const f of nhScreenFiles) {
+  if (!existsSync(resolve(ROOT, f))) { check(false, `${f} does not exist`); continue }
+  const src = strip(readFileSync(resolve(ROOT, f), 'utf8'))
+  check(!/react-native-maps|MapView|AccommodationDetailBottomSlot|dormDeal|DormRoomSheet/.test(src), `${f}: imports a map, the dorm room sheet or an ad slot`)
+  check(!/dormWaMessage|dormWebsiteUrl|DORM_PARTNERS/.test(src), `${f}: reaches into the dorm config; this tab is a copy, not a parametrization`)
+  check(!/Linking\.openURL\([^)]*\)\s*\n?\s*;?\s*logContactEvent/.test(src), `${f}: logs a tap AFTER openURL`)
+}
+if (existsSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'))) {
+  const apt = strip(readFileSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'), 'utf8'))
+  check(apt.includes('__DEV__ && NORTH_HOUSES_FORM_PROTO'), `NorthHousesApartmentScreen must read the prototype as the literal \`__DEV__ && NORTH_HOUSES_FORM_PROTO\``)
+  check((apt.match(/NORTH_HOUSES_FORM_PROTO/g) || []).length === 2, `NORTH_HOUSES_FORM_PROTO must appear exactly twice (import + the one guarded read)`)
+  const ins = /from\('partner_booking_requests'\)\s*\.insert\(\[\{([^}]*)\}\]\)([^;\n]*)/.exec(apt)
+  check(!!ins, `no partner_booking_requests insert found in NorthHousesApartmentScreen`)
+  if (ins) {
+    check(!/name|phone/i.test(ins[1]), `the booking-request insert carries a name or phone: ${ins[1]}`)
+    check(!/\.select\(/.test(ins[2]) && !/\.select\(/.test(apt), `the insert chains .select() — no SELECT policy exists, RETURNING makes it fail`)
+    check(/partner:\s*NORTH_HOUSES\.slug/.test(ins[1]) && /apartment:/.test(ins[1]) && /check_in/.test(ins[1]) && /check_out/.test(ins[1]) && /guests/.test(ins[1]),
+      `the insert is not {partner, apartment, check_in, check_out, guests}: ${ins[1]}`)
+    check(/\.then\(/.test(ins[2]), `the insert is a lazy thenable: without .then() it sends nothing`)
+  }
+}
+
 // ─── 4. Assets, also in two directions ──────────────────────────────────────
 //
 // partnerAssets.js cannot be imported here: it is the one file that require()s PNGs, which
@@ -755,6 +935,8 @@ console.log(
   `dorm config: OK (${DORM_PARTNERS.length} partner(s) · ${assertions} assertions · `
   + `${referencedKeys.size + SCREEN_KEYS.length} key(s) x ${LANGS.length} locales · `
   + `${referencedAssets.size} asset key(s) · ${pending.size} pending key(s) held unwritten)`)
+console.log(`north houses: OK (${NH_APARTMENTS.length} apartments · ${NH_BUILDINGS.length} buildings · ${nhPhotos} photos wired · ${nhMessages} WhatsApp texts · ${nhWalked} config keys walked for coordinates · ${nhTableKeys.length} nh* keys x ${LANGS.length} locales)`)
+console.log(`  tabs both live: [${tabIds({ dorm: true, daily_rental: true })}] landing ${accomLandingTab({ dorm: true, daily_rental: true })} · only daily_rental: [${tabIds({ dorm: false, daily_rental: true })}] landing ${accomLandingTab({ dorm: false, daily_rental: true })}`)
 console.log(`  tabs dark: [${darkIds.join(', ')}]  landing ${accomLandingTab({ dorm: false })}`)
 console.log(`  tabs live: [${liveIds.join(', ')}]  landing ${accomLandingTab({ dorm: true })} · Emlak chips [${ACCOM_SEGMENTS.map(s => s.id).join(', ')}] landing ${ACCOM_LANDING}`)
 console.log(`  NOTE: this reads FILES. It says nothing about contact_events_action_check,`)

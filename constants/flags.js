@@ -388,6 +388,40 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   5. hotels:health green. The list on kitob.org is dated 2023.
 export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04)
 
+// Günlük Kiralık — the North Houses daily-rental tab of Emlak & Konaklama (constants/dailyRentals.js).
+// false = no tab (the module opens exactly as before: Yurtlar | Emlak) and the apartment screen is
+// unreachable. true = Yurtlar | Günlük Kiralık | Emlak; the module still opens on its first tab.
+//
+// Not a MODULE_FLAGS key, for the DORMS_LIVE reason: a tab inside a live module has no Coming Soon
+// screen and no waitlist to collect, and a true entry in that map would trip the waitlist and
+// notify-path checks in scripts/check-module-flags.mjs against a perfectly correct app.
+//
+// ⚠ DO NOT FLIP until ALL of these hold, in this order:
+//   1. North Houses' WRITTEN OK to list them. There is no deal yet: a free listing, so no ADA code,
+//      no discount, no deal band anywhere in this tab.
+//   2. The content re-checked against northcyprusbnb.com (prices, check-in / check-out, the four map
+//      links, the 56 photos). It was copied on 2026-10-28 and prices move with season.
+//   3. ONLY IF the request form ships (NORTH_HOUSES_FORM_PROTO): 20261143_partner_booking_requests
+//      applied and its verify_schema rows OK. The listing itself writes nothing but contact_events
+//      taps, which already pass their live CHECKs (module 'accommodation', actions whatsapp /
+//      website / maps).
+//   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit (here and
+//      EXPECTED_SCALARS in scripts/check-module-flags.mjs), then Preview, then OTA.
+export const NORTH_HOUSES_LIVE = false
+
+// Dev-only prototype of North Houses' booking-request form on the apartment screen. A developer's
+// own build gets a form; production never does.
+//
+// ⚠ UNREACHABLE IN PRODUCTION, NOT MERELY DEFAULTED OFF. NorthHousesApartmentScreen reads it as
+//   `__DEV__ && NORTH_HOUSES_FORM_PROTO`, so a release bundle constant-folds the whole branch away
+//   (the PREVIEW_PENDING_PARTNERS reasoning). Two independent guards, on purpose: the fold protects
+//   USERS, the EXPECTED_SCALARS baseline protects the REPO — a working-tree flip cannot be pushed or
+//   ride out on `npm run ota`, which bundles the working tree and never runs a release fold.
+//
+// NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. Shipping the form for real is its own
+// decision (the table, the privacy wording, a flag of its own), not this boolean turning true.
+export const NORTH_HOUSES_FORM_PROTO = false
+
 // Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
 // from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no
 // Home tile and no way in; the AdminScreen score-editor entry is unaffected (admins enter

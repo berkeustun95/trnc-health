@@ -154,6 +154,70 @@ export const PARTNER_ASSETS = {
   'kktcell/tasi':             require('../assets/partners/kktcell/kktcell-tasi.png'),     // 546x600
   'kktcell/turist':           require('../assets/partners/kktcell/kktcell-turist.png'),   // 600x540
   'kktcell/yenihat':          require('../assets/partners/kktcell/kktcell-yenihat.png'),  // 533x600
+
+  // ─── North Houses (Günlük Kiralık) ───────────────────────────────────────
+  // Logo and photos are the partner's own, from northcyprusbnb.com (2026-10-28); the partner's written
+  // OK is still PENDING (precondition 1 of NORTH_HOUSES_LIVE in constants/flags.js). Photos are 1024 px
+  // on the long edge and carry only dimension/colour-space EXIF, an empty IPTC block and an sRGB ICC
+  // profile (no GPS, camera or date). Site gallery order, 8 per apartment: `<apartment key>-NN`. Six are
+  // portraits (768x1024): NorthHousesApartmentScreen shows those whole (contain), never cropped.
+  'northhouses/logo': require('../assets/partners/northhouses/logo.png'),
+  'northhouses/y1-01': require('../assets/partners/northhouses/y1-01.jpg'),
+  'northhouses/y1-02': require('../assets/partners/northhouses/y1-02.jpg'),
+  'northhouses/y1-03': require('../assets/partners/northhouses/y1-03.jpg'),
+  'northhouses/y1-04': require('../assets/partners/northhouses/y1-04.jpg'),
+  'northhouses/y1-05': require('../assets/partners/northhouses/y1-05.jpg'),
+  'northhouses/y1-06': require('../assets/partners/northhouses/y1-06.jpg'),
+  'northhouses/y1-07': require('../assets/partners/northhouses/y1-07.jpg'),
+  'northhouses/y1-08': require('../assets/partners/northhouses/y1-08.jpg'),
+  'northhouses/y2-01': require('../assets/partners/northhouses/y2-01.jpg'),
+  'northhouses/y2-02': require('../assets/partners/northhouses/y2-02.jpg'),
+  'northhouses/y2-03': require('../assets/partners/northhouses/y2-03.jpg'),
+  'northhouses/y2-04': require('../assets/partners/northhouses/y2-04.jpg'),
+  'northhouses/y2-05': require('../assets/partners/northhouses/y2-05.jpg'),
+  'northhouses/y2-06': require('../assets/partners/northhouses/y2-06.jpg'),
+  'northhouses/y2-07': require('../assets/partners/northhouses/y2-07.jpg'),
+  'northhouses/y2-08': require('../assets/partners/northhouses/y2-08.jpg'),
+  'northhouses/ys-01': require('../assets/partners/northhouses/ys-01.jpg'),
+  'northhouses/ys-02': require('../assets/partners/northhouses/ys-02.jpg'),
+  'northhouses/ys-03': require('../assets/partners/northhouses/ys-03.jpg'),
+  'northhouses/ys-04': require('../assets/partners/northhouses/ys-04.jpg'),
+  'northhouses/ys-05': require('../assets/partners/northhouses/ys-05.jpg'),
+  'northhouses/ys-06': require('../assets/partners/northhouses/ys-06.jpg'),
+  'northhouses/ys-07': require('../assets/partners/northhouses/ys-07.jpg'),
+  'northhouses/ys-08': require('../assets/partners/northhouses/ys-08.jpg'),
+  'northhouses/ms-01': require('../assets/partners/northhouses/ms-01.jpg'),
+  'northhouses/ms-02': require('../assets/partners/northhouses/ms-02.jpg'),
+  'northhouses/ms-03': require('../assets/partners/northhouses/ms-03.jpg'),
+  'northhouses/ms-04': require('../assets/partners/northhouses/ms-04.jpg'),
+  'northhouses/ms-05': require('../assets/partners/northhouses/ms-05.jpg'),
+  'northhouses/ms-06': require('../assets/partners/northhouses/ms-06.jpg'),
+  'northhouses/ms-07': require('../assets/partners/northhouses/ms-07.jpg'),
+  'northhouses/ms-08': require('../assets/partners/northhouses/ms-08.jpg'),
+  'northhouses/t1-01': require('../assets/partners/northhouses/t1-01.jpg'),
+  'northhouses/t1-02': require('../assets/partners/northhouses/t1-02.jpg'),
+  'northhouses/t1-03': require('../assets/partners/northhouses/t1-03.jpg'),
+  'northhouses/t1-04': require('../assets/partners/northhouses/t1-04.jpg'),
+  'northhouses/t1-05': require('../assets/partners/northhouses/t1-05.jpg'),
+  'northhouses/t1-06': require('../assets/partners/northhouses/t1-06.jpg'),
+  'northhouses/t1-07': require('../assets/partners/northhouses/t1-07.jpg'),
+  'northhouses/t1-08': require('../assets/partners/northhouses/t1-08.jpg'),
+  'northhouses/m1-01': require('../assets/partners/northhouses/m1-01.jpg'),
+  'northhouses/m1-02': require('../assets/partners/northhouses/m1-02.jpg'),
+  'northhouses/m1-03': require('../assets/partners/northhouses/m1-03.jpg'),
+  'northhouses/m1-04': require('../assets/partners/northhouses/m1-04.jpg'),
+  'northhouses/m1-05': require('../assets/partners/northhouses/m1-05.jpg'),
+  'northhouses/m1-06': require('../assets/partners/northhouses/m1-06.jpg'),
+  'northhouses/m1-07': require('../assets/partners/northhouses/m1-07.jpg'),
+  'northhouses/m1-08': require('../assets/partners/northhouses/m1-08.jpg'),
+  'northhouses/a4-01': require('../assets/partners/northhouses/a4-01.jpg'),
+  'northhouses/a4-02': require('../assets/partners/northhouses/a4-02.jpg'),
+  'northhouses/a4-03': require('../assets/partners/northhouses/a4-03.jpg'),
+  'northhouses/a4-04': require('../assets/partners/northhouses/a4-04.jpg'),
+  'northhouses/a4-05': require('../assets/partners/northhouses/a4-05.jpg'),
+  'northhouses/a4-06': require('../assets/partners/northhouses/a4-06.jpg'),
+  'northhouses/a4-07': require('../assets/partners/northhouses/a4-07.jpg'),
+  'northhouses/a4-08': require('../assets/partners/northhouses/a4-08.jpg'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)
