@@ -4113,6 +4113,15 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
       OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    -- 1145: to_jsonb, so it never names order_method (never an error before 1144). Prices, pin, logo and is_active are
+    --       expected to change later, so the token asserts only what the file fixed for good.
+    UNION ALL SELECT '20261145_bidda_badadez_data','bidda-badadez exists with order_method phone and its 8 named dishes, once 1145 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261145_bidda_badadez_data.sql')
+      OR COALESCE((SELECT to_jsonb(p)->>'order_method' = 'phone'
+                          AND (SELECT count(DISTINCT i.name) FROM public.eatery_menu_items i WHERE i.partner_id = p.id
+                                 AND i.name IN ('Bidda Badadez Sade','Bidda Badadez Hellimli','Bidda Badadez Şiş Köfte','Bidda Badadez Tavuk Köfte',
+                                                'Bidda Badadez Special','Katmer','Hellim Böreği','Kıyma Böreği')) = 8
+                     FROM public.eatery_partners p WHERE p.slug = 'bidda-badadez'), false)
     -- 1128 deletes rows once; the deletion is not observable afterwards (real orders replace the tests), so the token only
     -- proves the table it acted on still exists. The proof was the in-file asserts (counts printed in the apply log).
     UNION ALL SELECT '20261128_eatery_orders_test_cleanup','eatery_orders exists once 1128 is applied (one-time test-order delete; asserted in-file, not re-checkable)',
