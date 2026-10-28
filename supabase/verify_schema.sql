@@ -51,6 +51,8 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders'),
     -- Duty push run log (20261141): registered ahead of the apply; red until it runs.
     ('20261141_duty_push_runs','duty_push_runs'),
+    -- Partner booking requests (20261143): registered ahead of the apply; red until it runs.
+    ('20261143_partner_booking_requests','partner_booking_requests'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers'),
     -- Per-dish options (1134): registered ahead of the apply; red until it runs.
@@ -247,6 +249,14 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs','error_kinds'),
     -- 20261142: registered ahead of the apply; red until it runs.
     ('20261142_duty_push_runs_partial_retries','duty_push_runs','push_retries'),
+    -- 20261143: partner_booking_requests (no identifier column; asserted as an absence in H).
+    ('20261143_partner_booking_requests','partner_booking_requests','id'),
+    ('20261143_partner_booking_requests','partner_booking_requests','partner'),
+    ('20261143_partner_booking_requests','partner_booking_requests','apartment'),
+    ('20261143_partner_booking_requests','partner_booking_requests','check_in'),
+    ('20261143_partner_booking_requests','partner_booking_requests','check_out'),
+    ('20261143_partner_booking_requests','partner_booking_requests','guests'),
+    ('20261143_partner_booking_requests','partner_booking_requests','created_at'),
     ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
     ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
     ('20261132_eatery_orders_is_test','order_testers','added_at'),
@@ -788,6 +798,13 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs_error_kinds_check'),
     ('20261141_duty_push_runs','duty_push_runs_finished_check'),
     ('20261142_duty_push_runs_partial_retries','duty_push_runs_retries_check'),
+    -- 20261143: partner_booking_requests.
+    ('20261143_partner_booking_requests','partner_booking_requests_pkey'),
+    ('20261143_partner_booking_requests','partner_booking_requests_partner_check'),
+    ('20261143_partner_booking_requests','partner_booking_requests_apartment_check'),
+    ('20261143_partner_booking_requests','partner_booking_requests_dates_check'),
+    ('20261143_partner_booking_requests','partner_booking_requests_stay_check'),
+    ('20261143_partner_booking_requests','partner_booking_requests_guests_check'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers_pkey'),
     ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
@@ -5171,6 +5188,61 @@ WITH report AS (
     AND COALESCE(NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.duty_push_runs') AND a.attnum > 0 AND NOT a.attisdropped
                               AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
                                 OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))), false)
+  UNION ALL
+  -- 20261143: partner_booking_requests, the North Houses booking-request log. Registered ahead of the apply; RED UNTIL IT RUNS.
+  --     Reached via to_regclass so a not-yet-applied table yields MISSING rows, not an aborted report. Four tokens, one question each.
+  --     (1) POSTURE: RLS on; exactly 4 policies, 2 of them permissive; exactly 7 columns and NO identifier column (an absence no
+  --         existence section can express).
+  SELECT '20261143_partner_booking_requests','partner_booking_requests: RLS on, exactly the 4 pbr_* policies (2 permissive), 7 columns, no identifier column',
+    COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.partner_booking_requests')), false)
+    AND COALESCE((SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests')
+        IS NOT DISTINCT FROM ARRAY['pbr_insert_authenticated','pbr_no_delete','pbr_no_update','pbr_select_admin'], false)
+    AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND permissive = 'PERMISSIVE') = 2
+    AND COALESCE((SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('public.partner_booking_requests') AND a.attnum > 0 AND NOT a.attisdropped) = 7, false)
+    AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'partner_booking_requests'
+          AND column_name IN ('user_id','device_id','session_id','install_id','ip','ip_address','name','full_name','phone','email','dedup_key'))
+  --     (2) GRANTS (a GRANT creates no named object). anon: nothing, table or column. authenticated: INSERT on EXACTLY the five columns
+  --         (so id and created_at are unforgeable), SELECT at table level (RLS gates it to admins), no UPDATE/DELETE/TRUNCATE/REFERENCES/
+  --         TRIGGER. Positive control: authenticated CAN insert partner, so the denials are not scored on a dead table.
+  UNION ALL SELECT '20261143_partner_booking_requests','partner_booking_requests grants: anon none; authenticated INSERT exactly (partner,apartment,check_in,check_out,guests) + SELECT only',
+    COALESCE(NOT has_table_privilege('anon', to_regclass('public.partner_booking_requests'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+         AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.partner_booking_requests') AND a.attnum > 0 AND NOT a.attisdropped
+                          AND has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))
+         AND NOT has_table_privilege('authenticated', to_regclass('public.partner_booking_requests'), 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+         AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.partner_booking_requests') AND a.attnum > 0 AND NOT a.attisdropped
+                          AND has_column_privilege('authenticated', a.attrelid, a.attnum, 'UPDATE,REFERENCES'))
+         AND has_table_privilege('authenticated', to_regclass('public.partner_booking_requests'), 'SELECT')
+         AND has_column_privilege('authenticated', to_regclass('public.partner_booking_requests'), 'partner', 'INSERT'), false)
+    AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+          WHERE a.attrelid = to_regclass('public.partner_booking_requests') AND a.attnum > 0 AND NOT a.attisdropped AND has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT'))
+        IS NOT DISTINCT FROM 'apartment,check_in,check_out,guests,partner', false)
+  --     (3) CONSTRAINT DEFINITIONS, by fragment (older majors render parentheses differently): the 7 apartment slugs EXACTLY (derived from
+  --         the live definition), partner north_houses only, check_out > check_in, stay <= 90, guests >= 1 and <= 12.
+  UNION ALL SELECT '20261143_partner_booking_requests','partner_booking_requests CHECK definitions: 7 apartment slugs exactly, partner north_houses, out > in, stay <= 90, guests 1..12',
+    COALESCE((SELECT array_agg(m[1] ORDER BY m[1]) FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z0-9-]+)''::text', 'g') AS m
+               WHERE c.conrelid = to_regclass('public.partner_booking_requests') AND c.conname = 'partner_booking_requests_apartment_check')
+        IS NOT DISTINCT FROM ARRAY['lefkosa-gunluk-kiralik-daire-2-yatak-odali','lefkosa-gunluk-kiralik-daire-iki-yatak-odali','lefkosa-gunluk-kiralik-studio-daire','lefkosa-gunluk-kiralik-studio-daire-dereboyu','north-houses-aladag-sk-kucuk-kaymakli-lefkosa','yasemin-2plus1','yasemin-2plus1-plus'], false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%''north_houses''::text%' AND pg_get_constraintdef(oid) NOT LIKE '% OR %'
+                    FROM pg_constraint WHERE conrelid = to_regclass('public.partner_booking_requests') AND conname = 'partner_booking_requests_partner_check'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%check_out > check_in%' FROM pg_constraint WHERE conrelid = to_regclass('public.partner_booking_requests') AND conname = 'partner_booking_requests_dates_check'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%check_out - check_in%' AND pg_get_constraintdef(oid) LIKE '%<= 90%'
+                    FROM pg_constraint WHERE conrelid = to_regclass('public.partner_booking_requests') AND conname = 'partner_booking_requests_stay_check'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%guests >= 1%' AND pg_get_constraintdef(oid) LIKE '%guests <= 12%'
+                    FROM pg_constraint WHERE conrelid = to_regclass('public.partner_booking_requests') AND conname = 'partner_booking_requests_guests_check'), false)
+  --     (4) POLICY BODIES (Q3 counts policies, it cannot see what one says): insert is authenticated-only with the partner/date/guest
+  --         bounds (partner, apartment, order, stay, guests; NO date-vs-today rule) in its WITH CHECK; select is admin-only via is_admin(); update and delete are RESTRICTIVE USING (false). Each
+  --         negative is paired with its positive (the insert policy exists and reaches authenticated; the admin read exists).
+  UNION ALL SELECT '20261143_partner_booking_requests','partner_booking_requests policy bodies: insert authenticated-only + bounds, select admin-only, update/delete restrictive false',
+    COALESCE((SELECT roles::text = '{authenticated}' AND with_check LIKE '%north_houses%' AND with_check LIKE '%check_out > check_in%'
+                     AND with_check LIKE '%<= 90%' AND with_check LIKE '%guests >= 1%' AND with_check LIKE '%guests <= 12%'
+                     AND with_check LIKE '%yasemin-2plus1%' AND with_check LIKE '%north-houses-aladag-sk-kucuk-kaymakli-lefkosa%' AND with_check NOT LIKE '%CURRENT_DATE%'
+                FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND policyname = 'pbr_insert_authenticated' AND cmd = 'INSERT' AND permissive = 'PERMISSIVE'), false)
+    AND COALESCE((SELECT roles::text = '{authenticated}' AND qual LIKE '%is_admin()%'
+                FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND policyname = 'pbr_select_admin' AND cmd = 'SELECT' AND permissive = 'PERMISSIVE'), false)
+    AND COALESCE((SELECT qual = 'false' AND with_check = 'false'
+                FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND policyname = 'pbr_no_update' AND cmd = 'UPDATE' AND permissive = 'RESTRICTIVE'), false)
+    AND COALESCE((SELECT qual = 'false'
+                FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND policyname = 'pbr_no_delete' AND cmd = 'DELETE' AND permissive = 'RESTRICTIVE'), false)
   ) z
 
   UNION ALL
