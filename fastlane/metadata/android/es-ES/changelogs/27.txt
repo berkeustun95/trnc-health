@@ -1,0 +1,3 @@
+Un comienzo nuevo: ADA ahora se abre con una nueva pantalla de inicio blanca. Nuestro logo de brújula se convierte en un anillo, y Oli y Maki salen de él para decirte hola.
+• Un arranque más fluido y limpio
+• Pequeñas correcciones y mejoras
