@@ -62,7 +62,7 @@ if (process.argv.includes('--live')) {
   const sb = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     { auth: { persistSession: false, autoRefreshToken: false } })
   const { error: authErr } = await sb.auth.signInWithPassword({
-    email: process.env.ADA_TEST_EMAIL, password: process.env.ADA_TEST_PASSWORD })
+    email: process.env.QA_TEST_EMAIL, password: process.env.QA_TEST_PASSWORD })
   if (authErr) { console.error(red(`sign-in failed: ${authErr.message}`)); process.exit(1) }
   const { data, error } = await sb.from('facilities').select('name, latitude, longitude')
     .eq('type', 'pharmacy').in('name', EXPECTED.map(([, , to]) => to))
