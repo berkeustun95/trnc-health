@@ -1,3 +1,104 @@
+# EAS uploads what this file does NOT exclude, and when it exists it REPLACES .gitignore for the
+# upload: anything only gitignored is packed and sent with every build (found 2026-10-28: .env with
+# test passwords, a local *.jks keystore, .claude/settings.local.json). So the first block repeats
+# .gitignore verbatim; keep it in step whenever .gitignore changes (`npm run easignore:check`).
+# ── .gitignore (verbatim) ──────────────────────────────────────────────────────
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env
+.env*.local
+
+# store credentials
+google-play-service-account.json
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# dev-only test tooling (not part of the app bundle)
+scripts/send-test-duty-push.js
+
+# Tier-2 geocoder output. Timestamped per run and regenerated on every dry run, so it is
+# working output, never a source of truth — the authoritative list of pharmacies still
+# needing a pin is `facilities WHERE latitude IS NULL`. The untimestamped legacy name is
+# matched too: it predates the timestamping and was overwritten by every run.
+hand-place-queue*.csv
+
+# Dorm showcase maximum-content fixture (scripts/dev/dorm-fixture.mjs --apply).
+# Generated solid-colour PNGs, never real photographs, never committed. The config edits
+# the fixture makes are caught by scripts/check-dorms.mjs and .githooks/pre-commit.
+assets/partners/_fixture/
+
+# Transient fetch artifact from scripts/fetch-gisekibris-feed.mjs. The COMMITTED
+# record is supabase/seed/gisekibris-events-clean.json, which is derived from it —
+# committing both would keep two copies of one drop that can disagree.
+supabase/seed/gisekibris-feed-raw.json
+
+# Bundler gems (fastlane), installed locally — never commit
+vendor/
+
+# Geocoder output: holds Google Places results (terms limit caching) — never committed.
+data/kitob/geocode-*.csv
+data/pharmacy-hand-place-*.csv
+data/osm/
+data/placement-progress.json
+data/hnc/
+
+# supabase link state (project ref, CLI versions) — per checkout, never committed
+supabase/.temp/
+# Deno lockfile from the local Edge Function harness (scripts/test-google-places-edge.ts)
+deno.lock
+# agent run reports (Hermes / ada-team) — local output, never committed
+/reports/
+
+# Designer screenshots (scripts/screenshot-android.sh); never commit them
+.screenshots/
+
+# Designer agent parked backlog (local only; repo is public)
+.designer/
+
+# ── .gitignore end ─────────────────────────────────────────────────────────────
+
+# Ignored on Berke's Mac outside .gitignore (.git/info/exclude, ~/.config/git/ignore), which EAS
+# does not read either. .claude/ holds Claude Code's local settings and session state; no build input.
+.claude/
+reviews.md
+.splash-build/
+
 google-play-service-account.json
 
 # Local 62 MB scratch directory, untracked. `.easignore` is what governs the EAS upload

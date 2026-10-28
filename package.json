@@ -57,6 +57,7 @@
     "ios:build": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 build --platform ios --profile production --non-interactive --no-wait",
     "ios:submit": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 submit --platform ios --profile production --latest --non-interactive",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "easignore:check": "node scripts/check-easignore.mjs && node scripts/check-easignore.mjs --self",
     "conn:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-connectivity-content.mjs",
     "native:safe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs",
     "explore:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-photo-attribution.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-explore-seed.mjs",
