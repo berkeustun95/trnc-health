@@ -19,7 +19,7 @@ import EateryPartnerScreen from './EateryPartnerScreen'
 // The table cannot legitimately be empty while the section is live: zero rows is an ERROR STATE.
 // utils/loadEateryPartners.js fetches the rows, adds the Preview placeholder and applies the partner gates.
 
-const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, order_requires_account, adult_only, ' +
+const COLS = 'id, slug, name, category, phone, whatsapp, website_url, menu_url, maps_url, region, address, opening_hours, logo_path, menu_verified_on, sort_order, is_active, order_method, order_requires_account, adult_only, ' +
   'eatery_menu_items(id, section, section_order, name, description, price, currency, sort_order, is_available, photo_path, photo_width, photo_height, role, protein, spicy, portion, eatery_item_options(id, kind, label_i18n, message_tr, price, max_qty, sort_order, is_available)), ' +
   'eatery_photos(id, kind, storage_path, width, height, sort_order)'
 

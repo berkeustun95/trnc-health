@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -109,7 +109,7 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
         <Text style={s.itemName}>{item.name}</Text>
         {!!item.description && <Text style={s.itemDesc}>{item.description}</Text>}
       </View>
-      {!!price && <Text style={s.itemPrice}>{price}</Text>}
+      {price ? <Text style={s.itemPrice}>{price}</Text> : <Text style={s.itemPricePending}>{t('eateryPricePending', lang)}</Text>}
     </View>
   )
   if (!ordering || !eateryOrderable(item)) return row
@@ -180,7 +180,7 @@ function DishPhotoViewer({ item, lang, reduce, onClose, onFail }) {
           </View>
           <View style={s.caption}>
             <Text style={s.capName}>{item.name}</Text>
-            {!!price && <Text style={s.capPrice}>{price}</Text>}
+            {price ? <Text style={s.capPrice}>{price}</Text> : <Text style={s.capPricePending}>{t('eateryPricePending', lang)}</Text>}
           </View>
         </Pressable>
       )}
@@ -212,7 +212,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // Order via WhatsApp. The basket (per partner, in memory) holds quantities only; names and prices are read from the
   // menu rows here. No number behind it (and never a fixture partner) = no basket at all.
   const orderDigits = eateryOrderDigits(effectiveWhatsapp(partner))
-  const ordering = !!orderDigits
+  const ordering = eateryOrdersByWhatsapp(partner) && !!orderDigits
+  const orderByPhone = partner.order_method === 'phone'
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
     if (!ordering) return []
@@ -536,7 +537,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           <View style={s.actions}>
             {contacts.map(c => (
               <Button key={c.action} fullWidth variant={CONTACT_UI[c.action].variant}
-                icon={CONTACT_UI[c.action].icon} title={t(CONTACT_UI[c.action].labelKey, lang)}
+                icon={CONTACT_UI[c.action].icon} title={t(c.action === 'call' && orderByPhone ? 'eateryOrderByPhone' : CONTACT_UI[c.action].labelKey, lang)}
                 onPress={() => go(c.action, c.url)} />
             ))}
             {IS_PREVIEW && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
@@ -617,6 +618,7 @@ const s = StyleSheet.create({
   itemName:  { ...type.body, color: colors.textPrimary },
   itemDesc:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
   itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
+  itemPricePending: { ...type.small, color: colors.textSecondary, flexShrink: 0 },
   itemOrder: { alignItems: 'flex-end', marginBottom: space[4] },
   focusRow:  { marginHorizontal: -space[8], paddingHorizontal: space[8], borderRadius: radii.sm },
   focusMark: { ...StyleSheet.absoluteFillObject, borderRadius: radii.sm, backgroundColor: colors.primaryLight },
@@ -632,4 +634,5 @@ const s = StyleSheet.create({
   caption:   { paddingHorizontal: space[20], gap: space[4], alignItems: 'center', flexShrink: 0 },
   capName:   { ...type.rowTitle, color: colors.onPrimary, textAlign: 'center' },
   capPrice:  { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.onPrimary },
+  capPricePending: { ...type.small, color: colors.onPrimary, opacity: 0.75 },
 })

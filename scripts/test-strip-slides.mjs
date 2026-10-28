@@ -141,6 +141,13 @@ t('base order = sort_order then name, whatever the input order',
   ids(await run({ partners: [P('z', 'Zed', { sort_order: 1 }), C, P('b2', 'Bravo2', { sort_order: 0 }), A] })).slice(1), ['eatery-a-cafe', 'eatery-b2', 'eatery-c-bake', 'eatery-z'])
 t('gate false for a slug -> absent', ids(await run({ partners: [A, B], gates: { 'a-cafe': false } })).slice(1), ['eatery-b-bar'])
 t('gate true / unlisted slug -> present', ids(await run({ partners: [A, B], gates: { 'a-cafe': true } })).slice(1), ['eatery-a-cafe', 'eatery-b-bar'])
+{
+  const Off = P('d-dark', 'Delta', { is_active: false }), On = P('e-live', 'Echo', { is_active: true })
+  const sl = await run({ partners: [On, Off] })
+  t('two partners, one inactive: both slides, order by name', ids(sl).slice(1), ['eatery-d-dark', 'eatery-e-live'])
+  t('inactive partner slide is flagged unpublished, the active one is not', sl.slice(1).map(x => x.unpublished === true), [true, false])
+  t('no partner-specific branch: a second partner is just another row', sl.slice(1).map(x => x.action.slug), ['d-dark', 'e-live'])
+}
 t('duplicate slug rows -> one slide', ids(await run({ partners: [A, A] })).slice(1), ['eatery-a-cafe'])
 t('rotation is relative to the visible partners (gated one does not count)', ids(await run({ partners: [A, B, C], gates: { 'a-cafe': false }, rotation: 1 })).slice(1), ['eatery-c-bake', 'eatery-b-bar'])
 console.log('slide shape')
