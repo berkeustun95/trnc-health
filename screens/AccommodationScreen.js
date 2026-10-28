@@ -134,7 +134,7 @@ const TITLE_KEY = 'menuAccomTile'
 // Rendered only when more than one tab is live — a single segment is not a choice.
 function TabBar({ tab, onChange, lang }) {
   return (
-    <View style={cs.tabBar} accessibilityRole="tablist">
+    <View style={[cs.tabBar, TABS.length > 2 && cs.tabBarTight]} accessibilityRole="tablist">
       {TABS.map(item => {
         const active = tab === item.id
         return (
@@ -149,7 +149,7 @@ function TabBar({ tab, onChange, lang }) {
                 positioned so it never changes the segment's size; state-aware colour for
                 the same contrast reason the chip's was (see intentDot below). */}
             {item.promoted && (
-              <View pointerEvents="none" style={[cs.intentDot, active && cs.intentDotOnActive]} />
+              <View pointerEvents="none" style={[cs.intentDot, TABS.length > 2 && cs.tabDotTight, active && cs.intentDotOnActive]} />
             )}
           </TouchableOpacity>
         )
@@ -951,6 +951,10 @@ const legacyCs = StyleSheet.create({
   tabSegActive:        { backgroundColor: colors.primary },
   // Three tabs (Günlük Kiralık live): each segment is a third wide, so the label gets the padding back.
   tabSegTight:         { paddingHorizontal: 4 },
+  // With three segments they touch, and Yurtlar's dot (right: 7) sat against the next tab's
+  // active pill. A gap between segments and the dot pulled inward; two-tab layout untouched.
+  tabBarTight:         { gap: 4 },
+  tabDotTight:         { right: 12 },
   tabSegText:          { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
   tabSegTextActive:    { fontFamily: 'Inter_700Bold', color: '#fff' },
   // The promoted marker. `position: 'absolute'` is the requirement, not the styling
