@@ -156,7 +156,10 @@ function loadExpoVideo() {
 
 // Defined outside BootSplash so a re-render never remounts the player. Created only for a
 // playing, non-Reduce-Motion launch. The player and view hold the last frame after the end.
-function ClipVideo({ top, cw, ch, onShown }) {
+// Reports the clip's own position and end, so the wordmark and exit follow what is on screen
+// rather than the wall clock (a 1.4.1 iPhone played the clip slower than real time and the exit
+// cut Oli mid-pop, Berke 2026-10-28). `onFail` hands timing back to the wall-clock fallback.
+function ClipVideo({ top, cw, ch, onShown, onProgress, onEnd, onFail }) {
   const { useVideoPlayer, VideoView } = loadExpoVideo()
   const player = useVideoPlayer(VIDEO, p => {
     p.muted = true
@@ -164,11 +167,16 @@ function ClipVideo({ top, cw, ch, onShown }) {
     p.audioMixingMode = 'mixWithOthers'
     p.showNowPlayingNotification = false
     p.staysActiveInBackground = false
+    p.timeUpdateEventInterval = 0.1
     p.play()
   })
   useEffect(() => {
-    const sub = player.addListener('statusChange', ({ status }) => { if (status === 'error') onShown() })
-    return () => sub.remove()
+    const subs = [
+      player.addListener('statusChange', ({ status }) => { if (status === 'error') onFail() }),
+      player.addListener('timeUpdate', ({ currentTime }) => onProgress(currentTime)),
+      player.addListener('playToEnd', onEnd),
+    ]
+    return () => subs.forEach(s => s.remove())
   }, [player])
   return (
     <VideoView
@@ -185,10 +193,13 @@ function ClipVideo({ top, cw, ch, onShown }) {
   )
 }
 
-// ms from the clip's first displayed frame. The clip runs 3.33 s and holds its last frame. The
-// logo-to-gate second puts the old clip 958 ms later, so its approved beats move by that much.
+// ms into the clip. The clip runs 3.33 s and holds its last frame. The logo-to-gate second puts
+// the old clip 958 ms later, so its approved beats move by that much. VIDEO_PATH reads them off the
+// player's position and end; the WebP path, Reduce Motion and a clip that never reports a frame
+// fall back to the wall clock from `shownAt`.
 const WORD_IN = 2560
-// The fade starts once the clip has landed on its held smile (Berke 2026-10-24).
+// The fade starts once the clip has landed on its held smile (Berke 2026-10-24): its end, plus up
+// to EXIT_MAX - EXIT_MIN for the app to be ready.
 const EXIT_MIN = 3360
 const EXIT_MAX = 3610
 const EXIT_FADE = 250
@@ -216,6 +227,12 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   const startScale = MORPH ? (Platform.OS === 'ios' ? W : MORPH_ANDROID_W) * MORPH_LOGO / (CLIP_LOGO * W) : 1
   const zoom = useRef(new Animated.Value(startScale)).current
   const [shownAt, setShownAt] = useState(null)
+  // True once the clip has drawn a real frame (not the watchdog): from then on its position times
+  // the wordmark and its end times the exit.
+  const [clipDriven, setClipDriven] = useState(false)
+  const [clipEnded, setClipEnded] = useState(false)
+  const clipFailed = useRef(false)
+  const wordIn = useRef(false)
   const [firstShown, setFirstShown] = useState(false)
   const readyAt = useRef(null)
   const done = useRef(false)
@@ -231,6 +248,25 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   }
 
   const releaseNative = HOLD_NATIVE ? hideNativeSplash : undefined
+
+  const showWord = () => {
+    if (wordIn.current) return
+    wordIn.current = true
+    Animated.timing(word, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
+  }
+  const onClipShown = () => {
+    if (!clipFailed.current) setClipDriven(true)
+    setShownAt(t0 => t0 ?? Date.now())
+    if (HOLD_NATIVE) hideNativeSplash()
+  }
+  const onClipFail = () => {
+    clipFailed.current = true
+    setClipDriven(false)
+    setShownAt(t0 => t0 ?? Date.now())
+    if (HOLD_NATIVE) hideNativeSplash()
+  }
+  const onClipProgress = s => { if (s * 1000 >= WORD_IN) showWord() }
+  const onClipEnd = () => { showWord(); setClipEnded(true) }
 
   useEffect(() => {
     const timer = setTimeout(finish, HARD_CAP)
@@ -260,21 +296,32 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
   }, [firstShown, shownAt, reduce])
 
   useEffect(() => {
-    if (shownAt == null) return
-    if (!reduce) {
-      Animated.timing(zoom, { toValue: 1, duration: LOGO_TO_GATE, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }).start()
-      Animated.timing(word, { toValue: 1, duration: 300, delay: WORD_IN, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
-    }
+    if (shownAt == null || reduce) return
+    Animated.timing(zoom, { toValue: 1, duration: LOGO_TO_GATE, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }).start()
   }, [shownAt])
 
+  // Wall-clock fallback; a clip that starts after the watchdog takes the timing over.
   useEffect(() => {
-    if (shownAt == null) return
+    if (shownAt == null || reduce || clipDriven) return
+    const timer = setTimeout(showWord, Math.max(0, WORD_IN - (Date.now() - shownAt)))
+    return () => clearTimeout(timer)
+  }, [shownAt, clipDriven])
+
+  useEffect(() => {
+    if (shownAt == null || clipDriven) return
     const min = reduce ? REDUCED_MIN : EXIT_MIN
     const sinceShown = readyAt.current == null ? Infinity : readyAt.current - shownAt
     const at = Math.min(EXIT_MAX, Math.max(min, sinceShown))
     const timer = setTimeout(finish, Math.max(0, at - (Date.now() - shownAt)))
     return () => clearTimeout(timer)
-  }, [ready, shownAt])
+  }, [ready, shownAt, clipDriven])
+
+  useEffect(() => {
+    if (!clipDriven || !clipEnded) return
+    if (ready) { finish(); return }
+    const timer = setTimeout(finish, EXIT_MAX - EXIT_MIN)
+    return () => clearTimeout(timer)
+  }, [clipDriven, clipEnded, ready])
 
   // Undecided: look exactly like the native splash. With no morph to draw (Android < 12, a
   // stage-A binary) that is its plain window colour, never the app underneath.
@@ -325,7 +372,7 @@ export default function BootSplash({ play, ready, lang, fontsLoaded, onDone }) {
             <Image source={FIRST} fadeDuration={0} onLoad={() => { setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} onError={() => { if (!VIDEO_PATH) return; setFirstShown(true); if (HOLD_NATIVE) hideNativeSplash() }} style={{ position: 'absolute', left: 0, top: 0, width: cw, height: ch }} />
           )}
           {reduce === false && VIDEO_PATH && !leaving && (
-            <ClipVideo top={0} cw={cw} ch={ch} onShown={() => { setShownAt(t0 => t0 ?? Date.now()); if (HOLD_NATIVE) hideNativeSplash() }} />
+            <ClipVideo top={0} cw={cw} ch={ch} onShown={onClipShown} onProgress={onClipProgress} onEnd={onClipEnd} onFail={onClipFail} />
           )}
           {reduce === false && !VIDEO_PATH && (
             <ExpoImage
