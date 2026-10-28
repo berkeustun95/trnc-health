@@ -23,6 +23,11 @@ eq('entry card hidden without tagged mains', Q.quizHasMains([bare]), false)
 eq('a side is not a main', Q.quizHasMains([partner('s', 0, [dish('Fries', { role: 'side' })])]), false)
 eq('unavailable main is no candidate', Q.quizHasMains([partner('u', 0, [dish('X', { is_available: false })])]), false)
 eq('priceless main is no candidate', Q.quizHasMains([partner('n', 0, [dish('X', { price: null })])]), false)
+{
+  const mixed = partner('m', 0, [dish('Priced'), dish('Pending', { price: null }), dish('Empty', { price: '' })])
+  eq('only the priced main is a candidate', Q.quizCandidates([mixed]).map(c => c.item.name), ['Priced'])
+  eq('a NULL-price main is never suggested', names(Q.quizMatch([partner('p2', 0, [dish('Pending', { price: null })])], ANY)), [])
+}
 eq('entry card shown with one tagged main', Q.quizHasMains([bare, partner('ok', 1, [dish('Burger')])]), true)
 eq('fixture partner never appears in results', names(Q.quizMatch([bare], ANY)), [])
 

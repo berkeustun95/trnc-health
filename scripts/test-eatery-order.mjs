@@ -2,7 +2,7 @@
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -610,6 +610,28 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('wiring: getFix checks services before the fresh fix and uses askFreshFix', [/hasServicesEnabledAsync[\s\S]*askFreshFix\(servicesOn\) \? await withTimeout\(askedFix/.test(dl)], [true])
   eq('wiring: goTo clears the accuracy note (any programmatic move); goMe sets it AFTER goTo; the map label carries it', [/const goTo = [^\n]*\n\s*setAcc\(null\)/.test(pk), /goTo\(p\.lat, p\.lng, AREA_DELTA \/ 2\); setAcc\(p\.accuracy\)/.test(pk), /eateryPinMapA11y'[^\n]*accText/.test(pk), /useState\(start\.accuracy \?\? null\)/.test(pk)], [true, true, true, true])
   eq('wiring: the picker hands back lat / lng only (no accuracy) and shows the note from state', [/onUse\(centre\.current\)/.test(pk), /centre\.current = \{ lat: r\.latitude, lng: r\.longitude \}/.test(pk)], [true, true])
+}
+
+// Order method: only an explicit 'whatsapp' partner gets a basket, even when a number exists (Preview swaps EVERY
+// partner's number for the tester's).
+{
+  const canBasket = (p, o) => eateryOrdersByWhatsapp(p) && !!eateryOrderDigits(eateryContactNumbers(p, o).whatsapp)
+  const wa = { order_method: 'whatsapp', whatsapp: '+90 548 000 00 00', phone: '+90 392 000 00 00' }
+  const ph = { order_method: 'phone', whatsapp: null, phone: '+90 392 000 00 00' }
+  const PV = { isPreview: true, testNumber: '+90 533 111 22 33' }
+  eq('helper: whatsapp -> true', eateryOrdersByWhatsapp(wa), true)
+  eq('helper: phone -> false', eateryOrdersByWhatsapp(ph), false)
+  eq('helper: undefined / null / unknown -> false (fail closed)', [eateryOrdersByWhatsapp(undefined), eateryOrdersByWhatsapp(null), eateryOrdersByWhatsapp({}), eateryOrdersByWhatsapp({ order_method: 'WhatsApp' })], [false, false, false, false])
+  eq('production: whatsapp partner with a number -> basket', canBasket(wa, {}), true)
+  eq('production: phone partner -> no basket', canBasket(ph, {}), false)
+  eq('Preview test number: whatsapp partner -> basket', canBasket(wa, PV), true)
+  eq('Preview test number swaps in a whatsapp number, a phone partner still -> NO basket', [eateryContactNumbers(ph, PV).whatsapp, canBasket(ph, PV)], ['+90 533 111 22 33', false])
+  eq('phone partner: call entry still comes from the one door', eateryContacts(ph, eateryContactNumbers(ph, {})).map(c => c.action), ['call'])
+  const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const qz = fs.readFileSync(new URL('../components/EateryQuiz.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('wiring: partner page basket needs eateryOrdersByWhatsapp', /const ordering = eateryOrdersByWhatsapp\(partner\) && !!orderDigits/.test(ps), true)
+  eq('wiring: quiz canOrder needs eateryOrdersByWhatsapp', /const canOrder = p => eateryOrdersByWhatsapp\(p\) && /.test(qz), true)
+  eq('wiring: phone partner call button is relabelled eateryOrderByPhone', /c\.action === 'call' && orderByPhone \? 'eateryOrderByPhone'/.test(ps), true)
 }
 
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.

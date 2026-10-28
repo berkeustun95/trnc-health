@@ -143,6 +143,10 @@ export function eateryOpenStatus(p, lang, now = new Date()) {
 export const eateryOrderable = i => !!i && i.is_available !== false && i.price != null && i.price !== '' && Number.isFinite(Number(i.price))
 export const ORDER_NOTE_MAX = 200
 
+// The basket exists only for a partner that takes WhatsApp orders. Fail closed: a row without order_method (an older
+// column list, a fixture) or any other value (e.g. 'phone') is not a basket partner. Always combined with a number.
+export const eateryOrdersByWhatsapp = p => p?.order_method === 'whatsapp'
+
 // wa.me wants digits only (country code first). Same rule as eateryContacts(); null when too short to dial.
 export const eateryOrderDigits = wa => {
   const d = filled(wa) ? wa.replace(/\D/g, '') : ''

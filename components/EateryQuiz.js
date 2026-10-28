@@ -3,7 +3,7 @@ import { View, Text, Image, Pressable, ScrollView, Animated, Easing, Accessibili
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { formatPrice, eateryOrderDigits, eateryItemOptions } from '../constants/eatery'
+import { formatPrice, eateryOrderDigits, eateryOrdersByWhatsapp, eateryItemOptions } from '../constants/eatery'
 import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
@@ -293,7 +293,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
   // stepper) show here: any store change re-renders this page, which reads the baskets fresh.
   const [, setTick] = useState(0)
   useEffect(() => subscribe(() => setTick(n => n + 1)), [])
-  const canOrder = p => !!eateryOrderDigits(effectiveWhatsapp(p))
+  const canOrder = p => eateryOrdersByWhatsapp(p) && !!eateryOrderDigits(effectiveWhatsapp(p))
   const onQty = (p, id, delta) => {
     changeQty(p.id, id, delta)
   }
