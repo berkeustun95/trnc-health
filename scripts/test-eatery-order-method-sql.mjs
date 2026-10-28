@@ -107,6 +107,18 @@ t('1143 applies a SECOND time (re-runnable, ledger row present)', await applyFil
 t('ledger row written', (await q(db, `SELECT filename FROM public.schema_migrations_applied ORDER BY 1`)).map(r => r.filename),
   ['20261125_eatery_orders.sql', '20261132_eatery_orders_is_test.sql', '20261134_eatery_item_options.sql', '20261143_eatery_order_method.sql'])
 await tokens(db, '1143 tokens AFTER 1143', T43, true)
+// The OLDER tokens that read create_eatery_order / its COMMENT must still be green on a post-1143 database (the sibling probes stop at 1134).
+{
+  const i34 = VS.indexOf('    -- ── 1134: per-dish options'), i32 = VS.indexOf('    -- ── 1132: server-marked TEST orders'),
+    i25 = VS.indexOf('    -- ── 1125: WhatsApp order proof.'), i19 = VS.indexOf("    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2")
+  if (i34 < 0 || i32 < i34 || i25 < i32 || i19 < i25) throw new Error('verify_schema 1134 / 1132 / 1125 token anchors missing')
+  const old = async (label, s) => {
+    const rows = (await db.query(tokq(s))).rows
+    t(`verify_schema ${label} AFTER 1143: ${rows.length} tokens, all true`, [rows.length > 0, rows.every(r => r.ok === true)], [true, true])
+    if (rows.some(r => r.ok !== true)) console.log(rows.filter(r => r.ok !== true).map(r => '      ' + r.object.slice(0, 110)).join('\n'))
+  }
+  await old('1134 tokens', VS.slice(i34, i32)); await old('1132 tokens', VS.slice(i32, i25)); await old('1125 tokens', VS.slice(i25, i19))
+}
 t('crunchy-express is whatsapp, and it is the only partner', await q(db, `SELECT slug, order_method FROM public.eatery_partners ORDER BY slug`), [{ slug: 'crunchy-express', order_method: 'whatsapp' }])
 t('column: text, NOT NULL, no default', await q(db, `SELECT data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='eatery_partners' AND column_name='order_method'`),
   [{ data_type: 'text', is_nullable: 'NO', column_default: null }])

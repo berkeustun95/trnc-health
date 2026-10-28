@@ -4254,7 +4254,7 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''created_by''%'
            AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%''client_id''%'
            AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text)')) NOT LIKE '%option_id%', false)
-    UNION ALL SELECT '20261134_eatery_item_options','COMMENTs: create (lists option_unavailable, keeps the NOT test orders sentence) / verify (lines carry detail) / the table / the helper all carry the 20261134 text',
+    UNION ALL SELECT '20261134_eatery_item_options','COMMENTs: create (lists option_unavailable, keeps the NOT test orders sentence; its 20261134. suffix is owned by the 20261143 token) / verify (lines carry detail) / the table / the helper carry the 20261134 text',
       COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%option_unavailable%'
            AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%NOT test orders%', false) -- 20261143:supersede (the create COMMENT's `20261134.` suffix half moved to the 20261143 token: one count, one owner)
       AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%detail%'
