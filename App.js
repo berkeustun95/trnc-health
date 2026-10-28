@@ -726,6 +726,8 @@ export default function App() {
   // would fall through to `showAccommodation` and close the whole module instead of the
   // overlay — the same shape as the events-detail back bug that is still open.
   const [openedDorm, setOpenedDorm] = useState(null)
+  // A North Houses apartment (Günlük Kiralık tab): the same overlay, the same reason it lives here.
+  const [openedRental, setOpenedRental] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   // ─── Redesign Slice 2 (shell) ───────────────────────────────────────────────
@@ -1098,6 +1100,7 @@ export default function App() {
       if (openedEvent) { if (eventFromHome) closeEvents(); else setOpenedEvent(null); return true }
       if (showEvents) { closeEvents(); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
+      if (openedRental) { setOpenedRental(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
@@ -1155,7 +1158,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2156,6 +2159,9 @@ export default function App() {
         onOpenDorm={d => setOpenedDorm(d)}
         selectedDorm={openedDorm}
         onCloseDorm={() => setOpenedDorm(null)}
+        onOpenRental={a => setOpenedRental(a)}
+        selectedRental={openedRental}
+        onCloseRental={() => setOpenedRental(null)}
       />
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />
