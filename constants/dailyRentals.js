@@ -40,7 +40,7 @@ export const NORTH_HOUSES = {
   name:    'North Houses',
   website: 'https://www.northcyprusbnb.com',
   email:   'book@northcyprusbnb.com',
-  // ONE number, in the form wa.me wants after the digits are taken from it.
+  // ONE number for WhatsApp and calls (partner, 2026-10-29); wa.me takes its digits, Ara dials it as is.
   phone:   '+905338470666',
 
   logo:       'northhouses/logo',

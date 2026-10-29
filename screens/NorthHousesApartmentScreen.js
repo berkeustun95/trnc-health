@@ -375,11 +375,15 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
   const typeLabel = apartment.kind === 'studio' ? t('nhTypeStudio', lang) : '2+1'
 
   // Each tap is logged on the line BEFORE the link (fire-and-forget, cannot throw), so a metrics
-  // failure can never cost the guest the handoff. Module 'accommodation' and these three actions
-  // already pass contact_events' live CHECKs.
+  // failure can never cost the guest the handoff. Module 'accommodation' and these four actions
+  // already pass contact_events' live CHECKs ('call' is the pair DormPartnerScreen logs).
   const openWhatsApp = () => {
     logContactEvent('accommodation', partner.id, 'whatsapp', null)
     Linking.openURL(nhWaUrl(nhWaMessage(t(apartment.nameKey, 'Turkish'), building?.name || ''))).catch(() => {})
+  }
+  const call = () => {
+    logContactEvent('accommodation', partner.id, 'call', null)
+    Linking.openURL(`tel:${partner.phone}`).catch(() => {})
   }
   const openWebsite = () => {
     logContactEvent('accommodation', partner.id, 'website', null)
@@ -475,13 +479,18 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
         <View style={[s.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <TouchableOpacity style={s.waBtn} onPress={openWhatsApp} activeOpacity={0.85} accessibilityRole="button"
             accessibilityLabel={t('accomWhatsApp', lang)}>
-            <Ionicons name="logo-whatsapp" size={18} color="#fff" />
-            <Text style={s.waBtnText} numberOfLines={1}>{t('accomWhatsApp', lang)}</Text>
+            <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+            <Text style={[s.barBtnText, s.waBtnText]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.15}>{t('accomWhatsApp', lang)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.webBtn} onPress={call} activeOpacity={0.7} accessibilityRole="button"
+            accessibilityLabel={`${t('accomCall', lang)} ${partner.phone}`}>
+            <Ionicons name="call-outline" size={20} color={colors.primary} />
+            <Text style={s.barBtnText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.15}>{t('accomCall', lang)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.webBtn} onPress={openWebsite} activeOpacity={0.7} accessibilityRole="link"
             accessibilityLabel={t('dormWebsite', lang)}>
-            <Ionicons name="open-outline" size={16} color={colors.primary} />
-            <Text style={s.webBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t('dormWebsite', lang)}</Text>
+            <Ionicons name="open-outline" size={20} color={colors.primary} />
+            <Text style={s.barBtnText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.15}>{t('dormWebsite', lang)}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -531,13 +540,16 @@ const s = StyleSheet.create({
   mapBtnText:  { ...type.body, fontFamily: 'Inter_700Bold', color: colors.primary },
   directNote:  { ...type.meta, color: colors.textSecondary, textAlign: 'center', marginTop: 2, marginBottom: 8 },
 
-  contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12,
+  contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12,
                  backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  waBtn:       { flex: 1.6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radii.md, backgroundColor: '#075E54' },
-  waBtnText:   { ...type.rowTitle, color: '#FFFFFF' },
-  webBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, paddingHorizontal: 8,
+  // Icon above the label: three labels side by side fit every locale at 360 dp only this way. Beside the icon,
+  // ru 'Позвонить' broke mid-word and ar 'الموقع الإلكتروني' shrank to unreadable (Android ignores minimumFontScale).
+  waBtn:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 56, paddingHorizontal: 4, paddingVertical: 6,
+                 borderRadius: radii.md, backgroundColor: '#075E54' },
+  webBtn:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 56, paddingHorizontal: 4, paddingVertical: 6,
                  borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-  webBtnText:  { ...type.rowTitle, color: colors.primary, flexShrink: 1 },
+  barBtnText:  { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.primary, textAlign: 'center' },
+  waBtnText:   { color: '#FFFFFF' },
 
   fieldRow:    { flexDirection: 'row', gap: 10 },
   field:       { flex: 1, marginBottom: 12 },
