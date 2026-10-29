@@ -797,6 +797,12 @@ for (const a of NH_APARTMENTS) {
     && Number.isInteger(a.minNights) && a.minNights >= 1, `${a.slug}: price / guests / minNights out of range`)
   check(a.photos.length === 8, `${a.slug}: expected 8 photos, found ${a.photos.length}`)
   nhKeys.add(a.nameKey); nhKeys.add(a.descKey)
+  if (a.electricity) {
+    const e = a.electricity
+    check(e.freeKwhPerDay === 7 && Number.isFinite(e.eurPerKwh) && e.eurPerKwh >= 0.1 && e.eurPerKwh <= 1,
+      `${a.slug}: electricity needs freeKwhPerDay 7 (the site's) and eurPerKwh 0.10..1.00, got ${JSON.stringify(e)}`)
+    nhKeys.add('nhElectricity')
+  }
   for (const k of a.amenityKeys) nhKeys.add(k)
   check(new Set(a.amenityKeys).size === a.amenityKeys.length, `${a.slug}: duplicate amenity key`)
   for (const key of a.photos) {
@@ -870,6 +876,11 @@ check(nhParseDate('31.02.2026') === null && nhParseDate('12.11.2026') === '2026-
   r = nhRequestLimit(st, T0 + 24 * H + 1)
   check(r.allowed && r.stamps.length <= 10, `limiter: nothing pruned after 24 h (kept ${r.stamps.length})`)
   check(nhRequestLimit('garbage', T0).allowed && nhRequestLimit([NaN, 'x', T0 + 99e9], T0).stamps.length === 1, `limiter: malformed stored stamps are not tolerated`)
+}
+check(NH_APARTMENTS.filter(a => a.electricity).length === 7, `expected 7 apartments with an electricity charge, found ${NH_APARTMENTS.filter(a => a.electricity).length}`)
+for (const lg of LANGS) {
+  const x = t('nhElectricity', lg)
+  check(hasOwnTranslation('nhElectricity', lg) && x.includes('{kwh}') && x.includes('{rate}'), `nhElectricity (${lg}) lacks its own text or a {kwh} / {rate} placeholder: ${x}`)
 }
 const nhReq = (ci, co, g) => nhValidateRequest({ checkInText: ci, checkOutText: co, guestsText: g, name: 'Ayşe', phone: '555 000 0000' })
 check(nhReq('01.01.2027', '02.01.2027', '1').ok, `1 night / 1 guest was refused`)

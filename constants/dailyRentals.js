@@ -78,6 +78,7 @@ export const nhBuilding = id => NH_BUILDINGS.find(b => b.id === id)
 //
 // price = the nightly rate in the site's booking panel, shown as "from" next to the site's own
 // "prices may vary" note. cleaningFee / deposit / minNights are the same panel's figures.
+// `electricity` (absent = the page states no charge): kWh a day included, then €/kWh, from each apartment's own page.
 // amenityKeys are the site's list in the site's order (Kaymaklı's list is empty on the site in
 // both languages: it shows none, nothing is invented).
 const photos = key => Array.from({ length: 8 }, (_, i) => `northhouses/${key}-${String(i + 1).padStart(2, '0')}`)
@@ -88,6 +89,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptY1Name', descKey: 'nhAptY1Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
     price: 60, cleaningFee: 50, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmDoubleEachRoom', 'nhAmAllRoomsAc', 'nhAmWorkArea', 'nhAmHotWater247', 'nhAmKitchen', 'nhAmSmartTv', 'nhAmWifiY1'],
     photos: photos('y1'),
   },
@@ -96,6 +98,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptY2Name', descKey: 'nhAptY2Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
     price: 60, cleaningFee: 50, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmWifiNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
     photos: photos('y2'),
   },
@@ -104,6 +107,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptYSName', descKey: 'nhAptYSDesc',
     bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
     price: 35, cleaningFee: 40, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
     amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
     photos: photos('ys'),
   },
@@ -112,6 +116,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptMSName', descKey: 'nhAptMSDesc',
     bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
     price: 40, cleaningFee: 40, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmFastWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmAirport'],
     photos: photos('ms'),
   },
@@ -120,6 +125,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptT1Name', descKey: 'nhAptT1Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
     price: 60, cleaningFee: 50, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmWifiT1', 'nhAmNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmKitchenEquip', 'nhAmLinen'],
     photos: photos('t1'),
   },
@@ -128,6 +134,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptM1Name', descKey: 'nhAptM1Desc',
     bedrooms: 2, beds: { double: 1, single: 2 }, guests: 4,
     price: 50, cleaningFee: 50, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
     amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
     photos: photos('m1'),
   },
@@ -136,6 +143,7 @@ export const NH_APARTMENTS = [
     nameKey: 'nhAptA4Name', descKey: 'nhAptA4Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
     price: 45, cleaningFee: 50, deposit: 100, minNights: 2,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: [],
     photos: photos('a4'),
   },

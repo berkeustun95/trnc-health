@@ -31,6 +31,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
 const fill = (text, n) => text.replace('{n}', String(n))
+const COMMA_DECIMAL = ['Turkish', 'Russian', 'Greek', 'French', 'Spanish', 'German']
+const fillElectricity = (text, e, lang) => text
+  .replace('{kwh}', String(e.freeKwhPerDay))
+  .replace('{rate}', COMMA_DECIMAL.includes(lang) ? e.eurPerKwh.toFixed(2).replace('.', ',') : e.eurPerKwh.toFixed(2))
 
 // ─── PHOTO PAGER + VIEWER ────────────────────────────────────────────────────
 // A fixed 4:3 frame (the files are 1440x1080), cover for EVERY photo, so nothing below the pager
@@ -449,6 +453,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
             <Text style={s.price}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
             <IconLine icon="sparkles-outline">{t('nhCleaning', lang)}: {eur(apartment.cleaningFee)}</IconLine>
             <IconLine icon="shield-checkmark-outline">{fill(t('nhDeposit', lang), apartment.deposit)}</IconLine>
+            {apartment.electricity && <IconLine icon="flash-outline">{fillElectricity(t('nhElectricity', lang), apartment.electricity, lang)}</IconLine>}
             <Text style={s.note}>{t(partner.priceNoteKey, lang)}</Text>
           </Card>
 
