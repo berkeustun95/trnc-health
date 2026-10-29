@@ -401,28 +401,27 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 //      no discount, no deal band anywhere in this tab.
 //   2. The content re-checked against northcyprusbnb.com (prices, check-in / check-out, the four map
 //      links, the 56 photos). It was copied on 2026-10-28 and prices move with season.
-//   3. ONLY IF the request form ships (NORTH_HOUSES_FORM_PROTO): 20261143_partner_booking_requests
-//      applied and its verify_schema rows OK. The listing itself writes nothing but contact_events
+//   3. ONLY IF the request form ships (NORTH_HOUSES_FORM_LIVE, below): 20261143_partner_booking_requests
+//      applied and its verify_schema rows OK, plus the form's own preconditions on that flag. The listing itself writes nothing but contact_events
 //      taps, which already pass their live CHECKs (module 'accommodation', actions whatsapp /
 //      website / maps).
 //   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit (here and
 //      EXPECTED_SCALARS in scripts/check-module-flags.mjs), then Preview, then OTA.
 export const NORTH_HOUSES_LIVE = false
 
-// Prototype of North Houses' booking-request form on the apartment screen. A developer's own build
-// gets it with this flipped; ADA Preview gets it via NORTH_HOUSES_FORM_PREVIEW (constants/redesign.js);
-// production never does.
+// Production switch for North Houses' booking-request form on the apartment screen (it saves a row in
+// partner_booking_requests and opens WhatsApp). Also needs NORTH_HOUSES_LIVE for the tab to exist.
+// ADA Preview shows the form without this, via NORTH_HOUSES_FORM_PREVIEW (constants/redesign.js).
 //
-// ⚠ GATED, NOT FOLDED (since 2026-10-29). The form code now SHIPS in the production bundle: the screen
-//   reads NORTH_HOUSES_FORM = (__DEV__ && this) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW), and
-//   IS_PREVIEW_BUILD is a runtime read of extra.appVariant, which only APP_VARIANT=preview sets — a
-//   production build or `npm run ota` never carries it (the EATERY_PREVIEW_DATA posture). The
-//   EXPECTED_SCALARS baseline still protects the REPO: a working-tree flip cannot be pushed or ride
-//   out on `npm run ota`.
+// ⚠ DO NOT FLIP until BOTH hold:
+//   1. 20261148 (retention of partner_booking_requests) is APPLIED.
+//   2. The privacy wording covering these requests is PUBLISHED.
+//   Then flip here AND in EXPECTED_SCALARS (scripts/check-module-flags.mjs) in one commit.
 //
-// NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. Shipping the form for real is its own
-// decision (the table, the privacy wording, a flag of its own), not this boolean turning true.
-export const NORTH_HOUSES_FORM_PROTO = false
+// The screen reads NORTH_HOUSES_FORM = NORTH_HOUSES && (this || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW));
+// IS_PREVIEW_BUILD is a runtime read of extra.appVariant, which only APP_VARIANT=preview sets. A dev build
+// needs the local flip like every gated screen. NOT a MODULE_FLAGS key: it gates nothing else and reveals nothing.
+export const NORTH_HOUSES_FORM_LIVE = false
 
 // Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
 // from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no

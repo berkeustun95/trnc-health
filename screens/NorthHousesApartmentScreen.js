@@ -13,20 +13,20 @@ import { t, LANG_CODES } from '../constants/i18n'
 import { NORTH_HOUSES_FORM } from '../constants/redesign'
 import {
   NORTH_HOUSES, nhBuilding, nhWaMessage, nhWaUrl, nhWebsiteUrl,
-  nhValidateRequest, nhRequestMessage, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
+  nhValidateRequest, nhRequestMessage, nhRequestLimit, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals'
 import { partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { supabase } from '../lib/supabase'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // One North Houses apartment: photo pager, what it is, what it costs (as the site shows it, with the
 // site's own "prices vary" note), what is inside, the description, check-in / check-out, its building's
 // map link, and two ways out — WhatsApp (primary) and the apartment's own page on their site.
 // A free listing: no deal band, no code, no ad slot. Config: constants/dailyRentals.js.
 //
-// The form at the foot is a prototype, rendered only when NORTH_HOUSES_FORM (constants/redesign.js): dev with
-// NORTH_HOUSES_FORM_PROTO flipped, or ADA Preview. Production never sets appVariant, so never renders it.
+// The form at the foot is a prototype, rendered only when NORTH_HOUSES_FORM (constants/redesign.js): NORTH_HOUSES_FORM_LIVE, or ADA Preview. Production never sets appVariant, so never renders it.
 
 const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
@@ -37,6 +37,21 @@ const fill = (text, n) => text.replace('{n}', String(n))
 // moves while swiping and no photo sits in bars. Six of the 56 are portraits (1080x1440): the frame
 // shows their middle, and a tap opens the viewer, which shows every photo whole (contain, on black).
 // Windowed FlatLists, so 8 decoded 1440 px photos are never all in memory at once.
+// Saves the request row unless this phone is over its limit (nhRequestLimit; only timestamps of saved
+// requests are kept, on the device). Fire-and-forget and NEVER throws: the WhatsApp message opens
+// regardless. A storage read failure allows the insert; a write failure only loses the count.
+const NH_STAMPS_KEY = 'nh_request_stamps'
+async function saveRequest(apartmentSlug, v) {
+  try {
+    let stamps = []
+    try { stamps = JSON.parse(await AsyncStorage.getItem(NH_STAMPS_KEY)) || [] } catch {}
+    const lim = nhRequestLimit(stamps, Date.now())
+    if (!lim.allowed) return
+    try { await AsyncStorage.setItem(NH_STAMPS_KEY, JSON.stringify(lim.stamps)) } catch {}
+    supabase.from('partner_booking_requests').insert([{ partner: NORTH_HOUSES.slug, apartment: apartmentSlug, check_in: v.checkIn, check_out: v.checkOut, guests: v.guests }]).then(() => {}, () => {})
+  } catch {}
+}
+
 function PagerPhoto({ photoKey, width, index, total, lang, onOpen }) {
   const src = partnerAsset(photoKey)
   const h = Math.round(width / PHOTO_ASPECT)
@@ -253,7 +268,7 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
   const send = () => {
     if (!v.ok) return
     logContactEvent('accommodation', NORTH_HOUSES.id, 'whatsapp', null)
-    supabase.from('partner_booking_requests').insert([{ partner: NORTH_HOUSES.slug, apartment: apartment.slug, check_in: v.checkIn, check_out: v.checkOut, guests: v.guests }]).then(() => {}, () => {})
+    saveRequest(apartment.slug, v)
     const text = nhRequestMessage({
       aptNameTr: t(apartment.nameKey, 'Turkish'), buildingName: building?.name || '',
       checkIn: v.checkIn, checkOut: v.checkOut, guests: v.guests, name, phone,

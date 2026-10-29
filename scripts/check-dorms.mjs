@@ -38,7 +38,7 @@ import { t, hasOwnTranslation, LANG_CODES } from '../constants/i18n.js'
 import {
   NORTH_HOUSES, NH_BUILDINGS, NH_APARTMENTS, NH_SLUGS, NH_FROM_PRICE,
   nhWaMessage, nhWaUrl, nhWebsiteUrl, nhRequestMessage, nhParseDate, nhNights,
-  nhValidateRequest, NH_MAX_NIGHTS, NH_MAX_GUESTS,
+  nhValidateRequest, nhRequestLimit, NH_MAX_NIGHTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
 
@@ -854,6 +854,23 @@ for (const a of NH_APARTMENTS) {
 // The form's bounds, probed at both edges (the DB's: ≤ 90 nights, guests 1..12, a real date).
 check(nhParseDate('31.02.2026') === null && nhParseDate('12.11.2026') === '2026-11-12' && nhParseDate('2026-11-12') === null,
   `nhParseDate: a non-date was accepted or a real one refused`)
+// Per-device limiter: 3 / rolling hour, 10 / rolling 24 h, over the limit = refused (and not counted).
+{
+  const H = 3600e3, T0 = 1e12
+  let st = [], r
+  for (let i = 0; i < 3; i++) { r = nhRequestLimit(st, T0 + i * 60e3); check(r.allowed, `limiter: request ${i + 1} of 3 in an hour was refused`); st = r.stamps }
+  r = nhRequestLimit(st, T0 + 3 * 60e3)
+  check(!r.allowed && r.stamps.length === 3, `limiter: the 4th request within an hour was allowed (allowed=${r.allowed}, kept ${r.stamps.length})`)
+  r = nhRequestLimit(st, T0 + H + 3 * 60e3)
+  check(r.allowed, `limiter: a request an hour after the first three was refused`)
+  st = []
+  for (let i = 0; i < 10; i++) { r = nhRequestLimit(st, T0 + i * 2 * H); check(r.allowed, `limiter: request ${i + 1} of 10 in 24 h (2 h apart) was refused`); st = r.stamps }
+  r = nhRequestLimit(st, T0 + 20 * H)
+  check(!r.allowed, `limiter: the 11th request within 24 h was allowed`)
+  r = nhRequestLimit(st, T0 + 24 * H + 1)
+  check(r.allowed && r.stamps.length <= 10, `limiter: nothing pruned after 24 h (kept ${r.stamps.length})`)
+  check(nhRequestLimit('garbage', T0).allowed && nhRequestLimit([NaN, 'x', T0 + 99e9], T0).stamps.length === 1, `limiter: malformed stored stamps are not tolerated`)
+}
 const nhReq = (ci, co, g) => nhValidateRequest({ checkInText: ci, checkOutText: co, guestsText: g, name: 'Ayşe', phone: '555 000 0000' })
 check(nhReq('01.01.2027', '02.01.2027', '1').ok, `1 night / 1 guest was refused`)
 check(nhReq('01.01.2027', '01.04.2027', '12').ok && nhNights('2027-01-01', '2027-04-01') === 90, `exactly ${NH_MAX_NIGHTS} nights / 12 guests was refused`)
@@ -896,14 +913,14 @@ if (existsSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'))) {
   const apt = strip(readFileSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'), 'utf8'))
   check(/import \{ NORTH_HOUSES_FORM \} from '\.\.\/constants\/redesign'/.test(apt), `NorthHousesApartmentScreen must import NORTH_HOUSES_FORM from constants/redesign`)
   check((apt.match(/\{NORTH_HOUSES_FORM && \(/g) || []).length === 1, `NorthHousesApartmentScreen must render the form behind exactly one \`{NORTH_HOUSES_FORM && (\``)
-  check(!/NORTH_HOUSES_FORM_PROTO|NORTH_HOUSES_LIVE/.test(apt), `NorthHousesApartmentScreen reads a raw flag; it must go through constants/redesign.js`)
+  check(!/NORTH_HOUSES_FORM_LIVE|NORTH_HOUSES_LIVE/.test(apt), `NorthHousesApartmentScreen reads a raw flag; it must go through constants/redesign.js`)
   const acc = strip(readFileSync(resolve(ROOT, 'screens/AccommodationScreen.js'), 'utf8'))
   check(/import \{ NORTH_HOUSES \} from '\.\.\/constants\/redesign'/.test(acc) && /daily_rental: NORTH_HOUSES \}/.test(acc) && !/NORTH_HOUSES_LIVE/.test(acc),
     `AccommodationScreen must gate the Günlük Kiralık tab on NORTH_HOUSES from constants/redesign, never the raw NORTH_HOUSES_LIVE`)
   // The gate itself: production can only reach the form through __DEV__ (folded) or an appVariant it never carries.
   const rd = strip(readFileSync(resolve(ROOT, 'constants/redesign.js'), 'utf8'))
-  check(rd.includes("export const NORTH_HOUSES_FORM = ((typeof __DEV__ !== 'undefined' && __DEV__) && NORTH_HOUSES_FORM_PROTO) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)"),
-    `constants/redesign.js: NORTH_HOUSES_FORM must be exactly (__DEV__ && NORTH_HOUSES_FORM_PROTO) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)`)
+  check(rd.includes("export const NORTH_HOUSES_FORM = NORTH_HOUSES && (NORTH_HOUSES_FORM_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW))"),
+    `constants/redesign.js: NORTH_HOUSES_FORM must be exactly NORTH_HOUSES && (NORTH_HOUSES_FORM_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)) (no __DEV__)`)
   check(rd.includes('export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)'),
     `constants/redesign.js: NORTH_HOUSES must be exactly NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW) (no __DEV__)`)
   check(rd.includes("const IS_PREVIEW_BUILD = Constants.expoConfig?.extra?.appVariant === 'preview'"), `constants/redesign.js: IS_PREVIEW_BUILD is no longer the appVariant read`)

@@ -180,7 +180,7 @@ export function nhWebsiteUrl(apartment, langCode) {
   return u.toString()
 }
 
-// ─── THE REQUEST FORM (dev-only prototype, NORTH_HOUSES_FORM_PROTO) ──────────
+// ─── THE REQUEST FORM (gated by NORTH_HOUSES_FORM_LIVE) ──────────
 //
 // Bounds are the database's (partner_booking_requests, 20261143): check_out > check_in, at most
 // 90 nights, guests 1..12. The client refuses what the table would refuse, so the form's
@@ -198,6 +198,19 @@ export function nhParseDate(text) {
   const dt = new Date(Date.UTC(y, mo - 1, d))
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null
   return `${m[3]}-${m[2]}-${m[1]}`
+}
+
+// Per-device throttle on SAVED requests (the WhatsApp message is never throttled). `stamps` = ms
+// timestamps of earlier saved requests, kept on the phone only. -> { allowed, stamps }, where
+// `stamps` is the pruned list (<= 24 h old, capped) with `now` appended when allowed.
+export const NH_LIMIT_HOUR = 3
+export const NH_LIMIT_DAY = 10
+export function nhRequestLimit(stamps, now) {
+  const day = 24 * 3600 * 1000, hour = 3600 * 1000
+  const kept = (Array.isArray(stamps) ? stamps : [])
+    .filter(x => Number.isFinite(x) && x <= now && now - x < day).slice(-NH_LIMIT_DAY)
+  const allowed = kept.filter(x => now - x < hour).length < NH_LIMIT_HOUR && kept.length < NH_LIMIT_DAY
+  return { allowed, stamps: allowed ? [...kept, now] : kept }
 }
 
 export const nhNights = (checkInIso, checkOutIso) =>
