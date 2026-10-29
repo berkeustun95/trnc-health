@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_PROTO } from './flags'
+import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE } from './flags'
 
 // The one switch every redesigned surface reads. On when:
 //   • REDESIGN_LIVE is flipped (go-live, both files in one commit — the flag guard), or
@@ -56,10 +56,10 @@ export const CRUNCHY_EXPRESS = CRUNCHY_EXPRESS_LIVE || (typeof __DEV__ !== 'unde
 export const EATERY_PREVIEW_DATA = (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
 
 // North Houses (Günlük Kiralık) before go-live: ADA Preview shows the tab and the booking-request
-// form; production shows neither while NORTH_HOUSES_LIVE / NORTH_HOUSES_FORM_PROTO stay false. No
+// form; production shows neither while NORTH_HOUSES_LIVE / NORTH_HOUSES_FORM_LIVE stay false. No
 // __DEV__ on the listing: Expo Go still needs the local flip, as before. scripts/check-dorms.mjs
 // asserts both reads. Set either _PREVIEW to false if ADA Preview must stop showing it.
 const NORTH_HOUSES_PREVIEW = true
 export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)
 const NORTH_HOUSES_FORM_PREVIEW = true
-export const NORTH_HOUSES_FORM = ((typeof __DEV__ !== 'undefined' && __DEV__) && NORTH_HOUSES_FORM_PROTO) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)
+export const NORTH_HOUSES_FORM = NORTH_HOUSES && (NORTH_HOUSES_FORM_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW))

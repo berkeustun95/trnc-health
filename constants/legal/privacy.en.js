@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `ADA – North Cyprus Assistant (Android package com.berkeustun95.ada), published on Google Play by P&D Digital, operated by Astarte Digital Trading Ltd. (TRNC, company no. MŞ29454).
 
-Version: 2026-10-25
-Last updated: October 24, 2026
+Version: 2026-10-30
+Last updated: October 30, 2026
 
 WHO WE ARE
 
@@ -74,6 +74,7 @@ Location: ADA uses your device's location only if you allow it, and you can turn
 • Names of places from Google — wherever ADA shows a place that comes from Google — the check-in lists, the check-ins in your profile and the Explore map — its name is requested from Google through our server when it is shown, and ADA does not save it. These requests carry only the place's identifier, nothing about you. A place from Google appears as a pin on the Explore map once someone whose check-ins are visible has checked in there; we keep the pin's position for less than 30 days, and the pin shows no people.
 • Maps — the maps in ADA are Google Maps (on iPhone, Apple Maps in versions of ADA that do not yet include Google Maps). To draw a map, your phone connects to Google or Apple directly, which receives your device's internet address and the area being shown, under its own privacy policy.
 • Contact taps — when you tap a call, WhatsApp, website or directions button for a listed business or partner, we record that the tap happened, for which business, and one of the seven broad districts of the TRNC it relates to (for example Girne or Lefke): the district your location places you in, or the one you chose in the app. We never record your account, your device or your exact position with it, so it cannot be traced back to you. We use these counts to tell businesses how many people contacted them through ADA.
+• Booking requests to partners — when you send a booking request to a partner through ADA (for example a daily-rental apartment), we record: which apartment, the check-in and check-out dates, how many guests, and when the request was sent. We do not record your name or phone number; they go to the partner only in your WhatsApp message. The record contains nothing about your account or your device. We use these counts to tell partners how many requests they get through ADA. To prevent misuse, the app keeps the times of your recent requests on your phone only, for 24 hours, and records at most 3 requests an hour and 10 a day. WhatsApp always opens with your message ready.
 • Places you submit — if you submit a place and use your current location for its pin, that position is saved as the place's location and shown publicly once the place is approved.
 • Delivery location — for delivery you mark your door on a map; moving the map needs no location permission. “Use my current location” uses your phone's position, if you allow it, only to place the pin. The pin is added to your WhatsApp message to the restaurant as a map link and saved with that address on your phone. It is not sent to us.
 
@@ -94,6 +95,7 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Keep a record of which terms you accepted — To show what was agreed. Legal basis: Our legitimate interest, and compliance with a legal obligation
 • Use your location to show what is near you: distance order, the map, search order and local weather — To give you the service you asked for. Legal basis: Performance of a contract with you
 • Count taps on businesses' contact buttons, with the district — To show businesses how many people contact them through ADA. Legal basis: Our legitimate interest in running and funding the service
+• Count booking requests sent to partners (apartment, dates, guests) — To show partners how many requests they get through ADA. Legal basis: Our legitimate interest in running and funding the service
 • Record the walking routes you complete and show your route badges — To give you the feature you use. Legal basis: Performance of a contract with you
 • Report monthly totals of completed walking routes to the Ministry of Tourism — To support the walking-routes programme we run with it. Legal basis: Our legitimate interest in running the service
 • Check that you are at a place when you check in, and show your check-ins to other signed-in users — To give you the feature you use. Legal basis: Performance of a contract with you
@@ -167,6 +169,7 @@ Different data is kept for different lengths of time.
 • Route badges: retained for as long as your account is active, and deleted with it. A guest's badge is kept only on the phone, for 7 days.
 • Check-ins: retained for as long as your account is active, and deleted with it. A check-in you delete is removed at once.
 • Order records — 30 days: deleted automatically 30 days after the order was created. The verification page stops confirming an order 2 hours after it was created.
+• Booking requests — 12 months: the record of a request (apartment, dates, number of guests, time sent) is deleted automatically after 12 months.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 
 8. AGE AND CHILDREN

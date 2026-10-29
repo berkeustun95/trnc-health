@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `ADA – Kuzey Kıbrıs Asistanı (Android paket adı com.berkeustun95.ada), Google Play'de P&D Digital tarafından yayımlanır ve Astarte Digital Trading Ltd. (KKTC, şirket no. MŞ29454) tarafından işletilir.
 
-Sürüm: 2026-10-25
-Son güncelleme: 24 Ekim 2026
+Sürüm: 2026-10-30
+Son güncelleme: 30 Ekim 2026
 
 KİM OLDUĞUMUZ
 
@@ -74,6 +74,7 @@ Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bu
 • Google'dan gelen mekan adları — ADA'nın Google'dan gelen bir mekanı gösterdiği her yerde — check-in listeleri, profilinizdeki check-in'ler ve Keşfet haritası — mekanın adı gösterildiği anda sunucumuz aracılığıyla Google'dan istenir ve ADA bu adı kaydetmez. Bu istekler yalnızca mekanın tanımlayıcısını taşır, sizinle ilgili hiçbir şey içermez. Google'dan gelen bir mekan, check-in'leri görünür olan biri orada check-in yaptıktan sonra Keşfet haritasında bir iğne olarak görünür; iğnenin konumunu 30 günden kısa süre tutarız ve iğne hiçbir kişiyi göstermez.
 • Haritalar — ADA'daki haritalar Google Haritalar'dır (iPhone'da, henüz Google Haritalar içermeyen ADA sürümlerinde Apple Haritalar). Bir haritayı çizmek için telefonunuz doğrudan Google'a veya Apple'a bağlanır; bunlar cihazınızın internet adresini ve gösterilen bölgeyi kendi gizlilik politikaları kapsamında alır.
 • İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
+• İş ortaklarına gönderilen rezervasyon talepleri — ADA'dan bir iş ortağına (örneğin günlük kiralık bir daireye) rezervasyon talebi gönderdiğinizde şunları kaydederiz: hangi daire, giriş ve çıkış tarihi, kaç misafir ve talebin ne zaman gönderildiği. Adınızı ve telefon numaranızı kaydetmeyiz; bunlar yalnızca WhatsApp mesajınızla iş ortağına gider. Kayıtta hesabınız veya cihazınızla ilgili hiçbir bilgi yoktur. Bu sayılarla iş ortaklarına ADA üzerinden kaç talep aldıklarını söyleriz. Kötüye kullanımı önlemek için uygulama, son taleplerinizin saatini 24 saat boyunca yalnızca telefonunuzda tutar ve saatte en fazla 3, günde en fazla 10 talep kaydeder. WhatsApp her zaman mesajınız hazır şekilde açılır.
 • Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
 • Teslimat konumu — adrese teslim için kapınızı haritada işaretlersiniz; haritayı kaydırmak konum izni gerektirmez. “Şu anki konumumu kullan”, izin verirseniz telefonunuzun konumunu yalnızca pini yerleştirmek için kullanır. Pin, restorana gönderdiğiniz WhatsApp mesajına harita bağlantısı olarak eklenir ve o adresle birlikte telefonunuzda saklanır. Bize gönderilmez.
 
@@ -94,6 +95,7 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Hangi koşulları kabul ettiğinizin kaydını tutmak — Neyin kabul edildiğini gösterebilmek için. Hukuki dayanak: Meşru menfaatimiz ve hukuki yükümlülüğe uyum
 • Yakınınızdakileri göstermek için konumunuzu kullanmak: uzaklık sırası, harita, arama sırası ve yerel hava durumu — İstediğiniz hizmeti sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • İşletmelerin iletişim düğmelerine yapılan dokunuşları bölgeyle birlikte saymak — İşletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
+• İş ortaklarına gönderilen rezervasyon taleplerini saymak (daire, tarihler, misafir sayısı) — İş ortaklarına ADA üzerinden kaç talep aldıklarını gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
 • Tamamladığınız yürüyüş rotalarını kaydetmek ve rota rozetlerinizi göstermek — Kullandığınız özelliği sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • Tamamlanan yürüyüş rotalarının aylık toplamlarını Turizm Bakanlığı'na bildirmek — Bakanlıkla birlikte yürüttüğümüz yürüyüş rotaları programını desteklemek için. Hukuki dayanak: Hizmeti yürütmeye ilişkin meşru menfaatimiz
 • Bir mekanda check-in yaptığınızda orada olduğunuzu kontrol etmek ve check-in'lerinizi giriş yapmış diğer kullanıcılara göstermek — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
@@ -167,6 +169,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Rota rozetleri: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Misafir kullanıcının rozeti yalnızca telefonda, 7 gün boyunca tutulur.
 • Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
 • Sipariş kayıtları — 30 gün: siparişin oluşturulmasından 30 gün sonra otomatik olarak silinir. Doğrulama sayfası, siparişi oluşturulmasından 2 saat sonra artık doğrulamaz.
+• Rezervasyon talepleri — 12 ay: bir talebin kaydı (daire, tarihler, misafir sayısı, gönderilme zamanı) 12 ay sonra otomatik olarak silinir.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
 8. YAŞ VE ÇOCUKLAR

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, Platform, Dimensions, useWindowDimensions } from 'react-native'
+import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, Platform, Dimensions, useWindowDimensions, AppState } from 'react-native'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -13,30 +13,70 @@ import { t, LANG_CODES } from '../constants/i18n'
 import { NORTH_HOUSES_FORM } from '../constants/redesign'
 import {
   NORTH_HOUSES, nhBuilding, nhWaMessage, nhWaUrl, nhWebsiteUrl,
-  nhValidateRequest, nhRequestMessage, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
+  nhValidateRequest, nhRequestMessage, nhRequestLimit, nhFreshStamps, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals'
 import { partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { supabase } from '../lib/supabase'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // One North Houses apartment: photo pager, what it is, what it costs (as the site shows it, with the
 // site's own "prices vary" note), what is inside, the description, check-in / check-out, its building's
 // map link, and two ways out — WhatsApp (primary) and the apartment's own page on their site.
 // A free listing: no deal band, no code, no ad slot. Config: constants/dailyRentals.js.
 //
-// The form at the foot is a prototype, rendered only when NORTH_HOUSES_FORM (constants/redesign.js): dev with
-// NORTH_HOUSES_FORM_PROTO flipped, or ADA Preview. Production never sets appVariant, so never renders it.
+// The booking-request form at the foot renders only when NORTH_HOUSES_FORM (constants/redesign.js): the North Houses tab
+// is on AND (NORTH_HOUSES_FORM_LIVE, or ADA Preview).
 
 const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
 const fill = (text, n) => text.replace('{n}', String(n))
+const COMMA_DECIMAL = ['Turkish', 'Russian', 'Greek', 'French', 'Spanish', 'German']
+// A no-break space before the price keeps "başına €0,30" on one line (it wrapped the price alone in TR).
+const fillElectricity = (text, e, lang) => text
+  .replace(' €{rate}', '\u00A0€{rate}')
+  .replace('{kwh}', String(e.freeKwhPerDay))
+  .replace('{rate}', COMMA_DECIMAL.includes(lang) ? e.eurPerKwh.toFixed(2).replace('.', ',') : e.eurPerKwh.toFixed(2))
 
 // ─── PHOTO PAGER + VIEWER ────────────────────────────────────────────────────
 // A fixed 4:3 frame (the files are 1440x1080), cover for EVERY photo, so nothing below the pager
 // moves while swiping and no photo sits in bars. Six of the 56 are portraits (1080x1440): the frame
 // shows their middle, and a tap opens the viewer, which shows every photo whole (contain, on black).
 // Windowed FlatLists, so 8 decoded 1440 px photos are never all in memory at once.
+// Saves the request row unless this phone is over its limit (nhRequestLimit; only timestamps of saved
+// requests are kept, on the device). Fire-and-forget and NEVER throws: the WhatsApp message opens
+// regardless. A storage read failure allows the insert; a write failure only loses the count.
+const NH_STAMPS_KEY = 'nh_request_stamps'
+async function saveRequest(apartmentSlug, v) {
+  try {
+    let stamps = []
+    try { stamps = JSON.parse(await AsyncStorage.getItem(NH_STAMPS_KEY)) || [] } catch {}
+    const lim = nhRequestLimit(stamps, Date.now())
+    if (!lim.allowed) return
+    try { await AsyncStorage.setItem(NH_STAMPS_KEY, JSON.stringify(lim.stamps)) } catch {}
+    supabase.from('partner_booking_requests').insert([{ partner: NORTH_HOUSES.slug, apartment: apartmentSlug, check_in: v.checkIn, check_out: v.checkOut, guests: v.guests }]).then(() => {}, () => {})
+  } catch {}
+}
+
+// The privacy policy promises the times stay on the phone for 24 hours: drop older ones at app start and on
+// foreground (this module loads at start, via AccommodationScreen), as logContactEvent's outbox does.
+async function pruneRequestStamps() {
+  try {
+    const raw = await AsyncStorage.getItem(NH_STAMPS_KEY)
+    if (raw == null) return
+    let stamps = []
+    try { stamps = JSON.parse(raw) } catch {}
+    const fresh = nhFreshStamps(stamps, Date.now())
+    if (fresh.length === 0) await AsyncStorage.removeItem(NH_STAMPS_KEY)
+    else if (fresh.length !== (Array.isArray(stamps) ? stamps.length : -1)) await AsyncStorage.setItem(NH_STAMPS_KEY, JSON.stringify(fresh))
+  } catch {}
+}
+try {
+  AppState.addEventListener('change', s => { if (s === 'active') pruneRequestStamps() })
+  setTimeout(pruneRequestStamps, 3000)
+} catch {}
+
 function PagerPhoto({ photoKey, width, index, total, lang, onOpen }) {
   const src = partnerAsset(photoKey)
   const h = Math.round(width / PHOTO_ASPECT)
@@ -253,7 +293,7 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
   const send = () => {
     if (!v.ok) return
     logContactEvent('accommodation', NORTH_HOUSES.id, 'whatsapp', null)
-    supabase.from('partner_booking_requests').insert([{ partner: NORTH_HOUSES.slug, apartment: apartment.slug, check_in: v.checkIn, check_out: v.checkOut, guests: v.guests }]).then(() => {}, () => {})
+    saveRequest(apartment.slug, v)
     const text = nhRequestMessage({
       aptNameTr: t(apartment.nameKey, 'Turkish'), buildingName: building?.name || '',
       checkIn: v.checkIn, checkOut: v.checkOut, guests: v.guests, name, phone,
@@ -434,6 +474,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
             <Text style={s.price}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
             <IconLine icon="sparkles-outline">{t('nhCleaning', lang)}: {eur(apartment.cleaningFee)}</IconLine>
             <IconLine icon="shield-checkmark-outline">{fill(t('nhDeposit', lang), apartment.deposit)}</IconLine>
+            {apartment.electricity && <IconLine icon="flash-outline">{fillElectricity(t('nhElectricity', lang), apartment.electricity, lang)}</IconLine>}
             <Text style={s.note}>{t(partner.priceNoteKey, lang)}</Text>
           </Card>
 
