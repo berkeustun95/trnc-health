@@ -882,7 +882,7 @@ for (const key of new Set([...nhKeys, ...nhTableKeys])) {
 }
 
 // The screens, as text (they import react-native, so Node cannot): no map, no ad slot, no deal
-// language, the form behind the literal `__DEV__ && NORTH_HOUSES_FORM_PROTO`, and an insert that
+// language, the form behind NORTH_HOUSES_FORM (constants/redesign.js), and an insert that
 // asks for nothing back and never carries a name or a phone.
 const strip = src => src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|\s)\/\/.*$/, '')).join('\n')
 const nhScreenFiles = ['screens/NorthHousesTab.js', 'screens/NorthHousesApartmentScreen.js']
@@ -895,8 +895,19 @@ for (const f of nhScreenFiles) {
 }
 if (existsSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'))) {
   const apt = strip(readFileSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'), 'utf8'))
-  check(apt.includes('__DEV__ && NORTH_HOUSES_FORM_PROTO'), `NorthHousesApartmentScreen must read the prototype as the literal \`__DEV__ && NORTH_HOUSES_FORM_PROTO\``)
-  check((apt.match(/NORTH_HOUSES_FORM_PROTO/g) || []).length === 2, `NORTH_HOUSES_FORM_PROTO must appear exactly twice (import + the one guarded read)`)
+  check(/import \{ NORTH_HOUSES_FORM \} from '\.\.\/constants\/redesign'/.test(apt), `NorthHousesApartmentScreen must import NORTH_HOUSES_FORM from constants/redesign`)
+  check((apt.match(/\{NORTH_HOUSES_FORM && \(/g) || []).length === 1, `NorthHousesApartmentScreen must render the form behind exactly one \`{NORTH_HOUSES_FORM && (\``)
+  check(!/NORTH_HOUSES_FORM_PROTO|NORTH_HOUSES_LIVE/.test(apt), `NorthHousesApartmentScreen reads a raw flag; it must go through constants/redesign.js`)
+  const acc = strip(readFileSync(resolve(ROOT, 'screens/AccommodationScreen.js'), 'utf8'))
+  check(/import \{ NORTH_HOUSES \} from '\.\.\/constants\/redesign'/.test(acc) && /daily_rental: NORTH_HOUSES \}/.test(acc) && !/NORTH_HOUSES_LIVE/.test(acc),
+    `AccommodationScreen must gate the Günlük Kiralık tab on NORTH_HOUSES from constants/redesign, never the raw NORTH_HOUSES_LIVE`)
+  // The gate itself: production can only reach the form through __DEV__ (folded) or an appVariant it never carries.
+  const rd = strip(readFileSync(resolve(ROOT, 'constants/redesign.js'), 'utf8'))
+  check(rd.includes("export const NORTH_HOUSES_FORM = ((typeof __DEV__ !== 'undefined' && __DEV__) && NORTH_HOUSES_FORM_PROTO) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)"),
+    `constants/redesign.js: NORTH_HOUSES_FORM must be exactly (__DEV__ && NORTH_HOUSES_FORM_PROTO) || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW)`)
+  check(rd.includes('export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)'),
+    `constants/redesign.js: NORTH_HOUSES must be exactly NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW) (no __DEV__)`)
+  check(rd.includes("const IS_PREVIEW_BUILD = Constants.expoConfig?.extra?.appVariant === 'preview'"), `constants/redesign.js: IS_PREVIEW_BUILD is no longer the appVariant read`)
   const ins = /from\('partner_booking_requests'\)\s*\.insert\(\[\{([^}]*)\}\]\)([^;\n]*)/.exec(apt)
   check(!!ins, `no partner_booking_requests insert found in NorthHousesApartmentScreen`)
   if (ins) {

@@ -28,7 +28,8 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE, NORTH_HOUSES_LIVE } from '../constants/flags'
+import { DORMS_LIVE } from '../constants/flags'
+import { NORTH_HOUSES } from '../constants/redesign'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
 
@@ -76,7 +77,7 @@ const PAGE = 20
 // All config, in constants/dorms.js. Tabs are derived from the flags, never read straight
 // off the config, so a dark tab can neither render nor be landed on. Module scope is
 // correct: both are constant for a given bundle.
-const LIVE_TABS      = { dorm: DORMS_LIVE, daily_rental: NORTH_HOUSES_LIVE }
+const LIVE_TABS      = { dorm: DORMS_LIVE, daily_rental: NORTH_HOUSES }
 const TABS           = accomTabs(LIVE_TABS)
 const LANDING_TAB    = accomLandingTab(LIVE_TABS)
 const SEGMENTS       = ACCOM_SEGMENTS
@@ -134,7 +135,7 @@ const TITLE_KEY = 'menuAccomTile'
 // Rendered only when more than one tab is live — a single segment is not a choice.
 function TabBar({ tab, onChange, lang }) {
   return (
-    <View style={cs.tabBar} accessibilityRole="tablist">
+    <View style={[cs.tabBar, TABS.length > 2 && cs.tabBarTight]} accessibilityRole="tablist">
       {TABS.map(item => {
         const active = tab === item.id
         return (
@@ -149,7 +150,7 @@ function TabBar({ tab, onChange, lang }) {
                 positioned so it never changes the segment's size; state-aware colour for
                 the same contrast reason the chip's was (see intentDot below). */}
             {item.promoted && (
-              <View pointerEvents="none" style={[cs.intentDot, active && cs.intentDotOnActive]} />
+              <View pointerEvents="none" style={[cs.intentDot, TABS.length > 2 && cs.tabDotTight, active && cs.intentDotOnActive]} />
             )}
           </TouchableOpacity>
         )
@@ -951,6 +952,10 @@ const legacyCs = StyleSheet.create({
   tabSegActive:        { backgroundColor: colors.primary },
   // Three tabs (Günlük Kiralık live): each segment is a third wide, so the label gets the padding back.
   tabSegTight:         { paddingHorizontal: 4 },
+  // With three segments they touch, and Yurtlar's dot (right: 7) sat against the next tab's
+  // active pill. A gap between segments and the dot pulled inward; two-tab layout untouched.
+  tabBarTight:         { gap: 4 },
+  tabDotTight:         { right: 12 },
   tabSegText:          { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
   tabSegTextActive:    { fontFamily: 'Inter_700Bold', color: '#fff' },
   // The promoted marker. `position: 'absolute'` is the requirement, not the styling
