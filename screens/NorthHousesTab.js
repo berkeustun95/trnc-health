@@ -1,4 +1,4 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, PixelRatio } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, PixelRatio, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { Card, OnPhotoLabel } from '../components/ui'
@@ -41,15 +41,18 @@ function IconLine({ icon, children }) {
   )
 }
 
-function ApartmentCard({ apartment, lang, onPress }) {
+function ApartmentCard({ apartment, lang, width, onPress }) {
+  // Numbers, not width:'100%' + aspectRatio: on Android that pair let the 1440 px source size the
+  // box (a 16:10 slot rendered taller than wide, showing a zoomed slice). DormRoomRow sizes the same way.
+  const photo = { width, height: Math.round(width / CARD_PHOTO_ASPECT) }
   const cover = partnerAsset(apartment.photos[0])
   const building = nhBuilding(apartment.buildingId)
   const typeLabel = apartment.kind === 'studio' ? t('nhTypeStudio', lang) : '2+1'
   return (
     <Card padding={0} onPress={onPress} style={s.aptCard} accessibilityLabel={`${t(apartment.nameKey, lang)}, ${building?.name}, ${fill(t('nhGuestsUpTo', lang), apartment.guests)}, ${fill(t('nhFromNight', lang), apartment.price)}`}>
       {cover
-        ? <Image source={cover} style={s.aptPhoto} resizeMode="cover" accessible={false} />
-        : <View style={s.aptPhoto} />}
+        ? <Image source={cover} style={[s.aptPhoto, photo]} resizeMode="cover" accessible={false} />
+        : <View style={[s.aptPhoto, photo]} />}
       <View style={s.aptBody}>
         <Text style={[s.aptName, { height: Math.ceil(type.sheetTitle.lineHeight * 2 * Math.min(PixelRatio.getFontScale(), NAME_SCALE_MAX)) }]}
           numberOfLines={2} maxFontSizeMultiplier={NAME_SCALE_MAX}>{t(apartment.nameKey, lang)}</Text>
@@ -57,13 +60,11 @@ function ApartmentCard({ apartment, lang, onPress }) {
           <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
           <Text style={s.metaText} numberOfLines={1}>{building?.name} · {typeLabel}</Text>
         </View>
-        <View style={s.aptFoot}>
-          <View style={s.chip}>
-            <Ionicons name="people-outline" size={13} color={colors.textSecondary} />
-            <Text style={s.chipText} numberOfLines={1}>{fill(t('nhGuestsUpTo', lang), apartment.guests)}</Text>
-          </View>
-          <Text style={s.aptPrice} numberOfLines={1}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
+        <View style={s.metaRow}>
+          <Ionicons name="people-outline" size={14} color={colors.textSecondary} />
+          <Text style={s.metaText} numberOfLines={1}>{fill(t('nhGuestsUpTo', lang), apartment.guests)}</Text>
         </View>
+        <Text style={s.aptPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
       </View>
     </Card>
   )
@@ -86,6 +87,7 @@ function LocationRow({ building, lang, last, onOpenMap }) {
 
 export default function NorthHousesTab({ lang, onOpenApartment, bottomPad = 24 }) {
   const partner = NORTH_HOUSES
+  const { width: winW } = useWindowDimensions()
 
   // logContactEvent first, then the link: it is fire-and-forget and cannot throw, so it can never
   // cost the tap. 'maps' is permitted by the contact_events CHECK (20261046).
@@ -112,7 +114,7 @@ export default function NorthHousesTab({ lang, onOpenApartment, bottomPad = 24 }
 
       <SectionTitle>{t('nhApartmentsTitle', lang)}</SectionTitle>
       {NH_APARTMENTS.map(a => (
-        <ApartmentCard key={a.slug} apartment={a} lang={lang} onPress={() => onOpenApartment(a)} />
+        <ApartmentCard key={a.slug} apartment={a} lang={lang} width={winW - 32} onPress={() => onOpenApartment(a)} />
       ))}
       <Card padding={12} style={s.block}>
         <IconLine icon="information-circle-outline">{t(partner.priceNoteKey, lang)}</IconLine>
@@ -155,16 +157,13 @@ const s = StyleSheet.create({
   iconLineText: { flex: 1, ...type.body, color: colors.textPrimary },
 
   aptCard:      { marginBottom: 12, overflow: 'hidden' },
-  aptPhoto:     { width: '100%', aspectRatio: CARD_PHOTO_ASPECT, backgroundColor: colors.soft },
+  aptPhoto:     { backgroundColor: colors.soft },
   aptBody:      { padding: 14, gap: 6 },
   aptName:      { ...type.sheetTitle, color: colors.textPrimary },
   metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText:     { flex: 1, ...type.small, color: colors.textSecondary },
-  aptFoot:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 },
-  chip:         { flexShrink: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.xs, backgroundColor: colors.soft },
-  chipText:     { flexShrink: 1, ...type.meta, color: colors.textSecondary },
-  // The price never shrinks or truncates; the guests chip gives way first.
-  aptPrice:     { flexShrink: 0, ...type.rowTitle, color: colors.primaryDark },
+  // Its own line, so it never competes with other text for width (one line in all nine locales).
+  aptPrice:     { ...type.rowTitle, color: colors.primaryDark, marginTop: 4 },
 
   locRow:       { paddingVertical: 12 },
   locRowDivider:{ borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
