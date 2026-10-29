@@ -37,7 +37,7 @@ import {
 import { t, hasOwnTranslation, LANG_CODES } from '../constants/i18n.js'
 import {
   NORTH_HOUSES, NH_BUILDINGS, NH_APARTMENTS, NH_SLUGS, NH_FROM_PRICE,
-  nhWaMessage, nhWaUrl, nhWebsiteUrl, nhRequestMessage, nhParseDate, nhNights, nhFormatDateInput,
+  nhWaMessage, nhWaUrl, nhWebsiteUrl, nhRequestMessage, nhParseDate, nhNights,
   nhValidateRequest, NH_MAX_NIGHTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
@@ -854,7 +854,6 @@ for (const a of NH_APARTMENTS) {
 // The form's bounds, probed at both edges (the DB's: ≤ 90 nights, guests 1..12, a real date).
 check(nhParseDate('31.02.2026') === null && nhParseDate('12.11.2026') === '2026-11-12' && nhParseDate('2026-11-12') === null,
   `nhParseDate: a non-date was accepted or a real one refused`)
-check(nhFormatDateInput('12112026') === '12.11.2026' && nhFormatDateInput('1211') === '12.11', `nhFormatDateInput does not insert the dots`)
 const nhReq = (ci, co, g) => nhValidateRequest({ checkInText: ci, checkOutText: co, guestsText: g, name: 'Ayşe', phone: '555 000 0000' })
 check(nhReq('01.01.2027', '02.01.2027', '1').ok, `1 night / 1 guest was refused`)
 check(nhReq('01.01.2027', '01.04.2027', '12').ok && nhNights('2027-01-01', '2027-04-01') === 90, `exactly ${NH_MAX_NIGHTS} nights / 12 guests was refused`)
