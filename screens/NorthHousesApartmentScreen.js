@@ -542,7 +542,7 @@ const s = StyleSheet.create({
 
   contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12,
                  backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  waBtn:       { flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, paddingHorizontal: 8, borderRadius: radii.md, backgroundColor: '#075E54' },
+  waBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, paddingHorizontal: 8, borderRadius: radii.md, backgroundColor: '#075E54' },
   waBtnText:   { ...type.rowTitle, color: '#FFFFFF', flexShrink: 1 },
   webBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, paddingHorizontal: 8,
                  borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
