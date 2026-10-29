@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, Platform, Dimensions, useWindowDimensions } from 'react-native'
+import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, Platform, Dimensions, useWindowDimensions, AppState } from 'react-native'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -13,7 +13,7 @@ import { t, LANG_CODES } from '../constants/i18n'
 import { NORTH_HOUSES_FORM } from '../constants/redesign'
 import {
   NORTH_HOUSES, nhBuilding, nhWaMessage, nhWaUrl, nhWebsiteUrl,
-  nhValidateRequest, nhRequestMessage, nhRequestLimit, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
+  nhValidateRequest, nhRequestMessage, nhRequestLimit, nhFreshStamps, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals'
 import { partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
@@ -26,7 +26,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // map link, and two ways out — WhatsApp (primary) and the apartment's own page on their site.
 // A free listing: no deal band, no code, no ad slot. Config: constants/dailyRentals.js.
 //
-// The form at the foot is a prototype, rendered only when NORTH_HOUSES_FORM (constants/redesign.js): NORTH_HOUSES_FORM_LIVE, or ADA Preview. Production never sets appVariant, so never renders it.
+// The booking-request form at the foot renders only when NORTH_HOUSES_FORM (constants/redesign.js): the North Houses tab
+// is on AND (NORTH_HOUSES_FORM_LIVE, or ADA Preview).
 
 const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
@@ -55,6 +56,24 @@ async function saveRequest(apartmentSlug, v) {
     supabase.from('partner_booking_requests').insert([{ partner: NORTH_HOUSES.slug, apartment: apartmentSlug, check_in: v.checkIn, check_out: v.checkOut, guests: v.guests }]).then(() => {}, () => {})
   } catch {}
 }
+
+// The privacy policy promises the times stay on the phone for 24 hours: drop older ones at app start and on
+// foreground (this module loads at start, via AccommodationScreen), as logContactEvent's outbox does.
+async function pruneRequestStamps() {
+  try {
+    const raw = await AsyncStorage.getItem(NH_STAMPS_KEY)
+    if (raw == null) return
+    let stamps = []
+    try { stamps = JSON.parse(raw) } catch {}
+    const fresh = nhFreshStamps(stamps, Date.now())
+    if (fresh.length === 0) await AsyncStorage.removeItem(NH_STAMPS_KEY)
+    else if (fresh.length !== (Array.isArray(stamps) ? stamps.length : -1)) await AsyncStorage.setItem(NH_STAMPS_KEY, JSON.stringify(fresh))
+  } catch {}
+}
+try {
+  AppState.addEventListener('change', s => { if (s === 'active') pruneRequestStamps() })
+  setTimeout(pruneRequestStamps, 3000)
+} catch {}
 
 function PagerPhoto({ photoKey, width, index, total, lang, onOpen }) {
   const src = partnerAsset(photoKey)

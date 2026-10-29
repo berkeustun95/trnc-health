@@ -213,10 +213,16 @@ export function nhParseDate(text) {
 // `stamps` is the pruned list (<= 24 h old, capped) with `now` appended when allowed.
 export const NH_LIMIT_HOUR = 3
 export const NH_LIMIT_DAY = 10
-export function nhRequestLimit(stamps, now) {
-  const day = 24 * 3600 * 1000, hour = 3600 * 1000
-  const kept = (Array.isArray(stamps) ? stamps : [])
+// The stamps still inside the 24 h window. The privacy policy says the times are kept on the phone for 24 hours,
+// so the screen also runs this at app start and on foreground, not only when the next request is sent.
+export function nhFreshStamps(stamps, now) {
+  const day = 24 * 3600 * 1000
+  return (Array.isArray(stamps) ? stamps : [])
     .filter(x => Number.isFinite(x) && x <= now && now - x < day).slice(-NH_LIMIT_DAY)
+}
+export function nhRequestLimit(stamps, now) {
+  const hour = 3600 * 1000
+  const kept = nhFreshStamps(stamps, now)
   const allowed = kept.filter(x => now - x < hour).length < NH_LIMIT_HOUR && kept.length < NH_LIMIT_DAY
   return { allowed, stamps: allowed ? [...kept, now] : kept }
 }

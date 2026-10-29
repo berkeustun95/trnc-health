@@ -38,7 +38,7 @@ import { t, hasOwnTranslation, LANG_CODES } from '../constants/i18n.js'
 import {
   NORTH_HOUSES, NH_BUILDINGS, NH_APARTMENTS, NH_SLUGS, NH_FROM_PRICE,
   nhWaMessage, nhWaUrl, nhWebsiteUrl, nhRequestMessage, nhParseDate, nhNights,
-  nhValidateRequest, nhRequestLimit, NH_MAX_NIGHTS, NH_MAX_GUESTS,
+  nhValidateRequest, nhRequestLimit, nhFreshStamps, NH_MAX_NIGHTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
 
@@ -864,6 +864,7 @@ check(nhParseDate('31.02.2026') === null && nhParseDate('12.11.2026') === '2026-
 {
   const H = 3600e3, T0 = 1e12
   let st = [], r
+  { const f = nhFreshStamps([T0 - 25 * 3600e3, T0 - 23 * 3600e3, 'x', T0 + 60e3], T0); check(f.length === 1 && f[0] === T0 - 23 * 3600e3, `nhFreshStamps must keep only the last 24 h (and nothing malformed or future): got ${JSON.stringify(f)}`) }
   for (let i = 0; i < 3; i++) { r = nhRequestLimit(st, T0 + i * 60e3); check(r.allowed, `limiter: request ${i + 1} of 3 in an hour was refused`); st = r.stamps }
   r = nhRequestLimit(st, T0 + 3 * 60e3)
   check(!r.allowed && r.stamps.length === 3, `limiter: the 4th request within an hour was allowed (allowed=${r.allowed}, kept ${r.stamps.length})`)

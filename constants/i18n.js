@@ -16954,7 +16954,7 @@ const translations = {
     routeStart: "Starten",
     routeCredit: "Tourismusministerium · {brand}",
     policyUpdatedTitle: "Wir haben unsere Datenschutzerklärung aktualisiert",
-    policyUpdatedBody: "Sie können jetzt Buchungsanfragen an Partner senden, etwa an tageweise vermietete Wohnungen. Wir speichern die Wohnung, die Daten und die Anzahl der Gäste, niemals Ihren Namen oder Ihre Telefonnummer. Diese Einträge werden nach 12 Monaten gelöscht.",
+    policyUpdatedBody: "Sie können jetzt Buchungsanfragen an Partner senden, etwa an tageweise vermietete Wohnungen. Wir speichern die Wohnung, den Zeitraum und die Anzahl der Gäste, niemals Ihren Namen oder Ihre Telefonnummer. Diese Einträge werden nach 12 Monaten gelöscht.",
     policyUpdatedRead: "Erklärung lesen",
     policyUpdatedOk: "Verstanden",
     updateTitle: "Neue Version verfügbar",
