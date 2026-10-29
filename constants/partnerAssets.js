@@ -157,10 +157,11 @@ export const PARTNER_ASSETS = {
 
   // ─── North Houses (Günlük Kiralık) ───────────────────────────────────────
   // Logo and photos are the partner's own, from northcyprusbnb.com (2026-10-28); the partner's written
-  // OK is still PENDING (precondition 1 of NORTH_HOUSES_LIVE in constants/flags.js). Photos are 1024 px
-  // on the long edge and carry only dimension/colour-space EXIF, an empty IPTC block and an sRGB ICC
-  // profile (no GPS, camera or date). Site gallery order, 8 per apartment: `<apartment key>-NN`. Six are
-  // portraits (768x1024): NorthHousesApartmentScreen shows those whole (contain), never cropped.
+  // OK is still PENDING (precondition 1 of NORTH_HOUSES_LIVE in constants/flags.js). Photos are the
+  // site's 1920 px originals re-encoded at 1440 px on the long edge (JPEG q82, 2026-10-29), metadata
+  // stripped. Site gallery order, 8 per apartment: `<apartment key>-NN`; -01 is the living room for all
+  // seven, so it is the card cover. Six are portraits (1080x1440): the 4:3 pager crops them (cover) and
+  // the full-screen viewer shows them whole.
   'northhouses/logo': require('../assets/partners/northhouses/logo.png'),
   'northhouses/y1-01': require('../assets/partners/northhouses/y1-01.jpg'),
   'northhouses/y1-02': require('../assets/partners/northhouses/y1-02.jpg'),
