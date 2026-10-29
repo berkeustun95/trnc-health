@@ -203,14 +203,6 @@ export function nhParseDate(text) {
 export const nhNights = (checkInIso, checkOutIso) =>
   Math.round((Date.parse(`${checkOutIso}T00:00:00Z`) - Date.parse(`${checkInIso}T00:00:00Z`)) / 86400000)
 
-// Digits typed by the user -> 'DD.MM.YYYY' with the dots inserted as they type.
-export function nhFormatDateInput(text) {
-  const d = String(text || '').replace(/\D/g, '').slice(0, 8)
-  if (d.length <= 2) return d
-  if (d.length <= 4) return `${d.slice(0, 2)}.${d.slice(2)}`
-  return `${d.slice(0, 2)}.${d.slice(2, 4)}.${d.slice(4)}`
-}
-
 // -> { checkIn, checkOut, guests, datesOk, guestsOk, contactOk, ok }. `checkIn` / `checkOut` are
 // ISO or null. A phone needs 7+ digits and a name 2+ characters: enough to be reachable, not a
 // validation of who they are.

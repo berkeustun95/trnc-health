@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react'
-import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, useWindowDimensions } from 'react-native'
+import { useState, useRef, useEffect } from 'react'
+import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, Platform, Dimensions, useWindowDimensions } from 'react-native'
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -12,7 +13,7 @@ import { t, LANG_CODES } from '../constants/i18n'
 import { NORTH_HOUSES_FORM } from '../constants/redesign'
 import {
   NORTH_HOUSES, nhBuilding, nhWaMessage, nhWaUrl, nhWebsiteUrl,
-  nhValidateRequest, nhRequestMessage, nhFormatDateInput,
+  nhValidateRequest, nhRequestMessage, NH_MAX_NIGHTS, NH_MIN_GUESTS, NH_MAX_GUESTS,
 } from '../constants/dailyRentals'
 import { partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
@@ -150,11 +151,12 @@ function FormField({ label, children }) {
   )
 }
 
-// ─── THE REQUEST FORM — DEV-ONLY PROTOTYPE ───────────────────────────────────
+// ─── THE REQUEST FORM — PROTOTYPE ────────────────────────────────────────────
 //
-// Check-in / check-out are free-entry 'DD.MM.YYYY' (dots inserted as the digits are typed, a number
-// pad), not a calendar widget: the picker is a native module with an iOS / Android split that cannot
-// be device-tested yet, and free entry maps 1:1 onto the validator and the DB's dates.
+// Dates come from the native picker (the Events filter's pattern: Android's imperative dialog, an
+// inline calendar in a sheet on iOS), so a date is never typed and never malformed: Giriş from today,
+// Çıkış from the day after Giriş up to NH_MAX_NIGHTS later. Guests is a stepper that starts at a real 2.
+// Under a disabled button the form says, in words, what is still missing: nothing is silently off.
 //
 // Send builds the Turkish WhatsApp text (with name and phone: for the partner's eyes only) and opens
 // it. The row for our own table is sent fire-and-forget, NOT awaited, and carries NO name or phone:
@@ -162,21 +164,89 @@ function FormField({ label, children }) {
 //   - supabase queries are lazy thenables: the .then() is what actually sends it;
 //   - errors are swallowed: a failed insert must never block WhatsApp. ADA Preview talks to the
 //     PRODUCTION project, so a Preview send is a real row (20261143 applied 2026-10-28).
+const pad2 = n => String(n).padStart(2, '0')
+const isoOf = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+const dateOf = iso => new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)))
+const addDays = (iso, n) => { const d = dateOf(iso); d.setDate(d.getDate() + n); return isoOf(d) }
+const dmyOf = iso => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '')
+
+function DateField({ label, value, placeholder, onPress }) {
+  return (
+    <FormField label={label}>
+      <TouchableOpacity style={s.dateBtn} onPress={onPress} activeOpacity={0.7} accessibilityRole="button"
+        accessibilityLabel={`${label}: ${value ? dmyOf(value) : placeholder}`}>
+        <Ionicons name="calendar-outline" size={16} color={value ? colors.primaryDark : colors.textSecondary} />
+        <Text style={[s.dateText, !value && s.datePh]} numberOfLines={1}>{value ? dmyOf(value) : placeholder}</Text>
+      </TouchableOpacity>
+    </FormField>
+  )
+}
+
+function GuestStepper({ value, onChange, lang }) {
+  const less = value > NH_MIN_GUESTS, more = value < NH_MAX_GUESTS
+  return (
+    <View style={s.stepper} accessible accessibilityRole="adjustable" accessibilityLabel={t('nhFormGuests', lang)}
+      accessibilityValue={{ min: NH_MIN_GUESTS, max: NH_MAX_GUESTS, now: value }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={e => onChange(e.nativeEvent.actionName === 'increment' ? Math.min(NH_MAX_GUESTS, value + 1) : Math.max(NH_MIN_GUESTS, value - 1))}>
+      <TouchableOpacity style={[s.stepBtn, !less && s.stepBtnOff]} onPress={() => less && onChange(value - 1)} disabled={!less}
+        activeOpacity={0.7} accessibilityLabel={t('nhFormGuestsLess', lang)}>
+        <Ionicons name="remove" size={20} color={colors.primary} />
+      </TouchableOpacity>
+      <Text style={s.stepValue}>{value}</Text>
+      <TouchableOpacity style={[s.stepBtn, !more && s.stepBtnOff]} onPress={() => more && onChange(value + 1)} disabled={!more}
+        activeOpacity={0.7} accessibilityLabel={t('nhFormGuestsMore', lang)}>
+        <Ionicons name="add" size={20} color={colors.primary} />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
 function RequestForm({ apartment, building, lang, onFieldFocus }) {
-  const [ci, setCi] = useState('')
-  const [co, setCo] = useState('')
-  const [guests, setGuests] = useState('')
+  const [ci, setCi] = useState(null)
+  const [co, setCo] = useState(null)
+  const [guests, setGuests] = useState(2)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const refs = { ci: useRef(null), co: useRef(null), guests: useRef(null), name: useRef(null), phone: useRef(null) }
+  const [iosPicker, setIosPicker] = useState(null)
+  const footerRef = useRef(null)
+  const phoneRef = useRef(null)
 
-  const v = nhValidateRequest({ checkInText: ci, checkOutText: co, guestsText: guests, name, phone })
-  const datesFilled = ci.length === 10 && co.length === 10
-  const contactTouched = name.trim().length > 0 || phone.trim().length > 0
-  const err = (datesFilled && !v.datesOk) ? t('nhFormErrDates', lang)
-    : (guests.length > 0 && !v.guestsOk) ? t('nhFormErrGuests', lang)
-    : (contactTouched && !v.contactOk) ? t('nhFormErrContact', lang)
-    : null
+  const v = nhValidateRequest({ checkInText: dmyOf(ci), checkOutText: dmyOf(co), guestsText: String(guests), name, phone })
+  const phoneDigits = phone.replace(/\D/g, '').length
+  const missing = [
+    !ci && t('nhFormMissCheckIn', lang),
+    !co && t('nhFormMissCheckOut', lang),
+    name.trim().length < 2 && t('nhFormMissName', lang),
+    phoneDigits === 0 ? t('nhFormMissPhone', lang) : phoneDigits < 7 ? t('nhFormMissPhoneShort', lang) : null,
+  ].filter(Boolean)
+
+  // Çıkış is kept only while it is still after Giriş and within the stay limit.
+  const pickCheckIn = iso => {
+    setCi(iso)
+    if (co && (co <= iso || co > addDays(iso, NH_MAX_NIGHTS))) setCo(null)
+  }
+  const bounds = which => which === 'ci'
+    ? { min: isoOf(new Date()), max: null }
+    : { min: ci ? addDays(ci, 1) : addDays(isoOf(new Date()), 1), max: ci ? addDays(ci, NH_MAX_NIGHTS) : null }
+  const apply = (which, date) => {
+    const iso = isoOf(date)
+    if (which === 'ci') pickCheckIn(iso)
+    else setCo(iso)
+  }
+
+  const openPicker = which => {
+    if (Platform.OS !== 'android') { setIosPicker(which); return }
+    const { min, max } = bounds(which)
+    const cur = which === 'ci' ? ci : co
+    DateTimePickerAndroid.open({
+      value: dateOf(cur && cur >= min ? cur : min),
+      mode: 'date',
+      minimumDate: dateOf(min),
+      ...(max ? { maximumDate: dateOf(max) } : {}),
+      onChange: (e, date) => { if (e.type === 'set' && date) apply(which, date) },
+    })
+  }
 
   const send = () => {
     if (!v.ok) return
@@ -189,55 +259,107 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
     Linking.openURL(nhWaUrl(text)).catch(() => {})
   }
 
-  const focus = key => () => onFieldFocus(refs[key])
+  // Name and phone both lift the FOOTER (missing line + button) above the keyboard, so the field
+  // being typed in and the button it unlocks are on screen together.
+  const revealFooter = () => onFieldFocus(footerRef)
   const ph = t('nhFormDatePh', lang)
+  const ios = iosPicker ? bounds(iosPicker) : null
   return (
     <Card padding={16} style={s.block}>
       <Text style={s.blockTitle} accessibilityRole="header">{t('nhFormTitle', lang)}</Text>
       <View style={s.fieldRow}>
-        <FormField label={t('nhFormCheckIn', lang)}>
-          <TextInput ref={refs.ci} style={s.input} value={ci} onChangeText={x => setCi(nhFormatDateInput(x))}
-            onFocus={focus('ci')} placeholder={ph} placeholderTextColor={colors.textSecondary}
-            keyboardType="number-pad" maxLength={10} returnKeyType="next" />
-        </FormField>
-        <FormField label={t('nhFormCheckOut', lang)}>
-          <TextInput ref={refs.co} style={s.input} value={co} onChangeText={x => setCo(nhFormatDateInput(x))}
-            onFocus={focus('co')} placeholder={ph} placeholderTextColor={colors.textSecondary}
-            keyboardType="number-pad" maxLength={10} />
-        </FormField>
+        <DateField label={t('nhFormCheckIn', lang)} value={ci} placeholder={ph} onPress={() => openPicker('ci')} />
+        <DateField label={t('nhFormCheckOut', lang)} value={co} placeholder={ph} onPress={() => openPicker('co')} />
       </View>
       <FormField label={t('nhFormGuests', lang)}>
-        <TextInput ref={refs.guests} style={s.input} value={guests} onChangeText={x => setGuests(x.replace(/\D/g, '').slice(0, 2))}
-          onFocus={focus('guests')} placeholder="2" placeholderTextColor={colors.textSecondary}
-          keyboardType="number-pad" maxLength={2} />
+        <GuestStepper value={guests} onChange={setGuests} lang={lang} />
       </FormField>
       <FormField label={t('nhFormName', lang)}>
-        <TextInput ref={refs.name} style={s.input} value={name} onChangeText={setName}
-          onFocus={focus('name')} autoCapitalize="words" autoCorrect={false} />
+        <TextInput style={s.input} value={name} onChangeText={setName} onFocus={revealFooter}
+          autoCapitalize="words" autoCorrect={false} returnKeyType="next"
+          blurOnSubmit={false} onSubmitEditing={() => phoneRef.current?.focus()} />
       </FormField>
       <FormField label={t('nhFormPhone', lang)}>
-        <TextInput ref={refs.phone} style={s.input} value={phone} onChangeText={setPhone}
-          onFocus={focus('phone')} keyboardType="phone-pad" />
+        <TextInput ref={phoneRef} style={s.input} value={phone} onChangeText={setPhone} onFocus={revealFooter} keyboardType="phone-pad" />
       </FormField>
-      {!!err && <Text style={s.formError} accessibilityLiveRegion="polite">{err}</Text>}
-      <TouchableOpacity style={[s.sendBtn, !v.ok && s.sendBtnOff]} onPress={send} disabled={!v.ok} activeOpacity={0.85}
-        accessibilityRole="button" accessibilityState={{ disabled: !v.ok }}>
-        <Ionicons name="logo-whatsapp" size={18} color="#fff" />
-        <Text style={s.sendBtnText}>{t('nhFormSend', lang)}</Text>
-      </TouchableOpacity>
+      <View ref={footerRef} collapsable={false}>
+        {missing.length > 0 && (
+          <Text style={s.formMissing} accessibilityLiveRegion="polite">
+            {t('nhFormMissing', lang).replace('{items}', () => missing.join(', '))}
+          </Text>
+        )}
+        <TouchableOpacity style={[s.sendBtn, !v.ok && s.sendBtnOff]} onPress={send} disabled={!v.ok} activeOpacity={0.85}
+          accessibilityRole="button" accessibilityState={{ disabled: !v.ok }}>
+          <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+          <Text style={s.sendBtnText}>{t('nhFormSend', lang)}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {Platform.OS === 'ios' && (
+        <Modal visible={!!iosPicker} transparent animationType="fade" onRequestClose={() => setIosPicker(null)}>
+          <TouchableOpacity style={s.pickerBackdrop} activeOpacity={1} onPress={() => setIosPicker(null)} />
+          {!!ios && (
+            <View style={s.pickerSheet}>
+              <View style={s.pickerSheetHeader}>
+                <Text style={s.pickerSheetTitle}>{t(iosPicker === 'ci' ? 'nhFormCheckIn' : 'nhFormCheckOut', lang)}</Text>
+                <TouchableOpacity onPress={() => setIosPicker(null)} hitSlop={8}>
+                  <Text style={s.pickerDoneText}>{t('done', lang)}</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={dateOf((iosPicker === 'ci' ? ci : co) || ios.min)}
+                mode="date"
+                display="inline"
+                locale={LANG_CODES[lang] || 'en'}
+                minimumDate={dateOf(ios.min)}
+                {...(ios.max ? { maximumDate: dateOf(ios.max) } : {})}
+                onChange={(_, date) => { if (date) apply(iosPicker, date) }}
+                style={{ alignSelf: 'stretch' }}
+              />
+            </View>
+          )}
+        </Modal>
+      )}
     </Card>
   )
 }
 
 export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) {
   const insets = useSafeAreaInsets()
-  const { width: winW, height: winH } = useWindowDimensions()
+  const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
   const scrollRef = useRef(null)
   const scrollY = useRef(0)
   const kbTopRef = useRef(null)
   kbTopRef.current = kbTop
   const [viewerAt, setViewerAt] = useState(null)
+
+  // Lifts the focused part of the form above the keyboard. measureInWindow is window-relative and the window can start
+  // below the screen top, while the keyboard's top is screen-relative: the page root's own window y is the offset
+  // (AddressEditor's device-diagnosed fix). Runs again once the keyboard has measured itself, since focus can come first.
+  const rootRef = useRef(null)
+  const pending = useRef(null)
+  const reveal = () => {
+    const top = kbTopRef.current, target = pending.current?.current, root = rootRef.current
+    if (top == null || !target || !root) return
+    root.measureInWindow((_rx, ry) => target.measureInWindow((_x, y, _w, h) => {
+      const over = Math.round(y - ry + h + 16 - top)
+      if (over > 0) scrollRef.current?.scrollTo({ y: scrollY.current + over, animated: true })
+    }))
+  }
+  const revealField = ref => {
+    pending.current = ref
+    setTimeout(reveal, 60)
+    setTimeout(reveal, 320)
+  }
+  // pending is kept when the keyboard closes: Back (or a keyboard switch) hides it but leaves the field focused, and the
+  // tap that reopens it fires no new onFocus.
+  useEffect(() => {
+    if (kbTop == null) return
+    const ids = [setTimeout(reveal, 60), setTimeout(reveal, 320)]
+    return () => ids.forEach(clearTimeout)
+  }, [kbTop])
+
   if (!apartment) return null
 
   const partner = NORTH_HOUSES
@@ -261,19 +383,9 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
     Linking.openURL(building.mapUrl).catch(() => {})
   }
 
-  // Lifts a focused field above the keyboard once the keyboard has measured itself.
-  const revealField = ref => {
-    setTimeout(() => {
-      ref.current?.measureInWindow((x, y, w, h) => {
-        const top = kbTopRef.current
-        if (top == null) return
-        const over = y + h + 24 - top
-        if (over > 0) scrollRef.current?.scrollTo({ y: scrollY.current + over, animated: true })
-      })
-    }, 350)
-  }
-
-  const kbPad = kbTop != null ? Math.max(0, winH - kbTop) : 0
+  // Screen height, not window height: kbTop is screen-relative, and the window here is shorter than the screen by the
+  // system bars, which left the scroll too short for the footer to clear the keyboard (device-tested).
+  const kbPad = kbTop != null ? Math.max(0, Dimensions.get('screen').height - kbTop) : 0
   const chips = []
   if (apartment.kind === 'twoPlusOne') chips.push(['bed-outline', fill(t('nhBedrooms', lang), apartment.bedrooms)])
   if (apartment.beds.double > 0) chips.push(['moon-outline', fill(t('nhBedsDouble', lang), apartment.beds.double)])
@@ -282,7 +394,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
   if (apartment.minNights > 1) chips.push(['calendar-outline', fill(t('nhMinStay', lang), apartment.minNights)])
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView ref={rootRef} collapsable={false} style={s.safe} edges={['top']}>
       {REDESIGN ? (
         <ScreenHeader title={partner.name} onBack={onBack} lang={lang} />
       ) : (
@@ -425,7 +537,23 @@ const s = StyleSheet.create({
   fieldLabel:  { ...type.meta, color: colors.textSecondary, marginBottom: 4 },
   input:       { minHeight: 48, paddingHorizontal: 12, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
                  backgroundColor: 'transparent', ...type.body, fontSize: 15, color: colors.textPrimary },
-  formError:   { ...type.small, color: colors.dangerInk, marginBottom: 10 },
+  formMissing: { ...type.small, color: colors.textSecondary, marginBottom: 10 },
+  dateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, paddingHorizontal: 12, borderRadius: radii.md,
+                 borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: 'transparent' },
+  dateText:    { flex: 1, ...type.body, fontSize: 15, color: colors.textPrimary },
+  datePh:      { color: colors.textSecondary },
+  stepper:     { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, minHeight: 48 },
+  stepBtn:     { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center',
+                 borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
+  stepBtnOff:  { opacity: 0.35 },
+  stepValue:   { minWidth: 48, textAlign: 'center', ...type.sheetTitle, color: colors.textPrimary },
+  pickerBackdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet:       { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card,
+                       borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
+  pickerSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                       paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  pickerSheetTitle:  { ...type.rowTitle, color: colors.textPrimary },
+  pickerDoneText:    { ...type.rowTitle, color: colors.primary },
   sendBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radii.md, backgroundColor: '#075E54' },
   sendBtnOff:  { opacity: 0.4 },
   sendBtnText: { ...type.rowTitle, color: '#FFFFFF' },
