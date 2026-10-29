@@ -70,7 +70,6 @@ DECLARE
   v_sched  text;
   v_active boolean;
   v_role   text;
-  v_before int;
   v_old    uuid;
   v_edge   uuid;
   v_fresh  uuid;
@@ -91,7 +90,7 @@ BEGIN
   IF btrim(v_cmd) IS DISTINCT FROM 'SELECT public.purge_partner_booking_requests()' THEN RAISE EXCEPTION 'cron command is %', v_cmd; END IF;
   IF v_active IS DISTINCT FROM true THEN RAISE EXCEPTION 'cron job is not active'; END IF;
 
-  -- EXECUTE: nobody but the owner. has_function_privilege(...,'EXECUTE') resolves PUBLIC for each named role; PUBLIC itself
+  -- EXECUTE: not anon, authenticated or PUBLIC. The owner (postgres) and service_role hold it (service_role via Supabase default privileges; the harness proacl shows both). has_function_privilege(...,'EXECUTE') resolves PUBLIC for each named role; PUBLIC itself
   -- is read from proacl (grantee 0). Positive control: the owner (postgres) can still execute it.
   FOREACH v_role IN ARRAY ARRAY['anon','authenticated'] LOOP
     IF has_function_privilege(v_role, v_fn, 'EXECUTE') THEN RAISE EXCEPTION '% can EXECUTE purge_partner_booking_requests', v_role; END IF;
@@ -113,11 +112,10 @@ BEGIN
   END IF;
   RAISE NOTICE 'partner_booking_requests policies (% , unchanged): %', v_n, v_names;
 
-  IF obj_description(v_t, 'pg_class') NOT LIKE '%12 months%' THEN RAISE EXCEPTION 'table comment does not state the 12-month retention'; END IF;
+  IF coalesce(obj_description(v_t, 'pg_class'), '') NOT LIKE '%12 months%' THEN RAISE EXCEPTION 'table comment does not state the 12-month retention'; END IF;
 
   -- BEHAVIOUR: old goes, fresh stays. Rows are inserted as postgres (owner) with a backdated created_at, which the
   -- app roles cannot do. Probe rows are told apart by id, and removed again so a re-run is safe.
-  SELECT count(*) INTO v_before FROM public.partner_booking_requests;
   INSERT INTO public.partner_booking_requests (partner, apartment, check_in, check_out, guests, created_at)
     VALUES ('north_houses', 'yasemin-2plus1', current_date + 30, current_date + 33, 9, now() - interval '13 months') RETURNING id INTO v_old;
   INSERT INTO public.partner_booking_requests (partner, apartment, check_in, check_out, guests, created_at)
@@ -138,7 +136,7 @@ BEGIN
   IF v_edge_left  IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'positive control: an 11-month-old row was deleted (retention too aggressive)'; END IF;
   IF v_fresh_left IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'positive control: a fresh row was deleted'; END IF;
   IF (v_res->>'deleted')::int < 1 THEN RAISE EXCEPTION 'purge reported deleted=% (want >= 1)', v_res->>'deleted'; END IF;
-  IF (SELECT count(*) FROM public.partner_booking_requests) IS DISTINCT FROM v_before THEN
+  IF EXISTS (SELECT 1 FROM public.partner_booking_requests WHERE id IN (v_old, v_edge, v_fresh)) THEN
     RAISE EXCEPTION 'probe rows leaked into partner_booking_requests';
   END IF;
 END $$;
@@ -154,7 +152,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261148_partner_booking_requests_retention.sql', '23cf5d64db79f5b76b5d821737e32171509756675a681d4acd0701359442c382')
+VALUES ('20261148_partner_booking_requests_retention.sql', '2fbc5e8221f111688997f4fa1756a59c21cc265e67807a7e59127154ed79cc52')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
