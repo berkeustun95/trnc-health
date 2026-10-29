@@ -480,17 +480,17 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
           <TouchableOpacity style={s.waBtn} onPress={openWhatsApp} activeOpacity={0.85} accessibilityRole="button"
             accessibilityLabel={t('accomWhatsApp', lang)}>
             <Ionicons name="logo-whatsapp" size={20} color="#fff" />
-            <Text style={[s.barBtnText, s.waBtnText]} numberOfLines={1} adjustsFontSizeToFit>{t('accomWhatsApp', lang)}</Text>
+            <Text style={[s.barBtnText, s.waBtnText]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.15}>{t('accomWhatsApp', lang)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.webBtn} onPress={call} activeOpacity={0.7} accessibilityRole="button"
             accessibilityLabel={`${t('accomCall', lang)} ${partner.phone}`}>
             <Ionicons name="call-outline" size={20} color={colors.primary} />
-            <Text style={s.barBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('accomCall', lang)}</Text>
+            <Text style={s.barBtnText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.15}>{t('accomCall', lang)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.webBtn} onPress={openWebsite} activeOpacity={0.7} accessibilityRole="link"
             accessibilityLabel={t('dormWebsite', lang)}>
             <Ionicons name="open-outline" size={20} color={colors.primary} />
-            <Text style={s.barBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('dormWebsite', lang)}</Text>
+            <Text style={s.barBtnText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.15}>{t('dormWebsite', lang)}</Text>
           </TouchableOpacity>
         </View>
       )}
