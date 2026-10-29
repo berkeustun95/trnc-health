@@ -4652,7 +4652,7 @@ const translations = {
     nhPriceNote: "Fiyatlar doluluk ve döneme göre değişiklik gösterebilir. En uygun ve doğru fiyat için lütfen direkt iletişime geçin.",
     nhCleaning: "Temizlik ücreti",
     nhDeposit: "Ayrıca rezervasyon anında alınan, çıkışta iade edilen €{n} depozito.",
-    nhElectricity: "Günde {kwh} kWh üzeri elektrik: kWh başına €{rate}",
+    nhElectricity: "Günde {kwh} kWh üzeri elektrik: kWh başına €{rate}.",
     nhMinStay: "En az konaklama: {n} gece",
     nhGuestsUpTo: "En fazla {n} kişi",
     nhBedrooms: "Yatak odası: {n}",

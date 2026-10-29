@@ -33,7 +33,9 @@ const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
 const fill = (text, n) => text.replace('{n}', String(n))
 const COMMA_DECIMAL = ['Turkish', 'Russian', 'Greek', 'French', 'Spanish', 'German']
+// A no-break space before the price keeps "başına €0,30" on one line (it wrapped the price alone in TR).
 const fillElectricity = (text, e, lang) => text
+  .replace(' €{rate}', '\u00A0€{rate}')
   .replace('{kwh}', String(e.freeKwhPerDay))
   .replace('{rate}', COMMA_DECIMAL.includes(lang) ? e.eurPerKwh.toFixed(2).replace('.', ',') : e.eurPerKwh.toFixed(2))
 
