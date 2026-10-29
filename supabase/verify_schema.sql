@@ -637,6 +637,8 @@ WITH report AS (
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
     ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
     ('1051_app_versions','purge_app_update_events'),
+    -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
+    ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
     ('1056_route_medals','award_route_medal'),
     ('1056_route_medals','get_profile_route_badges'),
@@ -4580,6 +4582,10 @@ WITH report AS (
       to_regprocedure('public.purge_app_update_events(interval)') IS NOT NULL
       AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.purge_app_update_events(interval)'), 'EXECUTE')
                AND NOT has_function_privilege('authenticated', to_regprocedure('public.purge_app_update_events(interval)'), 'EXECUTE'), false)
+    UNION ALL SELECT '20261148_partner_booking_requests_retention','purge_partner_booking_requests exists and is not client-callable',
+      to_regprocedure('public.purge_partner_booking_requests()') IS NOT NULL
+      AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.purge_partner_booking_requests()'), 'EXECUTE')
+               AND NOT has_function_privilege('authenticated', to_regprocedure('public.purge_partner_booking_requests()'), 'EXECUTE'), false)
     -- (3) A place on a route cannot be deleted silently: place_id RESTRICT ('r'), route_id CASCADE ('c').
     --     Section E sees the constraint NAMES, which survive a change of delete action.
     UNION ALL SELECT '1048_walking_routes','walking_route_stops: place_id ON DELETE RESTRICT, route_id ON DELETE CASCADE',
@@ -5284,6 +5290,11 @@ WITH report AS (
                 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND policyname = 'pbr_no_update' AND cmd = 'UPDATE' AND permissive = 'RESTRICTIVE'), false)
     AND COALESCE((SELECT qual = 'false'
                 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'partner_booking_requests' AND policyname = 'pbr_no_delete' AND cmd = 'DELETE' AND permissive = 'RESTRICTIVE'), false)
+  -- 20261148: the retention is a 12-month cutoff in the function body and is stated in the table comment (neither names an object).
+  UNION ALL SELECT '20261148_partner_booking_requests_retention','purge_partner_booking_requests: deletes created_at < now() - interval ''12 months''; table comment states the 12-month retention',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.purge_partner_booking_requests()')) LIKE '%DELETE FROM public.partner_booking_requests WHERE created_at < v_cut%'
+         AND pg_get_functiondef(to_regprocedure('public.purge_partner_booking_requests()')) LIKE '%v_cut timestamptz := now() - interval ''12 months''%', false)
+    AND COALESCE(obj_description(to_regclass('public.partner_booking_requests'), 'pg_class') LIKE '%12 months%', false)
   ) z
 
   UNION ALL
@@ -5396,7 +5407,9 @@ FROM (VALUES
   ('1106_sync_novest_cron_timeout','sync-novest-morning'),
   ('1106_sync_novest_cron_timeout','sync-novest-evening'),
   -- Retention on eatery_orders (order proof): since 20261132 hourly at :40 (30 days real, 24 h TEST); schedule + command are the 1132 row below.
-  ('20261125_eatery_orders','eatery-orders-retention')
+  ('20261125_eatery_orders','eatery-orders-retention'),
+  -- 12-month retention on partner_booking_requests (20261148), 03:53 UTC daily; exact schedule + command are the 20261148 row below.
+  ('20261148_partner_booking_requests_retention','purge-partner-booking-requests')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -5428,6 +5441,16 @@ SELECT '20261132_eatery_orders_is_test', 'eatery-orders-retention: schedule 40 *
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'eatery-orders-retention' AND active
                     AND schedule = '40 * * * *'
                     AND btrim(command) = 'DELETE FROM public.eatery_orders WHERE created_at < now() - interval ''30 days'' OR (is_test AND created_at < now() - interval ''24 hours'')') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261148: purge-partner-booking-requests runs daily at 03:53 and calls the purge function ───
+SELECT '20261148_partner_booking_requests_retention', 'purge-partner-booking-requests: schedule 53 3 * * * and the exact purge call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-partner-booking-requests') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-partner-booking-requests' AND active
+                    AND schedule = '53 3 * * *'
+                    AND btrim(command) = 'SELECT public.purge_partner_booking_requests()') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
