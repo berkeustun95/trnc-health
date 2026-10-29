@@ -907,6 +907,9 @@ if (existsSync(resolve(ROOT, 'screens/NorthHousesApartmentScreen.js'))) {
   check(rd.includes('export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)'),
     `constants/redesign.js: NORTH_HOUSES must be exactly NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW) (no __DEV__)`)
   check(rd.includes("const IS_PREVIEW_BUILD = Constants.expoConfig?.extra?.appVariant === 'preview'"), `constants/redesign.js: IS_PREVIEW_BUILD is no longer the appVariant read`)
+  // Ara dials the same number as WhatsApp, and is counted like Alasia's call button.
+  check(NORTH_HOUSES.phone === '+905338470666' && /logContactEvent\('accommodation', partner\.id, 'call', null\)\s*Linking\.openURL\(`tel:\$\{partner\.phone\}`\)/.test(apt),
+    `NorthHousesApartmentScreen: Ara must log 'call' and open tel:\${partner.phone} (+905338470666), got phone ${NORTH_HOUSES.phone}`)
   const ins = /from\('partner_booking_requests'\)\s*\.insert\(\[\{([^}]*)\}\]\)([^;\n]*)/.exec(apt)
   check(!!ins, `no partner_booking_requests insert found in NorthHousesApartmentScreen`)
   if (ins) {
