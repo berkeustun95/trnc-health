@@ -237,10 +237,10 @@ const EXPECTED_SCALARS = {
   HOTELS_LIVE:           true,   // live at unfreeze (KITOB approved 2026-10-04)
   // Günlük Kiralık (North Houses). Dark until the partner's written OK, a content re-check and the
   // Turkish device pass; a working-tree true would put an unlisted partner's tab in front of every user.
-  NORTH_HOUSES_LIVE:     false,
+  NORTH_HOUSES_LIVE:     true,
   // Production switch for the booking-request form (needs 20261148 applied + privacy wording published).
   // ADA Preview has its own switch (NORTH_HOUSES_FORM_PREVIEW, constants/redesign.js).
-  NORTH_HOUSES_FORM_LIVE: false,
+  NORTH_HOUSES_FORM_LIVE: true,
   LIVE_SCORES_LIVE:      false,  // hidden 2026-10-06 (provider account suspended); was live 2026-10-04
   // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a
   // MODULE_FLAGS key for the same mechanical reason DORMS_LIVE is not: it gates a PARTNER
