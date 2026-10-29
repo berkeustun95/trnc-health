@@ -39,14 +39,20 @@ export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
-    version: '1.4.1',
+    version: '1.4.2',
     orientation: 'portrait',
     icon: IS_PREVIEW ? './assets/brand/v2/preview-icon.png' : './assets/brand/v2/icon.png',
     splash: {
       image: './assets/brand/v2/splash-icon.png',
       resizeMode: 'contain',
+      // Expo Go / manifest only; the native splash colour is the expo-splash-screen plugin below.
       backgroundColor: '#FFFFFF',
     },
+    // expo-system-ui: the window background under the JS root. Equals colors.bg, the App.js boot
+    // loader, so there is no #303030 dark-mode flash between the Android launch screen and the loader.
+    backgroundColor: '#F7F8FA',
+    // Android derives the status-bar colour from the splash plugin's colour; pin the 1.4.1 value.
+    androidStatusBar: { backgroundColor: '#FFFFFF' },
     scheme: 'ada',
     updates: {
       url: 'https://u.expo.dev/704d192a-1a80-41f8-ab98-cb3c8f078d7c',
@@ -114,6 +120,32 @@ export default {
     },
     plugins: [
       '@react-native-community/datetimepicker',
+      // Native splash = the 1.4.1 look: the v2 logo on white. BootSplash.js draws an identical frame
+      // (MorphFrame) and cross-fades it into the clip's first still. Every value is set: the props
+      // path defaults differ from the legacy one (imageWidth 100, no fullscreen).
+      // iOS: legacy launch screen, a full-screen image view with scaleAspectFit (a screen-width square).
+      // Android 12+: splash-icon.png in a 288 dp slot, masked to a 192 dp circle (no icon background);
+      // its logo reaches 0.3256 of the canvas (93.8 dp), inside the 96 dp mask (the adaptive foreground
+      // reaches 0.3904 = 112 dp and would lose the tail).
+      // No dark variant: userInterfaceStyle is light. No expo-video entry: its props would add
+      // UIBackgroundModes audio / a mediaPlayback service.
+      [
+        'expo-splash-screen',
+        {
+          backgroundColor: '#FFFFFF',
+          android: {
+            image: './assets/brand/v2/splash-icon.png',
+            imageWidth: 288,
+            backgroundColor: '#FFFFFF',
+          },
+          ios: {
+            image: './assets/brand/v2/splash-icon.png',
+            resizeMode: 'contain',
+            enableFullScreenImage_legacy: true,
+            backgroundColor: '#FFFFFF',
+          },
+        },
+      ],
       'expo-font',
       'expo-apple-authentication',
       ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }],

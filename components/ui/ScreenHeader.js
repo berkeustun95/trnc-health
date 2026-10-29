@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, type } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import IconButton from './IconButton'
-import { StatusBar } from 'expo-status-bar'
+import SplashStatusBar from '../SplashStatusBar'
 import { useOnPhoto } from './onPhoto'
 
 // Back · left-aligned title · up to two labelled actions. No white slab with a hairline:
@@ -19,7 +19,7 @@ export default function ScreenHeader({ title, subtitle, onBack, lang, actions = 
   const insets = useSafeAreaInsets()
   return (
     <View style={[s.bar, inset && { paddingTop: insets.top }, style]}>
-      <StatusBar style={light ? 'light' : 'dark'} />
+      <SplashStatusBar style={light ? 'light' : 'dark'} />
       {onBack
         ? <IconButton icon="chevron-back" iconSize={24} onPress={onBack} accessibilityLabel={t('back', lang)}
             variant={onPhoto ? 'frosted' : 'plain'} color={light && !onPhoto ? '#FFFFFF' : undefined} />

@@ -1,0 +1,3 @@
+Un nouveau départ : ADA s’ouvre désormais avec un nouvel écran de lancement blanc. Notre logo boussole se transforme en anneau, et Oli et Maki en jaillissent pour vous dire bonjour.
+• Un démarrage plus fluide et plus net
+• Petites corrections et améliorations

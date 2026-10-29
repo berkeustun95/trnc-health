@@ -1,6 +1,6 @@
 import { View, Image, Text, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StatusBar } from 'expo-status-bar'
+import SplashStatusBar from '../SplashStatusBar'
 import { colors, type, radii } from '../../constants/theme'
 import { OnPhotoContext } from './onPhoto'
 
@@ -53,7 +53,7 @@ export default function ModuleScreen({ topic, fullBleed = false, children, style
   return (
     <OnPhotoContext.Provider value={true}>
       <View style={[s.root, style]}>
-        <StatusBar style="light" />
+        <SplashStatusBar style="light" />
         {/* The live app's PageBackground, exactly: a frame from below the status bar (it sat in a
             top-edge SafeAreaView) to the bottom of the SCREEN — this root is the screen, never the
             list — and the photo filling it, cover, centred. width/height '100%' are REQUIRED: a

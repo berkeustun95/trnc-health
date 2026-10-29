@@ -1,0 +1,3 @@
+A fresh start: ADA now opens with a new white launch screen. Our compass logo turns into a ring, and Oli & Maki pop out to say hello.
+• Smoother, cleaner start-up
+• Small fixes and polish
