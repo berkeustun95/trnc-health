@@ -19403,7 +19403,7 @@ const translations = {
     nhFormMissCheckOut: "تاریخ خروج",
     nhFormMissName: "نام شما",
     nhFormMissPhone: "شمارهٔ تلفن شما",
-    nhFormMissPhoneShort: "شماره تلفنی با حداقل ۷ رقم",
+    nhFormMissPhoneShort: "شماره تلفنی با حداقل 7 رقم",
     nhFormGuestsLess: "مهمان کمتر",
     nhFormGuestsMore: "مهمان بیشتر",
     nhTagline: "آپارتمان‌های اجاره‌ای در نیکوزیای شمالی",

@@ -175,7 +175,7 @@ function DateField({ label, value, placeholder, onPress }) {
     <FormField label={label}>
       <TouchableOpacity style={s.dateBtn} onPress={onPress} activeOpacity={0.7} accessibilityRole="button"
         accessibilityLabel={`${label}: ${value ? dmyOf(value) : placeholder}`}>
-        <Ionicons name="calendar-outline" size={16} color={value ? colors.primaryDark : colors.textSecondary} />
+        <Ionicons name="calendar-outline" size={18} color={value ? colors.primaryDark : colors.textSecondary} />
         <Text style={[s.dateText, !value && s.datePh]} numberOfLines={1}>{value ? dmyOf(value) : placeholder}</Text>
       </TouchableOpacity>
     </FormField>
@@ -191,12 +191,12 @@ function GuestStepper({ value, onChange, lang }) {
       onAccessibilityAction={e => onChange(e.nativeEvent.actionName === 'increment' ? Math.min(NH_MAX_GUESTS, value + 1) : Math.max(NH_MIN_GUESTS, value - 1))}>
       <TouchableOpacity style={[s.stepBtn, !less && s.stepBtnOff]} onPress={() => less && onChange(value - 1)} disabled={!less}
         activeOpacity={0.7} accessibilityLabel={t('nhFormGuestsLess', lang)}>
-        <Ionicons name="remove" size={20} color={colors.primary} />
+        <Ionicons name="remove" size={20} color={colors.primaryDark} />
       </TouchableOpacity>
       <Text style={s.stepValue}>{value}</Text>
       <TouchableOpacity style={[s.stepBtn, !more && s.stepBtnOff]} onPress={() => more && onChange(value + 1)} disabled={!more}
         activeOpacity={0.7} accessibilityLabel={t('nhFormGuestsMore', lang)}>
-        <Ionicons name="add" size={20} color={colors.primary} />
+        <Ionicons name="add" size={20} color={colors.primaryDark} />
       </TouchableOpacity>
     </View>
   )
@@ -209,6 +209,7 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [iosPicker, setIosPicker] = useState(null)
+  const insets = useSafeAreaInsets()
   const footerRef = useRef(null)
   const phoneRef = useRef(null)
 
@@ -220,6 +221,7 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
     name.trim().length < 2 && t('nhFormMissName', lang),
     phoneDigits === 0 ? t('nhFormMissPhone', lang) : phoneDigits < 7 ? t('nhFormMissPhoneShort', lang) : null,
   ].filter(Boolean)
+  const missingText = t('nhFormMissing', lang).replace('{items}', () => missing.join(lang === 'Arabic' || lang === 'Persian' ? '، ' : ', '))
 
   // Çıkış is kept only while it is still after Giriş and within the stay limit.
   const pickCheckIn = iso => {
@@ -264,6 +266,11 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
   const revealFooter = () => onFieldFocus(footerRef)
   const ph = t('nhFormDatePh', lang)
   const ios = iosPicker ? bounds(iosPicker) : null
+  // The inline calendar highlights a day before any tap: Done keeps that day rather than leaving the field empty.
+  const closeIosPicker = () => {
+    if (iosPicker && !(iosPicker === 'ci' ? ci : co)) apply(iosPicker, dateOf(ios.min))
+    setIosPicker(null)
+  }
   return (
     <Card padding={16} style={s.block}>
       <Text style={s.blockTitle} accessibilityRole="header">{t('nhFormTitle', lang)}</Text>
@@ -285,11 +292,11 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
       <View ref={footerRef} collapsable={false}>
         {missing.length > 0 && (
           <Text style={s.formMissing} accessibilityLiveRegion="polite">
-            {t('nhFormMissing', lang).replace('{items}', () => missing.join(', '))}
+            {missingText}
           </Text>
         )}
         <TouchableOpacity style={[s.sendBtn, !v.ok && s.sendBtnOff]} onPress={send} disabled={!v.ok} activeOpacity={0.85}
-          accessibilityRole="button" accessibilityState={{ disabled: !v.ok }}>
+          accessibilityRole="button" accessibilityState={{ disabled: !v.ok }} accessibilityHint={missing.length ? missingText : undefined}>
           <Ionicons name="logo-whatsapp" size={18} color="#fff" />
           <Text style={s.sendBtnText}>{t('nhFormSend', lang)}</Text>
         </TouchableOpacity>
@@ -299,10 +306,10 @@ function RequestForm({ apartment, building, lang, onFieldFocus }) {
         <Modal visible={!!iosPicker} transparent animationType="fade" onRequestClose={() => setIosPicker(null)}>
           <TouchableOpacity style={s.pickerBackdrop} activeOpacity={1} onPress={() => setIosPicker(null)} />
           {!!ios && (
-            <View style={s.pickerSheet}>
+            <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 16 }]}>
               <View style={s.pickerSheetHeader}>
                 <Text style={s.pickerSheetTitle}>{t(iosPicker === 'ci' ? 'nhFormCheckIn' : 'nhFormCheckOut', lang)}</Text>
-                <TouchableOpacity onPress={() => setIosPicker(null)} hitSlop={8}>
+                <TouchableOpacity style={s.pickerDone} onPress={closeIosPicker} accessibilityRole="button">
                   <Text style={s.pickerDoneText}>{t('done', lang)}</Text>
                 </TouchableOpacity>
               </View>
@@ -542,17 +549,18 @@ const s = StyleSheet.create({
                  borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: 'transparent' },
   dateText:    { flex: 1, ...type.body, fontSize: 15, color: colors.textPrimary },
   datePh:      { color: colors.textSecondary },
-  stepper:     { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, minHeight: 48 },
-  stepBtn:     { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center',
-                 borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
+  stepper:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56, paddingHorizontal: 5,
+                 borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: 'transparent' },
+  stepBtn:     { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
   stepBtnOff:  { opacity: 0.35 },
-  stepValue:   { minWidth: 48, textAlign: 'center', ...type.sheetTitle, color: colors.textPrimary },
+  stepValue:   { flex: 1, textAlign: 'center', ...type.sectionHeading, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   pickerBackdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   pickerSheet:       { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card,
-                       borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
+                       borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet },
   pickerSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                       paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+                       paddingHorizontal: 16, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border },
   pickerSheetTitle:  { ...type.rowTitle, color: colors.textPrimary },
+  pickerDone:        { minHeight: TAP, justifyContent: 'center', paddingHorizontal: 4 },
   pickerDoneText:    { ...type.rowTitle, color: colors.primary },
   sendBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radii.md, backgroundColor: '#075E54' },
   sendBtnOff:  { opacity: 0.4 },
