@@ -381,14 +381,15 @@ const s = StyleSheet.create({
   dots:        { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6,
                  paddingHorizontal: 10, paddingVertical: 7, borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
   dotsOnPhoto: { bottom: 12 },
-  dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
+  dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.75)' },
   dotOn:       { width: 16, backgroundColor: '#FFFFFF' },
 
+  // Pure black behind the photo, as every photo viewer does: no theme token is a photo backdrop.
   viewer:      { flex: 1, backgroundColor: '#000000' },
   viewerBar:   { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  viewerCount: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
+  viewerCount: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
   viewerCountText: { ...type.meta, color: '#FFFFFF' },
-  viewerClose: { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' },
+  viewerClose: { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
 
   body:        { paddingHorizontal: 16, paddingTop: 16 },
   titleBlock:  { marginBottom: 12 },

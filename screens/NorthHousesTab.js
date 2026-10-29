@@ -1,4 +1,4 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, PixelRatio } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { Card, OnPhotoLabel } from '../components/ui'
@@ -18,6 +18,8 @@ import { logContactEvent } from '../utils/logContactEvent'
 // Every apartment card is the same height: one photo ratio (cover), and text slots of fixed line
 // counts. The full name is on the apartment screen; the card holds two lines of it.
 const CARD_PHOTO_ASPECT = 16 / 10
+// The name's two-line slot grows with the system font scale up to this cap, so it never clips.
+const NAME_SCALE_MAX = 1.15
 const LOGO = 56
 
 const fill = (text, n) => text.replace('{n}', String(n))
@@ -49,7 +51,8 @@ function ApartmentCard({ apartment, lang, onPress }) {
         ? <Image source={cover} style={s.aptPhoto} resizeMode="cover" accessible={false} />
         : <View style={s.aptPhoto} />}
       <View style={s.aptBody}>
-        <Text style={s.aptName} numberOfLines={2}>{t(apartment.nameKey, lang)}</Text>
+        <Text style={[s.aptName, { height: Math.ceil(type.sheetTitle.lineHeight * 2 * Math.min(PixelRatio.getFontScale(), NAME_SCALE_MAX)) }]}
+          numberOfLines={2} maxFontSizeMultiplier={NAME_SCALE_MAX}>{t(apartment.nameKey, lang)}</Text>
         <View style={s.metaRow}>
           <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
           <Text style={s.metaText} numberOfLines={1}>{building?.name} · {typeLabel}</Text>
@@ -57,9 +60,9 @@ function ApartmentCard({ apartment, lang, onPress }) {
         <View style={s.aptFoot}>
           <View style={s.chip}>
             <Ionicons name="people-outline" size={13} color={colors.textSecondary} />
-            <Text style={s.chipText}>{fill(t('nhGuestsUpTo', lang), apartment.guests)}</Text>
+            <Text style={s.chipText} numberOfLines={1}>{fill(t('nhGuestsUpTo', lang), apartment.guests)}</Text>
           </View>
-          <Text style={s.aptPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
+          <Text style={s.aptPrice} numberOfLines={1}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
         </View>
       </View>
     </Card>
@@ -154,13 +157,14 @@ const s = StyleSheet.create({
   aptCard:      { marginBottom: 12, overflow: 'hidden' },
   aptPhoto:     { width: '100%', aspectRatio: CARD_PHOTO_ASPECT, backgroundColor: colors.soft },
   aptBody:      { padding: 14, gap: 6 },
-  aptName:      { ...type.sheetTitle, color: colors.textPrimary, height: type.sheetTitle.lineHeight * 2 },
+  aptName:      { ...type.sheetTitle, color: colors.textPrimary },
   metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText:     { flex: 1, ...type.small, color: colors.textSecondary },
   aptFoot:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 },
-  chip:         { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.xs, backgroundColor: colors.soft },
-  chipText:     { ...type.meta, color: colors.textSecondary },
-  aptPrice:     { flex: 1, textAlign: 'right', ...type.rowTitle, color: colors.primaryDark },
+  chip:         { flexShrink: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.xs, backgroundColor: colors.soft },
+  chipText:     { flexShrink: 1, ...type.meta, color: colors.textSecondary },
+  // The price never shrinks or truncates; the guests chip gives way first.
+  aptPrice:     { flexShrink: 0, ...type.rowTitle, color: colors.primaryDark },
 
   locRow:       { paddingVertical: 12 },
   locRowDivider:{ borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
