@@ -15,6 +15,8 @@ import { logContactEvent } from '../utils/logContactEvent'
 // Sections sit on the module photo, so each is a white Card and each heading an OnPhotoLabel.
 // Everything that re-renders is defined out here, not inside the screen.
 
+// Every apartment card is the same height: one photo ratio (cover), and text slots of fixed line
+// counts. The full name is on the apartment screen; the card holds two lines of it.
 const CARD_PHOTO_ASPECT = 16 / 10
 const LOGO = 56
 
@@ -43,11 +45,11 @@ function ApartmentCard({ apartment, lang, onPress }) {
   const typeLabel = apartment.kind === 'studio' ? t('nhTypeStudio', lang) : '2+1'
   return (
     <Card padding={0} onPress={onPress} style={s.aptCard} accessibilityLabel={`${t(apartment.nameKey, lang)}, ${building?.name}, ${fill(t('nhGuestsUpTo', lang), apartment.guests)}, ${fill(t('nhFromNight', lang), apartment.price)}`}>
-      {!!cover && (
-        <Image source={cover} style={s.aptPhoto} resizeMode="cover" accessible={false} />
-      )}
+      {cover
+        ? <Image source={cover} style={s.aptPhoto} resizeMode="cover" accessible={false} />
+        : <View style={s.aptPhoto} />}
       <View style={s.aptBody}>
-        <Text style={s.aptName} numberOfLines={3}>{t(apartment.nameKey, lang)}</Text>
+        <Text style={s.aptName} numberOfLines={2}>{t(apartment.nameKey, lang)}</Text>
         <View style={s.metaRow}>
           <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
           <Text style={s.metaText} numberOfLines={1}>{building?.name} · {typeLabel}</Text>
@@ -57,7 +59,7 @@ function ApartmentCard({ apartment, lang, onPress }) {
             <Ionicons name="people-outline" size={13} color={colors.textSecondary} />
             <Text style={s.chipText}>{fill(t('nhGuestsUpTo', lang), apartment.guests)}</Text>
           </View>
-          <Text style={s.aptPrice} numberOfLines={2}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
+          <Text style={s.aptPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{fill(t('nhFromNight', lang), apartment.price)}</Text>
         </View>
       </View>
     </Card>
@@ -152,11 +154,11 @@ const s = StyleSheet.create({
   aptCard:      { marginBottom: 12, overflow: 'hidden' },
   aptPhoto:     { width: '100%', aspectRatio: CARD_PHOTO_ASPECT, backgroundColor: colors.soft },
   aptBody:      { padding: 14, gap: 6 },
-  aptName:      { ...type.sheetTitle, color: colors.textPrimary },
+  aptName:      { ...type.sheetTitle, color: colors.textPrimary, height: type.sheetTitle.lineHeight * 2 },
   metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText:     { flex: 1, ...type.small, color: colors.textSecondary },
   aptFoot:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 },
-  chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.xs, backgroundColor: colors.soft },
+  chip:         { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.xs, backgroundColor: colors.soft },
   chipText:     { ...type.meta, color: colors.textSecondary },
   aptPrice:     { flex: 1, textAlign: 'right', ...type.rowTitle, color: colors.primaryDark },
 

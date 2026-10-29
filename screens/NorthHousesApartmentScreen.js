@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
+import { View, Text, Image, FlatList, ScrollView, TextInput, TouchableOpacity, Pressable, Modal, StyleSheet, Linking, useWindowDimensions } from 'react-native'
+import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../components/BackButton'
@@ -30,24 +31,33 @@ const PHOTO_ASPECT = 4 / 3
 const eur = n => `€${n}`
 const fill = (text, n) => text.replace('{n}', String(n))
 
-// ─── PHOTO PAGER ─────────────────────────────────────────────────────────────
-// A fixed 4:3 frame (the files are 1024x768), so nothing below the pager moves while swiping. Six of
-// the 56 photos are portraits (768x1024): those are shown WHOLE (contain, on the soft well) rather
-// than cropped to a landscape slice, because a bathroom cropped to its middle third shows nothing.
-// A windowed FlatList, so 8 decoded 1024 px photos are never all in memory at once.
-function PagerPhoto({ photoKey, width }) {
+// ─── PHOTO PAGER + VIEWER ────────────────────────────────────────────────────
+// A fixed 4:3 frame (the files are 1440x1080), cover for EVERY photo, so nothing below the pager
+// moves while swiping and no photo sits in bars. Six of the 56 are portraits (1080x1440): the frame
+// shows their middle, and a tap opens the viewer, which shows every photo whole (contain, on black).
+// Windowed FlatLists, so 8 decoded 1440 px photos are never all in memory at once.
+function PagerPhoto({ photoKey, width, index, total, lang, onOpen }) {
   const src = partnerAsset(photoKey)
-  if (!src) return <View style={{ width, height: Math.round(width / PHOTO_ASPECT), backgroundColor: colors.soft }} />
-  const meta = Image.resolveAssetSource(src)
-  const portrait = !!meta && meta.height > meta.width
+  const h = Math.round(width / PHOTO_ASPECT)
+  if (!src) return <View style={{ width, height: h, backgroundColor: colors.soft }} />
   return (
-    <View style={{ width, height: Math.round(width / PHOTO_ASPECT), backgroundColor: colors.soft }}>
-      <Image source={src} style={StyleSheet.absoluteFill} resizeMode={portrait ? 'contain' : 'cover'} accessible={false} />
+    <Pressable onPress={() => onOpen(index)} accessibilityRole="imagebutton"
+      accessibilityLabel={t('eateryPhotoCount', lang).replace('{n}', index + 1).replace('{total}', total)}>
+      <Image source={src} style={{ width, height: h, backgroundColor: colors.soft }} resizeMode="cover" />
+    </Pressable>
+  )
+}
+
+function Dots({ count, active, style }) {
+  if (count < 2) return null
+  return (
+    <View style={[s.dots, style]} pointerEvents="none">
+      {Array.from({ length: count }, (_, i) => <View key={i} style={[s.dot, i === active && s.dotOn]} />)}
     </View>
   )
 }
 
-function Pager({ photos, width }) {
+function Pager({ photos, width, lang, onOpen }) {
   const [idx, setIdx] = useState(0)
   const h = Math.round(width / PHOTO_ASPECT)
   return (
@@ -59,11 +69,56 @@ function Pager({ photos, width }) {
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         initialNumToRender={2} windowSize={3} maxToRenderPerBatch={2} removeClippedSubviews
         onMomentumScrollEnd={e => setIdx(Math.round(e.nativeEvent.contentOffset.x / width))}
-        renderItem={({ item }) => <PagerPhoto photoKey={item} width={width} />}
+        renderItem={({ item, index }) => (
+          <PagerPhoto photoKey={item} width={width} index={index} total={photos.length} lang={lang} onOpen={onOpen} />
+        )}
       />
-      <View style={s.counter} pointerEvents="none">
-        <Text style={s.counterText}>{idx + 1} / {photos.length}</Text>
+      <Dots count={photos.length} active={idx} style={s.dotsOnPhoto} />
+    </View>
+  )
+}
+
+// Full screen, black, every photo whole. Android back closes it through onRequestClose (a Modal is
+// its own native window, outside the addBackListener chain); iOS closes it with the button.
+function PhotoViewer({ photos, start, lang, onClose }) {
+  return (
+    <Modal visible={start != null} animationType="fade" onRequestClose={onClose}
+      statusBarTranslucent supportedOrientations={['portrait']}>
+      {start != null && <ViewerBody photos={photos} start={start} lang={lang} onClose={onClose} />}
+    </Modal>
+  )
+}
+
+// Mounted per opening, so its page index starts at the photo that was tapped.
+function ViewerBody({ photos, start, lang, onClose }) {
+  const insets = useSafeAreaInsets()
+  const { width, height } = useWindowDimensions()
+  const [idx, setIdx] = useState(start)
+  return (
+    <View style={s.viewer}>
+      <StatusBar style="light" />
+      <FlatList
+        data={photos}
+        keyExtractor={k => k}
+        horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+        initialScrollIndex={start}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        initialNumToRender={1} windowSize={3} maxToRenderPerBatch={2}
+        onMomentumScrollEnd={e => setIdx(Math.round(e.nativeEvent.contentOffset.x / width))}
+        renderItem={({ item, index }) => (
+          <Image source={partnerAsset(item)} style={{ width, height }} resizeMode="contain"
+            accessible accessibilityLabel={t('eateryPhotoCount', lang).replace('{n}', index + 1).replace('{total}', photos.length)} />
+        )}
+      />
+      <View style={[s.viewerBar, { top: insets.top + 8 }]}>
+        <View style={s.viewerCount}>
+          <Text style={s.viewerCountText}>{idx + 1} / {photos.length}</Text>
+        </View>
+        <Pressable style={s.viewerClose} onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}>
+          <Ionicons name="close" size={22} color="#FFFFFF" />
+        </Pressable>
       </View>
+      <Dots count={photos.length} active={idx} style={[s.dotsOnPhoto, { bottom: insets.bottom + 24 }]} />
     </View>
   )
 }
@@ -182,6 +237,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
   const scrollY = useRef(0)
   const kbTopRef = useRef(null)
   kbTopRef.current = kbTop
+  const [viewerAt, setViewerAt] = useState(null)
   if (!apartment) return null
 
   const partner = NORTH_HOUSES
@@ -240,7 +296,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
       <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
         scrollEventThrottle={16} onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y }}
         contentContainerStyle={{ paddingBottom: (kbTop != null ? kbPad : 96 + insets.bottom) + 16 }}>
-        <Pager photos={apartment.photos} width={winW} />
+        <Pager photos={apartment.photos} width={winW} lang={lang} onOpen={setViewerAt} />
 
         <View style={s.body}>
           <View style={s.titleBlock}>
@@ -310,6 +366,8 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
           </TouchableOpacity>
         </View>
       )}
+
+      <PhotoViewer photos={apartment.photos} start={viewerAt} lang={lang} onClose={() => setViewerAt(null)} />
     </SafeAreaView>
   )
 }
@@ -320,8 +378,17 @@ const s = StyleSheet.create({
   navTitle:    { flex: 1, textAlign: 'center', ...type.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   navSpacer:   { width: 40 },
 
-  counter:     { position: 'absolute', right: 12, bottom: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
-  counterText: { ...type.meta, color: '#FFFFFF' },
+  dots:        { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6,
+                 paddingHorizontal: 10, paddingVertical: 7, borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
+  dotsOnPhoto: { bottom: 12 },
+  dot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
+  dotOn:       { width: 16, backgroundColor: '#FFFFFF' },
+
+  viewer:      { flex: 1, backgroundColor: '#000000' },
+  viewerBar:   { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  viewerCount: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
+  viewerCountText: { ...type.meta, color: '#FFFFFF' },
+  viewerClose: { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' },
 
   body:        { paddingHorizontal: 16, paddingTop: 16 },
   titleBlock:  { marginBottom: 12 },
