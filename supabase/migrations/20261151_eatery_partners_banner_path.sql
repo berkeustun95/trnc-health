@@ -112,7 +112,8 @@ BEGIN
 
   -- BEHAVIOUR on a throwaway INACTIVE partner, rolled back by a sentinel (variables survive, rows do not).
   BEGIN
-    INSERT INTO public.eatery_partners (slug, name, category) VALUES ('zz-banner-probe', 'zz banner probe', 'cafe') RETURNING id INTO v_probe;
+    -- order_method is NOT NULL with no default (20261144): the probe must state one, or the insert raises 23502 and the file never applies.
+    INSERT INTO public.eatery_partners (slug, name, category, order_method) VALUES ('zz-banner-probe', 'zz banner probe', 'cafe', 'whatsapp') RETURNING id INTO v_probe;
 
     BEGIN UPDATE public.eatery_partners SET banner_path = 'bidda-badadez/banner.jpg' WHERE id = v_probe; v_ok := 'accepted';
     EXCEPTION WHEN check_violation THEN v_ok := 'REFUSED(valid path)'; END;
@@ -129,7 +130,8 @@ BEGIN
     BEGIN UPDATE public.eatery_partners SET banner_path = '/x/y.jpg' WHERE id = v_probe; v_slash := 'ACCEPTED(leading slash)';
     EXCEPTION WHEN check_violation THEN v_slash := 'refused'; END;
 
-    -- Visibility: production roles see no inactive partner (postgres = positive control).
+    -- Visibility: production roles WITHOUT a Preview key (headers cleared below, so is_previewer() is false; 20261119/20261120's
+    -- preview policies stay shut) see no inactive partner (postgres = positive control; the test also proves a key header opens them).
     SELECT count(*) INTO v_pos FROM public.eatery_partners WHERE id = v_probe;
     SET LOCAL ROLE anon;
     PERFORM set_config('request.jwt.claims', '', true);
@@ -192,7 +194,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261151_eatery_partners_banner_path.sql', '576bb4ed430b1e5bc9068c7e46c907bc0ec6f2d02b6b726a043f12e80b25a7cb')
+VALUES ('20261151_eatery_partners_banner_path.sql', '1fbb4849b48c463041f0cb45dd200c0204e1745374da1a93d648c4fcc0816ea5')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
