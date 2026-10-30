@@ -89,6 +89,11 @@ const T34 = (() => {
   if (a < 0 || b < a) throw new Error('verify_schema 1134 constraints token anchors missing')
   return `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n    ${VS.slice(a, b)}) z`
 })()
+const T34C = (() => {
+  const a = VS.indexOf("UNION ALL SELECT '20261134_eatery_item_options','COMMENTs: create"), b = VS.indexOf('    -- ── 1132: server-marked TEST orders.')
+  if (a < 0 || b < a) throw new Error('verify_schema 1134 COMMENTs token anchors missing')
+  return `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n    ${VS.slice(a, b)}) z`
+})()
 const token = async (d, T) => { try { const r = (await d.query(T)).rows; return r.length === 1 ? r[0].ok : `rows=${r.length}` } catch (e) { return 'ERROR ' + e.message.split('\n')[0] } }
 
 const DESC = { 'Bidda Badadez Sade': 'Bidda ekmeği, badadez', 'Bidda Badadez Hellim': 'Bidda ekmeği, hellim, badadez, domates' }
@@ -127,6 +132,7 @@ const idsBefore = await q(db, `SELECT i.name, o.message_tr, o.id::text FROM publ
 const pBefore = await q(db, `SELECT md5(to_jsonb(p)::text) h FROM public.eatery_partners p WHERE slug = 'bidda-badadez'`)
 t('1149 end state: 3 options, all price NULL', await q(db, ROW('o.price IS NULL AND o.kind = \'extra\'')), [{ n: 3 }])
 t('1134 constraint token before 1150 is true (no price rule in it any more)', await token(db, T34), true)
+t('1134 COMMENTs token before 1150 is true', await token(db, T34C), true)
 {
   const d = await after1149()
   await d.exec(`ALTER TABLE public.eatery_item_options DROP CONSTRAINT eatery_item_options_price_check; ALTER TABLE public.eatery_item_options ADD CONSTRAINT eatery_item_options_price_check CHECK (price IS NULL OR price > 0)`)
@@ -142,6 +148,7 @@ t('price_check renders price >= (0)::numeric', rendered.includes('price >= (0)::
 t('verify_schema 1150 token after 1150', await token(db, T50), true)
 t('verify_schema 1149 token after 1150', await token(db, T49), true)
 t('verify_schema 1134 constraint token after 1150', await token(db, T34), true)
+t('verify_schema 1134 COMMENTs token after 1150 (1150 rewrote the table COMMENT; prod went red on this 2026-10-30)', await token(db, T34C), true)
 t('menu: only the Sade + Hellim descriptions changed (no Eklenebilir anywhere)',
   (await q(db, MENU_SQL)).filter(r => DESC[r.name]).map(r => [r.name, r.description]),
   Object.entries(DESC))

@@ -4123,7 +4123,8 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261150_bidda_badadez_free_options.sql')
       OR (COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%price >= (0)::numeric%' AND pg_get_constraintdef(c.oid) LIKE '%price IS NULL%'
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_price_check'), false)
-          AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%price 0 = free%', false)
+          AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%price 0 = free%'
+                       AND obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%20261134, price rule 20261150.', false)
           AND COALESCE((SELECT count(*) = 10
                                AND count(*) FILTER (WHERE o.kind = 'extra' AND o.price = 0 AND o.max_qty = 1) = 4
                                AND count(*) FILTER (WHERE o.kind = 'remove' AND o.price IS NULL AND o.max_qty = 1) = 6
@@ -4297,7 +4298,7 @@ WITH report AS (
            AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'), 'pg_proc') LIKE '%NOT test orders%', false) -- 20261144:supersede (the create COMMENT's `20261134.` suffix half moved to the 20261144 token: one count, one owner)
       AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%detail%'
            AND obj_description(to_regprocedure('public.verify_eatery_order(text)'), 'pg_proc') LIKE '%20261134.', false)
-      AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%20261134.', false)
+      AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%20261134%', false) -- 20261150:supersede (1150 rewrote the table COMMENT to end `20261134, price rule 20261150.`; the 1150 token owns the ending)
       AND COALESCE(obj_description(to_regprocedure('public.eatery_option_label_valid(jsonb)'), 'pg_proc') LIKE '%20261134.', false)
     -- ── 1132: server-marked TEST orders. Same discipline as the 1125 block: only to_regclass / to_regprocedure / catalogs,
     --    red until applied, never an error. (1125's body token lost its `created_as_guest AND created_at` half: 1132 owns it.)
