@@ -46,6 +46,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod — migrations only via
   `supabase-migrate`. Fallback without this Mac: `supabase-function-secrets` + `supabase-functions-deploy`.
   Lost Mac → revoke the token (Supabase → Account → Access Tokens).
+- ⚠ **GCP API-key work runs via `gcloud` on this Mac** (Berke, 2026-10-30; Homebrew, login `berke.ustun95`, full
+  cloud-platform scope). Read with `gcloud services api-keys describe/list`; NEVER `get-key-string` (the Places server key
+  must stay unreadable from here). Before any `update`, save `describe --format=json` to the vault; `--no-check-existing-usage`
+  only when the blocking traffic is proven 4xx (Monitoring `request_count` by credential). Vault `2026-10-30_gcp-keys-gcloud.md`.
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **`production-db` keeps its required reviewer (Berke) — never remove it** (Berke, 2026-10-14; removal
