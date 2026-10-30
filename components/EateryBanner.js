@@ -15,6 +15,8 @@ import { EateryLogo, PlaceholderTag } from './EateryBits'
 export const BANNER_COLLAPSE = EATERY_BANNER_H - BANNER_BAR_ROW   // scroll offset at which the photo is fully behind the bar
 export const BAR_SOLID_AT = BANNER_COLLAPSE - 24                  // the status bar icons flip dark here
 const FADE_IN = 48   // the canvas bar fades in over this much scroll, ending at BANNER_COLLAPSE
+const BANNER_TINT = 0.22   // bottom tint over the photo so a white photo edge still separates from the white head card
+const BANNER_TINT_H = 96
 const DARK_FADE = require('../assets/oli-scenes/dark-fade.png')   // black 0.6 -> 0, the same strip ModuleScreen uses
 
 export function BannerPhoto({ y, uri, reduce, onError }) {
@@ -25,9 +27,7 @@ export function BannerPhoto({ y, uri, reduce, onError }) {
       style={[s.photo, { height: EATERY_BANNER_H + insets.top, transform: [{ translateY }] }]}>
       <RemoteImage source={{ uri }} resizeMode="cover" style={s.fill} placeholderColor={colors.primaryDark}
         transition={reduce ? 0 : 200} onError={onError} accessibilityIgnoresInvertColors />
-      <View style={[s.band, { height: insets.top + BANNER_BAR_ROW, backgroundColor: `rgba(0,0,0,${HEADER_SCRIM})` }]} />
-      <Image source={DARK_FADE} resizeMode="stretch"
-        style={[s.band, { top: insets.top + BANNER_BAR_ROW, height: SCRIM_FADE, opacity: HEADER_SCRIM / 0.6 }]} />
+      <Image source={DARK_FADE} resizeMode="stretch" pointerEvents="none" importantForAccessibility="no" accessibilityElementsHidden style={s.tint} />
     </Animated.View>
   )
 }
@@ -41,6 +41,11 @@ export function BannerBar({ y, lang, onBack, solid }) {
   return (
     <View pointerEvents="box-none" style={[s.bar, { height: insets.top + BANNER_BAR_ROW, paddingTop: insets.top }]}>
       <SplashStatusBar style={solid ? 'dark' : 'light'} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: whiteOp }]}>
+        <View style={[s.band, { height: insets.top + BANNER_BAR_ROW, backgroundColor: `rgba(0,0,0,${HEADER_SCRIM})` }]} />
+        <Image source={DARK_FADE} resizeMode="stretch"
+          style={[s.band, { top: insets.top + BANNER_BAR_ROW, height: SCRIM_FADE, opacity: HEADER_SCRIM / 0.6 }]} />
+      </Animated.View>
       <Animated.View pointerEvents="none" style={[s.canvas, { opacity: canvasOp }]} />
       <View style={s.row}>
         <IconButton icon="chevron-back" iconSize={24} onPress={onBack} accessibilityLabel={t('back', lang)}
@@ -81,6 +86,7 @@ export function BannerHead({ partner, lang }) {
 const s = StyleSheet.create({
   photo:      { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.primaryDark, overflow: 'hidden' },
   fill:       { width: '100%', height: '100%' },
+  tint:       { position: 'absolute', left: 0, right: 0, bottom: 0, height: BANNER_TINT_H, opacity: BANNER_TINT, transform: [{ scaleY: -1 }] },
   band:       { position: 'absolute', top: 0, left: 0, right: 0 },
   bar:        { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   canvas:     { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas },

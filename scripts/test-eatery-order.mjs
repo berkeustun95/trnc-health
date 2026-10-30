@@ -773,6 +773,10 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   const rnAnim = fs.readFileSync(new URL('../node_modules/react-native/Libraries/Animated/createAnimatedComponent.js', import.meta.url), 'utf8')
   eq('RN: createAnimatedComponent merges the forwarded ref onto the ScrollView instance (no wrapper handle)', [/useMergeRefs[\s\S]{0,60}callbackRef,\s*forwardedRef/.test(rnAnim), /<Component[\s\S]*ref=\{ref\}/.test(rnAnim)], [true, true])
   eq('status bar: one setState per crossing (ref-compared), native-driver event', [sc.includes('if (solid !== barSolidRef.current)'), sc.includes('useNativeDriver: true, listener')], [true, true])
+  const fnBody = name => bn.match(new RegExp('export function ' + name + '\\([\\s\\S]*?\\n}\\n'))?.[0] || ''
+  const photoFn = fnBody('BannerPhoto'), barFn = fnBody('BannerBar')
+  eq('scrim: lives in BannerBar under opacity whiteOp (first child, before the canvas), NOT in BannerPhoto', [barFn.length > 100, /<Animated\.View pointerEvents="none" style=\{\[StyleSheet\.absoluteFill, \{ opacity: whiteOp \}\]\}>[\s\S]*HEADER_SCRIM[\s\S]*DARK_FADE[\s\S]*<\/Animated\.View>/.test(barFn), barFn.indexOf('HEADER_SCRIM') < barFn.indexOf('s.canvas'), photoFn.includes('HEADER_SCRIM'), (bn.match(/HEADER_SCRIM\)? ?\/ 0\.6|HEADER_SCRIM \/ 0\.6/g) || []).length, /s\.bar[\s\S]*overflow/.test(bn.match(/bar: *\{[^}]*\}/)?.[0] || '')], [true, true, true, false, 1, false])
+  eq('card edge: BannerPhoto carries a flipped DARK_FADE bottom tint, pointerEvents none, hidden from a11y', [photoFn.includes('DARK_FADE'), /scaleY: -1/.test(bn), /bottom: 0/.test(bn.match(/tint: *\{[^}]*\}/)?.[0] || ''), /pointerEvents="none"[^>]*style=\{s\.tint\}|style=\{\[s\.tint/.test(photoFn), /BANNER_TINT *= *0\.\d+/.test(bn)], [true, true, true, true, true])
   // every theme token the new file reads exists
   const themeMod = await import('../constants/theme.js')
   const used = [...bn.matchAll(/\b(colors|type|elevation|radii|font|motion)\.(\w+)/g)].map(m => [m[1], m[2]])
