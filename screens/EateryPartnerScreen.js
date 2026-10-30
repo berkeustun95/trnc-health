@@ -19,7 +19,7 @@ import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
-import { quizHasMains } from '../constants/eateryQuiz'
+import { quizHasMains, partnerQuizConfig } from '../constants/eateryQuiz'
 import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
 
@@ -199,8 +199,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const { width: winW } = useWindowDimensions()
   const W = winW - 32
 
-  const contactNums = partnerContactNumbers(partner)
-  const contacts = eateryContacts(partner, contactNums)
+  const nums = partnerContactNumbers(partner)
+  const contacts = eateryContacts(partner, nums)
   const menuUrl = eateryMenuUrl(partner)
   const sections = useMemo(() => eateryMenuSections(partner), [partner])
   const gallery = eateryPhotos(partner, 'gallery')
@@ -215,7 +215,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const orderDigits = eateryOrderDigits(effectiveWhatsapp(partner))
   const whatsappOrdering = eateryOrdersByWhatsapp(partner) && !!orderDigits
   // "Listem" (phone partners): the same basket store and controls, but the list is read out on the call: nothing is sent or recorded.
-  const listMode = eateryListMode(partner, contactNums)
+  const listMode = eateryListMode(partner, nums)
   const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
   const callUrl = contacts.find(c => c.action === 'call')?.url
@@ -236,6 +236,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [quizShown, setQuizShown] = useState(false)
   const quizBackRef = useRef(null)
   const quizRows = useMemo(() => [partner], [partner])
+  const quizConfig = partnerQuizConfig(partner.slug)   // Bidda has its own questions, every other partner the general set over its own menu
   const [focusReq, setFocusReq] = useState(null)   // { id, n }: a dish picked on the quiz results; n lets the same dish be picked twice
   const focusId = focusReq ? focusReq.id : focusItemId
   const [note, setNote] = useState('')
@@ -563,7 +564,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           onClosed={() => setEditor(e => (e.open ? e : { ...e, shown: false }))} onSaved={onAddressSaved} onDeleted={onAddressDeleted} />
       )}
       {quizShown === true && (
-        <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
+        <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped config={quizConfig} backRef={quizBackRef}
           onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)}
           onOpenDish={(_p, id) => { setQuizOpen(false); setFocusReq({ id, n: Date.now() }) }}
           onOpenMenu={() => setQuizOpen(false)} onOpenBasket={() => { setQuizOpen(false); openBasket() }} />
