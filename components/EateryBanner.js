@@ -82,7 +82,7 @@ const s = StyleSheet.create({
   photo:      { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.primaryDark, overflow: 'hidden' },
   fill:       { width: '100%', height: '100%' },
   band:       { position: 'absolute', top: 0, left: 0, right: 0 },
-  bar:        { position: 'absolute', top: 0, left: 0, right: 0 },
+  bar:        { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   canvas:     { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas },
   row:        { height: BANNER_BAR_ROW, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[16], gap: space[12] },
   back:       { backgroundColor: colors.card },
