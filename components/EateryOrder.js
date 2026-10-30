@@ -3,13 +3,13 @@ import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animat
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, eateryOptionLabel, resolveLineOptions, formatPrice } from '../constants/eatery'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, sheetFadeVisible, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice } from '../constants/eatery'
 import MapView from 'react-native-maps'
 import { MAP_PROVIDER } from '../utils/googleMap'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
 import useKeyboardTop from '../utils/useKeyboardTop'
-import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
+import { colors, font, type, radii, space, press, motion, TAP, withAlpha } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, BottomSheet } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 
@@ -24,13 +24,13 @@ const ORDER_ERR_KEY = { adult: 'eateryOrderAdultOnly', generic: 'eateryOrderErrG
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
 // min / max: the options sheet's own bounds. Without min (every menu and basket row) nothing changes: the pill at 0 and the bin at 1.
 // With min it is always [−] n [+], the minus dimmed at min.
-export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY }) {
+export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY, mode }) {
   const bare = min == null
   const sub = key => t(key, lang).replace('{name}', () => name).replace('{qty}', () => String(qty))
   if (bare && qty < 1) {
     return (
       <Pressable onPress={() => onQty(id, 1)} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={sub('eateryOrderAddA11y')}>
+        accessibilityRole="button" accessibilityLabel={sub(mode === 'phone' ? 'eateryListAddA11y' : 'eateryOrderAddA11y')}>
         <Ionicons name="add" size={18} color={colors.primaryDark} />
         <Text style={st.addText} numberOfLines={1}>{t('eateryOrderAdd', lang)}</Text>
       </Pressable>
@@ -53,16 +53,16 @@ export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY }) {
 
 // Pinned under the scroll view. Wide enough: "Sepete git · 3 ürün · 1.890,00 TL" on one button; on a narrow phone
 // or a large font the count and total move to a line above instead of truncating.
-export function OrderBar({ count, totalText, lang, onOpen, partnerName }) {
+export function OrderBar({ count, totalText, lang, onOpen, partnerName, mode = 'whatsapp' }) {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15
   const summary = t('eateryOrderCount', lang).replace('{n}', () => String(count)).replace('{total}', () => totalText)
-  const go = t('eateryBasketGo', lang)
+  const go = t(mode === 'phone' ? 'eateryListGo' : 'eateryBasketGo', lang)
   return (
     <View style={[st.bar, { paddingBottom: insets.bottom + space[12] }]}>
       {stacked && <Text style={st.barSummary}>{summary}</Text>}
-      <Button fullWidth icon="basket-outline" title={stacked ? go : `${go} · ${summary}`} onPress={onOpen}
+      <Button fullWidth icon={mode === 'phone' ? 'list-outline' : 'basket-outline'} title={stacked ? go : `${go} · ${summary}`} onPress={onOpen}
         accessibilityLabel={`${partnerName ? partnerName + '. ' : ''}${go}, ${summary}`} />
     </View>
   )
@@ -85,18 +85,19 @@ function LineThumb({ photoPath }) {
 }
 
 // What a line says under the dish name. Turkish shows the exact text the restaurant will read (the contract's detail); any
-// other language shows its own labels in the same order. '' for a plain line.
-export function lineDetailText(line, lang) {
-  if (lang === 'Turkish') return line.detail || ''
+// other language shows its own labels in the same order. '' for a plain line. mode 'phone' (Listem): a free add reads "+maydanoz".
+export function lineDetailText(line, lang, mode) {
+  const bare = mode === 'phone' && line.extras.some(e => isFreeExtra(e.opt))
+  if (lang === 'Turkish') return bare ? optionDetail(line.removals, line.extras, true) : line.detail || ''
   const fill = (key, vars) => Object.keys(vars).reduce((txt, k) => txt.replace('{' + k + '}', () => vars[k]), t(key, lang))
   return [
     ...line.removals.map(o => fill('eateryOptWithout', { name: eateryOptionLabel(o, lang) })),
-    ...line.extras.map(({ opt, qty }) => (qty > 1 ? fill('eateryOptExtraLineN', { n: String(qty), name: eateryOptionLabel(opt, lang) }) : fill('eateryOptExtraLine', { name: eateryOptionLabel(opt, lang) }))),
+    ...line.extras.map(({ opt, qty }) => (mode === 'phone' && isFreeExtra(opt) ? `+ ${eateryOptionLabel(opt, lang)}` : qty > 1 ? fill('eateryOptExtraLineN', { n: String(qty), name: eateryOptionLabel(opt, lang) }) : fill('eateryOptExtraLine', { name: eateryOptionLabel(opt, lang) }))),
   ].join(', ')
 }
 
-function BasketLine({ line, onQty, onEdit, formatMoney, lang }) {
-  const detail = line.stale ? t('eateryOptStale', lang) : lineDetailText(line, lang)
+function BasketLine({ line, onQty, onEdit, formatMoney, lang, mode }) {
+  const detail = line.stale ? t('eateryOptStale', lang) : lineDetailText(line, lang, mode)
   const canEdit = eateryItemOptions(line.item).length > 0
   return (
     <View style={st.line}>
@@ -123,12 +124,12 @@ function BasketLine({ line, onQty, onEdit, formatMoney, lang }) {
 
 // ─── Per-dish options (eatery_item_options): the "Ekle" of a dish that has some, and the sheet behind it ───
 // A dish with options never gets the in-row stepper: every add goes through the sheet, which builds the line (dish + options).
-export function DishAddButton({ name, count, onPress, lang }) {
+export function DishAddButton({ name, count, onPress, lang, mode }) {
   return (
     <View style={st.row}>
-      {count > 0 && <Text style={st.inBasket} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(count))}</Text>}
+      {count > 0 && <Text style={st.inBasket} accessibilityLiveRegion="polite">{t(mode === 'phone' ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(count))}</Text>}
       <Pressable onPress={onPress} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={t('eateryOrderAddA11y', lang).replace('{name}', () => name)}>
+        accessibilityRole="button" accessibilityLabel={t(mode === 'phone' ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => name)}>
         <Ionicons name="add" size={18} color={colors.primaryDark} />
         <Text style={st.addText} numberOfLines={1}>{t('eateryOrderAdd', lang)}</Text>
       </Pressable>
@@ -148,36 +149,68 @@ function RemoveRow({ label, included, onToggle, lang }) {
   )
 }
 
+// A free add: unticked by default, ticked = one. Same look as RemoveRow, but the dim label is for "removed" only.
+function FreeRow({ label, checked, onToggle }) {
+  return (
+    <Pressable onPress={onToggle} style={({ pressed }) => [st.optRow, pressed && { opacity: press.small }]}
+      accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={label}>
+      <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={24} color={checked ? colors.primaryDark : colors.textSecondary} />
+      <Text style={st.optLabel}>{label}</Text>
+    </Pressable>
+  )
+}
+
 function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
   return (
     <View style={st.optRow}>
       <View style={st.extraText}>
         <Text style={st.optLabel}>{label}</Text>
-        <Text style={st.extraPrice}>+{priceText}</Text>
+        {!!priceText && <Text style={st.extraPrice}>+{priceText}</Text>}
       </View>
       <QtyStepper id={label} name={label} qty={qty} min={0} max={max} onQty={(_, d) => onChange(qty + d)} lang={lang} />
     </View>
   )
 }
 
+// Bottom fade of the options list: stacked bands of the sheet colour (BottomSheet is colors.card), alpha rising toward the footer.
+const FADE_ALPHAS = [0.06, 0.14, 0.24, 0.35, 0.47, 0.59, 0.71, 0.82, 0.91, 0.97]
+const FADE_BAND = space[4]
+const FADE_HEIGHT = FADE_ALPHAS.length * FADE_BAND
+function ScrollFade() {
+  return (
+    <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={st.fade}>
+      {FADE_ALPHAS.map((a, i) => <View key={i} style={{ height: FADE_BAND, backgroundColor: withAlpha(colors.card, a) }} />)}
+    </View>
+  )
+}
+
 // initial: { opts: [{ id, qty }], qty } of the line being edited (ids that no longer exist are ignored), or null for a new add.
-function SheetBody({ item, lang, initial, editing, onConfirm }) {
+function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
   const options = eateryItemOptions(item)
   const removals = options.filter(o => o.kind === 'remove')
-  const extras = options.filter(o => o.kind === 'extra')
+  const freeExtras = options.filter(isFreeExtra)
+  const extras = options.filter(o => o.kind === 'extra' && !isFreeExtra(o))
   const known = new Set(options.map(o => Number(o.id)))
   const [removed, setRemoved] = useState(() => new Set((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'remove').map(o => o.id)))
-  const [extraQty, setExtraQty] = useState(() => Object.fromEntries((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'extra').map(o => [o.id, o.qty])))
+  const [extraQty, setExtraQty] = useState(() => Object.fromEntries((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'extra').map(o => [o.id, isFreeExtra(options.find(x => Number(x.id) === o.id)) ? 1 : o.qty])))
   const [qty, setQty] = useState(initial?.qty || 1)
   const opts = [...removed].map(id => ({ id, qty: 1 })).concat(Object.entries(extraQty).filter(([, q]) => q > 0).map(([id, q]) => ({ id: Number(id), qty: q })))
   const unit = resolveLineOptions(item, opts).unit
   const price = formatPrice(Math.round(unit * qty * 100) / 100, item.currency, lang)
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15   // as OrderBar: the price moves to its own line instead of truncating
+  const addCta = editing ? 'eateryOptUpdateCta' : mode === 'phone' ? 'eateryListOptAddCta' : 'eateryOptAddCta'
+  const [scrollM, setScrollM] = useState({ contentH: 0, viewH: 0, offsetY: 0 })
+  const setM = patch => setScrollM(m => Object.keys(patch).every(k => m[k] === patch[k]) ? m : { ...m, ...patch })
+  const overflows = scrollM.viewH > 0 && scrollM.contentH > scrollM.viewH
+  const toggleFree = id => setExtraQty(e => ({ ...e, [id]: e[id] ? 0 : 1 }))
   const toggle = id => setRemoved(r => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <>
-      <ScrollView style={st.sheetScroll} contentContainerStyle={st.sheetContent} showsVerticalScrollIndicator={false}>
+      <View style={st.sheetScrollWrap}>
+      <ScrollView style={st.sheetScroll} contentContainerStyle={[st.sheetContent, overflows && st.sheetContentFade]} showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16} onLayout={e => setM({ viewH: e.nativeEvent.layout.height })} onContentSizeChange={(_, h) => setM({ contentH: h })}
+        onScroll={e => setM({ offsetY: e.nativeEvent.contentOffset.y })}>
         {removals.length > 0 && (
           <View>
             <Text style={st.secHead} accessibilityRole="header">{t('eateryOptRemoveTitle', lang)}</Text>
@@ -185,16 +218,25 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
             {removals.map(o => <RemoveRow key={o.id} label={eateryOptionLabel(o, lang)} included={!removed.has(Number(o.id))} onToggle={() => toggle(Number(o.id))} lang={lang} />)}
           </View>
         )}
+        {freeExtras.length > 0 && (
+          <View>
+            <Text style={st.secHead} accessibilityRole="header">{t('eateryOptFreeTitle', lang)}</Text>
+            <Text style={st.secHint}>{t('eateryOptFreeHint', lang)}</Text>
+            {freeExtras.map(o => <FreeRow key={o.id} label={eateryOptionLabel(o, lang)} checked={(extraQty[o.id] || 0) > 0} onToggle={() => toggleFree(o.id)} />)}
+          </View>
+        )}
         {extras.length > 0 && (
           <View>
             <Text style={st.secHead} accessibilityRole="header">{t('eateryOptExtraTitle', lang)}</Text>
             {extras.map(o => (
-              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={formatPrice(o.price, item.currency, lang)} qty={extraQty[o.id] || 0}
+              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={Number(o.price) > 0 ? formatPrice(o.price, item.currency, lang) : ''} qty={extraQty[o.id] || 0}
                 max={Math.max(1, Number(o.max_qty) || 1)} onChange={q => setExtraQty(e => ({ ...e, [o.id]: q }))} lang={lang} />
             ))}
           </View>
         )}
       </ScrollView>
+      {sheetFadeVisible(scrollM) && <ScrollFade />}
+      </View>
       <View style={st.sheetFoot}>
         <View style={st.footQtyGroup}>
           <View style={st.footQty}>
@@ -208,8 +250,8 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
           <Text style={st.footHintText}>{t('eateryOptAllergy', lang)}</Text>
         </View>
         {stacked && <Text style={st.barSummary}>{price}</Text>}
-        <Button fullWidth icon="basket-outline" title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
-          accessibilityLabel={t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
+        <Button fullWidth icon={mode === 'phone' ? 'list-outline' : 'basket-outline'} title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(addCta, lang).replace('{price}', () => price)}
+          accessibilityLabel={t(addCta, lang).replace('{price}', () => price)}
           onPress={() => onConfirm({ opts, qty })} />
       </View>
     </>
@@ -217,11 +259,11 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
 }
 
 // visible: the sheet is open (the body unmounts, and so resets, when it closes). onConfirm({ opts, qty }); onClose = dismissed.
-export function DishOptionsSheet({ visible, lang, item, initial = null, editing = false, onClose, onConfirm }) {
+export function DishOptionsSheet({ visible, lang, item, initial = null, editing = false, onClose, onConfirm, mode }) {
   if (!item) return null
   return (
     <BottomSheet visible={visible === true} onClose={onClose} title={item.name} lang={lang}>
-      <SheetBody item={item} lang={lang} initial={initial} editing={editing} onConfirm={onConfirm} />
+      <SheetBody item={item} lang={lang} initial={initial} editing={editing} onConfirm={onConfirm} mode={mode} />
     </BottomSheet>
   )
 }
@@ -331,7 +373,7 @@ function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -381,19 +423,20 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
   }, [kbTop, reveal])
   const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
+  const phone = mode === 'phone'   // "Listem": the same lines, read out on the call; no delivery, note or send
   const stale = lines.some(l => l.stale)   // an option that no longer exists: nothing is sent until that line is edited or removed
-  const msgKey = ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const msgKey = phone ? (stale ? 'eateryListStaleBlock' : null) : ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && (stale || ['generic', 'rate', 'account'].includes(orderError)) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
   const ready = deliveryReady(delivery)
   const deliveryKey = ready ? null : delivery.mode === 'delivery' ? 'eateryDeliveryNeedAddress' : 'eateryDeliveryNeedChoose'
-  const showSignIn = ageGate === 'guest' || (!ageGate && orderError === 'account')
+  const showSignIn = !phone && (ageGate === 'guest' || (!ageGate && orderError === 'account'))
   useEffect(() => {
     if (msgKey) AccessibilityInfo.announceForAccessibility?.(t(msgKey, lang))   // iOS does not always speak a live region
   }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
       <SafeAreaView style={st.page} edges={['top']} {...(covered ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
-        <ScreenHeader lang={lang} title={t('eateryBasketTitle', lang)} onBack={onClose} />
+        <ScreenHeader lang={lang} title={t(phone ? 'eateryListTitle' : 'eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
           onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y }} scrollEventThrottle={16}>
@@ -403,9 +446,9 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
           </View>
           {empty ? (
             <View style={st.empty}>
-              <Ionicons name="basket-outline" size={44} color={colors.textSecondary} />
-              <Text style={st.emptyTitle} accessibilityRole="header">{t('eateryBasketEmpty', lang)}</Text>
-              <Text style={st.emptyBody}>{t('eateryBasketEmptyBody', lang)}</Text>
+              <Ionicons name={phone ? 'list-outline' : 'basket-outline'} size={44} color={colors.textSecondary} />
+              <Text style={st.emptyTitle} accessibilityRole="header">{t(phone ? 'eateryListEmpty' : 'eateryBasketEmpty', lang)}</Text>
+              <Text style={st.emptyBody}>{t(phone ? 'eateryListEmptyBody' : 'eateryBasketEmptyBody', lang)}</Text>
               <Button variant="secondary" title={t('eateryBasketBackToMenu', lang)} onPress={onClose} style={st.emptyBtn} />
             </View>
           ) : (
@@ -413,21 +456,23 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
               <Card padding={space[12]}>
                 {lines.map((l, i) => (
                   <View key={l.key} style={i > 0 && st.lineSep}>
-                    <BasketLine line={l} onQty={onQty} onEdit={onEditLine} formatMoney={formatMoney} lang={lang} />
+                    <BasketLine line={l} onQty={onQty} onEdit={onEditLine} formatMoney={formatMoney} lang={lang} mode={mode} />
                   </View>
                 ))}
               </Card>
-              <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />
-              <Card>
-                <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
-                <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
-                  placeholder={t('eateryOrderNotePlaceholder', lang)} placeholderTextColor={colors.textSecondary}
-                  accessibilityLabel={t('eateryOrderNote', lang)} textAlignVertical="top"
-                  onFocus={() => focusReveal(noteInput)} onBlur={() => onBlurInput(noteInput)} />
-                <Text style={st.counter} accessibilityElementsHidden importantForAccessibility="no">{note.length}/{ORDER_NOTE_MAX}</Text>
-                <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
-              </Card>
+              <Button variant="text" icon="trash-outline" title={t(phone ? 'eateryListClear' : 'eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
+              {!phone && <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />}
+              {!phone && (
+                <Card>
+                  <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
+                  <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
+                    placeholder={t('eateryOrderNotePlaceholder', lang)} placeholderTextColor={colors.textSecondary}
+                    accessibilityLabel={t('eateryOrderNote', lang)} textAlignVertical="top"
+                    onFocus={() => focusReveal(noteInput)} onBlur={() => onBlurInput(noteInput)} />
+                  <Text style={st.counter} accessibilityElementsHidden importantForAccessibility="no">{note.length}/{ORDER_NOTE_MAX}</Text>
+                  <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
+                </Card>
+              )}
             </>
           )}
         </ScrollView>
@@ -437,7 +482,12 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
-            {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
+            {phone ? (
+              <>
+                <Text style={st.listHint}>{t('eateryListHint', lang)}</Text>
+                <Button fullWidth icon="call-outline" title={t('eateryOrderByPhone', lang)} onPress={onCall} disabled={stale} />
+              </>
+            ) : ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
               disabled={!ready || stale} disabledHint={!orderError && !stale && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
             <View accessibilityLiveRegion="polite">
               {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
@@ -462,7 +512,10 @@ const st = StyleSheet.create({
   qty:       { minWidth: 28, textAlign: 'center', ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   dim:       { opacity: 0.4 },
   inBasket:  { ...type.small, fontFamily: font.semibold, color: colors.primaryDark, marginRight: space[8], flexShrink: 1 },
+  sheetScrollWrap:{ flexGrow: 0, flexShrink: 1 },
   sheetScroll:{ flexGrow: 0, flexShrink: 1 },
+  sheetContentFade:{ paddingBottom: FADE_HEIGHT },
+  fade:      { position: 'absolute', left: 0, right: 0, bottom: 0 },
   sheetContent:{ gap: space[16], paddingBottom: space[12] },
   sheetFoot: { flexShrink: 0, gap: space[8], paddingTop: space[8], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   footQty:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
@@ -526,6 +579,7 @@ const st = StyleSheet.create({
   input:     { minHeight: 72, maxHeight: 140, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   counter:   { ...type.meta, color: colors.textSecondary, alignSelf: 'flex-end', marginTop: space[4] },
   hint:      { ...type.small, color: colors.textSecondary, marginTop: space[8] },
+  listHint:  { ...type.small, color: colors.textSecondary, textAlign: 'center' },
   empty:     { alignItems: 'center', paddingVertical: space[24] * 2, paddingHorizontal: space[16], gap: space[8] },
   emptyTitle:{ ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginTop: space[8] },
   emptyBody: { ...type.body, color: colors.textSecondary, textAlign: 'center' },

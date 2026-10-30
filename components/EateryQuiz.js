@@ -3,13 +3,13 @@ import { View, Text, Image, Pressable, ScrollView, Animated, Easing, Accessibili
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { formatPrice, eateryOrderDigits, eateryOrdersByWhatsapp, eateryItemOptions } from '../constants/eatery'
-import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
+import { formatPrice, eateryListMode, eateryItemOptions } from '../constants/eatery'
+import { QUIZ_GENERAL, quizSteps, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 import { QtyStepper, DishOptionsSheet, OrderBar } from './EateryOrder'
-import { effectiveWhatsapp, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
+import { partnerContactNumbers, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
 import { subscribe } from '../utils/eateryBasketCore'
 
 // ─── Yeme-İçme: "Ne yesem?" (dish finder) ───────────────────────────────────
@@ -31,9 +31,9 @@ export function PartnerQuizBanner({ lang, partnerName, onPress }) {
   )
 }
 
-export function QuizEntryCard({ lang, onPress }) {
+export function QuizEntryCard({ lang, count, onPress }) {
   const title = t('eateryQuizCardTitle', lang)
-  const body = t('eateryQuizCardBody', lang)
+  const body = t('eateryQuizCardBody', lang).replace('{n}', () => String(count))
   return (
     <Card onPress={onPress} accessibilityLabel={`${title}. ${body}`} padding={space[12]}>
       <View style={st.entry}>
@@ -71,10 +71,10 @@ function Tile({ emoji, image, label, selected, locked, hint, role, onPress, cols
   )
 }
 
-function Dots({ step }) {
+function Dots({ step, total }) {
   return (
     <View style={st.dots} accessible={false} importantForAccessibility="no-hide-descendants">
-      {Array.from({ length: QUIZ_STEPS }, (_, i) => <View key={i} style={[st.dot, i <= step && st.dotOn]} />)}
+      {Array.from({ length: total }, (_, i) => <View key={i} style={[st.dot, i <= step && st.dotOn]} />)}
     </View>
   )
 }
@@ -128,7 +128,7 @@ function Expand({ open, reduce, children }) {
 
 // One "Yanına" line. A priced side is a 44pt toggle (the whole row): the plus adds one unit to the partner's basket, then
 // it reads "Eklendi" and a second tap takes that one unit off again. A side that cannot be ordered stays a plain line.
-function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle }) {
+function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle, phone }) {
   if (!orderable) {
     return (
       <View style={st.sideRow}>
@@ -140,16 +140,16 @@ function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle }) {
   const added = qty > 0 && !hasOpts   // a side with options only ever adds: the sheet builds another line, the row counts them
   return (
     <Pressable onPress={onToggle} style={({ pressed }) => [st.sideRow, st.sideTap, pressed && { opacity: press.small }]} accessibilityRole="button"
-      accessibilityLabel={added ? t('eateryQuizSideRemoveA11y', lang).replace('{name}', () => item.name) : `${t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)}. ${text}`}>
+      accessibilityLabel={added ? t(phone ? 'eateryListSideRemoveA11y' : 'eateryQuizSideRemoveA11y', lang).replace('{name}', () => item.name) : `${t(phone ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => item.name)}. ${text}`}>
       <Ionicons name={added ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={colors.primaryDark} />
       <Text style={st.sideText}>{text}</Text>
       {added && <Text style={st.sideAdded}>{t('eateryQuizSideAdded', lang)}</Text>}
-      {hasOpts && qty > 0 && <Text style={st.sideAdded}>{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
+      {hasOpts && qty > 0 && <Text style={st.sideAdded}>{t(phone ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
     </Pressable>
   )
 }
 
-function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
+function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
   const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
@@ -201,10 +201,10 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
       {canOrder && (
         <View style={st.orderRow}>
           {qty < 1 || hasOpts
-            ? <PillButton filled icon="basket-outline" title={t('eateryQuizAddToBasket', lang)}
-                label={t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
-            : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} />}
-          {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
+            ? <PillButton filled icon={phone ? 'list-outline' : 'basket-outline'} title={t(phone ? 'eateryListAdd' : 'eateryQuizAddToBasket', lang)}
+                label={t(phone ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
+            : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} mode={phone ? 'phone' : undefined} />}
+          {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t(phone ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
         </View>
       )}
       {sides.length > 0 && (
@@ -213,7 +213,7 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
             <Text style={st.sidesTitle} accessibilityRole="header">{t('eateryQuizSidesTitle', lang)}</Text>
             {sides.map((line, k) => (
               <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={dishQty(basket, sideItems[k].id)} orderable={sideOk[k]} hasOpts={eateryItemOptions(sideItems[k]).length > 0} lang={lang}
-                onToggle={() => toggleSide(sideItems[k])} />
+                onToggle={() => toggleSide(sideItems[k])} phone={phone} />
             ))}
           </View>
         </Expand>
@@ -222,23 +222,19 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
   )
 }
 
-// kind 'multi' = checkboxes (QUIZ_MULTI holds the cap and the exclusive tile), 'single' = radios.
-const STEPS = [
-  { key: 'protein', kind: 'multi', q: 'eateryQuizQ1', hint: 'eateryQuizHintMax2', opts: [['chicken', 'eateryQuizChicken', '🍗'], ['beef', 'eateryQuizBeef', '🥩'], ['veg', 'eateryQuizVeg', '🥗'], ['any', 'eateryQuizAny', '🤷']] },
-  { key: 'spicy',   kind: 'single', q: 'eateryQuizQ2', opts: [['yes', 'eateryQuizYes', '🌶️'], ['no', 'eateryQuizNo', '😌'], ['any', 'eateryQuizAny', '🤷']] },
-  { key: 'portion', kind: 'multi', q: 'eateryQuizQ3', hint: 'eateryQuizHintMax2', opts: [['snack', 'eateryQuizSnack', null, require('../assets/eatery-quiz/snack.png')], ['meal', 'eateryQuizMeal', null, require('../assets/eatery-quiz/meal.png')], ['share', 'eateryQuizShare', null, require('../assets/eatery-quiz/share.png')]] },
-  { key: 'extra',   kind: 'multi', q: 'eateryQuizQ4', hint: 'eateryQuizHintAny', opts: [['sauce', 'eateryQuizSauce', '🥫'], ['drink', 'eateryQuizDrink', '🥤'], ['dessert', 'eateryQuizDessert', '🍰'], ['none', 'eateryQuizNone', '🚫']] },
-]
+// The questions come from constants/eateryQuiz.js (quizSteps: kind 'multi' = checkboxes with the step's own cap / exclusive tile,
+// 'single' = radios); only the Q3 artwork lives here.
+const PORTION_IMG = { snack: require('../assets/eatery-quiz/snack.png'), meal: require('../assets/eatery-quiz/meal.png'), share: require('../assets/eatery-quiz/share.png') }
 const RELAX_KEY = { portion: 'eateryQuizRelaxPortion', spicy: 'eateryQuizRelaxSpicy' }
 
 // rows: the visible partner rows (with tagged menu items). backRef: App's back chain asks here first (the page is a layer above the list).
 // scoped: rows is ONE partner (the quiz opened from that partner's own page): its cards drop the partner row and "Menüyü gör" is the caller's close.
-export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, onClose, onClosed, onOpenDish, onOpenMenu, onOpenBasket }) {
+export function QuizPage({ lang, open, rows, reduce, scoped = false, config = QUIZ_GENERAL, backRef, onClose, onClosed, onOpenDish, onOpenMenu, onOpenBasket }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const width = winW
-  const [step, setStep] = useState(0)          // 0-4 = a question, 5 = the result
-  const [answers, setAnswers] = useState({ protein: [], portion: [], extra: [] })
+  const [step, setStep] = useState(0)          // 0..steps.length-1 = a question, steps.length = the result
+  const [answers, setAnswers] = useState({ protein: [], portion: [], extra: [], filling: [] })
   const scrollRef = useRef(null)
 
   const slide = useRef(new Animated.Value(reduce ? 0 : winW)).current
@@ -276,7 +272,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
   useEffect(() => { setCapHit(false) }, [step])
   const tap = (cur, value) => {
     if (cur.kind === 'single') { setAnswers(a => ({ ...a, [cur.key]: value })); return }
-    const { next, blocked } = quizToggle(cur.key, answers[cur.key], value)
+    const { next, blocked } = quizToggle(cur.rule, answers[cur.key], value)
     if (blocked) {
       setCapHit(true)
       AccessibilityInfo.announceForAccessibility?.(t('eateryQuizHintMax2', lang))
@@ -285,15 +281,18 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
     setCapHit(false)
     setAnswers(a => ({ ...a, [cur.key]: next }))
   }
-  const retry = () => { setAnswers({ protein: [], portion: [], extra: [] }); setStep(0) }
+  const retry = () => { setAnswers({ protein: [], portion: [], extra: [], filling: [] }); setStep(0) }
 
-  const result = useMemo(() => (step >= QUIZ_STEPS ? quizMatch(rows, answers) : null), [step, rows, answers])
+  // A config may drop a question after an answer (Bidda: no filling for a gatmer), so the list is re-read from the answers.
+  const steps = useMemo(() => quizSteps(config, rows, answers), [config, rows, answers])
+  const total = steps.length
+  const result = useMemo(() => (step >= total ? quizMatch(rows, answers, config) : null), [step, total, rows, answers, config])
 
   // Results basket: the SAME per-partner store the menu page uses, so edits made there (clear after sending, undo, the
   // stepper) show here: any store change re-renders this page, which reads the baskets fresh.
   const [, setTick] = useState(0)
   useEffect(() => subscribe(() => setTick(n => n + 1)), [])
-  const canOrder = p => eateryOrdersByWhatsapp(p) && !!eateryOrderDigits(effectiveWhatsapp(p))
+  const canOrder = p => eateryListMode(p, partnerContactNumbers(p)) != null   // a WhatsApp basket or a phone list
   const onQty = (p, id, delta) => {
     changeQty(p.id, id, delta)
   }
@@ -303,7 +302,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
   const resultPartners = result ? result.dishes.map(d => d.partner).filter((p, i, a) => a.findIndex(x => x.id === p.id) === i && canOrder(p)) : []
   const barPartner = quizBarPartner(resultPartners, p => quizBasketSummary(p, getBasket(p.id)), getLastAdded())
   const bar = barPartner ? quizBasketSummary(barPartner, getBasket(barPartner.id)) : null
-  const cur = STEPS[step]
+  const cur = steps[step]
   const showBar = !cur && !!bar
   const picked = cur ? answers[cur.key] : null
   const canNext = !!cur && (cur.kind === 'single' ? !!picked : !!picked?.length)
@@ -315,10 +314,10 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
       <SafeAreaView style={st.page} edges={['top']}>
         <ScreenHeader lang={lang} title={t('eateryQuizCardTitle', lang)} onBack={goBack} />
         <View style={st.progress}>
-          <Dots step={step} />
+          <Dots step={step} total={total} />
           {!!cur && (
             <Text style={st.step} accessibilityLiveRegion="polite">
-              {t('eateryQuizStep', lang).replace('{n}', () => String(step + 1)).replace('{total}', () => String(QUIZ_STEPS))}
+              {t('eateryQuizStep', lang).replace('{n}', () => String(step + 1)).replace('{total}', () => String(total))}
             </Text>
           )}
         </View>
@@ -333,9 +332,10 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
                 <Text style={[st.hint, capHit && st.hintHit]} accessibilityLiveRegion="polite">{t(cur.hint, lang)}</Text>
               )}
               <View style={[st.grid, cols === 2 && st.gridWrap]} accessibilityRole={cur.kind === 'single' ? 'radiogroup' : undefined} accessibilityLabel={t(cur.q, lang)}>
-                {cur.opts.map(([v, k, emoji, image]) => {
+                {cur.opts.map(([v, k, emoji]) => {
+                  const image = cur.key === 'portion' ? PORTION_IMG[v] : undefined
                   const sel = cur.kind === 'single' ? picked === v : picked.includes(v)
-                  const max = cur.kind === 'multi' ? QUIZ_MULTI[cur.key].max : null
+                  const max = cur.kind === 'multi' ? cur.rule?.max : null
                   const locked = !!max && !sel && picked.length >= max
                   return (
                     <View key={v} style={tileW ? { width: tileW } : st.fullW}>
@@ -365,7 +365,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
                   <View style={st.cards}>
                     {result?.dishes.map(d => (
                       <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
-                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
+                        canOrder={canOrder(d.partner)} phone={d.partner.order_method === 'phone'} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
@@ -379,16 +379,16 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
           )}
         </ScrollView>
         {showBar && (
-          <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} onOpen={() => onOpenBasket(barPartner)} />
+          <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} mode={barPartner.order_method === 'phone' ? 'phone' : 'whatsapp'} onOpen={() => onOpenBasket(barPartner)} />
         )}
         {!!optSheet.item && (
-          <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item}
+          <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item} mode={optSheet.partner?.order_method === 'phone' ? 'phone' : undefined}
             onClose={() => setOptSheet(o => ({ ...o, open: false }))}
             onConfirm={({ opts, qty }) => { setLine(optSheet.partner.id, null, lineKey(optSheet.item.id, opts), qty); setOptSheet(o => ({ ...o, open: false })) }} />
         )}
         {!!cur && (
           <View style={[st.footer, { paddingBottom: insets.bottom + space[12] }]}>
-            <Button fullWidth title={t(step === QUIZ_STEPS - 1 ? 'eateryQuizSeeResults' : 'eateryQuizNext', lang)} disabled={!canNext} disabledHint={t('eateryQuizPickOne', lang)} onPress={() => setStep(step + 1)} />
+            <Button fullWidth title={t(step === total - 1 ? 'eateryQuizSeeResults' : 'eateryQuizNext', lang)} disabled={!canNext} disabledHint={t('eateryQuizPickOne', lang)} onPress={() => setStep(step + 1)} />
           </View>
         )}
       </SafeAreaView>

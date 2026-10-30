@@ -147,6 +147,14 @@ export const ORDER_NOTE_MAX = 200
 // column list, a fixture) or any other value (e.g. 'phone') is not a basket partner. Always combined with a number.
 export const eateryOrdersByWhatsapp = p => p?.order_method === 'whatsapp'
 
+// Which "my list" a partner offers: 'whatsapp' (the basket that sends an order), 'phone' (a list read out on the call: no send, no
+// server) or null (none). Fail closed on any other order_method. nums = eateryContactNumbers(...): a fixture partner has none, so none.
+export function eateryListMode(p, nums) {
+  if (eateryOrdersByWhatsapp(p)) return eateryOrderDigits(nums?.whatsapp) ? 'whatsapp' : null
+  if (p?.order_method === 'phone') return eateryContacts(p, nums).some(c => c.action === 'call') ? 'phone' : null
+  return null
+}
+
 // wa.me wants digits only (country code first). Same rule as eateryContacts(); null when too short to dial.
 export const eateryOrderDigits = wa => {
   const d = filled(wa) ? wa.replace(/\D/g, '') : ''
@@ -164,15 +172,18 @@ export function formatTl(amount) {
 }
 
 // ─── Per-dish options ("Malzeme çıkar" / "Ekstra ekle"; eatery_item_options, 20261134) ───
-// A dish's visible options: available, and either a removal or an extra with a real price (price NULL = hidden). A row fetched
+// A dish's visible options: available, and either a removal or an extra with a price (0 = free, shown without a price; price NULL = hidden). A row fetched
 // without the embed has none, and then nothing about the dish changes.
 export function eateryItemOptions(item) {
   const list = Array.isArray(item?.eatery_item_options) ? item.eatery_item_options : []
   return list
     .filter(o => o && Number.isFinite(Number(o.id)) && o.is_available !== false &&
-      (o.kind === 'remove' || (o.kind === 'extra' && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) && Number(o.price) > 0)))
+      (o.kind === 'remove' || (o.kind === 'extra' && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) && Number(o.price) >= 0)))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || Number(a.id) - Number(b.id))
 }
+
+// An extra that costs nothing (Bidda's domates / maydanoz): the sheet shows it as a tick, never a stepper, so its quantity is 0 or 1.
+export const isFreeExtra = opt => opt?.kind === 'extra' && opt.price != null && opt.price !== '' && Number(opt.price) === 0
 
 // What the customer reads: their language's label, else English, else the Turkish text the restaurant reads.
 export function eateryOptionLabel(opt, lang) {
@@ -185,10 +196,11 @@ const sortedByOrder = (a, b) => (a.opt.sort_order ?? 0) - (b.opt.sort_order ?? 0
 
 // The ONE Turkish detail text, the same the server stores (create_eatery_order, 20261134): removals first as the restaurant's
 // removed form, then extras "+ekstra x" / "+2 ekstra x", all in (sort_order, id) order, joined with ", ".
-export function optionDetail(removals, extras) {
+// bareFree (the phone list on screen only, never a stored or compared text): a free add reads "+maydanoz", not "+ekstra maydanoz".
+export function optionDetail(removals, extras, bareFree = false) {
   return [
     ...[...removals].sort((a, b) => sortedByOrder({ opt: a }, { opt: b })).map(o => o.message_tr),
-    ...[...extras].sort((a, b) => sortedByOrder(a, b)).map(({ opt, qty }) => (qty > 1 ? `+${qty} ekstra ${opt.message_tr}` : `+ekstra ${opt.message_tr}`)),
+    ...[...extras].sort((a, b) => sortedByOrder(a, b)).map(({ opt, qty }) => (bareFree && isFreeExtra(opt) ? `+${opt.message_tr}` : qty > 1 ? `+${qty} ekstra ${opt.message_tr}` : `+ekstra ${opt.message_tr}`)),
   ].join(', ')
 }
 
@@ -543,4 +555,11 @@ export function refineFix(watch, { ms = LOCATE_REFINE_MS, goodM = LOCATE_GOOD_M,
     if (best && fixAcc(best) <= goodM) finish()
   })).then(s => { sub = s || null; if (settled) drop() }, finish)
   return { done, stop: finish }
+}
+// Dish options sheet: show the bottom fade only while the list overflows its viewport and is not scrolled to the end
+// (SHEET_FADE_TOL pt of slack at the end, so sub-pixel rounding never leaves a fade on a list that is fully scrolled).
+export const SHEET_FADE_TOL = 2
+export function sheetFadeVisible({ contentH, viewH, offsetY } = {}) {
+  if (![contentH, viewH, offsetY].every(Number.isFinite) || viewH <= 0 || contentH <= viewH) return false
+  return offsetY < contentH - viewH - SHEET_FADE_TOL
 }

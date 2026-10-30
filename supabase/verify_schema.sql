@@ -4115,6 +4115,22 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
       OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    -- 1150: free options. The price CHECK now allows 0 (rendering `price >= (0)::numeric` is from the PGlite harness = PG 18; confirm
+    --       against prod output before trusting a red), the table comment names the new rule, bidda-badadez has exactly its 10
+    --       options (4 free extras price 0 / max_qty 1, 6 removals price NULL) and no description keeps the Eklenebilir suffix.
+    --       Activation and logo/photo later do not touch it. 1134's token no longer asserts `price > 0`.
+    UNION ALL SELECT '20261150_bidda_badadez_free_options','eatery_item_options price CHECK allows 0 (price >= (0)::numeric, PG-18 rendering), table comment says price 0 = free, bidda-badadez: exactly 10 options (4 extras price 0 / max_qty 1, 6 removals), no Eklenebilir description, once 1150 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261150_bidda_badadez_free_options.sql')
+      OR (COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%price >= (0)::numeric%' AND pg_get_constraintdef(c.oid) LIKE '%price IS NULL%'
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_price_check'), false)
+          AND COALESCE(obj_description(to_regclass('public.eatery_item_options'), 'pg_class') LIKE '%price 0 = free%', false)
+          AND COALESCE((SELECT count(*) = 10
+                               AND count(*) FILTER (WHERE o.kind = 'extra' AND o.price = 0 AND o.max_qty = 1) = 4
+                               AND count(*) FILTER (WHERE o.kind = 'remove' AND o.price IS NULL AND o.max_qty = 1) = 6
+                          FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
+                          JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = 'bidda-badadez'), false)
+          AND NOT EXISTS(SELECT 1 FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
+                          WHERE p.slug = 'bidda-badadez' AND i.description LIKE '%Eklenebilir%'))
     -- 1149: the owner's menu replaced 1145's. Asserts only what the file fixed for good: phone ordering, a partner pin (never
     --       Google), the 7 named dishes present and the 3 removed ones gone. Logo, photos, prices, hours and is_active change later.
     UNION ALL SELECT '20261149_bidda_badadez_owner_data','bidda-badadez: phone, pin source partner, the owner''s 7 dishes, no Katmer / Hellim Böreği / Kıyma Böreği, once 1149 is applied',
@@ -4242,13 +4258,12 @@ WITH report AS (
       AND COALESCE((SELECT string_agg(a.attname || '=' || pg_get_expr(d.adbin, d.adrelid), ', ' ORDER BY a.attname)
                   FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum WHERE d.adrelid = to_regclass('public.eatery_item_options'))
                = 'is_available=true, max_qty=1, sort_order=0', false)
-    UNION ALL SELECT '20261134_eatery_item_options','eatery_item_options constraints: exactly 9 (primary, foreign, unique, check; NOT NULL entries of PG 18 aside); one FK to eatery_menu_items ON DELETE CASCADE; CHECKs say kind remove/extra, label helper, price > 0 (rendered price > (0)::numeric), a removal has no price and max_qty 1; index on (item_id)',
+    UNION ALL SELECT '20261134_eatery_item_options','eatery_item_options constraints: exactly 9 (primary, foreign, unique, check; NOT NULL entries of PG 18 aside); one FK to eatery_menu_items ON DELETE CASCADE; CHECKs say kind remove/extra, label helper, a removal has no price and max_qty 1 (the price rule moved to the 20261150 token: one count, one owner); index on (item_id)',
       (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.contype IN ('p','f','u','c')) = 9
       AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.contype = 'f'
               AND c.confrelid = to_regclass('public.eatery_menu_items') AND c.confdeltype = 'c') = 1
       AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%eatery_option_label_valid(label_i18n)%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_label_check'), false)
       AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%remove%' AND pg_get_constraintdef(c.oid) LIKE '%extra%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_kind_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%price > (0)::numeric%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_price_check'), false)
       AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%price IS NULL%' AND pg_get_constraintdef(c.oid) LIKE '%max_qty = 1%' FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_item_options') AND c.conname = 'eatery_item_options_remove_shape_check'), false)
       AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'eatery_item_options' AND indexname = 'eatery_item_options_item_idx' AND indexdef LIKE '%(item_id)%') = 1
     UNION ALL SELECT '20261134_eatery_item_options','eatery_option_label_valid(jsonb): IMMUTABLE, owner postgres, search_path empty, NO EXECUTE for anon/authenticated/PUBLIC, service_role keeps it; body is the nine-name check',

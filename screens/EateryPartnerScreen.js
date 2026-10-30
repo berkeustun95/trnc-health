@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -19,7 +19,7 @@ import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
-import { quizHasMains } from '../constants/eateryQuiz'
+import { quizHasMains, partnerQuizConfig } from '../constants/eateryQuiz'
 import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
 
@@ -99,7 +99,7 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
 
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions, phone }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   const row = (
@@ -118,8 +118,8 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
       {row}
       <View style={s.itemOrder}>
         {sheet
-          ? <DishAddButton name={item.name} count={qty} onPress={() => onOptions(item)} lang={lang} />
-          : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={onQty} lang={lang} />}
+          ? <DishAddButton name={item.name} count={qty} onPress={() => onOptions(item)} lang={lang} mode={phone ? 'phone' : undefined} />
+          : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={onQty} lang={lang} mode={phone ? 'phone' : undefined} />}
       </View>
     </View>
   )
@@ -199,7 +199,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const { width: winW } = useWindowDimensions()
   const W = winW - 32
 
-  const contacts = eateryContacts(partner, partnerContactNumbers(partner))
+  const nums = partnerContactNumbers(partner)
+  const contacts = eateryContacts(partner, nums)
   const menuUrl = eateryMenuUrl(partner)
   const sections = useMemo(() => eateryMenuSections(partner), [partner])
   const gallery = eateryPhotos(partner, 'gallery')
@@ -212,8 +213,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // Order via WhatsApp. The basket (per partner, in memory) holds quantities only; names and prices are read from the
   // menu rows here. No number behind it (and never a fixture partner) = no basket at all.
   const orderDigits = eateryOrderDigits(effectiveWhatsapp(partner))
-  const ordering = eateryOrdersByWhatsapp(partner) && !!orderDigits
+  const whatsappOrdering = eateryOrdersByWhatsapp(partner) && !!orderDigits
+  // "Listem" (phone partners): the same basket store and controls, but the list is read out on the call: nothing is sent or recorded.
+  const listMode = eateryListMode(partner, nums)
+  const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
+  const callUrl = contacts.find(c => c.action === 'call')?.url
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
     if (!ordering) return []
@@ -231,6 +236,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const [quizShown, setQuizShown] = useState(false)
   const quizBackRef = useRef(null)
   const quizRows = useMemo(() => [partner], [partner])
+  const quizConfig = partnerQuizConfig(partner.slug)   // Bidda has its own questions, every other partner the general set over its own menu
   const [focusReq, setFocusReq] = useState(null)   // { id, n }: a dish picked on the quiz results; n lets the same dish be picked twice
   const focusId = focusReq ? focusReq.id : focusItemId
   const [note, setNote] = useState('')
@@ -274,7 +280,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const clearBasket = () => {
     if (!clearAll(partner.id, noteRef.current)) return
     setNote('')
-    setSnack('eateryBasketCleared')
+    setSnack(listMode === 'phone' ? 'eateryListCleared' : 'eateryBasketCleared')
   }
   // Any real edit drops the old snapshot inside the store; taking the last unit off a dish (the bin) offers its own undo.
   const onQty = useCallback((id, delta) => {
@@ -417,7 +423,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
   const sendOrder = async () => {
-    if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery) || lines.some(l => l.stale)) return
+    if (!whatsappOrdering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery) || lines.some(l => l.stale)) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
     sendingRef.current = true
     setSending(true)
@@ -497,7 +503,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 </Text>
                 {sec.items.map(i => {
                   const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
-                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} />
+                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} phone={listMode === 'phone'} />
                   return i.id === focusId
                     ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
                     : <Fragment key={i.id}>{row}</Fragment>
@@ -545,26 +551,26 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         )}
 
       </ScrollView>
-      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} />}
+      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} mode={listMode} />}
       </View>
       {ordering && basketShown === true && (
-        <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
+        <BasketPage partner={partner} lang={lang} mode={listMode} onCall={() => { if (callUrl) go('call', callUrl) }} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onAddress={openEditor} covered={editor.open === true} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
-      {ordering && editor.shown === true && (
+      {whatsappOrdering && editor.shown === true && (
         <AddressEditor key={editor.key} lang={lang} open={editor.open === true} step={editor.step} pickerOpen={editor.picker === true} seed={editor.seed} reduce={reduce}
           onStep={n => setEditor(e => ({ ...e, step: n }))} onPicker={v => setEditor(e => ({ ...e, picker: v }))}
           onBack={() => editorBackTo(eateryPartnerBack({ editorOpen: true, editorStep: editor.step, pickerOpen: editor.picker === true }))}
           onClosed={() => setEditor(e => (e.open ? e : { ...e, shown: false }))} onSaved={onAddressSaved} onDeleted={onAddressDeleted} />
       )}
       {quizShown === true && (
-        <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped backRef={quizBackRef}
+        <QuizPage lang={lang} open={quizOpen === true} rows={quizRows} reduce={reduce} scoped config={quizConfig} backRef={quizBackRef}
           onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)}
           onOpenDish={(_p, id) => { setQuizOpen(false); setFocusReq({ id, n: Date.now() }) }}
           onOpenMenu={() => setQuizOpen(false)} onOpenBasket={() => { setQuizOpen(false); openBasket() }} />
       )}
       {ordering && !!optSheet.item && (
-        <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item} initial={optSheet.initial} editing={optSheet.fromKey != null}
+        <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item} initial={optSheet.initial} editing={optSheet.fromKey != null} mode={listMode}
           onClose={() => setOptSheet(o => ({ ...o, open: false }))} onConfirm={confirmOptions} />
       )}
       <Snackbar visible={snack !== null} message={snack ? t(snack, lang) : ''} actionLabel={t('eateryOrderUndo', lang)}
@@ -614,10 +620,10 @@ const s = StyleSheet.create({
   tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondary },
   tabTextOn: { color: colors.primary },
   itemRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[12], paddingVertical: space[8] },
-  itemText:  { flex: 1 },
-  itemName:  { ...type.body, color: colors.textPrimary },
-  itemDesc:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
-  itemPrice: { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
+  itemText:  { flex: 1, minWidth: 0 },
+  itemName:  { ...type.rowTitle, color: colors.textPrimary },
+  itemDesc:  { ...type.meta, fontFamily: font.regular, color: colors.textSecondary, marginTop: space[4] },
+  itemPrice: { ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   itemPricePending: { ...type.small, color: colors.textSecondary, flexShrink: 0 },
   itemOrder: { alignItems: 'flex-end', marginBottom: space[4] },
   focusRow:  { marginHorizontal: -space[8], paddingHorizontal: space[8], borderRadius: radii.sm },

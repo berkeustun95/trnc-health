@@ -1,8 +1,9 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
+import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -121,6 +122,24 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('price: base + extras x qty, cents exact', [rOpts([{ id: 11, qty: 1 }]).unit, rOpts([{ id: 13, qty: 1 }]).unit, rOpts([{ id: 14, qty: 2 }, { id: 13, qty: 1 }]).unit], [620, 650, 850])
   eq('unresolved: a hidden / unknown / over-max / removal-qty-2 option makes the line not ok', [rOpts([{ id: 15, qty: 1 }]).ok, rOpts([{ id: 99, qty: 1 }]).ok, rOpts([{ id: 14, qty: 4 }]).ok, rOpts([{ id: 11, qty: 2 }]).ok, rOpts([{ id: 16, qty: 1 }]).ok], [false, false, false, false, false])
   eq('optionDetail: sort_order wins over input order', optionDetail([opts[1], opts[0]], []), 'turşusuz, marulsuz')
+
+  // free extras (price 0, Bidda): visible, add nothing, never print a price; NULL stays hidden; Crunchy's priced extras unchanged
+  {
+    const free = O(17, 'extra', 'Domates', { msg: 'domates', price: 0 })
+    const freeStr = { ...O(18, 'extra', 'Maydanoz', { msg: 'maydanoz' }), price: '0.00' }
+    const hidden = O(19, 'extra', 'Gizli', { msg: 'gizli' })
+    const durum = { id: 8, name: 'Sade', price: 250, currency: 'TRY', is_available: true, photoPath: null, eatery_item_options: [free, freeStr, hidden, O(20, 'remove', 'Domates', { msg: 'domatessiz' }), opts[2]] }
+    eq('free extra: price 0 (number or "0.00") is visible, NULL still hidden', eateryItemOptions(durum).map(o => o.id), [13, 17, 18, 20].sort((a, b) => a - b))
+    const rf = o => resolveLineOptions(durum, o)
+    eq('free extra: unit stays the base price, line ok, total unchanged', [rf([{ id: 17, qty: 1 }]).unit, rf([{ id: 17, qty: 1 }]).ok, orderTotal([{ qty: 2, price: rf([{ id: 17, qty: 1 }]).unit }])], [250, true, 500])
+    eq('free extra: detail is the restaurant text, no price', rf([{ id: 20, qty: 1 }, { id: 17, qty: 1 }]).detail, 'domatessiz, +ekstra domates')
+    eq('free extra + priced extra: only the priced one adds', rf([{ id: 17, qty: 1 }, { id: 13, qty: 1 }]).unit, 280)
+    eq('free extra: the hidden NULL one is still refused', rf([{ id: 19, qty: 1 }]).ok, false)
+    eq('Crunchy priced extra unchanged: 620 -> 650', rOpts([{ id: 13, qty: 1 }]).unit, 650)
+    eq('free extra: the non-Turkish line text names no currency', ['English', 'Turkish', 'German'].map(l => /[₺$€]|TL|TRY/.test(t('eateryOptExtraLine', l).replace('{name}', 'x'))), [false, false, false])
+    const eo = fs.readFileSync(new URL('../components/EateryOrder.js', import.meta.url), 'utf8')
+    eq('wiring: the options sheet prices only extras above 0 and renders the price line only when there is one', /priceText=\{Number\(o\.price\) > 0 \? formatPrice\(o\.price, item\.currency, lang\) : ''\}/.test(eo) && /\{!!priceText && <Text style=\{st\.extraPrice\}>/.test(eo), true)
+  }
 
   // lines from a basket
   const items = [burger, fries]
@@ -626,17 +645,114 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('production: phone partner -> no basket', canBasket(ph, {}), false)
   eq('Preview test number: whatsapp partner -> basket', canBasket(wa, PV), true)
   eq('Preview test number swaps in a whatsapp number, a phone partner still -> NO basket', [eateryContactNumbers(ph, PV).whatsapp, canBasket(ph, PV)], ['+90 533 111 22 33', false])
+  eq('list mode: whatsapp+number -> whatsapp; phone+call number -> phone; phone without number / other / fixture -> null', [
+    eateryListMode(wa, eateryContactNumbers(wa, {})), eateryListMode(ph, eateryContactNumbers(ph, {})),
+    eateryListMode({ ...ph, phone: null }, eateryContactNumbers({ ...ph, phone: null }, {})), eateryListMode({ ...wa, whatsapp: null }, eateryContactNumbers({ ...wa, whatsapp: null }, {})),
+    eateryListMode({ order_method: 'x', phone: '+90 392 000 00 00' }, eateryContactNumbers({ phone: '+90 392 000 00 00' }, {})), eateryListMode({ ...ph, placeholder: true }, eateryContactNumbers({ ...ph, placeholder: true }, {})), eateryListMode(null, null),
+  ], ['whatsapp', 'phone', null, null, null, null, null])
+  eq('list mode: Preview swaps in the test number (phone list needs a test number); dev dials nothing', [eateryListMode(ph, eateryContactNumbers(ph, PV)), eateryListMode(ph, eateryContactNumbers(ph, { isPreview: true })), eateryListMode(ph, eateryContactNumbers(ph, { isDev: true }))], ['phone', null, null])
   eq('phone partner: call entry still comes from the one door', eateryContacts(ph, eateryContactNumbers(ph, {})).map(c => c.action), ['call'])
   const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   const qz = fs.readFileSync(new URL('../components/EateryQuiz.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
-  eq('wiring: partner page basket needs eateryOrdersByWhatsapp', /const ordering = eateryOrdersByWhatsapp\(partner\) && !!orderDigits/.test(ps), true)
-  eq('wiring: quiz canOrder needs eateryOrdersByWhatsapp', /const canOrder = p => eateryOrdersByWhatsapp\(p\) && /.test(qz), true)
+  eq('wiring: the WhatsApp SEND path still needs eateryOrdersByWhatsapp + a number', /const whatsappOrdering = eateryOrdersByWhatsapp\(partner\) && !!orderDigits/.test(ps), true)
+  eq('wiring: sendOrder is guarded by whatsappOrdering, not by the list mode', /const sendOrder = async \(\) => \{\s*if \(!whatsappOrdering \|\|/.test(ps), true)
+  eq('wiring: the partner page list (controls, BasketPage) is eateryListMode', /const listMode = eateryListMode\(partner, nums\)/.test(ps) && /const ordering = listMode != null/.test(ps), true)
+  eq('wiring: the address editor stays WhatsApp-only', /\{whatsappOrdering && editor\.shown === true/.test(ps), true)
+  eq('wiring: phone mode never arms the "left the app" clear (armedRef is set only in sendOrder)', (ps.match(/armedRef\.current = \{/g) || []).length, 1)
+  eq('wiring: the phone call logs through go(\'call\') only; no new contact action', /onCall=\{\(\) => \{ if \(callUrl\) go\('call', callUrl\) \}\}/.test(ps), true)
+  eq('wiring: quiz canOrder is eateryListMode (whatsapp or phone list)', /const canOrder = p => eateryListMode\(p, partnerContactNumbers\(p\)\) != null/.test(qz), true)
   eq('wiring: phone partner call button is relabelled eateryOrderByPhone', /c\.action === 'call' && orderByPhone \? 'eateryOrderByPhone'/.test(ps), true)
+}
+
+// ── "Listem" wording: a phone partner never reads basket keys (sheet CTA, per-dish count, a11y, stale block) ──
+{
+  const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  const PAIRS = [['eateryListOptAddCta', 'eateryOptAddCta'], ['eateryListInList', 'eateryOptInBasket'], ['eateryListSideRemoveA11y', 'eateryQuizSideRemoveA11y'], ['eateryListStaleBlock', 'eateryOptStaleBlock'], ['eateryListAddA11y', 'eateryOrderAddA11y']]
+  const ph = x => (x.match(/\{\w+\}/g) || []).sort().join()
+  for (const [list, basket] of PAIRS) {
+    eq(`list key ${list}: present in all 9 languages, never the basket text`, LANGS.map(l => t(list, l) !== list && t(list, l) !== t(basket, l)), Array(9).fill(true))
+    eq(`list key ${list}: {placeholders} match ${basket}${list === 'eateryListStaleBlock' ? ' (none)' : ''}`, LANGS.map(l => ph(t(list, l)) === ph(t(basket, l))), Array(9).fill(true))
+  }
+  const rd = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const eo = rd('../components/EateryOrder.js'), qz = rd('../components/EateryQuiz.js'), sc = rd('../screens/EateryPartnerScreen.js')
+  // each basket key may only be read next to its phone switch (or the editing branch / the WhatsApp side of a ternary)
+  const all = eo + '\n' + qz
+  eq('wiring: eateryOrderAddA11y / eateryQuizSideRemoveA11y / eateryOptAddCta are only read behind a phone switch',
+    ['eateryOrderAddA11y', 'eateryQuizSideRemoveA11y', 'eateryOptAddCta'].map(k => [...all.matchAll(new RegExp(`.{0,40}'${k}'`, 'g'))].every(m => /phone/.test(m[0]) || /sub\(|PAIR/.test(m[0]) || /'eateryOptUpdateCta' : mode/.test(m[0]))), [true, true, true])
+  eq('wiring: no bare t(\'eateryOptInBasket\' outside a phone switch', [...(eo + qz).matchAll(/t\('eateryOptInBasket'/g)].length, 0)
+  eq('wiring: sheet CTA picks the list key for mode phone', /const addCta = editing \? 'eateryOptUpdateCta' : mode === 'phone' \? 'eateryListOptAddCta' : 'eateryOptAddCta'/.test(eo), true)
+  eq('wiring: phone BasketPage stale block is the list text', eo.includes("phone ? (stale ? 'eateryListStaleBlock' : null)"), true)
+  eq('wiring: screen passes the list mode to the sheet and the dish rows',
+    [sc.includes("editing={optSheet.fromKey != null} mode={listMode}"), sc.includes("phone={listMode === 'phone'}"), sc.includes("onPress={() => onOptions(item)} lang={lang} mode={phone ? 'phone' : undefined}"), sc.includes("onQty={onQty} lang={lang} mode={phone ? 'phone' : undefined}")], [true, true, true, true])
+  eq('wiring: quiz passes phone to the sheet, the sides and the stepper',
+    [qz.includes("mode={optSheet.partner?.order_method === 'phone' ? 'phone' : undefined}"), qz.includes('phone={phone} />'), qz.includes("lang={lang} mode={phone ? 'phone' : undefined} />")], [true, true, true])
+}
+
+// ── Free add = checkbox (price 0), paid extra = stepper; the Listem line reads "+maydanoz" ──
+{
+  const rd = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const eo = rd('../components/EateryOrder.js')
+  const free = { id: 1, kind: 'extra', price: 0, max_qty: 1, message_tr: 'maydanoz', sort_order: 1 }
+  const paid = { id: 2, kind: 'extra', price: 30, max_qty: 2, message_tr: 'köfte', sort_order: 2 }
+  eq('isFreeExtra: 0 / "0.00" yes; priced, NULL, removal no', [isFreeExtra(free), isFreeExtra({ ...free, price: '0.00' }), isFreeExtra(paid), isFreeExtra({ ...free, price: null }), isFreeExtra({ kind: 'remove', price: 0 }), isFreeExtra(null)], [true, true, false, false, false, false])
+  eq('free tick in the stored detail is UNCHANGED ("+ekstra", the server text); bareFree only for the phone screen', [optionDetail([], [{ opt: free, qty: 1 }]), optionDetail([], [{ opt: free, qty: 1 }], true)], ['+ekstra maydanoz', '+maydanoz'])
+  eq('bareFree leaves a priced extra untouched (Crunchy: "+ekstra x", "+2 ekstra x")', [optionDetail([], [{ opt: paid, qty: 1 }], true), optionDetail([], [{ opt: paid, qty: 2 }], true), optionDetail([], [{ opt: paid, qty: 2 }])], ['+ekstra köfte', '+2 ekstra köfte', '+2 ekstra köfte'])
+  const dish = { id: 5, name: 'D', price: 100, currency: 'TRY', is_available: true, photoPath: null, eatery_item_options: [free, paid] }
+  const ln = basketLines([dish], { '5|1,2': 1 })[0]
+  const srv = { total: ln.price, lines: [{ item_id: 5, name: 'D', qty: 1, unit_price: ln.price, detail: '+ekstra maydanoz, +ekstra köfte' }] }
+  eq('server comparison: the WhatsApp line detail (free tick included) still equals the server text -> no mismatch', [ln.detail, orderMismatch([ln], srv)], ['+ekstra maydanoz, +ekstra köfte', false])
+  eq('wiring: the sheet splits free (price 0) from paid extras and renders removals, then free, then paid',
+    [/const freeExtras = options\.filter\(isFreeExtra\)/.test(eo), /const extras = options\.filter\(o => o\.kind === 'extra' && !isFreeExtra\(o\)\)/.test(eo),
+      eo.indexOf("t('eateryOptRemoveTitle'") < eo.indexOf("t('eateryOptFreeTitle'") && eo.indexOf("t('eateryOptFreeTitle'") < eo.indexOf("t('eateryOptExtraTitle'")], [true, true, true])
+  eq('wiring: free rows are FreeRow checkboxes (toggle 0 <-> 1, never a stepper); only paid extras reach ExtraRow with max_qty',
+    [/\{freeExtras\.map\(o => <FreeRow /.test(eo), /const toggleFree = id => setExtraQty\(e => \(\{ \.\.\.e, \[id\]: e\[id\] \? 0 : 1 \}\)\)/.test(eo), /\{extras\.map\(o => \(\s*<ExtraRow/.test(eo), /max=\{Math\.max\(1, Number\(o\.max_qty\) \|\| 1\)\}/.test(eo),
+      /function FreeRow[\s\S]*?accessibilityRole="checkbox"[\s\S]*?\}\n/.test(eo), /function FreeRow[^]*?QtyStepper/.test(eo.slice(eo.indexOf('function FreeRow'), eo.indexOf('function ExtraRow')))], [true, true, true, true, true, false])
+  eq('wiring: an edited line restores the ticks, a free one clamped to 1', /isFreeExtra\(options\.find\(x => Number\(x\.id\) === o\.id\)\) \? 1 : o\.qty/.test(eo), true)
+  eq('wiring: the Listem line summary uses the phone mode', /lineDetailText\(line, lang, mode\)/.test(eo) && /lang=\{lang\} mode=\{mode\} \/>/.test(eo), true)
+  const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  eq('i18n: free-add heading + hint exist in all 9 languages', ['eateryOptFreeTitle', 'eateryOptFreeHint'].map(k => LANGS.every(l => t(k, l) !== k && t(k, l).trim() !== '')), [true, true])
+}
+
+// ── Label audit: a phone partner never resolves a basket label or the basket icon, on any sheet / add path ──
+{
+  const rd = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const eo = rd('../components/EateryOrder.js'), qz = rd('../components/EateryQuiz.js'), sc = rd('../screens/EateryPartnerScreen.js')
+  const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  const BASKET_WORD = /sepet|basket|cart|panier|cesta|warenkorb|корзин|καλάθ|سلة|سبد/i
+  // every key a phone path can resolve: sheet CTA (normal fresh / edit, stacked fresh / edit), row add, quiz add, bar, a11y
+  const PHONE_KEYS = ['eateryListOptAddCta', 'eateryOptUpdateCta', 'eateryOrderAdd', 'updateCta', 'eateryListAdd', 'eateryListGo', 'eateryListAddA11y', 'eateryListInList', 'eateryListSideRemoveA11y', 'eateryListStaleBlock', 'eateryListTitle', 'eateryListEmpty', 'eateryListEmptyBody', 'eateryListClear']
+  for (const k of PHONE_KEYS) eq(`phone key ${k}: no basket wording in any language`, LANGS.map(l => BASKET_WORD.test(t(k, l))), Array(9).fill(false))
+  // the sheet CTA, evaluated as the code does (normal and stacked layout, fresh and edit, with and without a photo = same SheetBody)
+  const cta = (mode, editing, stacked) => stacked ? (editing ? 'updateCta' : 'eateryOrderAdd') : (editing ? 'eateryOptUpdateCta' : mode === 'phone' ? 'eateryListOptAddCta' : 'eateryOptAddCta')
+  eq('sheet CTA expressions in the source are the ones evaluated here', [/const addCta = editing \? 'eateryOptUpdateCta' : mode === 'phone' \? 'eateryListOptAddCta' : 'eateryOptAddCta'/.test(eo), /stacked \? t\(editing \? 'updateCta' : 'eateryOrderAdd', lang\)/.test(eo)], [true, true])
+  for (const editing of [false, true]) for (const stacked of [false, true]) for (const l of LANGS)
+    eq(`phone sheet CTA (${editing ? 'edit' : 'fresh'}, ${stacked ? 'stacked' : 'normal'}, ${l}) has no basket word`, BASKET_WORD.test(t(cta('phone', editing, stacked), l)), false)
+  eq('WhatsApp control: the same evaluation still reads the basket text (the test can see red)', BASKET_WORD.test(t(cta('whatsapp', false, false), 'Turkish')), true)
+  // every basket-labelled key / icon sits behind a phone switch
+  const guarded = (src, k) => [...src.matchAll(new RegExp(`.{0,60}'${k}'`, 'g'))].every(m => /phone/.test(m[0]))
+  eq('wiring: basket keys are only read behind a phone switch', ['eateryOptAddCta', 'eateryQuizAddToBasket', 'eateryOrderAddA11y', 'eateryQuizSideRemoveA11y', 'eateryOptInBasket', 'eateryBasketGo', 'eateryBasketTitle', 'eateryBasketEmpty', 'eateryBasketEmptyBody', 'eateryBasketClear'].map(k => guarded(eo, k) && guarded(qz, k)), Array(10).fill(true))
+  eq('wiring: every basket-outline icon is behind a phone switch', [...(eo + qz).matchAll(/.{0,40}basket-outline/g)].every(m => /phone/.test(m[0])), true)
+  eq('wiring: the screen and the quiz pass the phone mode to the sheet (menu add, edit from Listem, quiz result)', [sc.includes('editing={optSheet.fromKey != null} mode={listMode}'), qz.includes("mode={optSheet.partner?.order_method === 'phone' ? 'phone' : undefined}")], [true, true])
+  eq('wiring: the screen opens the sheet only through the one DishOptionsSheet (add and edit share it)', (sc.match(/<DishOptionsSheet/g) || []).length, 1)
 }
 
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.
 eq('NEL does not survive in a note', buildOrderMessage(lines, 'a\u0085b').split('\n').find(l => l.startsWith('Not: ')), 'Not: a b')
 eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'), 'x y')
+
+// ── Dish options sheet: bottom fade only while the list overflows and is not at its end ──
+{
+  const f = (contentH, viewH, offsetY) => sheetFadeVisible({ contentH, viewH, offsetY })
+  eq('fade: short sheet (content <= view) never fades', [f(300, 400, 0), f(400, 400, 0), f(399.5, 400, 0)], [false, false, false])
+  eq('fade: overflowing at top and middle', [f(600, 400, 0), f(600, 400, 100)], [true, true])
+  eq('fade: gone within the tolerance of the end and at the end', [f(600, 400, 200 - SHEET_FADE_TOL), f(600, 400, 199), f(600, 400, 200), f(600, 400, 230)], [false, false, false, false])
+  eq('fade: still on just outside the tolerance', f(600, 400, 200 - SHEET_FADE_TOL - 0.5), true)
+  eq('fade: not measured yet (0 / missing) -> off', [f(0, 0, 0), f(600, 0, 0), sheetFadeVisible({}), sheetFadeVisible()], [false, false, false, false])
+  const eo = fs.readFileSync(new URL('../components/EateryOrder.js', import.meta.url), 'utf8')
+  const fade = eo.match(/function ScrollFade\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+  eq('wiring: the fade is non-interactive and hidden from accessibility', [/pointerEvents="none"/.test(fade), /no-hide-descendants/.test(fade), /accessibilityElementsHidden/.test(fade)], [true, true, true])
+  eq('wiring: SheetBody renders the fade from the helper, inside the scroll area, and measures the list', [/\{sheetFadeVisible\(scrollM\) && <ScrollFade \/>\}/.test(eo), /onContentSizeChange/.test(eo), /scrollEventThrottle=\{16\}/.test(eo)], [true, true, true])
+}
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)
