@@ -1,6 +1,7 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
+import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
 import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
@@ -121,6 +122,24 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('price: base + extras x qty, cents exact', [rOpts([{ id: 11, qty: 1 }]).unit, rOpts([{ id: 13, qty: 1 }]).unit, rOpts([{ id: 14, qty: 2 }, { id: 13, qty: 1 }]).unit], [620, 650, 850])
   eq('unresolved: a hidden / unknown / over-max / removal-qty-2 option makes the line not ok', [rOpts([{ id: 15, qty: 1 }]).ok, rOpts([{ id: 99, qty: 1 }]).ok, rOpts([{ id: 14, qty: 4 }]).ok, rOpts([{ id: 11, qty: 2 }]).ok, rOpts([{ id: 16, qty: 1 }]).ok], [false, false, false, false, false])
   eq('optionDetail: sort_order wins over input order', optionDetail([opts[1], opts[0]], []), 'turşusuz, marulsuz')
+
+  // free extras (price 0, Bidda): visible, add nothing, never print a price; NULL stays hidden; Crunchy's priced extras unchanged
+  {
+    const free = O(17, 'extra', 'Domates', { msg: 'domates', price: 0 })
+    const freeStr = { ...O(18, 'extra', 'Maydanoz', { msg: 'maydanoz' }), price: '0.00' }
+    const hidden = O(19, 'extra', 'Gizli', { msg: 'gizli' })
+    const durum = { id: 8, name: 'Sade', price: 250, currency: 'TRY', is_available: true, photoPath: null, eatery_item_options: [free, freeStr, hidden, O(20, 'remove', 'Domates', { msg: 'domatessiz' }), opts[2]] }
+    eq('free extra: price 0 (number or "0.00") is visible, NULL still hidden', eateryItemOptions(durum).map(o => o.id), [13, 17, 18, 20].sort((a, b) => a - b))
+    const rf = o => resolveLineOptions(durum, o)
+    eq('free extra: unit stays the base price, line ok, total unchanged', [rf([{ id: 17, qty: 1 }]).unit, rf([{ id: 17, qty: 1 }]).ok, orderTotal([{ qty: 2, price: rf([{ id: 17, qty: 1 }]).unit }])], [250, true, 500])
+    eq('free extra: detail is the restaurant text, no price', rf([{ id: 20, qty: 1 }, { id: 17, qty: 1 }]).detail, 'domatessiz, +ekstra domates')
+    eq('free extra + priced extra: only the priced one adds', rf([{ id: 17, qty: 1 }, { id: 13, qty: 1 }]).unit, 280)
+    eq('free extra: the hidden NULL one is still refused', rf([{ id: 19, qty: 1 }]).ok, false)
+    eq('Crunchy priced extra unchanged: 620 -> 650', rOpts([{ id: 13, qty: 1 }]).unit, 650)
+    eq('free extra: the non-Turkish line text names no currency', ['English', 'Turkish', 'German'].map(l => /[₺$€]|TL|TRY/.test(t('eateryOptExtraLine', l).replace('{name}', 'x'))), [false, false, false])
+    const eo = fs.readFileSync(new URL('../components/EateryOrder.js', import.meta.url), 'utf8')
+    eq('wiring: the options sheet prices only extras above 0 and renders the price line only when there is one', /priceText=\{Number\(o\.price\) > 0 \? formatPrice\(o\.price, item\.currency, lang\) : ''\}/.test(eo) && /\{!!priceText && <Text style=\{st\.extraPrice\}>/.test(eo), true)
+  }
 
   // lines from a basket
   const items = [burger, fries]

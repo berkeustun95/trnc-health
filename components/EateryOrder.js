@@ -153,7 +153,7 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
     <View style={st.optRow}>
       <View style={st.extraText}>
         <Text style={st.optLabel}>{label}</Text>
-        <Text style={st.extraPrice}>+{priceText}</Text>
+        {!!priceText && <Text style={st.extraPrice}>+{priceText}</Text>}
       </View>
       <QtyStepper id={label} name={label} qty={qty} min={0} max={max} onQty={(_, d) => onChange(qty + d)} lang={lang} />
     </View>
@@ -189,7 +189,7 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
           <View>
             <Text style={st.secHead} accessibilityRole="header">{t('eateryOptExtraTitle', lang)}</Text>
             {extras.map(o => (
-              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={formatPrice(o.price, item.currency, lang)} qty={extraQty[o.id] || 0}
+              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={Number(o.price) > 0 ? formatPrice(o.price, item.currency, lang) : ''} qty={extraQty[o.id] || 0}
                 max={Math.max(1, Number(o.max_qty) || 1)} onChange={q => setExtraQty(e => ({ ...e, [o.id]: q }))} lang={lang} />
             ))}
           </View>
