@@ -1,6 +1,9 @@
 // 20261151_eatery_partners_banner_path.sql against the PGlite harness (PostgreSQL 18; prod is older — see supabase/CLAUDE.md).
-// The fixture is SLICED FROM THE REAL 20261115 file (tables, CHECKs, RLS, grants, policies), not retyped, plus a
-// towing_hours_valid stub and 3 partners: one active (with a logo), one inactive, one inactive "bidda-badadez".
+// The fixture is the CURRENT eatery_partners shape, built like test-eatery-order-method-sql.mjs: the SAME base fixture text as
+// test-eatery-orders-sql.mjs (sliced out of that file: 20261115 table/CHECKs/RLS/grants + adult_only + is_previewer + private.preview_key_hashes),
+// the Crunchy Express seed row of 20261115, the 20261120 preview-key policies, then the REAL 20261125, 20261132, 20261134 and 20261144 files
+// (order_requires_account; order_method text NOT NULL, no default). Then 3 partners: one active (with a logo), one inactive, one inactive "bidda-badadez".
+// (A fixture built from 20261115 alone lacked order_method NOT NULL, so the probe INSERT passed here and would have raised 23502 on prod.)
 // Checks: the apply; a re-apply is a no-op; positive controls (valid path, NULL); privileges printed; RED-FIRST mutants
 // (file mutants anchor-asserted exactly once; pre-state mutants seeded before the apply); the NOTIFY text check (applyFile
 // strips NOTIFY, so it is a text assertion on the file); the verify_schema.sql 1151 token (vacuous before, true after, red on a mutated state).
@@ -13,18 +16,25 @@ import { join } from 'node:path'
 import { freshDb, applyFile, asRole } from './migration-harness.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261151_eatery_partners_banner_path.sql', import.meta.url))
-const PRIOR = readFileSync(fileURLToPath(new URL('../supabase/migrations/20261115_eatery_partners.sql', import.meta.url)), 'utf8')
+const M = (n) => fileURLToPath(new URL(`../supabase/migrations/${n}`, import.meta.url))
+const PRIOR = readFileSync(M('20261115_eatery_partners.sql'), 'utf8')
 const SQL = readFileSync(FILE, 'utf8')
-const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners')
-const b = PRIOR.indexOf('-- ─── Storage bucket')
-if (a < 0 || b < a) throw new Error('fixture anchors missing in 20261115')
-const FIXTURE = `
-CREATE FUNCTION public.towing_hours_valid(j jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS 'SELECT true';
-${PRIOR.slice(a, b)}`
+const a = PRIOR.indexOf('CREATE TABLE IF NOT EXISTS public.eatery_partners'), b = PRIOR.indexOf('-- ─── Storage bucket')
+const s0 = PRIOR.indexOf('-- ─── Seed: Crunchy Express, INACTIVE'), s1 = PRIOR.indexOf('-- ─── contact_events: module')
+if (a < 0 || b < a || s0 < 0 || s1 < s0) throw new Error('fixture anchors missing in 20261115')
+const SIB = readFileSync(fileURLToPath(new URL('./test-eatery-orders-sql.mjs', import.meta.url)), 'utf8')
+const fa = SIB.indexOf('const FIXTURE = `'), fb = SIB.indexOf('`\n\nlet bad', fa)
+if (fa < 0 || fb < fa) throw new Error('FIXTURE anchors missing in test-eatery-orders-sql.mjs')
+const BASE = new Function('PRIOR', 'a', 'b', 'return ' + SIB.slice(fa + 'const FIXTURE = '.length, fb + 1))(PRIOR, a, b)
+const KEY = readFileSync(M('20261120_eatery_preview_key.sql'), 'utf8')
+const pa = KEY.indexOf('DROP POLICY IF EXISTS eatery_partners_select_preview'), pb = KEY.indexOf('-- ─── Post-state + proof')
+if (pa < 0 || pb < pa) throw new Error('policy anchors missing in 20261120')
+const FIXTURE = BASE + '\n' + PRIOR.slice(s0, s1) + '\n' + KEY.slice(pa, pb)
+const PRE = ['20261125_eatery_orders.sql', '20261132_eatery_orders_is_test.sql', '20261134_eatery_item_options.sql', '20261144_eatery_order_method.sql'].map(M)
 const DATA = `
-INSERT INTO public.eatery_partners (slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active) VALUES
- ('fx-active','fx active','cafe',35.1,33.3,'partner','fx/logo.png','2026-10-01',true);
-INSERT INTO public.eatery_partners (slug, name, category) VALUES ('fx-inactive','fx inactive','cafe'),('bidda-badadez','Bidda','fast_food');`
+INSERT INTO public.eatery_partners (slug, name, category, order_method, lat, lng, geocode_source, logo_path, menu_verified_on, is_active) VALUES
+ ('fx-active','fx active','cafe','whatsapp',35.1,33.3,'partner','fx/logo.png','2026-10-01',true);
+INSERT INTO public.eatery_partners (slug, name, category, order_method) VALUES ('fx-inactive','fx inactive','cafe','whatsapp'),('bidda-badadez','Bidda','fast_food','phone');`
 
 let bad = 0
 const t = (name, got, want) => {
@@ -33,7 +43,7 @@ const t = (name, got, want) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
 }
 const dir = mkdtempSync(join(tmpdir(), 'banner-'))
-const fx = async (extra = '') => { const d = await freshDb(FIXTURE); await d.exec(DATA); if (extra) await d.exec(extra); return d }
+const fx = async (extra = '') => { const d = await freshDb(FIXTURE); for (const f of PRE) { const r = await applyFile(d, f); if (!r.ok) throw new Error(f + ' did not apply: ' + r.msg) } await d.exec(DATA); if (extra) await d.exec(extra); return d }
 const mutant = (name, pairs, text = SQL) => {
   for (const [from, to] of pairs) {
     const n = text.split(from).length - 1
@@ -51,7 +61,7 @@ const refused = async (name, p, extra, wantMsg) => {
   console.log(`      ${r.msg}`)
 }
 
-console.log('20261151_eatery_partners_banner_path — real file on the 20261115-state fixture (3 partners)')
+console.log('20261151_eatery_partners_banner_path — real file on the 20261115-state fixture (+3 partners, 1125/1132/1134/1144 applied)')
 const db = await fx()
 const q = async (sql, d = db) => (await d.query(sql)).rows
 const before = await q(`SELECT md5(string_agg(to_jsonb(p)::text, ',' ORDER BY id)) m FROM public.eatery_partners p`)
@@ -59,7 +69,7 @@ t('column absent before', (await q(`SELECT 1 FROM information_schema.columns WHE
 t('applies cleanly (in-file assertions green)', await applyFile(db, FILE), { ok: true, msg: null })
 t('applies a SECOND time (no-op)', await applyFile(db, FILE), { ok: true, msg: null })
 t('column: text, nullable, no default', await q(`SELECT data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name='eatery_partners' AND column_name='banner_path'`), [{ data_type: 'text', is_nullable: 'YES', column_default: null }])
-t('ledger row written once', (await q(`SELECT filename FROM public.schema_migrations_applied`)).map(r => r.filename), ['20261151_eatery_partners_banner_path.sql'])
+t('ledger row written once', (await q(`SELECT filename FROM public.schema_migrations_applied WHERE filename LIKE '20261151%'`)).map(r => r.filename), ['20261151_eatery_partners_banner_path.sql'])
 t('rows unchanged apart from the new NULL column', (await q(`SELECT md5(string_agg((to_jsonb(p) - 'banner_path')::text, ',' ORDER BY id)) m FROM public.eatery_partners p`)), before)
 t('every banner_path NULL', (await q(`SELECT count(*)::int n FROM public.eatery_partners WHERE banner_path IS NOT NULL`)), [{ n: 0 }])
 t('COMMENT names eatery-images', (await q(`SELECT col_description('public.eatery_partners'::regclass, a.attnum) ~ 'eatery-images' ok FROM pg_attribute a WHERE a.attrelid='public.eatery_partners'::regclass AND a.attname='banner_path'`)), [{ ok: true }])
@@ -81,6 +91,18 @@ const rd = async (role) => (await asRole(db, role, role === 'authenticated' ? 'c
 t('anon reads banner_path of the ACTIVE partner only (read positive control)', await rd('anon'), [{ slug: 'fx-active', banner_path: 'fx/banner.webp' }])
 t('authenticated likewise', await rd('authenticated'), [{ slug: 'fx-active', banner_path: 'fx/banner.webp' }])
 t('anon cannot UPDATE banner_path (control: postgres can)', [(await asRole(db, 'anon', null, `UPDATE public.eatery_partners SET banner_path=NULL`)).ok, (await db.query(`UPDATE public.eatery_partners SET banner_path=banner_path`).then(() => true))], [false, true])
+// Preview policies (20261119/20261120) are in the fixture: a request WITH a registered key header sees the inactive partners (control for the
+// probe in the file, which clears request.headers and so proves the no-key case only); wrong key and no header stay shut.
+await db.exec(`INSERT INTO private.preview_key_hashes (hash, label) VALUES (encode(sha256(convert_to('k-banner-test', 'UTF8')), 'hex'), 'test')`)
+const withHdr = async (hdr, role) => {
+  await db.exec('RESET ROLE;')
+  await db.query("SELECT set_config('request.headers', $1, false)", [hdr])
+  try { return (await asRole(db, role, null, `SELECT slug FROM public.eatery_partners WHERE slug LIKE 'fx-%' OR slug = 'bidda-badadez' ORDER BY 1`)).rows.map(r => r.slug) }
+  finally { await db.query("SELECT set_config('request.headers', '', false)") }
+}
+t('anon WITH a valid preview key header sees the inactive partners (positive control for the preview policy)', await withHdr('{"x-ada-preview-key":"k-banner-test"}', 'anon'), ['bidda-badadez', 'fx-active', 'fx-inactive'])
+t('anon with a WRONG key sees the active partner only', await withHdr('{"x-ada-preview-key":"nope"}', 'anon'), ['fx-active'])
+t('anon with an empty header sees the active partner only (what the in-file probe does)', await withHdr('', 'anon'), ['fx-active'])
 t('authenticated cannot UPDATE banner_path', (await asRole(db, 'authenticated', 'c0000000-0000-4000-8000-000000000001', `UPDATE public.eatery_partners SET banner_path=NULL`)).ok, false)
 
 console.log('NOTIFY text check (applyFile strips NOTIFY, so this is a text assertion)')
