@@ -173,12 +173,13 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
 }
 
 // Bottom fade of the options list: stacked bands of the sheet colour (BottomSheet is colors.card), alpha rising toward the footer.
-const FADE_ALPHAS = [0.3, 0.55, 0.8, 0.95]
-const FADE_BAND = space[8]
+const FADE_ALPHAS = [0.06, 0.14, 0.24, 0.35, 0.47, 0.59, 0.71, 0.82, 0.91, 0.97]
+const FADE_BAND = space[4]
+const FADE_HEIGHT = FADE_ALPHAS.length * FADE_BAND
 function ScrollFade() {
   return (
     <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={st.fade}>
-      {FADE_ALPHAS.map(a => <View key={a} style={{ height: FADE_BAND, backgroundColor: withAlpha(colors.card, a) }} />)}
+      {FADE_ALPHAS.map((a, i) => <View key={i} style={{ height: FADE_BAND, backgroundColor: withAlpha(colors.card, a) }} />)}
     </View>
   )
 }
@@ -513,7 +514,7 @@ const st = StyleSheet.create({
   inBasket:  { ...type.small, fontFamily: font.semibold, color: colors.primaryDark, marginRight: space[8], flexShrink: 1 },
   sheetScrollWrap:{ flexGrow: 0, flexShrink: 1 },
   sheetScroll:{ flexGrow: 0, flexShrink: 1 },
-  sheetContentFade:{ paddingBottom: space[32] },
+  sheetContentFade:{ paddingBottom: FADE_HEIGHT },
   fade:      { position: 'absolute', left: 0, right: 0, bottom: 0 },
   sheetContent:{ gap: space[16], paddingBottom: space[12] },
   sheetFoot: { flexShrink: 0, gap: space[8], paddingTop: space[8], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
