@@ -483,7 +483,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       {showBanner
         ? <BannerPhoto y={y} uri={bannerUri} reduce={reduce} onError={() => setBannerFailed(true)} />
         : <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />}
-      {showBanner && <BannerBar y={y} lang={lang} onBack={onBack} solid={barSolid} />}
+      {showBanner && <BannerBar lang={lang} onBack={onBack} solid={barSolid} reduce={reduce} />}
       <Animated.ScrollView ref={scrollRef} style={showBanner ? { marginTop: insets.top + BANNER_BAR_ROW } : undefined}
         contentContainerStyle={[s.content, showBanner && { paddingTop: bannerContentPad() }, { paddingBottom: lines.length > 0 ? space[20] : listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
         stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showBanner ? onScrollBanner : showTabs ? onScroll : undefined} scrollEventThrottle={16}
