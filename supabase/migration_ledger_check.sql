@@ -266,7 +266,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261148_partner_booking_requests_retention.sql', '2fbc5e8221f111688997f4fa1756a59c21cc265e67807a7e59127154ed79cc52'),
   ('20261149_bidda_badadez_owner_data.sql', '5d38ce6a8fb1603cd0a7a70917a268c2261d3d80d1720f0e08f8b30519c9a9e7'),
   ('20261150_bidda_badadez_free_options.sql', '0e1c0e0d7b5c582768e0b3d675cb602e337e58856b88c2f0c97ff131fbef7961'),
-  ('20261151_eatery_partners_banner_path.sql', '5bd0b6ae24860b8dc7275149a098ad50e4f3089885f34b59a3e9715203669fb7')
+  ('20261151_eatery_partners_banner_path.sql', '576bb4ed430b1e5bc9068c7e46c907bc0ec6f2d02b6b726a043f12e80b25a7cb')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

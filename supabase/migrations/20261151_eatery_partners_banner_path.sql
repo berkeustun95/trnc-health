@@ -163,16 +163,16 @@ BEGIN
 
   -- Existing rows: unchanged apart from the new NULL column; the active set unchanged (Bidda stays inactive);
   -- every existing banner_path is NULL (no data written).
-  IF (SELECT md5(COALESCE(string_agg((to_jsonb(p) - 'banner_path')::text, ',' ORDER BY p.id), '')) FROM public.eatery_partners p)
-       IS DISTINCT FROM current_setting('ada.m1151_rows', true) THEN
-    RAISE EXCEPTION 'existing eatery_partners rows changed. Nothing applied.';
-  END IF;
   IF (SELECT COALESCE(string_agg(p.slug, ',' ORDER BY p.slug), '') FROM public.eatery_partners p WHERE p.is_active)
        IS DISTINCT FROM current_setting('ada.m1151_active', true) THEN
     RAISE EXCEPTION 'active partner set changed. Nothing applied.';
   END IF;
   IF EXISTS (SELECT 1 FROM public.eatery_partners WHERE slug = 'bidda-badadez' AND is_active) THEN
     RAISE EXCEPTION 'bidda-badadez is active';
+  END IF;
+  IF (SELECT md5(COALESCE(string_agg((to_jsonb(p) - 'banner_path')::text, ',' ORDER BY p.id), '')) FROM public.eatery_partners p)
+       IS DISTINCT FROM current_setting('ada.m1151_rows', true) THEN
+    RAISE EXCEPTION 'existing eatery_partners rows changed. Nothing applied.';
   END IF;
   SELECT array_agg(slug ORDER BY slug) INTO v_names FROM public.eatery_partners WHERE banner_path IS NOT NULL;
   IF v_names IS NOT NULL THEN RAISE EXCEPTION 'banner_path is set on %: this file writes no data', v_names; END IF;
@@ -192,7 +192,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261151_eatery_partners_banner_path.sql', '5bd0b6ae24860b8dc7275149a098ad50e4f3089885f34b59a3e9715203669fb7')
+VALUES ('20261151_eatery_partners_banner_path.sql', '576bb4ed430b1e5bc9068c7e46c907bc0ec6f2d02b6b726a043f12e80b25a7cb')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
