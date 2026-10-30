@@ -22,8 +22,12 @@ const FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(jpg|jpeg|png|webp)$/i
 //   dish    short side >= 800: a dish shows as a ~200 pt thumbnail in the menu list but opens in a full-screen viewer
 //           on a 1170 px-wide phone; the short side is what survives fit-to-screen without a visible upscale
 //           beyond ~1.5x, whatever the crop (square, 4:3, portrait). Below 800 the viewer is visibly soft.
+//   banner  width      >= 1000: the banner is a full-width header, ~390 pt wide on a phone, i.e. ~1010 px at 2.6x (a mid-range
+//           Android density); 1000 px is the width below which it is upscaled on such a screen. It must also be wider than
+//           tall, since the slot is a landscape strip (designs 160-320 pt tall at 390 pt wide).
 export const DISH_WAIVER_FLOOR = 600   // a size waiver can never go below this, whatever the manifest says
-export const MIN = { logoShortSide: 256, galleryWidth: 800, menuWidth: 1000, dishShortSide: 800 }
+export const BANNER_WAIVER_FLOOR = 600 // same for the banner width waiver
+export const MIN = { logoShortSide: 256, galleryWidth: 800, menuWidth: 1000, dishShortSide: 800, bannerWidth: 1000 }
 // Separator of the "Section › Name" dish key (U+203A), used when one name occurs in several sections.
 export const DISH_SEP = ' \u203a '
 
@@ -92,7 +96,7 @@ function webp(b) {
 export const sha256 = buf => createHash('sha256').update(buf).digest('hex')
 
 // ─── manifest + files → items ───────────────────────────────────────────────
-// manifest = { logo?: 'logo.png', gallery?: [...], menu?: [...], dishes?: { '<item name>': 'file.jpg' } }.
+// manifest = { logo?: 'logo.png', banner?: 'banner.jpg', bannerSizeWaiver?: {...}, gallery?: [...], menu?: [...], dishes?: { '<item name>': 'file.jpg' } }.
 // readFile(name) -> Buffer | null (null = missing). Returns { problems: string[], items: [...], dishes: [...] }.
 // A dish has no object path yet: it needs the menu item id, so matchDishes() resolves it later.
 export function validateLocal(slug, manifest, readFile) {
@@ -105,11 +109,33 @@ export function validateLocal(slug, manifest, readFile) {
     problems.push('manifest.json is not a JSON object')
     return { problems, items, dishes, waivers }
   }
-  for (const k of Object.keys(manifest)) if (!['logo', 'gallery', 'menu', 'dishes', 'dishSizeWaivers'].includes(k)) problems.push(`manifest: unknown key '${k}'`)
+  for (const k of Object.keys(manifest)) if (!['logo', 'banner', 'bannerSizeWaiver', 'gallery', 'menu', 'dishes', 'dishSizeWaivers'].includes(k)) problems.push(`manifest: unknown key '${k}'`)
   const want = []
   if (manifest.logo !== undefined) {
     if (typeof manifest.logo !== 'string') problems.push("manifest.logo must be a file name string")
     else want.push({ kind: 'logo', n: 1, name: manifest.logo })
+  }
+  if (manifest.banner !== undefined) {
+    if (typeof manifest.banner !== 'string') problems.push("manifest.banner must be a file name string")
+    else want.push({ kind: 'banner', n: 1, name: manifest.banner })
+  }
+  // bannerSizeWaiver: { minWidth, reason, approvedBy, date }, only valid together with a banner.
+  let bannerWaiver = null
+  if (manifest.bannerSizeWaiver !== undefined) {
+    const w = manifest.bannerSizeWaiver
+    const tag = 'manifest.bannerSizeWaiver'
+    if (manifest.banner === undefined) problems.push(`${tag}: there is no banner in the manifest`)
+    if (!w || typeof w !== 'object' || Array.isArray(w)) problems.push(`${tag}: must be an object { minWidth, reason, approvedBy, date }`)
+    else {
+      for (const f of Object.keys(w)) if (!['minWidth', 'reason', 'approvedBy', 'date'].includes(f)) problems.push(`${tag}: unknown field '${f}'`)
+      const okMin = Number.isInteger(w.minWidth) && w.minWidth >= BANNER_WAIVER_FLOOR && w.minWidth < MIN.bannerWidth
+      if (!okMin) problems.push(`${tag}: minWidth must be an integer from ${BANNER_WAIVER_FLOOR} to ${MIN.bannerWidth - 1}`)
+      if (typeof w.reason !== 'string' || w.reason.trim().length < 20) problems.push(`${tag}: reason must be at least 20 characters`)
+      if (typeof w.approvedBy !== 'string' || w.approvedBy.trim() === '') problems.push(`${tag}: approvedBy is required`)
+      const dateOk = typeof w.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.date) && new Date(w.date + 'T00:00:00Z').toISOString().slice(0, 10) === w.date
+      if (!dateOk) problems.push(`${tag}: date must be a valid YYYY-MM-DD`)
+      if (okMin && typeof w.approvedBy === 'string' && w.approvedBy.trim() !== '' && dateOk && typeof w.reason === 'string' && w.reason.trim().length >= 20) bannerWaiver = w
+    }
   }
   for (const kind of ['gallery', 'menu']) {
     const arr = manifest[kind]
@@ -153,7 +179,7 @@ export function validateLocal(slug, manifest, readFile) {
   if (!want.length && !problems.length) problems.push('manifest lists no images')
   const seen = new Map()
   for (const w of want) {
-    const tag = `${w.kind}${w.kind === 'logo' ? '' : '#' + w.n} '${w.name}'`   // never the dish key: it is an item name and logs are public
+    const tag = `${w.kind}${w.kind === 'logo' || w.kind === 'banner' ? '' : '#' + w.n} '${w.name}'`   // never the dish key: it is an item name and logs are public
     if (!FILE_RE.test(w.name)) { problems.push(`${tag}: file name must be a plain name ending .jpg/.jpeg/.png/.webp (no folders)`); continue }
     if (seen.has(w.name)) { problems.push(`${tag}: listed twice (also ${seen.get(w.name)})`); continue }
     seen.set(w.name, tag)
@@ -169,6 +195,13 @@ export function validateLocal(slug, manifest, readFile) {
     if (ext !== s.format) { problems.push(`${tag}: extension .${extRaw} but the bytes are ${s.format.toUpperCase()}`); continue }
     const { width, height } = s
     if (w.kind === 'logo' && Math.min(width, height) < MIN.logoShortSide) problems.push(`${tag}: ${width}x${height}, short side must be >= ${MIN.logoShortSide}`)
+    if (w.kind === 'banner') {
+      if (width <= height) problems.push(`${tag}: ${width}x${height}, a banner must be wider than tall`)
+      if (bannerWaiver && width >= MIN.bannerWidth) problems.push(`${tag}: manifest.bannerSizeWaiver is an unnecessary waiver, the banner is ${width}x${height} and meets ${MIN.bannerWidth}; remove it`)
+      const minW = bannerWaiver ? bannerWaiver.minWidth : MIN.bannerWidth
+      if (width < minW) problems.push(`${tag}: ${width}x${height}, width must be >= ${minW}${bannerWaiver ? ' (waived)' : ''}`)
+      else if (bannerWaiver) waivers.push({ src: w.name, kind: 'banner', minWidth: bannerWaiver.minWidth, width, height, approvedBy: bannerWaiver.approvedBy.trim(), date: bannerWaiver.date })
+    }
     if (w.kind === 'gallery' && width < MIN.galleryWidth) problems.push(`${tag}: ${width}x${height}, width must be >= ${MIN.galleryWidth}`)
     if (w.kind === 'menu' && width < MIN.menuWidth) problems.push(`${tag}: ${width}x${height}, width must be >= ${MIN.menuWidth}`)
     if (w.kind === 'dish') {
@@ -181,7 +214,7 @@ export function validateLocal(slug, manifest, readFile) {
       dishes.push({ key: w.key, src: w.name, format: s.format, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
       continue
     }
-    const path = `${slug}/${w.kind === 'logo' ? 'logo' : `${w.kind}-${w.n}`}.${s.format}`
+    const path = `${slug}/${w.kind === 'logo' || w.kind === 'banner' ? w.kind : `${w.kind}-${w.n}`}.${s.format}`
     if (!PATH_RE.test(path)) problems.push(`${tag}: object path '${path}' does not match the database path CHECK`)
     items.push({ kind: w.kind, n: w.n, src: w.name, path, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
   }
@@ -246,8 +279,8 @@ export function planDishes(resolved, state, replace = false) {
 
 // ─── apply (all writes; the client is passed in so the order is provable offline) ─
 // Order: every object (upload + re-download + sha256 verify), then, only if ALL succeeded, photo rows, logo_path,
-// dish photo_path. One object failure means no row of any kind is written (no row may point at a missing object).
-// ctx = { sb, partnerId, uploads, bytesByPath: Map(path -> {buf,mime,sha256}), inserts, updates, logo, dishUpdates,
+// banner_path, dish photo_path. One object failure means no row of any kind is written (no row may point at a missing object).
+// ctx = { sb, partnerId, uploads, bytesByPath: Map(path -> {buf,mime,sha256}), inserts, updates, logo, banner?, dishUpdates,
 //         replace, out(line), fail(what, error) }. Returns the failure count.
 export async function applyPlan(ctx) {
   const { sb, partnerId, bytesByPath, out, fail, replace } = ctx
@@ -274,6 +307,10 @@ export async function applyPlan(ctx) {
   if (ctx.logo.action === 'set') {
     const up = await sb.from('eatery_partners').update({ logo_path: ctx.logo.path }).eq('id', partnerId)
     if (up.error) bad('logo_path update', up.error); else out(`logo_path set ${ctx.logo.path}`)
+  }
+  if (ctx.banner?.action === 'set') {
+    const up = await sb.from('eatery_partners').update({ banner_path: ctx.banner.path }).eq('id', partnerId)
+    if (up.error) bad('banner_path update', up.error); else out(`banner_path set ${ctx.banner.path}`)
   }
   for (const r of ctx.dishUpdates) {
     if (r.action === 'keep') continue
@@ -305,7 +342,7 @@ export function readiness(partner, menuItems, dishCount = 0) {
 // state = {
 //   existing: { [path]: { sha256 } | null }   object already in the bucket (null/absent = not there)
 //   rows:     [{ storage_path, kind, width, height, sort_order }]   this partner's eatery_photos rows
-//   logoPath: partner.logo_path
+//   logoPath: partner.logo_path, bannerPath: partner.banner_path
 // }
 // Returns { problems, uploads:[{path,action}], inserts:[...], updates:[...], logo:{action,path?} , orphans:[paths] }
 export function plan(items, state, replace = false) {
@@ -317,7 +354,7 @@ export function plan(items, state, replace = false) {
     else if (ex.sha256 === it.sha256) uploads.push({ path: it.path, action: 'skip-identical' })
     else if (replace) uploads.push({ path: it.path, action: 'replace' })
     else problems.push(`${it.path}: a DIFFERENT file already exists at this path (re-run with replace=true to overwrite)`)
-    if (it.kind === 'logo') continue
+    if (it.kind === 'logo' || it.kind === 'banner') continue
     const row = (state.rows || []).find(r => r.storage_path === it.path)
     const want = { kind: it.kind, storage_path: it.path, width: it.width, height: it.height, sort_order: it.n }
     if (!row) inserts.push(want)
@@ -334,9 +371,17 @@ export function plan(items, state, replace = false) {
     else if (replace) logoPlan = { action: 'set', path: logo.path }
     else problems.push(`logo_path is already '${state.logoPath}', manifest logo would be '${logo.path}' (re-run with replace=true)`)
   }
+  const banner = items.find(i => i.kind === 'banner')
+  let bannerPlan = { action: 'none' }
+  if (banner) {
+    if (state.bannerPath == null) bannerPlan = { action: 'set', path: banner.path }
+    else if (state.bannerPath === banner.path) bannerPlan = { action: 'keep', path: banner.path }
+    else if (replace) bannerPlan = { action: 'set', path: banner.path }
+    else problems.push(`banner_path is already '${state.bannerPath}', manifest banner would be '${banner.path}' (re-run with replace=true)`)
+  }
   const mine = new Set(items.map(i => i.path))
   const orphans = (state.rows || []).map(r => r.storage_path).filter(p => !mine.has(p))
-  return { problems, uploads, inserts, updates, logo: logoPlan, orphans }
+  return { problems, uploads, inserts, updates, logo: logoPlan, banner: bannerPlan, orphans }
 }
 
 // ─── file reading that never follows a link out of the partner folder ────────
