@@ -201,7 +201,7 @@ function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPr
       {canOrder && (
         <View style={st.orderRow}>
           {qty < 1 || hasOpts
-            ? <PillButton filled icon="basket-outline" title={t(phone ? 'eateryListAdd' : 'eateryQuizAddToBasket', lang)}
+            ? <PillButton filled icon={phone ? 'list-outline' : 'basket-outline'} title={t(phone ? 'eateryListAdd' : 'eateryQuizAddToBasket', lang)}
                 label={t(phone ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
             : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} mode={phone ? 'phone' : undefined} />}
           {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t(phone ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}

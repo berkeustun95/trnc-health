@@ -182,6 +182,9 @@ export function eateryItemOptions(item) {
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || Number(a.id) - Number(b.id))
 }
 
+// An extra that costs nothing (Bidda's domates / maydanoz): the sheet shows it as a tick, never a stepper, so its quantity is 0 or 1.
+export const isFreeExtra = opt => opt?.kind === 'extra' && opt.price != null && opt.price !== '' && Number(opt.price) === 0
+
 // What the customer reads: their language's label, else English, else the Turkish text the restaurant reads.
 export function eateryOptionLabel(opt, lang) {
   const l = opt?.label_i18n
@@ -193,10 +196,11 @@ const sortedByOrder = (a, b) => (a.opt.sort_order ?? 0) - (b.opt.sort_order ?? 0
 
 // The ONE Turkish detail text, the same the server stores (create_eatery_order, 20261134): removals first as the restaurant's
 // removed form, then extras "+ekstra x" / "+2 ekstra x", all in (sort_order, id) order, joined with ", ".
-export function optionDetail(removals, extras) {
+// bareFree (the phone list on screen only, never a stored or compared text): a free add reads "+maydanoz", not "+ekstra maydanoz".
+export function optionDetail(removals, extras, bareFree = false) {
   return [
     ...[...removals].sort((a, b) => sortedByOrder({ opt: a }, { opt: b })).map(o => o.message_tr),
-    ...[...extras].sort((a, b) => sortedByOrder(a, b)).map(({ opt, qty }) => (qty > 1 ? `+${qty} ekstra ${opt.message_tr}` : `+ekstra ${opt.message_tr}`)),
+    ...[...extras].sort((a, b) => sortedByOrder(a, b)).map(({ opt, qty }) => (bareFree && isFreeExtra(opt) ? `+${opt.message_tr}` : qty > 1 ? `+${qty} ekstra ${opt.message_tr}` : `+ekstra ${opt.message_tr}`)),
   ].join(', ')
 }
 

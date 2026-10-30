@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animat
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, eateryOptionLabel, resolveLineOptions, formatPrice } from '../constants/eatery'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice } from '../constants/eatery'
 import MapView from 'react-native-maps'
 import { MAP_PROVIDER } from '../utils/googleMap'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
@@ -62,7 +62,7 @@ export function OrderBar({ count, totalText, lang, onOpen, partnerName, mode = '
   return (
     <View style={[st.bar, { paddingBottom: insets.bottom + space[12] }]}>
       {stacked && <Text style={st.barSummary}>{summary}</Text>}
-      <Button fullWidth icon="basket-outline" title={stacked ? go : `${go} · ${summary}`} onPress={onOpen}
+      <Button fullWidth icon={mode === 'phone' ? 'list-outline' : 'basket-outline'} title={stacked ? go : `${go} · ${summary}`} onPress={onOpen}
         accessibilityLabel={`${partnerName ? partnerName + '. ' : ''}${go}, ${summary}`} />
     </View>
   )
@@ -85,18 +85,19 @@ function LineThumb({ photoPath }) {
 }
 
 // What a line says under the dish name. Turkish shows the exact text the restaurant will read (the contract's detail); any
-// other language shows its own labels in the same order. '' for a plain line.
-export function lineDetailText(line, lang) {
-  if (lang === 'Turkish') return line.detail || ''
+// other language shows its own labels in the same order. '' for a plain line. mode 'phone' (Listem): a free add reads "+maydanoz".
+export function lineDetailText(line, lang, mode) {
+  const bare = mode === 'phone' && line.extras.some(e => isFreeExtra(e.opt))
+  if (lang === 'Turkish') return bare ? optionDetail(line.removals, line.extras, true) : line.detail || ''
   const fill = (key, vars) => Object.keys(vars).reduce((txt, k) => txt.replace('{' + k + '}', () => vars[k]), t(key, lang))
   return [
     ...line.removals.map(o => fill('eateryOptWithout', { name: eateryOptionLabel(o, lang) })),
-    ...line.extras.map(({ opt, qty }) => (qty > 1 ? fill('eateryOptExtraLineN', { n: String(qty), name: eateryOptionLabel(opt, lang) }) : fill('eateryOptExtraLine', { name: eateryOptionLabel(opt, lang) }))),
+    ...line.extras.map(({ opt, qty }) => (mode === 'phone' && isFreeExtra(opt) ? `+ ${eateryOptionLabel(opt, lang)}` : qty > 1 ? fill('eateryOptExtraLineN', { n: String(qty), name: eateryOptionLabel(opt, lang) }) : fill('eateryOptExtraLine', { name: eateryOptionLabel(opt, lang) }))),
   ].join(', ')
 }
 
-function BasketLine({ line, onQty, onEdit, formatMoney, lang }) {
-  const detail = line.stale ? t('eateryOptStale', lang) : lineDetailText(line, lang)
+function BasketLine({ line, onQty, onEdit, formatMoney, lang, mode }) {
+  const detail = line.stale ? t('eateryOptStale', lang) : lineDetailText(line, lang, mode)
   const canEdit = eateryItemOptions(line.item).length > 0
   return (
     <View style={st.line}>
@@ -148,6 +149,17 @@ function RemoveRow({ label, included, onToggle, lang }) {
   )
 }
 
+// A free add: unticked by default, ticked = one. Same look as RemoveRow, but the dim label is for "removed" only.
+function FreeRow({ label, checked, onToggle }) {
+  return (
+    <Pressable onPress={onToggle} style={({ pressed }) => [st.optRow, pressed && { opacity: press.small }]}
+      accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={label}>
+      <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={24} color={checked ? colors.primaryDark : colors.textSecondary} />
+      <Text style={st.optLabel}>{label}</Text>
+    </Pressable>
+  )
+}
+
 function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
   return (
     <View style={st.optRow}>
@@ -164,10 +176,11 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
 function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
   const options = eateryItemOptions(item)
   const removals = options.filter(o => o.kind === 'remove')
-  const extras = options.filter(o => o.kind === 'extra')
+  const freeExtras = options.filter(isFreeExtra)
+  const extras = options.filter(o => o.kind === 'extra' && !isFreeExtra(o))
   const known = new Set(options.map(o => Number(o.id)))
   const [removed, setRemoved] = useState(() => new Set((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'remove').map(o => o.id)))
-  const [extraQty, setExtraQty] = useState(() => Object.fromEntries((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'extra').map(o => [o.id, o.qty])))
+  const [extraQty, setExtraQty] = useState(() => Object.fromEntries((initial?.opts || []).filter(o => known.has(o.id) && options.find(x => Number(x.id) === o.id)?.kind === 'extra').map(o => [o.id, isFreeExtra(options.find(x => Number(x.id) === o.id)) ? 1 : o.qty])))
   const [qty, setQty] = useState(initial?.qty || 1)
   const opts = [...removed].map(id => ({ id, qty: 1 })).concat(Object.entries(extraQty).filter(([, q]) => q > 0).map(([id, q]) => ({ id: Number(id), qty: q })))
   const unit = resolveLineOptions(item, opts).unit
@@ -175,6 +188,7 @@ function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15   // as OrderBar: the price moves to its own line instead of truncating
   const addCta = editing ? 'eateryOptUpdateCta' : mode === 'phone' ? 'eateryListOptAddCta' : 'eateryOptAddCta'
+  const toggleFree = id => setExtraQty(e => ({ ...e, [id]: e[id] ? 0 : 1 }))
   const toggle = id => setRemoved(r => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <>
@@ -184,6 +198,13 @@ function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
             <Text style={st.secHead} accessibilityRole="header">{t('eateryOptRemoveTitle', lang)}</Text>
             <Text style={st.secHint}>{t('eateryOptRemoveHint', lang)}</Text>
             {removals.map(o => <RemoveRow key={o.id} label={eateryOptionLabel(o, lang)} included={!removed.has(Number(o.id))} onToggle={() => toggle(Number(o.id))} lang={lang} />)}
+          </View>
+        )}
+        {freeExtras.length > 0 && (
+          <View>
+            <Text style={st.secHead} accessibilityRole="header">{t('eateryOptFreeTitle', lang)}</Text>
+            <Text style={st.secHint}>{t('eateryOptFreeHint', lang)}</Text>
+            {freeExtras.map(o => <FreeRow key={o.id} label={eateryOptionLabel(o, lang)} checked={(extraQty[o.id] || 0) > 0} onToggle={() => toggleFree(o.id)} />)}
           </View>
         )}
         {extras.length > 0 && (
@@ -209,7 +230,7 @@ function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
           <Text style={st.footHintText}>{t('eateryOptAllergy', lang)}</Text>
         </View>
         {stacked && <Text style={st.barSummary}>{price}</Text>}
-        <Button fullWidth icon="basket-outline" title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(addCta, lang).replace('{price}', () => price)}
+        <Button fullWidth icon={mode === 'phone' ? 'list-outline' : 'basket-outline'} title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(addCta, lang).replace('{price}', () => price)}
           accessibilityLabel={t(addCta, lang).replace('{price}', () => price)}
           onPress={() => onConfirm({ opts, qty })} />
       </View>
@@ -405,7 +426,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
           </View>
           {empty ? (
             <View style={st.empty}>
-              <Ionicons name="basket-outline" size={44} color={colors.textSecondary} />
+              <Ionicons name={phone ? 'list-outline' : 'basket-outline'} size={44} color={colors.textSecondary} />
               <Text style={st.emptyTitle} accessibilityRole="header">{t(phone ? 'eateryListEmpty' : 'eateryBasketEmpty', lang)}</Text>
               <Text style={st.emptyBody}>{t(phone ? 'eateryListEmptyBody' : 'eateryBasketEmptyBody', lang)}</Text>
               <Button variant="secondary" title={t('eateryBasketBackToMenu', lang)} onPress={onClose} style={st.emptyBtn} />
@@ -415,7 +436,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
               <Card padding={space[12]}>
                 {lines.map((l, i) => (
                   <View key={l.key} style={i > 0 && st.lineSep}>
-                    <BasketLine line={l} onQty={onQty} onEdit={onEditLine} formatMoney={formatMoney} lang={lang} />
+                    <BasketLine line={l} onQty={onQty} onEdit={onEditLine} formatMoney={formatMoney} lang={lang} mode={mode} />
                   </View>
                 ))}
               </Card>
