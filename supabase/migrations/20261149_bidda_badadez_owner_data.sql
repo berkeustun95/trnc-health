@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261149 — Bidda Badadez: the owner's data (menu, prices, hours, pin, menu date, removal options), STILL INACTIVE
+-- 20261149 — Bidda Badadez: the owner's data (menu, prices, hours, pin, menu date, add options), STILL INACTIVE
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- DATA ONLY, NO SCHEMA, NO POLICY, NO GRANT. Bidda stays is_active = false: every client role still sees NOTHING of this
@@ -27,12 +27,15 @@
 --   Dish-finder tags (PROVISIONAL, Berke): wraps main / meal (Sade none, Hellim veg, Şiş beef, Tavuk chicken, Special
 --   beef); both gatmers side / none / no portion (eatery_menu_items_tags_check). spicy false everywhere.
 --
--- OPTIONS (eatery_item_options, 20261134), Berke 2026-10-30: description AND 'remove' rows. Only what the owner marked
---   çıkarılabilir: Sade "Domates" (domatessiz), "Maydanoz" (maydanozsuz); Hellim "Maydanoz" (maydanozsuz). Nothing for
---   the other wraps (the owner listed no removals there). No 'extra' rows: the owner gave no prices, and an extra with
---   price NULL is hidden anyway. INVISIBLE TODAY: the app shows options only inside the WhatsApp basket, and Bidda's
---   order_method is 'phone' (EateryPartnerScreen: the sheet is gated on `ordering`). Labels in the nine languages,
---   same form as Crunchy's (20261135).
+-- OPTIONS (eatery_item_options, 20261134), Berke 2026-10-30: description AND 3 ADD options ('extra'), nothing else. The
+--   owner's "eklenebilir/çıkarılabilir" ingredients are not in the dish's İçerik, so they are additions: Sade +domates,
+--   +maydanoz; Hellim +maydanoz (message_tr "domates" / "maydanoz"; the server prints "+ekstra domates"). No option on any
+--   other dish. FREE at Bidda, but stored with price NULL: eatery_item_options_price_check allows only NULL or > 0, and
+--   NULL means hidden (the app skips it, create_eatery_order refuses it). Berke left the call to Code 2026-10-30: no
+--   schema change for rows nobody can see. INVISIBLE TODAY either way: the app shows options only inside the WhatsApp
+--   basket, and Bidda's order_method is 'phone' (EateryPartnerScreen: the sheet is gated on `ordering`). If Bidda ever
+--   takes basket orders, free add-ons first need a schema change (price 0 allowed and shown as free). Labels in the nine
+--   languages, same form as Crunchy's (20261135).
 --
 -- ─── WHO CAN READ / WRITE ───────────────────────────────────────────────────
 --   UNCHANGED; no policy or grant is touched. All rows here are readable by anyone ONLY once is_active = true (never set
@@ -100,11 +103,11 @@ DECLARE
   c_removed constant text[] := ARRAY['Katmer', 'Hellim Böreği', 'Kıyma Böreği'];
   v_opts  constant jsonb := $opts$
   [
-  {"dish": "Bidda Badadez Sade",   "sort_order": 1, "message_tr": "domatessiz",
+  {"dish": "Bidda Badadez Sade",   "sort_order": 1, "message_tr": "domates",
    "label_i18n": {"English": "Tomato", "Turkish": "Domates", "Arabic": "الطماطم", "Russian": "Помидоры", "Greek": "Ντομάτα", "French": "Tomate", "Spanish": "Tomate", "German": "Tomate", "Persian": "گوجه‌فرنگی"}},
-  {"dish": "Bidda Badadez Sade",   "sort_order": 2, "message_tr": "maydanozsuz",
+  {"dish": "Bidda Badadez Sade",   "sort_order": 2, "message_tr": "maydanoz",
    "label_i18n": {"English": "Parsley", "Turkish": "Maydanoz", "Arabic": "البقدونس", "Russian": "Петрушка", "Greek": "Μαϊντανός", "French": "Persil", "Spanish": "Perejil", "German": "Petersilie", "Persian": "جعفری"}},
-  {"dish": "Bidda Badadez Hellim", "sort_order": 1, "message_tr": "maydanozsuz",
+  {"dish": "Bidda Badadez Hellim", "sort_order": 1, "message_tr": "maydanoz",
    "label_i18n": {"English": "Parsley", "Turkish": "Maydanoz", "Arabic": "البقدونس", "Russian": "Петрушка", "Greek": "Μαϊντανός", "French": "Persil", "Spanish": "Perejil", "German": "Petersilie", "Persian": "جعفری"}}
   ]
   $opts$;
@@ -212,7 +215,7 @@ BEGIN
   -- ── Options ──
   IF NOT EXISTS (SELECT 1 FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.partner_id = c_id) THEN
     INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, max_qty, sort_order, is_available)
-    SELECT i.id, 'remove', e->'label_i18n', e->>'message_tr', NULL, 1, (e->>'sort_order')::int, true
+    SELECT i.id, 'extra', e->'label_i18n', e->>'message_tr', NULL, 1, (e->>'sort_order')::int, true
       FROM jsonb_array_elements(v_opts) e
       JOIN public.eatery_menu_items i ON i.partner_id = c_id AND i.name = e->>'dish';
   END IF;
@@ -220,10 +223,10 @@ BEGIN
   SELECT jsonb_agg(jsonb_build_object('dish', i.name, 'sort_order', o.sort_order, 'message_tr', o.message_tr, 'label_i18n', o.label_i18n)
                    ORDER BY i.name, o.sort_order)
     INTO v_have FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id
-   WHERE i.partner_id = c_id AND o.kind = 'remove' AND o.price IS NULL AND o.max_qty = 1 AND o.is_available;
+   WHERE i.partner_id = c_id AND o.kind = 'extra' AND o.price IS NULL AND o.max_qty = 1 AND o.is_available;
   SELECT count(*) INTO v_n FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.partner_id = c_id;
   IF v_have IS DISTINCT FROM v_want OR v_n IS DISTINCT FROM 3 THEN
-    RAISE EXCEPTION 'bidda-badadez options are not exactly this file''s 3 removals (live: % rows). Nothing applied.', v_n;
+    RAISE EXCEPTION 'bidda-badadez options are not exactly this file''s 3 add options (live: % rows). Nothing applied.', v_n;
   END IF;
 
   -- ── Post-state: nothing else moved ──
@@ -267,7 +270,7 @@ BEGIN
     RAISE EXCEPTION 'inactive partner visible: anon % / % / %, authenticated % / % / %', v_anon_p, v_anon_i, v_anon_o, v_auth_p, v_auth_i, v_auth_o;
   END IF;
 
-  RAISE NOTICE 'bidda-badadez INACTIVE, phone, pin partner, % menu items, % removal options; anon sees % / % / %, authenticated % / % / % (postgres % / % / %); % other partners unchanged; active set {%}',
+  RAISE NOTICE 'bidda-badadez INACTIVE, phone, pin partner, % menu items, % add options (hidden, price NULL); anon sees % / % / %, authenticated % / % / % (postgres % / % / %); % other partners unchanged; active set {%}',
     v_pos_i, v_pos_o, v_anon_p, v_anon_i, v_anon_o, v_auth_p, v_auth_i, v_auth_o, v_pos_p, v_pos_i, v_pos_o, v_others, v_active_after;
 END $$;
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -281,7 +284,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261149_bidda_badadez_owner_data.sql', 'a62b5c76655d2815d31fd904c3e54fe5f6719e99d1d250aefec14cd92de9ec17')
+VALUES ('20261149_bidda_badadez_owner_data.sql', '5d38ce6a8fb1603cd0a7a70917a268c2261d3d80d1720f0e08f8b30519c9a9e7')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
