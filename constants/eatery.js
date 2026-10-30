@@ -147,6 +147,14 @@ export const ORDER_NOTE_MAX = 200
 // column list, a fixture) or any other value (e.g. 'phone') is not a basket partner. Always combined with a number.
 export const eateryOrdersByWhatsapp = p => p?.order_method === 'whatsapp'
 
+// Which "my list" a partner offers: 'whatsapp' (the basket that sends an order), 'phone' (a list read out on the call: no send, no
+// server) or null (none). Fail closed on any other order_method. nums = eateryContactNumbers(...): a fixture partner has none, so none.
+export function eateryListMode(p, nums) {
+  if (eateryOrdersByWhatsapp(p)) return eateryOrderDigits(nums?.whatsapp) ? 'whatsapp' : null
+  if (p?.order_method === 'phone') return eateryContacts(p, nums).some(c => c.action === 'call') ? 'phone' : null
+  return null
+}
+
 // wa.me wants digits only (country code first). Same rule as eateryContacts(); null when too short to dial.
 export const eateryOrderDigits = wa => {
   const d = filled(wa) ? wa.replace(/\D/g, '') : ''

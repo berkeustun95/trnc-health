@@ -3,13 +3,13 @@ import { View, Text, Image, Pressable, ScrollView, Animated, Easing, Accessibili
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { formatPrice, eateryOrderDigits, eateryOrdersByWhatsapp, eateryItemOptions } from '../constants/eatery'
+import { formatPrice, eateryListMode, eateryItemOptions } from '../constants/eatery'
 import { QUIZ_STEPS, QUIZ_MULTI, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 import { QtyStepper, DishOptionsSheet, OrderBar } from './EateryOrder'
-import { effectiveWhatsapp, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
+import { partnerContactNumbers, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
 import { subscribe } from '../utils/eateryBasketCore'
 
 // ─── Yeme-İçme: "Ne yesem?" (dish finder) ───────────────────────────────────
@@ -149,7 +149,7 @@ function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle }) {
   )
 }
 
-function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
+function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
   const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
@@ -201,7 +201,7 @@ function ResultCard({ entry, lang, canOrder, basket, reduce, scoped, onPress, on
       {canOrder && (
         <View style={st.orderRow}>
           {qty < 1 || hasOpts
-            ? <PillButton filled icon="basket-outline" title={t('eateryQuizAddToBasket', lang)}
+            ? <PillButton filled icon="basket-outline" title={t(phone ? 'eateryListAdd' : 'eateryQuizAddToBasket', lang)}
                 label={t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
             : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} />}
           {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
@@ -293,7 +293,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
   // stepper) show here: any store change re-renders this page, which reads the baskets fresh.
   const [, setTick] = useState(0)
   useEffect(() => subscribe(() => setTick(n => n + 1)), [])
-  const canOrder = p => eateryOrdersByWhatsapp(p) && !!eateryOrderDigits(effectiveWhatsapp(p))
+  const canOrder = p => eateryListMode(p, partnerContactNumbers(p)) != null   // a WhatsApp basket or a phone list
   const onQty = (p, id, delta) => {
     changeQty(p.id, id, delta)
   }
@@ -365,7 +365,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
                   <View style={st.cards}>
                     {result?.dishes.map(d => (
                       <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
-                        canOrder={canOrder(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
+                        canOrder={canOrder(d.partner)} phone={d.partner.order_method === 'phone'} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
@@ -379,7 +379,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, backRef, on
           )}
         </ScrollView>
         {showBar && (
-          <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} onOpen={() => onOpenBasket(barPartner)} />
+          <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} mode={barPartner.order_method === 'phone' ? 'phone' : 'whatsapp'} onOpen={() => onOpenBasket(barPartner)} />
         )}
         {!!optSheet.item && (
           <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item}

@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -199,7 +199,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const { width: winW } = useWindowDimensions()
   const W = winW - 32
 
-  const contacts = eateryContacts(partner, partnerContactNumbers(partner))
+  const contactNums = partnerContactNumbers(partner)
+  const contacts = eateryContacts(partner, contactNums)
   const menuUrl = eateryMenuUrl(partner)
   const sections = useMemo(() => eateryMenuSections(partner), [partner])
   const gallery = eateryPhotos(partner, 'gallery')
@@ -212,8 +213,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // Order via WhatsApp. The basket (per partner, in memory) holds quantities only; names and prices are read from the
   // menu rows here. No number behind it (and never a fixture partner) = no basket at all.
   const orderDigits = eateryOrderDigits(effectiveWhatsapp(partner))
-  const ordering = eateryOrdersByWhatsapp(partner) && !!orderDigits
+  const whatsappOrdering = eateryOrdersByWhatsapp(partner) && !!orderDigits
+  // "Listem" (phone partners): the same basket store and controls, but the list is read out on the call: nothing is sent or recorded.
+  const listMode = eateryListMode(partner, contactNums)
+  const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
+  const callUrl = contacts.find(c => c.action === 'call')?.url
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
     if (!ordering) return []
@@ -274,7 +279,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const clearBasket = () => {
     if (!clearAll(partner.id, noteRef.current)) return
     setNote('')
-    setSnack('eateryBasketCleared')
+    setSnack(listMode === 'phone' ? 'eateryListCleared' : 'eateryBasketCleared')
   }
   // Any real edit drops the old snapshot inside the store; taking the last unit off a dish (the bin) offers its own undo.
   const onQty = useCallback((id, delta) => {
@@ -417,7 +422,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   // 18+ partners: guests, accounts without a date of birth and under-18 accounts browse and fill the basket but cannot send.
   const ageGate = orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })
   const sendOrder = async () => {
-    if (!ordering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery) || lines.some(l => l.stale)) return
+    if (!whatsappOrdering || lines.length === 0 || sendingRef.current || ageGate || !deliveryReady(delivery) || lines.some(l => l.stale)) return
     if (partner.order_requires_account === true && isGuest(session)) { setOrderError('account'); return }
     sendingRef.current = true
     setSending(true)
@@ -545,13 +550,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         )}
 
       </ScrollView>
-      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} />}
+      {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} mode={listMode} />}
       </View>
       {ordering && basketShown === true && (
-        <BasketPage partner={partner} lang={lang} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
+        <BasketPage partner={partner} lang={lang} mode={listMode} onCall={() => { if (callUrl) go('call', callUrl) }} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onAddress={openEditor} covered={editor.open === true} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
-      {ordering && editor.shown === true && (
+      {whatsappOrdering && editor.shown === true && (
         <AddressEditor key={editor.key} lang={lang} open={editor.open === true} step={editor.step} pickerOpen={editor.picker === true} seed={editor.seed} reduce={reduce}
           onStep={n => setEditor(e => ({ ...e, step: n }))} onPicker={v => setEditor(e => ({ ...e, picker: v }))}
           onBack={() => editorBackTo(eateryPartnerBack({ editorOpen: true, editorStep: editor.step, pickerOpen: editor.picker === true }))}
