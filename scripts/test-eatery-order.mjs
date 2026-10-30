@@ -664,6 +664,30 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('wiring: phone partner call button is relabelled eateryOrderByPhone', /c\.action === 'call' && orderByPhone \? 'eateryOrderByPhone'/.test(ps), true)
 }
 
+// ── "Listem" wording: a phone partner never reads basket keys (sheet CTA, per-dish count, a11y, stale block) ──
+{
+  const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  const PAIRS = [['eateryListOptAddCta', 'eateryOptAddCta'], ['eateryListInList', 'eateryOptInBasket'], ['eateryListSideRemoveA11y', 'eateryQuizSideRemoveA11y'], ['eateryListStaleBlock', 'eateryOptStaleBlock'], ['eateryListAddA11y', 'eateryOrderAddA11y']]
+  const ph = x => (x.match(/\{\w+\}/g) || []).sort().join()
+  for (const [list, basket] of PAIRS) {
+    eq(`list key ${list}: present in all 9 languages, never the basket text`, LANGS.map(l => t(list, l) !== list && t(list, l) !== t(basket, l)), Array(9).fill(true))
+    eq(`list key ${list}: {placeholders} match ${basket}${list === 'eateryListStaleBlock' ? ' (none)' : ''}`, LANGS.map(l => ph(t(list, l)) === ph(t(basket, l))), Array(9).fill(true))
+  }
+  const rd = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const eo = rd('../components/EateryOrder.js'), qz = rd('../components/EateryQuiz.js'), sc = rd('../screens/EateryPartnerScreen.js')
+  // each basket key may only be read next to its phone switch (or the editing branch / the WhatsApp side of a ternary)
+  const all = eo + '\n' + qz
+  eq('wiring: eateryOrderAddA11y / eateryQuizSideRemoveA11y / eateryOptAddCta are only read behind a phone switch',
+    ['eateryOrderAddA11y', 'eateryQuizSideRemoveA11y', 'eateryOptAddCta'].map(k => [...all.matchAll(new RegExp(`.{0,40}'${k}'`, 'g'))].every(m => /phone/.test(m[0]) || /sub\(|PAIR/.test(m[0]) || /'eateryOptUpdateCta' : mode/.test(m[0]))), [true, true, true])
+  eq('wiring: no bare t(\'eateryOptInBasket\' outside a phone switch', [...(eo + qz).matchAll(/t\('eateryOptInBasket'/g)].length, 0)
+  eq('wiring: sheet CTA picks the list key for mode phone', /const addCta = editing \? 'eateryOptUpdateCta' : mode === 'phone' \? 'eateryListOptAddCta' : 'eateryOptAddCta'/.test(eo), true)
+  eq('wiring: phone BasketPage stale block is the list text', eo.includes("phone ? (stale ? 'eateryListStaleBlock' : null)"), true)
+  eq('wiring: screen passes the list mode to the sheet and the dish rows',
+    [sc.includes("editing={optSheet.fromKey != null} mode={listMode}"), sc.includes("phone={listMode === 'phone'}"), sc.includes("onPress={() => onOptions(item)} lang={lang} mode={phone ? 'phone' : undefined}"), sc.includes("onQty={onQty} lang={lang} mode={phone ? 'phone' : undefined}")], [true, true, true, true])
+  eq('wiring: quiz passes phone to the sheet, the sides and the stepper',
+    [qz.includes("mode={optSheet.partner?.order_method === 'phone' ? 'phone' : undefined}"), qz.includes('phone={phone} />'), qz.includes("lang={lang} mode={phone ? 'phone' : undefined} />")], [true, true, true])
+}
+
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.
 eq('NEL does not survive in a note', buildOrderMessage(lines, 'a\u0085b').split('\n').find(l => l.startsWith('Not: ')), 'Not: a b')
 eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'), 'x y')

@@ -24,13 +24,13 @@ const ORDER_ERR_KEY = { adult: 'eateryOrderAdultOnly', generic: 'eateryOrderErrG
 // 0 = a single "Ekle" pill; 1+ = [−] n [+]. Every target is 44pt.
 // min / max: the options sheet's own bounds. Without min (every menu and basket row) nothing changes: the pill at 0 and the bin at 1.
 // With min it is always [−] n [+], the minus dimmed at min.
-export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY }) {
+export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY, mode }) {
   const bare = min == null
   const sub = key => t(key, lang).replace('{name}', () => name).replace('{qty}', () => String(qty))
   if (bare && qty < 1) {
     return (
       <Pressable onPress={() => onQty(id, 1)} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={sub('eateryOrderAddA11y')}>
+        accessibilityRole="button" accessibilityLabel={sub(mode === 'phone' ? 'eateryListAddA11y' : 'eateryOrderAddA11y')}>
         <Ionicons name="add" size={18} color={colors.primaryDark} />
         <Text style={st.addText} numberOfLines={1}>{t('eateryOrderAdd', lang)}</Text>
       </Pressable>
@@ -123,12 +123,12 @@ function BasketLine({ line, onQty, onEdit, formatMoney, lang }) {
 
 // ─── Per-dish options (eatery_item_options): the "Ekle" of a dish that has some, and the sheet behind it ───
 // A dish with options never gets the in-row stepper: every add goes through the sheet, which builds the line (dish + options).
-export function DishAddButton({ name, count, onPress, lang }) {
+export function DishAddButton({ name, count, onPress, lang, mode }) {
   return (
     <View style={st.row}>
-      {count > 0 && <Text style={st.inBasket} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(count))}</Text>}
+      {count > 0 && <Text style={st.inBasket} accessibilityLiveRegion="polite">{t(mode === 'phone' ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(count))}</Text>}
       <Pressable onPress={onPress} style={({ pressed }) => [st.add, pressed && { opacity: press.small }]}
-        accessibilityRole="button" accessibilityLabel={t('eateryOrderAddA11y', lang).replace('{name}', () => name)}>
+        accessibilityRole="button" accessibilityLabel={t(mode === 'phone' ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => name)}>
         <Ionicons name="add" size={18} color={colors.primaryDark} />
         <Text style={st.addText} numberOfLines={1}>{t('eateryOrderAdd', lang)}</Text>
       </Pressable>
@@ -161,7 +161,7 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
 }
 
 // initial: { opts: [{ id, qty }], qty } of the line being edited (ids that no longer exist are ignored), or null for a new add.
-function SheetBody({ item, lang, initial, editing, onConfirm }) {
+function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
   const options = eateryItemOptions(item)
   const removals = options.filter(o => o.kind === 'remove')
   const extras = options.filter(o => o.kind === 'extra')
@@ -174,6 +174,7 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
   const price = formatPrice(Math.round(unit * qty * 100) / 100, item.currency, lang)
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15   // as OrderBar: the price moves to its own line instead of truncating
+  const addCta = editing ? 'eateryOptUpdateCta' : mode === 'phone' ? 'eateryListOptAddCta' : 'eateryOptAddCta'
   const toggle = id => setRemoved(r => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <>
@@ -208,8 +209,8 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
           <Text style={st.footHintText}>{t('eateryOptAllergy', lang)}</Text>
         </View>
         {stacked && <Text style={st.barSummary}>{price}</Text>}
-        <Button fullWidth icon="basket-outline" title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
-          accessibilityLabel={t(editing ? 'eateryOptUpdateCta' : 'eateryOptAddCta', lang).replace('{price}', () => price)}
+        <Button fullWidth icon="basket-outline" title={stacked ? t(editing ? 'updateCta' : 'eateryOrderAdd', lang) : t(addCta, lang).replace('{price}', () => price)}
+          accessibilityLabel={t(addCta, lang).replace('{price}', () => price)}
           onPress={() => onConfirm({ opts, qty })} />
       </View>
     </>
@@ -217,11 +218,11 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
 }
 
 // visible: the sheet is open (the body unmounts, and so resets, when it closes). onConfirm({ opts, qty }); onClose = dismissed.
-export function DishOptionsSheet({ visible, lang, item, initial = null, editing = false, onClose, onConfirm }) {
+export function DishOptionsSheet({ visible, lang, item, initial = null, editing = false, onClose, onConfirm, mode }) {
   if (!item) return null
   return (
     <BottomSheet visible={visible === true} onClose={onClose} title={item.name} lang={lang}>
-      <SheetBody item={item} lang={lang} initial={initial} editing={editing} onConfirm={onConfirm} />
+      <SheetBody item={item} lang={lang} initial={initial} editing={editing} onConfirm={onConfirm} mode={mode} />
     </BottomSheet>
   )
 }
@@ -383,7 +384,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
   const empty = lines.length === 0
   const phone = mode === 'phone'   // "Listem": the same lines, read out on the call; no delivery, note or send
   const stale = lines.some(l => l.stale)   // an option that no longer exists: nothing is sent until that line is edited or removed
-  const msgKey = phone ? (stale ? 'eateryOptStaleBlock' : null) : ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const msgKey = phone ? (stale ? 'eateryListStaleBlock' : null) : ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && (stale || ['generic', 'rate', 'account'].includes(orderError)) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
   const ready = deliveryReady(delivery)
   const deliveryKey = ready ? null : delivery.mode === 'delivery' ? 'eateryDeliveryNeedAddress' : 'eateryDeliveryNeedChoose'

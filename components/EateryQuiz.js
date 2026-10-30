@@ -128,7 +128,7 @@ function Expand({ open, reduce, children }) {
 
 // One "Yanına" line. A priced side is a 44pt toggle (the whole row): the plus adds one unit to the partner's basket, then
 // it reads "Eklendi" and a second tap takes that one unit off again. A side that cannot be ordered stays a plain line.
-function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle }) {
+function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle, phone }) {
   if (!orderable) {
     return (
       <View style={st.sideRow}>
@@ -140,11 +140,11 @@ function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle }) {
   const added = qty > 0 && !hasOpts   // a side with options only ever adds: the sheet builds another line, the row counts them
   return (
     <Pressable onPress={onToggle} style={({ pressed }) => [st.sideRow, st.sideTap, pressed && { opacity: press.small }]} accessibilityRole="button"
-      accessibilityLabel={added ? t('eateryQuizSideRemoveA11y', lang).replace('{name}', () => item.name) : `${t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)}. ${text}`}>
+      accessibilityLabel={added ? t(phone ? 'eateryListSideRemoveA11y' : 'eateryQuizSideRemoveA11y', lang).replace('{name}', () => item.name) : `${t(phone ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => item.name)}. ${text}`}>
       <Ionicons name={added ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={colors.primaryDark} />
       <Text style={st.sideText}>{text}</Text>
       {added && <Text style={st.sideAdded}>{t('eateryQuizSideAdded', lang)}</Text>}
-      {hasOpts && qty > 0 && <Text style={st.sideAdded}>{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
+      {hasOpts && qty > 0 && <Text style={st.sideAdded}>{t(phone ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
     </Pressable>
   )
 }
@@ -202,9 +202,9 @@ function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPr
         <View style={st.orderRow}>
           {qty < 1 || hasOpts
             ? <PillButton filled icon="basket-outline" title={t(phone ? 'eateryListAdd' : 'eateryQuizAddToBasket', lang)}
-                label={t('eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
-            : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} />}
-          {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t('eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
+                label={t(phone ? 'eateryListAddA11y' : 'eateryOrderAddA11y', lang).replace('{name}', () => item.name)} onPress={() => (hasOpts ? onOptions(partner, item) : onQty(partner, item.id, 1))} />
+            : <QtyStepper id={item.id} name={item.name} qty={qty} onQty={(id, d) => onQty(partner, id, d)} lang={lang} mode={phone ? 'phone' : undefined} />}
+          {hasOpts && qty > 0 && <Text style={[st.sideAdded, { marginTop: space[4] }]} accessibilityLiveRegion="polite">{t(phone ? 'eateryListInList' : 'eateryOptInBasket', lang).replace('{n}', () => String(qty))}</Text>}
         </View>
       )}
       {sides.length > 0 && (
@@ -213,7 +213,7 @@ function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPr
             <Text style={st.sidesTitle} accessibilityRole="header">{t('eateryQuizSidesTitle', lang)}</Text>
             {sides.map((line, k) => (
               <SideRow key={sideItems[k].id} item={sideItems[k]} text={line} qty={dishQty(basket, sideItems[k].id)} orderable={sideOk[k]} hasOpts={eateryItemOptions(sideItems[k]).length > 0} lang={lang}
-                onToggle={() => toggleSide(sideItems[k])} />
+                onToggle={() => toggleSide(sideItems[k])} phone={phone} />
             ))}
           </View>
         </Expand>
@@ -382,7 +382,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, config = QU
           <OrderBar count={bar.count} totalText={formatPrice(bar.total, bar.currency, lang)} lang={lang} partnerName={barPartner.name} mode={barPartner.order_method === 'phone' ? 'phone' : 'whatsapp'} onOpen={() => onOpenBasket(barPartner)} />
         )}
         {!!optSheet.item && (
-          <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item}
+          <DishOptionsSheet visible={optSheet.open === true} lang={lang} item={optSheet.item} mode={optSheet.partner?.order_method === 'phone' ? 'phone' : undefined}
             onClose={() => setOptSheet(o => ({ ...o, open: false }))}
             onConfirm={({ opts, qty }) => { setLine(optSheet.partner.id, null, lineKey(optSheet.item.id, opts), qty); setOptSheet(o => ({ ...o, open: false })) }} />
         )}
