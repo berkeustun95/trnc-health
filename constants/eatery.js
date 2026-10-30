@@ -411,6 +411,14 @@ export function deliveryLine(delivery) {
   return ['Teslimat: Adrese teslim — ' + (name ? `${name}: ` : '') + addr, phone && `Teslimatta aranacak: ${phone}`, directions && `Tarif: ${directions}`, link && `Konum (haritada aç): ${link}`, coords && `Koordinat: ${coords}`].filter(Boolean).join(' · ')
 }
 
+// Partner page photo banner. 240 = the photo's height below the status bar (mockup lever 160-320). The head card overlaps
+// the photo by one bar row, so the scroll content starts BANNER_H - 2 rows down (the ScrollView itself starts one row down).
+export const EATERY_BANNER_H = 240
+export const BANNER_BAR_ROW = 56   // ScreenHeader's minHeight: the bar's row under the status bar
+export const bannerContentPad = () => EATERY_BANNER_H - 2 * BANNER_BAR_ROW
+// Banner mode only when the row has a banner that resolves to a URL and it has not failed to load.
+export const eateryBannerOn = (url, failed) => !!url && failed !== true
+
 // The address editor's Back: step 3 -> 2 -> 1 -> closed (the editor is the first layer in the back chain, then the basket).
 export const editorBack = step => (step === 3 ? 2 : step === 2 ? 1 : 'closed')
 
