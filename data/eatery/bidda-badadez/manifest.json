@@ -1,0 +1,21 @@
+{
+  "logo": "logo.png",
+  "dishes": {
+    "Bidda Badadez Sade": "sade.jpg",
+    "Bidda Badadez Hellim": "hellim.jpg",
+    "Bidda Badadez Şiş Köfte": "sis-kofte.jpg",
+    "Bidda Badadez Tavuk Köfte": "tavuk-kofte.jpg",
+    "Bidda Badadez Special": "special.jpg",
+    "Sac Gatmeri Gaymak Yağlı": "gatmer-gaymak-yagli.jpg",
+    "Sac Gatmeri Zeytinyağlı": "gatmer-zeytinyagli.jpg"
+  },
+  "dishSizeWaivers": {
+    "Bidda Badadez Sade": { "minShortSide": 757, "reason": "Owner's photo, 757x1600 original (İBO.pdf img 1); no larger version exists. Approved by Berke", "approvedBy": "Berke", "date": "2026-10-30" },
+    "Bidda Badadez Hellim": { "minShortSide": 757, "reason": "Owner's photo, 757x1600 original (İBO.pdf img 2); no larger version exists. Approved by Berke", "approvedBy": "Berke", "date": "2026-10-30" },
+    "Bidda Badadez Şiş Köfte": { "minShortSide": 757, "reason": "Owner's photo, 757x1600 original (İBO.pdf img 3); no larger version exists. Approved by Berke", "approvedBy": "Berke", "date": "2026-10-30" },
+    "Bidda Badadez Tavuk Köfte": { "minShortSide": 757, "reason": "Same photo as Şiş Köfte (İBO.pdf img 4 = img 3, byte-identical); used for Tavuk Köfte with Berke's approval. 757x1600 original", "approvedBy": "Berke", "date": "2026-10-30" },
+    "Bidda Badadez Special": { "minShortSide": 757, "reason": "Owner's photo, 757x1600 original (İBO.pdf img 5); no larger version exists. Approved by Berke", "approvedBy": "Berke", "date": "2026-10-30" },
+    "Sac Gatmeri Gaymak Yağlı": { "minShortSide": 757, "reason": "Owner's folded gatmer photo (İBO.pdf img 6), shared with Sac Gatmeri Zeytinyağlı. 757x1600 original. Approved by Berke", "approvedBy": "Berke", "date": "2026-10-30" },
+    "Sac Gatmeri Zeytinyağlı": { "minShortSide": 757, "reason": "Owner's folded gatmer photo (İBO.pdf img 6), shared with Sac Gatmeri Gaymak Yağlı. 757x1600 original. Approved by Berke", "approvedBy": "Berke", "date": "2026-10-30" }
+  }
+}

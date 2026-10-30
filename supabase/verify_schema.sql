@@ -4115,10 +4115,22 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
       OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    -- 1149: the owner's menu replaced 1145's. Asserts only what the file fixed for good: phone ordering, a partner pin (never
+    --       Google), the 7 named dishes present and the 3 removed ones gone. Logo, photos, prices, hours and is_active change later.
+    UNION ALL SELECT '20261149_bidda_badadez_owner_data','bidda-badadez: phone, pin source partner, the owner''s 7 dishes, no Katmer / Hellim Böreği / Kıyma Böreği, once 1149 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261149_bidda_badadez_owner_data.sql')
+      OR COALESCE((SELECT to_jsonb(p)->>'order_method' = 'phone' AND p.geocode_source = 'partner' AND p.lat IS NOT NULL AND p.lng IS NOT NULL
+                          AND (SELECT count(DISTINCT i.name) FROM public.eatery_menu_items i WHERE i.partner_id = p.id
+                                 AND i.name IN ('Bidda Badadez Sade','Bidda Badadez Hellim','Bidda Badadez Şiş Köfte','Bidda Badadez Tavuk Köfte',
+                                                'Bidda Badadez Special','Sac Gatmeri Gaymak Yağlı','Sac Gatmeri Zeytinyağlı')) = 7
+                          AND NOT EXISTS(SELECT 1 FROM public.eatery_menu_items i WHERE i.partner_id = p.id
+                                 AND i.name IN ('Katmer','Hellim Böreği','Kıyma Böreği','Bidda Badadez Hellimli'))
+                     FROM public.eatery_partners p WHERE p.slug = 'bidda-badadez'), false)
     -- 1145: to_jsonb, so it never names order_method (never an error before 1144). Prices, pin, logo and is_active are
     --       expected to change later, so the token asserts only what the file fixed for good.
-    UNION ALL SELECT '20261145_bidda_badadez_data','bidda-badadez exists with order_method phone and its 8 named dishes, once 1145 is applied',
+    UNION ALL SELECT '20261145_bidda_badadez_data','bidda-badadez exists with order_method phone and its 8 named dishes, once 1145 is applied (until 1149 replaces the menu)',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261145_bidda_badadez_data.sql')
+      OR EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261149_bidda_badadez_owner_data.sql')
       OR COALESCE((SELECT to_jsonb(p)->>'order_method' = 'phone'
                           AND (SELECT count(DISTINCT i.name) FROM public.eatery_menu_items i WHERE i.partner_id = p.id
                                  AND i.name IN ('Bidda Badadez Sade','Bidda Badadez Hellimli','Bidda Badadez Şiş Köfte','Bidda Badadez Tavuk Köfte',
