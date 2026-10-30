@@ -2,7 +2,7 @@
 // Fixture: test-bidda-badadez-data-sql.mjs's (sliced, not retyped), then the REAL 1125 / 1132 / 1134 / 1144 / 1145 files.
 // Checks:
 //   (a) order: refused without 1145 in the ledger;
-//   (b) the data: partner pin / hours / menu date, the owner's 7 rows (wrap ids kept), 3 removal options, still
+//   (b) the data: partner pin / hours / menu date, the owner's 7 rows (wrap ids kept), 3 add options, still
 //       inactive; anon / authenticated see nothing; Crunchy untouched; a re-apply is a no-op, also after the image
 //       upload set logo_path / photo_path; a drifted menu or option set is refused;
 //   (c) RED-FIRST mutants of the file (every anchor asserted present, the apply must FAIL with the expected message);
@@ -131,11 +131,16 @@ t("the owner's 7 rows: sections, prices, tags, Turkish descriptions", await q(db
 t('the five wraps kept their ids (updated in place; Hellimli renamed)',
   await q(db, `SELECT i.name, i.id::text FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = 'bidda-badadez' AND i.section_order = 1 ORDER BY i.sort_order`),
   idsBefore.map(r => ({ ...r, name: r.name === 'Bidda Badadez Hellimli' ? 'Bidda Badadez Hellim' : r.name })))
-t('3 removal options, only where the owner said çıkarılabilir',
+t('3 add options (extra, price NULL = hidden: the CHECK refuses 0), Sade + Hellim only',
   await q(db, OPTS_SQL),
-  [['Bidda Badadez Sade', 'domatessiz', 'Domates', 'Tomato', 1], ['Bidda Badadez Sade', 'maydanozsuz', 'Maydanoz', 'Parsley', 2],
-   ['Bidda Badadez Hellim', 'maydanozsuz', 'Maydanoz', 'Parsley', 1]]
-    .map(([dish, message_tr, tr, en, sort_order]) => ({ dish, kind: 'remove', message_tr, tr, en, price: null, max_qty: 1, sort_order, is_available: true })))
+  [['Bidda Badadez Sade', 'domates', 'Domates', 'Tomato', 1], ['Bidda Badadez Sade', 'maydanoz', 'Maydanoz', 'Parsley', 2],
+   ['Bidda Badadez Hellim', 'maydanoz', 'Maydanoz', 'Parsley', 1]]
+    .map(([dish, message_tr, tr, en, sort_order]) => ({ dish, kind: 'extra', message_tr, tr, en, price: null, max_qty: 1, sort_order, is_available: true })))
+{
+  // why price NULL and not 0: the 20261134 CHECK refuses a 0 TL extra (control: 1 TL is accepted), both rolled back
+  const zero = async (price) => { try { await db.exec(`BEGIN; UPDATE public.eatery_item_options SET price = ${price} WHERE message_tr = 'domates'; ROLLBACK;`); return 'accepted' } catch (e) { await db.exec('ROLLBACK'); return e.message.includes('eatery_item_options_price_check') ? 'price_check' : e.message } }
+  t('a 0 TL add option is refused by eatery_item_options_price_check; 1 TL accepted (control)', [await zero(0), await zero(1)], ['price_check', 'accepted'])
+}
 t('every option label carries the nine languages (CHECK eatery_option_label_valid)',
   await q(db, `SELECT count(*)::int n FROM public.eatery_item_options o WHERE public.eatery_option_label_valid(o.label_i18n)`), [{ n: 4 }])
 {

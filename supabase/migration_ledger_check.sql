@@ -264,7 +264,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261146_app_versions_latest_142.sql', 'c79cdda978d2e296e6aae1d06e683a0fefe26ffe75b8b32ca68f5b70a406b66f'),
   ('20261147_crunchy_burger_description_tr.sql', '6346252b86625f23450a6c7c52e4d75e80ba14d88e5f3ee12cc4a16998fdba4e'),
   ('20261148_partner_booking_requests_retention.sql', '2fbc5e8221f111688997f4fa1756a59c21cc265e67807a7e59127154ed79cc52'),
-  ('20261149_bidda_badadez_owner_data.sql', 'a62b5c76655d2815d31fd904c3e54fe5f6719e99d1d250aefec14cd92de9ec17')
+  ('20261149_bidda_badadez_owner_data.sql', '5d38ce6a8fb1603cd0a7a70917a268c2261d3d80d1720f0e08f8b30519c9a9e7')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
