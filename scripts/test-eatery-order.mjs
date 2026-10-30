@@ -3,7 +3,7 @@
 import * as B from '../utils/eateryBasketCore.js'
 import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -739,6 +739,20 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
 // U+0085 (NEL) is not in JS \s; it must not survive into a note or address either.
 eq('NEL does not survive in a note', buildOrderMessage(lines, 'a\u0085b').split('\n').find(l => l.startsWith('Not: ')), 'Not: a b')
 eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'), 'x y')
+
+// ── Dish options sheet: bottom fade only while the list overflows and is not at its end ──
+{
+  const f = (contentH, viewH, offsetY) => sheetFadeVisible({ contentH, viewH, offsetY })
+  eq('fade: short sheet (content <= view) never fades', [f(300, 400, 0), f(400, 400, 0), f(399.5, 400, 0)], [false, false, false])
+  eq('fade: overflowing at top and middle', [f(600, 400, 0), f(600, 400, 100)], [true, true])
+  eq('fade: gone within the tolerance of the end and at the end', [f(600, 400, 200 - SHEET_FADE_TOL), f(600, 400, 199), f(600, 400, 200), f(600, 400, 230)], [false, false, false, false])
+  eq('fade: still on just outside the tolerance', f(600, 400, 200 - SHEET_FADE_TOL - 0.5), true)
+  eq('fade: not measured yet (0 / missing) -> off', [f(0, 0, 0), f(600, 0, 0), sheetFadeVisible({}), sheetFadeVisible()], [false, false, false, false])
+  const eo = fs.readFileSync(new URL('../components/EateryOrder.js', import.meta.url), 'utf8')
+  const fade = eo.match(/function ScrollFade\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+  eq('wiring: the fade is non-interactive and hidden from accessibility', [/pointerEvents="none"/.test(fade), /no-hide-descendants/.test(fade), /accessibilityElementsHidden/.test(fade)], [true, true, true])
+  eq('wiring: SheetBody renders the fade from the helper, inside the scroll area, and measures the list', [/\{sheetFadeVisible\(scrollM\) && <ScrollFade \/>\}/.test(eo), /onContentSizeChange/.test(eo), /scrollEventThrottle=\{16\}/.test(eo)], [true, true, true])
+}
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
 if (bad) process.exit(1)

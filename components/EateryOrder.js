@@ -3,13 +3,13 @@ import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animat
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice } from '../constants/eatery'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, sheetFadeVisible, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice } from '../constants/eatery'
 import MapView from 'react-native-maps'
 import { MAP_PROVIDER } from '../utils/googleMap'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
 import useKeyboardTop from '../utils/useKeyboardTop'
-import { colors, font, type, radii, space, press, motion, TAP } from '../constants/theme'
+import { colors, font, type, radii, space, press, motion, TAP, withAlpha } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, BottomSheet } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 
@@ -172,6 +172,17 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
   )
 }
 
+// Bottom fade of the options list: stacked bands of the sheet colour (BottomSheet is colors.card), alpha rising toward the footer.
+const FADE_ALPHAS = [0.3, 0.55, 0.8, 0.95]
+const FADE_BAND = space[8]
+function ScrollFade() {
+  return (
+    <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={st.fade}>
+      {FADE_ALPHAS.map(a => <View key={a} style={{ height: FADE_BAND, backgroundColor: withAlpha(colors.card, a) }} />)}
+    </View>
+  )
+}
+
 // initial: { opts: [{ id, qty }], qty } of the line being edited (ids that no longer exist are ignored), or null for a new add.
 function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
   const options = eateryItemOptions(item)
@@ -188,11 +199,17 @@ function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15   // as OrderBar: the price moves to its own line instead of truncating
   const addCta = editing ? 'eateryOptUpdateCta' : mode === 'phone' ? 'eateryListOptAddCta' : 'eateryOptAddCta'
+  const [scrollM, setScrollM] = useState({ contentH: 0, viewH: 0, offsetY: 0 })
+  const setM = patch => setScrollM(m => Object.keys(patch).every(k => m[k] === patch[k]) ? m : { ...m, ...patch })
+  const overflows = scrollM.viewH > 0 && scrollM.contentH > scrollM.viewH
   const toggleFree = id => setExtraQty(e => ({ ...e, [id]: e[id] ? 0 : 1 }))
   const toggle = id => setRemoved(r => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <>
-      <ScrollView style={st.sheetScroll} contentContainerStyle={st.sheetContent} showsVerticalScrollIndicator={false}>
+      <View style={st.sheetScrollWrap}>
+      <ScrollView style={st.sheetScroll} contentContainerStyle={[st.sheetContent, overflows && st.sheetContentFade]} showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16} onLayout={e => setM({ viewH: e.nativeEvent.layout.height })} onContentSizeChange={(_, h) => setM({ contentH: h })}
+        onScroll={e => setM({ offsetY: e.nativeEvent.contentOffset.y })}>
         {removals.length > 0 && (
           <View>
             <Text style={st.secHead} accessibilityRole="header">{t('eateryOptRemoveTitle', lang)}</Text>
@@ -217,6 +234,8 @@ function SheetBody({ item, lang, initial, editing, onConfirm, mode }) {
           </View>
         )}
       </ScrollView>
+      {sheetFadeVisible(scrollM) && <ScrollFade />}
+      </View>
       <View style={st.sheetFoot}>
         <View style={st.footQtyGroup}>
           <View style={st.footQty}>
@@ -492,7 +511,10 @@ const st = StyleSheet.create({
   qty:       { minWidth: 28, textAlign: 'center', ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   dim:       { opacity: 0.4 },
   inBasket:  { ...type.small, fontFamily: font.semibold, color: colors.primaryDark, marginRight: space[8], flexShrink: 1 },
+  sheetScrollWrap:{ flexGrow: 0, flexShrink: 1 },
   sheetScroll:{ flexGrow: 0, flexShrink: 1 },
+  sheetContentFade:{ paddingBottom: space[32] },
+  fade:      { position: 'absolute', left: 0, right: 0, bottom: 0 },
   sheetContent:{ gap: space[16], paddingBottom: space[12] },
   sheetFoot: { flexShrink: 0, gap: space[8], paddingTop: space[8], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   footQty:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },

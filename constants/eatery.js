@@ -556,3 +556,10 @@ export function refineFix(watch, { ms = LOCATE_REFINE_MS, goodM = LOCATE_GOOD_M,
   })).then(s => { sub = s || null; if (settled) drop() }, finish)
   return { done, stop: finish }
 }
+// Dish options sheet: show the bottom fade only while the list overflows its viewport and is not scrolled to the end
+// (SHEET_FADE_TOL pt of slack at the end, so sub-pixel rounding never leaves a fade on a list that is fully scrolled).
+export const SHEET_FADE_TOL = 2
+export function sheetFadeVisible({ contentH, viewH, offsetY } = {}) {
+  if (![contentH, viewH, offsetY].every(Number.isFinite) || viewH <= 0 || contentH <= viewH) return false
+  return offsetY < contentH - viewH - SHEET_FADE_TOL
+}
