@@ -372,7 +372,7 @@ violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal re
 Berke's `production-db` approval.
 Sync PRs from `main` into a release branch (`release/**`) count as Mac Code's own PRs.
 
-**Hermes server** (Hetzner `37.27.157.78`, Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
+**Hermes server** (Hetzner `<HERMES_HOST>`, address + SSH route in vault `2026-10-18_claude-code-github-identity.md`; Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
 team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
 write; `ops/hermes/team-user-setup.sh`) as GitHub `ada-hermes-bot` (Write): it pushes only `agent/*` branches, cannot
 read any production credential, and acts through three root-owned wrappers (`sudo -n /usr/local/sbin/…`; sudoers
