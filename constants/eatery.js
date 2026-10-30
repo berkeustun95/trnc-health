@@ -147,6 +147,14 @@ export const ORDER_NOTE_MAX = 200
 // column list, a fixture) or any other value (e.g. 'phone') is not a basket partner. Always combined with a number.
 export const eateryOrdersByWhatsapp = p => p?.order_method === 'whatsapp'
 
+// Which "my list" a partner offers: 'whatsapp' (the basket that sends an order), 'phone' (a list read out on the call: no send, no
+// server) or null (none). Fail closed on any other order_method. nums = eateryContactNumbers(...): a fixture partner has none, so none.
+export function eateryListMode(p, nums) {
+  if (eateryOrdersByWhatsapp(p)) return eateryOrderDigits(nums?.whatsapp) ? 'whatsapp' : null
+  if (p?.order_method === 'phone') return eateryContacts(p, nums).some(c => c.action === 'call') ? 'phone' : null
+  return null
+}
+
 // wa.me wants digits only (country code first). Same rule as eateryContacts(); null when too short to dial.
 export const eateryOrderDigits = wa => {
   const d = filled(wa) ? wa.replace(/\D/g, '') : ''
@@ -164,13 +172,13 @@ export function formatTl(amount) {
 }
 
 // ─── Per-dish options ("Malzeme çıkar" / "Ekstra ekle"; eatery_item_options, 20261134) ───
-// A dish's visible options: available, and either a removal or an extra with a real price (price NULL = hidden). A row fetched
+// A dish's visible options: available, and either a removal or an extra with a price (0 = free, shown without a price; price NULL = hidden). A row fetched
 // without the embed has none, and then nothing about the dish changes.
 export function eateryItemOptions(item) {
   const list = Array.isArray(item?.eatery_item_options) ? item.eatery_item_options : []
   return list
     .filter(o => o && Number.isFinite(Number(o.id)) && o.is_available !== false &&
-      (o.kind === 'remove' || (o.kind === 'extra' && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) && Number(o.price) > 0)))
+      (o.kind === 'remove' || (o.kind === 'extra' && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) && Number(o.price) >= 0)))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || Number(a.id) - Number(b.id))
 }
 

@@ -4,7 +4,6 @@
 // A dish is only ever suggested when it carries a tag: the Preview fixture and any untagged item have role null.
 import { eateryOrderable, eateryMenuSections, orderTotal, basketLines } from './eatery.js'
 
-export const QUIZ_STEPS = 4
 export const QUIZ_EXTRAS = ['sauce', 'drink', 'dessert']
 
 const filled = v => typeof v === 'string' && v.trim().length > 0
@@ -15,11 +14,14 @@ const cmpItem = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || byNum(a.i
 // answers: { protein: ['chicken'|'beef'|'veg'... up to 2, or ['any']], spicy: 'yes'|'no'|'any',
 //            portion: ['snack'|'meal'|'share' ... up to 2], extra: any of ['sauce','drink','dessert'] or ['none'] }
 // Several picks on one question are an OR. Fark etmez on protein keeps pork and untagged-protein mains; a named protein is
-// an exact match (Et = beef only, so pork never comes back for it, alone or together with Tavuk).
+// an exact match (Et = beef only, so pork never comes back for it, alone or together with Tavuk), except that Vejetaryen also
+// takes a meatless dish tagged protein 'none' (Bidda's Sade). A dish with no portion is never excluded by a portion answer; it just
+// earns no portion bonus (hitPortion).
 const has = (list, v) => Array.isArray(list) && list.includes(v)
-const passProtein = (i, a) => !a?.protein?.length || has(a.protein, 'any') || has(a.protein, i.protein)
+const passProtein = (i, a) => !a?.protein?.length || has(a.protein, 'any') || has(a.protein, i.protein) || (has(a.protein, 'veg') && i.protein === 'none')
 const passSpicy = (i, a) => !a?.spicy || a.spicy === 'any' || i.spicy === (a.spicy === 'yes')
-const passPortion = (i, a) => !a?.portion?.length || has(a.portion, i.portion)
+const passPortion = (i, a) => !a?.portion?.length || i.portion == null || has(a.portion, i.portion)
+const hitPortion = (i, a) => !!a?.portion?.length && has(a.portion, i.portion)
 
 // Picking rules per multi-select question: a cap and an exclusive tile ("Fark etmez" / "Hiçbiri").
 export const QUIZ_MULTI = {
@@ -30,7 +32,7 @@ export const QUIZ_MULTI = {
 // -> { next, blocked }: the new selection after tapping `value`. A tapped selected tile is always removed; an exclusive tile
 // replaces everything and is replaced by any other pick; a pick over the cap changes nothing and says so.
 export function quizToggle(key, current, value) {
-  const { max, exclusive } = QUIZ_MULTI[key]
+  const { max, exclusive } = typeof key === 'string' ? QUIZ_MULTI[key] : key   // a question's own rule object works too
   const cur = current || []
   if (cur.includes(value)) return { next: cur.filter(v => v !== value), blocked: false }
   if (exclusive && value === exclusive) return { next: [value], blocked: false }
@@ -39,13 +41,70 @@ export function quizToggle(key, current, value) {
   return { next: [...base, value], blocked: false }
 }
 
-// Every available, priced, tagged main of the given partners: [{ item, partner }]. With answers: only those passing Q1-Q3.
-export function quizCandidates(rows, answers = null) {
+// ── Quiz configs: which dish roles can be suggested, what is asked, how a dish passes. Everything below reads one config. ──
+// relax: soft answers in the order they are dropped when nothing matches (hit = the strict form that earns a ranking point);
+// base: the hard answers, never relaxed; wanted: one carrier test per picked value, so every pick gets a dish when one exists.
+const step = (key, kind, q, opts, extra = {}) => ({ key, kind, q, opts, ...extra })
+const S_PROTEIN = step('protein', 'multi', 'eateryQuizQ1', [['chicken', 'eateryQuizChicken', '🍗'], ['beef', 'eateryQuizBeef', '🥩'], ['veg', 'eateryQuizVeg', '🥗'], ['any', 'eateryQuizAny', '🤷']], { rule: QUIZ_MULTI.protein, hint: 'eateryQuizHintMax2' })
+const S_SPICY = step('spicy', 'single', 'eateryQuizQ2', [['yes', 'eateryQuizYes', '🌶️'], ['no', 'eateryQuizNo', '😌'], ['any', 'eateryQuizAny', '🤷']])
+const S_PORTION = step('portion', 'multi', 'eateryQuizQ3', [['snack', 'eateryQuizSnack'], ['meal', 'eateryQuizMeal'], ['share', 'eateryQuizShare']], { rule: QUIZ_MULTI.portion, hint: 'eateryQuizHintMax2' })
+const EXTRA_TILE = { sauce: ['sauce', 'eateryQuizSauce', '🥫'], drink: ['drink', 'eateryQuizDrink', '🥤'], dessert: ['dessert', 'eateryQuizDessert', '🍰'] }
+const s_extra = roles => step('extra', 'multi', 'eateryQuizQ4', [...roles.map(r => EXTRA_TILE[r]), ['none', 'eateryQuizNone', '🚫']], { rule: QUIZ_MULTI.extra, hint: 'eateryQuizHintAny' })
+
+const isMain = i => i && i.role === 'main' && filled(i.name) && eateryOrderable(i)
+const sideRoleOf = (partner, role) => (partner?.eatery_menu_items || []).some(i => i && i.role === role && i.is_available !== false && filled(i.name))
+
+export const QUIZ_GENERAL = {
+  id: 'general',
+  roles: ['main'],
+  base: passProtein,
+  relax: [
+    { key: 'portion', asked: a => !!a.portion?.length, pass: passPortion, hit: hitPortion },
+    { key: 'spicy', asked: a => !!a.spicy && a.spicy !== 'any', pass: passSpicy, hit: passSpicy },
+  ],
+  wanted: a => [
+    ...(a.protein || []).filter(v => v !== 'any').map(v => c => c.item.protein === v),
+    ...(a.portion || []).map(v => c => c.item.portion === v),
+  ],
+  // Protein and portion always; spicy only when a candidate dish is spicy; the extras question only when a candidate partner has
+  // such items, with a tile for each role that exists.
+  steps: rows => {
+    const cands = quizCandidates(rows)
+    const partners = (rows || []).filter(p => (p?.eatery_menu_items || []).some(isMain))
+    const roles = QUIZ_EXTRAS.filter(role => partners.some(p => sideRoleOf(p, role)))
+    return [S_PROTEIN, ...(cands.some(c => c.item.spicy === true) ? [S_SPICY] : []), S_PORTION, ...(roles.length ? [s_extra(roles)] : [])]
+  },
+}
+
+// Per-partner quiz, pure data keyed by slug (no DB tags): Bidda asks "Dürüm mü, gatmer mi?" (role main / side), then, unless
+// a gatmer, what goes inside (protein tag; Sade = 'none'). Any partner without an entry uses QUIZ_GENERAL over its own rows.
+const passFilling = (i, a) => a.form === 'side' || !a.filling?.length || has(a.filling, 'any') || has(a.filling, i.protein)
+const passForm = (i, a) => a.form !== 'main' && a.form !== 'side' ? true : i.role === a.form
+const BIDDA = {
+  id: 'bidda-badadez',
+  roles: ['main', 'side'],
+  base: (i, a) => passForm(i, a) && passFilling(i, a),
+  relax: [],
+  wanted: a => (a.form === 'side' ? [] : (a.filling || []).filter(v => v !== 'any').map(v => c => c.item.protein === v)),
+  steps: (_rows, a) => [
+    step('form', 'single', 'eateryQuizBiddaQ1', [['main', 'eateryQuizBiddaWrap', '🌯'], ['side', 'eateryQuizBiddaGatmer', '🫓'], ['any', 'eateryQuizAny', '🤷']]),
+    ...(a?.form === 'side' ? [] : [step('filling', 'multi', 'eateryQuizBiddaQ2', [['beef', 'eateryQuizBiddaKofte', '🥩'], ['chicken', 'eateryQuizBiddaTavuk', '🍗'], ['veg', 'eateryQuizBiddaHellim', '🧀'], ['none', 'eateryQuizBiddaSade', '🥙'], ['any', 'eateryQuizAny', '🤷']], { rule: { max: 2, exclusive: 'any' }, hint: 'eateryQuizHintMax2' })]),
+  ],
+}
+const PARTNER_QUIZ = { 'bidda-badadez': BIDDA }
+export const partnerQuizConfig = slug => PARTNER_QUIZ[slug] || QUIZ_GENERAL
+
+// The questions to ask for these rows and the answers so far (a config may drop a question after an answer, so Dots / "n/total" /
+// the result gate all read this one list).
+export const quizSteps = (cfg, rows, answers) => (cfg || QUIZ_GENERAL).steps(rows, answers)
+
+// Every available, priced, tagged dish of the config's roles for the given partners: [{ item, partner }]. With answers: only those passing them.
+export function quizCandidates(rows, answers = null, cfg = QUIZ_GENERAL) {
   const out = []
   for (const partner of rows || []) {
     for (const item of partner?.eatery_menu_items || []) {
-      if (!item || item.role !== 'main' || !filled(item.name) || !eateryOrderable(item)) continue
-      if (answers && !(passProtein(item, answers) && passSpicy(item, answers) && passPortion(item, answers))) continue
+      if (!item || !cfg.roles.includes(item.role) || !filled(item.name) || !eateryOrderable(item)) continue
+      if (answers && !(cfg.base(item, answers) && cfg.relax.every(k => k.pass(item, answers)))) continue
       out.push({ item, partner })
     }
   }
@@ -53,27 +112,25 @@ export function quizCandidates(rows, answers = null) {
 }
 
 // The entry card shows exactly when the matcher has something to draw from.
-export const quizHasMains = rows => quizCandidates(rows).length > 0
+export const quizHasMains = (rows, cfg = QUIZ_GENERAL) => quizCandidates(rows, null, cfg).length > 0
 
 // -> { dishes: [{ item, partner, companions }] (0-3), relaxed: ['portion'|'spicy'], companions: the top dish's }
-export function quizMatch(rows, answers) {
-  const spicyAsked = !!answers.spicy && answers.spicy !== 'any'
-  const portionAsked = !!answers.portion?.length
-  const score = c => (spicyAsked && passSpicy(c.item, answers) ? 1 : 0) + (portionAsked && passPortion(c.item, answers) ? 1 : 0)
+export function quizMatch(rows, answers, cfg = QUIZ_GENERAL) {
+  const asked = cfg.relax.filter(k => k.asked(answers))
+  const score = c => asked.reduce((n, k) => n + (k.hit(c.item, answers) ? 1 : 0), 0)
 
-  // Relaxation order: portion, then spicy; protein never. A step that drops an answer nobody gave is skipped.
-  const all = quizCandidates(rows).filter(c => passProtein(c.item, answers))
+  // Relaxation order: the config's soft answers (general: portion, then spicy); the hard ones (protein) never. A step that drops an answer nobody gave is skipped.
+  const all = quizCandidates(rows, null, cfg).filter(c => cfg.base(c.item, answers))
   const stages = [[]]
   const dropped = []
-  for (const k of ['portion', 'spicy']) {
-    if ((k === 'portion' && !portionAsked) || (k === 'spicy' && !spicyAsked)) continue
-    dropped.push(k)
+  for (const k of asked) {
+    dropped.push(k.key)
     stages.push([...dropped])
   }
   let pool = []
   let relaxed = []
   for (const drop of stages) {
-    pool = all.filter(c => (drop.includes('portion') || passPortion(c.item, answers)) && (drop.includes('spicy') || passSpicy(c.item, answers)))
+    pool = all.filter(c => cfg.relax.every(k => drop.includes(k.key) || k.pass(c.item, answers)))
     relaxed = drop
     if (pool.length) break
   }
@@ -94,11 +151,7 @@ export function quizMatch(rows, answers) {
     chosen.push(c)
     return true
   }
-  const wanted = [
-    ...(answers.protein || []).filter(v => v !== 'any').map(v => c => c.item.protein === v),
-    ...(answers.portion || []).map(v => c => c.item.portion === v),
-  ]
-  for (const carries of wanted) {
+  for (const carries of cfg.wanted(answers)) {
     if (chosen.some(carries)) continue
     ranked.find(c => carries(c) && take(c))   // take() refuses a dish the partner cap blocks; the next carrier is tried
   }

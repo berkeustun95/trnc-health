@@ -10,7 +10,7 @@ import { colors, type, space, listBottomPad } from '../constants/theme'
 import { ScreenHeader, ErrorState, Card, CardSkeleton } from '../components/ui'
 import { EateryLogo, PlaceholderTag, useReduceMotion } from '../components/EateryBits'
 import { QuizEntryCard, QuizPage } from '../components/EateryQuiz'
-import { quizHasMains } from '../constants/eateryQuiz'
+import { quizHasMains, quizSteps, QUIZ_GENERAL } from '../constants/eateryQuiz'
 import EateryPartnerScreen from './EateryPartnerScreen'
 
 // ─── Yeme-İçme: the partner list ────────────────────────────────────────────
@@ -69,6 +69,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
   const [focus, setFocus] = useState(null)   // { partnerId, itemId, basket }: scroll the partner page to this dish / open its Sepetim (only for that partner)
   const reduce = useReduceMotion()
   const showQuiz = useMemo(() => quizHasMains(rows), [rows])
+  const quizCount = useMemo(() => quizSteps(QUIZ_GENERAL, rows).length, [rows])   // the card says how many questions this list asks
   const openQuiz = () => { setQuizShown(true); setQuizOpen(true) }
   const openDish = (p, itemId) => { setFocus({ partnerId: p.id, itemId }); onOpenPartner(p) }
   const openMenu = p => openDish(p, null)
@@ -110,7 +111,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
         <ErrorState onRetry={retry} lang={lang} />
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
-          {showQuiz && <QuizEntryCard lang={lang} onPress={openQuiz} />}
+          {showQuiz && <QuizEntryCard lang={lang} count={quizCount} onPress={openQuiz} />}
           {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => { setFocus(null); onOpenPartner(p) }} />)}
         </ScrollView>
       )}

@@ -53,12 +53,12 @@ export function QtyStepper({ id, name, qty, onQty, lang, min, max = MAX_QTY }) {
 
 // Pinned under the scroll view. Wide enough: "Sepete git · 3 ürün · 1.890,00 TL" on one button; on a narrow phone
 // or a large font the count and total move to a line above instead of truncating.
-export function OrderBar({ count, totalText, lang, onOpen, partnerName }) {
+export function OrderBar({ count, totalText, lang, onOpen, partnerName, mode = 'whatsapp' }) {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15
   const summary = t('eateryOrderCount', lang).replace('{n}', () => String(count)).replace('{total}', () => totalText)
-  const go = t('eateryBasketGo', lang)
+  const go = t(mode === 'phone' ? 'eateryListGo' : 'eateryBasketGo', lang)
   return (
     <View style={[st.bar, { paddingBottom: insets.bottom + space[12] }]}>
       {stacked && <Text style={st.barSummary}>{summary}</Text>}
@@ -153,7 +153,7 @@ function ExtraRow({ label, priceText, qty, max, onChange, lang }) {
     <View style={st.optRow}>
       <View style={st.extraText}>
         <Text style={st.optLabel}>{label}</Text>
-        <Text style={st.extraPrice}>+{priceText}</Text>
+        {!!priceText && <Text style={st.extraPrice}>+{priceText}</Text>}
       </View>
       <QtyStepper id={label} name={label} qty={qty} min={0} max={max} onQty={(_, d) => onChange(qty + d)} lang={lang} />
     </View>
@@ -189,7 +189,7 @@ function SheetBody({ item, lang, initial, editing, onConfirm }) {
           <View>
             <Text style={st.secHead} accessibilityRole="header">{t('eateryOptExtraTitle', lang)}</Text>
             {extras.map(o => (
-              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={formatPrice(o.price, item.currency, lang)} qty={extraQty[o.id] || 0}
+              <ExtraRow key={o.id} label={eateryOptionLabel(o, lang)} priceText={Number(o.price) > 0 ? formatPrice(o.price, item.currency, lang) : ''} qty={extraQty[o.id] || 0}
                 max={Math.max(1, Number(o.max_qty) || 1)} onChange={q => setExtraQty(e => ({ ...e, [o.id]: q }))} lang={lang} />
             ))}
           </View>
@@ -331,7 +331,7 @@ function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -381,19 +381,20 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
   }, [kbTop, reveal])
   const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
+  const phone = mode === 'phone'   // "Listem": the same lines, read out on the call; no delivery, note or send
   const stale = lines.some(l => l.stale)   // an option that no longer exists: nothing is sent until that line is edited or removed
-  const msgKey = ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const msgKey = phone ? (stale ? 'eateryOptStaleBlock' : null) : ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && (stale || ['generic', 'rate', 'account'].includes(orderError)) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
   const ready = deliveryReady(delivery)
   const deliveryKey = ready ? null : delivery.mode === 'delivery' ? 'eateryDeliveryNeedAddress' : 'eateryDeliveryNeedChoose'
-  const showSignIn = ageGate === 'guest' || (!ageGate && orderError === 'account')
+  const showSignIn = !phone && (ageGate === 'guest' || (!ageGate && orderError === 'account'))
   useEffect(() => {
     if (msgKey) AccessibilityInfo.announceForAccessibility?.(t(msgKey, lang))   // iOS does not always speak a live region
   }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
       <SafeAreaView style={st.page} edges={['top']} {...(covered ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
-        <ScreenHeader lang={lang} title={t('eateryBasketTitle', lang)} onBack={onClose} />
+        <ScreenHeader lang={lang} title={t(phone ? 'eateryListTitle' : 'eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
           onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y }} scrollEventThrottle={16}>
@@ -404,8 +405,8 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
           {empty ? (
             <View style={st.empty}>
               <Ionicons name="basket-outline" size={44} color={colors.textSecondary} />
-              <Text style={st.emptyTitle} accessibilityRole="header">{t('eateryBasketEmpty', lang)}</Text>
-              <Text style={st.emptyBody}>{t('eateryBasketEmptyBody', lang)}</Text>
+              <Text style={st.emptyTitle} accessibilityRole="header">{t(phone ? 'eateryListEmpty' : 'eateryBasketEmpty', lang)}</Text>
+              <Text style={st.emptyBody}>{t(phone ? 'eateryListEmptyBody' : 'eateryBasketEmptyBody', lang)}</Text>
               <Button variant="secondary" title={t('eateryBasketBackToMenu', lang)} onPress={onClose} style={st.emptyBtn} />
             </View>
           ) : (
@@ -417,17 +418,19 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
                   </View>
                 ))}
               </Card>
-              <Button variant="text" icon="trash-outline" title={t('eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />
-              <Card>
-                <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
-                <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
-                  placeholder={t('eateryOrderNotePlaceholder', lang)} placeholderTextColor={colors.textSecondary}
-                  accessibilityLabel={t('eateryOrderNote', lang)} textAlignVertical="top"
-                  onFocus={() => focusReveal(noteInput)} onBlur={() => onBlurInput(noteInput)} />
-                <Text style={st.counter} accessibilityElementsHidden importantForAccessibility="no">{note.length}/{ORDER_NOTE_MAX}</Text>
-                <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
-              </Card>
+              <Button variant="text" icon="trash-outline" title={t(phone ? 'eateryListClear' : 'eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
+              {!phone && <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />}
+              {!phone && (
+                <Card>
+                  <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
+                  <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
+                    placeholder={t('eateryOrderNotePlaceholder', lang)} placeholderTextColor={colors.textSecondary}
+                    accessibilityLabel={t('eateryOrderNote', lang)} textAlignVertical="top"
+                    onFocus={() => focusReveal(noteInput)} onBlur={() => onBlurInput(noteInput)} />
+                  <Text style={st.counter} accessibilityElementsHidden importantForAccessibility="no">{note.length}/{ORDER_NOTE_MAX}</Text>
+                  <Text style={st.hint}>{t('eateryOrderHint', lang)}</Text>
+                </Card>
+              )}
             </>
           )}
         </ScrollView>
@@ -437,7 +440,12 @@ export function BasketPage({ partner, lang, open, lines, onQty, onEditLine, form
               <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
               <Text style={st.totalVal}>{totalText}</Text>
             </View>
-            {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
+            {phone ? (
+              <>
+                <Text style={st.listHint}>{t('eateryListHint', lang)}</Text>
+                <Button fullWidth icon="call-outline" title={t('eateryOrderByPhone', lang)} onPress={onCall} disabled={stale} />
+              </>
+            ) : ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
               disabled={!ready || stale} disabledHint={!orderError && !stale && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
             <View accessibilityLiveRegion="polite">
               {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
@@ -526,6 +534,7 @@ const st = StyleSheet.create({
   input:     { minHeight: 72, maxHeight: 140, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   counter:   { ...type.meta, color: colors.textSecondary, alignSelf: 'flex-end', marginTop: space[4] },
   hint:      { ...type.small, color: colors.textSecondary, marginTop: space[8] },
+  listHint:  { ...type.small, color: colors.textSecondary, textAlign: 'center' },
   empty:     { alignItems: 'center', paddingVertical: space[24] * 2, paddingHorizontal: space[16], gap: space[8] },
   emptyTitle:{ ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginTop: space[8] },
   emptyBody: { ...type.body, color: colors.textSecondary, textAlign: 'center' },
