@@ -72,6 +72,18 @@ if (process.argv.includes('--mutants')) {
     ['dish match: stored side no NFC', "String(x ?? '').normalize('NFC').trim()", "String(x ?? '').trim()"],
     ['dish match: ASCII > hint dropped', "key.includes(' > ')", 'false'],
     ['apply: dish update 0 rows not noticed', 'up.data?.length !== 1', 'false'],
+    ['banner: minimum removed', 'if (width < minW)', 'if (false)'],
+    ['banner: wider-than-tall check removed', 'if (width <= height)', 'if (false)'],
+    ['banner: waiver ignored when checking width', 'const minW = bannerWaiver ? bannerWaiver.minWidth : MIN.bannerWidth', 'const minW = 0'],
+    ['banner: unnecessary waiver accepted', 'if (bannerWaiver && width >= MIN.bannerWidth)', 'if (false)'],
+    ['banner: waiver floor removed', 'w.minWidth >= BANNER_WAIVER_FLOOR', 'true'],
+    ['banner: waiver without banner accepted', 'if (manifest.banner === undefined) problems.push', 'if (false) problems.push'],
+    ['banner: waiver reason unchecked', 'if (typeof w.reason !== \'string\' || w.reason.trim().length < 20) problems.push(`${tag}: reason', 'if (false) problems.push(`${tag}: reason'],
+    ['banner: unknown key accepted', "'banner', 'bannerSizeWaiver',", "'banner', 'bannerSizeWaiver', 'banners',"],
+    ['banner: path not banner.<ext>', "w.kind === 'logo' || w.kind === 'banner' ? w.kind :", "w.kind === 'logo' ? 'logo' :"],
+    ['banner: overwrite without replace', 'else if (replace) bannerPlan', 'else if (true) bannerPlan'],
+    ['banner: row-write skipped for banner kind', "if (it.kind === 'logo' || it.kind === 'banner') continue", "if (it.kind === 'logo') continue"],
+    ['banner: banner_path never written', "if (ctx.banner?.action === 'set') {", "if (false) {"],
   ]
   let bad = 0
   M.forEach(([name, from, to], i) => {
@@ -392,6 +404,79 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   }
   { const sb = mkSb(); await L.applyPlan({ ...base(sb), uploads: p1.uploads })
     check('apply: skip-identical objects are not uploaded', sb.calls.filter(c => c[0] === 'upload').length === 0)
+  }
+}
+
+// ─── banner ─────────────────────────────────────────────────────────────────
+{
+  const bf = { 'b.jpg': jpeg(1600, 1000), 'small.jpg': jpeg(757, 473), 'tall.jpg': jpeg(1000, 1200), 'sq.jpg': jpeg(1000, 1000), 'b2.jpg': jpeg(1500, 900), 'logo.png': png(512, 512) }
+  const rb = n => bf[n] ?? null
+  const WV = { minWidth: 700, reason: 'Only a 757 px original exists; cropped around the wrap', approvedBy: 'Berke', date: '2026-10-30' }
+  const ok = run({ banner: 'b.jpg' }, rb)
+  check('banner: no problems, planned path <slug>/banner.jpg', ok.problems.length === 0 && ok.items[0]?.path === 'crunchy-express/banner.jpg' && ok.items[0].kind === 'banner', ok.problems.join(' | '))
+  check('banner path matches the DB regex', ok.items.every(i => L.PATH_RE.test(i.path)))
+  check('banner: png keeps its real extension', run({ banner: 'x.png' }, () => png(1200, 700)).items[0]?.path === 'crunchy-express/banner.png')
+  check('RED banner not a string', has(run({ banner: ['b.jpg'] }, rb).problems, /manifest.banner must be/))
+  check('RED banner missing file', has(run({ banner: 'nope.jpg' }, rb).problems, /not found/))
+  check('RED banner 999 wide, no waiver', has(run({ banner: 'x.jpg' }, () => jpeg(999, 600)).problems, /width must be >= 1000/))
+  check('green banner exactly 1000 wide', run({ banner: 'x.jpg' }, () => jpeg(1000, 600)).problems.length === 0)
+  check('RED banner taller than wide', has(run({ banner: 'tall.jpg' }, rb).problems, /wider than tall/))
+  check('RED banner square', has(run({ banner: 'sq.jpg' }, rb).problems, /wider than tall/))
+  check('RED banner and logo are the same file', has(run({ logo: 'b.jpg', banner: 'b.jpg' }, rb).problems, /listed twice/))
+  check('RED banner and gallery are the same file', has(run({ banner: 'b.jpg', gallery: ['b.jpg'] }, rb).problems, /listed twice/))
+  check('RED banner and a dish are the same file', has(run({ banner: 'b.jpg', dishes: { 'Burger': 'b.jpg' } }, rb).problems, /listed twice/))
+  check('green banner + logo + gallery together', run({ logo: 'logo.png', banner: 'b.jpg', gallery: ['b2.jpg'] }, rb).problems.length === 0)
+  check('RED unknown key near banner', has(run({ banner: 'b.jpg', banners: 'b.jpg' }, rb).problems, /unknown key 'banners'/))
+  // waiver
+  const w1 = run({ banner: 'small.jpg', bannerSizeWaiver: WV }, rb)
+  check('waiver accepted: 757x473 with minWidth 700', w1.problems.length === 0 && w1.waivers.length === 1 && w1.waivers[0].kind === 'banner' && w1.waivers[0].width === 757, w1.problems.join(' | '))
+  check('RED 757 wide without waiver', has(run({ banner: 'small.jpg' }, rb).problems, /width must be >= 1000/))
+  check('RED waiver minWidth above the banner width', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, minWidth: 800 } }, rb).problems, /width must be >= 800 \(waived\)/))
+  check('RED waiver on a banner that meets the floor', has(run({ banner: 'b.jpg', bannerSizeWaiver: WV }, rb).problems, /unnecessary waiver/))
+  check('RED waiver without a banner', has(run({ logo: 'logo.png', bannerSizeWaiver: WV }, rb).problems, /no banner in the manifest/))
+  check('RED waiver minWidth below the floor (599)', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, minWidth: 599 } }, rb).problems, /minWidth must be an integer from 600 to 999/))
+  check('RED waiver minWidth 1000 (not a waiver)', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, minWidth: 1000 } }, rb).problems, /minWidth must be/))
+  check('RED waiver minWidth as a string', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, minWidth: '700' } }, rb).problems, /minWidth must be/))
+  check('RED waiver short reason', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, reason: 'too small' } }, rb).problems, /reason must be/))
+  check('RED waiver no approvedBy', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, approvedBy: ' ' } }, rb).problems, /approvedBy is required/))
+  check('RED waiver bad date', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, date: '2026-02-31' } }, rb).problems, /valid YYYY-MM-DD/))
+  check('RED waiver unknown field', has(run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, extra: 1 } }, rb).problems, /unknown field/))
+  check('RED waiver not an object', has(run({ banner: 'small.jpg', bannerSizeWaiver: 'yes' }, rb).problems, /must be an object/))
+  check('RED malformed waiver does not silently waive', run({ banner: 'small.jpg', bannerSizeWaiver: { ...WV, approvedBy: '' } }, rb).problems.length >= 2)
+  // plan
+  const it = ok.items[0]
+  const pb = (st, rep = false) => L.plan(ok.items, { existing: {}, rows: [], logoPath: null, bannerPath: null, ...st }, rep)
+  check('banner plan: fresh -> upload + set, no photo row', (() => { const p = pb({}); return p.problems.length === 0 && p.uploads[0].action === 'upload' && p.banner.action === 'set' && p.banner.path === it.path && p.inserts.length === 0 && p.logo.action === 'none' })())
+  check('banner plan: equal path -> keep', pb({ bannerPath: it.path, existing: { [it.path]: { sha256: it.sha256 } } }).banner.action === 'keep')
+  check('RED banner plan: different banner_path, no replace', has(pb({ bannerPath: 'crunchy-express/banner.png' }).problems, /banner_path is already/))
+  check('green banner plan: different banner_path with replace -> set', pb({ bannerPath: 'crunchy-express/banner.png' }, true).banner.action === 'set')
+  check('RED banner plan: different object at the path, no replace', has(pb({ existing: { [it.path]: { sha256: 'deadbeef' } } }).problems, /DIFFERENT file/))
+  check('green banner plan: different object with replace -> replace', pb({ existing: { [it.path]: { sha256: 'deadbeef' } } }, true).uploads[0].action === 'replace')
+  check('no banner in the manifest -> banner action none', L.plan(run(GOOD).items, { existing: {}, rows: [], logoPath: null, bannerPath: 'x/banner.jpg' }).banner.action === 'none')
+  // apply
+  const mk = ({ failUpload = null, failVerify = null } = {}) => {
+    const calls = [], store = {}
+    return { calls,
+      storage: { from: () => ({
+        upload: async (path, buf) => { calls.push(['upload', path]); if (path === failUpload) return { error: { statusCode: '500' } }; store[path] = buf; return { error: null } },
+        download: async path => { const b = path === failVerify ? Buffer.from('tampered') : store[path]; return { data: { arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }, error: null } },
+      }) },
+      from: table => ({ insert: async () => { calls.push(['insert', table]); return { error: null } },
+        update: vals => { calls.push(['update', table, vals]); const q = { eq: () => q, then: res => res({ error: null }) }; return q } }) }
+  }
+  const ctx = (sb, banner) => ({ sb, partnerId: 'p', uploads: [{ path: it.path, action: 'upload' }], bytesByPath: new Map([[it.path, it]]), inserts: [], updates: [], logo: { action: 'none' }, banner, dishUpdates: [], replace: false, out: () => {}, fail: () => {} })
+  { const sb = mk(); const f = await L.applyPlan(ctx(sb, { action: 'set', path: it.path }))
+    const u = sb.calls.filter(c => c[0] === 'update')
+    check('apply banner: upload, verify, then banner_path written on eatery_partners', f === 0 && u.length === 1 && u[0][1] === 'eatery_partners' && u[0][2].banner_path === it.path && sb.calls.findIndex(c => c[0] === 'upload') < sb.calls.findIndex(c => c[0] === 'update'), JSON.stringify(sb.calls.map(c => c.slice(0, 2))))
+  }
+  { const sb = mk({ failUpload: it.path }); const f = await L.applyPlan(ctx(sb, { action: 'set', path: it.path }))
+    check('RED atomic: a failed banner upload writes NO banner_path', f === 1 && sb.calls.filter(c => c[0] === 'update' || c[0] === 'insert').length === 0)
+  }
+  { const sb = mk({ failVerify: it.path }); const f = await L.applyPlan(ctx(sb, { action: 'set', path: it.path }))
+    check('RED atomic: banner bytes differing after upload writes NO banner_path', f === 1 && sb.calls.filter(c => c[0] === 'update').length === 0)
+  }
+  { const sb = mk(); await L.applyPlan(ctx(sb, { action: 'keep', path: it.path }))
+    check('apply banner: keep writes nothing', sb.calls.filter(c => c[0] === 'update').length === 0)
   }
 }
 
