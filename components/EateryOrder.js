@@ -383,11 +383,11 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
   const empty = lines.length === 0
   const phone = mode === 'phone'   // "Listem": the same lines, read out on the call; no delivery, note or send
   const stale = lines.some(l => l.stale)   // an option that no longer exists: nothing is sent until that line is edited or removed
-  const msgKey = ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
+  const msgKey = phone ? (stale ? 'eateryOptStaleBlock' : null) : ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && (stale || ['generic', 'rate', 'account'].includes(orderError)) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
   const ready = deliveryReady(delivery)
   const deliveryKey = ready ? null : delivery.mode === 'delivery' ? 'eateryDeliveryNeedAddress' : 'eateryDeliveryNeedChoose'
-  const showSignIn = ageGate === 'guest' || (!ageGate && orderError === 'account')
+  const showSignIn = !phone && (ageGate === 'guest' || (!ageGate && orderError === 'account'))
   useEffect(() => {
     if (msgKey) AccessibilityInfo.announceForAccessibility?.(t(msgKey, lang))   // iOS does not always speak a live region
   }, [msgKey])
@@ -445,8 +445,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
                 <Text style={st.listHint}>{t('eateryListHint', lang)}</Text>
                 <Button fullWidth icon="call-outline" title={t('eateryOrderByPhone', lang)} onPress={onCall} disabled={stale} />
               </>
-            ) : <>
-            {ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
+            ) : ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
               disabled={!ready || stale} disabledHint={!orderError && !stale && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
             <View accessibilityLiveRegion="polite">
               {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
@@ -454,7 +453,6 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
             {showSignIn && (
               <Button variant="secondary" fullWidth title={t('eateryOrderErrAccount', lang)} onPress={onSignIn} style={st.errBtn} />
             )}
-            </>}
           </View>
         )}
       </SafeAreaView>
