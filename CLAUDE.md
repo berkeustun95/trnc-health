@@ -46,9 +46,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod — migrations only via
   `supabase-migrate`. Fallback without this Mac: `supabase-function-secrets` + `supabase-functions-deploy`.
   Lost Mac → revoke the token (Supabase → Account → Access Tokens).
-- ⚠ **GCP API-key work runs via `gcloud` on this Mac** (Berke, 2026-10-30; Homebrew, login `berke.ustun95`, full
-  cloud-platform scope). Read with `gcloud services api-keys describe/list`; NEVER `get-key-string` (the Places server key
-  must stay unreadable from here). Before any `update`, save `describe --format=json` to the vault; `--no-check-existing-usage`
+- ⚠ **GCP API-key work runs via `gcloud` on this Mac as service account `ada-apikeys-ops@trnc-health-58b47`** (Berke,
+  2026-10-30; Berke's own gcloud login REVOKED). Roles: API Keys Admin + Logging Viewer + Monitoring Viewer on
+  `trnc-health-58b47` and `project-958a71e2-…` ONLY (ada-app-499617 = no access, so the Places server key stays unreadable).
+  Key file `~/.config/ada-gcp/ada-apikeys-ops.json` (600, outside every repo and the vault): never commit/print/copy it;
+  lost Mac → delete the SA key in IAM. Monitoring reads 403 until it gets a billed quota project (open decision). Read with
+  `gcloud services api-keys describe/list`; NEVER `get-key-string`. Before any `update`, save `describe --format=json` to the vault; `--no-check-existing-usage`
   only when the blocking traffic is proven 4xx (Monitoring `request_count` by credential). Vault `2026-10-30_gcp-keys-gcloud.md`.
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
@@ -113,11 +116,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
 - **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
   production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key"), **restricted
-  2026-10-06**: Android apps `com.berkeustun95.ada` + upload SHA-1 + Play App Signing SHA-1, API = Maps
-  SDK for Android only (a Places call now gets 403 `API_KEY_ANDROID_APP_BLOCKED`; nothing else may use
-  this key, iOS uses Apple Maps). A new signing key needs its SHA-1 added FIRST; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
-  **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
-  preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
+  2026-10-06**: Android apps `com.berkeustun95.ada` + upload SHA-1 + Play App Signing SHA-1 (a Places call gets 403
+  `API_KEY_ANDROID_APP_BLOCKED`; nothing else may use this key, iOS uses Apple Maps). ⚠ Its API list is still the
+  35-API Maps Platform default, NOT Maps SDK only (read live 2026-10-30). A new signing key needs its SHA-1 added FIRST; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
+  **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` + preview
+  SHA-1 and `com.berkeustun95.ada` + this Mac's debug-keystore SHA-1 (local dev builds); API = Maps SDK for Android
+  (`maps-android-backend`) only since 2026-10-30 (rollback script in vault `attachments/`). Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
   build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
 - **Google keys for check-ins (2026-10-07, both in ada-app-499617 "ADA App", billing country Cyprus →
   Maps Platform EEA terms):** iOS map `AIzaSyCa…w3Ic` "ADA Maps – iOS" (Maps SDK for iOS, bundle ids
