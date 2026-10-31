@@ -36,11 +36,16 @@ import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
+// --dry is what the workflow's dry job passes, so an `--apply` smuggled into the file list there is a refusal,
+// not an apply that skips production-db (security review of #258).
 const apply = args.includes('--apply')
+const dry = args.includes('--dry')
 const files = args.filter(a => !a.startsWith('--'))
-const unknown = args.filter(a => a.startsWith('--') && a !== '--apply')
+const unknown = args.filter(a => a.startsWith('--') && a !== '--apply' && a !== '--dry')
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
-if (unknown.length) fail(`Unknown argument(s): ${unknown.join(' ')} — usage: <file.sql> [<file.sql> …] [--apply]`)
+if (unknown.length) fail(`Unknown argument(s): ${unknown.join(' ')} — usage: <file.sql> [<file.sql> …] [--dry | --apply]`)
+if (apply && dry) fail('REFUSED: --dry and --apply together. Nothing was sent.')
+if (args.filter(a => a === '--apply').length > 1) fail('REFUSED: --apply given more than once. Nothing was sent.')
 prodWriteGuard({ wouldWrite: apply, workflow: 'supabase-migrate' })
 
 if (!files.length) fail('No migration file given (want e.g. 20261066_x.sql).')

@@ -69,9 +69,12 @@ jobs:
         run: node scripts/test-supabase-migrate.mjs
       - name: Migrate (dry)
         run: |
-          read -ra list <<< "$IN_FILE $IN_FILES"
+          set -f
+          list=($(printf '%s' "$IN_FILE $IN_FILES" | tr -s '[:space:]' ' '))
           [ -z "$IN_FILE" ] || [ -z "$IN_FILES" ] || { echo "::error::set file OR files, not both"; exit 1; }
-          node scripts/supabase-migrate.mjs "${list[@]}"
+          [ "${#list[@]}" -gt 0 ] || { echo "::error::no migration file given"; exit 1; }
+          for f in "${list[@]}"; do [[ "$f" =~ ^[0-9]+_[a-z0-9_]+\.sql$ ]] || { echo "::error::not a migration file name: $f"; exit 1; }; done
+          node scripts/supabase-migrate.mjs --dry "${list[@]}"
 
   approve:
     if: ${{ inputs.apply }}
@@ -84,7 +87,11 @@ jobs:
       IN_FILE: ${{ inputs.file }}
       IN_FILES: ${{ inputs.files }}
     steps:
-      - run: echo "Apply of $IN_FILE$IN_FILES approved for production."
+      - run: |
+          set -f
+          list=($(printf '%s' "$IN_FILE $IN_FILES" | tr -s '[:space:]' ' '))
+          echo "Apply of ${#list[@]} file(s) approved for production, in this order:"
+          printf '  %s\n' "${list[@]}"
 
   apply:
     if: ${{ inputs.apply }}
@@ -112,6 +119,9 @@ jobs:
         run: node scripts/migration-ledger.mjs --verify 20261065_hotels_commons_photo_credit.sql
       - name: Migrate (apply)
         run: |
-          read -ra list <<< "$IN_FILE $IN_FILES"
+          set -f
+          list=($(printf '%s' "$IN_FILE $IN_FILES" | tr -s '[:space:]' ' '))
           [ -z "$IN_FILE" ] || [ -z "$IN_FILES" ] || { echo "::error::set file OR files, not both"; exit 1; }
+          [ "${#list[@]}" -gt 0 ] || { echo "::error::no migration file given"; exit 1; }
+          for f in "${list[@]}"; do [[ "$f" =~ ^[0-9]+_[a-z0-9_]+\.sql$ ]] || { echo "::error::not a migration file name: $f"; exit 1; }; done
           node scripts/supabase-migrate.mjs "${list[@]}" --apply

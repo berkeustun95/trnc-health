@@ -79,6 +79,10 @@ expect(run('duplicate refused', [A, A, '--apply']), 1, [], 'more than once')
 expect(run('bad name refused', [A, 'x.sql', '--apply']), 1, [], 'Not a migration file name')
 expect(run('missing file refused', [A, '29991231_nope.sql', '--apply']), 1, [], 'is not in this commit')
 expect(run('no file refused', ['--apply']), 1, [], 'No migration file given')
+// The dry job's shape is `--dry <list>`; a list carrying "--apply" must not become an apply.
+expect(run('--apply smuggled into the dry job\'s list refused, nothing sent', ['--dry', '--apply', A]), 1, [], '--dry and --apply together')
+expect(run('--apply twice refused', [A, '--apply', '--apply']), 1, [], 'more than once')
+expect(run('explicit --dry sends no SQL', ['--dry', A, B]), 0, [`ledger:${A}`, `ledger:${B}`], `${A} → ${B}`)
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)
