@@ -781,6 +781,7 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   eq('threshold switch: canvas, scrim and title opacities derive from solidV, not from the scroll value', [/const canvasOp = solidV\b/.test(bn), /const whiteOp = solidV\.interpolate/.test(bn), barFn.includes('y.interpolate'), /function BannerBar\(\{[^}]*\by\b/.test(bn)], [true, true, false, false])
   eq('threshold switch: timing on solidV, motion.fast, native driver, duration 0 under reduce motion', [/Animated\.timing\(solidV,[^)]*duration: reduce \? 0 : motion\.fast[^)]*useNativeDriver: true/.test(bn)], [true])
   eq('threshold switch: BAR_SOLID_AT sits below BANNER_COLLAPSE', [/BAR_SOLID_AT = BANNER_COLLAPSE - [1-9]\d*/.test(bn)], [true])
+  eq('threshold switch: BAR_SOLID_AT margin is 8 (solid at 176 of 184: no photo strip beside the card)', [bn.match(/BAR_SOLID_AT = BANNER_COLLAPSE - (\d+)/)?.[1], EATERY_BANNER_H - BANNER_BAR_ROW - 8], ['8', 176])
   // every theme token the new file reads exists
   const themeMod = await import('../constants/theme.js')
   const used = [...bn.matchAll(/\b(colors|type|elevation|radii|font|motion)\.(\w+)/g)].map(m => [m[1], m[2]])

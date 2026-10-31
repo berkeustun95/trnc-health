@@ -15,7 +15,7 @@ import { EateryLogo, PlaceholderTag } from './EateryBits'
 // crossfade: a linear one passes through glyph == background mid-ramp).
 // All three are defined here, outside the screen, so a scroll-driven re-render never remounts the photo.
 export const BANNER_COLLAPSE = EATERY_BANNER_H - BANNER_BAR_ROW   // scroll offset at which the photo is fully behind the bar
-export const BAR_SOLID_AT = BANNER_COLLAPSE - 24                  // below BANNER_COLLAPSE: the scrim state only ever sits over the photo
+export const BAR_SOLID_AT = BANNER_COLLAPSE - 8                   // below BANNER_COLLAPSE: scrim only over the photo; 8 keeps the photo strip beside the card hidden
 const BANNER_TINT = 0.22   // bottom tint over the photo so a white photo edge still separates from the white head card
 const BANNER_TINT_H = 96
 const DARK_FADE = require('../assets/oli-scenes/dark-fade.png')   // black 0.6 -> 0, the same strip ModuleScreen uses
