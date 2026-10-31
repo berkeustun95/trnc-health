@@ -54,20 +54,28 @@
 //
 // OLD OBJECTS ARE KEPT by an upload, so a phone mid-load or a session still holding the old row never 404s.
 //   --prune is the separate, explicit clean-up: it lists (dry) / deletes (--apply) objects directly under <slug>/ that NO
-//   row references (any partner's logo_path, banner_path, eatery_photos, eatery_menu_items.photo_path) AND that are older
-//   than PRUNE_GRACE_DAYS (7) by created_at and updated_at. It refuses if any row query fails or is truncated, if the
-//   partner is missing, or if the partner references nothing at all. It reads no manifest, cannot be combined with
-//   --replace, and is never run after an upload.
+//   row references (any partner's logo_path, banner_path, eatery_photos, eatery_menu_items.photo_path). Rules (lib planPrune):
+//   it KEEPS EVERYTHING while the NEWEST object a row references under <slug>/ is younger than PRUNE_GRACE_DAYS (7): that object
+//   dates the last repoint (a replace apply uploads it first). An old object's own age is NOT the grace: Crunchy's fixed-name
+//   objects are weeks old on the day they are repointed. KNOWN LIMIT: a repoint onto an already-existing identical object
+//   uploads nothing, so nothing dates it; wait the 7 days yourself. Then only unreferenced objects older than 7 days
+//   (created_at and updated_at) go. It refuses if any row query fails or is truncated (count 'exact' vs received), if the
+//   partner is missing, if the partner references nothing, if a referenced <slug>/ path is MISSING from the storage listing
+//   (listing or filter unreliable), if the folder holds >= 1000 objects, or if storage confirms fewer deletions than asked.
+//   It reads no manifest, cannot be combined with --replace, and is never run after an upload.
+// ⚠ A menu data migration that DELETES and re-inserts menu items clears their photo_path, so a later prune deletes those dish
+//   objects. Recovery: re-run the upload (apply) from data/eatery/<slug>/, which uploads the dish photos again.
 //
 // ONE-TIME ROLLOUT (rows still point at the old fixed names): dry run, read the old -> new plan, apply with replace=true
-//   (moves every row to hashed names; the old objects stay), and >= 7 days later prune dry, then prune apply.
+//   (moves every row to hashed names; the old objects stay), and >= 7 days later prune dry, then prune apply (a prune sooner
+// keeps everything and says so).
 
 import { writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { BUCKET, MIN, SLUG_RE, PRUNE_GRACE_DAYS, sha256, validateLocal, readiness, plan, planPrune, safeRead, matchDishes, planDishes, applyPlan } from './lib/eatery-images-lib.mjs'
+import { BUCKET, MIN, SLUG_RE, PRUNE_GRACE_DAYS, sha256, validateLocal, readiness, plan, planPrune, pruneModeRefusal, queryRefusal, ownPartnerRefusal, listingRefusal, removeRefusal, LIST_LIMIT, safeRead, matchDishes, planDishes, applyPlan } from './lib/eatery-images-lib.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -97,7 +105,7 @@ const refuse = problems => {
 }
 
 if (!slug || !SLUG_RE.test(slug)) refuse([`--slug is required and must match ${SLUG_RE}`])
-if (prune && replace) refuse(['--prune cannot be combined with --replace'])
+{ const m = pruneModeRefusal({ prune, replace }); if (m) refuse([m]) }
 if (apply && process.env.GITHUB_REF !== 'refs/heads/main') refuse([`apply runs from refs/heads/main only (GITHUB_REF=${process.env.GITHUB_REF ?? 'unset'})`])
 
 // 0. prune mode: no manifest, no local files
@@ -114,20 +122,18 @@ if (prune) {
     sb0.from('eatery_menu_items').select('photo_path', { count: 'exact' }).like('photo_path', like),
   ])
   for (const [what, r] of [['partner query', pq], ['photo rows query', fq], ['menu items query', mq]]) {
-    if (r.error) bail0(what, r.error)
-    if (r.count !== r.data.length) bail0(what, `truncated: count ${r.count} vs received ${r.data.length}`)
+    const m = queryRefusal(what, { error: r.error, count: r.count, received: r.data?.length })
+    if (m) bail0(what, r.error ?? m)
   }
   const own = pq.data.filter(p => p.slug === slug)
-  if (own.length !== 1) refuse([`prune needs exactly one partner row for the slug, found ${own.length}`])
+  { const m = ownPartnerRefusal(own.length); if (m) refuse([m]) }
   const referenced = new Set([...pq.data.flatMap(p => [p.logo_path, p.banner_path]), ...fq.data.map(r => r.storage_path), ...mq.data.map(r => r.photo_path)].filter(Boolean))
   const ownRefs = [...referenced].filter(p => p.startsWith(`${slug}/`))
-  if (ownRefs.length === 0) refuse(['no row references anything under this slug: refusing to prune a folder that would be deleted entirely'])
-  const lp = await sb0.storage.from(BUCKET).list(slug, { limit: 1000 })
-  if (lp.error) bail0('bucket listing', lp.error)
-  if (lp.data.length >= 1000) bail0('bucket listing', 'folder holds >= 1000 objects, listing may be truncated')
+  const lp = await sb0.storage.from(BUCKET).list(slug, { limit: LIST_LIMIT })
+  { const m = listingRefusal({ error: lp.error, received: lp.data?.length }); if (m) bail0('bucket listing', lp.error ?? m) }
   const objects = lp.data.filter(o => o.id).map(o => ({ path: `${slug}/${o.name}`, created_at: o.created_at, updated_at: o.updated_at }))
   const pp = planPrune({ slug, objects, referenced, now: new Date() })
-  if (pp.problems.length) refuse(pp.problems)
+  if (pp.problems.length) { if (pp.missing) report.missing_referenced = pp.missing; refuse(pp.problems) }
   report.prune_plan = { graceDays: PRUNE_GRACE_DAYS, objects: objects.length, referenced: ownRefs.length, delete: pp.delete, keep: pp.keep }
   out(`\nPRUNE (${apply ? 'APPLY' : 'DRY - nothing is deleted'}), grace ${PRUNE_GRACE_DAYS} days: ${objects.length} object(s) under ${slug}/, ${ownRefs.length} referenced by rows`)
   for (const k of pp.keep) out(`  keep    ${k.path}  (${k.why})`)
@@ -135,8 +141,8 @@ if (prune) {
   out(`summary: delete ${pp.delete.length}, keep ${pp.keep.length}`)
   if (!apply || pp.delete.length === 0) { out(apply ? 'Nothing to delete.' : 'DRY: no write of any kind was made.'); finish(0) }
   const rm = await sb0.storage.from(BUCKET).remove(pp.delete)
-  if (rm.error) { report.errors.push(`remove: ${why(rm.error)}`); console.error('FAILED remove (code in the report artifact)'); finish(1) }
-  if (rm.data?.length !== pp.delete.length) { report.errors.push(`remove: ${rm.data?.length ?? 0} of ${pp.delete.length} confirmed`); console.error(`FAILED: storage confirmed ${rm.data?.length ?? 0} of ${pp.delete.length} deletions`); finish(1) }
+  const rmMsg = removeRefusal({ error: rm.error, confirmed: rm.data?.length }, pp.delete.length)
+  if (rmMsg) { report.errors.push(rm.error ? `remove: ${why(rm.error)}` : rmMsg); console.error(rm.error ? 'FAILED remove (code in the report artifact)' : `FAILED: ${rmMsg}`); finish(1) }
   out(`DELETED ${pp.delete.length} object(s).`)
   finish(0)
 }
@@ -191,7 +197,7 @@ if (local.dishes.length) {
   dishes = md.resolved
 }
 
-const lr = await sb.storage.from(BUCKET).list(slug, { limit: 1000 })
+const lr = await sb.storage.from(BUCKET).list(slug, { limit: LIST_LIMIT })
 if (lr.error) bail('bucket listing', lr.error)
 if (lr.data.length >= 1000) bail('bucket listing', 'folder holds >= 1000 objects, listing may be truncated')
 const names = new Set(lr.data.map(o => o.name))

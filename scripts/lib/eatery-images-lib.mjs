@@ -108,10 +108,15 @@ export function objectPath(slug, kind, n, hex, ext) {
   return `${slug}/${stem}-${hashTag(hex)}.${ext}`
 }
 
-// Objects unreferenced by any row are pruned only after this many days. Why 7: an old object can still be asked for
-// by a phone that loaded the previous row just before a repoint (a session holds its row for hours) and by an apply
-// that uploaded but failed before the row write (those objects are unreferenced AND fresh). A week outlasts both by
-// a wide margin; deleting sooner buys nothing, since the storage held is a few hundred KB per replaced image.
+// Grace period of a prune. WHAT IS MEASURED: the age of the NEWEST object that a row references under <slug>/, taken as the
+// date of the last repoint (a replace apply always uploads the new content-addressed objects before it moves a row, so
+// that object is born at the repoint). While it is younger than this, a prune keeps EVERYTHING: a phone that loaded the
+// old row just before the repoint may still ask for the old object (a session holds its row for hours), and an apply that
+// uploaded but failed before its row write leaves fresh unreferenced objects too. An old object's OWN age proves nothing
+// (Crunchy's fixed-name objects are weeks old on the day they are repointed), so it is used only as a second guard.
+// Why 7: it outlasts a session and a retry by a wide margin; the storage held is a few hundred KB per replaced image.
+// KNOWN LIMIT: a repoint onto an object that ALREADY existed (identical bytes, nothing uploaded) leaves no new object to
+// date it by; the check can then be satisfied by older referenced objects. Wait the grace yourself after such a repoint.
 export const PRUNE_GRACE_DAYS = 7
 
 // ─── manifest + files → items ───────────────────────────────────────────────
@@ -379,7 +384,7 @@ export function plan(items, state, replace = false) {
   const rows = state.rows || []
   const moved = new Set()
   // Pass 1: rows matched by PATH (same bytes, same name) are claimed first, so pass 2 (slot match) can never take the
-  // row of another image. Prepending a gallery photo: the old photo keeps its row (reorder), the new one gets an insert.
+  // row of another image. Prepending a gallery photo: n is in the name, so the old photo's content gets a NEW name at slot 2 (an insert); the new photo takes slot 1 by repointing the old slot-1 row, and the old slot-1 object becomes prunable.
   const claimed = new Map()   // row -> item path that owns it
   const claim = (row, it) => {
     if (claimed.has(row)) { problems.push(`${it.path}: its row is already claimed by '${claimed.get(row)}'`); return false }
@@ -432,9 +437,13 @@ export function plan(items, state, replace = false) {
 // not 404). Pruning is its own explicit mode, never run after an upload. Pure: the caller reads the rows and the
 // bucket listing. objects = [{ path, created_at, updated_at }] (full bucket paths); referenced = Set of paths that ANY
 // row points at (logo_path, banner_path, eatery_photos.storage_path, eatery_menu_items.photo_path).
-// Boundary: an object exactly graceDays old IS deleted (older-or-equal); one second younger is kept.
-// Deletes only objects that are (1) directly inside `<slug>/`, (2) referenced by no row, (3) older than graceDays by
-// BOTH timestamps (the newer of created_at/updated_at decides), with a valid timestamp (no date = kept).
+// Rules, in order (each one refuses or keeps, none deletes more):
+//   1. a referenced `<slug>/...` path that is NOT in the listing -> problem, nothing deleted (listing or LIKE filter unreliable);
+//   2. no referenced `<slug>/...` path at all -> problem (the folder would be deleted entirely);
+//   3. the NEWEST referenced object (max of created_at/updated_at) is younger than graceDays, or has no usable
+//      timestamp -> KEEP EVERYTHING (the repoint is recent, see PRUNE_GRACE_DAYS);
+//   4. otherwise delete objects directly inside `<slug>/`, referenced by no row, whose newer timestamp is older-or-equal
+//      graceDays (an object exactly graceDays old IS deleted), with a usable timestamp (no date = kept).
 // Returns { problems, delete:[path], keep:[{path, why}] }.
 export function planPrune({ slug, objects, referenced, now, graceDays = PRUNE_GRACE_DAYS }) {
   const problems = []
@@ -445,11 +454,22 @@ export function planPrune({ slug, objects, referenced, now, graceDays = PRUNE_GR
   if (problems.length) return { problems, delete: del, keep }
   const prefix = `${slug}/`
   const cutoff = now.getTime() - graceDays * 86400000
+  const ownRefs = [...referenced].filter(p => typeof p === 'string' && p.startsWith(prefix))
+  if (ownRefs.length === 0) problems.push('no row references anything under this slug: refusing to prune a folder that would be deleted entirely')
+  const byPath = new Map(objects.map(o => [String(o.path ?? ''), o]))
+  const missing = ownRefs.filter(p => !byPath.has(p))
+  if (missing.length) problems.push(`${missing.length} referenced path(s) are missing from the storage listing: the listing or the row filter is unreliable (paths in the report artifact)`)
+  if (problems.length) return { problems, delete: del, keep, missing }
+  const refTimes = ownRefs.flatMap(p => [byPath.get(p).created_at, byPath.get(p).updated_at]).map(t => (t ? Date.parse(t) : NaN))
+  const newestRef = refTimes.some(Number.isNaN) ? NaN : Math.max(...refTimes)
+  const holdWhy = Number.isNaN(newestRef) ? 'a referenced object has no usable timestamp, the last repoint cannot be dated'
+    : newestRef > cutoff ? `newest referenced object is younger than ${graceDays} days: a recent repoint, old objects may still be in use` : null
   for (const o of objects) {
     const path = String(o.path ?? '')
     const rest = path.slice(prefix.length)
     if (!path.startsWith(prefix) || rest === '' || rest.includes('/') || rest.includes('..')) { keep.push({ path, why: 'outside this slug folder' }); continue }
     if (referenced.has(path)) { keep.push({ path, why: 'referenced by a row' }); continue }
+    if (holdWhy) { keep.push({ path, why: holdWhy }); continue }
     const times = [o.created_at, o.updated_at].map(t => (t ? Date.parse(t) : NaN))
     if (times.some(Number.isNaN)) { keep.push({ path, why: 'no usable timestamp' }); continue }
     if (Math.max(...times) > cutoff) { keep.push({ path, why: `younger than ${graceDays} days` }); continue }
@@ -457,6 +477,18 @@ export function planPrune({ slug, objects, referenced, now, graceDays = PRUNE_GR
   }
   return { problems, delete: del, keep }
 }
+
+// Orchestration decisions of --prune, pure so they can be tested and mutated. Each returns null (fine) or a message.
+export const LIST_LIMIT = 1000
+export const pruneModeRefusal = ({ prune, replace }) => (prune && replace ? '--prune cannot be combined with --replace' : null)
+// r = { error, count, received } of one row query: a failed or truncated read (count: 'exact' vs rows received) refuses.
+export const queryRefusal = (what, r) => (r.error ? `${what} failed`
+  : r.count !== r.received ? `${what} truncated: count ${r.count} vs received ${r.received}` : null)
+export const ownPartnerRefusal = found => (found === 1 ? null : `prune needs exactly one partner row for the slug, found ${found}`)
+export const listingRefusal = lp => (lp.error ? 'bucket listing failed'
+  : lp.received >= LIST_LIMIT ? `folder holds >= ${LIST_LIMIT} objects, listing may be truncated` : null)
+export const removeRefusal = (rm, expected) => (rm.error ? 'remove failed'
+  : (rm.confirmed ?? 0) !== expected ? `storage confirmed ${rm.confirmed ?? 0} of ${expected} deletions` : null)
 
 // ─── file reading that never follows a link out of the partner folder ────────
 // A committed symlink (e.g. to /proc/self/environ) must never be read. Refuses a symlink entry, and any

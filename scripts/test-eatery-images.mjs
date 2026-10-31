@@ -100,6 +100,24 @@ if (process.argv.includes('--mutants')) {
     ['prune: nested paths allowed', "rest.includes('/') ||", ''],
     ['prune: grace constant is 0', 'export const PRUNE_GRACE_DAYS = 7', 'export const PRUNE_GRACE_DAYS = 0'],
     ['prune: bad slug accepted', "if (typeof slug !== 'string' || !SLUG_RE.test(slug)) problems.push(`slug '${slug}' does not match ${SLUG_RE}`)\n  if (!(referenced", "if (!(referenced"],
+    ['prune: grace measured on the old object only (hold removed)', 'if (holdWhy) {', 'if (false) {'],
+    ['prune: hold uses the OLDEST referenced object', 'Math.max(...refTimes)', 'Math.min(...refTimes)'],
+    ['prune: hold ignores updated_at of referenced objects', 'flatMap(p => [byPath.get(p).created_at, byPath.get(p).updated_at])', 'flatMap(p => [byPath.get(p).created_at])'],
+    ['prune: hold off by one (recent repoint released at the cutoff)', 'newestRef > cutoff ?', 'newestRef >= cutoff ?'],
+    ['prune: unusable referenced timestamp does not hold', 'refTimes.some(Number.isNaN) ? NaN', 'refTimes.some(Number.isNaN) ? 0'],
+    ['prune: missing referenced path tolerated', 'if (missing.length) problems.push', 'if (false) problems.push'],
+    ['prune: zero own references tolerated', 'if (ownRefs.length === 0) problems.push', 'if (false) problems.push'],
+    ['prune: own references counted without the slash', "p.startsWith(prefix))\n  if (ownRefs", "p.startsWith(slug))\n  if (ownRefs"],
+    ['orchestration: prune+replace allowed', '(prune && replace ?', '(false ?'],
+    ['orchestration: query error ignored', 'r.error ? `${what} failed`', 'false ? `${what} failed`'],
+    ['orchestration: truncation ignored', 'r.count !== r.received ?', 'false ?'],
+    ['orchestration: truncation compared with cap not count', 'r.count !== r.received ?', 'r.received < 1000 ?'],
+    ['orchestration: any number of partner rows accepted', '(found === 1 ? null', '(found >= 1 ? null'],
+    ['orchestration: listing cap off by one', 'lp.received >= LIST_LIMIT ?', 'lp.received > LIST_LIMIT ?'],
+    ['orchestration: listing error ignored', 'lp.error ? \'bucket listing failed\'', 'false ? \'bucket listing failed\''],
+    ['orchestration: list cap raised silently', 'export const LIST_LIMIT = 1000', 'export const LIST_LIMIT = 100000'],
+    ['orchestration: remove count not checked', '(rm.confirmed ?? 0) !== expected ?', 'false ?'],
+    ['orchestration: remove error ignored', "rm.error ? 'remove failed'", "false ? 'remove failed'"],
     ['banner: unknown key accepted', "'banner', 'bannerSizeWaiver',", "'banner', 'bannerSizeWaiver', 'banners',"],
     ['banner: row-write skipped for banner kind', "if (it.kind === 'logo' || it.kind === 'banner') continue\n    const want", "if (it.kind === 'logo') continue\n    const want"],
     ['banner: banner_path never written', "if (ctx.banner?.action === 'set') {", "if (false) {"],
@@ -515,11 +533,12 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   const S = 'crunchy-express'
   const obj = (name, created, updated = created, slug = S) => ({ path: `${slug}/${name}`, created_at: created, updated_at: updated })
   const refs = new Set([`${S}/logo-aaaaaaaa.png`, `${S}/dish-1-bbbbbbbb.jpg`])
-  const pr = (objects, extra = {}) => L.planPrune({ slug: S, objects, referenced: refs, now: NOW, ...extra })
+  const refObjs = (age = 400) => [obj('logo-aaaaaaaa.png', ago(age)), obj('dish-1-bbbbbbbb.jpg', ago(age))]
+  const pr = (objects, extra = {}) => L.planPrune({ slug: S, objects: [...objects, ...(extra.noRefs ? [] : refObjs(extra.refAge ?? 400))].filter((o, i, a) => a.findIndex(x => x.path === o.path) === i), referenced: refs, now: NOW, ...extra })
   check('PRUNE_GRACE_DAYS is 7', L.PRUNE_GRACE_DAYS === 7)
   const old = obj('logo.png', ago(30))
   check('prune: an old unreferenced object is deleted', pr([old]).delete.join() === old.path)
-  check('prune: a REFERENCED object is never deleted, however old', pr([obj('logo-aaaaaaaa.png', ago(400)), obj('dish-1-bbbbbbbb.jpg', ago(400))]).delete.length === 0)
+  check('prune: a REFERENCED object is never deleted, however old', pr([]).delete.length === 0 && pr([]).keep.length === 2)
   check('prune: referenced + unreferenced mixed -> only the unreferenced old one', pr([obj('logo-aaaaaaaa.png', ago(400)), old]).delete.join() === old.path)
   check('prune: within the grace period nothing is deleted (6 days)', pr([obj('x.jpg', ago(6))]).delete.length === 0)
   check('prune: 8 days old is deleted', pr([obj('x.jpg', ago(8))]).delete.length === 1)
@@ -529,9 +548,34 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   check('prune: another slug never touched (prefix compared with the slash)', pr([obj('logo.png', ago(30), ago(30), 'crunchy-express-2'), obj('logo.png', ago(30), ago(30), 'bidda-badadez'), { path: 'crunchy-express', created_at: ago(30), updated_at: ago(30) }, { path: 'crunchy-express-old.png', created_at: ago(30), updated_at: ago(30) }]).delete.length === 0)
   check('prune: a nested path or .. is never deleted', pr([obj('sub/x.jpg', ago(30)), obj('../bidda-badadez/logo.png', ago(30))]).delete.length === 0)
   check('prune: every deletion path starts with <slug>/ and sits directly in it', pr([old, obj('b.jpg', ago(20)), obj('logo.png', ago(30), ago(30), 'other')]).delete.every(p => p.startsWith(`${S}/`) && !p.slice(S.length + 1).includes('/')))
-  check('prune: RED bad slug, missing referenced set, bad now are refused with nothing to delete', ['', 'A/b'].every(sl => L.planPrune({ slug: sl, objects: [old], referenced: refs, now: NOW }).delete.length === 0 && L.planPrune({ slug: sl, objects: [old], referenced: refs, now: NOW }).problems.length) && L.planPrune({ slug: S, objects: [old], referenced: null, now: NOW }).delete.length === 0 && L.planPrune({ slug: S, objects: [old], referenced: refs, now: new Date('x') }).delete.length === 0)
+  check('prune: RED bad slug, missing referenced set, bad now are refused with nothing to delete', ['', 'A/b'].every(sl => L.planPrune({ slug: sl, objects: [old, ...refObjs()], referenced: refs, now: NOW }).delete.length === 0 && L.planPrune({ slug: sl, objects: [old, ...refObjs()], referenced: refs, now: NOW }).problems.length) && L.planPrune({ slug: S, objects: [old], referenced: null, now: NOW }).delete.length === 0 && L.planPrune({ slug: S, objects: [old, ...refObjs()], referenced: refs, now: new Date('x') }).delete.length === 0)
   check('prune: boundary pinned, exactly 7 days old IS deleted, 7 days minus 1 s is kept', pr([obj('x.jpg', ago(7))]).delete.length === 1 && pr([obj('y.jpg', new Date(NOW.getTime() - 7 * 86400000 + 1000).toISOString())]).delete.length === 0)
-  check('prune: honours a custom grace', pr([obj('x.jpg', ago(3))], { graceDays: 2 }).delete.length === 1)
+  check('prune: honours a custom grace', pr([obj('x.jpg', ago(3))], { graceDays: 2, refAge: 3 }).delete.length === 1)
+  // grace measures the repoint (newest referenced object), not the old object
+  const rollout = pr([old, obj('banner.jpg', ago(60)), obj('gallery-1.jpg', ago(40))], { refAge: 0.01 })
+  check('prune: weeks-old unreferenced objects are KEPT while the newest referenced object is minutes old', rollout.delete.length === 0 && rollout.keep.filter(k => /recent repoint/.test(k.why)).length === 3)
+  check('prune: newest referenced 6 days old keeps all', pr([old], { refAge: 6 }).delete.length === 0)
+  check('prune: newest referenced exactly 7 days old releases the hold', pr([old], { refAge: 7 }).delete.length === 1)
+  check('prune: ONE fresh referenced object among old ones holds everything', L.planPrune({ slug: S, objects: [old, obj('logo-aaaaaaaa.png', ago(400)), obj('dish-1-bbbbbbbb.jpg', ago(1))], referenced: refs, now: NOW }).delete.length === 0)
+  check('prune: a fresh updated_at on a referenced object holds everything', L.planPrune({ slug: S, objects: [old, obj('logo-aaaaaaaa.png', ago(400), ago(1)), obj('dish-1-bbbbbbbb.jpg', ago(400))], referenced: refs, now: NOW }).delete.length === 0)
+  check('prune: a referenced object without a timestamp holds everything', L.planPrune({ slug: S, objects: [old, obj('logo-aaaaaaaa.png', null), obj('dish-1-bbbbbbbb.jpg', ago(400))], referenced: refs, now: NOW }).delete.length === 0)
+  check('prune: an unreferenced FRESH object does not itself hold the others (its own age is checked)', pr([old, obj('new.jpg', ago(1))]).delete.join() === old.path)
+  // cross-check: referenced path absent from the listing
+  const miss = L.planPrune({ slug: S, objects: [old, obj('logo-aaaaaaaa.png', ago(400))], referenced: refs, now: NOW })
+  check('prune: RED a referenced path missing from the listing refuses, deletes nothing', miss.problems.length === 1 && miss.delete.length === 0 && miss.missing.join() === `${S}/dish-1-bbbbbbbb.jpg`)
+  check('prune: RED zero own references refuses (other slugs referenced do not count)', L.planPrune({ slug: S, objects: [old], referenced: new Set(['bidda-badadez/logo-aaaaaaaa.png']), now: NOW }).problems.length === 1 && L.planPrune({ slug: S, objects: [old], referenced: new Set(), now: NOW }).delete.length === 0)
+  check('prune: another slug\'s reference is not required in this listing', L.planPrune({ slug: S, objects: [old, ...refObjs()], referenced: new Set([...refs, 'bidda-badadez/x-aaaaaaaa.png']), now: NOW }).delete.join() === old.path)
+  check('prune: a sibling slug sharing the prefix is not "own" (crunchy-express-2 ref absent from this listing is fine)', L.planPrune({ slug: S, objects: [old, ...refObjs()], referenced: new Set([...refs, 'crunchy-express-2/logo-aaaaaaaa.png']), now: NOW }).problems.length === 0)
+  check('prune: RED a slug with a slash deletes nothing even when its own paths look valid', (() => { const r = L.planPrune({ slug: 'A/b', objects: [{ path: 'A/b/ref.png', created_at: ago(400), updated_at: ago(400) }, { path: 'A/b/del.png', created_at: ago(400), updated_at: ago(400) }], referenced: new Set(['A/b/ref.png']), now: NOW }); return r.delete.length === 0 && r.problems.length > 0 })())
+  // orchestration decisions
+  check('orchestration: --prune with --replace is refused, either alone is fine', L.pruneModeRefusal({ prune: true, replace: true }) !== null && L.pruneModeRefusal({ prune: true, replace: false }) === null && L.pruneModeRefusal({ prune: false, replace: true }) === null)
+  check('orchestration: a query error refuses', L.queryRefusal('q', { error: { code: 'x' }, count: 0, received: 0 }) !== null)
+  check('orchestration: a truncated query (count 5, received 3) refuses; equal passes; zero equal passes', L.queryRefusal('q', { error: null, count: 5, received: 3 }) !== null && L.queryRefusal('q', { error: null, count: 3, received: 3 }) === null && L.queryRefusal('q', { error: null, count: 0, received: 0 }) === null)
+  check('orchestration: a null count never passes as equal to received', L.queryRefusal('q', { error: null, count: null, received: 3 }) !== null && L.queryRefusal('q', { error: null, count: 3, received: undefined }) !== null)
+  check('orchestration: exactly one own partner row required (0 and 2 refuse)', L.ownPartnerRefusal(0) !== null && L.ownPartnerRefusal(2) !== null && L.ownPartnerRefusal(1) === null)
+  check('orchestration: listing at the cap (1000) refuses, 999 passes, an error refuses', L.listingRefusal({ error: null, received: 1000 }) !== null && L.listingRefusal({ error: null, received: 999 }) === null && L.listingRefusal({ error: { code: 'x' }, received: 0 }) !== null && L.LIST_LIMIT === 1000)
+  check('orchestration: remove confirming fewer / none / error refuses; exact passes', L.removeRefusal({ error: null, confirmed: 2 }, 3) !== null && L.removeRefusal({ error: null, confirmed: undefined }, 3) !== null && L.removeRefusal({ error: { code: 'x' }, confirmed: 3 }, 3) !== null && L.removeRefusal({ error: null, confirmed: 3 }, 3) === null)
+  check('orchestration: remove confirming MORE than asked also refuses', L.removeRefusal({ error: null, confirmed: 4 }, 3) !== null)
 }
 
 // ─── banner ─────────────────────────────────────────────────────────────────
