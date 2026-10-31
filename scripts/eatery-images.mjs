@@ -3,6 +3,7 @@
 //
 //   node scripts/eatery-images.mjs --slug=crunchy-express                   # DRY (default): validate + print the plan
 //   node scripts/eatery-images.mjs --slug=crunchy-express --apply [--replace]
+//   node scripts/eatery-images.mjs --slug=crunchy-express --prune [--apply]  # separate mode: list/delete OLD unreferenced objects
 //   options: --report=path.json  (plan + sanitised codes only: the artifact is PUBLIC-downloadable on this repo; no raw error text)
 //
 // CI-only for anything that writes (scripts/lib/prod-write-guard.mjs). Workflow: eatery-images, whose apply
@@ -24,28 +25,49 @@
 //   Dishes need the partner's menu items to exist (the menu data migration first). Problems and the report name the
 //   FILE and the item id, never the item name (Actions logs and artifacts are public).
 //
-// OBJECT PATHS (bucket eatery-images)   <slug>/logo.<ext>   <slug>/banner.<ext>   <slug>/gallery-<n>.<ext>   <slug>/menu-<n>.<ext>
-//   <slug>/dish-<eatery_menu_items.id>.<ext>   (dish photo; the row gets photo_path/photo_width/photo_height)
+// OBJECT PATHS (bucket eatery-images), CONTENT-ADDRESSED. <h8> = the first 8 hex chars of the file's sha256, joined with a
+//   HYPHEN (the database path CHECK allows one dot only, before the extension):
+//   <slug>/logo-<h8>.<ext>   <slug>/banner-<h8>.<ext>   <slug>/gallery-<n>-<h8>.<ext>   <slug>/menu-<n>-<h8>.<ext>
+//   <slug>/dish-<eatery_menu_items.id>-<h8>.<ext>   (dish photo; the row gets photo_path/photo_width/photo_height)
 //   n is the 1-based manifest position and also eatery_photos.sort_order. <ext> comes from the real bytes
 //   (a .jpeg file is stored as .jpg).
+//   WHY: the app caches images on disk keyed by URL (expo-image, memory-disk). A replaced file written to the SAME path
+//   kept showing the old picture until the user cleared the cache (seen on device 2026-10-31, bidda-badadez dish-105).
+//   A changed file now gets a NEW name, hence a new URL. Every app URL is built from the stored path alone
+//   (components/EateryBits.js eateryImageUrl), so no app change or migration is needed: the names pass the same
+//   database CHECK regex as before.
 //
 // VALIDATION (the whole run refuses, listing EVERY problem): slug ^[a-z0-9-]+$; manifest files exist; <= 2 MB;
 //   magic bytes JPEG/PNG/WebP match the extension; width/height read from the header; minimums (lib: MIN);
 //   path matches the database CHECK. Dish minimum: 800 px on the SHORT side (lib: MIN, with the reasoning).
 // READINESS: the partner row must exist with lat/lng, address, menu_verified_on and (>= 1 menu item OR menu_url),
 //   i.e. go-live checklist step 1 is done. Active or inactive are both allowed; is_active is printed loudly.
-// ADD-ONLY + RE-RUNNABLE: an identical object is skipped; a DIFFERENT file at the same path is refused without
-//   --replace (upload uses upsert:false, so storage itself refuses a silent overwrite); photo rows are inserted
-//   only if absent; logo_path, banner_path and eatery_menu_items.photo_path are set only if null or equal. Order: ALL uploads
-//   (gallery, menu, logo, dish), verify by re-download, then photo rows, logo_path, dish photo_path.
-//   Nothing is ever deleted; rows for photos not in the manifest are listed, not touched.
+// ADD-ONLY + RE-RUNNABLE: an identical file (same bytes = same name) whose object exists with the same sha256 is skipped.
+//   A CHANGED file has a new name: uploaded with upsert:false (nothing is ever overwritten; if that name exists with other
+//   bytes the run refuses, whatever --replace says), verified by re-download, and ONLY THEN are the rows repointed.
+//   Order: ALL uploads (gallery, menu, logo, banner, dish) + verify, then photo rows, logo_path, banner_path, dish photo_path;
+//   one object failure writes no row. Photo rows are inserted only if absent (a gallery/menu slot is (kind, order): the
+//   existing row is UPDATED to the new path, never duplicated). logo_path, banner_path, eatery_menu_items.photo_path and
+//   a photo row are set when null/equal; pointing one at a DIFFERENT path than it holds now (including today's un-hashed
+//   names like crunchy-express/logo.png) needs --replace, so changing an image stays an explicit act. The plan prints
+//   every move as old -> new. Rows for photos not in the manifest are listed, not touched.
+//
+// OLD OBJECTS ARE KEPT by an upload, so a phone mid-load or a session still holding the old row never 404s.
+//   --prune is the separate, explicit clean-up: it lists (dry) / deletes (--apply) objects directly under <slug>/ that NO
+//   row references (any partner's logo_path, banner_path, eatery_photos, eatery_menu_items.photo_path) AND that are older
+//   than PRUNE_GRACE_DAYS (7) by created_at and updated_at. It refuses if any row query fails or is truncated, if the
+//   partner is missing, or if the partner references nothing at all. It reads no manifest, cannot be combined with
+//   --replace, and is never run after an upload.
+//
+// ONE-TIME ROLLOUT (rows still point at the old fixed names): dry run, read the old -> new plan, apply with replace=true
+//   (moves every row to hashed names; the old objects stay), and >= 7 days later prune dry, then prune apply.
 
 import { writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { BUCKET, MIN, SLUG_RE, sha256, validateLocal, readiness, plan, safeRead, matchDishes, planDishes, applyPlan } from './lib/eatery-images-lib.mjs'
+import { BUCKET, MIN, SLUG_RE, PRUNE_GRACE_DAYS, sha256, validateLocal, readiness, plan, planPrune, safeRead, matchDishes, planDishes, applyPlan } from './lib/eatery-images-lib.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -53,6 +75,7 @@ const opt = n => args.find(a => a.startsWith(`--${n}=`))?.slice(n.length + 3)
 const slug = opt('slug')
 const apply = args.includes('--apply')
 const replace = args.includes('--replace')
+const prune = args.includes('--prune')
 const reportPath = opt('report')
 prodWriteGuard({ wouldWrite: apply, workflow: 'eatery-images', dryHint: 'node scripts/eatery-images.mjs --slug=<slug>' })
 
@@ -60,7 +83,7 @@ prodWriteGuard({ wouldWrite: apply, workflow: 'eatery-images', dryHint: 'node sc
 // masking does not apply to artifacts. So it never holds raw Supabase error text (which could echo a request or
 // header): only the step, the object path and a short sanitised code.
 const why = e => (typeof e === 'string' ? e : `code=${[e?.statusCode, e?.status, e?.code].map(String).find(c => /^[A-Za-z0-9_-]{1,20}$/.test(c) && c !== 'undefined') ?? 'unknown'}`)
-const report = { slug, apply, replace, problems: [], errors: [] }
+const report = { slug, apply, replace, prune, problems: [], errors: [] }
 const out = (...l) => console.log(...l)
 const finish = code => {
   if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2))
@@ -74,7 +97,49 @@ const refuse = problems => {
 }
 
 if (!slug || !SLUG_RE.test(slug)) refuse([`--slug is required and must match ${SLUG_RE}`])
+if (prune && replace) refuse(['--prune cannot be combined with --replace'])
 if (apply && process.env.GITHUB_REF !== 'refs/heads/main') refuse([`apply runs from refs/heads/main only (GITHUB_REF=${process.env.GITHUB_REF ?? 'unset'})`])
+
+// 0. prune mode: no manifest, no local files
+if (prune) {
+  const url0 = process.env.EXPO_PUBLIC_SUPABASE_URL
+  if (!url0) refuse(['EXPO_PUBLIC_SUPABASE_URL is empty'])
+  const sb0 = createClient(url0, serviceRoleKey(), { auth: { persistSession: false, autoRefreshToken: false } })
+  const bail0 = (what, error) => { report.errors.push(`${what}: ${why(error)}`); refuse([`${what} failed (code in the report artifact)`]) }
+  const like = `${slug}/%`
+  // Every partner's references to this folder, not just this partner's: an object any row uses is never deleted.
+  const [pq, fq, mq] = await Promise.all([
+    sb0.from('eatery_partners').select('id,slug,logo_path,banner_path', { count: 'exact' }),
+    sb0.from('eatery_photos').select('storage_path', { count: 'exact' }).like('storage_path', like),
+    sb0.from('eatery_menu_items').select('photo_path', { count: 'exact' }).like('photo_path', like),
+  ])
+  for (const [what, r] of [['partner query', pq], ['photo rows query', fq], ['menu items query', mq]]) {
+    if (r.error) bail0(what, r.error)
+    if (r.count !== r.data.length) bail0(what, `truncated: count ${r.count} vs received ${r.data.length}`)
+  }
+  const own = pq.data.filter(p => p.slug === slug)
+  if (own.length !== 1) refuse([`prune needs exactly one partner row for the slug, found ${own.length}`])
+  const referenced = new Set([...pq.data.flatMap(p => [p.logo_path, p.banner_path]), ...fq.data.map(r => r.storage_path), ...mq.data.map(r => r.photo_path)].filter(Boolean))
+  const ownRefs = [...referenced].filter(p => p.startsWith(`${slug}/`))
+  if (ownRefs.length === 0) refuse(['no row references anything under this slug: refusing to prune a folder that would be deleted entirely'])
+  const lp = await sb0.storage.from(BUCKET).list(slug, { limit: 1000 })
+  if (lp.error) bail0('bucket listing', lp.error)
+  if (lp.data.length >= 1000) bail0('bucket listing', 'folder holds >= 1000 objects, listing may be truncated')
+  const objects = lp.data.filter(o => o.id).map(o => ({ path: `${slug}/${o.name}`, created_at: o.created_at, updated_at: o.updated_at }))
+  const pp = planPrune({ slug, objects, referenced, now: new Date() })
+  if (pp.problems.length) refuse(pp.problems)
+  report.prune_plan = { graceDays: PRUNE_GRACE_DAYS, objects: objects.length, referenced: ownRefs.length, delete: pp.delete, keep: pp.keep }
+  out(`\nPRUNE (${apply ? 'APPLY' : 'DRY - nothing is deleted'}), grace ${PRUNE_GRACE_DAYS} days: ${objects.length} object(s) under ${slug}/, ${ownRefs.length} referenced by rows`)
+  for (const k of pp.keep) out(`  keep    ${k.path}  (${k.why})`)
+  for (const d of pp.delete) out(`  DELETE  ${d}`)
+  out(`summary: delete ${pp.delete.length}, keep ${pp.keep.length}`)
+  if (!apply || pp.delete.length === 0) { out(apply ? 'Nothing to delete.' : 'DRY: no write of any kind was made.'); finish(0) }
+  const rm = await sb0.storage.from(BUCKET).remove(pp.delete)
+  if (rm.error) { report.errors.push(`remove: ${why(rm.error)}`); console.error('FAILED remove (code in the report artifact)'); finish(1) }
+  if (rm.data?.length !== pp.delete.length) { report.errors.push(`remove: ${rm.data?.length ?? 0} of ${pp.delete.length} confirmed`); console.error(`FAILED: storage confirmed ${rm.data?.length ?? 0} of ${pp.delete.length} deletions`); finish(1) }
+  out(`DELETED ${pp.delete.length} object(s).`)
+  finish(0)
+}
 
 // 1. local files
 const dir = resolve(ROOT, 'data/eatery', slug)
@@ -110,7 +175,7 @@ out(`readiness inputs: menu items ${menuItems}, menu_url ${partner?.menu_url ? '
 const notReady = readiness(partner, menuItems, local.dishes.length)
 if (notReady.length) refuse(notReady.map(p => `not ready: ${p}`))
 
-const rr = await sb.from('eatery_photos').select('storage_path,kind,width,height,sort_order', { count: 'exact' }).eq('partner_id', partner.id)
+const rr = await sb.from('eatery_photos').select('id,storage_path,kind,width,height,sort_order', { count: 'exact' }).eq('partner_id', partner.id)
 if (rr.error) bail('photo rows query', rr.error)
 if (rr.count !== rr.data.length) bail('photo rows query', `truncated: count ${rr.count} vs received ${rr.data.length}`)
 
@@ -143,21 +208,22 @@ const pl = plan(local.items, { existing, rows: rr.data, logoPath: partner.logo_p
 const dp = planDishes(dishes, { existing, itemRows: Object.fromEntries(itemRows.map(r => [r.id, r])) }, replace)
 pl.problems.push(...dp.problems)
 pl.uploads.push(...dp.uploads)
-report.plan = { uploads: pl.uploads, inserts: pl.inserts, updates: pl.updates, logo: pl.logo, banner: pl.banner, orphans: pl.orphans, dishes: dp.updates.map(u => ({ itemId: u.id, path: u.path, row: u.action })) }
+report.plan = { uploads: pl.uploads, inserts: pl.inserts, updates: pl.updates, logo: pl.logo, banner: pl.banner, orphans: pl.orphans, dishes: dp.updates.map(u => ({ itemId: u.id, path: u.path, from: u.from ?? null, row: u.action })) }
 out(`\nPLAN (${apply ? 'APPLY' : 'DRY - nothing is written'}${replace ? ', replace=true' : ''}):`)
 for (const u of pl.uploads) out(`  object  ${u.action.padEnd(15)} ${u.path}`)
 for (const r of pl.inserts) out(`  row     insert          ${r.kind} ${r.storage_path} ${r.width}x${r.height} order ${r.sort_order}`)
-for (const r of pl.updates) out(`  row     update          ${r.kind} ${r.storage_path}`)
-out(`  logo_path ${pl.logo.action}${pl.logo.path ? ' ' + pl.logo.path : ''}`)
-out(`  banner_path ${pl.banner.action}${pl.banner.path ? ' ' + pl.banner.path : ''}`)
+for (const r of pl.updates) out(`  row     update          ${r.kind} ${r.from && r.from !== r.storage_path ? `${r.from} -> ` : ''}${r.storage_path}`)
+const mv = x => `${x.action}${x.path ? ' ' + (x.from ? `${x.from} -> ` : '') + x.path : ''}`
+out(`  logo_path ${mv(pl.logo)}`)
+out(`  banner_path ${mv(pl.banner)}`)
 for (const d of dishes) {
   const up = pl.uploads.find(u => u.path === d.path), row = dp.updates.find(u => u.id === d.itemId)
-  out(`  dish    ${d.src} -> item ${d.itemId} -> ${d.path}  ${d.bytes} bytes ${d.mime} ${d.width}x${d.height}  object ${up?.action ?? 'REFUSED'}, row ${row?.action ?? 'REFUSED'}`)
+  out(`  dish    ${d.src} -> item ${d.itemId} -> ${d.path}  ${d.bytes} bytes ${d.mime} ${d.width}x${d.height}  object ${up?.action ?? 'REFUSED'}, row ${row?.action ?? 'REFUSED'}${row?.from && row.from !== row.path ? ` (${row.from} -> ${row.path})` : ''}`)
 }
 if (pl.orphans.length) out(`  note: ${pl.orphans.length} existing photo row(s) are not in the manifest and stay untouched: ${pl.orphans.join(', ')}`)
 if (pl.problems.length) refuse(pl.problems)
 const counts = a => pl.uploads.filter(u => u.action === a).length
-out(`\nsummary: upload ${counts('upload')}, replace ${counts('replace')}, skip ${counts('skip-identical')}, rows insert ${pl.inserts.length}, rows update ${pl.updates.length}, logo ${pl.logo.action}, banner ${pl.banner.action}, dish rows set ${dp.updates.filter(u => u.action === 'set').length} keep ${dp.updates.filter(u => u.action === 'keep').length}`)
+out(`\nsummary: upload ${counts('upload')}, skip ${counts('skip-identical')}, rows insert ${pl.inserts.length}, rows update ${pl.updates.length} (repoint ${pl.updates.filter(u => u.from !== u.storage_path).length}), logo ${pl.logo.action}, banner ${pl.banner.action}, dish rows set ${dp.updates.filter(u => u.action === 'set').length} keep ${dp.updates.filter(u => u.action === 'keep').length}`)
 if (!apply) { out('DRY: no write of any kind was made.'); finish(0) }
 
 // 4. apply

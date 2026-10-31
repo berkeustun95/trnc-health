@@ -95,6 +95,25 @@ function webp(b) {
 
 export const sha256 = buf => createHash('sha256').update(buf).digest('hex')
 
+// ─── content-addressed object names ─────────────────────────────────────────
+// An object's name embeds the first 8 hex chars of the sha256 of its bytes, joined with a HYPHEN (PATH_RE allows one
+// dot only, before the extension): <slug>/logo-<h8>.<ext>, banner-<h8>, gallery-<n>-<h8>, menu-<n>-<h8>, dish-<itemId>-<h8>.
+// WHY: the app caches images on disk keyed by URL (expo-image, cachePolicy memory-disk). A replaced file written to
+// the SAME path kept showing the old picture until the user cleared the cache. A changed file now gets a NEW name, so
+// a new URL, so a cache miss. The same bytes always give the same name, so a re-run stays a no-op.
+export const HASH_LEN = 8
+export const hashTag = hex => hex.slice(0, HASH_LEN)
+export function objectPath(slug, kind, n, hex, ext) {
+  const stem = kind === 'logo' || kind === 'banner' ? kind : `${kind}-${n}`
+  return `${slug}/${stem}-${hashTag(hex)}.${ext}`
+}
+
+// Objects unreferenced by any row are pruned only after this many days. Why 7: an old object can still be asked for
+// by a phone that loaded the previous row just before a repoint (a session holds its row for hours) and by an apply
+// that uploaded but failed before the row write (those objects are unreferenced AND fresh). A week outlasts both by
+// a wide margin; deleting sooner buys nothing, since the storage held is a few hundred KB per replaced image.
+export const PRUNE_GRACE_DAYS = 7
+
 // ─── manifest + files → items ───────────────────────────────────────────────
 // manifest = { logo?: 'logo.png', banner?: 'banner.jpg', bannerSizeWaiver?: {...}, gallery?: [...], menu?: [...], dishes?: { '<item name>': 'file.jpg' } }.
 // readFile(name) -> Buffer | null (null = missing). Returns { problems: string[], items: [...], dishes: [...] }.
@@ -214,7 +233,7 @@ export function validateLocal(slug, manifest, readFile) {
       dishes.push({ key: w.key, src: w.name, format: s.format, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
       continue
     }
-    const path = `${slug}/${w.kind === 'logo' || w.kind === 'banner' ? w.kind : `${w.kind}-${w.n}`}.${s.format}`
+    const path = objectPath(slug, w.kind, w.n, sha256(buf), s.format)
     if (!PATH_RE.test(path)) problems.push(`${tag}: object path '${path}' does not match the database path CHECK`)
     items.push({ kind: w.kind, n: w.n, src: w.name, path, mime: MIME[s.format], bytes: buf.length, width, height, sha256: sha256(buf), buf })
   }
@@ -249,7 +268,7 @@ export function matchDishes(slug, dishes, menuRows) {
     const item = hit[0]
     if (taken.has(item.id)) { problems.push(`${tag}: maps to the same menu item (id ${item.id}) as '${taken.get(item.id)}'`); continue }
     taken.set(item.id, d.src)
-    const path = `${slug}/dish-${item.id}.${d.format}`
+    const path = objectPath(slug, 'dish', item.id, d.sha256, d.format)
     if (!PATH_RE.test(path)) { problems.push(`${tag}: object path '${path}' does not match the database path CHECK`); continue }
     resolved.push({ ...d, itemId: item.id, path, kind: 'dish' })
   }
@@ -258,21 +277,22 @@ export function matchDishes(slug, dishes, menuRows) {
 
 // state = { existing: { [path]: {sha256}|null }, itemRows: { [id]: { photo_path, photo_width, photo_height } } }
 // Returns { problems, uploads:[{path,action}], updates:[{id,path,width,height,action:'set'|'keep'}] }.
-// photo_path may be set only when it is null or already this path; a different one needs replace.
+// photo_path may be set only when it is null or already this path; a different one (a REPOINT, old -> new) needs replace.
+// A name is a function of the bytes, so an object that exists at the planned path with DIFFERENT bytes is a hash-prefix
+// collision or tampering: refused whatever replace says. Nothing is ever overwritten.
 export function planDishes(resolved, state, replace = false) {
   const problems = [], uploads = [], updates = []
   for (const d of resolved) {
     const ex = state.existing?.[d.path]
     if (!ex) uploads.push({ path: d.path, action: 'upload' })
     else if (ex.sha256 === d.sha256) uploads.push({ path: d.path, action: 'skip-identical' })
-    else if (replace) uploads.push({ path: d.path, action: 'replace' })
-    else problems.push(`${d.path}: a DIFFERENT file already exists at this path (re-run with replace=true to overwrite)`)
+    else problems.push(`${d.path}: an object with DIFFERENT bytes already sits at this content-addressed name; refusing (nothing is overwritten)`)
     const row = state.itemRows?.[d.itemId]
     if (!row) { problems.push(`${d.path}: menu item ${d.itemId} not found among this partner's rows`); continue }
     const same = row.photo_path === d.path && row.photo_width === d.width && row.photo_height === d.height
-    if (row.photo_path == null || row.photo_path === d.path) updates.push({ id: d.itemId, path: d.path, width: d.width, height: d.height, action: same ? 'keep' : 'set' })
-    else if (replace) updates.push({ id: d.itemId, path: d.path, width: d.width, height: d.height, action: 'set' })
-    else problems.push(`${d.path}: menu item ${d.itemId} already has photo_path '${row.photo_path}' (re-run with replace=true)`)
+    if (row.photo_path == null || row.photo_path === d.path) updates.push({ id: d.itemId, path: d.path, from: row.photo_path ?? null, width: d.width, height: d.height, action: same ? 'keep' : 'set' })
+    else if (replace) updates.push({ id: d.itemId, path: d.path, from: row.photo_path, width: d.width, height: d.height, action: 'set' })
+    else problems.push(`${d.path}: menu item ${d.itemId} already points at '${row.photo_path}', would move to this path (re-run with replace=true)`)
   }
   return { problems, uploads, updates }
 }
@@ -280,6 +300,7 @@ export function planDishes(resolved, state, replace = false) {
 // ─── apply (all writes; the client is passed in so the order is provable offline) ─
 // Order: every object (upload + re-download + sha256 verify), then, only if ALL succeeded, photo rows, logo_path,
 // banner_path, dish photo_path. One object failure means no row of any kind is written (no row may point at a missing object).
+// Uploads are always upsert:false: a name that exists is never written over (the plan already refused different bytes).
 // ctx = { sb, partnerId, uploads, bytesByPath: Map(path -> {buf,mime,sha256}), inserts, updates, logo, banner?, dishUpdates,
 //         replace, out(line), fail(what, error) }. Returns the failure count.
 export async function applyPlan(ctx) {
@@ -289,7 +310,7 @@ export async function applyPlan(ctx) {
   for (const u of ctx.uploads) {
     if (u.action === 'skip-identical') continue
     const it = bytesByPath.get(u.path)
-    const up = await sb.storage.from(BUCKET).upload(u.path, it.buf, { contentType: it.mime, upsert: u.action === 'replace', cacheControl: '3600' })
+    const up = await sb.storage.from(BUCKET).upload(u.path, it.buf, { contentType: it.mime, upsert: false, cacheControl: '3600' })
     if (up.error) { bad(`upload ${u.path}`, up.error); continue }
     const dl = await sb.storage.from(BUCKET).download(u.path)
     if (dl.error || sha256(Buffer.from(await dl.data.arrayBuffer())) !== it.sha256) { bad(`verify ${u.path}`, dl.error ?? 'bytes differ after upload'); continue }
@@ -301,16 +322,19 @@ export async function applyPlan(ctx) {
     if (ins.error) bad(`insert row ${r.storage_path}`, ins.error); else out(`row inserted ${r.storage_path}`)
   }
   for (const r of ctx.updates) {
-    const up = await sb.from('eatery_photos').update({ kind: r.kind, width: r.width, height: r.height, sort_order: r.sort_order }).eq('partner_id', partnerId).eq('storage_path', r.storage_path)
-    if (up.error) bad(`update row ${r.storage_path}`, up.error); else out(`row updated ${r.storage_path}`)
+    // Identified by the row id read at plan time (a repoint changes storage_path, so the new path would match nothing).
+    const up = await sb.from('eatery_photos').update({ kind: r.kind, storage_path: r.storage_path, width: r.width, height: r.height, sort_order: r.sort_order }).eq('partner_id', partnerId).eq('id', r.rowId).select('id')
+    if (up.error) bad(`update row ${r.storage_path}`, up.error)
+    else if (up.data?.length !== 1) bad(`update row ${r.storage_path}`, `${up.data?.length ?? 0} rows changed (expected 1)`)
+    else out(`row updated ${r.from && r.from !== r.storage_path ? `${r.from} -> ` : ''}${r.storage_path}`)
   }
   if (ctx.logo.action === 'set') {
     const up = await sb.from('eatery_partners').update({ logo_path: ctx.logo.path }).eq('id', partnerId)
-    if (up.error) bad('logo_path update', up.error); else out(`logo_path set ${ctx.logo.path}`)
+    if (up.error) bad('logo_path update', up.error); else out(`logo_path set ${ctx.logo.from ? `${ctx.logo.from} -> ` : ''}${ctx.logo.path}`)
   }
   if (ctx.banner?.action === 'set') {
     const up = await sb.from('eatery_partners').update({ banner_path: ctx.banner.path }).eq('id', partnerId)
-    if (up.error) bad('banner_path update', up.error); else out(`banner_path set ${ctx.banner.path}`)
+    if (up.error) bad('banner_path update', up.error); else out(`banner_path set ${ctx.banner.from ? `${ctx.banner.from} -> ` : ''}${ctx.banner.path}`)
   }
   for (const r of ctx.dishUpdates) {
     if (r.action === 'keep') continue
@@ -319,7 +343,7 @@ export async function applyPlan(ctx) {
     const up = await q.select('id')
     if (up.error) bad(`dish photo_path update item ${r.id}`, up.error)
     else if (up.data?.length !== 1) bad(`dish photo_path update item ${r.id}`, `${up.data?.length ?? 0} rows changed (expected 1)`)
-    else out(`dish photo_path set item ${r.id}`)
+    else out(`dish photo_path set item ${r.id}${r.from && r.from !== r.path ? ` ${r.from} -> ${r.path}` : ''}`)
   }
   return failed
 }
@@ -341,47 +365,97 @@ export function readiness(partner, menuItems, dishCount = 0) {
 // ─── plan: what would happen, given what already exists ─────────────────────
 // state = {
 //   existing: { [path]: { sha256 } | null }   object already in the bucket (null/absent = not there)
-//   rows:     [{ storage_path, kind, width, height, sort_order }]   this partner's eatery_photos rows
+//   rows:     [{ id, storage_path, kind, width, height, sort_order }]   this partner's eatery_photos rows
 //   logoPath: partner.logo_path, bannerPath: partner.banner_path
 // }
-// Returns { problems, uploads:[{path,action}], inserts:[...], updates:[...], logo:{action,path?} , orphans:[paths] }
+// A gallery/menu row is the slot (kind, sort_order); its storage_path is what changes when the bytes change. So a row is
+// found by its path first (same bytes, same name), else by its slot among rows no other image claimed (new bytes ->
+// REPOINT old -> new, needs replace). No row is ever claimed twice.
+// A name is a function of the bytes: an object at the planned path with other bytes is a collision, refused always.
+// Returns { problems, uploads:[{path,action}], inserts:[...], updates:[{..., rowId, from}], logo:{action,path?,from?}, banner, orphans:[paths] }
 export function plan(items, state, replace = false) {
   const problems = []
   const uploads = [], inserts = [], updates = []
+  const rows = state.rows || []
+  const moved = new Set()
+  // Pass 1: rows matched by PATH (same bytes, same name) are claimed first, so pass 2 (slot match) can never take the
+  // row of another image. Prepending a gallery photo: the old photo keeps its row (reorder), the new one gets an insert.
+  const claimed = new Map()   // row -> item path that owns it
+  const claim = (row, it) => {
+    if (claimed.has(row)) { problems.push(`${it.path}: its row is already claimed by '${claimed.get(row)}'`); return false }
+    claimed.set(row, it.path); return true
+  }
+  const owner = new Map()
+  for (const it of items) {
+    if (it.kind === 'logo' || it.kind === 'banner') continue
+    const byPath = rows.find(r => r.storage_path === it.path)
+    if (byPath && claim(byPath, it)) owner.set(it.path, byPath)
+  }
   for (const it of items) {
     const ex = state.existing?.[it.path]
     if (!ex) uploads.push({ path: it.path, action: 'upload' })
     else if (ex.sha256 === it.sha256) uploads.push({ path: it.path, action: 'skip-identical' })
-    else if (replace) uploads.push({ path: it.path, action: 'replace' })
-    else problems.push(`${it.path}: a DIFFERENT file already exists at this path (re-run with replace=true to overwrite)`)
+    else problems.push(`${it.path}: an object with DIFFERENT bytes already sits at this content-addressed name; refusing (nothing is overwritten)`)
     if (it.kind === 'logo' || it.kind === 'banner') continue
-    const row = (state.rows || []).find(r => r.storage_path === it.path)
     const want = { kind: it.kind, storage_path: it.path, width: it.width, height: it.height, sort_order: it.n }
-    if (!row) inserts.push(want)
-    else if (row.kind !== want.kind || row.width !== want.width || row.height !== want.height || row.sort_order !== want.sort_order) {
-      if (replace) updates.push(want)
+    const byPath = owner.get(it.path)
+    const slot = byPath ? [] : rows.filter(r => r.kind === it.kind && r.sort_order === it.n && !claimed.has(r))
+    if (slot.length > 1) { problems.push(`${it.path}: ${slot.length} existing ${it.kind} rows share order ${it.n}, cannot tell which to repoint`); continue }
+    const row = byPath ?? slot[0]
+    if (!row) { inserts.push(want); continue }
+    if (!byPath) claim(row, it)
+    moved.add(row.storage_path)
+    if (row.storage_path !== it.path) {
+      if (replace) updates.push({ ...want, rowId: row.id, from: row.storage_path })
+      else problems.push(`${it.kind} #${it.n}: row points at '${row.storage_path}', would move to '${it.path}' (re-run with replace=true)`)
+    } else if (row.kind !== want.kind || row.width !== want.width || row.height !== want.height || row.sort_order !== want.sort_order) {
+      if (replace) updates.push({ ...want, rowId: row.id, from: row.storage_path })
       else problems.push(`${it.path}: eatery_photos row differs (${row.width}x${row.height} order ${row.sort_order}); re-run with replace=true to update it`)
     }
   }
-  const logo = items.find(i => i.kind === 'logo')
-  let logoPlan = { action: 'none' }
-  if (logo) {
-    if (state.logoPath == null) logoPlan = { action: 'set', path: logo.path }
-    else if (state.logoPath === logo.path) logoPlan = { action: 'keep', path: logo.path }
-    else if (replace) logoPlan = { action: 'set', path: logo.path }
-    else problems.push(`logo_path is already '${state.logoPath}', manifest logo would be '${logo.path}' (re-run with replace=true)`)
+  const one = (item, cur, label) => {
+    if (!item) return { action: 'none' }
+    if (cur == null) return { action: 'set', path: item.path }
+    if (cur === item.path) return { action: 'keep', path: item.path }
+    if (replace) return { action: 'set', path: item.path, from: cur }
+    problems.push(`${label} is already '${cur}', manifest ${item.kind} would be '${item.path}' (re-run with replace=true)`)
+    return { action: 'none' }
   }
-  const banner = items.find(i => i.kind === 'banner')
-  let bannerPlan = { action: 'none' }
-  if (banner) {
-    if (state.bannerPath == null) bannerPlan = { action: 'set', path: banner.path }
-    else if (state.bannerPath === banner.path) bannerPlan = { action: 'keep', path: banner.path }
-    else if (replace) bannerPlan = { action: 'set', path: banner.path }
-    else problems.push(`banner_path is already '${state.bannerPath}', manifest banner would be '${banner.path}' (re-run with replace=true)`)
-  }
-  const mine = new Set(items.map(i => i.path))
-  const orphans = (state.rows || []).map(r => r.storage_path).filter(p => !mine.has(p))
+  const logoPlan = one(items.find(i => i.kind === 'logo'), state.logoPath, 'logo_path')
+  const bannerPlan = one(items.find(i => i.kind === 'banner'), state.bannerPath, 'banner_path')
+  const orphans = rows.map(r => r.storage_path).filter(p => !moved.has(p))
   return { problems, uploads, inserts, updates, logo: logoPlan, banner: bannerPlan, orphans }
+}
+
+// ─── prune: delete OLD objects no row references ────────────────────────────
+// A replaced image leaves its old object behind on purpose (a phone mid-load, or a session holding the old row, must
+// not 404). Pruning is its own explicit mode, never run after an upload. Pure: the caller reads the rows and the
+// bucket listing. objects = [{ path, created_at, updated_at }] (full bucket paths); referenced = Set of paths that ANY
+// row points at (logo_path, banner_path, eatery_photos.storage_path, eatery_menu_items.photo_path).
+// Boundary: an object exactly graceDays old IS deleted (older-or-equal); one second younger is kept.
+// Deletes only objects that are (1) directly inside `<slug>/`, (2) referenced by no row, (3) older than graceDays by
+// BOTH timestamps (the newer of created_at/updated_at decides), with a valid timestamp (no date = kept).
+// Returns { problems, delete:[path], keep:[{path, why}] }.
+export function planPrune({ slug, objects, referenced, now, graceDays = PRUNE_GRACE_DAYS }) {
+  const problems = []
+  const del = [], keep = []
+  if (typeof slug !== 'string' || !SLUG_RE.test(slug)) problems.push(`slug '${slug}' does not match ${SLUG_RE}`)
+  if (!(referenced instanceof Set)) problems.push('referenced set missing')
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) problems.push('now is not a valid Date')
+  if (problems.length) return { problems, delete: del, keep }
+  const prefix = `${slug}/`
+  const cutoff = now.getTime() - graceDays * 86400000
+  for (const o of objects) {
+    const path = String(o.path ?? '')
+    const rest = path.slice(prefix.length)
+    if (!path.startsWith(prefix) || rest === '' || rest.includes('/') || rest.includes('..')) { keep.push({ path, why: 'outside this slug folder' }); continue }
+    if (referenced.has(path)) { keep.push({ path, why: 'referenced by a row' }); continue }
+    const times = [o.created_at, o.updated_at].map(t => (t ? Date.parse(t) : NaN))
+    if (times.some(Number.isNaN)) { keep.push({ path, why: 'no usable timestamp' }); continue }
+    if (Math.max(...times) > cutoff) { keep.push({ path, why: `younger than ${graceDays} days` }); continue }
+    del.push(path)
+  }
+  return { problems, delete: del, keep }
 }
 
 // ─── file reading that never follows a link out of the partner folder ────────

@@ -34,10 +34,7 @@ if (process.argv.includes('--mutants')) {
     ['readiness: menu_verified_on check removed', '!partner.menu_verified_on', 'false'],
     ['readiness: menu check removed', "!(menuItems >= 1 || (partner.menu_url != null && String(partner.menu_url).trim() !== ''))", 'false'],
     ['readiness: missing partner passes', "if (!partner) return ['no eatery_partners row for this slug (run the data migration first)']", 'if (!partner) return []'],
-    ['different file overwrites silently', 'else if (replace) uploads.push({ path: it.path, action: \'replace\' })', "else if (true) uploads.push({ path: it.path, action: 'replace' })"],
     ['identical file re-uploaded', "ex.sha256 === it.sha256", 'false'],
-    ['logo overwrite without replace', "else if (replace) logoPlan", 'else if (true) logoPlan'],
-    ['photo row duplicate insert', 'if (!row) inserts.push(want)', 'if (true) inserts.push(want)'],
     ['symlink check removed', 'st.isSymbolicLink()', 'false'],
     ['realpath escape check removed', '!real.startsWith(root + sep)', 'false'],
     ['JPEG parser stops at first marker', 'i += 2 + len', 'return { error: "stop" }'],
@@ -58,9 +55,7 @@ if (process.argv.includes('--mutants')) {
     ['dish match: ambiguous name accepted', 'if (hit.length > 1) {', 'if (false) {'],
     ['dish match: item mapped twice accepted', 'if (taken.has(item.id))', 'if (false)'],
     ['dish match: Section > Name form dropped', '`${t(r.section)}${DISH_SEP}${t(r.name)}` === key', 'false'],
-    ['dish path wrong prefix', '`${slug}/dish-${item.id}.${d.format}`', '`${slug}/dishes-${item.id}.${d.format}`'],
     ['dish readiness: items not required', 'if (dishCount > 0 && !(menuItems >= 1))', 'if (false)'],
-    ['dish plan: different object overwrites silently', "else if (replace) uploads.push({ path: d.path, action: 'replace' })", "else if (true) uploads.push({ path: d.path, action: 'replace' })"],
     ['dish plan: foreign photo_path overwritten without replace', 'else if (replace) updates.push({ id: d.itemId', 'else if (true) updates.push({ id: d.itemId'],
     ['dish plan: identical object re-uploaded', "ex.sha256 === d.sha256", 'false'],
     ['apply: rows written despite a failed upload', 'if (failed) return failed', 'if (false) return failed'],
@@ -79,10 +74,34 @@ if (process.argv.includes('--mutants')) {
     ['banner: waiver floor removed', 'w.minWidth >= BANNER_WAIVER_FLOOR', 'true'],
     ['banner: waiver without banner accepted', 'if (manifest.banner === undefined) problems.push', 'if (false) problems.push'],
     ['banner: waiver reason unchecked', 'if (typeof w.reason !== \'string\' || w.reason.trim().length < 20) problems.push(`${tag}: reason', 'if (false) problems.push(`${tag}: reason'],
+    ['dish name drops the hash', "objectPath(slug, 'dish', item.id, d.sha256, d.format)", "`${slug}/dish-${item.id}.${d.format}`"],
+    ['every name drops the hash', "return `${slug}/${stem}-${hashTag(hex)}.${ext}`", "return `${slug}/${stem}.${ext}`"],
+    ['banner/logo name drops the hash', "const stem = kind === 'logo' || kind === 'banner' ? kind : `${kind}-${n}`", "const stem = kind === 'logo' || kind === 'banner' ? kind : `${kind}-${n}`; if (kind === 'banner' || kind === 'logo') return `${slug}/${kind}.${ext}`"],
+    ['hash is 6 chars, not 8', 'export const HASH_LEN = 8', 'export const HASH_LEN = 6'],
+    ['hash separated by a dot', "-${hashTag(hex)}.${ext}", ".${hashTag(hex)}.${ext}"],
+    ['upload uses upsert:true', 'upsert: false, cacheControl', 'upsert: true, cacheControl'],
+    ['plan: different bytes at a name overwrite (replace)', "else problems.push(`${it.path}: an object with DIFFERENT bytes", "else if (replace) uploads.push({ path: it.path, action: 'replace' }); else problems.push(`${it.path}: an object with DIFFERENT bytes"],
+    ['dish plan: different bytes at a name overwrite (replace)', "else problems.push(`${d.path}: an object with DIFFERENT bytes", "else if (replace) uploads.push({ path: d.path, action: 'replace' }); else problems.push(`${d.path}: an object with DIFFERENT bytes"],
+    ['plan: repoint without replace', "if (replace) updates.push({ ...want, rowId: row.id, from: row.storage_path })\n      else problems.push(`${it.kind} #", "if (true) updates.push({ ...want, rowId: row.id, from: row.storage_path })\n      else problems.push(`${it.kind} #"],
+    ['plan: row found by path only (slot match reverted)', 'const row = byPath ?? slot[0]', 'const row = byPath'],
+    ['plan: logo/banner repoint without replace', "if (replace) return { action: 'set', path: item.path, from: cur }", "if (true) return { action: 'set', path: item.path, from: cur }"],
+    ['plan: moved row still reported as orphan', 'moved.add(row.storage_path)', 'void 0'],
+    ['plan: slot match takes a row another image claimed', '&& !claimed.has(r))', ')'],
+    ['plan: two rows in one slot guessed', 'if (slot.length > 1) {', 'if (false) {'],
+    ['dish plan: repoint without replace', 'else if (replace) updates.push({ id: d.itemId', 'else if (true) updates.push({ id: d.itemId'],
+    ['apply: row update by path, not by id', ".eq('id', r.rowId).select('id')", ".eq('storage_path', r.from).select('id')"],
+    ['apply: row update of 0 rows not noticed', "else if (up.data?.length !== 1) bad(`update row", "else if (false) bad(`update row"],
+    ['prune: referenced objects deleted', 'if (referenced.has(path))', 'if (false)'],
+    ['prune: grace period ignored', 'if (Math.max(...times) > cutoff)', 'if (false)'],
+    ['prune: the OLDER timestamp decides', 'Math.max(...times) > cutoff', 'Math.min(...times) > cutoff'],
+    ['prune: missing timestamp deleted', 'times.some(Number.isNaN)', 'false'],
+    ['prune: slug prefix not checked', '!path.startsWith(prefix) ||', 'false ||'],
+    ['prune: prefix without the slash', 'const prefix = `${slug}/`', 'const prefix = slug'],
+    ['prune: nested paths allowed', "rest.includes('/') ||", ''],
+    ['prune: grace constant is 0', 'export const PRUNE_GRACE_DAYS = 7', 'export const PRUNE_GRACE_DAYS = 0'],
+    ['prune: bad slug accepted', "if (typeof slug !== 'string' || !SLUG_RE.test(slug)) problems.push(`slug '${slug}' does not match ${SLUG_RE}`)\n  if (!(referenced", "if (!(referenced"],
     ['banner: unknown key accepted', "'banner', 'bannerSizeWaiver',", "'banner', 'bannerSizeWaiver', 'banners',"],
-    ['banner: path not banner.<ext>', "w.kind === 'logo' || w.kind === 'banner' ? w.kind :", "w.kind === 'logo' ? 'logo' :"],
-    ['banner: overwrite without replace', 'else if (replace) bannerPlan', 'else if (true) bannerPlan'],
-    ['banner: row-write skipped for banner kind', "if (it.kind === 'logo' || it.kind === 'banner') continue", "if (it.kind === 'logo') continue"],
+    ['banner: row-write skipped for banner kind', "if (it.kind === 'logo' || it.kind === 'banner') continue\n    const want", "if (it.kind === 'logo') continue\n    const want"],
     ['banner: banner_path never written', "if (ctx.banner?.action === 'set') {", "if (false) {"],
   ]
   let bad = 0
@@ -158,7 +177,9 @@ const run = (m, f = rd, slug = 'crunchy-express') => L.validateLocal(slug, m, f)
   check('good fixture: no problems', r.problems.length === 0, r.problems.join(' | '))
   check('good fixture: 5 items', r.items.length === 5)
   const paths = r.items.map(i => i.path).join()
-  check('object paths are logo / gallery-n / menu-n with real-format extension', paths === 'crunchy-express/logo.png,crunchy-express/gallery-1.jpg,crunchy-express/gallery-2.jpg,crunchy-express/menu-1.webp,crunchy-express/menu-2.jpg', paths)
+  const h8 = n => L.sha256(files[n]).slice(0, 8)
+  check('object paths are logo / gallery-n / menu-n + sha256[0:8] with real-format extension', paths === `crunchy-express/logo-${h8('logo.png')}.png,crunchy-express/gallery-1-${h8('g1.jpg')}.jpg,crunchy-express/gallery-2-${h8('g2.jpeg')}.jpg,crunchy-express/menu-1-${h8('m1.webp')}.webp,crunchy-express/menu-2-${h8('m2.jpg')}.jpg`, paths)
+  check('hash is lowercase hex, hyphen-joined, one dot only', r.items.every(i => /-[0-9a-f]{8}\.[a-z]+$/.test(i.path) && i.path.split('.').length === 2))
   check('every path matches the DB regex', r.items.every(i => L.PATH_RE.test(i.path)))
 }
 check('RED bad slug (uppercase)', has(run(GOOD, rd, 'Crunchy_Express').problems, /slug/))
@@ -234,19 +255,19 @@ check('active partner is allowed (no readiness problem)', L.readiness({ ...P, is
   check('sort_order = manifest position', p0.inserts.filter(r => r.kind === 'menu').map(r => r.sort_order).join() === '1,2')
   const existing = Object.fromEntries(items.map(i => [i.path, { sha256: i.sha256 }]))
   const rows = p0.inserts.map(r => ({ ...r }))
-  const p1 = L.plan(items, { existing, rows, logoPath: 'crunchy-express/logo.png' })
+  const p1 = L.plan(items, { existing, rows, logoPath: items[0].path })
   check('rerun is a no-op (all skip, no rows, logo keep)', p1.problems.length === 0 && p1.uploads.every(u => u.action === 'skip-identical') && p1.inserts.length === 0 && p1.updates.length === 0 && p1.logo.action === 'keep')
   const other = { ...existing, [items[1].path]: { sha256: 'deadbeef' } }
   const p2 = L.plan(items, { existing: other, rows, logoPath: null })
-  check('RED different file at same path, no replace', has(p2.problems, /DIFFERENT file/))
+  check('RED different bytes at a content-addressed name (collision), no replace', has(p2.problems, /DIFFERENT bytes/))
   const p3 = L.plan(items, { existing: other, rows, logoPath: null }, true)
-  check('green with replace: that path becomes replace', p3.problems.length === 0 && p3.uploads.find(u => u.path === items[1].path).action === 'replace')
-  const p4 = L.plan(items, { existing, rows, logoPath: 'crunchy-express/logo.jpg' })
+  check('RED collision stays refused WITH replace: nothing is ever overwritten', has(p3.problems, /DIFFERENT bytes/) && !p3.uploads.some(u => u.action === 'replace'))
+  const p4 = L.plan(items, { existing, rows, logoPath: 'crunchy-express/logo.jpg' })   // legacy un-hashed name
   check('RED logo_path set to something else, no replace', has(p4.problems, /logo_path is already/))
-  check('green logo_path other with replace', L.plan(items, { existing, rows, logoPath: 'crunchy-express/logo.jpg' }, true).logo.action === 'set')
-  const p5 = L.plan(items, { existing, rows: rows.map(r => (r.sort_order === 1 && r.kind === 'gallery' ? { ...r, width: 1 } : r)), logoPath: 'crunchy-express/logo.png' })
+  check('green logo_path other with replace: set, with the old path as from', (() => { const l = L.plan(items, { existing, rows, logoPath: 'crunchy-express/logo.jpg' }, true).logo; return l.action === 'set' && l.from === 'crunchy-express/logo.jpg' && l.path === items[0].path })())
+  const p5 = L.plan(items, { existing, rows: rows.map(r => (r.sort_order === 1 && r.kind === 'gallery' ? { ...r, width: 1 } : r)), logoPath: items[0].path })
   check('RED photo row with different size, no replace', has(p5.problems, /row differs/))
-  const p6 = L.plan(items, { existing, rows: [...rows, { storage_path: 'crunchy-express/old.jpg', kind: 'gallery', width: 1, height: 1, sort_order: 9 }], logoPath: 'crunchy-express/logo.png' })
+  const p6 = L.plan(items, { existing, rows: [...rows, { storage_path: 'crunchy-express/old.jpg', kind: 'gallery', width: 1, height: 1, sort_order: 9 }], logoPath: items[0].path })
   check('rows outside the manifest are reported, never touched', p6.orphans.join() === 'crunchy-express/old.jpg' && p6.inserts.length === 0 && p6.problems.length === 0)
 }
 
@@ -318,7 +339,7 @@ check('dish problems never echo the item name', !has(dv({ 'Secret Name': 'nope.j
 {
   const { m } = dm({ 'Chicken Burger': 'burger.jpg', Fries: 'fries.png', ['Wraps' + SEP + 'Special']: 'wrap.jpg' })
   check('match: exact name, and Section > Name for a name in two sections', m.problems.length === 0 && m.resolved.map(r => r.itemId).join() === '11,12,13', m.problems.join(' | '))
-  check('match: object path = slug/dish-<id>.<ext>, DB regex', m.resolved.map(r => r.path).join() === 'crunchy-express/dish-11.jpg,crunchy-express/dish-12.png,crunchy-express/dish-13.jpg' && m.resolved.every(r => L.PATH_RE.test(r.path)), m.resolved.map(r => r.path).join())
+  check('match: object path = slug/dish-<id>-<h8>.<ext>, DB regex', m.resolved.map(r => r.path).join() === ['burger.jpg', 'fries.png', 'wrap.jpg'].map((f, i) => `crunchy-express/dish-${11 + i}-${L.sha256(dfiles[f]).slice(0, 8)}.${f.split('.')[1]}`).join() && m.resolved.every(r => L.PATH_RE.test(r.path)), m.resolved.map(r => r.path).join())
 }
 check('match: the qualified form also works for a unique name', dm({ ['Sides' + SEP + 'Fries']: 'fries.png' }).m.resolved[0]?.itemId === 12)
 check('match: name is case-exact (no fuzzy)', has(dm({ 'chicken burger': 'burger.jpg' }).m.problems, /matches no menu item/))
@@ -353,10 +374,10 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   check('dish plan: identical object but row still null -> upload skipped, row set', (() => { const p = L.planDishes(r, { existing, itemRows }); return p.uploads.every(u => u.action === 'skip-identical') && p.updates.every(u => u.action === 'set') })())
   check('dish plan: equal path, different dims -> row set', L.planDishes(r, { existing, itemRows: { ...done, 11: { ...done[11], photo_width: 1 } } }).updates[0].action === 'set')
   const diff = { ...existing, [r[0].path]: { sha256: 'deadbeef' } }
-  check('RED different object at the path, no replace', has(L.planDishes(r, { existing: diff, itemRows }).problems, /DIFFERENT file/))
-  check('green different object with replace -> replace', L.planDishes(r, { existing: diff, itemRows }, true).uploads[0].action === 'replace')
+  check('RED different bytes at the content-addressed name, no replace', has(L.planDishes(r, { existing: diff, itemRows }).problems, /DIFFERENT bytes/))
+  check('RED ... and still refused with replace (never overwrites)', has(L.planDishes(r, { existing: diff, itemRows }, true).problems, /DIFFERENT bytes/) && !L.planDishes(r, { existing: diff, itemRows }, true).uploads.some(u => u.action === 'replace'))
   const other = { ...itemRows, 11: { photo_path: 'crunchy-express/dish-11.png', photo_width: 1, photo_height: 1 } }
-  check('RED row has a different photo_path, no replace', has(L.planDishes(r, { existing: {}, itemRows: other }).problems, /already has photo_path/))
+  check('RED row has a different photo_path, no replace', has(L.planDishes(r, { existing: {}, itemRows: other }).problems, /already points at/))
   check('green different photo_path with replace -> set', L.planDishes(r, { existing: {}, itemRows: other }, true).updates[0].action === 'set')
   check('RED item row missing from state', has(L.planDishes(r, { existing: {}, itemRows: {} }).problems, /not found among/))
 
@@ -366,7 +387,7 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
     const sb = {
       calls,
       storage: { from: () => ({
-        upload: async (path, buf) => { calls.push(['upload', path]); if (path === failUpload) return { error: { statusCode: '500' } }; store[path] = buf; return { error: null } },
+        upload: async (path, buf, opts) => { calls.push(['upload', path, opts]); if (path === failUpload) return { error: { statusCode: '500' } }; store[path] = buf; return { error: null } },
         download: async path => { calls.push(['download', path]); const b = path === failVerify ? Buffer.from('tampered') : store[path]; return { data: { arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }, error: null } },
       }) },
       from: table => ({
@@ -378,13 +399,14 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   }
   const base = sb => ({
     sb, partnerId: 'p', uploads: p0.uploads, bytesByPath: new Map(r.map(d => [d.path, d])), inserts: [{ kind: 'gallery', storage_path: 'x' }], updates: [],
-    logo: { action: 'set', path: 'crunchy-express/logo.png' }, dishUpdates: p0.updates, replace: false, out: () => {}, fail: () => {},
+    logo: { action: 'set', path: 'crunchy-express/logo-aaaaaaaa.png' }, dishUpdates: p0.updates, replace: false, out: () => {}, fail: () => {},
   })
   const writes = sb => sb.calls.filter(c => c[0] === 'insert' || c[0] === 'update')
   { const sb = mkSb(); const f = await L.applyPlan(base(sb)); const w = writes(sb)
     check('apply: all green -> 0 failures, rows + logo + 2 dish updates written', f === 0 && w.filter(c => c[1] === 'eatery_menu_items').length === 2 && w.some(c => c[1] === 'eatery_photos') && w.some(c => c[1] === 'eatery_partners'), JSON.stringify(w.map(c => c.slice(0, 2))))
     check('apply: dish update sets photo_path/width/height guarded by null-or-equal', (() => { const c = w.find(x => x[1] === 'eatery_menu_items'); return c[2].photo_path === r[0].path && c[2].photo_width === r[0].width && c.ors.length === 1 && c.ors[0] === `photo_path.is.null,photo_path.eq.${r[0].path}` })())
     check('apply: every dish update is scoped by partner_id AND item id', (() => { const u = w.filter(x => x[1] === 'eatery_menu_items'); return u.length === 2 && u.every((c, i) => c.eqs.some(e => e[0] === 'partner_id' && e[1] === 'p') && c.eqs.some(e => e[0] === 'id' && e[1] === p0.updates[i].id)) })())
+    check('apply: every upload is upsert:false (nothing is overwritten)', sb.calls.filter(c => c[0] === 'upload').length === 2 && sb.calls.filter(c => c[0] === 'upload').every(c => c[2].upsert === false))
     check('apply: every upload comes before every row write', sb.calls.findLastIndex(c => c[0] === 'upload') < sb.calls.findIndex(c => c[0] === 'insert' || c[0] === 'update'))
   }
   { const sb = mkSb({ failUpload: r[1].path }); const f = await L.applyPlan(base(sb))
@@ -394,6 +416,7 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
     check('RED atomic: bytes differing after upload writes NO row', f === 1 && writes(sb).length === 0)
   }
   { const sb = mkSb(); const f = await L.applyPlan({ ...base(sb), replace: true })
+    check('apply with replace: still upsert:false', sb.calls.filter(c => c[0] === 'upload').every(c => c[2].upsert === false))
     check('apply with replace: no null-or-equal guard on the dish update', f === 0 && writes(sb).filter(c => c[1] === 'eatery_menu_items').every(c => c.ors.length === 0))
   }
   { const sb = mkSb({ rowsChanged: 0 }); const f = await L.applyPlan(base(sb))
@@ -407,15 +430,119 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   }
 }
 
+// ─── content-addressed names: identical -> skip, changed -> new name + repoint ──
+{
+  const items = run(GOOD).items
+  const g1 = items.find(i => i.kind === 'gallery' && i.n === 1)
+  const rowFor = (i, id) => ({ id, storage_path: i.path, kind: i.kind, width: i.width, height: i.height, sort_order: i.n })
+  const rowsNow = items.filter(i => i.kind === 'gallery' || i.kind === 'menu').map((i, k) => rowFor(i, k + 1))
+  const existing = Object.fromEntries(items.map(i => [i.path, { sha256: i.sha256 }]))
+  // same bytes -> same name, always
+  check('hash is deterministic over bytes (two validations, same names)', run(GOOD).items.map(i => i.path).join() === items.map(i => i.path).join())
+  check('different bytes -> different name', (() => { const a = run({ gallery: ['x.jpg'] }, () => jpeg(1200, 800, 4000)).items[0].path, b = run({ gallery: ['x.jpg'] }, () => jpeg(1200, 800, 4001)).items[0].path; return a !== b && L.PATH_RE.test(a) && L.PATH_RE.test(b) })())
+  check('same bytes under a different file name -> same object name', run({ gallery: ['a.jpg'] }, () => jpeg(1200, 800)).items[0].path === run({ gallery: ['zzz.jpg'] }, () => jpeg(1200, 800)).items[0].path)
+  const same = L.plan(items, { existing, rows: rowsNow, logoPath: items[0].path })
+  check('identical: skip everything, no insert/update, no replace needed', same.problems.length === 0 && same.uploads.every(u => u.action === 'skip-identical') && same.inserts.length === 0 && same.updates.length === 0 && same.logo.action === 'keep')
+  // changed gallery-1: new bytes -> new name, the SAME row is repointed (no duplicate slot)
+  const v2 = run({ ...GOOD }, n => (n === 'g1.jpg' ? jpeg(1200, 800, 4321) : files[n]))
+  const g1b = v2.items.find(i => i.kind === 'gallery' && i.n === 1)
+  check('changed file gets a NEW path', g1b.path !== g1.path && L.PATH_RE.test(g1b.path))
+  const noRep = L.plan(v2.items, { existing, rows: rowsNow, logoPath: items[0].path })
+  check('RED repoint without replace is refused, naming old and new', has(noRep.problems, /would move to/) && has(noRep.problems, new RegExp(g1.path)) && noRep.updates.length === 0)
+  const rep = L.plan(v2.items, { existing, rows: rowsNow, logoPath: items[0].path }, true)
+  const up = rep.updates.find(u => u.storage_path === g1b.path)
+  check('replace: ONE row update old -> new (by row id), no duplicate insert', rep.problems.length === 0 && rep.inserts.length === 0 && rep.updates.length === 1 && up.from === g1.path && up.rowId === 1 && rep.orphans.length === 0, JSON.stringify(rep))
+  check('replace: new object is an upload, the old is not touched (not in uploads)', rep.uploads.find(u => u.path === g1b.path).action === 'upload' && !rep.uploads.some(u => u.path === g1.path))
+  // legacy fixed names (today's rows) count as "different path"
+  const legacy = rowsNow.map(r => ({ ...r, storage_path: `crunchy-express/${r.kind}-${r.sort_order}.${r.storage_path.split('.').pop()}` }))
+  const lg = L.plan(items, { existing: {}, rows: legacy, logoPath: 'crunchy-express/logo.png' })
+  check('RED legacy un-hashed rows need replace', lg.problems.length === 5)
+  const lg2 = L.plan(items, { existing: {}, rows: legacy, logoPath: 'crunchy-express/logo.png' }, true)
+  check('legacy -> hashed with replace: 4 row repoints + logo moved, 0 inserts, 0 orphans', lg2.problems.length === 0 && lg2.updates.length === 4 && lg2.updates.every(u => u.from !== u.storage_path) && lg2.inserts.length === 0 && lg2.orphans.length === 0 && lg2.logo.action === 'set' && lg2.logo.from === 'crunchy-express/logo.png')
+  check('two rows in one slot are refused, not guessed', has(L.plan(items, { existing, rows: [...rowsNow, { ...rowsNow[0], id: 99, storage_path: 'crunchy-express/gallery-1-aaaaaaaa.jpg' }].map((r, i) => (i === 0 ? { ...r, storage_path: 'crunchy-express/gallery-1-bbbbbbbb.jpg' } : r)), logoPath: items[0].path }, true).problems, /share order/))
+  // prepend: manifest was [g1], now [new, g1]. The slot number is part of the name, so g1 becomes gallery-2-<h>: the old
+  // row (slot 1) is repointed to the new photo and g1 is an INSERT at slot 2. No row is lost, none updated twice.
+  {
+    const old1 = run({ gallery: ['g1.jpg'] }, rd).items.find(i => i.kind === 'gallery')
+    const row = { id: 1, storage_path: old1.path, kind: 'gallery', width: old1.width, height: old1.height, sort_order: 1 }
+    const nu = run({ gallery: ['new.jpg', 'g1.jpg'] }, n => (n === 'new.jpg' ? jpeg(1300, 900, 4100) : files[n]))
+    const pp = L.plan(nu.items, { existing: {}, rows: [row], logoPath: null }, true)
+    check('prepend: row 1 repointed to the new photo, g1 inserted at slot 2', pp.problems.length === 0 && pp.inserts.length === 1 && pp.inserts[0].sort_order === 2 && pp.updates.length === 1 && pp.updates[0].rowId === 1 && pp.updates[0].from === old1.path && pp.updates[0].sort_order === 1, JSON.stringify(pp))
+    // a row whose own sort_order disagrees with the slot in its name (hand-edited): claimed by PATH first, never taken twice
+    const g2 = nu.items.find(i => i.kind === 'gallery' && i.n === 2)
+    const odd = { id: 5, storage_path: g2.path, kind: 'gallery', width: g2.width, height: g2.height, sort_order: 1 }
+    const pq = L.plan(nu.items, { existing: {}, rows: [odd], logoPath: null }, true)
+    check('double-claim: the row owned by path is reordered once; the other image inserts (never takes the same row)', pq.problems.length === 0 && pq.inserts.length === 1 && pq.inserts[0].sort_order === 1 && pq.updates.length === 1 && pq.updates[0].rowId === 5 && pq.updates[0].from === pq.updates[0].storage_path && pq.updates[0].sort_order === 2, JSON.stringify(pq))
+    check('no row id is updated twice', new Set([...pp.updates, ...pq.updates].map(u => u.rowId)).size === 2)
+  }
+  // dish repoint
+  const dr = dm({ 'Chicken Burger': 'burger.jpg' }).m.resolved
+  const legacyDish = { 11: { photo_path: 'crunchy-express/dish-11.jpg', photo_width: 900, photo_height: 1200 } }
+  const dp = L.planDishes(dr, { existing: {}, itemRows: legacyDish })
+  check('RED dish repoint (legacy path) without replace is refused', has(dp.problems, /would move to this path/))
+  const dp2 = L.planDishes(dr, { existing: {}, itemRows: legacyDish }, true)
+  check('dish repoint with replace: set, from = old path, new object is an upload', dp2.problems.length === 0 && dp2.updates[0].action === 'set' && dp2.updates[0].from === 'crunchy-express/dish-11.jpg' && dp2.uploads[0].action === 'upload')
+  check('dish name carries the hash (dish-<id>-<h8>)', new RegExp(`^crunchy-express/dish-11-${L.sha256(dfiles['burger.jpg']).slice(0, 8)}\\.jpg$`).test(dr[0].path))
+}
+
+// ─── apply: repointing a gallery row, verify-before-row-write ────────────────
+{
+  const items = run(GOOD).items
+  const g = items.find(i => i.kind === 'gallery' && i.n === 1)
+  const calls = [], store = {}
+  const sb = {
+    storage: { from: () => ({
+      upload: async (path, buf, opts) => { calls.push(['upload', path, opts]); store[path] = buf; return { error: null } },
+      download: async path => { calls.push(['download', path]); const b = store[path]; return { data: { arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }, error: null } },
+    }) },
+    from: table => ({ update: vals => { const rec = ['update', table, vals, []]; calls.push(rec); const q = { eq: (c, v) => { rec[3].push([c, v]); return q }, select: async () => ({ data: [{ id: 7 }], error: null }) }; return q } }),
+  }
+  const upd = { kind: 'gallery', storage_path: g.path, width: g.width, height: g.height, sort_order: 1, rowId: 7, from: 'crunchy-express/gallery-1.jpg' }
+  const f = await L.applyPlan({ sb, partnerId: 'p', uploads: [{ path: g.path, action: 'upload' }], bytesByPath: new Map([[g.path, g]]), inserts: [], updates: [upd], logo: { action: 'none' }, dishUpdates: [], replace: true, out: () => {}, fail: () => {} })
+  const u = calls.find(c => c[0] === 'update')
+  check('repoint apply: 0 failures, row updated BY ID with the new storage_path', f === 0 && u[2].storage_path === g.path && u[3].some(e => e[0] === 'id' && e[1] === 7) && !u[3].some(e => e[0] === 'storage_path'))
+  check('repoint apply: upload, then download-verify, THEN the row write', calls.findIndex(c => c[0] === 'upload') < calls.findIndex(c => c[0] === 'download') && calls.findIndex(c => c[0] === 'download') < calls.findIndex(c => c[0] === 'update'))
+  check('repoint apply: upsert:false', calls.find(c => c[0] === 'upload')[2].upsert === false)
+  const sb2 = { ...sb, from: () => ({ update: () => ({ eq() { return this }, select: async () => ({ data: [], error: null }) }) }) }
+  const f2 = await L.applyPlan({ sb: sb2, partnerId: 'p', uploads: [], bytesByPath: new Map(), inserts: [], updates: [upd], logo: { action: 'none' }, dishUpdates: [], replace: true, out: () => {}, fail: () => {} })
+  check('RED a repoint that changed 0 rows is a failure', f2 === 1)
+}
+
+// ─── prune ──────────────────────────────────────────────────────────────────
+{
+  const NOW = new Date('2026-11-20T12:00:00Z')
+  const ago = d => new Date(NOW.getTime() - d * 86400000).toISOString()
+  const S = 'crunchy-express'
+  const obj = (name, created, updated = created, slug = S) => ({ path: `${slug}/${name}`, created_at: created, updated_at: updated })
+  const refs = new Set([`${S}/logo-aaaaaaaa.png`, `${S}/dish-1-bbbbbbbb.jpg`])
+  const pr = (objects, extra = {}) => L.planPrune({ slug: S, objects, referenced: refs, now: NOW, ...extra })
+  check('PRUNE_GRACE_DAYS is 7', L.PRUNE_GRACE_DAYS === 7)
+  const old = obj('logo.png', ago(30))
+  check('prune: an old unreferenced object is deleted', pr([old]).delete.join() === old.path)
+  check('prune: a REFERENCED object is never deleted, however old', pr([obj('logo-aaaaaaaa.png', ago(400)), obj('dish-1-bbbbbbbb.jpg', ago(400))]).delete.length === 0)
+  check('prune: referenced + unreferenced mixed -> only the unreferenced old one', pr([obj('logo-aaaaaaaa.png', ago(400)), old]).delete.join() === old.path)
+  check('prune: within the grace period nothing is deleted (6 days)', pr([obj('x.jpg', ago(6))]).delete.length === 0)
+  check('prune: 8 days old is deleted', pr([obj('x.jpg', ago(8))]).delete.length === 1)
+  check('prune: old created_at but fresh updated_at is kept (the newer one decides)', pr([obj('x.jpg', ago(90), ago(1))]).delete.length === 0)
+  check('prune: fresh created_at but old updated_at is kept too', pr([obj('x.jpg', ago(1), ago(90))]).delete.length === 0)
+  check('prune: a missing/garbled timestamp is kept, not deleted', pr([obj('x.jpg', null), obj('y.jpg', 'not a date')]).delete.length === 0)
+  check('prune: another slug never touched (prefix compared with the slash)', pr([obj('logo.png', ago(30), ago(30), 'crunchy-express-2'), obj('logo.png', ago(30), ago(30), 'bidda-badadez'), { path: 'crunchy-express', created_at: ago(30), updated_at: ago(30) }, { path: 'crunchy-express-old.png', created_at: ago(30), updated_at: ago(30) }]).delete.length === 0)
+  check('prune: a nested path or .. is never deleted', pr([obj('sub/x.jpg', ago(30)), obj('../bidda-badadez/logo.png', ago(30))]).delete.length === 0)
+  check('prune: every deletion path starts with <slug>/ and sits directly in it', pr([old, obj('b.jpg', ago(20)), obj('logo.png', ago(30), ago(30), 'other')]).delete.every(p => p.startsWith(`${S}/`) && !p.slice(S.length + 1).includes('/')))
+  check('prune: RED bad slug, missing referenced set, bad now are refused with nothing to delete', ['', 'A/b'].every(sl => L.planPrune({ slug: sl, objects: [old], referenced: refs, now: NOW }).delete.length === 0 && L.planPrune({ slug: sl, objects: [old], referenced: refs, now: NOW }).problems.length) && L.planPrune({ slug: S, objects: [old], referenced: null, now: NOW }).delete.length === 0 && L.planPrune({ slug: S, objects: [old], referenced: refs, now: new Date('x') }).delete.length === 0)
+  check('prune: boundary pinned, exactly 7 days old IS deleted, 7 days minus 1 s is kept', pr([obj('x.jpg', ago(7))]).delete.length === 1 && pr([obj('y.jpg', new Date(NOW.getTime() - 7 * 86400000 + 1000).toISOString())]).delete.length === 0)
+  check('prune: honours a custom grace', pr([obj('x.jpg', ago(3))], { graceDays: 2 }).delete.length === 1)
+}
+
 // ─── banner ─────────────────────────────────────────────────────────────────
 {
   const bf = { 'b.jpg': jpeg(1600, 1000), 'small.jpg': jpeg(757, 473), 'tall.jpg': jpeg(1000, 1200), 'sq.jpg': jpeg(1000, 1000), 'b2.jpg': jpeg(1500, 900), 'logo.png': png(512, 512) }
   const rb = n => bf[n] ?? null
   const WV = { minWidth: 700, reason: 'Only a 757 px original exists; cropped around the wrap', approvedBy: 'Berke', date: '2026-10-30' }
   const ok = run({ banner: 'b.jpg' }, rb)
-  check('banner: no problems, planned path <slug>/banner.jpg', ok.problems.length === 0 && ok.items[0]?.path === 'crunchy-express/banner.jpg' && ok.items[0].kind === 'banner', ok.problems.join(' | '))
+  check('banner: no problems, planned path <slug>/banner-<h8>.jpg', ok.problems.length === 0 && ok.items[0]?.path === `crunchy-express/banner-${L.sha256(bf['b.jpg']).slice(0, 8)}.jpg` && ok.items[0].kind === 'banner', ok.problems.join(' | '))
   check('banner path matches the DB regex', ok.items.every(i => L.PATH_RE.test(i.path)))
-  check('banner: png keeps its real extension', run({ banner: 'x.png' }, () => png(1200, 700)).items[0]?.path === 'crunchy-express/banner.png')
+  check('banner: png keeps its real extension', /^crunchy-express\/banner-[0-9a-f]{8}\.png$/.test(run({ banner: 'x.png' }, () => png(1200, 700)).items[0]?.path))
   check('RED banner not a string', has(run({ banner: ['b.jpg'] }, rb).problems, /manifest.banner must be/))
   check('RED banner missing file', has(run({ banner: 'nope.jpg' }, rb).problems, /not found/))
   check('RED banner 999 wide, no waiver', has(run({ banner: 'x.jpg' }, () => jpeg(999, 600)).problems, /width must be >= 1000/))
@@ -450,8 +577,9 @@ check('readiness: no dishes, menu_url only is still fine', L.readiness({ ...P, m
   check('banner plan: equal path -> keep', pb({ bannerPath: it.path, existing: { [it.path]: { sha256: it.sha256 } } }).banner.action === 'keep')
   check('RED banner plan: different banner_path, no replace', has(pb({ bannerPath: 'crunchy-express/banner.png' }).problems, /banner_path is already/))
   check('green banner plan: different banner_path with replace -> set', pb({ bannerPath: 'crunchy-express/banner.png' }, true).banner.action === 'set')
-  check('RED banner plan: different object at the path, no replace', has(pb({ existing: { [it.path]: { sha256: 'deadbeef' } } }).problems, /DIFFERENT file/))
-  check('green banner plan: different object with replace -> replace', pb({ existing: { [it.path]: { sha256: 'deadbeef' } } }, true).uploads[0].action === 'replace')
+  check('RED banner plan: different bytes at the name, no replace', has(pb({ existing: { [it.path]: { sha256: 'deadbeef' } } }).problems, /DIFFERENT bytes/))
+  check('RED banner plan: ... and still refused with replace', has(pb({ existing: { [it.path]: { sha256: 'deadbeef' } } }, true).problems, /DIFFERENT bytes/))
+  check('green banner plan: legacy banner.jpg with replace -> set with from', (() => { const b = pb({ bannerPath: 'crunchy-express/banner.jpg' }, true).banner; return b.action === 'set' && b.from === 'crunchy-express/banner.jpg' && b.path === it.path })())
   check('no banner in the manifest -> banner action none', L.plan(run(GOOD).items, { existing: {}, rows: [], logoPath: null, bannerPath: 'x/banner.jpg' }).banner.action === 'none')
   // apply
   const mk = ({ failUpload = null, failVerify = null } = {}) => {
