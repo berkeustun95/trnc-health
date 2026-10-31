@@ -3,6 +3,9 @@
 # CI-only (scripts/lib/prod-write-guard.mjs). Default is a dry run. Each Places call is
 # billed: set `limit` for a look.
 #
+# NO STANDING PLACES KEY (since 2026-10-31). Before a run: create a fresh Places-only key in
+# ada-app-499617 and set it as production secret GOOGLE_PLACES_API_KEY; after: delete both.
+#
 #   gh workflow run hotels-geocode -f limit=5        # dry, first 5 unpinned hotels
 #   gh workflow run hotels-geocode -f apply=true     # write pins
 #
