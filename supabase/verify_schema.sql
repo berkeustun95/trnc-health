@@ -4119,6 +4119,10 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
       OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    UNION ALL SELECT '20261152_bidda_badadez_activate','bidda-badadez is_active = true with order_method phone and no whatsapp, once 1152 is applied; red later = it was deactivated or switched to basket orders, review it',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261152_bidda_badadez_activate.sql')
+      OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true AND to_jsonb(p)->>'order_method' = 'phone' AND p.whatsapp IS NULL
+                     FROM public.eatery_partners p WHERE p.slug = 'bidda-badadez'), false)
     -- 1151: eatery_partners.banner_path. Nullable text, NO default, no column-level ACL (the table-level SELECT covers it), the CHECK is
     --       logo_path_check with the column renamed (compared as renamed text, so no regex decoding; the rendering is PG-18-only until read from
     --       prod), the COMMENT names the bucket, launch_complete_check does NOT mention banner_path (a banner is optional), anon/authenticated
