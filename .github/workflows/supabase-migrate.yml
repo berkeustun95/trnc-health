@@ -1,10 +1,15 @@
-# ─── Apply ONE migration to production ───────────────────────────────────────
+# ─── Apply migrations to production: one file, or a release's files in ONE run ─
 #
 # The only migration path: no Mac holds a production credential. Manual only — never
 # on push. Engine and every refusal rule: scripts/supabase-migrate.mjs.
 #
 #   gh workflow run supabase-migrate -f file=<full name>.sql               # dry: SQL + ledger check
 #   gh workflow run supabase-migrate -f file=<full name>.sql -f apply=true
+#   gh workflow run supabase-migrate -f files="<a>.sql <b>.sql" -f apply=true   # a release, ONE approval
+#
+# `files` (2026-10-31): the release's pending files, space-separated, in name order = apply
+# order. Each file is still its own transaction; the first failure stops the run and the log
+# names what committed. QUERY 1 runs once, after the last file. Exactly one of file / files.
 #
 # Three jobs (2026-10-12): `dry` always runs. With apply=true, `approve` then waits in the
 # `production-db` environment until Berke approves it in GitHub (Actions → the run → Review
@@ -21,9 +26,13 @@ on:
   workflow_dispatch:
     inputs:
       file:
-        description: 'FULL migration file name in supabase/migrations/ (prefixes repeat)'
+        description: 'ONE full migration file name in supabase/migrations/ (prefixes repeat)'
         type: string
-        required: true
+        required: false
+      files:
+        description: 'OR several full file names, space-separated, in name order (one approval for all)'
+        type: string
+        required: false
       apply:
         description: 'Apply to production (otherwise a dry run)'
         type: boolean
@@ -44,6 +53,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_FILE: ${{ inputs.file }}
+      IN_FILES: ${{ inputs.files }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -55,8 +65,16 @@ jobs:
           done
       - name: Ledger tool self-check
         run: node scripts/migration-ledger.mjs --verify 20261065_hotels_commons_photo_credit.sql
+      - name: Offline proofs
+        run: node scripts/test-supabase-migrate.mjs
       - name: Migrate (dry)
-        run: node scripts/supabase-migrate.mjs "$IN_FILE"
+        run: |
+          set -f
+          list=($(printf '%s' "$IN_FILE $IN_FILES" | tr -s '[:space:]' ' '))
+          [ -z "$IN_FILE" ] || [ -z "$IN_FILES" ] || { echo "::error::set file OR files, not both"; exit 1; }
+          [ "${#list[@]}" -gt 0 ] || { echo "::error::no migration file given"; exit 1; }
+          for f in "${list[@]}"; do [[ "$f" =~ ^[0-9]+_[a-z0-9_]+\.sql$ ]] || { echo "::error::not a migration file name: $f"; exit 1; }; done
+          node scripts/supabase-migrate.mjs --dry "${list[@]}"
 
   approve:
     if: ${{ inputs.apply }}
@@ -67,8 +85,13 @@ jobs:
     permissions: {}
     env:
       IN_FILE: ${{ inputs.file }}
+      IN_FILES: ${{ inputs.files }}
     steps:
-      - run: echo "Apply of $IN_FILE approved for production."
+      - run: |
+          set -f
+          list=($(printf '%s' "$IN_FILE $IN_FILES" | tr -s '[:space:]' ' '))
+          echo "Apply of ${#list[@]} file(s) approved for production, in this order:"
+          printf '  %s\n' "${list[@]}"
 
   apply:
     if: ${{ inputs.apply }}
@@ -82,6 +105,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_FILE: ${{ inputs.file }}
+      IN_FILES: ${{ inputs.files }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -94,4 +118,10 @@ jobs:
       - name: Ledger tool self-check
         run: node scripts/migration-ledger.mjs --verify 20261065_hotels_commons_photo_credit.sql
       - name: Migrate (apply)
-        run: node scripts/supabase-migrate.mjs "$IN_FILE" --apply
+        run: |
+          set -f
+          list=($(printf '%s' "$IN_FILE $IN_FILES" | tr -s '[:space:]' ' '))
+          [ -z "$IN_FILE" ] || [ -z "$IN_FILES" ] || { echo "::error::set file OR files, not both"; exit 1; }
+          [ "${#list[@]}" -gt 0 ] || { echo "::error::no migration file given"; exit 1; }
+          for f in "${list[@]}"; do [[ "$f" =~ ^[0-9]+_[a-z0-9_]+\.sql$ ]] || { echo "::error::not a migration file name: $f"; exit 1; }; done
+          node scripts/supabase-migrate.mjs "${list[@]}" --apply

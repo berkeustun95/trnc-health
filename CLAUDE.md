@@ -63,6 +63,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   only approver**, `prevent_self_review` ON, admin bypass OFF — so **production runs are started by Code**
   (a run Berke starts himself cannot be approved by him). Code never approves a deployment (PreToolUse hook
   `.claude/hooks/deny-deploy-approval.sh`, also in `~/.claude/settings.json`; keep it).
+  **Image uploads no longer sit behind it** (Berke, 2026-10-31): an `eatery-images` upload apply runs on its own
+  after a clean dry, from the `production-storage` environment (main only, no reviewers, service key + URL only).
+  Accepted consequence: an image committed to `data/eatery/` on main can be uploaded and rows repointed with no
+  human gate. A prune (deletes) still waits for `production-db`.
 - ⚠ **Local Claude sessions act on GitHub as the App `ada-claude-code[bot]`, never as `berkeustun95`**
   (2026-10-18; App 5372493, installation 172817185, `trnc-health` only). `gh` = wrapper `~/.local/bin/gh`,
   git over https = credential helper, both minting a 1-hour token from `~/.config/ada-claude-code/` (private
@@ -146,6 +150,8 @@ adds `environment: production`. Check a secret's identity with `key-fingerprint`
   for the run, set it as `production` secret `GOOGLE_PLACES_API_KEY`, then delete key + secret after.
   HotelRunner links: `hotelrunner-links -f mode=--apply` (writes `data/kitob/hotelrunner-links.json`, clears unlisted hotels).
 - Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
+- Eatery images: `eatery-images -f slug=<slug>` (dry), `-f apply=true` applies with NO approval once the dry is
+  clean (adds objects / repoints rows only); `-f prune=true -f apply=true` deletes and waits for `production-db`.
 - Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
   `novest-images` also runs on schedule at 05:20 / 15:20 UTC and APPLIES (approved 2026-10-11): add-only,
   a no-op when nothing is due, red on any failed image. Until it runs, a new listing stays hidden.
@@ -158,6 +164,9 @@ adds `environment: production`. Check a secret's identity with `key-fingerprint`
   listings photo-less), notify). A red run emails. `npm run novest:verify` is post-import only, by hand in CI.
 - Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`, which
   WAITS until Berke approves the `production-db` environment in GitHub (Actions → the run → Review deployments).
+  **A release's migrations go in ONE run** (one approval): `-f files="<a>.sql <b>.sql"`, the explicit list of
+  that release's pending files in name order (never "whatever the ledger lacks": some files stay unapplied on
+  purpose). Each file is its own transaction; the first failure stops the run and names what committed.
   Stamp first (`node scripts/migration-ledger.mjs --stamp <file>`; `--verify` checks it). Never `db push`:
   prod has no CLI ledger and 13 prefixes repeat. Details: supabase/CLAUDE.md.
 
@@ -382,6 +391,8 @@ violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal re
 0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
 Berke's `production-db` approval.
 Sync PRs from `main` into a release branch (`release/**`) count as Mac Code's own PRs.
+**Draft → ready is Code's job** (Berke, 2026-10-31): when a PR is ready (reviews/QA passed, checks green), Code
+runs `gh pr ready <n>` itself and tells Berke "ready to merge" with the PR link; he never has to undraft it.
 
 **Hermes server** (Hetzner `<HERMES_HOST>`, address + SSH route in vault `2026-10-18_claude-code-github-identity.md`; Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
 team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or

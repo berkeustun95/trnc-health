@@ -6,8 +6,8 @@
 //   node scripts/eatery-images.mjs --slug=crunchy-express --prune [--apply]  # separate mode: list/delete OLD unreferenced objects
 //   options: --report=path.json  (plan + sanitised codes only: the artifact is PUBLIC-downloadable on this repo; no raw error text)
 //
-// CI-only for anything that writes (scripts/lib/prod-write-guard.mjs). Workflow: eatery-images, whose apply
-// path waits for Berke's approval in the `production-db` environment.
+// CI-only for anything that writes (scripts/lib/prod-write-guard.mjs). Workflow: eatery-images. An upload apply
+// runs without approval once its dry is clean; a --prune apply waits for Berke's approval in `production-db`.
 // ⚠ A manifest with a "banner" entry needs migration 20261151 (eatery_partners.banner_path) APPLIED: the partner
 //   select reads banner_path, so every run (dry included) fails on a database without the column. Even a dry run needs the service key
 // (inactive rows are invisible to anon), so it too runs in CI.
