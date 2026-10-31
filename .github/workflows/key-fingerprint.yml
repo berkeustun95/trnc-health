@@ -8,8 +8,10 @@
 #
 # Also the before/after check when a secret moves between repository and environment scope
 # (2026-10-12: the five production secrets moved into the `production` environment).
-# `-f environment=production-storage` (2026-10-31): the eatery-images copy of the service key + URL must
-# print the same fingerprint as `production`'s. A secret that environment lacks prints "is empty".
+# `-f environment=production-storage` (2026-10-31): EXPO_PUBLIC_SUPABASE_URL must match `production`'s;
+# SUPABASE_SERVICE_ROLE_KEY is DELIBERATELY different (production-storage's own sb_secret_ key, revocable
+# alone): prove it with a passing eatery-images dry run, never by copying production's key over it.
+# A secret that environment lacks prints "is empty".
 
 name: key-fingerprint
 
