@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─── KITOB hotels → a pin: OSM where it agrees, else the corroborated Google Place ─
 //
-//   gh workflow run hotels-geocode -f limit=10            # dry run (GOOGLE_PLACES_API_KEY is a repo secret)
+//   gh workflow run hotels-geocode -f limit=10            # dry run (GOOGLE_PLACES_API_KEY: per-run key, see hotels-geocode.yml)
 //   gh workflow run hotels-geocode -f apply=true          # write (needs 20261062)
 //
 // POLICY (Berke 2026-09-29, revised; CLAUDE.md "Geocoding"): Google Places pins are accepted as

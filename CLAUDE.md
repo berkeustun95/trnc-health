@@ -31,7 +31,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
 - ⚠ **Production DATA is written only from GitHub Actions** (see "Production operations"). The service
-  key, Places/geocoding key and ORS key live only in the GitHub `production` environment (deployable from
+  key and ORS key live only in the GitHub `production` environment (deployable from
   `main` only; since 2026-10-12) — never repo-level, never on this Mac, never in the Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
   writer = new `workflow_dispatch` workflow, dry by default.
 - ⚠ **Supabase CLI on this Mac (Berke, 2026-10-07; replaces the 2026-10-01 "never `supabase login`").**
@@ -142,6 +142,8 @@ adds `environment: production`. Check a secret's identity with `key-fingerprint`
 - Gişe Kıbrıs sync: `gisekibris-feed` (also daily 04:15 UTC). Health: its Content health step.
 - Hotels: `hotels-import -f file=data/kitob/<f>.csv -f list_date=YYYY-MM-DD`, `hotels-window -f mode=--apply|--rollback`,
   geocoding `hotels-geocode -f limit=N` (Places calls are billed; an apply commits google-pins.csv back).
+  **No standing Places key** (server-geocode-temp deleted 2026-10-31): create a fresh Places-only key in ada-app-499617
+  for the run, set it as `production` secret `GOOGLE_PLACES_API_KEY`, then delete key + secret after.
   HotelRunner links: `hotelrunner-links -f mode=--apply` (writes `data/kitob/hotelrunner-links.json`, clears unlisted hotels).
 - Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
 - Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
