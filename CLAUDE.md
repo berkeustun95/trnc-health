@@ -32,7 +32,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
 - ⚠ **Production DATA is written only from GitHub Actions** (see "Production operations"). The service
   key and ORS key live only in the GitHub `production` environment (deployable from
-  `main` only; since 2026-10-12) — never repo-level, never on this Mac, never in the Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
+  `main` only; since 2026-10-12), plus `production-storage`'s OWN secret key (below) — never repo-level, never on this Mac, never in the Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
   writer = new `workflow_dispatch` workflow, dry by default.
 - ⚠ **Supabase CLI on this Mac (Berke, 2026-10-07; replaces the 2026-10-01 "never `supabase login`").**
   Long-term login in the Keychain ("Supabase CLI"), token scoped to trnc-health only: Project Settings
@@ -65,6 +65,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   `.claude/hooks/deny-deploy-approval.sh`, also in `~/.claude/settings.json`; keep it).
   **Image uploads no longer sit behind it** (Berke, 2026-10-31): an `eatery-images` upload apply runs on its own
   after a clean dry, from the `production-storage` environment (main only, no reviewers, service key + URL only).
+  **`production-storage` holds its OWN Supabase secret key** (`sb_secret_…`, Berke 2026-10-31), deliberately
+  NOT production's: its fingerprint differs from `production`'s by design. The check is "an eatery-images dry
+  run passes", not "fingerprint matches production". Revoke it in Supabase → API keys without touching any
+  other lane (then the image lane fails until a new key is set there).
   Accepted consequence: an image committed to `data/eatery/` on main can be uploaded and rows repointed with no
   human gate. A prune (deletes) still waits for `production-db`.
 - ⚠ **Local Claude sessions act on GitHub as the App `ada-claude-code[bot]`, never as `berkeustun95`**

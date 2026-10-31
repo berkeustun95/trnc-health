@@ -23,8 +23,8 @@
 # PRUNE (prune=true + apply=true) deletes, so it keeps the approval: `approve` waits in `production-db` until
 # Berke approves it (Actions → the run → Review deployments); only then does `apply` run. The approve job
 # holds no secret. `apply` runs from main only.
-# Secrets come from the `production-storage` environment (main only, no reviewers): the service key + URL
-# and nothing else, so this workflow never sees the Management API token (schema) or the Places/ORS keys.
+# Secrets come from the `production-storage` environment (main only, no reviewers): its OWN Supabase secret
+# key (not production's; revocable alone, proven by a passing dry run) + URL and nothing else, so this workflow never sees the Management API token (schema) or the Places/ORS keys.
 # The service key itself is not storage-scoped: the scope is this script (bucket eatery-images + the
 # eatery photo/logo/banner/dish path columns). Public repo: stdout carries counts and keys
 # only. The eatery-images-report artifact is NOT private: anyone signed in to GitHub can download it and
