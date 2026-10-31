@@ -763,7 +763,9 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   eq('banner wiring: showBanner comes from eateryBannerOn(eateryImageUrl(partner.banner_path ?? null), bannerFailed)', /const bannerUri = eateryImageUrl\(partner\.banner_path \?\? null\)/.test(sc) && /const showBanner = eateryBannerOn\(bannerUri, bannerFailed\)/.test(sc), true)
   eq('banner wiring: a load error falls back (onError -> setBannerFailed(true))', sc.includes('onError={() => setBannerFailed(true)}'), true)
   const cols = fs.readFileSync(new URL('../screens/EateryScreen.js', import.meta.url), 'utf8').match(/const COLS = ([\s\S]*?)\n\nfunction /)?.[1] || ''
-  eq('ordering rule: COLS is read and does NOT select banner_path (20261151 not applied)', [cols.length > 100, cols.includes('banner_path'), /select\([^)]*banner_path/.test(list)], [true, false, false])
+  // This branch must only merge AFTER 20261151 is applied on prod: COLS naming a missing column is 42703 and empties the eatery list.
+  // Home and the map pass only the slug to the partner page (App.js resolves it against these rows), so their column lists stay banner-free.
+  eq('ordering rule: COLS selects banner_path (requires 20261151 applied)', [cols.length > 100, cols.includes('banner_path')], [true, true])
   eq('overlap maths: content paddingTop = BANNER_H - 112 (128 at 240)', [bannerContentPad(), bannerContentPad() === EATERY_BANNER_H - 112, EATERY_BANNER_H, BANNER_BAR_ROW], [128, true, 240, 56])
   eq('overlap wiring: banner-only paddingTop from bannerContentPad(), ScrollView marginTop = insets.top + BANNER_BAR_ROW', [sc.includes('showBanner && { paddingTop: bannerContentPad() }'), sc.includes('marginTop: insets.top + BANNER_BAR_ROW')], [true, true])
   eq('layout wiring: safe-area top edge dropped only in banner mode; ScreenHeader only without a banner', [sc.includes("edges={showBanner ? [] : ['top']}"), /: <ScreenHeader lang=\{lang\} title=\{t\('menuEatery', lang\)\} onBack=\{onBack\} \/>/.test(sc)], [true, true])
