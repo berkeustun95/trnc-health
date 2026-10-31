@@ -7,7 +7,13 @@
 #
 #   gh workflow run eatery-images -f slug=crunchy-express                      # dry: validate + print the plan
 #   gh workflow run eatery-images -f slug=crunchy-express -f apply=true        # waits for Berke's approval
-#   ... -f replace=true   only to overwrite a different file / change logo_path (default false)
+#   ... -f replace=true   only to MOVE a row (logo_path / banner_path / photo row / dish photo_path) to a different
+#                         path, e.g. a changed image or a legacy un-hashed name (default false). Nothing is
+#                         overwritten: objects are named by the first 8 hex of their sha256 and uploaded with
+#                         upsert:false, and a changed image gets a new name (new URL, so the app's disk cache
+#                         cannot show the old picture). The old objects stay until a prune.
+#   gh workflow run eatery-images -f slug=crunchy-express -f prune=true        # dry: lists unreferenced objects older than 7 days
+#   ... -f prune=true -f apply=true   deletes them (own approval; never automatic; cannot be combined with replace)
 #
 # Three jobs, as supabase-migrate: `dry` always runs (it needs the service key even to read inactive
 # partner rows). With apply=true, `approve` waits in the `production-db` environment until Berke approves
@@ -31,7 +37,11 @@ on:
         type: boolean
         default: false
       replace:
-        description: 'Allow overwriting a DIFFERENT file at an existing path / changing logo_path / banner_path / a dish photo_path'
+        description: 'Allow MOVING a row to a different object (logo_path / banner_path / photo row / dish photo_path); no object is ever overwritten'
+        type: boolean
+        default: false
+      prune:
+        description: 'Prune mode instead of an upload: list (dry) / delete (apply) old objects no row references, older than 7 days. Not with replace'
         type: boolean
         default: false
 
@@ -49,6 +59,7 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_SLUG: ${{ inputs.slug }}
       IN_REPLACE: ${{ inputs.replace }}
+      IN_PRUNE: ${{ inputs.prune }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -66,6 +77,7 @@ jobs:
         run: |
           args=(--slug="$IN_SLUG" --report=eatery-images-report.json)
           [ "$IN_REPLACE" != "true" ] || args+=(--replace)
+          [ "$IN_PRUNE" != "true" ] || args+=(--prune)
           node scripts/eatery-images.mjs "${args[@]}"
       - name: Counts summary
         if: always()
@@ -74,7 +86,10 @@ jobs:
           node -e "
             const r = JSON.parse(require('fs').readFileSync('eatery-images-report.json', 'utf8'))
             const p = r.plan, c = a => p ? p.uploads.filter(u => u.action === a).length : 0
-            console.log(p
+            const q = r.prune_plan
+            console.log(q
+              ? 'eatery-images prune dry ' + r.slug + ': objects ' + q.objects + ' / referenced ' + q.referenced + ' / would delete ' + q.delete.length + ' / kept ' + q.keep.length + ' / problems ' + r.problems.length
+              : p
               ? 'eatery-images dry ' + r.slug + ': uploads ' + c('upload') + ' / skips ' + c('skip-identical') + ' / replaces ' + c('replace') + ' / rows ' + p.inserts.length + ' insert + ' + p.updates.length + ' update / logo ' + p.logo.action + ' / banner ' + (p.banner ? p.banner.action : 'none') + ' / dish rows set ' + (p.dishes || []).filter(d => d.row === 'set').length + ' keep ' + (p.dishes || []).filter(d => d.row === 'keep').length + ' / problems ' + r.problems.length
               : 'eatery-images dry ' + r.slug + ': refused, problems ' + r.problems.length)
           " >> "$GITHUB_STEP_SUMMARY"
@@ -98,12 +113,14 @@ jobs:
       IN_SLUG: ${{ inputs.slug }}
       IN_APPLY: ${{ inputs.apply }}
       IN_REPLACE: ${{ inputs.replace }}
+      IN_PRUNE: ${{ inputs.prune }}
     steps:
       - name: What is being approved
         run: |
-          echo "slug=$IN_SLUG apply=$IN_APPLY replace=$IN_REPLACE"
-          if [ "$IN_REPLACE" = "true" ]; then echo "::warning::REPLACE: overwrites public objects / logo_path / banner_path"; echo "REPLACE: overwrites public objects / logo_path / banner_path"; fi
-          echo "Image upload for $IN_SLUG approved for production."
+          echo "slug=$IN_SLUG apply=$IN_APPLY replace=$IN_REPLACE prune=$IN_PRUNE"
+          if [ "$IN_PRUNE" = "true" ]; then echo "::warning::PRUNE: permanently DELETES public objects no row references (older than 7 days)"; echo "PRUNE: deletes unreferenced objects older than 7 days"; fi
+          if [ "$IN_REPLACE" = "true" ]; then echo "::warning::REPLACE: moves logo_path / banner_path / photo rows / dish photo_path to new object names (no object is overwritten)"; echo "REPLACE: repoints rows to new object names; nothing is overwritten"; fi
+          echo "Run for $IN_SLUG approved for production."
 
   apply:
     if: ${{ inputs.apply }}
@@ -118,6 +135,7 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_SLUG: ${{ inputs.slug }}
       IN_REPLACE: ${{ inputs.replace }}
+      IN_PRUNE: ${{ inputs.prune }}
     steps:
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::apply runs from main only"; exit 1; }'
@@ -135,6 +153,7 @@ jobs:
         run: |
           args=(--slug="$IN_SLUG" --apply --report=eatery-images-report.json)
           [ "$IN_REPLACE" != "true" ] || args+=(--replace)
+          [ "$IN_PRUNE" != "true" ] || args+=(--prune)
           node scripts/eatery-images.mjs "${args[@]}"
       - name: Report
         if: always()
