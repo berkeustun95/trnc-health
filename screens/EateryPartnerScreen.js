@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
@@ -22,6 +22,7 @@ import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains, partnerQuizConfig } from '../constants/eateryQuiz'
 import { haptic } from '../components/ui'
 import Snackbar from '../components/Snackbar'
+import { BannerPhoto, BannerBar, BannerHead, BAR_SOLID_AT } from '../components/EateryBanner'
 
 // ─── Yeme-İçme: one partner, in full ────────────────────────────────────────
 // Contact buttons are stacked full width: Button truncates its label to one line, and a two-column
@@ -356,6 +357,24 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   }, [measureTops, reduce])
   const setTabsH = useCallback(h => { tabsH.current = h }, [])
 
+  // Photo banner (banner_path, optional): Animated.ScrollView forwards its ref to the underlying ScrollView instance
+  // (createAnimatedComponent merges forwardedRef onto it), so getInnerViewRef / scrollTo above keep working. y drives the
+  // photo and the bar on the native driver; the JS listener only runs the tab logic and flips the status bar once per crossing.
+  const y = useRef(new Animated.Value(0)).current
+  const [bannerFailed, setBannerFailed] = useState(false)
+  const bannerUri = eateryImageUrl(partner.banner_path ?? null)
+  const showBanner = eateryBannerOn(bannerUri, bannerFailed)
+  const [barSolid, setBarSolid] = useState(false)
+  const barSolidRef = useRef(false)
+  const scrollJs = useRef(null)
+  scrollJs.current = e => {
+    const solid = e.nativeEvent.contentOffset.y >= BAR_SOLID_AT
+    if (solid !== barSolidRef.current) { barSolidRef.current = solid; setBarSolid(solid) }
+    if (showTabs) onScroll(e)
+  }
+  const onScrollBanner = useMemo(() => Animated.event([{ nativeEvent: { contentOffset: { y } } }],
+    { useNativeDriver: true, listener: e => scrollJs.current(e) }), [y])
+
   // Quiz hand-off: scroll so the dish row sits just under the pinned tabs, then mark it for 1.2 s (no mark with reduced
   // motion). One shot per open. The row is measured against the scroll content (no cached onLayout); a measure that
   // fails because the row has not mounted yet is retried a few times.
@@ -459,14 +478,18 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   }, [startInBasket, ordering, lines.length])
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={showBanner ? [] : ['top']}>
       <View style={s.under} {...(basketOpen || quizOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
-      <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
-      <ScrollView ref={scrollRef} contentContainerStyle={[s.content, { paddingBottom: lines.length > 0 ? space[20] : listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showTabs ? onScroll : undefined} scrollEventThrottle={16}
+      {showBanner
+        ? <BannerPhoto y={y} uri={bannerUri} reduce={reduce} onError={() => setBannerFailed(true)} />
+        : <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />}
+      {showBanner && <BannerBar lang={lang} onBack={onBack} solid={barSolid} reduce={reduce} />}
+      <Animated.ScrollView ref={scrollRef} style={showBanner ? { marginTop: insets.top + BANNER_BAR_ROW } : undefined}
+        contentContainerStyle={[s.content, showBanner && { paddingTop: bannerContentPad() }, { paddingBottom: lines.length > 0 ? space[20] : listBottomPad(insets) }]} showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={showTabs ? [tabsIndex] : undefined} onScroll={showBanner ? onScrollBanner : showTabs ? onScroll : undefined} scrollEventThrottle={16}
         onContentSizeChange={showTabs ? scheduleMeasure : undefined}
         onMomentumScrollEnd={showTabs ? releaseLock : undefined} onScrollEndDrag={showTabs ? releaseLock : undefined}>
-        <Card>
+        {showBanner ? <BannerHead partner={partner} lang={lang} /> : <Card>
           <View style={s.head}>
             <EateryLogo partner={partner} width={72} height={72} decorative />
             <View style={s.headText}>
@@ -482,7 +505,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           </View>
           {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tag} />}
           {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
-        </Card>
+        </Card>}
 
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
 
@@ -550,7 +573,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           </View>
         )}
 
-      </ScrollView>
+      </Animated.ScrollView>
       {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} mode={listMode} />}
       </View>
       {ordering && basketShown === true && (

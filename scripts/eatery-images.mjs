@@ -6,12 +6,17 @@
 //   options: --report=path.json  (plan + sanitised codes only: the artifact is PUBLIC-downloadable on this repo; no raw error text)
 //
 // CI-only for anything that writes (scripts/lib/prod-write-guard.mjs). Workflow: eatery-images, whose apply
-// path waits for Berke's approval in the `production-db` environment. Even a dry run needs the service key
+// path waits for Berke's approval in the `production-db` environment.
+// ⚠ A manifest with a "banner" entry needs migration 20261151 (eatery_partners.banner_path) APPLIED: the partner
+//   select reads banner_path, so every run (dry included) fails on a database without the column. Even a dry run needs the service key
 // (inactive rows are invisible to anon), so it too runs in CI.
 //
 // FILE LAYOUT (committed to main; the bucket is public, so a file is world-readable once uploaded)
-//   data/eatery/<slug>/manifest.json   { "logo": "logo.png", "gallery": ["a.jpg", "b.jpg"], "menu": ["m1.jpg"],
+//   data/eatery/<slug>/manifest.json   { "logo": "logo.png", "banner": "banner.jpg", "gallery": ["a.jpg", "b.jpg"], "menu": ["m1.jpg"],
 //                                         "dishes": { "Chicken Burger": "burger.jpg", "Sides › Fries": "fries.jpg" } }
+//   "banner" (optional, one file) is the full-width partner-page header: width >= 1000 px (lib: MIN) and wider than tall.
+//   A smaller original needs "bannerSizeWaiver": { "minWidth": 600..999, "reason": ">= 20 chars", "approvedBy": "...", "date": "YYYY-MM-DD" }
+//   (printed as "!! SIZE WAIVER APPLIED"; refused if malformed, if there is no banner, or if the banner meets the floor anyway).
 //   data/eatery/<slug>/<files>         plain names, display order = array order; logo optional; arrays optional
 //   DISH KEYS: an eatery_menu_items.name, matched EXACTLY (trimmed) for this partner. A name that occurs in more than
 //   one section is accepted only as "Section › Name" (U+203A). Refused: a key matching no item, matching several
@@ -19,7 +24,7 @@
 //   Dishes need the partner's menu items to exist (the menu data migration first). Problems and the report name the
 //   FILE and the item id, never the item name (Actions logs and artifacts are public).
 //
-// OBJECT PATHS (bucket eatery-images)   <slug>/logo.<ext>   <slug>/gallery-<n>.<ext>   <slug>/menu-<n>.<ext>
+// OBJECT PATHS (bucket eatery-images)   <slug>/logo.<ext>   <slug>/banner.<ext>   <slug>/gallery-<n>.<ext>   <slug>/menu-<n>.<ext>
 //   <slug>/dish-<eatery_menu_items.id>.<ext>   (dish photo; the row gets photo_path/photo_width/photo_height)
 //   n is the 1-based manifest position and also eatery_photos.sort_order. <ext> comes from the real bytes
 //   (a .jpeg file is stored as .jpg).
@@ -31,7 +36,7 @@
 //   i.e. go-live checklist step 1 is done. Active or inactive are both allowed; is_active is printed loudly.
 // ADD-ONLY + RE-RUNNABLE: an identical object is skipped; a DIFFERENT file at the same path is refused without
 //   --replace (upload uses upsert:false, so storage itself refuses a silent overwrite); photo rows are inserted
-//   only if absent; logo_path and eatery_menu_items.photo_path are set only if null or equal. Order: ALL uploads
+//   only if absent; logo_path, banner_path and eatery_menu_items.photo_path are set only if null or equal. Order: ALL uploads
 //   (gallery, menu, logo, dish), verify by re-download, then photo rows, logo_path, dish photo_path.
 //   Nothing is ever deleted; rows for photos not in the manifest are listed, not touched.
 
@@ -84,7 +89,9 @@ if (local.problems.length) refuse(local.problems)
 out(`manifest OK: ${local.items.length} image(s) + ${local.dishes.length} dish photo(s) for ${slug}`)
 for (const it of local.items) out(`  ${it.path}  ${it.bytes} bytes  ${it.mime}  ${it.width}x${it.height}`)
 for (const d of local.dishes) out(`  dish ${d.src}  ${d.bytes} bytes  ${d.mime}  ${d.width}x${d.height}`)
-for (const w of local.waivers) out(`  !! SIZE WAIVER APPLIED: ${w.src} is ${w.width}x${w.height}, below ${MIN.dishShortSide}; accepted down to ${w.minShortSide} (approved by ${w.approvedBy}, ${w.date})`)
+for (const w of local.waivers) out(w.kind === 'banner'
+  ? `  !! SIZE WAIVER APPLIED: banner ${w.src} is ${w.width}x${w.height}, below width ${MIN.bannerWidth}; accepted down to ${w.minWidth} (approved by ${w.approvedBy}, ${w.date})`
+  : `  !! SIZE WAIVER APPLIED: ${w.src} is ${w.width}x${w.height}, below ${MIN.dishShortSide}; accepted down to ${w.minShortSide} (approved by ${w.approvedBy}, ${w.date})`)
 
 // 2. production state (service key; reads only until the apply section below)
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL
@@ -93,7 +100,7 @@ const sb = createClient(url, serviceRoleKey(), { auth: { persistSession: false, 
 const bail = (what, error) => { report.errors.push(`${what}: ${why(error)}`); refuse([`${what} failed (code in the report artifact)`]) }
 
 const pr = await sb.from('eatery_partners')
-  .select('id,is_active,lat,lng,address,menu_url,menu_verified_on,logo_path,eatery_menu_items(count)').eq('slug', slug)
+  .select('id,is_active,lat,lng,address,menu_url,menu_verified_on,logo_path,banner_path,eatery_menu_items(count)').eq('slug', slug)
 if (pr.error) bail('partner query', pr.error)
 if (pr.data.length > 1) refuse([`slug matched ${pr.data.length} partner rows`])
 const partner = pr.data[0] ?? null
@@ -132,16 +139,17 @@ for (const it of [...local.items, ...dishes]) {
 }
 
 // 3. plan
-const pl = plan(local.items, { existing, rows: rr.data, logoPath: partner.logo_path }, replace)
+const pl = plan(local.items, { existing, rows: rr.data, logoPath: partner.logo_path, bannerPath: partner.banner_path }, replace)
 const dp = planDishes(dishes, { existing, itemRows: Object.fromEntries(itemRows.map(r => [r.id, r])) }, replace)
 pl.problems.push(...dp.problems)
 pl.uploads.push(...dp.uploads)
-report.plan = { uploads: pl.uploads, inserts: pl.inserts, updates: pl.updates, logo: pl.logo, orphans: pl.orphans, dishes: dp.updates.map(u => ({ itemId: u.id, path: u.path, row: u.action })) }
+report.plan = { uploads: pl.uploads, inserts: pl.inserts, updates: pl.updates, logo: pl.logo, banner: pl.banner, orphans: pl.orphans, dishes: dp.updates.map(u => ({ itemId: u.id, path: u.path, row: u.action })) }
 out(`\nPLAN (${apply ? 'APPLY' : 'DRY - nothing is written'}${replace ? ', replace=true' : ''}):`)
 for (const u of pl.uploads) out(`  object  ${u.action.padEnd(15)} ${u.path}`)
 for (const r of pl.inserts) out(`  row     insert          ${r.kind} ${r.storage_path} ${r.width}x${r.height} order ${r.sort_order}`)
 for (const r of pl.updates) out(`  row     update          ${r.kind} ${r.storage_path}`)
 out(`  logo_path ${pl.logo.action}${pl.logo.path ? ' ' + pl.logo.path : ''}`)
+out(`  banner_path ${pl.banner.action}${pl.banner.path ? ' ' + pl.banner.path : ''}`)
 for (const d of dishes) {
   const up = pl.uploads.find(u => u.path === d.path), row = dp.updates.find(u => u.id === d.itemId)
   out(`  dish    ${d.src} -> item ${d.itemId} -> ${d.path}  ${d.bytes} bytes ${d.mime} ${d.width}x${d.height}  object ${up?.action ?? 'REFUSED'}, row ${row?.action ?? 'REFUSED'}`)
@@ -149,13 +157,13 @@ for (const d of dishes) {
 if (pl.orphans.length) out(`  note: ${pl.orphans.length} existing photo row(s) are not in the manifest and stay untouched: ${pl.orphans.join(', ')}`)
 if (pl.problems.length) refuse(pl.problems)
 const counts = a => pl.uploads.filter(u => u.action === a).length
-out(`\nsummary: upload ${counts('upload')}, replace ${counts('replace')}, skip ${counts('skip-identical')}, rows insert ${pl.inserts.length}, rows update ${pl.updates.length}, logo ${pl.logo.action}, dish rows set ${dp.updates.filter(u => u.action === 'set').length} keep ${dp.updates.filter(u => u.action === 'keep').length}`)
+out(`\nsummary: upload ${counts('upload')}, replace ${counts('replace')}, skip ${counts('skip-identical')}, rows insert ${pl.inserts.length}, rows update ${pl.updates.length}, logo ${pl.logo.action}, banner ${pl.banner.action}, dish rows set ${dp.updates.filter(u => u.action === 'set').length} keep ${dp.updates.filter(u => u.action === 'keep').length}`)
 if (!apply) { out('DRY: no write of any kind was made.'); finish(0) }
 
 // 4. apply
 const fail = (what, error) => { report.errors.push(`${what}: ${why(error)}`); console.error(`FAILED ${what} (code in the report artifact)`) }
 const bytesByPath = new Map([...local.items, ...dishes].map(i => [i.path, i]))
-const failed = await applyPlan({ sb, partnerId: partner.id, uploads: pl.uploads, bytesByPath, inserts: pl.inserts, updates: pl.updates, logo: pl.logo, dishUpdates: dp.updates, replace, out, fail })
-if (failed && report.errors.some(e => /^(upload|verify) /.test(e))) console.error(`\n${failed} object failure(s): rows, logo_path and dish photo_path NOT written (no row may point at a missing object).`)
+const failed = await applyPlan({ sb, partnerId: partner.id, uploads: pl.uploads, bytesByPath, inserts: pl.inserts, updates: pl.updates, logo: pl.logo, banner: pl.banner, dishUpdates: dp.updates, replace, out, fail })
+if (failed && report.errors.some(e => /^(upload|verify) /.test(e))) console.error(`\n${failed} object failure(s): rows, logo_path, banner_path and dish photo_path NOT written (no row may point at a missing object).`)
 out(failed ? `\n${failed} failure(s).` : '\nAPPLIED.')
 finish(failed ? 1 : 0)

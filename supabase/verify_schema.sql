@@ -195,6 +195,8 @@ WITH report AS (
     ('1121_eatery_partners_adult_only','eatery_partners','adult_only'),
     -- 20261144: how a partner takes orders (whatsapp basket | phone). NOT NULL, no DEFAULT: the H token asserts both.
     ('20261144_eatery_order_method','eatery_partners','order_method'),
+    -- 20261151: optional full-width header photo path (nullable, no DEFAULT); state asserted by an H token.
+    ('20261151_eatery_partners_banner_path','eatery_partners','banner_path'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -824,6 +826,8 @@ WITH report AS (
     ('20261134_eatery_item_options','eatery_item_options_remove_shape_check'),
     -- 20261144: its allowed set (whatsapp, phone) is an H token.
     ('20261144_eatery_order_method','eatery_partners_order_method_check'),
+    -- 20261151: same expression as logo_path_check; equality with it is an H token.
+    ('20261151_eatery_partners_banner_path','eatery_partners_banner_path_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
     ('1102_duyurular','announcement_sources_pkey'),
     ('1102_duyurular','announcement_sources_key_key'),
@@ -4115,6 +4119,29 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261127_crunchy_express_activate.sql')
       OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    -- 1151: eatery_partners.banner_path. Nullable text, NO default, no column-level ACL (the table-level SELECT covers it), the CHECK is
+    --       logo_path_check with the column renamed (compared as renamed text, so no regex decoding; the rendering is PG-18-only until read from
+    --       prod), the COMMENT names the bucket, launch_complete_check does NOT mention banner_path (a banner is optional), anon/authenticated
+    --       can SELECT and cannot INSERT/UPDATE it. Vacuously true until the ledger records the file.
+    UNION ALL SELECT '20261151_eatery_partners_banner_path','eatery_partners.banner_path: text NULL no default, no column ACL, CHECK = logo_path_check renamed, COMMENT names eatery-images, launch_complete_check untouched, clients read-only',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261151_eatery_partners_banner_path.sql')
+      OR (COALESCE((SELECT a.atttypid = 'text'::regtype AND NOT a.attnotnull AND a.attacl IS NULL FROM pg_attribute a
+                     WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'banner_path' AND NOT a.attisdropped), false)
+          AND NOT EXISTS (SELECT 1 FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                           WHERE d.adrelid = to_regclass('public.eatery_partners') AND a.attname = 'banner_path')
+          AND COALESCE((SELECT replace(pg_get_constraintdef(l.oid), 'logo_path', 'banner_path') = pg_get_constraintdef(b.oid) AND b.convalidated
+                          FROM pg_constraint b, pg_constraint l
+                         WHERE b.conrelid = to_regclass('public.eatery_partners') AND b.conname = 'eatery_partners_banner_path_check'
+                           AND l.conrelid = to_regclass('public.eatery_partners') AND l.conname = 'eatery_partners_logo_path_check'), false)
+          AND COALESCE((SELECT col_description(to_regclass('public.eatery_partners'), a.attnum) LIKE '%eatery-images%'
+                                AND col_description(to_regclass('public.eatery_partners'), a.attnum) LIKE '%NULL = no banner%'
+                          FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'banner_path'), false)
+          AND COALESCE((SELECT pg_get_constraintdef(c.oid) NOT LIKE '%banner_path%' FROM pg_constraint c
+                         WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_launch_complete_check'), false)
+          AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_partners'), 'banner_path', 'SELECT')
+                   AND has_column_privilege('authenticated', to_regclass('public.eatery_partners'), 'banner_path', 'SELECT')
+                   AND NOT has_column_privilege('anon', to_regclass('public.eatery_partners'), 'banner_path', 'INSERT,UPDATE,REFERENCES')
+                   AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_partners'), 'banner_path', 'INSERT,UPDATE,REFERENCES'), false))
     -- 1150: free options. The price CHECK now allows 0 (rendering `price >= (0)::numeric` is from the PGlite harness = PG 18; confirm
     --       against prod output before trusting a red), the table comment names the new rule, bidda-badadez has exactly its 10
     --       options (4 free extras price 0 / max_qty 1, 6 removals price NULL) and no description keeps the Eklenebilir suffix.

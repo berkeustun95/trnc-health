@@ -1,5 +1,7 @@
 {
   "logo": "logo.png",
+  "banner": "banner.jpg",
+  "bannerSizeWaiver": { "minWidth": 757, "reason": "Owner's Special photo (İBO.pdf img 5), only a 757x1600 original exists; cropped to 757x473 around the wrap", "approvedBy": "Berke", "date": "2026-10-30" },
   "dishes": {
     "Bidda Badadez Sade": "sade.jpg",
     "Bidda Badadez Hellim": "hellim.jpg",

@@ -3,7 +3,7 @@
 import * as B from '../utils/eateryBasketCore.js'
 import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -752,6 +752,44 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   const fade = eo.match(/function ScrollFade\(\) \{[\s\S]*?\n\}/)?.[0] || ''
   eq('wiring: the fade is non-interactive and hidden from accessibility', [/pointerEvents="none"/.test(fade), /no-hide-descendants/.test(fade), /accessibilityElementsHidden/.test(fade)], [true, true, true])
   eq('wiring: SheetBody renders the fade from the helper, inside the scroll area, and measures the list', [/\{sheetFadeVisible\(scrollM\) && <ScrollFade \/>\}/.test(eo), /onContentSizeChange/.test(eo), /scrollEventThrottle=\{16\}/.test(eo)], [true, true, true])
+}
+
+// ── Photo banner (partner page): pure rules + wiring ──
+{
+  const rd = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const sc = rd('../screens/EateryPartnerScreen.js'), bn = rd('../components/EateryBanner.js'), list = rd('../screens/EateryScreen.js')
+  const theme = fs.readFileSync(new URL('../constants/theme.js', import.meta.url), 'utf8')
+  eq('banner mode: only when the URL resolves and the load has not failed', [eateryBannerOn('https://x/b.jpg', false), eateryBannerOn('https://x/b.jpg', true), eateryBannerOn(null, false), eateryBannerOn('', false), eateryBannerOn(undefined, undefined)], [true, false, false, false, false])
+  eq('banner wiring: showBanner comes from eateryBannerOn(eateryImageUrl(partner.banner_path ?? null), bannerFailed)', /const bannerUri = eateryImageUrl\(partner\.banner_path \?\? null\)/.test(sc) && /const showBanner = eateryBannerOn\(bannerUri, bannerFailed\)/.test(sc), true)
+  eq('banner wiring: a load error falls back (onError -> setBannerFailed(true))', sc.includes('onError={() => setBannerFailed(true)}'), true)
+  const cols = fs.readFileSync(new URL('../screens/EateryScreen.js', import.meta.url), 'utf8').match(/const COLS = ([\s\S]*?)\n\nfunction /)?.[1] || ''
+  eq('ordering rule: COLS is read and does NOT select banner_path (20261151 not applied)', [cols.length > 100, cols.includes('banner_path'), /select\([^)]*banner_path/.test(list)], [true, false, false])
+  eq('overlap maths: content paddingTop = BANNER_H - 112 (128 at 240)', [bannerContentPad(), bannerContentPad() === EATERY_BANNER_H - 112, EATERY_BANNER_H, BANNER_BAR_ROW], [128, true, 240, 56])
+  eq('overlap wiring: banner-only paddingTop from bannerContentPad(), ScrollView marginTop = insets.top + BANNER_BAR_ROW', [sc.includes('showBanner && { paddingTop: bannerContentPad() }'), sc.includes('marginTop: insets.top + BANNER_BAR_ROW')], [true, true])
+  eq('layout wiring: safe-area top edge dropped only in banner mode; ScreenHeader only without a banner', [sc.includes("edges={showBanner ? [] : ['top']}"), /: <ScreenHeader lang=\{lang\} title=\{t\('menuEatery', lang\)\} onBack=\{onBack\} \/>/.test(sc)], [true, true])
+  eq('back: the banner bar back button calls the SAME onBack the ScreenHeader gets (back chain untouched)', [/<IconButton icon="chevron-back"[^>]*onPress=\{onBack\}/.test(bn), sc.includes('<BannerBar lang={lang} onBack={onBack} solid={barSolid} reduce={reduce} />')], [true, true])
+  eq('scroll ref: the Animated.ScrollView carries scrollRef, and the measuring code still uses getInnerViewRef / scrollTo', [/<Animated\.ScrollView ref=\{scrollRef\}/.test(sc), (sc.match(/scrollRef\.current\?\.getInnerViewRef\?\.\(\)/g) || []).length >= 2, /scrollRef\.current\?\.scrollTo\(/.test(sc)], [true, true, true])
+  eq('a11y order: BannerBar precedes the Animated.ScrollView in the tree (Back + title are read first) and stays on top via zIndex', [sc.indexOf('<BannerBar') > -1 && sc.indexOf('<BannerBar') < sc.indexOf('<Animated.ScrollView'), /bar:\s*\{[^}]*zIndex: 10/.test(bn)], [true, true])
+  const rnAnim = fs.readFileSync(new URL('../node_modules/react-native/Libraries/Animated/createAnimatedComponent.js', import.meta.url), 'utf8')
+  eq('RN: createAnimatedComponent merges the forwarded ref onto the ScrollView instance (no wrapper handle)', [/useMergeRefs[\s\S]{0,60}callbackRef,\s*forwardedRef/.test(rnAnim), /<Component[\s\S]*ref=\{ref\}/.test(rnAnim)], [true, true])
+  eq('status bar: one setState per crossing (ref-compared), native-driver event', [sc.includes('if (solid !== barSolidRef.current)'), sc.includes('useNativeDriver: true, listener')], [true, true])
+  const fnBody = name => bn.match(new RegExp('export function ' + name + '\\([\\s\\S]*?\\n}\\n'))?.[0] || ''
+  const photoFn = fnBody('BannerPhoto'), barFn = fnBody('BannerBar')
+  eq('scrim: lives in BannerBar under opacity whiteOp (first child, before the canvas), NOT in BannerPhoto', [barFn.length > 100, /<Animated\.View pointerEvents="none" style=\{\[StyleSheet\.absoluteFill, \{ opacity: whiteOp \}\]\}>[\s\S]*HEADER_SCRIM[\s\S]*DARK_FADE[\s\S]*<\/Animated\.View>/.test(barFn), barFn.indexOf('HEADER_SCRIM') < barFn.indexOf('s.canvas'), photoFn.includes('HEADER_SCRIM'), (bn.match(/HEADER_SCRIM\)? ?\/ 0\.6|HEADER_SCRIM \/ 0\.6/g) || []).length, /s\.bar[\s\S]*overflow/.test(bn.match(/bar: *\{[^}]*\}/)?.[0] || '')], [true, true, true, false, 1, false])
+  eq('card edge: BannerPhoto carries a flipped DARK_FADE bottom tint, pointerEvents none, hidden from a11y', [photoFn.includes('DARK_FADE'), /scaleY: -1/.test(bn), /bottom: 0/.test(bn.match(/tint: *\{[^}]*\}/)?.[0] || ''), /pointerEvents="none"[^>]*style=\{s\.tint\}|style=\{\[s\.tint/.test(photoFn), /BANNER_TINT *= *0\.\d+/.test(bn)], [true, true, true, true, true])
+  eq('fade images: band and tint carry width 100% (the 4dp asset would otherwise render as a sliver)', [/band: *\{[^}]*width: '100%'/.test(bn), /tint: *\{[^}]*width: '100%'/.test(bn)], [true, true])
+  eq('threshold switch: canvas, scrim and title opacities derive from solidV, not from the scroll value', [/const canvasOp = solidV\b/.test(bn), /const whiteOp = solidV\.interpolate/.test(bn), barFn.includes('y.interpolate'), /function BannerBar\(\{[^}]*\by\b/.test(bn)], [true, true, false, false])
+  eq('threshold switch: timing on solidV, motion.fast, native driver, duration 0 under reduce motion', [/Animated\.timing\(solidV,[^)]*duration: reduce \? 0 : motion\.fast[^)]*useNativeDriver: true/.test(bn)], [true])
+  eq('threshold switch: BAR_SOLID_AT sits below BANNER_COLLAPSE', [/BAR_SOLID_AT = BANNER_COLLAPSE - [1-9]\d*/.test(bn)], [true])
+  eq('threshold switch: BAR_SOLID_AT margin is 8 (solid at 176 of 184: no photo strip beside the card)', [bn.match(/BAR_SOLID_AT = BANNER_COLLAPSE - (\d+)/)?.[1], EATERY_BANNER_H - BANNER_BAR_ROW - 8], ['8', 176])
+  // every theme token the new file reads exists
+  const themeMod = await import('../constants/theme.js')
+  const used = [...bn.matchAll(/\b(colors|type|elevation|radii|font|motion)\.(\w+)/g)].map(m => [m[1], m[2]])
+  const spaceUsed = [...bn.matchAll(/\bspace\[(\d+)\]/g)].map(m => m[1])
+  eq('theme tokens: every colors./type./elevation. name in EateryBanner.js exists', used.filter(([g, k]) => themeMod[g]?.[k] === undefined), [])
+  eq('theme tokens: every space[n] in EateryBanner.js exists', spaceUsed.filter(n => themeMod.space[n] === undefined), [])
+  eq('theme tokens: the scan saw something (not measuring nothing)', [used.length > 10, spaceUsed.length > 2], [true, true])
+  eq('theme tokens: no theme import of a name the file does not have', [...bn.matchAll(/import \{([^}]*)\} from '\.\.\/constants\/theme'/g)].flatMap(m => m[1].split(',').map(x => x.trim()).filter(Boolean)).filter(n => themeMod[n] === undefined), [])
 }
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
