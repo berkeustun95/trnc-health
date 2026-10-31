@@ -48,7 +48,9 @@ If any step below is unclear or a guard refuses, STOP and report. Never work aro
    directly. Never `FREEZE_OVERRIDE` or `PREVIEW_LINEAGE_OVERRIDE` unless Berke handed it over in
    this conversation.
 5. `web/` changes: `npm run web:deploy` after Berke's go, never `npx wrangler deploy`.
-6. Native changes (app.config.js, native deps, permissions): do not build. Report that a native
+6. A draft PR whose reviews and QA passed and whose checks are green: `gh pr ready <n>` yourself, then report
+   "ready to merge" with the PR link. Berke never has to take a PR out of draft.
+7. Native changes (app.config.js, native deps, permissions): do not build. Report that a native
    build is needed.
 
 ## On the Hermes server (user `adateam`, repo `~/ada` = `/home/adateam/ada`)

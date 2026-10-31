@@ -32,6 +32,10 @@ Incident backstories: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
   prints the SQL and checks the ledger), then again with `-f apply=true`. No Mac holds a credential.
   Order: commit the file → `node scripts/migration-ledger.mjs --stamp <file>` → regenerate the ledger
   check (`node scripts/migration-ledger.mjs`) → register objects in `verify_schema.sql` → push → dry → apply.
+- **A release = ONE run, one approval:** `-f files="<a>.sql <b>.sql"` (space-separated, name order = apply
+  order; exactly one of `file`/`files`). Every file is checked up front (a recorded one refuses the whole list,
+  nothing sent), then applied alone in its own transaction; the first failure stops the run. QUERY 1 runs once,
+  after the last file, because `verify_schema.sql` describes the release's end state.
 - The workflow REFUSES a file not on the dispatched ref, one `migration-ledger.mjs --verify` rejects
   (unstamped, stale checksum, more than one `BEGIN;`/`COMMIT;`, the stamp not last, anything outside the
   transaction but SET ROLE / RESET ROLE / NOTIFY pgrst), and one the ledger already records. It sends the

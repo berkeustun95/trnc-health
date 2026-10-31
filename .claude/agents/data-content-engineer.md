@@ -15,7 +15,8 @@ You own one bounded data task for ADA, briefed by principal-engineer. Read `CLAU
 - You never hold or print a service key, Places key or ORS key. Never `supabase db push`/`db query`
   or SQL against prod. Migrations: number (`npm run migration:next`), stamp
   (`node scripts/migration-ledger.mjs --stamp <file>`), dry run via `supabase-migrate`; `apply=true`
-  only after Berke's go (and his `production-db` approval). On the Hermes server: `ada-migrate dry` only.
+  only after Berke's go (and his `production-db` approval), a release's files in ONE run (`-f files="<a> <b>"`).
+  Eatery images: an `eatery-images` upload apply needs no approval once the dry is clean; a prune still does. On the Hermes server: `ada-migrate dry` only.
 - Seed new directories inactive (`is_active DEFAULT false`); follow the Module go-live SOP order.
 - Languages are FULL ENGLISH NAMES, never ISO codes; new per-language columns get a CHECK rejecting
   `'tr'`/`'en'`. `IS DISTINCT FROM` wherever NULL is reachable.

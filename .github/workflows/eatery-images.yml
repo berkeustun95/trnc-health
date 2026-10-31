@@ -6,7 +6,7 @@
 # images), committed to main BEFORE dispatching.
 #
 #   gh workflow run eatery-images -f slug=crunchy-express                      # dry: validate + print the plan
-#   gh workflow run eatery-images -f slug=crunchy-express -f apply=true        # waits for Berke's approval
+#   gh workflow run eatery-images -f slug=crunchy-express -f apply=true        # applies on its own once the dry is clean
 #   ... -f replace=true   only to MOVE a row (logo_path / banner_path / photo row / dish photo_path) to a different
 #                         path, e.g. a changed image or a legacy un-hashed name (default false). Nothing is
 #                         overwritten: objects are named by the first 8 hex of their sha256 and uploaded with
@@ -15,10 +15,18 @@
 #   gh workflow run eatery-images -f slug=crunchy-express -f prune=true        # dry: lists unreferenced objects older than 7 days
 #   ... -f prune=true -f apply=true   deletes them (own approval; never automatic; cannot be combined with replace)
 #
-# Three jobs, as supabase-migrate: `dry` always runs (it needs the service key even to read inactive
-# partner rows). With apply=true, `approve` waits in the `production-db` environment until Berke approves
-# it (Actions → the run → Review deployments); only then does `apply` run, from main only, and it
-# re-validates everything. The approve job holds no secret. Public repo: stdout carries counts and keys
+# Three jobs. `dry` always runs (it needs the service key even to read inactive partner rows).
+# UPLOAD (apply=true, no prune) — NO approval since 2026-10-31 (Berke): `apply` runs right after a CLEAN dry,
+# i.e. the dry passed and its report has a plan, zero problems, no prune, and every object action is `upload`
+# or `skip-identical`. Upload mode cannot delete or overwrite anything (content-addressed names, upsert:false);
+# it adds objects and sets/repoints rows, and `apply` re-validates everything.
+# PRUNE (prune=true + apply=true) deletes, so it keeps the approval: `approve` waits in `production-db` until
+# Berke approves it (Actions → the run → Review deployments); only then does `apply` run. The approve job
+# holds no secret. `apply` runs from main only.
+# Secrets come from the `production-storage` environment (main only, no reviewers): the service key + URL
+# and nothing else, so this workflow never sees the Management API token (schema) or the Places/ORS keys.
+# The service key itself is not storage-scoped: the scope is this script (bucket eatery-images + the
+# eatery photo/logo/banner/dish path columns). Public repo: stdout carries counts and keys
 # only. The eatery-images-report artifact is NOT private: anyone signed in to GitHub can download it and
 # secret masking does not apply to artifacts, so it holds the plan (object paths), problems and short
 # sanitised error codes only, never raw error text.
@@ -50,7 +58,9 @@ concurrency: { group: prod-eatery-images, cancel-in-progress: false }
 jobs:
   dry:
     runs-on: ubuntu-24.04
-    environment: production
+    outputs:
+      clean: ${{ steps.clean.outputs.clean }}
+    environment: production-storage
     timeout-minutes: 15
     permissions:
       contents: read
@@ -79,6 +89,17 @@ jobs:
           [ "$IN_REPLACE" != "true" ] || args+=(--replace)
           [ "$IN_PRUNE" != "true" ] || args+=(--prune)
           node scripts/eatery-images.mjs "${args[@]}"
+      - name: Clean for an unapproved apply
+        id: clean
+        run: |
+          clean=$(node -e "
+            const r = JSON.parse(require('fs').readFileSync('eatery-images-report.json', 'utf8'))
+            const ok = !!r.plan && !r.prune_plan && !r.prune && r.problems.length === 0 && (r.errors || []).length === 0
+              && r.plan.uploads.every(u => u.action === 'upload' || u.action === 'skip-identical')
+            console.log(ok ? 'true' : 'false')
+          ")
+          echo "clean=$clean" >> "$GITHUB_OUTPUT"
+          echo "clean for an unapproved upload apply: $clean"
       - name: Counts summary
         if: always()
         run: |
@@ -103,7 +124,7 @@ jobs:
           retention-days: 7
 
   approve:
-    if: ${{ inputs.apply }}
+    if: ${{ inputs.apply && inputs.prune }}
     needs: dry
     runs-on: ubuntu-24.04
     environment: production-db
@@ -120,13 +141,14 @@ jobs:
           echo "slug=$IN_SLUG apply=$IN_APPLY replace=$IN_REPLACE prune=$IN_PRUNE"
           if [ "$IN_PRUNE" = "true" ]; then echo "::warning::PRUNE: permanently DELETES public objects no row references (older than 7 days)"; echo "PRUNE: deletes unreferenced objects older than 7 days"; fi
           if [ "$IN_REPLACE" = "true" ]; then echo "::warning::REPLACE: moves logo_path / banner_path / photo rows / dish photo_path to new object names (no object is overwritten)"; echo "REPLACE: repoints rows to new object names; nothing is overwritten"; fi
-          echo "Run for $IN_SLUG approved for production."
+          echo "Prune for $IN_SLUG approved for production."
 
   apply:
-    if: ${{ inputs.apply }}
-    needs: approve
+    # !cancelled(): approve is SKIPPED on the upload lane, which would otherwise skip apply too.
+    if: ${{ !cancelled() && inputs.apply && needs.dry.result == 'success' && ((inputs.prune && needs.approve.result == 'success') || (!inputs.prune && needs.dry.outputs.clean == 'true')) }}
+    needs: [dry, approve]
     runs-on: ubuntu-24.04
-    environment: production
+    environment: production-storage
     timeout-minutes: 15
     permissions:
       contents: read
@@ -136,9 +158,12 @@ jobs:
       IN_SLUG: ${{ inputs.slug }}
       IN_REPLACE: ${{ inputs.replace }}
       IN_PRUNE: ${{ inputs.prune }}
+      APPROVED: ${{ needs.approve.result }}
     steps:
-      - name: Main only
-        run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::apply runs from main only"; exit 1; }'
+      - name: Main only, and a prune only when approved
+        run: |
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::apply runs from main only"; exit 1; }
+          [ "$IN_PRUNE" != "true" ] || [ "$APPROVED" = "success" ] || { echo "::error::prune deletes and needs the production-db approval"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with: { node-version: '24', cache: npm }
