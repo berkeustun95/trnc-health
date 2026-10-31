@@ -40,9 +40,14 @@ jobs:
       GISEKIBRIS_FEED_URL: ${{ secrets.GISEKIBRIS_FEED_URL }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_NAME: ${{ inputs.secret }}
+      IN_ENV: ${{ inputs.environment }}
     steps:
       - name: Fingerprint
         run: |
+          # Allowlist BEFORE ${!IN_NAME}: indirect expansion evaluates an array subscript, so a name that ever
+          # got past the server-side choice check could run code with every secret above in env.
+          case "$IN_NAME" in GOOGLE_PLACES_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ACCESS_TOKEN|ORS_API_KEY|GISEKIBRIS_FEED_URL|EXPO_PUBLIC_SUPABASE_URL) ;; *) echo "::error::not an allowed secret name"; exit 1 ;; esac
+          case "$IN_ENV" in production|production-storage) ;; *) echo "::error::not an allowed environment"; exit 1 ;; esac
           v="${!IN_NAME}"
           [ -n "$v" ] || { echo "::error::$IN_NAME is empty"; exit 1; }
-          echo "$IN_NAME: sha256[0:16]=$(printf %s "$v" | sha256sum | cut -c1-16) length=${#v}"
+          echo "$IN_ENV/$IN_NAME: sha256[0:16]=$(printf %s "$v" | sha256sum | cut -c1-16) length=${#v}"
