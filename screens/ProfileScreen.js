@@ -1673,7 +1673,7 @@ const s = StyleSheet.create({
   blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   unblockBtn:       { paddingHorizontal: 12, minHeight: TAP, justifyContent: 'center', borderRadius: 8, backgroundColor: colors.primaryLight },
   unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
-  errorText:        { fontFamily: 'Inter_400Regular', color: colors.dangerInk, fontSize: 13, marginBottom: 12 },
+  errorText:        { fontFamily: 'Inter_400Regular', color: colors.dangerInkOnPage, fontSize: 13, marginBottom: 12 },
   marketingSection: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
   marketingRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
   marketingLabel:   { flex: 1, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
@@ -1724,7 +1724,7 @@ const s = StyleSheet.create({
   eduAddBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
                        borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary,
                        minHeight: TAP, justifyContent: 'center' },
-  eduAddText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
+  eduAddText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primaryDark },   // on the ground: primary is 3.79 on pageTop
   eduDraft:          { marginTop: 12, paddingTop: 12,
                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   eduConfirm:        { marginTop: 12, padding: 12, borderRadius: radius.md, backgroundColor: colors.cardBg,
