@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import ScreenHeader from '../../components/ScreenHeader'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -14,8 +14,9 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
   const tint = { bg: colors.tintLifestyleBg, fg: colors.tintLifestyleFg }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} style={s.header} />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.grid}>
@@ -93,11 +94,13 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg },
+  safe:       { flex: 1 },
+  header:     { marginBottom: 18 },
   scroll:     { padding: spacing.md },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tileWrap:   { width: '48%', marginBottom: spacing.md },

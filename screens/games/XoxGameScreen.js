@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import ScreenHeader from '../../components/ScreenHeader'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize, shadow } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -192,8 +192,9 @@ export default function XoxGameScreen({ lang, onBack }) {
   const oStat = mode === 'ai' ? modeStats.losses : modeStats.oWins
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesXoxTitle', lang)} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesXoxTitle', lang)} style={s.header} />
 
       <View style={s.body}>
         <View style={s.modeRow}>
@@ -266,11 +267,13 @@ export default function XoxGameScreen({ lang, onBack }) {
         )}
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: colors.bg },
+  safe:      { flex: 1 },
+  header:     { marginBottom: 18 },
   body:      { flex: 1, padding: spacing.md, alignItems: 'center' },
 
   modeRow:   { flexDirection: 'row', backgroundColor: colors.border, borderRadius: radius.lg, padding: 4, marginBottom: spacing.md },
