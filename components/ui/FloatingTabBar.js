@@ -14,14 +14,15 @@ import { t } from '../../constants/i18n'
 export const TAB_BAR_H = 64
 export const TAB_BAR_SIDE = 24
 const GAP_BELOW = 12
-// Content fades out instead of cutting sharply at the bar: a solid canvas band from the
-// screen's bottom edge (under the Android nav bar, which is edge-to-edge and draws its own
-// contrast scrim over whatever is behind it — canvas, now, not content) up to the bar's
-// middle, then FADE_H of canvas → transparent. A stretched PNG, not stepped views (8 steps drew
-// visible bands over dark event photos) and not expo-linear-gradient (a native module). Scroll
-// content pads by the footprint + FADE_H so its last row clears it.
+// Content fades out instead of cutting sharply at the bar: a solid pageBase band (Base C's flat
+// ground, PageCanvas) from the screen's bottom edge (under the Android nav bar, which is
+// edge-to-edge and draws its own contrast scrim over whatever is behind it — the ground, now,
+// not content) up to the bar's middle, then FADE_H of pageBase → transparent. A stretched PNG,
+// not stepped views (8 steps drew visible bands over dark event photos) and not
+// expo-linear-gradient (a native module). Scroll content pads by the footprint + FADE_H so its
+// last row clears it.
 export const FADE_H = 32
-const CANVAS_FADE = require('../../assets/oli-scenes/canvas-fade.png')   // colors.canvas, alpha 0 → 1
+const CANVAS_FADE = require('../../assets/oli-scenes/canvas-fade.png')   // pageBase, alpha 0 → 1
 
 // The vertical space the bar occupies above the screen's bottom edge. Screens that must
 // not be covered pad by this; Home scrolls under it and pads its content instead.
@@ -46,7 +47,7 @@ export default function FloatingTabBar({ tabs, activeTab, onTabPress, refs = {},
     <>
     <View pointerEvents="none" style={[s.fadeWrap, { height: solid + FADE_H }]}>
       <Image source={CANVAS_FADE} resizeMode="stretch" style={{ width: '100%', height: FADE_H }} />
-      <View style={{ height: solid, backgroundColor: colors.canvas }} />
+      <View style={{ height: solid, backgroundColor: colors.pageBase }} />
     </View>
     <View
       style={[s.bar, elevation.tabBar, { bottom }]}
