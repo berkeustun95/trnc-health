@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
 import { LANG_CODES, dateLocale } from '../constants/i18n.js'
 import { assembleStripSlides } from './stripSlides.js'
+import { maybeListedFilter, isEventOver } from './eventVisibility.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
@@ -192,7 +193,9 @@ function eventWhen(startDate, lang) {
 }
 
 // ─── RANKS 2 + 3 — events ───────────────────────────────────────────────────
-// One query serves both: everything from now to end of local day, ordered ascending. The
+// One query serves both: everything ON NOW or starting before end of local day, ordered
+// ascending. "On now" uses the same rule as Etkinlikler (utils/eventVisibility.js): until
+// end_date, or 06:00 Cyprus the morning after for events with no end. The
 // SPLIT between "within 6 hours" and "later today" is then a comparison on the first row,
 // not a second round trip.
 //
@@ -205,16 +208,18 @@ function eventWhen(startDate, lang) {
 //   the bound and leave the heading saying today.
 async function readEventsToday(now, lang) {
   const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999)
+  // The server filter is exact (scripts/test-event-visibility.mjs proves it matches isEventOver);
+  // the client check and limit 10 are a backstop for clock skew between phone and server.
   const { data, error } = await supabase
     .from('events')
-    .select('id, title, images, source_image_url, start_date')
+    .select('id, title, images, source_image_url, start_date, end_date')
     .eq('status', 'approved')
-    .gte('start_date', now.toISOString())
+    .or(maybeListedFilter(now))
     .lte('start_date', endOfDay.toISOString())
     .order('start_date', { ascending: true })
-    .limit(1)
+    .limit(10)
   if (error) throw error
-  const e = (data || [])[0]
+  const e = (Array.isArray(data) ? data : []).find(row => !isEventOver(row, now))
   if (!e) return null
   return {
     kind: 'event', id: e.id,
