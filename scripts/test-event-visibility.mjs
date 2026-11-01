@@ -1,6 +1,6 @@
 // When events stop being listed (utils/eventVisibility.js) — shared by Etkinlikler and the Home strip.
 //   node scripts/test-event-visibility.mjs
-import { eventListedUntil, isEventOver, isEventOnNow, maybeListedFilter } from '../utils/eventVisibility.js'
+import { eventListedUntil, isEventOver, isEventOnNow, maybeListedFilter, isRunningFromEarlierDay, ongoingEndLabel, eventOverlaps, startsSoon } from '../utils/eventVisibility.js'
 
 let bad = 0
 const t = (name, got, want) => {
@@ -70,6 +70,34 @@ for (let n = Date.parse('2027-03-26T00:00:00Z'); n < Date.parse('2027-03-30T00:0
     if ((new Date(s) >= since) !== !isEventOver({ start_date: new Date(s).toISOString() }, now)) disagreeMar++
 }
 t('server bound == client rule, March DST week', disagreeMar, 0)
+
+
+// ─── Running events: "Devam ediyor · <end date>" ────────────────────────────────────────────
+const NOW = at('2026-11-01T13:30:00Z')                                                    // 15:30 Cyprus, Sun 1 Nov
+t('running: started 30 Oct, ends 2 Nov → label', isRunningFromEarlierDay(festival, NOW), true)
+t('running: started TODAY with an end → keeps its time', isRunningFromEarlierDay({ start_date: '2026-11-01T08:00:00Z', end_date: '2026-11-03T20:00:00Z' }, NOW), false)
+t('running: no end_date (carried past midnight) → no label', isRunningFromEarlierDay({ start_date: '2026-10-31T21:00:00Z', end_date: null }, at('2026-11-01T01:00:00Z')), false)
+t('running: already over → no label', isRunningFromEarlierDay(festival, at('2026-11-03T00:00:00Z')), false)
+t('running: Cyprus vs UTC — 22:30Z 31 Oct is 00:30 Cyprus 1 Nov = today', isRunningFromEarlierDay({ start_date: '2026-10-31T22:30:00Z', end_date: '2026-11-05T20:00:00Z' }, NOW), false)
+t('running: 21:30Z 31 Oct is 23:30 Cyprus 31 Oct = earlier day', isRunningFromEarlierDay({ start_date: '2026-10-31T21:30:00Z', end_date: '2026-11-05T20:00:00Z' }, NOW), true)
+t('label en-GB: British order', ongoingEndLabel('2026-11-04T20:00:00Z', 'en-GB-u-ca-gregory', NOW), '4 November')
+t('label tr', ongoingEndLabel('2026-11-04T20:00:00Z', 'tr-u-ca-gregory', NOW), '4 Kasım')
+t('label: Cyprus calendar day (22:30Z 4 Nov = 5 Nov in Cyprus)', ongoingEndLabel('2026-11-04T22:30:00Z', 'en-GB-u-ca-gregory', NOW), '5 November')
+t('label: year only when it differs', ongoingEndLabel('2027-01-10T20:00:00Z', 'en-GB-u-ca-gregory', NOW), '10 January 2027')
+t('label fa: Gregorian, not Jalali', /نوامبر/.test(ongoingEndLabel('2026-11-04T20:00:00Z', 'fa-u-ca-gregory', NOW)), true)
+
+// ─── "Bugün" and the other date filters: running events count ────────────────────────────────
+const dayFrom = at('2026-10-31T22:00:00Z'), dayTo = at('2026-11-01T21:59:59.999Z')           // 1 Nov in Cyprus
+t('Bugün: festival started 30 Oct, running today → in', eventOverlaps(festival, dayFrom, dayTo), true)
+t('Bugün: starts tonight → in', eventOverlaps({ start_date: '2026-11-01T17:00:00Z' }, dayFrom, dayTo), true)
+t('Bugün: starts tomorrow → out', eventOverlaps(tomorrow, dayFrom, dayTo), false)
+t('Bugün: ended yesterday → out', eventOverlaps({ start_date: '2026-10-29T17:00:00Z', end_date: '2026-10-31T20:00:00Z' }, dayFrom, dayTo), false)
+t('Bugün: last night, no end, listed until 06:00 today → in (still on after midnight)', eventOverlaps(halloween, dayFrom, dayTo), true)
+
+// ─── Home strip "starting soon" ───────────────────────────────────────────────────────────────
+t('soon: starts in 2 h', startsSoon({ start_date: '2026-11-01T15:30:00Z' }, NOW, 6), true)
+t('soon: running already → NOT soon', startsSoon(festival, NOW, 6), false)
+t('soon: starts in 8 h → not soon', startsSoon({ start_date: '2026-11-01T21:30:00Z' }, NOW, 6), false)
 
 if (bad) { console.error(`\n${bad} failing`); process.exit(1) }
 console.log('\nall passing')
