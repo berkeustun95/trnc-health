@@ -99,6 +99,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   ota:preview` (refuses unless you hold it, naming who does and since when), and `release <holder>` after your phone
   check. Held by someone else → wait or ask; never `--force` without Berke's word (log it). `status` shows the holder.
   Lock file: vault `locks/preview-phone.lock.json` (exclusive create; no expiry). `screenshot-android.sh` checks it too.
+  **Expo Go and dev bundles count as phone use** (Berke, 2026-11-01, after Expo Go sat in front of ADA Preview with the
+  lock held by another session): take the lock BEFORE `screenshot-android.sh --prep` (the Metro link), `npm start` /
+  `npm run android` aimed at the phone, or opening any project in Expo Go or a dev client on it — and when you
+  release, leave ADA Preview in front (`am force-stop host.exp.exponent`), not your dev bundle.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
