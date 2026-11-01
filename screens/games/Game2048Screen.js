@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, PanResponder } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import ScreenHeader from '../../components/ScreenHeader'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize, shadow, gameColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -171,6 +171,7 @@ export default function Game2048Screen({ lang, onBack }) {
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <ScreenHeader onBack={onBack} lang={lang} title={t('games2048Title', lang)} />
 
@@ -226,11 +227,12 @@ export default function Game2048Screen({ lang, onBack }) {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg },
+  safe:       { flex: 1 },
   body:       { flex: 1, padding: spacing.md },
 
   scoreRow:   { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
