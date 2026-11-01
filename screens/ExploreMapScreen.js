@@ -186,6 +186,17 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
         onChange={onSetKeys}
         style={{ marginRight: 8 }}
       />
+      {/* Before Rotalar: the row scrolls, and the chip must be visible without a swipe (Berke, 2026-11-01). */}
+      {canOfficial && (
+        <Chip
+          label={t('ovFilter', lang)}
+          ionicon={GROUP_META.heritage.icon}
+          active={!routesMode && officialOnly}
+          color={GROUP_META.heritage.colorToken.text}
+          colorBg={GROUP_META.heritage.colorToken.bg}
+          onPress={onOfficial}
+        />
+      )}
       {/* A MODE, not a filter: routes replace the pins while it is on, and any other chip
           leaves it. Numbered stops under a layer of clustered pins would be unreadable. */}
       {showRoutes && (
@@ -196,16 +207,6 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
           color={ROUTE_COLOR}
           colorBg="#E0F2F1"
           onPress={onRoutes}
-        />
-      )}
-      {canOfficial && (
-        <Chip
-          label={t('ovFilter', lang)}
-          ionicon={GROUP_META.heritage.icon}
-          active={!routesMode && officialOnly}
-          color={GROUP_META.heritage.colorToken.text}
-          colorBg={GROUP_META.heritage.colorToken.bg}
-          onPress={onOfficial}
         />
       )}
       {/* Hidden while no facility has parseable hours — see openNowApplicable(). */}
