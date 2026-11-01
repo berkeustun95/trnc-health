@@ -206,7 +206,7 @@ function eventWhen(startDate, lang) {
 //   happens tomorrow is worse than a card about a place. If this is ever revisited, the
 //   change is to the strip's PROMISE first and the window second; do not quietly extend
 //   the bound and leave the heading saying today.
-async function readEventsToday(now, lang, extraEvents = []) {
+async function readEventsToday(now, lang) {
   const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999)
   // The server filter is exact (scripts/test-event-visibility.mjs proves it matches isEventOver);
   // the client check and limit 10 are a backstop for clock skew between phone and server.
@@ -219,7 +219,7 @@ async function readEventsToday(now, lang, extraEvents = []) {
     .order('start_date', { ascending: true })
     .limit(10)
   if (error) throw error
-  const e = [...extraEvents, ...(Array.isArray(data) ? data : [])].find(row => !isEventOver(row, now))
+  const e = (Array.isArray(data) ? data : []).find(row => !isEventOver(row, now))
   if (!e) return null
   return {
     kind: 'event', id: e.id,
@@ -431,7 +431,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
 const DEV_TEST_PROMO = null
 // e.g. { kind: 'promo', id: 'dev-test', title_i18n: { tr: 'Test sponsor', en: 'Test sponsor' },
 //        subtitle_i18n: null, image_url: null, link_url: 'https://getadaapp.com', pin_date: null }
-async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, extraEvents = [] }) {
+async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }) {
   const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
   const todayIso = isoDay(now)
   let pins = null
@@ -458,7 +458,7 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, 
     }
   }
   try {
-    const e = (await readEventsToday(now, lang, extraEvents)) || (await readNextEvent(now, lang))
+    const e = (await readEventsToday(now, lang)) || (await readNextEvent(now, lang))
     if (e) return { ...e, soon: startsSoon({ start_date: e.startsAt }, now, STRIP_SOON_HOURS) }
   } catch { /* fall through */ }
   try {
@@ -477,8 +477,8 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, 
 
 // The slider: slide 1 = the ladder above, slides 2..n = eatery partners (pure part: utils/stripSlides.js).
 // `partners` are loadEateryPartners rows, `gates` = EATERY_GATES, `rotation` the stored integer.
-export async function resolveStripSlides({ lang, promosEligible = false, now = new Date(), dismissedIds = null, partners = [], gates = {}, rotation = 0, extraEvents = [] }) {
-  const lead = await resolveRedesignBanner({ lang, promosEligible, now, dismissedIds, extraEvents })
+export async function resolveStripSlides({ lang, promosEligible = false, now = new Date(), dismissedIds = null, partners = [], gates = {}, rotation = 0 }) {
+  const lead = await resolveRedesignBanner({ lang, promosEligible, now, dismissedIds })
   return assembleStripSlides({ lead, partners, promosEligible, gates, rotation, lang })
 }
 

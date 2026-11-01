@@ -26,8 +26,6 @@ import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { formatPetDate } from '../constants/petsContent'
 import { maybeListedFilter, isEventOver, eventOverlaps, isRunningFromEarlierDay, ongoingEndLabel } from '../utils/eventVisibility'
-import { EVENTS_ONGOING_FIXTURE } from '../constants/redesign'
-import { ongoingFixtureEvent } from '../utils/eventsPreviewFixture'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
   RemoteImage,
@@ -624,8 +622,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
       .or(maybeListedFilter(now))
       .order('start_date', { ascending: true })
     setLoadError(!!error)
-    const rows = EVENTS_ONGOING_FIXTURE && !error ? [ongoingFixtureEvent(now), ...(data ?? [])] : (data ?? [])
-    setEvents(error ? [] : rows.filter(e => !isEventOver(e, now)))
+    setEvents(error ? [] : (data ?? []).filter(e => !isEventOver(e, now)))
     setLoading(false)
   }, [])
   const retry = () => { setLoading(true); load() }
