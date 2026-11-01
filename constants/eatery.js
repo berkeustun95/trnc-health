@@ -1,10 +1,11 @@
 // Yeme-İçme (eatery partners) — pure helpers behind EateryScreen / EateryPartnerScreen, in the
 // petPartnerSections() mould: emptiness is decided HERE, so a screen renders what it is given and
 // partner #2 is data only. Plain JS, no React, no network.
-import { dateLocale, t } from './i18n.js'
+import { t } from './i18n.js'
 import { cyprusNow, openState } from '../utils/towingHours.js'
 import { ADULT_AGE } from './profileGate.js'
 import { parseKey } from '../utils/eateryBasketCore.js'
+import { numberLocale } from '../utils/money.js'
 
 export const EATERY_BUCKET = 'eatery-images'
 
@@ -114,7 +115,7 @@ export function formatPrice(price, currency, lang) {
   if (price == null || price === '' || !Number.isFinite(Number(price))) return ''
   const n = Number(price)
   try {
-    return new Intl.NumberFormat(dateLocale(lang), { style: 'currency', currency: currency || 'TRY' }).format(n)
+    return new Intl.NumberFormat(numberLocale(lang), { style: 'currency', currency: currency || 'TRY' }).format(n)
   } catch {
     return `${n.toFixed(2)} ${currency || ''}`.trim()
   }

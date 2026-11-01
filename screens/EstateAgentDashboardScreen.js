@@ -7,9 +7,9 @@ import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { propertyPriceText } from '../utils/money'
 import PropertySubmitScreen from './PropertySubmitScreen'
 
-const CURRENCIES = { GBP: '£', TRY: '₺', EUR: '€' }
 
 function statusColor(status) {
   if (status === 'active')   return colors.success
@@ -24,14 +24,6 @@ function statusLabel(status, lang) {
   if (status === 'rejected') return t('accomListingRejected', lang)
   if (status === 'archived') return t('accomListingArchived', lang)
   return status
-}
-
-function priceDisplay(price, currency, period, lang) {
-  const sym = CURRENCIES[currency] || currency
-  const fmt = Number(price).toLocaleString('en-GB', { maximumFractionDigits: 0 })
-  if (period === 'monthly') return `${sym}${fmt}${t('accomPerMonth', lang)}`
-  if (period === 'nightly') return `${sym}${fmt}${t('accomPerNight', lang)}`
-  return `${sym}${fmt}`
 }
 
 function ListingCard({ item, lang, onEdit, onArchive }) {
@@ -53,7 +45,7 @@ function ListingCard({ item, lang, onEdit, onArchive }) {
             </Text>
           </View>
         </View>
-        <Text style={ds.listingPrice}>{priceDisplay(item.price, item.currency, item.price_period, lang)}</Text>
+        <Text style={ds.listingPrice}>{propertyPriceText(item, lang)}</Text>
         {item.rejection_reason && (
           <View style={ds.rejectionBox}>
             <Text style={ds.rejectionText}>{item.rejection_reason}</Text>

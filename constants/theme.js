@@ -98,9 +98,9 @@ export const placeColors = {
   // pharmacy pin (262), 37 from grooming (335) — Android markers keep only the hue.
   googlePlace: { bg: '#FAE8FF', text: '#A01DA5' },
   // Döveç project pin (constants/mapSources.js). NOT a hue-only default marker: no hue is >= 30 deg
-  // from every existing pin any more (widest gap 86 -> 144), so the pin is a BADGE — a View marker in
-  // ADA teal with a white building icon (DovecMarker in ExploreMapScreen.js), which Android draws as
-  // drawn, not re-tinted. These two are the ADA primaryLight / primaryDark pair (chip + card badge).
+  // from every existing pin any more (widest gap 86 -> 144), so the pin is a BADGE — a bitmap marker in
+  // ADA teal with a white building glyph (assets/map-pins/dovec@2x/@3x.png, scripts/generate-dovec-pin.mjs),
+  // which Android draws as drawn, not re-tinted. These two are the ADA primaryLight / primaryDark pair (chip + card badge).
   dovec: { bg: '#E6F4F4', text: '#0A5E5D' },
 }
 

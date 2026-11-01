@@ -196,7 +196,7 @@ function eateryPins(partners, gates) {
 // RLS already returns only active projects with a cover. DOVEC_PARTNER_LIVE is the single switch for
 // the partner page, Home slot AND these pins; `dovecLive` is a parameter only so
 // validate-map-sources.mjs can assert both worlds.
-// marker: 'badge' — drawn as a View (see placeColors.dovec for why no hue is free).
+// marker: 'badge' — drawn as a bitmap badge (see placeColors.dovec for why no hue is free).
 function dovecPins(projects) {
   return (projects || [])
     .filter(p => p && p.location_precision === 'exact'

@@ -45,11 +45,3 @@ export function dovecDeliveryQuarter(isoDate) {
   if (!m) return null
   return `Q${Math.floor((Number(m[2]) - 1) / 3) + 1} ${m[1]}`
 }
-
-const SYMBOL = { GBP: '£', EUR: '€', USD: '$', TRY: '₺' }
-export function dovecPrice(amount, currency) {
-  if (!(amount > 0)) return null
-  const sym = SYMBOL[currency]
-  const n = Math.round(amount).toLocaleString('en-GB')
-  return sym ? `${sym}${n}` : `${n} ${currency || ''}`.trim()
-}

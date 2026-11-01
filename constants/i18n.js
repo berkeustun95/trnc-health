@@ -34,6 +34,8 @@ export const LANGUAGES = [
 ]
 const translations = {
   en: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Call for price",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "ADA partner",
     dovecProjects: "Projects",
@@ -44,7 +46,6 @@ const translations = {
     dovecDelivery: "Delivery",
     dovecFrom: "From",
     dovecPrice: "Price",
-    dovecPriceOnRequest: "Price on request",
     dovecUnitTypes: "Unit types",
     dovecAbout: "About the project",
     dovecAvailableUnits: "Available units",
@@ -2436,6 +2437,8 @@ const translations = {
     nhAptA4Desc: "North Houses Aladağ consists of two 2-bedroom apartments located in the same building in Küçük Kaymaklı, Nicosia. The apartments are suitable for families, business travelers and guests coming to Nicosia for treatment.\n\nIt is not a hotel, but independent apartment accommodation; There is no lobby or reception. Your apartment is prepared before your arrival. After your reservation is confirmed, you can self-check-in at any time of the day with the login information provided to you.\nPharmacies, supermarkets, cafes and Barış Manço Park are within walking distance. Suriçi and Dereboyu are approximately 10 minutes away by car, and Ercan Airport is 30 minutes away.\n\nPopular points of interest near North Houses Aladağ sk Küçük Kaymaklı Nicosia include Ministry of Agriculture, Rural Development and Environment - Nicosia, Ministry of Health - Nicosia and Cyprus Museum.",
   },
   tr: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Fiyat için arayın",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "ADA iş ortağı",
     dovecProjects: "Projeler",
@@ -2446,7 +2449,6 @@ const translations = {
     dovecDelivery: "Teslim",
     dovecFrom: "Başlangıç",
     dovecPrice: "Fiyat",
-    dovecPriceOnRequest: "Fiyat sorunuz",
     dovecUnitTypes: "Daire tipleri",
     dovecAbout: "Proje hakkında",
     dovecAvailableUnits: "Satıştaki birimler",
@@ -4809,6 +4811,8 @@ const translations = {
     nhAptA4Desc: "North Houses Aladağ, Lefkoşa Küçük Kaymaklı'da aynı binada yer alan iki adet 2 yatak odalı daireden oluşur. Daireler aileler, iş seyahatindekiler ve tedavi için Lefkoşa'ya gelen misafirler için uygundur.\n\nOtel değil, bağımsız daire konaklamasıdır; lobi veya resepsiyon yoktur. Daireniz girişinizden önce hazırlanır. Rezervasyonunuz onaylandıktan sonra size iletilen giriş bilgileriyle günün istediğiniz saatinde self check-in yapabilirsiniz.\nEczane, süpermarket, kafeler ve Barış Manço Parkı yürüme mesafesindedir. Sur içi ve Dereboyu araçla yaklaşık 10 dakika, Ercan Havalimanı 30 dakika uzaklıktadır.\n\nNorth Houses Aladağ sk Küçük Kaymaklı Lefkoşa yakınındaki popüler uğrak yerleri arasında Tarım, Kırsal Kalkınma ve Çevre Bakanlığı - Lefkoşa, Sağlık Bakanlığı - Lefkoşa ve Kıbrıs Müzesi bulunur.",
   },
   ar: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "اتصل لمعرفة السعر",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "شريك ADA",
     dovecProjects: "المشاريع",
@@ -4819,7 +4823,6 @@ const translations = {
     dovecDelivery: "التسليم",
     dovecFrom: "ابتداءً من",
     dovecPrice: "السعر",
-    dovecPriceOnRequest: "السعر عند الطلب",
     dovecUnitTypes: "أنواع الوحدات",
     dovecAbout: "عن المشروع",
     dovecAvailableUnits: "الوحدات المتاحة",
@@ -6958,6 +6961,8 @@ const translations = {
     nhAptA4Desc: "يتألف North Houses Aladağ من شقتين بغرفتي نوم في المبنى نفسه في Küçük Kaymaklı بنيقوسيا. الشقق مناسبة للعائلات والمسافرين من أجل العمل والضيوف القادمين إلى نيقوسيا للعلاج.\n\nليس فندقًا بل إقامة في شقق مستقلة؛ لا توجد ردهة أو استقبال. تُجهَّز شقتك قبل وصولك. بعد تأكيد حجزك، يمكنك الدخول الذاتي في أي وقت من اليوم باستخدام بيانات الدخول المُرسلة إليك.\nالصيدليات والسوبرماركت والمقاهي ومتنزه Barış Manço على مسافة سير. يبعد Suriçi وDereboyu نحو 10 دقائق بالسيارة، ويبعد مطار Ercan 30 دقيقة.\n\nمن أبرز المعالم القريبة من North Houses Aladağ sk Küçük Kaymaklı نيقوسيا: وزارة الزراعة والتنمية الريفية والبيئة - نيقوسيا، ووزارة الصحة - نيقوسيا، ومتحف قبرص.",
   },
   ru: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Цена по звонку",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "Партнёр ADA",
     dovecProjects: "Проекты",
@@ -6968,7 +6973,6 @@ const translations = {
     dovecDelivery: "Сдача",
     dovecFrom: "От",
     dovecPrice: "Цена",
-    dovecPriceOnRequest: "Цена по запросу",
     dovecUnitTypes: "Типы квартир",
     dovecAbout: "О проекте",
     dovecAvailableUnits: "Доступные объекты",
@@ -9123,6 +9127,8 @@ const translations = {
     nhAptA4Desc: "North Houses Aladağ — это две двухспальные квартиры в одном здании в Küçük Kaymaklı, Никосия. Квартиры подходят для семей, деловых путешественников и гостей, приезжающих в Никосию на лечение.\n\nЭто не отель, а отдельные апартаменты: лобби и ресепшена нет. Ваша квартира готовится до вашего приезда. После подтверждения бронирования вы можете самостоятельно заселиться в любое время суток по полученным данным для входа.\nАптеки, супермаркеты, кафе и парк Barış Manço находятся в пешей доступности. До Suriçi и Dereboyu около 10 минут на машине, до аэропорта Ercan — 30 минут.\n\nСреди популярных достопримечательностей рядом с North Houses Aladağ sk Küçük Kaymaklı, Никосия: Министерство сельского хозяйства, развития сельских районов и окружающей среды — Никосия, Министерство здравоохранения — Никосия и Музей Кипра.",
   },
   el: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Καλέστε για την τιμή",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "Συνεργάτης ADA",
     dovecProjects: "Έργα",
@@ -9133,7 +9139,6 @@ const translations = {
     dovecDelivery: "Παράδοση",
     dovecFrom: "Από",
     dovecPrice: "Τιμή",
-    dovecPriceOnRequest: "Τιμή κατόπιν αιτήματος",
     dovecUnitTypes: "Τύποι κατοικιών",
     dovecAbout: "Σχετικά με το έργο",
     dovecAvailableUnits: "Διαθέσιμες μονάδες",
@@ -11270,6 +11275,8 @@ const translations = {
     nhAptA4Desc: "Το North Houses Aladağ αποτελείται από δύο διαμερίσματα με δύο υπνοδωμάτια στο ίδιο κτίριο στο Küçük Kaymaklı της Λευκωσίας. Τα διαμερίσματα είναι κατάλληλα για οικογένειες, επαγγελματίες που ταξιδεύουν και επισκέπτες που έρχονται στη Λευκωσία για θεραπεία.\n\nΔεν είναι ξενοδοχείο, αλλά ανεξάρτητη διαμονή σε διαμερίσματα· δεν υπάρχει λόμπι ή ρεσεψιόν. Το διαμέρισμά σας ετοιμάζεται πριν από την άφιξή σας. Μετά την επιβεβαίωση της κράτησής σας, μπορείτε να κάνετε self check-in οποιαδήποτε ώρα της ημέρας με τα στοιχεία εισόδου που θα σας δοθούν.\nΦαρμακεία, σούπερ μάρκετ, καφέ και το πάρκο Barış Manço βρίσκονται σε απόσταση περπατήματος. Το Suriçi και η Dereboyu απέχουν περίπου 10 λεπτά με το αυτοκίνητο και το αεροδρόμιο Ercan 30 λεπτά.\n\nΔημοφιλή σημεία ενδιαφέροντος κοντά στο North Houses Aladağ sk Küçük Kaymaklı Λευκωσία είναι το Υπουργείο Γεωργίας, Αγροτικής Ανάπτυξης και Περιβάλλοντος - Λευκωσία, το Υπουργείο Υγείας - Λευκωσία και το Μουσείο Κύπρου.",
   },
   fr: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Appelez pour le prix",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "Partenaire ADA",
     dovecProjects: "Projets",
@@ -11280,7 +11287,6 @@ const translations = {
     dovecDelivery: "Livraison",
     dovecFrom: "À partir de",
     dovecPrice: "Prix",
-    dovecPriceOnRequest: "Prix sur demande",
     dovecUnitTypes: "Types de logements",
     dovecAbout: "À propos du projet",
     dovecAvailableUnits: "Logements disponibles",
@@ -13421,6 +13427,8 @@ const translations = {
     nhAptA4Desc: "North Houses Aladağ se compose de deux appartements de deux chambres dans le même immeuble, à Küçük Kaymaklı, Nicosie. Les appartements conviennent aux familles, aux voyageurs d'affaires et aux personnes venues se faire soigner à Nicosie.\n\nCe n'est pas un hôtel, mais un hébergement en appartements indépendants ; il n'y a ni hall ni réception. Votre appartement est préparé avant votre arrivée. Une fois votre réservation confirmée, vous pouvez vous enregistrer en autonomie à toute heure avec les informations de connexion qui vous sont communiquées.\nPharmacies, supermarchés, cafés et parc Barış Manço sont à distance de marche. Suriçi et Dereboyu sont à environ 10 minutes en voiture, et l'aéroport d'Ercan à 30 minutes.\n\nParmi les points d'intérêt populaires près de North Houses Aladağ sk Küçük Kaymaklı Nicosie : le ministère de l'Agriculture, du Développement rural et de l'Environnement - Nicosie, le ministère de la Santé - Nicosie et le Musée de Chypre.",
   },
   es: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Llame para conocer el precio",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "Socio ADA",
     dovecProjects: "Proyectos",
@@ -13431,7 +13439,6 @@ const translations = {
     dovecDelivery: "Entrega",
     dovecFrom: "Desde",
     dovecPrice: "Precio",
-    dovecPriceOnRequest: "Precio a consultar",
     dovecUnitTypes: "Tipos de vivienda",
     dovecAbout: "Sobre el proyecto",
     dovecAvailableUnits: "Unidades disponibles",
@@ -15569,6 +15576,8 @@ const translations = {
     nhAptA4Desc: "North Houses Aladağ consta de dos apartamentos de dos dormitorios en el mismo edificio, en Küçük Kaymaklı, Nicosia. Los apartamentos son adecuados para familias, viajeros de negocios e invitados que llegan a Nicosia para recibir tratamiento.\n\nNo es un hotel, sino un alojamiento en apartamentos independientes; no hay vestíbulo ni recepción. Su apartamento se prepara antes de su llegada. Una vez confirmada su reserva, puede hacer el autocheck-in a cualquier hora del día con los datos de acceso que se le faciliten.\nFarmacias, supermercados, cafés y el parque Barış Manço están a poca distancia a pie. Suriçi y Dereboyu están a unos 10 minutos en coche, y el aeropuerto de Ercan a 30 minutos.\n\nEntre los puntos de interés populares cerca de North Houses Aladağ sk Küçük Kaymaklı Nicosia se encuentran el Ministerio de Agricultura, Desarrollo Rural y Medio Ambiente - Nicosia, el Ministerio de Sanidad - Nicosia y el Museo de Chipre.",
   },
   de: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "Preis telefonisch erfragen",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "ADA-Partner",
     dovecProjects: "Projekte",
@@ -15579,7 +15588,6 @@ const translations = {
     dovecDelivery: "Übergabe",
     dovecFrom: "Ab",
     dovecPrice: "Preis",
-    dovecPriceOnRequest: "Preis auf Anfrage",
     dovecUnitTypes: "Wohnungstypen",
     dovecAbout: "Über das Projekt",
     dovecAvailableUnits: "Verfügbare Einheiten",
@@ -17717,6 +17725,8 @@ const translations = {
     nhAptA4Desc: "North Houses Aladağ besteht aus zwei Wohnungen mit je zwei Schlafzimmern im selben Gebäude in Küçük Kaymaklı, Nikosia. Die Wohnungen eignen sich für Familien, Geschäftsreisende und Gäste, die zur Behandlung nach Nikosia kommen.\n\nEs ist kein Hotel, sondern eine Unterkunft in eigenständigen Wohnungen; es gibt weder Lobby noch Rezeption. Ihre Wohnung wird vor Ihrer Ankunft vorbereitet. Nach der Bestätigung Ihrer Reservierung können Sie mit den Ihnen mitgeteilten Zugangsdaten zu jeder Tageszeit selbst einchecken.\nApotheken, Supermärkte, Cafés und der Barış-Manço-Park sind zu Fuß erreichbar. Suriçi und Dereboyu sind mit dem Auto etwa 10 Minuten entfernt, der Flughafen Ercan 30 Minuten.\n\nZu den beliebten Sehenswürdigkeiten in der Nähe von North Houses Aladağ sk Küçük Kaymaklı Nikosia zählen das Ministerium für Landwirtschaft, ländliche Entwicklung und Umwelt - Nikosia, das Gesundheitsministerium - Nikosia und das Zypern-Museum.",
   },
   fa: {
+    // Any listing with price_on_request (Konaklama, property page, Döveç): utils/money.js propertyPriceText.
+    accomPriceOnRequest: "برای قیمت تماس بگیرید",
     // ─── Döveç partner (screens/DovecPartnerScreen.js, Explore map pin, Home slot) ───
     dovecPartnerBadge: "شریک ADA",
     dovecProjects: "پروژه‌ها",
@@ -17727,7 +17737,6 @@ const translations = {
     dovecDelivery: "تحویل",
     dovecFrom: "از",
     dovecPrice: "قیمت",
-    dovecPriceOnRequest: "قیمت با استعلام",
     dovecUnitTypes: "انواع واحد",
     dovecAbout: "درباره پروژه",
     dovecAvailableUnits: "واحدهای موجود",

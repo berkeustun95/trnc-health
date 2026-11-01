@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type, radii, elevation, press } from '../constants/theme'
 import { ScreenHeader, ContactBar, EmptyState, ErrorState, CardSkeleton } from '../components/ui'
 import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { areaName } from '../constants/areas'
-import { DOVEC, DOVEC_STATUS, dovecLogsContacts, dovecTelUrl, dovecWhatsAppUrl, dovecDeliveryQuarter, dovecPrice } from '../constants/dovec'
+import { DOVEC, DOVEC_STATUS, dovecLogsContacts, dovecTelUrl, dovecWhatsAppUrl, dovecDeliveryQuarter } from '../constants/dovec'
+import { moneyText, propertyPriceText, formatAmount } from '../utils/money'
 import { loadDovecProjects } from '../utils/loadDovecProjects'
 import { logContactEvent } from '../utils/logContactEvent'
 
@@ -31,8 +32,8 @@ function placeOf(p, lang) {
 }
 
 function priceLine(p, lang) {
-  if (p.price_on_request) return t('dovecPriceOnRequest', lang)
-  const from = dovecPrice(p.price_from, p.currency)
+  if (p.price_on_request) return t('accomPriceOnRequest', lang)
+  const from = moneyText(p.price_from, p.currency, lang)
   return from ? `${t('dovecFrom', lang)} ${from}` : null
 }
 
@@ -103,9 +104,9 @@ function Fact({ icon, label, value }) {
 }
 
 function UnitRow({ unit, lang }) {
-  const price = unit.price_on_request ? t('dovecPriceOnRequest', lang) : dovecPrice(unit.price, unit.currency)
+  const price = propertyPriceText(unit, lang)
   const facts = [
-    unit.area_sqm ? `${Math.round(unit.area_sqm)} m²` : null,
+    unit.area_sqm ? `${formatAmount(unit.area_sqm, lang)} m²` : null,
     unit.floor != null ? `${t('dovecFloor', lang)} ${unit.floor}` : null,
   ].filter(Boolean).join(' · ')
   return (
@@ -222,7 +223,10 @@ export default function DovecPartnerScreen({ lang, onBack, backRef, openProjectI
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    // Top inset from the provider's insets, not a native SafeAreaView: that one measured itself one frame
+    // after mount when opened from the map, so the header sat under the status bar while loading. The
+    // provider's insets are known before this screen mounts, so the first frame is already right.
+    <View style={[s.safe, { paddingTop: insets.top }]}>
       <ScreenHeader title={selected ? selected.name : DOVEC.name} onBack={handleBack} lang={lang} />
       {error ? (
         <ErrorState message={t('dovecLoadError', lang)} onRetry={load} lang={lang} />
@@ -248,7 +252,7 @@ export default function DovecPartnerScreen({ lang, onBack, backRef, openProjectI
             : <EmptyState icon="business-outline" title={t('dovecEmpty', lang)} />}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   )
 }
 

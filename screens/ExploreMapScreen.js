@@ -105,21 +105,11 @@ function regionToBBox(region) {
   ]
 }
 
-// A Döveç project pin: a teal badge, not a tinted default marker (placeColors.dovec explains why
-// no hue is free). Same snapshot rule as ClusterMarker below: track briefly, then stop.
-function DovecMarker({ pin, onPress }) {
-  const [tracks, setTracks] = useState(true)
-  useEffect(() => {
-    const id = setTimeout(() => setTracks(false), 300)
-    return () => clearTimeout(id)
-  }, [])
-  return (
-    <Marker coordinate={{ latitude: pin.lat, longitude: pin.lng }} tracksViewChanges={tracks}
-      onPress={onPress} anchor={{ x: 0.5, y: 0.5 }} accessibilityLabel={pin.row.name}>
-      <View style={cl.dovec}><Ionicons name="business" size={16} color="#fff" /></View>
-    </Marker>
-  )
-}
+// A Döveç project pin: a BITMAP badge (placeColors.dovec explains why no tinted hue is free).
+// A bitmap, not a child View: Android hit-tests a View marker from a snapshot that may not exist yet,
+// so the first tap could register late. The image is native from the first frame
+// (scripts/generate-dovec-pin.mjs).
+const DOVEC_PIN = require('../assets/map-pins/dovec.png')
 
 // Android renders a custom-child Marker from a snapshot taken on first layout. With
 // tracksViewChanges false from the very first frame that snapshot can be empty, and the
@@ -861,7 +851,11 @@ export default function ExploreMapScreen({
           }
           const pin = c.properties.pin
           if (pin.marker === 'badge') {
-            return <DovecMarker key={pin.id} pin={pin} onPress={e => { e.stopPropagation(); setSelected(pin) }} />
+            return (
+              <Marker key={pin.id} coordinate={{ latitude: pin.lat, longitude: pin.lng }} image={DOVEC_PIN}
+                anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} accessibilityLabel={pin.row.name}
+                onPress={e => { e.stopPropagation(); setSelected(pin) }} />
+            )
           }
           return (
             <Marker
@@ -1018,9 +1012,6 @@ const r = StyleSheet.create({
 const cl = StyleSheet.create({
   bubble: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderWidth: 2.5, borderColor: '#fff', ...shadow },
   count:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  // A rounded SQUARE, so it never reads as a teal cluster bubble (which is round and carries a count).
-  dovec:  { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: colors.primary, borderWidth: 2.5, borderColor: '#fff', ...shadow },
 })
 
 const s = StyleSheet.create({

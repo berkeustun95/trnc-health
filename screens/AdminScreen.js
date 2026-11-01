@@ -10,6 +10,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { propertyPriceText } from '../utils/money'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
@@ -2571,8 +2572,6 @@ function PropertiesTab() {
     load()
   }
 
-  const CURRENCIES = { GBP: '£', TRY: '₺', EUR: '€' }
-
   return (
     <View style={{ flex: 1 }}>
       <View style={s.chipRow}>
@@ -2591,11 +2590,10 @@ function PropertiesTab() {
             contentContainerStyle={s.listContent}
             ListEmptyComponent={<SectionEmpty text={`No ${filter} listings.`} />}
             renderItem={({ item }) => {
-              const sym = CURRENCIES[item.currency] || item.currency
               return (
                 <View style={s.card}>
                   <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={s.cardSub}>{item.property_type} · {item.intent} · {sym}{Number(item.price).toLocaleString()}</Text>
+                  <Text style={s.cardSub}>{item.property_type} · {item.intent} · {propertyPriceText(item, 'English') ?? '—'}</Text>
                   <Text style={s.cardSub}>Agent: {item.estate_agents?.full_name || '—'} · {item.district}</Text>
                   {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
                   {filter === 'pending' && (

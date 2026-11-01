@@ -25,6 +25,7 @@ import {
   RemoteImage,
 } from '../components/ui'
 import { t } from '../constants/i18n'
+import { propertyPriceText, formatAmount, CURRENCY_SYMBOL } from '../utils/money'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
@@ -89,27 +90,10 @@ const PERIODS    = ['monthly', 'weekly', 'yearly', 'nightly']
 // Slice 1 widened properties_currency_check to exactly these four — the currencies
 // actually transacted in North Cyprus. A code with no symbol here renders raw
 // ("USD450,000"), which is the bug this map exists to prevent.
-const CURRENCIES = { GBP: '£', EUR: '€', USD: '$', TRY: '₺' }
+const CURRENCIES = CURRENCY_SYMBOL
 const CURRENCY_CODES = ['GBP', 'EUR', 'USD', 'TRY']
 
-// 'total' deliberately has no suffix. Every other period must have one, or a yearly
-// rent renders as a bare number and reads as a sale price.
-const PERIOD_SUFFIX_KEY = {
-  monthly: 'accomPerMonth',
-  weekly:  'accomPerWeek',
-  yearly:  'accomPerYear',
-  nightly: 'accomPerNight',
-}
-
-// ─── formatting ──────────────────────────────────────────────────────────────
-
-function priceDisplay(price, currency, period, lang) {
-  if (price == null) return null
-  const sym = CURRENCIES[currency] || currency
-  const formatted = Number(price).toLocaleString('en-GB', { maximumFractionDigits: 0 })
-  const key = PERIOD_SUFFIX_KEY[period]
-  return `${sym}${formatted}${key ? t(key, lang) : ''}`
-}
+// Prices: utils/money.js (app-language grouping, period suffix, price on request).
 
 function intentLabel(intent, lang) {
   if (intent === 'rent')       return t('accomRent', lang)
@@ -281,7 +265,7 @@ function PropertyCard({ item, lang, onPress }) {
 
         <View pointerEvents="none" style={cs.priceBadge}>
           <Text style={cs.priceBadgeText}>
-            {priceDisplay(item.price, item.currency, item.price_period, lang)}
+            {propertyPriceText(item, lang)}
           </Text>
         </View>
 
@@ -339,7 +323,7 @@ function PropertyCard({ item, lang, onPress }) {
           ) : item.plot_sqm != null ? (
             <View style={cs.specChip}>
               <Text style={cs.specText}>
-                {Number(item.plot_sqm).toLocaleString('en-GB')} m² {t('accomPlot', lang)}
+                {formatAmount(item.plot_sqm, lang)} m² {t('accomPlot', lang)}
               </Text>
             </View>
           ) : null}
@@ -513,8 +497,10 @@ export default function AccommodationScreen({
 
     // id is the tiebreaker on every sort: without it, rows sharing a price can shuffle
     // between pages and pagination duplicates or drops them.
-    if (effectiveSort === 'price_asc')  q = q.order('price', { ascending: true }).order('id', { ascending: true })
-    if (effectiveSort === 'price_desc') q = q.order('price', { ascending: false }).order('id', { ascending: true })
+    // nullsFirst false: a price-on-request listing (price NULL) sorts after every priced one in BOTH
+    // directions; Postgres would otherwise put it first on price_desc.
+    if (effectiveSort === 'price_asc')  q = q.order('price', { ascending: true, nullsFirst: false }).order('id', { ascending: true })
+    if (effectiveSort === 'price_desc') q = q.order('price', { ascending: false, nullsFirst: false }).order('id', { ascending: true })
     if (effectiveSort === 'updated')    q = q.order('updated_at', { ascending: false, nullsFirst: false }).order('id', { ascending: true })
     return q
   }, [intent, district, area, propType, beds, currency, priceMin, priceMax,
