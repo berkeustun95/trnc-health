@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
 import { colors, shadow, radius, elevation, type, font, TAP } from '../constants/theme'
-import { Button, ConfirmDialog, useTabBarFootprint } from '../components/ui'
+import { Button, ConfirmDialog, useTabBarFootprint, PageCanvas } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { t, dateLocale } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
@@ -883,23 +883,27 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
   if (loading) {
     return (
+      <PageCanvas>
       <SafeAreaView style={s.safe}>
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       </SafeAreaView>
+      </PageCanvas>
     )
   }
 
   if (loadError) {
     return (
+      <PageCanvas>
       <SafeAreaView style={s.safe}>
         <View style={s.center}>
           <Text style={{ fontSize: 32, marginBottom: 12 }}>⚠️</Text>
-          <Text style={{ fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, textAlign: 'center', paddingHorizontal: 32 }}>
             {t('profileLoadError', lang)}
           </Text>
           <Button variant="text" title={t('back', lang)} onPress={onBack} style={{ marginTop: 20 }} />
         </View>
       </SafeAreaView>
+      </PageCanvas>
     )
   }
 
@@ -912,6 +916,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     //   the Android three-button navigation bar and cannot be tapped — the same failure
     //   the message composer had. ProfileSetupScreen's footer is the pattern this copies.
     // Under the floating tab bar (redesign tab) the bottom inset is inside the bar's footprint.
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={underTabBar ? ['top'] : ['top', 'bottom']}>
       {REDESIGN && <StatusBar style="dark" />}
       <KeyboardAwareForm>
@@ -1603,15 +1608,16 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         )}
       </KeyboardAwareForm>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: colors.canvas },
+  safe:             { flex: 1 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container:        { paddingHorizontal: 16, paddingBottom: 48 },
-  sectionHint:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18, marginBottom: 14 },
-  fieldHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 6 },
+  sectionHint:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 18, marginBottom: 14 },
+  fieldHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 17, marginTop: 6 },
   dobRow:           { flexDirection: 'row', gap: 8 },
 
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 20 },
@@ -1621,7 +1627,7 @@ const s = StyleSheet.create({
   pageTitle:        { ...type.pageTitle, color: colors.textPrimary, paddingTop: 8, marginBottom: 16 },
   footer: {
     flexShrink: 0, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
-    borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas,
+    borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.pageBase,
   },
   footerBtn: {
     backgroundColor: colors.primary, borderRadius: radius.md,
@@ -1635,7 +1641,7 @@ const s = StyleSheet.create({
   avatarSection:    { alignItems: 'center', marginBottom: 24 },
   avatarWrap:       { marginBottom: 12, position: 'relative' },
   avatarEditBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.canvas },
-  emailText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 8 },
+  emailText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginBottom: 8 },
   rolePill:         { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.primaryLight },
   rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   rolePillTextRaw:  { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'capitalize' },
@@ -1648,11 +1654,11 @@ const s = StyleSheet.create({
   qrPlaceholder:    { width: 48, height: 48, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   qrIcon:           { fontSize: 24, color: '#fff' },
 
-  sectionTitle:     { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginBottom: 14, marginTop: 4 },
+  sectionTitle:     { ...type.meta, fontFamily: font.semibold, color: colors.textSecondaryOnPage, marginBottom: 14, marginTop: 4 },
   accordionHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4 },
   accordionTitle:   { ...type.rowTitle, color: colors.textPrimary },
   fieldGroup:       { marginBottom: 16 },
-  fieldLabel:       { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginBottom: 7 },
+  fieldLabel:       { ...type.meta, fontFamily: font.semibold, color: colors.textSecondaryOnPage, marginBottom: 7 },
   input:            { borderWidth: 1.5, borderColor: colors.fieldBorder, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
   pickerBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: colors.fieldBorder, borderRadius: 12, padding: 13, backgroundColor: colors.surface },
   pickerBtnText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
@@ -1663,7 +1669,7 @@ const s = StyleSheet.create({
   blockedWho:       { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
   blockedWhoBody:   { flex: 1, minWidth: 0 },
   blockedName:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  blockedHint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 3 },
+  blockedHint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 17, marginTop: 3 },
   blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   unblockBtn:       { paddingHorizontal: 12, minHeight: TAP, justifyContent: 'center', borderRadius: 8, backgroundColor: colors.primaryLight },
   unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
@@ -1672,12 +1678,12 @@ const s = StyleSheet.create({
   marketingRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
   marketingLabel:   { flex: 1, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   legalRow:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 16 },
-  legalLink:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
-  legalDot:         { fontSize: 13, color: colors.textSecondary },
+  legalLink:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, textDecorationLine: 'underline' },
+  legalDot:         { fontSize: 13, color: colors.textSecondaryOnPage },
   signOutBtn:       { borderWidth: 1.5, borderColor: colors.dangerInk, borderRadius: 12, padding: 15, alignItems: 'center' },
   signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
   deleteAccountBtn: { alignItems: 'center', marginTop: 16, paddingVertical: 12 },
-  deleteAccountText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
+  deleteAccountText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, textDecorationLine: 'underline' },
 
   // Phone + country code
   phoneRow:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.fieldBorder, borderRadius: 12, backgroundColor: colors.surface, overflow: 'hidden' },
@@ -1705,15 +1711,15 @@ const s = StyleSheet.create({
 
   // ─── Education ─────────────────────────────────────────────────────────────
   eduSection:        { marginTop: 4 },
-  eduGroupLabel:     { ...type.meta, fontFamily: font.semibold, color: colors.textSecondary, marginBottom: 8 },
+  eduGroupLabel:     { ...type.meta, fontFamily: font.semibold, color: colors.textSecondaryOnPage, marginBottom: 8 },
   eduGroupLabelSpaced: { marginTop: 20 },
   eduLoading:        { alignSelf: 'flex-start', marginBottom: 8 },
-  eduEmpty:          { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 4 },
+  eduEmpty:          { fontSize: 13, color: colors.textSecondaryOnPage, lineHeight: 19, marginBottom: 4 },
   eduRow:            { flexDirection: 'row', alignItems: 'center', gap: 0, paddingVertical: 10,
                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   eduRowBody:        { flex: 1, gap: 2 },
   eduRowTitle:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  eduRowMeta:        { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  eduRowMeta:        { fontSize: 12, color: colors.textSecondaryOnPage, lineHeight: 17 },
   eduRowAction:      { width: TAP, height: TAP, alignItems: 'center', justifyContent: 'center' },
   eduAddBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
                        borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary,
@@ -1727,7 +1733,7 @@ const s = StyleSheet.create({
   eduConfirmRow:     { flexDirection: 'row', gap: 10, marginTop: 4 },
   eduCancelBtn:      { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.fieldBorder,
                        minHeight: TAP, justifyContent: 'center', alignItems: 'center' },
-  eduCancelText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  eduCancelText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage },
   eduRemoveBtn:      { flex: 1, borderRadius: radius.md, backgroundColor: colors.dangerInk,
                        minHeight: TAP, justifyContent: 'center', alignItems: 'center' },
   eduRemoveText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },

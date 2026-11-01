@@ -24,8 +24,10 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 
 ## 2. Mix v2 Home (HOME_V2_LIVE + REDESIGN_LIVE, both true)
 - Page ground: Base C (Berke, 2026-11-01), drawn by `components/ui/PageCanvas.js`: `colors.pageBase`
-  `#F8F6F1` with a fixed top gradient `pageTop` → `pageMid` (260pt) → pageBase (640pt); a page in a Home
-  group passes `group` for its ink fade; partner screens get the base only. Cards stay white
+  `#F8F6F1` with a fixed top gradient `pageTop` → `pageMid` (260pt) → pageBase (640pt); the same on
+  every non-photo page, partner screens included: no per-group tint (group colour lives in chips
+  and icons). Secondary text sitting directly on it is `colors.textSecondaryOnPage`; inside white
+  cards it stays `textSecondary`. No photo behind the status bar → dark icons. Cards stay white
   (`colors.card`). `colors.canvas` `#F4F6F5` is the legacy ground of screens not yet migrated.
   Never add a second background surface.
 - Order (`screens/HomeScreen.js` renderHubRedesign): `RedesignHero` photo band → `OliBar` → widgets

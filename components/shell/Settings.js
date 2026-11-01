@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { colors, type, radii, elevation } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { ListRow, Button, CategoryIcon, useTabBarFootprint } from '../ui'
+import { ListRow, Button, CategoryIcon, useTabBarFootprint, PageCanvas } from '../ui'
 import { FADE_H } from '../ui/FloatingTabBar'
 
 // ─── Profil: the ONE settings place (redesign Slice 2) ──────────────────────
@@ -58,6 +58,7 @@ export function SettingsGroups({ lang, a, isGuest = false }) {
 export function GuestProfile({ lang, a, onCreateAccount }) {
   const pad = useTabBarFootprint()
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: pad + FADE_H + 8 }]} showsVerticalScrollIndicator={false}>
@@ -71,15 +72,16 @@ export function GuestProfile({ lang, a, onCreateAccount }) {
         <SettingsGroups lang={lang} a={a} isGuest />
       </ScrollView>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.canvas },
+  safe:       { flex: 1 },
   content:    { paddingHorizontal: 16, paddingTop: 8 },
   page:       { ...type.pageTitle, color: colors.textPrimary, marginBottom: 16 },
   group:      { marginTop: 20 },
-  groupTitle: { ...type.meta, color: colors.textSecondary, marginBottom: 8, marginLeft: 4 },
+  groupTitle: { ...type.meta, color: colors.textSecondaryOnPage, marginBottom: 8, marginLeft: 4 },   // on the ground
   card:       { backgroundColor: colors.card, borderRadius: radii.card, paddingHorizontal: 14 },
   guestCard:  { backgroundColor: colors.card, borderRadius: radii.card, padding: 16, alignItems: 'flex-start' },
   guestTitle: { ...type.sectionHeading, color: colors.textPrimary, marginTop: 12 },

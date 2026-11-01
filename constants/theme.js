@@ -34,6 +34,10 @@ export const colors = {
   // Was #64748B, which passed AA only on white (4.48 on bg, 4.22 on primaryLight). #55657A
   // measures 5.95 white · 5.48 canvas · 5.27 primaryLight · 5.11 on the lowest category tint.
   textSecondary: '#55657A',
+  // textSecondary for text sitting DIRECTLY on PageCanvas (not in a white card). The gradient
+  // is fixed, so any of it can scroll up to pageTop, where textSecondary is 4.49. This is 4.56
+  // on pageTop, 5.22 on pageMid, 5.59 on pageBase, 6.04 on white.
+  textSecondaryOnPage: '#546479',
 
   // ─── Redesign roles (feat/redesign, Slice 0) ──────────────────────────────
   // Added BESIDE the legacy names rather than over them: `bg` and friends stay until each
@@ -254,11 +258,9 @@ export const category = {
   city:     { bg: '#F7FEE7', ink: '#4D7C0F' },   // Şehir & Ulaşım
 }
 
-// Base C geometry, pt from the top of the screen: pageTop at 0, pageMid at midAt, pageBase at
-// endAt. A group page adds category[group].ink at alpha `from` → `mid` (at midAt) → 0 (at endAt).
+// Base C geometry, pt from the top of the screen: pageTop at 0, pageMid at midAt, pageBase at endAt.
 export const pageCanvas = {
-  gradient:  { midAt: 260, endAt: 640 },
-  groupFade: { from: 0.16, mid: 0.06, midAt: 200, endAt: 380 },
+  gradient: { midAt: 260, endAt: 640 },
 }
 
 // Inter only, and only the four registered weights. Every role carries its family, so a

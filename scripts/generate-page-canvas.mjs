@@ -11,8 +11,6 @@
 // 25 levels of red over 260pt, and plain rounding draws visible steps on an OLED panel.
 //
 //   assets/page-canvas/base.png        opaque, pageTop → pageMid → pageBase over gradient.endAt
-//   assets/page-canvas/group-fade.png  white, alpha from → mid → 0 over groupFade.endAt; tinted
-//                                      to category[group].ink by PageCanvas (Image tintColor)
 //   assets/oli-scenes/canvas-fade.png  pageBase, alpha 0 → 1 (the tab bar's fade)
 import sharp from 'sharp'
 import { writeFileSync } from 'node:fs'
@@ -53,15 +51,6 @@ function baseRows() {
   })
 }
 
-function groupFadeRows() {
-  const { from, mid, midAt, endAt } = pageCanvas.groupFade
-  return Array.from({ length: endAt * PX_PER_PT }, (_, y) => {
-    const pt = (y + 0.5) / PX_PER_PT
-    const a = pt < midAt ? lerp(from, mid, pt / midAt) : lerp(mid, 0, (pt - midAt) / (endAt - midAt))
-    return [255, 255, 255, a * 255]
-  })
-}
-
 function tabFadeRows() {
   const base = rgb(colors.pageBase)
   return Array.from({ length: 256 }, (_, y) => [...base, (y / 255) * 255])
@@ -69,7 +58,6 @@ function tabFadeRows() {
 
 const OUT = [
   { path: 'assets/page-canvas/base.png',       img: bake(baseRows(), 3) },
-  { path: 'assets/page-canvas/group-fade.png', img: bake(groupFadeRows(), 4) },
   { path: 'assets/oli-scenes/canvas-fade.png', img: bake(tabFadeRows(), 4) },
 ]
 
