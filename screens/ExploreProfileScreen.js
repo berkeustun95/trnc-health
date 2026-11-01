@@ -124,11 +124,19 @@ function OfficialVisitCard({ data, lang }) {
               )}
             </View>
           </View>
-          {v.sundayFree && <Text style={r.ovNote}>{t('ovSundayFree', lang)}</Text>}
+          {v.sundayFree && (
+            <View style={r.ovRow}>
+              <Ionicons name="calendar-outline" size={16} color={C.textSecondary} />
+              <Text style={[r.ovRowBody, r.ovMeta]}>{t('ovSundayFree', lang)}</Text>
+            </View>
+          )}
         </>
       )}
+      {/* hitSlop, not partnerCredit's minHeight 44: inside this card's gap the min height stacked
+          ~30 pt of empty space above the link. The touch target stays 44 pt. */}
       {!!v.sourceUrl && (
-        <TouchableOpacity style={r.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
+        <TouchableOpacity style={r.ovLink} activeOpacity={0.7} accessibilityRole="link"
+          hitSlop={{ top: 13, bottom: 13 }}
           onPress={() => Linking.openURL(v.sourceUrl).catch(() => {})}>
           <Ionicons name="globe-outline" size={14} color={C.primaryDark} />
           <Text style={r.partnerCreditText}>{t('ovSource', lang)}</Text>
@@ -768,7 +776,7 @@ const r = StyleSheet.create({
   ovRowBody:     { flex: 1, gap: 2 },
   ovText:        { ...type.body, color: C.textPrimary },
   ovMeta:        { ...type.small, color: C.textSecondary },
-  ovNote:        { ...type.small, color: C.textSecondary },
+  ovLink:        { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4 },
   ownerCard:     { backgroundColor: C.soft, borderRadius: radii.card, padding: 16, marginTop: 16, gap: 10 },
   ownerCardTitle:{ ...type.rowTitle, color: C.textPrimary },
   ownerCardBody: { ...type.small, color: C.textSecondary },
