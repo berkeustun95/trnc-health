@@ -516,7 +516,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
                   <Text style={s.rowLabel}>{t('accomCall', lang)}</Text>
                   <View style={s.rowRight}>
                     <Text style={[s.rowValue, s.rowValueLink]}>{partner.phone}</Text>
-                    <Ionicons name="call-outline" size={15} color={colors.primary} />
+                    <Ionicons name="call-outline" size={15} color={colors.primaryDark} />
                   </View>
                 </TouchableOpacity>
               )}
@@ -526,7 +526,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
                   <Text style={s.rowLabel}>{t('dormEmail', lang)}</Text>
                   <View style={s.rowRight}>
                     <Text style={[s.rowValue, s.rowValueLink]}>{partner.email}</Text>
-                    <Ionicons name="mail-outline" size={15} color={colors.primary} />
+                    <Ionicons name="mail-outline" size={15} color={colors.primaryDark} />
                   </View>
                 </TouchableOpacity>
               )}
@@ -534,7 +534,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
                 <TouchableOpacity style={s.row} onPress={openWebsite} activeOpacity={0.6}>
                   <Text style={s.rowLabel}>{t('dormWebsite', lang)}</Text>
                   <View style={s.rowRight}>
-                    <Ionicons name="open-outline" size={15} color={colors.primary} />
+                    <Ionicons name="open-outline" size={15} color={colors.primaryDark} />
                   </View>
                 </TouchableOpacity>
               )}

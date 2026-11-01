@@ -249,7 +249,7 @@ export default function HomeServicePartnerScreen({
               <Text style={s.rowLabel}>{t('hsCall', lang)}</Text>
               <View style={s.rowRight}>
                 <Text style={[s.rowValue, s.rowValueLink]}>{row.phone}</Text>
-                <Ionicons name="call-outline" size={15} color={colors.primary} />
+                <Ionicons name="call-outline" size={15} color={colors.primaryDark} />
               </View>
             </TouchableOpacity>
           )}
@@ -258,7 +258,7 @@ export default function HomeServicePartnerScreen({
               <Text style={s.rowLabel}>{t('hsWhatsApp', lang)}</Text>
               <View style={s.rowRight}>
                 <Text style={[s.rowValue, s.rowValueLink]}>{row.whatsapp}</Text>
-                <Ionicons name="logo-whatsapp" size={15} color={colors.primary} />
+                <Ionicons name="logo-whatsapp" size={15} color={colors.primaryDark} />
               </View>
             </TouchableOpacity>
           )}

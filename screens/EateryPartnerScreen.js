@@ -128,7 +128,7 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
 
 // Own memo component: an active-tab change re-renders this row only, never the 46 dish rows.
 // Tab positions inside the row are measured with measureLayout when the active tab changes.
-const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeight, reduce }) {
+const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onLayout, stuck, reduce }) {
   const scrollRef = useRef(null)
   const tabRefs = useRef([])
   const tabsViewW = useRef(0)
@@ -141,7 +141,7 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeig
     }, () => {})
   }, [active, reduce])
   return (
-    <View style={s.tabsWrap} onLayout={e => onHeight(e.nativeEvent.layout.height)}>
+    <View style={[s.tabsWrap, stuck && s.tabsStuck]} onLayout={e => onLayout(e.nativeEvent.layout)}>
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist"
         onLayout={e => { tabsViewW.current = e.nativeEvent.layout.width }} contentContainerStyle={s.tabsContent}>
         {titles.map((title, i) => (
@@ -314,6 +314,11 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
   const tabsH = useRef(0)
+  // Base C: the tabs are transparent over the page ground until they pin, then take pageTop (the ground at the top of
+  // the screen) so they read as one block with the header; a solid band mid-page would be a second ground.
+  const tabsY = useRef(null)
+  const stuckRef = useRef(false)
+  const [tabsStuck, setTabsStuck] = useState(false)
   const activeRef = useRef(0)
   const lockRef = useRef(false)    // true while a tab tap is scrolling: scroll-sync stays quiet
   const lockTimer = useRef(null)
@@ -336,6 +341,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   const releaseLock = useCallback(() => { lockRef.current = false }, [])
   const onScroll = useCallback(e => {
+    const stuck = tabsY.current != null && e.nativeEvent.contentOffset.y >= tabsY.current - 1
+    if (stuck !== stuckRef.current) { stuckRef.current = stuck; setTabsStuck(stuck) }
     if (lockRef.current) return
     const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
     const edge = contentOffset.y + tabsH.current + TAB_SCROLL_OFFSET
@@ -355,7 +362,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     clearTimeout(lockTimer.current)
     lockTimer.current = setTimeout(() => { lockRef.current = false }, reduce ? 80 : 1200)
   }, [measureTops, reduce])
-  const setTabsH = useCallback(h => { tabsH.current = h }, [])
+  const setTabsLayout = useCallback(l => { tabsH.current = l.height; tabsY.current = l.y }, [])
 
   // Photo banner (banner_path, optional): Animated.ScrollView forwards its ref to the underlying ScrollView instance
   // (createAnimatedComponent merges forwardedRef onto it), so getInnerViewRef / scrollTo above keep working. y drives the
@@ -512,7 +519,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
         {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
 
-        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onHeight={setTabsH} reduce={reduce} />}
+        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onLayout={setTabsLayout} stuck={tabsStuck} reduce={reduce} />}
 
         {hasMenu && (
           <Card>
@@ -633,15 +640,16 @@ const s = StyleSheet.create({
   hourDay:   { ...type.body, color: colors.textSecondary, flexShrink: 1 },
   hourVal:   { ...type.body, color: colors.textPrimary, flexShrink: 0 },
   actions:   { gap: space[8] },
-  previewHint: { ...type.small, color: colors.textSecondary, textAlign: 'center' },
+  previewHint: { ...type.small, color: colors.textSecondaryOnPage, textAlign: 'center' },
   menuSec:   { marginTop: space[12] },
   menuSecNext: { marginTop: space[20] },
   secTitle:  { ...type.sectionHeading, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.sm, paddingVertical: space[8], paddingHorizontal: space[12], marginBottom: space[4] },
   secCount:  { fontFamily: font.regular, color: colors.textSecondary },
-  tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.pageTop, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  tabsWrap:  { marginHorizontal: -16, backgroundColor: 'transparent', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  tabsStuck: { backgroundColor: colors.pageTop },
   tabsContent: { paddingHorizontal: 16 },
   tab:       { minHeight: 44, paddingHorizontal: space[12], justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  tabOn:     { borderBottomColor: colors.primary },
+  tabOn:     { borderBottomColor: colors.primaryDark },
   tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondaryOnPage },
   tabTextOn: { color: colors.primaryDark },
   itemRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[12], paddingVertical: space[8] },

@@ -73,7 +73,7 @@ function ContactRow({ icon, label, value, onPress }) {
       <Text style={s.rowLabel}>{label}</Text>
       <View style={s.rowRight}>
         {!!value && <Text style={[s.rowValue, s.rowValueLink]} numberOfLines={1}>{value}</Text>}
-        <Ionicons name={icon} size={15} color={colors.primary} />
+        <Ionicons name={icon} size={15} color={colors.primaryDark} />
       </View>
     </TouchableOpacity>
   )
@@ -296,7 +296,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               {!!sec.location.address && <Text style={s.about}>{sec.location.address}</Text>}
               {!!sec.location.mapsUrl && (
                 <TouchableOpacity style={s.mapsBtn} onPress={openMaps} activeOpacity={0.85}>
-                  <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                  <Ionicons name="navigate-outline" size={16} color={colors.primaryDark} />
                   <Text style={s.mapsBtnText}>{t('petHotelDirections', lang)}</Text>
                 </TouchableOpacity>
               )}
@@ -398,7 +398,7 @@ const legacyS = StyleSheet.create({
   serviceText:  { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   mapsBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.sm,
+                  borderWidth: 1.5, borderColor: colors.primaryDark, borderRadius: radius.sm,
                   paddingVertical: 11, marginTop: 10, backgroundColor: 'transparent' },
   mapsBtnText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 
@@ -430,7 +430,7 @@ const legacyS = StyleSheet.create({
 const redesignS = StyleSheet.create({
   safe:     { flex: 1 },
   mapsBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44,
-              borderWidth: 1.5, borderColor: colors.primary, borderRadius: radii.md, marginTop: 10, backgroundColor: 'transparent' },
+              borderWidth: 1.5, borderColor: colors.primaryDark, borderRadius: radii.md, marginTop: 10, backgroundColor: 'transparent' },
   waBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
               backgroundColor: '#075E54', borderRadius: radii.md },
   callBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
