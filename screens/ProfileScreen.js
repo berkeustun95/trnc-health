@@ -1640,7 +1640,7 @@ const s = StyleSheet.create({
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },
   avatarWrap:       { marginBottom: 12, position: 'relative' },
-  avatarEditBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.canvas },
+  avatarEditBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.card },
   emailText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginBottom: 8 },
   rolePill:         { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.primaryLight },
   rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
