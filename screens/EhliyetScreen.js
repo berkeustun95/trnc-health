@@ -16,7 +16,7 @@ import {
   EHLIYET_CITY_NAME, branchChipLabels, ADDRESS_SEP, addressParts,
 } from '../constants/ehliyet'
 import { logContactEvent } from '../utils/logContactEvent'
-import { ScreenHeader, ErrorState, CardSkeleton } from '../components/ui'
+import { ScreenHeader, ErrorState, CardSkeleton, PageCanvas } from '../components/ui'
 
 // ─── Ehliyet: driving schools ───────────────────────────────────────────────
 // Rows come from public.driving_schools (+ nested driving_school_branches); RLS returns active rows only.
@@ -167,6 +167,7 @@ export default function EhliyetScreen({ lang, onBack }) {
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScreenHeader lang={lang} title={t('menuEhliyet', lang)} onBack={onBack} />
       {loading ? (
@@ -182,11 +183,12 @@ export default function EhliyetScreen({ lang, onBack }) {
         </ScrollView>
       )}
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: colors.bg },
+  safe:    { flex: 1 },
   content: { padding: 16, paddingBottom: 32, gap: 14 },
 
   card:         { backgroundColor: '#FFFFFF', borderRadius: radii.card, padding: 18, ...elevation.card },

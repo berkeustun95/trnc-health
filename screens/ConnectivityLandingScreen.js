@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, readableOn } from '../constants/theme'
 import { t } from '../constants/i18n'
-import BackButton from '../components/BackButton'
+import { ScreenHeader, PageCanvas } from '../components/ui'
 import ConnectivityErrorState from '../components/ConnectivityErrorState'
 import { fetchOperator, fetchLinks, openHandoff } from '../lib/connectivity'
 import { logContactEvent } from '../utils/logContactEvent'
@@ -244,24 +244,20 @@ export default function ConnectivityLandingScreen({ lang, onBack, onOperatorLoad
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.headerTitle}>{t('connTitle', lang)}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title={t('connTitle', lang)} onBack={onBack} lang={lang} />
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
         {renderBody()}
       </ScrollView>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: colors.bg },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
+  safe:          { flex: 1 },
   scroll:        { flex: 1 },
   scrollContent: { padding: GUTTER, paddingBottom: 48 },
   center:        { paddingVertical: 40, alignItems: 'center' },
@@ -296,5 +292,5 @@ const s = StyleSheet.create({
   warnStrong:    { fontFamily: 'Inter_700Bold' },
 
   opening:       { marginTop: 14 },
-  failText:      { marginTop: 10, fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center' },
+  failText:      { marginTop: 10, fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.dangerInkOnPage, textAlign: 'center' },
 })

@@ -93,7 +93,7 @@ const s = StyleSheet.create({
   tint:       { position: 'absolute', left: 0, right: 0, width: '100%', bottom: 0, height: BANNER_TINT_H, opacity: BANNER_TINT, transform: [{ scaleY: -1 }] },
   band:       { position: 'absolute', top: 0, left: 0, right: 0, width: '100%' },
   bar:        { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  canvas:     { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas },
+  canvas:     { ...StyleSheet.absoluteFillObject, backgroundColor: colors.pageTop },
   row:        { height: BANNER_BAR_ROW, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[16], gap: space[12] },
   back:       { backgroundColor: colors.card },
   titleBox:   { flex: 1, height: BANNER_BAR_ROW },

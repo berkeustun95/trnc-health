@@ -10,7 +10,7 @@ import DormRoomSheet from '../components/DormRoomSheet'
 import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
 import { colors, shadow, radius, readableOn, radii, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader } from '../components/ui'
+import { ScreenHeader, PageCanvas } from '../components/ui'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { dormSections, dormWaMessage, dormWebsiteUrl, SECTION_ORDER, COLLAPSIBLE } from '../constants/dorms'
@@ -305,6 +305,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
   const HERO_ASPECT = 16 / 9
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
       {REDESIGN ? (
         <ScreenHeader title={partner.name} onBack={onBack} lang={lang} />
@@ -604,6 +605,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
       <DormRoomSheet room={openRoom} partner={partner} lang={lang} region={region}
         onClose={() => setOpenRoom(null)} />
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -643,7 +645,7 @@ const legacyS = StyleSheet.create({
   badgeText:   { fontSize: TYPE.meta, fontFamily: 'Inter_700Bold' },
   heroName:    { fontSize: TYPE.title, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 28 },
   placeRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  placeText:   { flex: 1, fontSize: TYPE.body, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  placeText:   { flex: 1, fontSize: TYPE.body, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   dealBand:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12,
                  borderRadius: radius.md, marginBottom: 18 },
@@ -655,7 +657,7 @@ const legacyS = StyleSheet.create({
   block:       { marginBottom: 22 },
   blockTitle:  { fontSize: TYPE.section, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
                  marginBottom: 12 },
-  subTitle:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
+  subTitle:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage,
                  textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4, marginBottom: 8 },
   about:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 21 },
 
@@ -669,7 +671,7 @@ const legacyS = StyleSheet.create({
   roomPriceLabel: { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                     textTransform: 'uppercase', letterSpacing: 0.4 },
   roomPrice:   { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
-  yearNote:    { marginTop: 2, fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  yearNote:    { marginTop: 2, fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   // ─── Services — a ROW DESIGN problem, solved as one ───────────────────────
   // Two columns were rejected: down-then-across defeats normal left-right scanning,
@@ -684,12 +686,12 @@ const legacyS = StyleSheet.create({
   svcGroupGap: { marginTop: 22 },
   collapseHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                    gap: 12, paddingVertical: 2 },
-  collapseCount: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  collapseCount: { fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   // ─── Shuttles ────────────────────────────────────────────────────────────
   shuttleHead:    { marginBottom: 10 },
   shuttleName:    { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  shuttleProvider:{ fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  shuttleProvider:{ fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginTop: 2 },
   routeCard:   { backgroundColor: colors.cardBg, borderRadius: radius.md, padding: 12, marginBottom: 10, ...shadow },
   routeName:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   routeStops:  { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
@@ -708,8 +710,8 @@ const legacyS = StyleSheet.create({
   row:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                  paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowLabel:    { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  rowValue:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  rowValueLink:{ color: colors.primary },
+  rowValue:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage },
+  rowValueLink:{ color: colors.primaryDark },
   rowRight:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
   addressRow:  { paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   addressText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginTop: 4, lineHeight: 19 },
@@ -728,7 +730,7 @@ const legacyS = StyleSheet.create({
   sourceLinkLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   operator:    { marginTop: 2, marginBottom: 10, textAlign: 'center', fontSize: TYPE.meta,
-                 fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+                 fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10,
                  paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.cardBg,
@@ -745,7 +747,7 @@ const legacyS = StyleSheet.create({
 // Every label, position, link, colour (accent, WhatsApp green, teal), photo crop and logo
 // size is unchanged.
 const redesignS = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: colors.canvas },
+  safe:          { flex: 1 },
   collapseHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: TAP },
   row:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TAP + 4,
                    paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },

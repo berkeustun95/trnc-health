@@ -12,7 +12,7 @@ import { partnerLogo, partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
 import { REDESIGN } from '../constants/redesign'
 import { colors as C, type } from '../constants/theme'
-import { ScreenHeader as UiHeader, ContactBar } from '../components/ui'
+import { ScreenHeader as UiHeader, ContactBar, PageCanvas } from '../components/ui'
 
 // The partner detail screen. Structure mirrors TowingDetailScreen — navbar, hero, a stack
 // of bordered blocks, a fixed contact bar — because that is the shape this app already
@@ -117,6 +117,7 @@ export default function HomeServicePartnerScreen({
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={st.safe} edges={['top']}>
       {REDESIGN ? (
         <UiHeader onBack={onBack} title={row.name} lang={lang} />
@@ -294,6 +295,7 @@ export default function HomeServicePartnerScreen({
       </View>
       )}
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -315,7 +317,7 @@ const s = StyleSheet.create({
   heroLogo:     { marginBottom: 10 },
   heroName:     { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   coverageRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  coverageText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  coverageText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   block:        { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
   blockTitle:   { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
@@ -342,10 +344,10 @@ const s = StyleSheet.create({
   projectTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
                   marginBottom: 10 },
   pairWrap:     { marginBottom: 14 },
-  pairLabel:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+  pairLabel:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
                   marginBottom: 6 },
   pairRow:      { flexDirection: 'row', gap: 8 },
-  extraTitle:   { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+  extraTitle:   { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
                   marginTop: 2, marginBottom: 8 },
   // paddingRight equals the gap so the last frame has the same breathing room as the
   // space between frames; without it the strip ends flush against the screen edge and
@@ -362,9 +364,9 @@ const s = StyleSheet.create({
 
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                   paddingVertical: 6, gap: 12 },
-  rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
   rowValue:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  rowValueLink: { color: colors.primary },
+  rowValueLink: { color: colors.primaryDark },
   rowRight:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
 
   contactBar:   { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row',
@@ -381,7 +383,7 @@ const s = StyleSheet.create({
 // Redesign: page canvas, kit header and bar, Inter section titles. Nothing about the partner
 // (logo strip, badge, gallery, copy, order) is restyled here.
 const r = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: C.canvas },
+  safe:       { flex: 1 },
   block:      { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
   blockTitle: { ...type.rowTitle, color: C.textPrimary, marginBottom: 10 },
   contactBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10,

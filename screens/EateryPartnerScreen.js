@@ -10,7 +10,7 @@ import {
   eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
+import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
@@ -478,6 +478,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   }, [startInBasket, ordering, lines.length])
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={showBanner ? [] : ['top']}>
       <View style={s.under} {...(basketOpen || quizOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       {showBanner
@@ -601,11 +602,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         bottom={insets.bottom + (lines.length > 0 ? SNACK_ABOVE_BAR : space[16])} />
       <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: colors.canvas },
+  safe:      { flex: 1 },
   under:     { flex: 1 },
   content:   { paddingHorizontal: 16, paddingTop: space[8], gap: 14 },
   head:      { flexDirection: 'row', alignItems: 'center', gap: space[16] },
@@ -636,12 +638,12 @@ const s = StyleSheet.create({
   menuSecNext: { marginTop: space[20] },
   secTitle:  { ...type.sectionHeading, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.sm, paddingVertical: space[8], paddingHorizontal: space[12], marginBottom: space[4] },
   secCount:  { fontFamily: font.regular, color: colors.textSecondary },
-  tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.pageTop, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   tabsContent: { paddingHorizontal: 16 },
   tab:       { minHeight: 44, paddingHorizontal: space[12], justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
   tabOn:     { borderBottomColor: colors.primary },
-  tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondary },
-  tabTextOn: { color: colors.primary },
+  tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondaryOnPage },
+  tabTextOn: { color: colors.primaryDark },
   itemRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[12], paddingVertical: space[8] },
   itemText:  { flex: 1, minWidth: 0 },
   itemName:  { ...type.rowTitle, color: colors.textPrimary },
