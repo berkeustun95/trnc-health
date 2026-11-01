@@ -8,7 +8,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, category as CAT, type, radii, elevation, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
-import { IconButton, InfoRow, ContactBar, Button, RemoteImage } from '../components/ui'
+import { IconButton, InfoRow, ContactBar, Button, RemoteImage, PageCanvas } from '../components/ui'
+import SplashStatusBar from '../components/SplashStatusBar'
 import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { areaName } from '../constants/areas'
@@ -463,7 +464,10 @@ function PropertyDetailRedesign({
   // The agency row (logo or name) sits on top of the sticky bar, as in the legacy bar.
   const barH = 10 + LOGO_H + 10 + TAP + 10
   return (
+    <PageCanvas>
     <SafeAreaView style={rs.root} edges={['top']}>
+      {/* The gallery starts below the status bar, so the icons sit on the light ground. */}
+      <SplashStatusBar style="dark" />
       {/* The overlays below are positioned against this View, not the SafeAreaView, so the
           back button sits 8pt under whatever top inset the host applied. */}
       <View style={{ flex: 1 }}>
@@ -487,7 +491,7 @@ function PropertyDetailRedesign({
             )}
           </View>
         ) : (
-          <View style={[rs.ground, { backgroundColor: c.bg }]}>
+          <View style={rs.ground}>
             <Ionicons name="home-outline" size={64} color={c.ink} />
           </View>
         )}
@@ -607,11 +611,12 @@ function PropertyDetailRedesign({
       </View>
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const rs = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: colors.canvas },
+  root:        { flex: 1 },
   ground:      { width: W, height: GALLERY_H, alignItems: 'center', justifyContent: 'center' },
   counter:     { position: 'absolute', bottom: 40, right: 14, flexDirection: 'row', alignItems: 'center', gap: 4,
                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: 'rgba(0,0,0,0.6)' },

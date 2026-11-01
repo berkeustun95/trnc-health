@@ -7,6 +7,7 @@ import IconButton from './IconButton'
 import RemoteImage from './RemoteImage'
 import SplashStatusBar from '../SplashStatusBar'
 import ContactBar from './ContactBar'
+import PageCanvas from './PageCanvas'
 
 // The detail screen pattern (S4, from the event detail): a photo (or the category ground when
 // there is none), a white sheet rising over it, a category tag, the title, then the screen's own
@@ -22,17 +23,21 @@ import ContactBar from './ContactBar'
 //   headerRight: optional element over the photo, top-right (share, favourite)
 //   scrollProps: spread onto the ScrollView — e.g. a useScrollMemory() result, so coming back
 //                from a deeper screen (all reviews) returns to the same scroll position
+//   canvas:   the Base C page ground (PageCanvas) instead of the category ground when there is no
+//             photo. Opt-in while the screens move over slice by slice (Berke, 2026-11-01).
+// Status icons: light over a photo, dark over any light ground (white measured 1.16–1.64 there).
 export const DETAIL_PHOTO_H = 260
 export default function DetailScaffold({
-  photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children, scrollProps,
+  photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children, scrollProps, canvas = false,
 }) {
   const insets = useSafeAreaInsets()
   const c = CAT[tag?.category] || CAT.city
+  const Root = canvas ? PageCanvas : View
   return (
-    <View style={s.root}>
-      <SplashStatusBar style="light" />
+    <Root style={canvas ? null : s.root}>
+      <SplashStatusBar style={photo ? 'light' : 'dark'} />
       <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
-        <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: c.bg }]}>
+        <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: canvas && !photo ? 'transparent' : c.bg }]}>
           {photo
             ? <RemoteImage source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
             : <Ionicons name={icon} size={64} color={c.ink} style={{ marginTop: insets.top }} />}
@@ -58,7 +63,7 @@ export default function DetailScaffold({
           <ContactBar actions={actions} lang={lang} />
         </View>
       )}
-    </View>
+    </Root>
   )
 }
 
