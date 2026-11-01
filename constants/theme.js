@@ -39,6 +39,12 @@ export const colors = {
   // Added BESIDE the legacy names rather than over them: `bg` and friends stay until each
   // screen is migrated in its own slice, so no untouched screen changes colour by accident.
   canvas:        '#F4F6F5',   // page ground; white cards separate from it by elevation.card only (1.09:1)
+  // Base C (Berke, 2026-11-01): the page ground drawn by components/ui/PageCanvas.js. pageBase
+  // is the flat ground; pageTop → pageMid → pageBase is the top gradient (pageCanvas below).
+  // scripts/generate-page-canvas.mjs bakes the PNGs from these: change one, rerun it.
+  pageBase:      '#F8F6F1',
+  pageTop:       '#CBE5E3',
+  pageMid:       '#E4F1EF',
   card:          '#FFFFFF',
   tileInk:       '#3F4E57',   // grid tile labels — 7.93 on canvas
   divider:       '#EEF1F4',
@@ -246,6 +252,13 @@ export const category = {
   explore:  { bg: '#F1EAFB', ink: '#6B3FB0' },   // Keşfet & Eğlence
   homeLife: { bg: '#FBF0E0', ink: '#92560C' },   // Ev & Yaşam
   city:     { bg: '#F7FEE7', ink: '#4D7C0F' },   // Şehir & Ulaşım
+}
+
+// Base C geometry, pt from the top of the screen: pageTop at 0, pageMid at midAt, pageBase at
+// endAt. A group page adds category[group].ink at alpha `from` → `mid` (at midAt) → 0 (at endAt).
+export const pageCanvas = {
+  gradient:  { midAt: 260, endAt: 640 },
+  groupFade: { from: 0.16, mid: 0.06, midAt: 200, endAt: 380 },
 }
 
 // Inter only, and only the four registered weights. Every role carries its family, so a

@@ -50,7 +50,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
-import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
+import { SectionHeader, useTabBarFootprint, RemoteImage, PageCanvas } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
@@ -281,7 +281,7 @@ export default function HomeScreen({
 }) {
   const tabFootprint = useTabBarFootprint()
   const insets = useSafeAreaInsets()
-  // Status bar over the redesigned hero: LIGHT icons on the photo, then a solid canvas strip
+  // Status bar over the redesigned hero: LIGHT icons on the photo, then a solid pageTop strip
   // with DARK icons once the photo has scrolled out from under it. State flips only when the
   // threshold is crossed, not on every scroll frame. RN's StatusBar is a stack, so leaving
   // Home unmounts this entry and the app default comes back by itself.
@@ -1710,7 +1710,7 @@ export default function HomeScreen({
   // directory — keeps its shell (header, back, hideHeaderActions) in both states; since S3
   // REDESIGN restyles the list INSIDE renderFacilityList() and adds no navigation.
   if (REDESIGN && !showFacilityList) {
-    return <View style={s.rCanvas}>{renderHubRedesign()}</View>
+    return <PageCanvas>{renderHubRedesign()}</PageCanvas>
   }
 
   const v2Hub = HOME_V2_LIVE && !showFacilityList
@@ -1809,8 +1809,9 @@ const s = StyleSheet.create({
   v2Canvas:         { flex: 1, backgroundColor: colors.bgWarm },
 
   // ─── Redesign (feat/redesign) ───
-  rCanvas:      { flex: 1, backgroundColor: colors.canvas },
-  rStatusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.canvas,
+  // pageTop: PageCanvas's gradient is fixed to the screen and starts at exactly this colour at 0pt,
+  // so the strip sits on it with no band; only the hairline marks where content scrolls under.
+  rStatusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.pageTop,
                   borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   rBelow:       { paddingHorizontal: PAGE_INSET },
   rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 12 },
