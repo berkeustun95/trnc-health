@@ -85,10 +85,9 @@ Then:
       UPDATE public.properties        SET status = 'active' WHERE source = 'dovec' AND status = 'pending';
       ```
       From then on the sync publishes new rows itself (agency active).
-- [ ] ⚠ Döveç units then also appear in **Konaklama** (Accommodation): they are `properties` rows.
-      Price-on-request units have `price` NULL — check `AccommodationScreen` / `PropertyDetailScreen`
-      price rendering first (they have no on-request branch today), or decide to keep Döveç out of
-      Konaklama with a `source` filter.
+- [ ] Döveç units then also appear in **Konaklama** (decided 2026-11-01: they should). Price-on-request
+      units render "Fiyat için arayın" there (utils/money.js `propertyPriceText`, any source) and sort
+      last on both price sorts. Spot-check one on device after the UPDATE.
 - [ ] Turkish device pass with `DOVEC_PARTNER_LIVE = true` flipped locally
 - [ ] Flip `DOVEC_PARTNER_LIVE = true` in **both** `constants/flags.js` and `EXPECTED_SCALARS` in
       `scripts/check-module-flags.mjs`, one commit → Preview → Berke's go → `npm run ota`
