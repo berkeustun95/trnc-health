@@ -63,11 +63,16 @@ export function isEventOnNow(event, now = new Date()) {
   return !Number.isNaN(s.getTime()) && s.getTime() <= now.getTime() && !isEventOver(event, now)
 }
 
-// The server half, for PostgREST .or(): every row that COULD still be listed. A no-end event is
-// listed at most 30 h after it starts (00:00 start → 06:00 next day), so 30 h back is enough;
-// isEventOver then applies the exact rule on the client.
+// The server half, for PostgREST .or(): EXACTLY the rows the client rule lists (isEventOver stays
+// as the backstop). A no-end event is listed while now < 06:00 on the day after its Cyprus start
+// date, i.e. while its Cyprus start date >= the Cyprus date of (now − 6 h); so the bound is 00:00
+// Cyprus on that date. Exact, not a 30 h slack: slack let already-over rows fill a small limit
+// (Home strip) ahead of tonight's events (security review, 2026-11-01).
 export function maybeListedFilter(now = new Date()) {
-  const nowIso = now.toISOString()
-  const since = new Date(now.getTime() - 30 * H).toISOString()
-  return `end_date.gte.${nowIso},and(end_date.is.null,start_date.gte.${since})`
+  const p = cyprusParts(now)
+  const shifted = new Date(now.getTime() + p.offsetMs - NO_END_CUTOFF_HOUR * H)   // Cyprus wall clock − 6 h, read as UTC
+  const midnightAsUtc = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate())
+  // Offset in force at that midnight (read 3 h earlier: the DST switches are at 03:00/04:00 local).
+  const since = new Date(midnightAsUtc - cyprusParts(new Date(midnightAsUtc - 3 * H)).offsetMs)
+  return `end_date.gte.${now.toISOString()},and(end_date.is.null,start_date.gte.${since.toISOString()})`
 }

@@ -41,11 +41,35 @@ t('upcoming: not over, not on now', [isEventOver(tomorrow, at('2026-11-01T13:30:
 t('unreadable start, no end: over', isEventOver({ start_date: 'x' }), true)
 t('unreadable end falls back to the 06:00 rule', eventListedUntil({ start_date: '2026-10-31T17:00:00Z', end_date: 'x' }).toISOString(), '2026-11-01T04:00:00.000Z')
 
-// Server filter: wide enough for the client rule (30 h back for no-end rows).
-t('server filter', maybeListedFilter(at('2026-11-01T13:30:00Z')),
-  'end_date.gte.2026-11-01T13:30:00.000Z,and(end_date.is.null,start_date.gte.2026-10-31T07:30:00.000Z)')
+// Server filter: exact. 15:30 Cyprus on 1 Nov − 6 h = 1 Nov → no-end rows from 00:00 Cyprus 1 Nov (22:00Z 31 Oct).
+t('server filter at 15:30 Cyprus', maybeListedFilter(at('2026-11-01T13:30:00Z')),
+  'end_date.gte.2026-11-01T13:30:00.000Z,and(end_date.is.null,start_date.gte.2026-10-31T22:00:00.000Z)')
+t('server filter at 03:00 Cyprus keeps last night (31 Oct 00:00 Cyprus)', maybeListedFilter(at('2026-11-01T01:00:00Z')),
+  'end_date.gte.2026-11-01T01:00:00.000Z,and(end_date.is.null,start_date.gte.2026-10-30T22:00:00.000Z)')
 const earliest = { start_date: '2026-10-31T22:00:00Z' }                                     // 00:00 Cyprus, 1 Nov
 t('longest no-end listing is 30 h (00:00 start → 06:00 next day)', (eventListedUntil(earliest) - at(earliest.start_date)) / 3600000, 30)
+
+// The server bound and the client rule must agree on EVERY no-end row: a row the server drops but the
+// client would list is a missing event; the reverse fills a small limit with over rows (the review finding).
+// Sweep: starts every 30 min over 4 days around the October DST switch, "now" every 30 min across the same span.
+const sinceOf = now => new Date(maybeListedFilter(now).match(/start_date\.gte\.([^)]+)\)/)[1])
+let disagree = 0, checked = 0
+for (let n = Date.parse('2026-10-23T00:00:00Z'); n < Date.parse('2026-10-27T00:00:00Z'); n += 30 * 60000) {
+  const now = new Date(n), since = sinceOf(now)
+  for (let s = n - 3 * 24 * 3600000; s < n + 3600000; s += 30 * 60000) {
+    const ev = { start_date: new Date(s).toISOString(), end_date: null }
+    checked++
+    if ((new Date(s) >= since) !== !isEventOver(ev, now)) disagree++
+  }
+}
+t(`server bound == client rule for no-end rows (${checked} pairs, DST week)`, disagree, 0)
+let disagreeMar = 0
+for (let n = Date.parse('2027-03-26T00:00:00Z'); n < Date.parse('2027-03-30T00:00:00Z'); n += 30 * 60000) {
+  const now = new Date(n), since = sinceOf(now)
+  for (let s = n - 3 * 24 * 3600000; s < n + 3600000; s += 30 * 60000)
+    if ((new Date(s) >= since) !== !isEventOver({ start_date: new Date(s).toISOString() }, now)) disagreeMar++
+}
+t('server bound == client rule, March DST week', disagreeMar, 0)
 
 if (bad) { console.error(`\n${bad} failing`); process.exit(1) }
 console.log('\nall passing')

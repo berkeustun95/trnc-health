@@ -208,8 +208,8 @@ function eventWhen(startDate, lang) {
 //   the bound and leave the heading saying today.
 async function readEventsToday(now, lang) {
   const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999)
-  // limit 10, not 1: rows the server filter lets through can still be over by the 06:00 rule,
-  // so the first LISTED row is picked after the client check.
+  // The server filter is exact (scripts/test-event-visibility.mjs proves it matches isEventOver);
+  // the client check and limit 10 are a backstop for clock skew between phone and server.
   const { data, error } = await supabase
     .from('events')
     .select('id, title, images, source_image_url, start_date, end_date')
