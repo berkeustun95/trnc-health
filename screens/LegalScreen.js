@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
+import PageCanvas from '../components/ui/PageCanvas'
 import BackButton from '../components/BackButton'
 import { legalDoc, isLegalFallback, LEGAL_TITLE_KEY } from '../constants/legal'
 
@@ -27,6 +28,7 @@ export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {
   const fallback = isLegalFallback(tab, lang)
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.container}>
         <View style={s.header}>
@@ -59,11 +61,12 @@ export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {
         </ScrollView>
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: colors.bg },
+  safe:        { flex: 1 },
   container:   { flex: 1, paddingHorizontal: 16 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 16 },
   backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 70 },
@@ -76,7 +79,7 @@ const s = StyleSheet.create({
   tabTextActive:{ fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   body:        { paddingBottom: 48 },
   bodyText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
-  fallbackNote:{ fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+  fallbackNote:{ fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
                  lineHeight: 19, marginBottom: 16, paddingBottom: 14,
                  borderBottomWidth: 1, borderBottomColor: colors.border },
 })

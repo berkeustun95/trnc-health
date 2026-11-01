@@ -24,6 +24,6 @@ const s = StyleSheet.create({
   card:  { backgroundColor: CARD_BG, borderRadius: radii.card, marginHorizontal: 16, marginVertical: 12 },
   wrap:  { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24 },
   title: { ...type.rowTitle, color: colors.textPrimary, marginTop: 14, textAlign: 'center' },
-  msg:   { ...type.body, color: colors.textSecondary, marginTop: 6, textAlign: 'center' },
+  msg:   { ...type.body, color: colors.textSecondaryOnPage, marginTop: 6, textAlign: 'center' },
   btn:   { marginTop: 16 },
 })

@@ -28,7 +28,7 @@ import { formatPetDate } from '../constants/petsContent'
 import { maybeListedFilter, isEventOver, eventOverlaps, isRunningFromEarlierDay, ongoingEndLabel } from '../utils/eventVisibility'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
-  RemoteImage,
+  RemoteImage, PageCanvas,
 } from '../components/ui'
 import { colors as C, category as CAT, type, radii, elevation, listBottomPad } from '../constants/theme'
 
@@ -440,6 +440,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
   // at the end of the body, with the same label and the same openTicketUrl().
   if (REDESIGN) {
     return (
+      <PageCanvas>
       <SafeAreaView style={rd.detailSafe} edges={['top']}>
         <KitHeader onBack={onBack} lang={lang} />
         <FlatList
@@ -485,6 +486,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
         />
         {viewer}
       </SafeAreaView>
+      </PageCanvas>
     )
   }
 
@@ -954,7 +956,7 @@ const legacy = StyleSheet.create({
 const rd = StyleSheet.create({
   root:          { flex: 1, backgroundColor: C.canvas },
   safe:          { flex: 1, backgroundColor: 'transparent' },
-  detailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: C.canvas, zIndex: 10, elevation: 10 },
+  detailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: C.pageBase, zIndex: 10, elevation: 10 },
   card:          { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20,
                    overflow: 'hidden', minHeight: CARD_H, ...elevation.card },
   thumbFallback: { backgroundColor: CAT.explore.bg, justifyContent: 'center', alignItems: 'center' },
@@ -962,12 +964,12 @@ const rd = StyleSheet.create({
   divider:       { height: 1, backgroundColor: C.divider, marginVertical: 5 },
   cardTitle:     { ...type.rowTitle, minHeight: 40, color: C.textPrimary },
   infoText:      { ...type.meta, lineHeight: 17, color: C.textSecondary, flex: 1 },
-  detailImage:   { width: SCREEN_W, backgroundColor: C.canvas },
+  detailImage:   { width: SCREEN_W, backgroundColor: 'transparent' },
   dotActive:     { backgroundColor: C.primary, width: 18 },
 
   skeletons:     { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
   banner:        { marginBottom: 0 },
-  detailSafe:    { flex: 1, backgroundColor: C.canvas },
+  detailSafe:    { flex: 1 },
   posterFallback:{ height: 200, backgroundColor: CAT.explore.bg, justifyContent: 'center', alignItems: 'center' },
   sheet:         { backgroundColor: C.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet,
                    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, minHeight: 300 },

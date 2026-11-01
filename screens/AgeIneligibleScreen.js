@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import PageCanvas from '../components/ui/PageCanvas'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -54,6 +55,7 @@ export default function AgeIneligibleScreen({ lang, onDone }) {
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <View style={s.wrap}>
         <View style={s.icon}>
@@ -69,19 +71,20 @@ export default function AgeIneligibleScreen({ lang, onDone }) {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1 },
   wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   icon: {
-    width: 62, height: 62, borderRadius: 31, backgroundColor: colors.bg,
+    width: 62, height: 62, borderRadius: 31,
     alignItems: 'center', justifyContent: 'center', marginBottom: 18,
   },
   title: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
-  body:  { fontSize: 14.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: 26 },
-  error: { fontSize: 13.5, color: colors.danger, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+  body:  { fontSize: 14.5, color: colors.textSecondaryOnPage, textAlign: 'center', lineHeight: 21, marginBottom: 26 },
+  error: { fontSize: 13.5, color: colors.dangerInkOnPage, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
   btn: {
     backgroundColor: colors.primary, borderRadius: radius.md, alignSelf: 'stretch',
     paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...shadow,

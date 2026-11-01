@@ -40,6 +40,6 @@ const s = StyleSheet.create({
   spacer:   { width: 8 },
   titles:   { flex: 1, paddingHorizontal: 4 },
   title:    { ...type.sheetTitle, color: colors.textPrimary },
-  subtitle: { ...type.meta, color: colors.textSecondary },
+  subtitle: { ...type.meta, color: colors.textSecondaryOnPage },
   light:    { color: '#FFFFFF' },
 })

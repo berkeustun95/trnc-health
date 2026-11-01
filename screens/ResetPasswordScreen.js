@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import PageCanvas from '../components/ui/PageCanvas'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -35,6 +36,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe}>
       <KeyboardAwareForm>
       <View style={s.container}>
@@ -98,21 +100,22 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
       </View>
       </KeyboardAwareForm>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: colors.bg },
+  safe:        { flex: 1 },
   container:   { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
   cancelBtn:   { position: 'absolute', top: 16, right: 0, padding: 8 },
   title:       { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
-  sub:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 22, marginBottom: 32 },
-  label:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
+  sub:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 22, marginBottom: 32 },
+  label:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
   passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface, marginBottom: 18 },
   passwordInput:{ flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   eyeBtn:       { paddingHorizontal: 14 },
-  error:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, marginBottom: 12, textAlign: 'center' },
+  error:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.dangerInkOnPage, marginBottom: 12, textAlign: 'center' },
   btn:         { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center' },
   btnText:     { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
-  successText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.success, textAlign: 'center' },
+  successText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primaryDark, textAlign: 'center' },
 })

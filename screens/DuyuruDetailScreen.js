@@ -56,7 +56,6 @@ export default function DuyuruDetailScreen({ item, lang, onBack }) {
 
   return (
     <DetailScaffold
-      canvas
       icon={cat?.icon || 'megaphone-outline'}
       tag={{ label: t(cat?.labelKey || 'menuDuyurular', lang), icon: cat?.icon, category: 'city' }}
       title={item.title}

@@ -563,7 +563,6 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
         {/* profileMem keeps the scroll position when coming back from all reviews;
             DetailScaffold spreads scrollProps onto its own ScrollView. */}
         <DetailScaffold
-          canvas
           photo={facility.cover_image_url ? { uri: facility.cover_image_url } : null}
           icon={TYPE_ION[facility.type] || 'medical-outline'}
           tag={{ label: t(facility.type, lang), category: cat, icon: TYPE_ION[facility.type] }}

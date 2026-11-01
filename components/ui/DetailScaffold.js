@@ -9,35 +9,32 @@ import SplashStatusBar from '../SplashStatusBar'
 import ContactBar from './ContactBar'
 import PageCanvas from './PageCanvas'
 
-// The detail screen pattern (S4, from the event detail): a photo (or the category ground when
-// there is none), a white sheet rising over it, a category tag, the title, then the screen's own
+// The detail screen pattern (S4, from the event detail): a photo (or the page ground, PageCanvas,
+// with the category icon when there is none), a white sheet rising over it, a category tag, the title, then the screen's own
 // rows, and a STICKY action bar at the bottom so Call / Directions / Book are never ~600pt down
 // the page (the audit's facility-profile finding). The floating tab bar does not render over
 // module screens (App.js shows it only on the three tab roots), so the bar pads by the safe-area
 // inset alone. Back is a frosted IconButton over the photo; Android back stays with the caller
 // (register it through addBackListener, as every layer does).
 //
-//   photo:    image source ({ uri } or require) | null → category ground with the icon
+//   photo:    image source ({ uri } or require) | null → the page ground with the category icon
 //   tag:      { label, category, icon? }
 //   actions:  ContactBar actions for the sticky bar (omit for none)
 //   headerRight: optional element over the photo, top-right (share, favourite)
 //   scrollProps: spread onto the ScrollView — e.g. a useScrollMemory() result, so coming back
 //                from a deeper screen (all reviews) returns to the same scroll position
-//   canvas:   the Base C page ground (PageCanvas) instead of the category ground when there is no
-//             photo. Opt-in while the screens move over slice by slice (Berke, 2026-11-01).
 // Status icons: light over a photo, dark over any light ground (white measured 1.16–1.64 there).
 export const DETAIL_PHOTO_H = 260
 export default function DetailScaffold({
-  photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children, scrollProps, canvas = false,
+  photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children, scrollProps,
 }) {
   const insets = useSafeAreaInsets()
   const c = CAT[tag?.category] || CAT.city
-  const Root = canvas ? PageCanvas : View
   return (
-    <Root style={canvas ? null : s.root}>
+    <PageCanvas>
       <SplashStatusBar style={photo ? 'light' : 'dark'} />
       <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
-        <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: canvas && !photo ? 'transparent' : c.bg }]}>
+        <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: photo ? c.bg : 'transparent' }]}>
           {photo
             ? <RemoteImage source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
             : <Ionicons name={icon} size={64} color={c.ink} style={{ marginTop: insets.top }} />}
@@ -63,12 +60,11 @@ export default function DetailScaffold({
           <ContactBar actions={actions} lang={lang} />
         </View>
       )}
-    </Root>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: colors.canvas },
   photo:    { width: '100%', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   sheet:    { marginTop: -28, backgroundColor: colors.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet,
               paddingHorizontal: 20, paddingTop: 20, minHeight: 300 },

@@ -14,7 +14,7 @@ import FilterDropdown from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { SUBMITTABLE_CATEGORIES, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import MapPinPicker from '../components/MapPinPicker'
-import BackButton from '../components/BackButton'
+import { ScreenHeader, PageCanvas } from '../components/ui'
 import { resolveRegion } from '../utils/resolveRegion'
 
 function decode(base64) {
@@ -208,22 +208,20 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, i
 
   if (done) {
     return (
+      <PageCanvas>
       <SafeAreaView style={[s.safe, s.safeCenter]} edges={['top', 'bottom']}>
         <SuccessState lang={lang} onBack={onBack} note={initialFix ? t('checkinAddedNote', lang) : null} />
       </SafeAreaView>
+      </PageCanvas>
     )
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
 
-        {/* Header */}
-        <View style={s.header}>
-          <BackButton variant="bare" lang={lang} onPress={onBack} />
-          <Text style={s.headerTitle}>{t(isEdit ? 'exploreEditTitle' : 'blSubmitTitle', lang)}</Text>
-          <View style={{ width: 44 }} />
-        </View>
+        <ScreenHeader title={t(isEdit ? 'exploreEditTitle' : 'blSubmitTitle', lang)} onBack={onBack} lang={lang} />
 
         <ScrollView
           contentContainerStyle={s.scroll}
@@ -373,21 +371,16 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, i
         onCancel={() => setShowMap(false)}
       />
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg },
+  safe:       { flex: 1 },
   safeCenter: { justifyContent: 'center' },
 
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                 paddingHorizontal: 16, paddingVertical: 14,
-                 backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Inter_700Bold',
-                 color: colors.textPrimary },
-
   scroll:       { padding: 20, gap: 0, paddingBottom: 48 },
-  sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
+  sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage,
                   textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginTop: 20 },
 
   // Chips
@@ -430,7 +423,7 @@ const s = StyleSheet.create({
   switchLabel:{ fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
 
   // Error
-  error: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger,
+  error: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.dangerInkOnPage,
            marginTop: 16, textAlign: 'center' },
 
   // Submit button
@@ -442,7 +435,7 @@ const s = StyleSheet.create({
   stateWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   stateEmoji: { fontSize: 56 },
   stateTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center' },
-  stateSub:   { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+  stateSub:   { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
                 textAlign: 'center', lineHeight: 22 },
   doneBtn:    { marginTop: 12, backgroundColor: colors.primary, borderRadius: radius.md,
                 paddingHorizontal: 40, paddingVertical: 14 },

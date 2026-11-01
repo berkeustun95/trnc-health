@@ -34,7 +34,7 @@ import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
-import { FloatingTabBar } from './components/ui'
+import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
 import { REGION_TO_DUTY } from './constants/regions'
@@ -421,11 +421,12 @@ class BLErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         REDESIGN ? (
-          <View style={{ flex: 1, padding: 24, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' }}>
+          <PageCanvas>
+          <View style={{ flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 17, lineHeight: 22, fontFamily: font.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
               {t('hrCrashTitle', this.props.lang)}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: font.regular, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+            <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: font.regular, color: colors.textSecondaryOnPage, textAlign: 'center', marginBottom: 24 }}>
               {t('hrCrashBody', this.props.lang)}
             </Text>
             <TouchableOpacity onPress={() => this.setState({ hasError: false })} accessibilityRole="button"
@@ -433,6 +434,7 @@ class BLErrorBoundary extends Component {
               <Text style={{ color: colors.onPrimary, fontFamily: font.semibold, fontSize: 15 }}>{t('back', this.props.lang)}</Text>
             </TouchableOpacity>
           </View>
+          </PageCanvas>
         ) : (
         <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 }}>Something went wrong</Text>
@@ -1892,7 +1894,8 @@ export default function App() {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
   } else if (loading || !profile) {
     content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageCanvas>
+      <SafeAreaView style={styles.rootFill} edges={['top']}>
         <View style={styles.container}>
           {/* Mimics HomeScreen's real top bar, which is a CENTRED logo (absolutely
               positioned) plus a right-hand pair. The old version was three flat children
@@ -1920,6 +1923,7 @@ export default function App() {
           </View>
         </View>
       </SafeAreaView>
+      </PageCanvas>
     )
   } else if (ageIneligible) {
     // BEFORE the gate, and before every exempt screen it renders. An ineligible account
@@ -2324,7 +2328,8 @@ export default function App() {
   // and below Pets the profile never rendered — the tap looked dead (2026-09-27, slice 0).
   } else if (unclaimedFacility) {
     content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageCanvas>
+      <SafeAreaView style={styles.rootFill} edges={['top']}>
         {/* NOT styles.header — that one is justifyContent:'flex-end' (it dresses the
             HomeScreen top bar, whose children ARE right-aligned). With a lone BackButton
             it pushed the control to the top-RIGHT, flush against the screen edge with no
@@ -2419,6 +2424,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      </PageCanvas>
     )
   } else if (selectedFacility && !(showPets && petsSubScreen === 'vetdirectory') && !showGrooming && !showGarages) {
     content = facilityProfileEl
@@ -3376,7 +3382,7 @@ const styles = StyleSheet.create({
   unclaimedNoticeText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
   unclaimedActions: { flexDirection: 'row', gap: 12 },
   reportBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, alignSelf: 'center' },
-  reportBtnText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
+  reportBtnText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, textDecorationLine: 'underline' },
   actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14 },
   actionBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
   dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.accent + '30' },
