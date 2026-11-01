@@ -194,7 +194,7 @@ export default function XoxGameScreen({ lang, onBack }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesXoxTitle', lang)} style={s.header} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesXoxTitle', lang)} />
 
       <View style={s.body}>
         <View style={s.modeRow}>
@@ -273,7 +273,6 @@ export default function XoxGameScreen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe:      { flex: 1 },
-  header:     { marginBottom: 18 },
   body:      { flex: 1, padding: spacing.md, alignItems: 'center' },
 
   modeRow:   { flexDirection: 'row', backgroundColor: colors.border, borderRadius: radius.lg, padding: 4, marginBottom: spacing.md },

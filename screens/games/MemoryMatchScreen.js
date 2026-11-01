@@ -155,7 +155,7 @@ export default function MemoryMatchScreen({ lang, onBack }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesMemoryTitle', lang)} style={s.header} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesMemoryTitle', lang)} />
 
       <View style={s.body}>
         <View style={s.diffRow}>
@@ -230,7 +230,6 @@ export default function MemoryMatchScreen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe:      { flex: 1 },
-  header:     { marginBottom: 18 },
   body:      { flex: 1, padding: spacing.md },
 
   diffRow:   { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.border, borderRadius: radius.lg, padding: 4, marginBottom: spacing.md },

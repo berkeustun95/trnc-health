@@ -173,7 +173,7 @@ export default function Game2048Screen({ lang, onBack }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('games2048Title', lang)} style={s.header} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('games2048Title', lang)} />
 
       <View style={s.body}>
         <View style={s.scoreRow}>
@@ -233,7 +233,6 @@ export default function Game2048Screen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe:       { flex: 1 },
-  header:     { marginBottom: 18 },
   body:       { flex: 1, padding: spacing.md },
 
   scoreRow:   { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },

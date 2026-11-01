@@ -161,7 +161,7 @@ export default function SudokuScreen({ lang, onBack }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesSudokuTitle', lang)} style={s.header} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesSudokuTitle', lang)} />
 
       <View style={s.body}>
         <View style={s.diffRow}>
@@ -267,8 +267,8 @@ export default function SudokuScreen({ lang, onBack }) {
             { key: 'erase', icon: 'backspace-outline',   label: t('gamesSudokuErase', lang), onPress: erase },
           ].map(b => (
             <TouchableOpacity key={b.key} style={[s.helperBtn, b.active && s.helperBtnActive]} onPress={b.onPress} activeOpacity={0.75}>
-              <Ionicons name={b.icon} size={22} color={b.active ? colors.primary : colors.textSecondary} />
-              <Text style={[s.helperLabel, b.active && { color: colors.primary }]}>{b.label}</Text>
+              <Ionicons name={b.icon} size={22} color={b.active ? colors.primaryDark : colors.textSecondary} />
+              <Text style={[s.helperLabel, b.active && { color: colors.primaryDark }]}>{b.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -280,7 +280,6 @@ export default function SudokuScreen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe:      { flex: 1 },
-  header:     { marginBottom: 18 },
   body:      { flex: 1, padding: spacing.md },
 
   diffRow:   { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.border, borderRadius: radius.lg, padding: 4, marginBottom: spacing.sm },

@@ -16,7 +16,7 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} style={s.header} />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.grid}>
@@ -100,7 +100,6 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
 
 const s = StyleSheet.create({
   safe:       { flex: 1 },
-  header:     { marginBottom: 18 },
   scroll:     { padding: spacing.md },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tileWrap:   { width: '48%', marginBottom: spacing.md },
