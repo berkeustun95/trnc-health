@@ -34,7 +34,7 @@ import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
-import { FloatingTabBar } from './components/ui'
+import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
 import { REGION_TO_DUTY } from './constants/regions'
@@ -137,7 +137,7 @@ import { ConfirmDialog } from './components/ui'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
-import { SplashUpContext } from './components/SplashStatusBar'
+import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -421,11 +421,13 @@ class BLErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         REDESIGN ? (
-          <View style={{ flex: 1, padding: 24, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' }}>
+          <PageCanvas>
+          <View style={{ flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <SplashStatusBar style="dark" />
             <Text style={{ fontSize: 17, lineHeight: 22, fontFamily: font.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
               {t('hrCrashTitle', this.props.lang)}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: font.regular, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+            <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: font.regular, color: colors.textSecondaryOnPage, textAlign: 'center', marginBottom: 24 }}>
               {t('hrCrashBody', this.props.lang)}
             </Text>
             <TouchableOpacity onPress={() => this.setState({ hasError: false })} accessibilityRole="button"
@@ -433,6 +435,7 @@ class BLErrorBoundary extends Component {
               <Text style={{ color: colors.onPrimary, fontFamily: font.semibold, fontSize: 15 }}>{t('back', this.props.lang)}</Text>
             </TouchableOpacity>
           </View>
+          </PageCanvas>
         ) : (
         <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 }}>Something went wrong</Text>
@@ -1892,7 +1895,9 @@ export default function App() {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
   } else if (loading || !profile) {
     content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageCanvas>
+      <SafeAreaView style={styles.rootFill} edges={['top']}>
+        <SplashStatusBar style="dark" />
         <View style={styles.container}>
           {/* Mimics HomeScreen's real top bar, which is a CENTRED logo (absolutely
               positioned) plus a right-hand pair. The old version was three flat children
@@ -1902,24 +1907,25 @@ export default function App() {
               so the only child in the flow is the right-hand group. */}
           <View style={styles.skeletonHeader}>
             <View style={styles.skeletonLogoWrap} pointerEvents="none">
-              <Skeleton width={110} height={54} borderRadius={10} />
+              <Skeleton width={110} height={54} borderRadius={10} style={styles.boneOnPage} />
             </View>
             <View style={styles.skeletonHeaderRight}>
-              <Skeleton width={34} height={34} borderRadius={17} />
-              <Skeleton width={34} height={34} borderRadius={10} />
+              <Skeleton width={34} height={34} borderRadius={17} style={styles.boneOnPage} />
+              <Skeleton width={34} height={34} borderRadius={10} style={styles.boneOnPage} />
             </View>
           </View>
-          <Skeleton width="100%" height={44} borderRadius={12} style={{ marginBottom: 10 }} />
+          <Skeleton width="100%" height={44} borderRadius={12} style={[styles.boneOnPage, { marginBottom: 10 }]} />
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-            <Skeleton width={72} height={30} borderRadius={20} />
-            <Skeleton width={80} height={30} borderRadius={20} />
-            <Skeleton width={64} height={30} borderRadius={20} />
+            <Skeleton width={72} height={30} borderRadius={20} style={styles.boneOnPage} />
+            <Skeleton width={80} height={30} borderRadius={20} style={styles.boneOnPage} />
+            <Skeleton width={64} height={30} borderRadius={20} style={styles.boneOnPage} />
           </View>
           <View style={{ flex: 1 }}>
             {[0, 1, 2, 3, 4].map(i => <FacilityCardSkeleton key={i} />)}
           </View>
         </View>
       </SafeAreaView>
+      </PageCanvas>
     )
   } else if (ageIneligible) {
     // BEFORE the gate, and before every exempt screen it renders. An ineligible account
@@ -2324,7 +2330,9 @@ export default function App() {
   // and below Pets the profile never rendered — the tap looked dead (2026-09-27, slice 0).
   } else if (unclaimedFacility) {
     content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageCanvas>
+      <SafeAreaView style={styles.rootFill} edges={['top']}>
+        <SplashStatusBar style="dark" />
         {/* NOT styles.header — that one is justifyContent:'flex-end' (it dresses the
             HomeScreen top bar, whose children ARE right-aligned). With a lone BackButton
             it pushed the control to the top-RIGHT, flush against the screen edge with no
@@ -2385,7 +2393,7 @@ export default function App() {
                 style={[styles.actionBtn, { flex: 1 }]}
                 onPress={() => Linking.openURL(`tel:${unclaimedFacility.phone.replace(/\s+/g, '')}`)}
               >
-                <Feather name="phone" size={16} color={colors.primary} />
+                <Feather name="phone" size={16} color={colors.primaryDark} />
                 <Text style={styles.actionBtnText}>{t('call', lang)}</Text>
               </TouchableOpacity>
             ) : null}
@@ -2394,7 +2402,7 @@ export default function App() {
                 style={[styles.actionBtn, { flex: 1 }]}
                 onPress={() => Linking.openURL(`https://maps.google.com/?q=${unclaimedFacility.latitude},${unclaimedFacility.longitude}`)}
               >
-                <Feather name="navigation" size={16} color={colors.primary} />
+                <Feather name="navigation" size={16} color={colors.primaryDark} />
                 <Text style={styles.actionBtnText}>{t('getDirections', lang)}</Text>
               </TouchableOpacity>
             ) : null}
@@ -2403,7 +2411,7 @@ export default function App() {
                 style={[styles.actionBtn, { flex: 1 }]}
                 onPress={() => Linking.openURL(unclaimedFacility.website)}
               >
-                <Feather name="globe" size={16} color={colors.primary} />
+                <Feather name="globe" size={16} color={colors.primaryDark} />
                 <Text style={styles.actionBtnText}>{t('visitWebsite', lang)}</Text>
               </TouchableOpacity>
             ) : null}
@@ -2419,6 +2427,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      </PageCanvas>
     )
   } else if (selectedFacility && !(showPets && petsSubScreen === 'vetdirectory') && !showGrooming && !showGarages) {
     content = facilityProfileEl
@@ -3259,6 +3268,7 @@ const styles = StyleSheet.create({
   // A detail drawn over a still-mounted module list (vet directory → facility).
   moduleOverlay:    { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   rootFill:         { flex: 1 },
+  boneOnPage:       { backgroundColor: colors.card },   // a bare bone (colors.border) vanishes on PageCanvas
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header:           { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
@@ -3376,9 +3386,9 @@ const styles = StyleSheet.create({
   unclaimedNoticeText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
   unclaimedActions: { flexDirection: 'row', gap: 12 },
   reportBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, alignSelf: 'center' },
-  reportBtnText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
-  actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14 },
-  actionBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
+  reportBtnText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, textDecorationLine: 'underline' },
+  actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14 },
+  actionBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.accent + '30' },
   dutyBannerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },

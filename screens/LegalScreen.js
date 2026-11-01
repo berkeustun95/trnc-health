@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
-import BackButton from '../components/BackButton'
+import { ScreenHeader, PageCanvas } from '../components/ui'
 import { legalDoc, isLegalFallback, LEGAL_TITLE_KEY } from '../constants/legal'
 
 // ─── THE DOCUMENTS MOVED OUT (2026-09-12) ───────────────────────────────────
@@ -27,13 +27,10 @@ export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {
   const fallback = isLegalFallback(tab, lang)
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
+      <ScreenHeader title={t(LEGAL_TITLE_KEY[tab], lang)} onBack={onBack} lang={lang} />
       <View style={s.container}>
-        <View style={s.header}>
-          <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
-          <Text style={s.title}>{t(LEGAL_TITLE_KEY[tab], lang)}</Text>
-          <View style={s.headerRight} />
-        </View>
 
         <View style={s.tabRow}>
           <TouchableOpacity
@@ -59,24 +56,21 @@ export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {
         </ScrollView>
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: colors.bg },
+  safe:        { flex: 1 },
   container:   { flex: 1, paddingHorizontal: 16 },
-  header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 16 },
-  backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 70 },
-  title:       { flex: 1, fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center' },
-  headerRight: { minWidth: 70 },
-  tabRow:      { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 12, padding: 3, marginBottom: 20 },
+  tabRow:      { flexDirection: 'row', backgroundColor: colors.soft, borderRadius: 12, padding: 3, marginTop: 4, marginBottom: 20 },
   tabBtn:      { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
   tabBtnActive:{ backgroundColor: colors.surface, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  tabText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  tabText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
   tabTextActive:{ fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   body:        { paddingBottom: 48 },
   bodyText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
-  fallbackNote:{ fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+  fallbackNote:{ fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
                  lineHeight: 19, marginBottom: 16, paddingBottom: 14,
                  borderBottomWidth: 1, borderBottomColor: colors.border },
 })

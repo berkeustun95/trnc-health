@@ -59,6 +59,7 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { NATIONALITIES, NATIONALITY_CODES, getNatLabel } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
 import { monthNames } from '../constants/months'
+import PageCanvas from '../components/ui/PageCanvas'
 import {
   MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, CURRENT_PROFILE_SCHEMA_VERSION,
   RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_STUDENT,
@@ -815,6 +816,7 @@ export default function ProfileSetupScreen({
   const title = step === 0 ? '' : t(STEP_TITLE_KEY[step], lang)
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       {REDESIGN && <StatusBar style="dark" />}
       <KeyboardAwareForm>
@@ -1188,6 +1190,7 @@ export default function ProfileSetupScreen({
         </View>
       </Modal>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -1354,7 +1357,7 @@ const legacyS = StyleSheet.create({
 // (colors.border 1.18:1 → fieldBorder 3.66:1), and the fontWeight-only styles that rendered
 // in the system font (Inter families throughout). Every control is 44pt+.
 const redesignS = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: colors.canvas },
+  safe:          { flex: 1 },
   dot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.fieldBorder },
   helpBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 12,
                    backgroundColor: colors.accentLight, borderColor: '#F5C9B4', borderWidth: 1, borderRadius: radii.pill },
@@ -1362,16 +1365,16 @@ const redesignS = StyleSheet.create({
   langBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 12,
                    backgroundColor: colors.card, borderColor: colors.fieldBorder, borderWidth: 1, borderRadius: radii.pill },
   langBtnText:   { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4 },
-  stepLabel:     { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 4 },
+  stepLabel:     { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondaryOnPage, marginBottom: 4 },
   title:         { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 18 },
   introScene:    { height: 132, borderRadius: radii.widget, overflow: 'hidden', marginBottom: 18, backgroundColor: '#084B4A' },
   introSceneArt: { position: 'absolute', bottom: 0, right: 18, top: 12, width: 150 },
   introTitle:    { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12 },
-  introBody:     { ...type.body, color: colors.textSecondary, marginBottom: 16 },
+  introBody:     { ...type.body, color: colors.textSecondaryOnPage, marginBottom: 16 },
   introDataText: { flex: 1, ...type.small, fontFamily: 'Inter_500Medium', color: colors.primaryDark },
-  introTime:     { ...type.small, color: colors.textSecondary },
+  introTime:     { ...type.small, color: colors.textSecondaryOnPage },
   label:         { fontSize: 14, lineHeight: 19, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginBottom: 7 },
-  hint:          { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6 },
+  hint:          { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginTop: 6 },
   input:         { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md,
                    minHeight: 48, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 10,
                    fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
@@ -1389,17 +1392,17 @@ const redesignS = StyleSheet.create({
   rowOn:         { borderColor: colors.primary, borderWidth: 2, backgroundColor: colors.primaryLight },
   rowText:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flex: 1, paddingRight: 8 },
   rowTextOn:     { color: colors.primaryDark, fontFamily: 'Inter_600SemiBold' },
-  err:           { ...type.small, fontFamily: 'Inter_500Medium', color: colors.dangerInk, marginTop: 7 },
+  err:           { ...type.small, fontFamily: 'Inter_500Medium', color: colors.dangerInkOnPage, marginTop: 7 },
   exitRow:       { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 24, marginTop: 20 },
-  exitText:      { ...type.body, color: colors.textSecondary, textDecorationLine: 'underline' },
+  exitText:      { ...type.body, color: colors.textSecondaryOnPage, textDecorationLine: 'underline' },
   optIn:         { flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginTop: 6, padding: 14,
                    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md },
   optInBox:      { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.fieldBorder,
                    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  termsText:     { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  termsText:     { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
   optInText:     { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   optInHint:     { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4 },
-  legalFooter:   { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 16 },
+  legalFooter:   { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginTop: 16 },
   legalFooterLink:{ color: colors.primaryDark, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
   footer:        { flexShrink: 0, flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
                    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, backgroundColor: colors.card },
@@ -1417,5 +1420,6 @@ const redesignS = StyleSheet.create({
                    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   helpRowText:   { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   helpNote:      { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 14 },
+  legalFallback: { fontSize: 12, lineHeight: 17, color: colors.textSecondaryOnPage, marginTop: 4 },
 })
 const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS
