@@ -128,7 +128,7 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
 
 // Own memo component: an active-tab change re-renders this row only, never the 46 dish rows.
 // Tab positions inside the row are measured with measureLayout when the active tab changes.
-const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onLayout, stuck, reduce }) {
+const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onMeasure, stuck, reduce }) {
   const scrollRef = useRef(null)
   const tabRefs = useRef([])
   const tabsViewW = useRef(0)
@@ -141,7 +141,7 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onLayo
     }, () => {})
   }, [active, reduce])
   return (
-    <View style={[s.tabsWrap, stuck && s.tabsStuck]} onLayout={e => onLayout(e.nativeEvent.layout)}>
+    <View style={[s.tabsWrap, stuck && s.tabsStuck]} onLayout={e => onMeasure(e.nativeEvent.layout)}>
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist"
         onLayout={e => { tabsViewW.current = e.nativeEvent.layout.width }} contentContainerStyle={s.tabsContent}>
         {titles.map((title, i) => (
@@ -519,7 +519,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
         {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
 
-        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onLayout={setTabsLayout} stuck={tabsStuck} reduce={reduce} />}
+        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onMeasure={setTabsLayout} stuck={tabsStuck} reduce={reduce} />}
 
         {hasMenu && (
           <Card>
