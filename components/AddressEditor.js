@@ -9,7 +9,7 @@ import { addAddress, updateAddress, deleteAddress, setLastUsed, ADDRESS_BOOK_MAX
 import { quietFix, useLocate } from '../utils/deliveryLocate'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
-import { ScreenHeader, Button, ConfirmDialog } from './ui'
+import { ScreenHeader, Button, ConfirmDialog, PageCanvas } from './ui'
 import DeliveryPinPicker from './DeliveryPinPicker'
 
 // "Yeni adres / Adresi düzenle": a full page layered over Sepetim (an overlay, not a Modal: the permission explanation screen is
@@ -272,6 +272,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   const showMap = step === 2 && pickerOpen && !!pickerStart
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+      <PageCanvas>
       <SafeAreaView style={s.page} edges={['top']}>
         <ScreenHeader lang={lang} title={title} onBack={onBack} />
         <View style={s.progress} accessible accessibilityRole="progressbar" accessibilityLabel={progress} accessibilityValue={{ min: 1, max: STEPS, now: step }}>
@@ -367,6 +368,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
           </>
         )}
       </SafeAreaView>
+      </PageCanvas>
       <ConfirmDialog visible={confirmDel === true} lang={lang} destructive title={t('eateryAddrDeleteTitle', lang)} confirmLabel={t('eateryAddrDeleteYes', lang)}
         loading={deleting} error={confirmDel ? saveErr : null} onConfirm={remove} onCancel={() => setConfirmDel(false)} />
     </Animated.View>
@@ -374,9 +376,9 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
 }
 
 const s = StyleSheet.create({
-  page:      { flex: 1, backgroundColor: colors.canvas },
+  page:      { flex: 1 },
   progress:  { flexShrink: 0, gap: space[8], paddingHorizontal: space[16], paddingVertical: space[8] },
-  progressText:{ ...type.meta, color: colors.textSecondary },
+  progressText:{ ...type.meta, color: colors.textSecondaryOnPage },
   segs:      { flexDirection: 'row', gap: space[8] },
   seg:       { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.fieldBorder },   // 4pt: a hairline rail, not a control; fieldBorder (colors.border is 1.18:1 on canvas)
   segOn:     { backgroundColor: colors.primary },
@@ -397,16 +399,16 @@ const s = StyleSheet.create({
   locFailText:{ flex: 1, minWidth: 140, ...type.small, color: colors.textPrimary },
   pinRow:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[8], minHeight: TAP },
   pinText:   { flex: 1, minWidth: 120, ...type.body, color: colors.textPrimary },
-  note:      { ...type.small, color: colors.textSecondary },
+  note:      { ...type.small, color: colors.textSecondaryOnPage },
   labelRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[8], marginBottom: space[4] },
   fieldLabel:{ flexShrink: 1, ...type.small, fontFamily: font.semibold, color: colors.textPrimary },
   tag:       { ...type.caption, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: 2, overflow: 'hidden' },   // 2pt: a caption pill is shorter than the smallest space token
   field:     { minHeight: TAP, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
   fieldMulti:{ minHeight: 72, maxHeight: 140 },
   fieldBad:  { borderColor: colors.dangerInk },
-  hint:      { ...type.small, color: colors.textSecondary, marginTop: space[4] },
-  error:     { ...type.small, color: colors.dangerInk, marginTop: space[4] },
-  err:       { ...type.small, color: colors.dangerInk, textAlign: 'center' },
+  hint:      { ...type.small, color: colors.textSecondaryOnPage, marginTop: space[4] },
+  error:     { ...type.small, color: colors.dangerInkOnPage, marginTop: space[4] },
+  err:       { ...type.small, color: colors.dangerInkOnPage, textAlign: 'center' },
   pair:      { flexDirection: 'row', gap: space[12] },
   half:      { flex: 1 },
   del:       { alignSelf: 'flex-start' },

@@ -10,7 +10,7 @@ import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, press, motion, TAP, withAlpha } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage, BottomSheet } from './ui'
+import { ScreenHeader, Card, Button, RemoteImage, BottomSheet, PageCanvas } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 
 // ─── Yeme-İçme: order via WhatsApp (the basket is utils/eateryBasket.js, the message constants/eatery.js) ───
@@ -435,6 +435,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
   }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+      <PageCanvas>
       <SafeAreaView style={st.page} edges={['top']} {...(covered ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
         <ScreenHeader lang={lang} title={t(phone ? 'eateryListTitle' : 'eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
@@ -498,6 +499,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
           </View>
         )}
       </SafeAreaView>
+      </PageCanvas>
     </Animated.View>
   )
 }
@@ -520,19 +522,19 @@ const st = StyleSheet.create({
   sheetFoot: { flexShrink: 0, gap: space[8], paddingTop: space[8], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   footQty:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[12] },
   secHead:   { ...type.rowTitle, color: colors.textPrimary },
-  secHint:   { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  secHint:   { ...type.small, color: colors.textSecondaryOnPage, marginTop: 2 },
   footHint:  { flexDirection: 'row', alignItems: 'flex-start', gap: space[8], marginTop: space[4] },
   footQtyGroup: { gap: space[4] },
-  footSub:   { ...type.small, color: colors.textSecondary },
-  footHintText:{ ...type.small, color: colors.textSecondary, flex: 1 },
+  footSub:   { ...type.small, color: colors.textSecondaryOnPage },
+  footHintText:{ ...type.small, color: colors.textSecondaryOnPage, flex: 1 },
   optRow:    { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[4] },
   optLabel:  { flex: 1, ...type.body, color: colors.textPrimary },
-  optLabelOff:{ color: colors.textSecondary, textDecorationLine: 'line-through' },
+  optLabelOff:{ color: colors.textSecondaryOnPage, textDecorationLine: 'line-through' },
   extraText: { flex: 1 },
-  extraPrice:{ ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondary },
+  extraPrice:{ ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondaryOnPage },
   bar:       { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },
   barSummary:{ ...type.rowTitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
-  page:      { flex: 1, backgroundColor: colors.canvas },
+  page:      { flex: 1 },
   scroll:    { flex: 1 },
   content:   { paddingHorizontal: space[16], paddingTop: space[8], paddingBottom: space[16], gap: space[12] },
   footer:    { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },
@@ -542,19 +544,19 @@ const st = StyleSheet.create({
   lineSep:   { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   lineMain:  { flex: 1 },
   lineDetail:{ ...type.small, color: colors.textPrimary, marginTop: 2 },
-  lineStale: { color: colors.dangerInk },
+  lineStale: { color: colors.dangerInkOnPage },
   lineEdit:  { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: space[4], minHeight: 32 },
   lineEditText:{ ...type.small, fontFamily: font.semibold, color: colors.primaryDark },
   lineName:  { ...type.body, fontFamily: font.semibold, color: colors.textPrimary },
-  linePrice: { ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondary, marginTop: 2 },
+  linePrice: { ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondaryOnPage, marginTop: 2 },
   lineFoot:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: space[12], marginTop: space[8] },
   lineTotal: { ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary, marginLeft: 'auto' },
   thumb:     { width: 56, height: 56, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbEmpty:{ backgroundColor: colors.soft, borderWidth: 0 },
   fill:      { width: '100%', height: '100%' },
   errText:   { ...type.small, textAlign: 'center' },
-  errBad:    { color: colors.dangerInk },
-  errCalm:   { color: colors.textSecondary },
+  errBad:    { color: colors.dangerInkOnPage },
+  errCalm:   { color: colors.textSecondaryOnPage },
   errInfo:   { color: colors.textPrimary },
   errBtn:    { marginTop: space[8] },
   opts:      { gap: space[8] },
@@ -577,11 +579,11 @@ const st = StyleSheet.create({
   totalVal:  { ...type.sectionHeading, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   noteLabel: { ...type.rowTitle, color: colors.textPrimary, marginBottom: space[8] },
   input:     { minHeight: 72, maxHeight: 140, ...type.body, color: colors.textPrimary, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, backgroundColor: 'transparent', paddingHorizontal: space[12], paddingVertical: space[8] },
-  counter:   { ...type.meta, color: colors.textSecondary, alignSelf: 'flex-end', marginTop: space[4] },
-  hint:      { ...type.small, color: colors.textSecondary, marginTop: space[8] },
-  listHint:  { ...type.small, color: colors.textSecondary, textAlign: 'center' },
+  counter:   { ...type.meta, color: colors.textSecondaryOnPage, alignSelf: 'flex-end', marginTop: space[4] },
+  hint:      { ...type.small, color: colors.textSecondaryOnPage, marginTop: space[8] },
+  listHint:  { ...type.small, color: colors.textSecondaryOnPage, textAlign: 'center' },
   empty:     { alignItems: 'center', paddingVertical: space[24] * 2, paddingHorizontal: space[16], gap: space[8] },
   emptyTitle:{ ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginTop: space[8] },
-  emptyBody: { ...type.body, color: colors.textSecondary, textAlign: 'center' },
+  emptyBody: { ...type.body, color: colors.textSecondaryOnPage, textAlign: 'center' },
   emptyBtn:  { marginTop: space[12], alignSelf: 'stretch' },
 })
