@@ -18,7 +18,8 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { REDESIGN, DUYURULAR, EHLIYET, EATERY } from '../constants/redesign'
+import { REDESIGN, DUYURULAR, EHLIYET, EATERY, EVENTS_ONGOING_FIXTURE } from '../constants/redesign'
+import { ongoingFixtureEvent } from '../utils/eventsPreviewFixture'
 import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -407,7 +408,7 @@ export default function HomeScreen({
           try { partners = (await loadEateryPartners('slug, name, logo_path, sort_order, adult_only, eatery_menu_items(photo_path, section_order, sort_order, id, is_available)')).rows } catch { partners = [] }
         }
         const rotation = await sessionRotation()
-        const slides = await resolveStripSlides({ lang, promosEligible, dismissedIds, partners, gates: EATERY_GATES, rotation })
+        const slides = await resolveStripSlides({ lang, promosEligible, dismissedIds, partners, gates: EATERY_GATES, rotation, extraEvents: EVENTS_ONGOING_FIXTURE ? [ongoingFixtureEvent()] : [] })
         const count = slides.filter(x => x.eaterySlug).length
         if (count > 0) storeNextRotation(rotation, count)
         return { slides }

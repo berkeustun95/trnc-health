@@ -63,3 +63,6 @@ const NORTH_HOUSES_PREVIEW = true
 export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)
 const NORTH_HOUSES_FORM_PREVIEW = true
 export const NORTH_HOUSES_FORM = NORTH_HOUSES && (NORTH_HOUSES_FORM_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW))
+
+// TEMPORARY (reverted next commit): a fake running event on ADA Preview for the "Devam ediyor" screenshots.
+export const EVENTS_ONGOING_FIXTURE = IS_PREVIEW_BUILD
