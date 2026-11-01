@@ -1362,7 +1362,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('place_claims_verified_by_fkey', '', 'id|verified_by'),
     ('places_access_type_check', 'private|public', 'access_type'),
     ('places_category_check', '2|40|^[a-zA-Z_]{2,40}$', 'category'),
-    ('places_official_visit_shape', '0|2|4|9|^[0-9]{4}-[0-9]{2}$|closed|https://eemd.gov.ct.tr/%|object|open|source_url|status|updated', 'official_visit|status'),
+    ('places_official_visit_shape', '0|1|2|4|9|^[0-9]{4}-(0[1-9]|1[0-2])$|closed|https://eemd.gov.ct.tr/%|object|open|source_url|status|updated', 'official_visit|status'),
     ('places_pkey', '', 'id'),
     ('places_provider_id_fkey', '', ''),
     ('places_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
