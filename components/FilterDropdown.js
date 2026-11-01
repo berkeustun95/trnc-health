@@ -148,8 +148,12 @@ function Row({ label, count, color, selected, multi, onPress }) {
       {color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
       <Text style={[st.rowText, selected && st.rowTextOn]} numberOfLines={1}>{label}</Text>
       {count != null ? <Text style={st.count}>{count}</Text> : null}
-      <Feather name={multi ? (selected ? 'check-square' : 'square') : 'check'} size={18}
-        color={selected ? colors.primary : (multi ? colors.border : 'transparent')} />
+      {/* Single-select: no glyph at all when unselected. A 'transparent' check rendered black on
+          Android (2026-11-01, S20+), ticking every row. The empty slot keeps counts aligned. */}
+      {multi || selected
+        ? <Feather name={multi ? (selected ? 'check-square' : 'square') : 'check'} size={18}
+            color={selected ? colors.primary : colors.border} />
+        : <View style={st.checkSlot} />}
     </TouchableOpacity>
   )
 }
@@ -181,6 +185,7 @@ const st = StyleSheet.create({
   rowTextOn:      { fontFamily: 'Inter_700Bold', color: colors.primary },
   count:          { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginRight: 10 },
   dot:            { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  checkSlot:      { width: 18, height: 18 },
   done:           { marginTop: 12, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   doneText:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
 })

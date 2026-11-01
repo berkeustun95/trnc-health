@@ -451,6 +451,12 @@ class BLErrorBoundary extends Component {
 const WX_COACH_WAIT_MS = 3000
 const WX_COACH_PENDING = '@trnc_coach_wx_pending'
 
+// A place hidden as a duplicate of another (20261155, Güzelyurt): a heart saved on the
+// hidden row follows the kept one, since favourites live only on the device.
+const MERGED_PLACE_IDS = {
+  '613c310f-c118-4668-9ea1-e5b4494164e9': '9f14da0c-e9a2-4489-81e2-20973b662942',
+}
+
 export default function App() {
   // ─── FOUR INTER WEIGHTS, AND TWO OF THEM ARE A BUG FIX ────────────────────
   //
@@ -1473,7 +1479,7 @@ export default function App() {
       const favVal = await AsyncStorage.getItem('ada_favorites')
       if (favVal) setFavorites(new Set(JSON.parse(favVal)))
       const placeFavVal = await AsyncStorage.getItem('ada_fav_places')
-      if (placeFavVal) setPlaceFavorites(new Set(JSON.parse(placeFavVal)))
+      if (placeFavVal) setPlaceFavorites(new Set(JSON.parse(placeFavVal).map(id => MERGED_PLACE_IDS[id] || id)))
 
       const { data, error } = await supabase.from('facilities').select('*').order('name')
       if (error) setFacilityLoadError(true)
