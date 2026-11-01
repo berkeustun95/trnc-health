@@ -45,7 +45,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
-import sharp from 'sharp'
+import { MAX_WIDTH, optimise } from './lib/partner-image-optimise.mjs'
 import { SOURCE, get, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
@@ -54,12 +54,6 @@ import { readAllRows, readAllResult } from './lib/read-all-rows.mjs'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
 const PREFIX = 'partner/novest'
-
-// Egress, not aesthetics — identical to the Gişe Kıbrıs pipeline so both modules serve
-// images at the same cost. The Supabase free tier shares 5 GB/month across everything.
-const MAX_WIDTH = 1200
-const JPEG_QUALITY = 80
-const OPTIMISE_FLOOR = 300 * 1024
 
 // ─── WHICH VARIANT WE PULL ───────────────────────────────────────────────────
 //
@@ -108,22 +102,6 @@ const supabase = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, KEY,
   { auth: { persistSession: false, autoRefreshToken: false } })
 
 // ─── Image pipeline ──────────────────────────────────────────────────────────
-
-async function optimise(body, sourceExt) {
-  if (body.length < OPTIMISE_FLOOR) return { buffer: body, ext: sourceExt, contentType: null, skipped: true }
-  const img = sharp(body, { failOn: 'none' })
-  const [m, stats] = await Promise.all([img.metadata(), img.stats()])
-  // hasAlpha alone is not enough — plenty of PNGs carry a fully opaque alpha channel.
-  const keepAlpha = m.hasAlpha === true && stats.isOpaque === false
-  const pipeline = sharp(body, { failOn: 'none' })
-    .rotate()
-    .resize({ width: MAX_WIDTH, withoutEnlargement: true })
-  const buffer = keepAlpha
-    ? await pipeline.png({ compressionLevel: 9, palette: true }).toBuffer()
-    : await pipeline.jpeg({ quality: JPEG_QUALITY, mozjpeg: true }).toBuffer()
-  if (buffer.length >= body.length) return { buffer: body, ext: sourceExt, contentType: null, skipped: true }
-  return { buffer, ext: keepAlpha ? 'png' : 'jpg', contentType: keepAlpha ? 'image/png' : 'image/jpeg', skipped: false }
-}
 
 function pickVariant(media) {
   const sizes = media.media_details?.sizes ?? {}
