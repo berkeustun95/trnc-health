@@ -833,7 +833,8 @@ export default function ExploreMapScreen({
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />
         )}
-        {!routesMode && GOOGLE_LAYER && googlePins.map(g => (
+        {/* Not EEMD sites: hidden while "Müze & Ören Yeri" is on (Open now leaves them, a modifier). */}
+        {!routesMode && GOOGLE_LAYER && !(officialOnly && canOfficial) && googlePins.map(g => (
           <Marker
             key={`g:${g.google_place_id}`}
             coordinate={{ latitude: g.latitude, longitude: g.longitude }}
