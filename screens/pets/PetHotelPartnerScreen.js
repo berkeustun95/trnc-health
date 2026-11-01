@@ -424,7 +424,8 @@ const legacyS = StyleSheet.create({
 })
 
 // S5 redesign overrides — shape and spacing only (partner rule): the ADA page ground, 44–48pt
-// buttons on the redesign radius. Every colour, label, link and position is unchanged; the
+// buttons on the redesign radius. Every colour, label, link and position is unchanged (except
+// ADA's own label/link tokens on the page ground: on-page variants, Base C 2026-11-01); the
 // WhatsApp is WhatsApp's dark green #075E54 (7.67:1; was #25D366, 1.98:1) — approved 2026-10-01.
 const redesignS = StyleSheet.create({
   safe:     { flex: 1 },

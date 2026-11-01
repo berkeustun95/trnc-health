@@ -745,7 +745,8 @@ const legacyS = StyleSheet.create({
 // REDESIGN — partner surface, so ONLY what the partner rule allows without asking: the ADA
 // header (above), the page ground, and button/row SHAPE (44pt targets, the redesign radius).
 // Every label, position, link, colour (accent, WhatsApp green, teal), photo crop and logo
-// size is unchanged.
+// size is unchanged, except ADA's own label/link tokens on the page ground, which moved to
+// the on-page variants (Base C, Berke 2026-11-01).
 const redesignS = StyleSheet.create({
   safe:          { flex: 1 },
   collapseHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: TAP },
