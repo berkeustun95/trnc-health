@@ -57,7 +57,7 @@ export const colors = {
   // 5.38 on white, 4.61 on the lowest category tint. `danger` stays for icons and fills.
   dangerInk:     '#C0384A',
   // dangerInk for text sitting DIRECTLY on PageCanvas: dangerInk is 4.06 on pageTop. This is
-  // 4.55 on pageTop, 5.20 on pageMid, 5.58 on pageBase, 6.03 on white.
+  // 4.54 on pageTop, 5.19 on pageMid, 5.57 on pageBase, 6.01 on white.
   dangerInkOnPage: '#B33445',
   fieldBorder:   '#7A8796',   // input / control boundary on white: 3.66:1 (WCAG 1.4.11 asks 3:1; colors.border is 1.18)
   onPrimary:     '#FFFFFF',
