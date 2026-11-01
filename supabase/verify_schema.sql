@@ -437,6 +437,8 @@ WITH report AS (
     -- places provenance (1045). Written only by service_role; places_guard_source locks it.
     ('1045_places_source','places','source'),
     ('1045_places_source','places','source_id'),
+    -- EEMD visiting info (1155). In BROWSE_COLS + PLACE_COLS: MISSING is a 42703 that empties Explore.
+    ('1155_places_official_visit','places','official_visit'),
     -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
     ('1056_route_medals','profiles','route_badges_public'),
     -- Gişe Kıbrıs sync liveness (1058). Stamped every run; read by check-gisekibris-staleness.
@@ -636,6 +638,7 @@ WITH report AS (
     ('1033_reviews_author_not_public','get_my_review'),
     ('1033_reviews_author_not_public','admin_content_author'),
     ('1045_places_source','places_guard_source'),
+    ('1155_places_official_visit','places_guard_official_visit'),
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
     ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
     ('1051_app_versions','purge_app_update_events'),
@@ -712,6 +715,7 @@ WITH report AS (
     ('1029_student_messaging','msg_40_immutable'),
     ('1029_student_messaging','msg_50_touch_conversation'),
     ('1045_places_source','places_guard_source'),
+    ('1155_places_official_visit','places_guard_official_visit'),
     ('1059_hotels','hotels_touch_updated_at'),
     ('1070_live_scores','matches_touch_updated_at')
 
@@ -1035,6 +1039,7 @@ WITH report AS (
     -- a plain UNIQUE is what PostgREST's ON CONFLICT (source, source_id) can infer.
     ('1045_places_source','places_source_pair_check'),
     ('1045_places_source','places_source_source_id_key'),
+    ('1155_places_official_visit','places_official_visit_shape'),
     -- walking routes (1048). The FK delete ACTIONS are asserted in H, not here: a name survives CASCADE.
     ('1048_walking_routes','walking_routes_pkey'),
     ('1048_walking_routes','walking_routes_region_check'),
@@ -3761,6 +3766,29 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := null%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := old.source_id%', false)
+    -- ── 1155: EEMD official_visit lock + data ───────────────────────────────────
+    -- Same shape as 1045: D cannot see that the trigger fires on UPDATE too, and an
+    -- INSERT-only trigger would let a claimed café write itself into "Müze & Ören Yeri".
+    UNION ALL SELECT '1155_places_official_visit','places_guard_official_visit fires BEFORE INSERT OR UPDATE, per row',
+      COALESCE((SELECT pg_get_triggerdef(t.oid) FROM pg_trigger t
+                 WHERE t.tgrelid = to_regclass('public.places') AND t.tgname = 'places_guard_official_visit')
+               LIKE '%BEFORE INSERT OR UPDATE ON %places FOR EACH ROW%', false)
+    UNION ALL SELECT '1155_places_official_visit','places_guard_official_visit: no-session passes, session insert nulled, update keeps old',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_official_visit()')) ILIKE '%if auth.uid() is null then return new%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_official_visit()')) ILIKE '%new.official_visit := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_official_visit()')) ILIKE '%new.official_visit := old.official_visit%', false)
+    -- The merge disabled guard_place_moderation for one statement; it must be enabled ('O').
+    UNION ALL SELECT '1155_places_official_visit','guard_place_moderation is enabled',
+      COALESCE((SELECT tgenabled = 'O' FROM pg_trigger
+                 WHERE tgrelid = to_regclass('public.places') AND tgname = 'guard_place_moderation'), false)
+    -- Data: 33 EEMD places (7 closed); the Güzelyurt duplicate hidden. Bump with a reason.
+    UNION ALL SELECT '1155_places_official_visit','33 places carry official_visit (7 closed); 613c310f hidden as duplicate',
+      -- Through to_jsonb(p), never the bare column: before the apply it does not exist, and a
+      -- missing name would kill the whole report instead of reading this row false.
+      COALESCE((SELECT count(*) FILTER (WHERE jsonb_typeof(to_jsonb(p)->'official_visit') = 'object') = 33
+                   AND count(*) FILTER (WHERE to_jsonb(p)->'official_visit'->>'status' = 'closed') = 7
+                   AND count(*) FILTER (WHERE p.id = '613c310f-c118-4668-9ea1-e5b4494164e9' AND p.hidden_reason = 'duplicate') = 1
+                  FROM public.places p), false)
     -- ── 1047: search_content reads places ───────────────────────────────────────
     -- Explore has read places since 0822; search kept two arms on the legacy tables, so
     -- any place added since was unfindable. Anchored to code (FROM <table> <alias>): the

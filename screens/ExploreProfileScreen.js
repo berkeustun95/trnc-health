@@ -17,6 +17,8 @@ import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
 import { VISITNCY_SOURCE, creditUrl, creditBrand } from '../constants/walkingRoutes'
 import { logCreditTap } from '../components/WalkingRoutes'
+import { officialVisitView } from '../utils/officialVisit'
+import { monthNames } from '../constants/months'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
@@ -75,6 +77,66 @@ function PhotoAttribution({ place, url, index, lang, style }) {
   const a = resolveAttribution(place, url, index)
   if (!a) return null   // legacy row with nothing to say — render nothing, never a blank line
   return <PhotoCredit a={a} lang={lang} style={style || s.creditWrap} />
+}
+
+// EEMD visiting info (places.official_visit, 20261155). Closed: the badge alone. Open: fee with
+// the month it was read, the schedule only while its season runs (else "check the official
+// page"), the Sunday note only where the schedule opens on Sundays, and the official page.
+// Module level, like PhotoAttribution (house rule).
+function OfficialVisitCard({ data, lang }) {
+  const v = officialVisitView(data)
+  if (!v) return null
+  const [y, mo] = v.updated ? v.updated.split('-').map(Number) : []
+  return (
+    <View style={r.ovCard}>
+      <Text style={r.sectionTitle}>{t('ovTitle', lang)}</Text>
+      {v.closed ? (
+        <View style={r.ovClosed}>
+          <Ionicons name="lock-closed" size={13} color={C.dangerInk} />
+          <Text style={r.ovClosedText}>{t('ovClosed', lang)}</Text>
+        </View>
+      ) : (
+        <>
+          {v.fee && (
+            <View style={r.ovRow}>
+              <Ionicons name="ticket-outline" size={16} color={C.textSecondary} />
+              <View style={r.ovRowBody}>
+                <Text style={r.ovText}>
+                  {v.fee.full === 0 && v.fee.student === 0 ? t('ovFree', lang)
+                    : t('ovFee', lang).replace('{full}', v.fee.full).replace('{student}', v.fee.student)}
+                </Text>
+                {!!y && <Text style={r.ovMeta}>{t('ovUpdated', lang).replace('{date}', `${monthNames(lang)[mo - 1]} ${y}`)}</Text>}
+              </View>
+            </View>
+          )}
+          <View style={r.ovRow}>
+            <Ionicons name="time-outline" size={16} color={C.textSecondary} />
+            <View style={r.ovRowBody}>
+              {v.hours ? (
+                <>
+                  <Text style={r.ovText}>
+                    {t('ovHours', lang).replace('{open}', v.hours.open).replace('{close}', v.hours.close).replace('{last}', v.hours.last_entry)}
+                  </Text>
+                  {!v.hours.weekends && <Text style={r.ovMeta}>{t('ovWeekdaysOnly', lang)}</Text>}
+                </>
+              ) : (
+                <Text style={r.ovText}>{t('ovCheckHours', lang)}</Text>
+              )}
+            </View>
+          </View>
+          {v.sundayFree && <Text style={r.ovNote}>{t('ovSundayFree', lang)}</Text>}
+        </>
+      )}
+      {!!v.sourceUrl && (
+        <TouchableOpacity style={r.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
+          onPress={() => Linking.openURL(v.sourceUrl).catch(() => {})}>
+          <Ionicons name="globe-outline" size={14} color={C.primaryDark} />
+          <Text style={r.partnerCreditText}>{t('ovSource', lang)}</Text>
+          <Ionicons name="open-outline" size={13} color={C.primaryDark} />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
 }
 
 export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite, onAdNavigate, backRef = null }) {
@@ -283,6 +345,8 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
 
           {!!desc && <Text style={r.desc}>{desc}</Text>}
 
+          <OfficialVisitCard data={place.official_visit} lang={lang} />
+
           {/* Visit NCY partner credit: handler, URL and strings unchanged from the legacy layout. */}
           {place.source === VISITNCY_SOURCE && (
             <TouchableOpacity style={r.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
@@ -454,6 +518,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
               <Text style={s.desc}>{placeDesc(place, lang)}</Text>
             </View>
           )}
+          <OfficialVisitCard data={place.official_visit} lang={lang} />
 
           {/* Partner credit for places imported from Visit NCY's city walking maps. Reads
               `source`, which reaches this screen only because BROWSE_COLS / PLACE_COLS
@@ -695,6 +760,15 @@ const r = StyleSheet.create({
   partnerCreditText: { flexShrink: 1, ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.primaryDark },
   section:       { marginTop: 20 },
   sectionTitle:  { ...type.sectionHeading, color: C.textPrimary, marginBottom: -4 },
+  ovCard:        { marginTop: 20, gap: 12 },
+  ovClosed:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8,
+                   backgroundColor: C.dangerLight, borderRadius: radii.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  ovClosedText:  { ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.dangerInk },
+  ovRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4 },
+  ovRowBody:     { flex: 1, gap: 2 },
+  ovText:        { ...type.body, color: C.textPrimary },
+  ovMeta:        { ...type.small, color: C.textSecondary },
+  ovNote:        { ...type.small, color: C.textSecondary },
   ownerCard:     { backgroundColor: C.soft, borderRadius: radii.card, padding: 16, marginTop: 16, gap: 10 },
   ownerCardTitle:{ ...type.rowTitle, color: C.textPrimary },
   ownerCardBody: { ...type.small, color: C.textSecondary },

@@ -20,7 +20,7 @@ import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import {
-  EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, CATEGORY_LABEL_KEY,
+  EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, CATEGORY_LABEL_KEY, OFFICIAL_SITE_FILTER,
   categoryToGroup, groupVisible,
 } from '../constants/exploreCategories'
 import { TRNC_CENTER } from '../constants/mapSources'
@@ -53,8 +53,14 @@ function regionLabel(region, lang) {
   return REGION_LABEL_KEY[region] ? t(REGION_LABEL_KEY[region], lang) : (region || '')
 }
 function categoryLabel(category, lang) {
+  if (category === OFFICIAL_SITE_FILTER) return t('ovFilter', lang)
   const key = CATEGORY_LABEL_KEY[category]
   return key ? t(key, lang) : category   // keyless categories → raw slug (admin-only today)
+}
+// The category dropdown's value is a category, or OFFICIAL_SITE_FILTER (EEMD data, any category).
+function matchesCat(p, cat) {
+  if (!cat) return true
+  return cat === OFFICIAL_SITE_FILTER ? !!p.official_visit : p.category === cat
 }
 function groupLabel(group, lang) {
   const key = GROUP_META[group]?.labelKey
@@ -158,6 +164,7 @@ function PlaceListCard({ item, lang, onPress, showFeatured, isSaved, onToggleSav
         { icon: 'location-outline', text: regionLabel(item.region, lang) },
         isBeach && item.blue_flag ? { icon: 'flag', text: t('blBlueFlagLabel', lang), tone: 'ok' } : null,
         isBeach && item.access_type ? { text: item.access_type === 'public' ? t('blAccessPublic', lang) : t('blAccessPrivate', lang) } : null,
+        item.official_visit?.status === 'closed' ? { icon: 'lock-closed-outline', text: t('ovClosed', lang), tone: 'warn' } : null,
       ]}
       onPress={onPress}
       lang={lang}
@@ -348,10 +355,11 @@ function ModuleFrame({ children }) {
 // link, with nothing on screen to say why. That is the PropertyDetailScreen contact-bar
 // bug exactly (its populated branch was built, shipped and verified while the embed
 // feeding it selected none of the columns it needed).
-// `source` is here for the same reason: ExploreProfileScreen's Visit NCY credit reads it.
+// `source` is here for the same reason: ExploreProfileScreen's Visit NCY credit reads it, and
+// `official_visit` for its EEMD visiting card (and the "Müze & Ören Yeri" filter below).
 export const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
-  'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source'
+  'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source, official_visit'
 
 export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate, placeOverlay = null, backRef = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
@@ -456,8 +464,10 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   // only rows are hidden would filter to an empty list.
   const groupCats = useMemo(() => {
     if (!activeGroup) return []
-    const present = new Set(places.filter(p => categoryToGroup(p.category) === activeGroup).map(p => p.category))
-    return EXPLORE_GROUPS[activeGroup].filter(c => present.has(c))
+    const inGroup = places.filter(p => categoryToGroup(p.category) === activeGroup)
+    const present = new Set(inGroup.map(p => p.category))
+    const cats = EXPLORE_GROUPS[activeGroup].filter(c => present.has(c))
+    return inGroup.some(p => p.official_visit) ? [OFFICIAL_SITE_FILTER, ...cats] : cats
   }, [activeGroup, places])
 
   // Filtered list for the active group.
@@ -468,7 +478,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     if (!activeGroup) return []
     return places.filter(p =>
       categoryToGroup(p.category) === activeGroup
-      && (!activeCat || p.category === activeCat)
+      && matchesCat(p, activeCat)
       && (!region || p.region === region)
     )
   }, [places, activeGroup, activeCat, region])
@@ -478,7 +488,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const regionOptions = useMemo(() => {
     const n = {}
     for (const p of places) {
-      if (categoryToGroup(p.category) !== activeGroup || (activeCat && p.category !== activeCat)) continue
+      if (categoryToGroup(p.category) !== activeGroup || !matchesCat(p, activeCat)) continue
       if (p.region) n[p.region] = (n[p.region] ?? 0) + 1
     }
     return REGIONS.filter(r => n[r] || r === region).map(r => ({ value: r, label: regionLabel(r, lang), count: n[r] ?? 0 }))

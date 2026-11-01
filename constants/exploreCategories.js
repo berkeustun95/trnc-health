@@ -63,6 +63,11 @@ export const CATEGORY_LABEL_KEY = {
   laundry:         'exploreCatLaundry',
 }
 
+// "Müze & Ören Yeri": a filter value in the heritage group's category dropdown, NOT a category.
+// It matches every place carrying EEMD visiting info (places.official_visit, 20261155) across
+// castle / ruins / museum / religious site / monument, which keep their own category.
+export const OFFICIAL_SITE_FILTER = 'official_site'
+
 // Categories a user may SUBMIT. Slice 5 opened the eat_drink / active / services sets now
 // that they have labels; every entry maps to a group in EXPLORE_GROUPS and a CATEGORY_LABEL_KEY.
 // ⚠ resubmit_place() (migration 20260829) DUPLICATES this exact list in SQL to reject unknown
