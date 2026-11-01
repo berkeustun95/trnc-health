@@ -393,7 +393,8 @@ function DashboardTab({ onNavigate }) {
         supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('provider_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        // Agent submissions only: partner-feed rows (Döveç) sit 'pending' until go-live and are not approvable here.
+        supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending').is('source', null),
         supabase.from('estate_agents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('home_services').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transport_providers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -2544,11 +2545,15 @@ function PropertiesTab() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
+    let q = supabase
       .from('properties')
       .select('*, estate_agents(full_name, phone)')
       .eq('status', filter)
-      .order('created_at', { ascending: false })
+    // The review queue is agent submissions only. A partner-feed row (source set) is published by its
+    // sync / go-live step, never by Approve here: Döveç units sit 'pending' until go-live (20261153).
+    // Other tabs are unchanged (Novest rows still list under active / delisted).
+    if (filter === 'pending') q = q.is('source', null)
+    const { data } = await q.order('created_at', { ascending: false })
     setProperties(data || [])
     setLoading(false)
   }, [filter])

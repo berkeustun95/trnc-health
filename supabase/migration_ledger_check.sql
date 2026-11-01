@@ -268,7 +268,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261150_bidda_badadez_free_options.sql', '0e1c0e0d7b5c582768e0b3d675cb602e337e58856b88c2f0c97ff131fbef7961'),
   ('20261151_eatery_partners_banner_path.sql', '1fbb4849b48c463041f0cb45dd200c0204e1745374da1a93d648c4fcc0816ea5'),
   ('20261152_bidda_badadez_activate.sql', '1fd494a57352c3c671a963ad231c498f7c7e4a6e21ff3930abd46292c8405d96'),
-  ('20261153_dovec_partner_feed.sql', 'd1ca92fbd64562602c542323b93aa8e56aeafffe81c1b433e3b3e00ba9ec7be4'),
+  ('20261153_dovec_partner_feed.sql', '59bf24372d8d39d48a23bd395442aec2cef3c9c12f3dae7f5d007374ba45e774'),
   ('20261154_contact_events_dovec.sql', '8926e044311e07e4dd2d28d48e55f431817aa79d24c7257e9fa42f2cb0efb431')
 )
 SELECT * FROM (

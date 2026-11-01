@@ -196,7 +196,7 @@ SELECT '00000000-0000-4000-9000-000000000003'::uuid,
        p.id,
        'Döveç Construction',
        'pending',
-       'https://www.dovecconstruction.com',
+       'https://www.dovecgroup.com',
        'Partner developer (Döveç Group). Projects and units are mirrored one-way from the '
        'developer''s API and are not editable in ADA.',
        '+905391050515',
@@ -333,7 +333,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261153_dovec_partner_feed.sql', 'd1ca92fbd64562602c542323b93aa8e56aeafffe81c1b433e3b3e00ba9ec7be4')
+VALUES ('20261153_dovec_partner_feed.sql', '59bf24372d8d39d48a23bd395442aec2cef3c9c12f3dae7f5d007374ba45e774')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
