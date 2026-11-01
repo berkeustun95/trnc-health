@@ -1,0 +1,57 @@
+# ─── Döveç images: mirror + re-encode (sharp) ────────────────────────────────
+#
+# The half sync-dovec cannot do (sharp is native Node, the edge function is Deno). Same shape as
+# novest-images.yml. CI-only (scripts/lib/prod-write-guard.mjs); a manual run defaults to --dry.
+#
+# ⚠ NOT SCHEDULED YET. The `schedule:` block below is commented out until the Döveç API is
+#   connected and sync-dovec is on (supabase/functions/sync-dovec/PLUG-IN.md, step 5). Until then
+#   the script refuses at fetchFeed (no DOVEC_API_BASE_URL / DOVEC_API_KEY), by design.
+#
+#   gh workflow run dovec-images                  # dry
+#   gh workflow run dovec-images -f apply=true    # mirror everything due
+
+name: dovec-images
+
+on:
+  # schedule:
+  #   # 20 min after each sync-dovec run (05:10 / 15:10 UTC, see sync-dovec/schedule.sql).
+  #   - cron: '30 5,15 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write to production (otherwise --dry)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-dovec, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      DOVEC_API_BASE_URL: ${{ secrets.DOVEC_API_BASE_URL }}
+      DOVEC_API_KEY: ${{ secrets.DOVEC_API_KEY }}
+      IN_APPLY: ${{ inputs.apply }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL DOVEC_API_BASE_URL DOVEC_API_KEY; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty (Döveç API not connected yet? see PLUG-IN.md)"; exit 1; }
+          done
+      - name: Mock pipeline self-test (offline)
+        run: node scripts/test-dovec-sync.mjs
+      - name: Mirror
+        run: |
+          args=()
+          [ "$IN_APPLY" = "true" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ] || args+=(--dry)
+          node scripts/mirror-dovec-images.mjs "${args[@]}"

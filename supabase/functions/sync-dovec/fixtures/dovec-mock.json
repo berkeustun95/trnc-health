@@ -1,0 +1,116 @@
+{
+  "_note": "FICTIONAL MOCK of the Döveç Construction API, written before the real API exists. Project names, units, prices and coordinates are invented; field names are guesses (see _shared/dovec-feed.mjs, every GUESS line). Images are generated placeholders (fixtures/make-mock-images.mjs). Never import this into production.",
+  "pages": [
+    {
+      "data": [
+        {
+          "id": 101,
+          "name": "Mavi Kıyı Residences",
+          "status": "under_construction",
+          "progress_percent": 62,
+          "delivery": "2027-Q2",
+          "description_html": "<p>Mock project. A 9-storey residence 300 m from the sea in Long Beach, with an outdoor pool, gym and underground parking.</p><ul><li>Concierge</li><li>Sea view</li></ul><p><b>Bilgi için:</b> +90 539 105 05 15</p>",
+          "location": { "city": "İskele", "area": "Long Beach", "address": "Long Beach, İskele", "lat": 35.2906, "lng": 33.9247 },
+          "price": { "from": 129000, "currency": "GBP", "on_request": false },
+          "unit_types": ["Studio", "1+1", "2+1", "Penthouse"],
+          "url": "https://mock.dovec.invalid/projects/mavi-kiyi",
+          "gallery": [
+            { "id": "m101-cover", "url": "https://mock.dovec.invalid/media/cover-1.jpg", "is_cover": true },
+            { "id": "m101-pool", "url": "https://mock.dovec.invalid/media/interior-1.jpg" }
+          ],
+          "units": [
+            { "id": 5001, "code": "A-104", "category": "studio", "layout": "Studio", "bathrooms": 1, "gross_m2": 48, "net_m2": 41, "floor": 1,
+              "price": { "amount": 129000, "currency": "GBP" }, "availability": "available",
+              "description_html": "<p>Studio with a balcony facing the pool.</p>", "features": ["Balcony", "Pool view"],
+              "images": [{ "id": "m5001-1", "url": "https://mock.dovec.invalid/media/interior-2.jpg", "is_cover": true }] },
+            { "id": 5002, "code": "B-305", "category": "apartment", "layout": "2+1", "bathrooms": 2, "gross_m2": 96, "net_m2": 84, "floor": 3,
+              "price": { "amount": 214000, "currency": "GBP" }, "availability": "available",
+              "description_html": "<p>Corner flat, two bathrooms, sea view.</p><p>Detaylı bilgi: info@mock-dovec.invalid</p>", "features": ["Sea view", "En-suite"],
+              "images": [{ "id": "m5002-1", "url": "https://mock.dovec.invalid/media/interior-1.jpg", "is_cover": true }, { "id": "m5002-2", "url": "https://mock.dovec.invalid/media/interior-3.jpg" }] },
+            { "id": 5003, "code": "B-306", "category": "apartment", "layout": "1+1", "bathrooms": 1, "gross_m2": 66, "floor": 3,
+              "price": { "amount": 159000, "currency": "GBP" }, "availability": "sold",
+              "images": [{ "id": "m5003-1", "url": "https://mock.dovec.invalid/media/interior-2.jpg" }] },
+            { "id": 5004, "code": "PH-901", "category": "penthouse", "layout": "3+1", "bathrooms": 3, "gross_m2": 182, "net_m2": 160, "floor": 9,
+              "price": { "on_request": true }, "availability": "available",
+              "description_html": "<p>Top-floor penthouse with a private roof terrace.</p>", "features": ["Roof terrace", "Private pool"],
+              "images": [{ "id": "m5004-1", "url": "https://mock.dovec.invalid/media/interior-3.jpg", "is_cover": true }] }
+          ]
+        },
+        {
+          "id": 102,
+          "name": "Esentepe Hills Villas",
+          "status": "on_sale",
+          "progress_percent": 15,
+          "delivery": "2028-Q1",
+          "description_html": "<p>Mock project. Detached villas on the hillside above Esentepe, each with a private pool and mountain-to-sea views.</p>",
+          "location": { "city": "Girne", "area": "Esentepe", "address": "Esentepe, Girne", "lat": 35.3352, "lng": 33.5861 },
+          "price": { "from": 389000, "currency": "GBP" },
+          "unit_types": ["3+1 Villa", "4+1 Villa"],
+          "url": "https://mock.dovec.invalid/projects/esentepe-hills",
+          "gallery": [{ "id": "m102-cover", "url": "https://mock.dovec.invalid/media/cover-2.jpg", "is_cover": true }],
+          "units": [
+            { "id": 5101, "code": "V-03", "category": "villa", "layout": "3+1", "bathrooms": 3, "gross_m2": 210, "floor": 0,
+              "price": { "amount": 389000, "currency": "GBP" }, "availability": "available",
+              "description_html": "<p>Three-bedroom villa, private pool, 450 m² plot.</p>", "features": ["Private pool", "Garden"],
+              "images": [{ "id": "m5101-1", "url": "https://mock.dovec.invalid/media/cover-2.jpg", "is_cover": true }] },
+            { "id": 5102, "code": "V-07", "category": "villa", "layout": "4+1", "bathrooms": 4, "gross_m2": 265, "floor": 0,
+              "price": { "amount": 495000, "currency": "GBP" }, "availability": "available",
+              "description_html": "<p>Four-bedroom villa on the top row.</p>",
+              "images": [] },
+            { "id": 5103, "code": "V-08", "category": "villa", "layout": "4+1", "bathrooms": 4, "gross_m2": 265, "floor": 0,
+              "price": { "amount": 505000, "currency": "GBP" }, "availability": "reserved",
+              "images": [{ "id": "m5103-1", "url": "https://mock.dovec.invalid/media/cover-2.jpg" }] }
+          ]
+        }
+      ],
+      "meta": { "page": 1, "last_page": 2, "total": 4 }
+    },
+    {
+      "data": [
+        {
+          "id": 103,
+          "name": "Tuzla Garden Homes",
+          "status": "completed",
+          "progress_percent": 100,
+          "delivery": "2025-11-30",
+          "description_html": "<p>Mock project. Completed garden apartments in Tuzla, 5 minutes from the university.</p>",
+          "location": { "city": "Gazimağusa", "area": "Tuzla", "address": "Tuzla, Gazimağusa", "lat": 35.1503, "lng": 33.8925 },
+          "price": { "from": 98000, "currency": "GBP" },
+          "unit_types": ["1+1", "2+1"],
+          "url": "https://mock.dovec.invalid/projects/tuzla-garden",
+          "gallery": [{ "id": "m103-cover", "url": "https://mock.dovec.invalid/media/cover-3.jpg", "is_cover": true }],
+          "units": [
+            { "id": 5201, "code": "C-12", "category": "apartment", "layout": "1+1", "bathrooms": 1, "gross_m2": 62, "floor": 1,
+              "price": { "amount": 98000, "currency": "GBP" }, "availability": "available",
+              "description_html": "<p>Ready to move in. Garden-facing.</p>",
+              "images": [{ "id": "m5201-1", "url": "https://mock.dovec.invalid/media/interior-2.jpg", "is_cover": true }] },
+            { "id": 5202, "code": "C-21", "category": "apartment", "layout": "2+1", "bathrooms": 2, "gross_m2": 91, "floor": 2,
+              "price": { "amount": 132000, "currency": "GBP" }, "availability": "available",
+              "images": [{ "id": "m5202-1", "url": "https://mock.dovec.invalid/media/interior-1.jpg", "is_cover": true }] }
+          ]
+        },
+        {
+          "id": 104,
+          "name": "Kent Plaza Lofts",
+          "status": "launch",
+          "progress_percent": 0,
+          "delivery": "2028-Q4",
+          "description_html": "<p>Mock project with no photos yet: it must stay hidden until a cover is mirrored.</p>",
+          "location": { "city": "Lefkoşa", "area": "Yenikent", "lat": 35.2134, "lng": 33.3355 },
+          "price": { "on_request": true },
+          "unit_types": ["1+1 Loft", "2+1 Loft"],
+          "url": "https://mock.dovec.invalid/projects/kent-plaza",
+          "gallery": [],
+          "units": [
+            { "id": 5301, "code": "L-01", "category": "loft", "layout": "1+1", "bathrooms": 1, "gross_m2": 70, "floor": 2,
+              "price": { "on_request": true }, "availability": "available", "images": [] },
+            { "id": 5302, "code": "L-02", "category": "loft", "layout": "2+1", "bathrooms": 2, "gross_m2": 104, "floor": 4,
+              "price": { "on_request": true }, "availability": "available", "images": [] },
+            { "id": 5303, "code": "X-01", "category": "parking", "layout": "", "price": { "amount": 9000, "currency": "GBP" }, "availability": "available", "images": [] }
+          ]
+        }
+      ],
+      "meta": { "page": 2, "last_page": 2, "total": 4 }
+    }
+  ]
+}

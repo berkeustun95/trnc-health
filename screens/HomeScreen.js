@@ -17,7 +17,7 @@ import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
-import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import { MODULE_FLAGS, HOME_V2_LIVE, DOVEC_PARTNER_LIVE } from '../constants/flags'
 import { REDESIGN, DUYURULAR, EHLIYET, EATERY } from '../constants/redesign'
 import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import HomeTopBar from '../components/home/HomeTopBar'
@@ -50,6 +50,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
+import DovecHomeSlot from '../components/home/redesign/DovecHomeSlot'
 import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
@@ -242,6 +243,7 @@ export default function HomeScreen({
   onShowExplore,
   onShowTransport,
   onShowDuyurular,
+  onShowDovec,
   onShowInsurance,
   onShowGrooming,
   onShowGarages,
@@ -1030,6 +1032,14 @@ export default function HomeScreen({
               <StripSlider slides={stripSlides} loading={stripLoading} lang={lang} paused={stripPaused}
                 onPress={handleStripPress} onDismiss={dismissStripItem} />
             </View>
+
+            {/* Döveç partner slot: nothing at all until DOVEC_PARTNER_LIVE flips (and nothing while the
+                partner has no visible project). A labelled partner placement, never editorial. */}
+            {DOVEC_PARTNER_LIVE && (
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <DovecHomeSlot lang={lang} onPress={onShowDovec} />
+              </View>
+            )}
 
             <SectionHeader title={t('favSectionTitle', lang)}
               action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />

@@ -10,6 +10,7 @@ import { colors, shadow, category as CAT, type, radii, elevation, TAP } from '..
 import { REDESIGN } from '../constants/redesign'
 import { IconButton, InfoRow, ContactBar, Button, RemoteImage } from '../components/ui'
 import { t } from '../constants/i18n'
+import { propertyPriceText, moneyText, formatAmount } from '../utils/money'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { areaName } from '../constants/areas'
 import BackButton from '../components/BackButton'
@@ -40,11 +41,6 @@ const LOGO_H = 54
 // The caller adds Math.max(insets.bottom, 12).
 const CONTACT_BAR_BASE = 12 + LOGO_H + 10 + 46 + 24   // pads + logo + gap + buttons + breathing
 
-const CURRENCIES = { GBP: '£', EUR: '€', USD: '$', TRY: '₺' }
-const PERIOD_SUFFIX_KEY = {
-  monthly: 'accomPerMonth', weekly: 'accomPerWeek',
-  yearly:  'accomPerYear',  nightly: 'accomPerNight',
-}
 
 // TRNC deed vocabulary is DELIBERATELY NOT TRANSLATED, in any locale. These are legal
 // terms of art; a literal rendering into Greek or Arabic could be actively wrong, and
@@ -58,13 +54,7 @@ const DEED_LABEL = {
   tmd:        'TMD',
 }
 
-function priceDisplay(price, currency, period, lang) {
-  if (price == null) return null
-  const sym = CURRENCIES[currency] || currency
-  const formatted = Number(price).toLocaleString('en-GB', { maximumFractionDigits: 0 })
-  const key = PERIOD_SUFFIX_KEY[period]
-  return `${sym}${formatted}${key ? t(key, lang) : ''}`
-}
+// Prices: utils/money.js (app-language grouping, period suffix, price on request).
 
 function typeLabel(type, lang) {
   const map = {
@@ -218,7 +208,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
             <View style={ds.intentBadge}><Text style={ds.intentBadgeText}>{intentLabel(prop.intent, lang)}</Text></View>
           </View>
           <Text style={ds.title}>{prop.title}</Text>
-          <Text style={ds.price}>{priceDisplay(prop.price, prop.currency, prop.price_period, lang)}</Text>
+          <Text style={ds.price}>{propertyPriceText(prop, lang)}</Text>
 
           {/* Location + reference number */}
           <View style={ds.locRow}>
@@ -241,7 +231,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
             <Fact label={t('accomEnsuite', lang)}     value={prop.ensuite_count != null ? String(prop.ensuite_count) : null} />
             <Fact label={t('accomGrossArea', lang)}   value={prop.area_sqm != null ? `${prop.area_sqm} m²` : null} />
             <Fact label={t('accomNetArea', lang)}     value={prop.net_area_sqm != null ? `${prop.net_area_sqm} m²` : null} />
-            <Fact label={t('accomPlot', lang)}        value={prop.plot_sqm != null ? `${Number(prop.plot_sqm).toLocaleString('en-GB')} m²` : null} />
+            <Fact label={t('accomPlot', lang)}        value={prop.plot_sqm != null ? `${formatAmount(prop.plot_sqm, lang)} m²` : null} />
             <Fact label={t('accomFloor', lang)}       value={floorText} />
             {/* building_age_band is a TEXT BAND ("6 - 10"). Rendered verbatim — never
                 parsed, never cast, never turned into a number. */}
@@ -251,7 +241,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
             <Fact label={t('accomSwap', lang)}        value={prop.swap_available} />
             <Fact label={t('accomFilterFurnished', lang)} value={prop.furnished != null ? (prop.furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang)) : null} />
             {/* Rent-only facts. Hidden entirely on a sale listing. */}
-            {isRent && <Fact label={t('accomDeposit', lang)} value={prop.deposit != null ? priceDisplay(prop.deposit, prop.deposit_currency || prop.currency, null, lang) : null} />}
+            {isRent && <Fact label={t('accomDeposit', lang)} value={prop.deposit != null ? moneyText(prop.deposit, prop.deposit_currency || prop.currency, lang) : null} />}
             {isRent && <Fact label={t('accomMinTerm', lang)} value={prop.min_term_months != null ? `${prop.min_term_months} ${t('accomMonths', lang)}` : null} />}
             {isRent && <Fact label={t('accomBills', lang)}   value={prop.bills_included} />}
           </View>
@@ -448,14 +438,14 @@ function PropertyDetailRedesign({
     [t('accomEnsuite', lang), prop.ensuite_count != null ? String(prop.ensuite_count) : null],
     [t('accomGrossArea', lang), prop.area_sqm != null ? `${prop.area_sqm} m²` : null],
     [t('accomNetArea', lang), prop.net_area_sqm != null ? `${prop.net_area_sqm} m²` : null],
-    [t('accomPlot', lang), prop.plot_sqm != null ? `${Number(prop.plot_sqm).toLocaleString('en-GB')} m²` : null],
+    [t('accomPlot', lang), prop.plot_sqm != null ? `${formatAmount(prop.plot_sqm, lang)} m²` : null],
     [t('accomFloor', lang), floorText],
     [t('accomBuildingAge', lang), prop.building_age_band],
     [t('accomDeedType', lang), prop.deed_type ? (DEED_LABEL[prop.deed_type] || prop.deed_type) : null],
     [t('accomGated', lang), prop.gated_community != null ? (prop.gated_community ? t('accomYes', lang) : t('accomNo', lang)) : null],
     [t('accomSwap', lang), prop.swap_available],
     [t('accomFilterFurnished', lang), prop.furnished != null ? (prop.furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang)) : null],
-    isRent && [t('accomDeposit', lang), prop.deposit != null ? priceDisplay(prop.deposit, prop.deposit_currency || prop.currency, null, lang) : null],
+    isRent && [t('accomDeposit', lang), prop.deposit != null ? moneyText(prop.deposit, prop.deposit_currency || prop.currency, lang) : null],
     isRent && [t('accomMinTerm', lang), prop.min_term_months != null ? `${prop.min_term_months} ${t('accomMonths', lang)}` : null],
     isRent && [t('accomBills', lang), prop.bills_included],
   ].filter(f => f && f[1] !== null && f[1] !== undefined && f[1] !== '')
@@ -503,7 +493,7 @@ function PropertyDetailRedesign({
             </View>
           </View>
           <Text style={rs.title} accessibilityRole="header">{prop.title}</Text>
-          <Text style={rs.price}>{priceDisplay(prop.price, prop.currency, prop.price_period, lang)}</Text>
+          <Text style={rs.price}>{propertyPriceText(prop, lang)}</Text>
 
           <View style={rs.rows}>
             <InfoRow icon="location-outline" category="homeLife" label={t('accomFilterArea', lang)} value={place}

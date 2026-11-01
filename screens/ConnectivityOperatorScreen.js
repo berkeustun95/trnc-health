@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { colors, readableOn, brandInk, withAlpha } from '../constants/theme'
 import { Ionicons } from '@expo/vector-icons'
 import { t, dateLocale } from '../constants/i18n'
+import { formatAmount } from '../utils/money'
 import BackButton from '../components/BackButton'
 import ConnectivityErrorState from '../components/ConnectivityErrorState'
 import OperatorWordmark from '../components/OperatorWordmark'
@@ -82,7 +83,7 @@ function PackageCard({ pkg, lang, primary, secondary, onPress }) {
             {[pkg.data_amount, pkg.duration_label].filter(Boolean).join(' · ')}
           </Text>
         </View>
-        <Text style={[s.pkgPrice, { color: ink }]}>{formatPrice(pkg.price_try)}</Text>
+        <Text style={[s.pkgPrice, { color: ink }]}>{formatPrice(pkg.price_try, lang)}</Text>
       </View>
 
       <PackageTags pkg={pkg} lang={lang} primary={primary} />
@@ -92,19 +93,13 @@ function PackageCard({ pkg, lang, primary, secondary, onPress }) {
 
 // numeric(10,2) arrives as a number through PostgREST. Trailing ".00" is noise on a price
 // board, so integers render bare and genuine decimals keep two places, in the device's
-// locale — Turkish wants "1.499,50" where English wants "1,499.50".
-function formatPrice(value) {
+// APP language (utils/money.js) — Turkish wants "1.499,50" where English wants "1,499.50".
+function formatPrice(value, lang) {
   // null/undefined/'' BEFORE Number(): Number(null) and Number('') are both 0, which is
   // finite, so a missing price would render "0 ₺" and tell the user the package is free.
   // Caught by the unit test, not by reading the code.
-  if (value == null || value === '') return '—'
-  const n = Number(value)
-  if (!Number.isFinite(n)) return '—'
-  const body = n.toLocaleString([], {
-    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })
-  return `${body} ₺`
+  const body = formatAmount(value, lang, { decimals: 2 })
+  return body == null ? '—' : `${body} ₺`
 }
 
 export default function ConnectivityOperatorScreen({

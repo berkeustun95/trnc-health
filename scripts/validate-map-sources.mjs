@@ -72,7 +72,7 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
-import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, EXPLORE_ROUTES_LIVE, DOVEC_PARTNER_LIVE } from '../constants/flags.js'
 import { colors, typeColors, placeColors } from '../constants/theme.js'
 import { PET_PARTNERS } from '../constants/petPartners.js'
 import { eateryPartnerVisible } from '../constants/eatery.js'
@@ -455,6 +455,28 @@ const eaClose = eaRivals.filter(([, c]) => !eaColor || hueGap(eaColor, c) < 30)
   .map(([k, c]) => `${k} ${c} (${eaColor ? hueGap(eaColor, c).toFixed(1) : '?'} deg)`)
 check(`eatery pin hue ${eaColor ? hueOf(eaColor).toFixed(0) : '?'} is >= 30 deg from all ${eaRivals.length} other pins`, eaClose, [])
 check('menuEatery label resolves in English', t('menuEatery', 'English') !== 'menuEatery', true)
+
+// ─── DÖVEÇ PROJECT PINS: ROWS FROM property_projects, ITS OWN GATE ──────────
+console.log(`\ndovec project pins — DOVEC_PARTNER_LIVE is ${DOVEC_PARTNER_LIVE}`)
+const DV_ROWS = [
+  { id: 'p1', name: 'Exact site', latitude: 35.2906, longitude: 33.9247, location_precision: 'exact' },
+  { id: 'p2', name: 'No pin', latitude: null, longitude: null, location_precision: null },
+  { id: 'p3', name: 'Area only', latitude: 35.1, longitude: 33.9, location_precision: 'area' },
+]
+const dvBuild = (dovecLive, extra = {}) => buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null,
+  isAdmin: false, petHotelLive: false, eateryLive: false, dovecLive, dovecProjects: DV_ROWS, ...extra })
+const dvPins = srcs => srcs.filter(s => s.key === 'dovec').flatMap(s => s.pins)
+check('flag off: no dovec chip, no dovec pin', [dvBuild(false).filter(s => s.key === 'dovec').length, dvPins(dvBuild(false)).length], [0, 0])
+check('flag on: exactly the EXACT-pin project draws (no pin / area-only never do)', dvPins(dvBuild(true)).map(p => p.id), ['dovec:p1'])
+check('flag on: the pin is the row coordinate, verbatim, inside the default region',
+  dvPins(dvBuild(true)).map(p => [p.lat, p.lng, inBox(p)]), [[35.2906, 33.9247, true]])
+check('flag on: the pin is a BADGE marker (no hue is free for a default marker)', dvPins(dvBuild(true)).map(p => p.marker), ['badge'])
+check('flag on, no rows: the chip is dropped, never an empty filter', dvBuild(true, { dovecProjects: [] }).filter(s => s.key === 'dovec').length, 0)
+check('flag on: All (the default path) includes it', selectedPins(dvBuild(true), new Set()).filter(p => p.kind === 'dovec').length, 1)
+check('default dovecLive follows DOVEC_PARTNER_LIVE',
+  dvPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, dovecProjects: DV_ROWS })).length,
+  DOVEC_PARTNER_LIVE ? 1 : 0)
+check('dovecMapChip label resolves in English', t('dovecMapChip', 'English') !== 'dovecMapChip', true)
 
 // ─── Walking routes (Visit NCY) — a LAYER, gated on its own flag ─────────────
 //

@@ -53,6 +53,8 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs'),
     -- Partner booking requests (20261143): registered ahead of the apply; red until it runs.
     ('20261143_partner_booking_requests','partner_booking_requests'),
+    -- Döveç partner projects (20261153): registered ahead of the apply; red until it runs.
+    ('20261153_dovec_partner_feed','property_projects'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers'),
     -- Per-dish options (1134): registered ahead of the apply; red until it runs.
@@ -261,6 +263,35 @@ WITH report AS (
     ('20261143_partner_booking_requests','partner_booking_requests','check_out'),
     ('20261143_partner_booking_requests','partner_booking_requests','guests'),
     ('20261143_partner_booking_requests','partner_booking_requests','created_at'),
+    -- 20261153: Döveç projects + the two unit columns on properties.
+    ('20261153_dovec_partner_feed','property_projects','id'),
+    ('20261153_dovec_partner_feed','property_projects','source'),
+    ('20261153_dovec_partner_feed','property_projects','external_id'),
+    ('20261153_dovec_partner_feed','property_projects','agency_id'),
+    ('20261153_dovec_partner_feed','property_projects','name'),
+    ('20261153_dovec_partner_feed','property_projects','description'),
+    ('20261153_dovec_partner_feed','property_projects','project_status'),
+    ('20261153_dovec_partner_feed','property_projects','construction_progress'),
+    ('20261153_dovec_partner_feed','property_projects','delivery_date'),
+    ('20261153_dovec_partner_feed','property_projects','unit_types'),
+    ('20261153_dovec_partner_feed','property_projects','price_from'),
+    ('20261153_dovec_partner_feed','property_projects','currency'),
+    ('20261153_dovec_partner_feed','property_projects','price_on_request'),
+    ('20261153_dovec_partner_feed','property_projects','district'),
+    ('20261153_dovec_partner_feed','property_projects','area'),
+    ('20261153_dovec_partner_feed','property_projects','address'),
+    ('20261153_dovec_partner_feed','property_projects','latitude'),
+    ('20261153_dovec_partner_feed','property_projects','longitude'),
+    ('20261153_dovec_partner_feed','property_projects','location_precision'),
+    ('20261153_dovec_partner_feed','property_projects','cover_image_url'),
+    ('20261153_dovec_partner_feed','property_projects','cover_source_url'),
+    ('20261153_dovec_partner_feed','property_projects','source_url'),
+    ('20261153_dovec_partner_feed','property_projects','status'),
+    ('20261153_dovec_partner_feed','property_projects','content_hash'),
+    ('20261153_dovec_partner_feed','property_projects','last_seen_at'),
+    ('20261153_dovec_partner_feed','property_projects','created_at'),
+    ('20261153_dovec_partner_feed','properties','project_id'),
+    ('20261153_dovec_partner_feed','properties','price_on_request'),
     ('20261132_eatery_orders_is_test','eatery_orders','is_test'),
     ('20261132_eatery_orders_is_test','order_testers','uid_sha256'),
     ('20261132_eatery_orders_is_test','order_testers','added_at'),
@@ -811,6 +842,23 @@ WITH report AS (
     ('20261143_partner_booking_requests','partner_booking_requests_dates_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_stay_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_guests_check'),
+    -- 20261153: Döveç projects, and the unit price coupling + project link on properties.
+    ('20261153_dovec_partner_feed','property_projects_pkey'),
+    ('20261153_dovec_partner_feed','property_projects_agency_id_fkey'),
+    ('20261153_dovec_partner_feed','property_projects_external_id_unique'),
+    ('20261153_dovec_partner_feed','property_projects_name_check'),
+    ('20261153_dovec_partner_feed','property_projects_status_check'),
+    ('20261153_dovec_partner_feed','property_projects_project_status_check'),
+    ('20261153_dovec_partner_feed','property_projects_progress_check'),
+    ('20261153_dovec_partner_feed','property_projects_unit_types_shape_check'),
+    ('20261153_dovec_partner_feed','property_projects_currency_check'),
+    ('20261153_dovec_partner_feed','property_projects_price_check'),
+    ('20261153_dovec_partner_feed','property_projects_district_check'),
+    ('20261153_dovec_partner_feed','property_projects_location_precision_check'),
+    ('20261153_dovec_partner_feed','property_projects_coords_check'),
+    ('20261153_dovec_partner_feed','properties_project_id_fkey'),
+    ('20261153_dovec_partner_feed','properties_price_on_request_check'),
+    ('20261153_dovec_partner_feed','properties_project_feed_check'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
     ('20261132_eatery_orders_is_test','order_testers_pkey'),
     ('20261132_eatery_orders_is_test','order_testers_uid_sha256_check'),
@@ -1215,6 +1263,8 @@ WITH report AS (
     ('0904_accommodation_partner_feed','property_images_property_id_idx'),
     -- UNIQUE: correctness — at most one primary image per property.
     ('0904_accommodation_partner_feed','property_images_primary_unique'),
+    ('20261153_dovec_partner_feed','property_projects_agency_status_idx'),
+    ('20261153_dovec_partner_feed','properties_project_id_idx'),
     -- towing: ONE index by design. vehicle_classes is a two-value domain and can
     -- never be selective, so it deliberately has none — see the migration header.
     ('0905_towing_companies','idx_towing_companies_coverage'),
@@ -4014,6 +4064,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
       IS NOT DISTINCT FROM ARRAY['accommodation','connectivity','eatery','ehliyet','events','explore','garages','grooming',
                                  'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261154_contact_events_dovec.sql') -- DOVEC-CONTACT-EVENTS:supersede (one count, one owner: the 1154 token owns the set once the ledger records it)
     UNION ALL SELECT '1115_eatery_partners','contact_events action vocabulary is exactly the 11-action set (incl. menu)',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
@@ -4923,6 +4974,7 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
         AND policyname='props_hide_photoless_novest' AND permissive='RESTRICTIVE' AND cmd='SELECT'
         AND qual LIKE '%novest%' AND qual LIKE '%is_admin()%' AND qual LIKE '%property_has_photo(id)%')
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261153_dovec_partner_feed.sql') -- DOVEC-PHOTO-RULE:supersede (one count, one owner: the 1153 token owns the policy body once the ledger records it)
     -- (2) The FULL policy set on properties, derived: 7 before 1068 + this one. Q3 never
     --     counted properties, so this token owns the count.
     UNION ALL SELECT '1068_novest_hide_photoless','properties has exactly 8 policies',
@@ -5354,6 +5406,46 @@ WITH report AS (
     COALESCE(pg_get_functiondef(to_regprocedure('public.purge_partner_booking_requests()')) LIKE '%DELETE FROM public.partner_booking_requests WHERE created_at < v_cut%'
          AND pg_get_functiondef(to_regprocedure('public.purge_partner_booking_requests()')) LIKE '%v_cut timestamptz := now() - interval ''12 months''%', false)
     AND COALESCE(obj_description(to_regclass('public.partner_booking_requests'), 'pg_class') LIKE '%12 months%', false)
+  -- 20261153: Döveç partner feed. Registered ahead of the apply; RED UNTIL IT RUNS. One question per token.
+  --     (1) THE PHOTO RULE, WIDENED: still RESTRICTIVE SELECT under its 1068 name, now keyed on `source IS NULL` (every feed
+  --         source) with no literal source name left in it; the admin and has-photo arms kept (positive halves).
+  UNION ALL SELECT '20261153_dovec_partner_feed','props_hide_photoless_novest is RESTRICTIVE SELECT on every feed source (source IS NULL arm, no novest literal) + is_admin() + property_has_photo(id)',
+    COALESCE((SELECT qual LIKE '%source IS NULL%' AND qual NOT LIKE '%novest%' AND qual LIKE '%is_admin()%' AND qual LIKE '%property_has_photo(id)%'
+                FROM pg_policies WHERE schemaname = 'public' AND tablename = 'properties'
+                 AND policyname = 'props_hide_photoless_novest' AND permissive = 'RESTRICTIVE' AND cmd = 'SELECT'), false)
+  --     (2) PROJECTS POSTURE: RLS on, exactly one policy (pp_select_public, PERMISSIVE SELECT) whose body requires active + a cover
+  --         or admin; clients may SELECT (positive control) and write nothing.
+  UNION ALL SELECT '20261153_dovec_partner_feed','property_projects: RLS on, only pp_select_public (active + cover, or admin); anon/authenticated SELECT only',
+    COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.property_projects')), false)
+    AND COALESCE((SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'property_projects')
+        IS NOT DISTINCT FROM ARRAY['pp_select_public'], false)
+    AND COALESCE((SELECT qual LIKE '%''active''%' AND qual LIKE '%cover_image_url IS NOT NULL%' AND qual LIKE '%is_admin()%' AND cmd = 'SELECT' AND permissive = 'PERMISSIVE'
+                FROM pg_policies WHERE schemaname = 'public' AND tablename = 'property_projects' AND policyname = 'pp_select_public'), false)
+    AND COALESCE(has_table_privilege('anon', to_regclass('public.property_projects'), 'SELECT')
+             AND NOT has_table_privilege('anon', to_regclass('public.property_projects'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+             AND NOT has_table_privilege('authenticated', to_regclass('public.property_projects'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+  --     (3) DEFAULTS that create no named object: a project is born pending; price_on_request defaults false (so every existing
+  --         listing satisfies the coupling); properties.price is nullable now (the coupling CHECK is the guard, section E).
+  UNION ALL SELECT '20261153_dovec_partner_feed','property_projects.status DEFAULT pending; properties.price_on_request NOT NULL DEFAULT false; properties.price nullable',
+    COALESCE((SELECT column_default LIKE '%pending%' FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'property_projects' AND column_name = 'status'), false)
+    AND COALESCE((SELECT column_default = 'false' AND is_nullable = 'NO' FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'properties' AND column_name = 'price_on_request'), false)
+    AND COALESCE((SELECT is_nullable = 'YES' FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'properties' AND column_name = 'price'), false)
+  --     (4) COUPLING BODIES, by fragment: price NULL exactly when on request; a project row only on a feed row.
+  UNION ALL SELECT '20261153_dovec_partner_feed','properties_price_on_request_check couples price IS NULL to price_on_request; properties_project_feed_check needs source',
+    COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%price_on_request AND (price IS NULL)%' AND pg_get_constraintdef(oid) LIKE '%price IS NOT NULL%'
+                FROM pg_constraint WHERE conrelid = to_regclass('public.properties') AND conname = 'properties_price_on_request_check'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%project_id IS NULL%' AND pg_get_constraintdef(oid) LIKE '%source IS NOT NULL%'
+                FROM pg_constraint WHERE conrelid = to_regclass('public.properties') AND conname = 'properties_project_feed_check'), false)
+  --     (5) THE PUBLISH SWITCH exists: the Döveç agency row. Pending until go-live, then active; never absent or rejected.
+  UNION ALL SELECT '20261153_dovec_partner_feed','Döveç estate_agencies row exists (pending before go-live, active after)',
+    COALESCE((SELECT status IN ('pending','active') FROM public.estate_agencies WHERE id = '00000000-0000-4000-9000-000000000003'), false)
+  -- 20261154: contact_events module 'dovec'. Owns the module set once recorded (the 1115 token stands down then).
+  UNION ALL SELECT '20261154_contact_events_dovec','contact_events module vocabulary is exactly the 17-module set (incl. dovec)',
+    (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+       FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+      WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+    IS NOT DISTINCT FROM ARRAY['accommodation','connectivity','dovec','eatery','ehliyet','events','explore','garages','grooming',
+                               'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
   ) z
 
   UNION ALL

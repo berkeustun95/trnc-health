@@ -10,6 +10,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { propertyPriceText } from '../utils/money'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
@@ -393,7 +394,8 @@ function DashboardTab({ onNavigate }) {
         supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('provider_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        // Agent submissions only: partner-feed rows (Döveç) sit 'pending' until go-live and are not approvable here.
+        supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending').is('source', null),
         supabase.from('estate_agents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('home_services').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transport_providers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -2544,11 +2546,15 @@ function PropertiesTab() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
+    let q = supabase
       .from('properties')
       .select('*, estate_agents(full_name, phone)')
       .eq('status', filter)
-      .order('created_at', { ascending: false })
+    // The review queue is agent submissions only. A partner-feed row (source set) is published by its
+    // sync / go-live step, never by Approve here: Döveç units sit 'pending' until go-live (20261153).
+    // Other tabs are unchanged (Novest rows still list under active / delisted).
+    if (filter === 'pending') q = q.is('source', null)
+    const { data } = await q.order('created_at', { ascending: false })
     setProperties(data || [])
     setLoading(false)
   }, [filter])
@@ -2565,8 +2571,6 @@ function PropertiesTab() {
     setRejectTarget(null)
     load()
   }
-
-  const CURRENCIES = { GBP: '£', TRY: '₺', EUR: '€' }
 
   return (
     <View style={{ flex: 1 }}>
@@ -2586,11 +2590,10 @@ function PropertiesTab() {
             contentContainerStyle={s.listContent}
             ListEmptyComponent={<SectionEmpty text={`No ${filter} listings.`} />}
             renderItem={({ item }) => {
-              const sym = CURRENCIES[item.currency] || item.currency
               return (
                 <View style={s.card}>
                   <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={s.cardSub}>{item.property_type} · {item.intent} · {sym}{Number(item.price).toLocaleString()}</Text>
+                  <Text style={s.cardSub}>{item.property_type} · {item.intent} · {propertyPriceText(item, 'English') ?? '—'}</Text>
                   <Text style={s.cardSub}>Agent: {item.estate_agents?.full_name || '—'} · {item.district}</Text>
                   {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
                   {filter === 'pending' && (

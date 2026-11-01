@@ -25,7 +25,7 @@
 
 // Extensions are explicit so plain Node (scripts/validate-map-sources.mjs) can import this
 // module and exercise the real gate against the real constants. Metro resolves both forms.
-import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE } from './flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, DOVEC_PARTNER_LIVE } from './flags.js'
 import { eateryPartnerVisible } from './eatery.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
 import { parseIsOpen, isOpenNow } from '../utils/facilityUtils.js'
@@ -190,13 +190,40 @@ function eateryPins(partners, gates) {
     }))
 }
 
+// ─── DÖVEÇ PROJECT PINS — ROWS, ITS OWN GATE, A BADGE MARKER ─────────────────
+// One pin per Döveç project that has an EXACT site pin (property_projects.location_precision
+// 'exact'; a construction site is a public place, unlike a unit for sale, which never gets one).
+// RLS already returns only active projects with a cover. DOVEC_PARTNER_LIVE is the single switch for
+// the partner page, Home slot AND these pins; `dovecLive` is a parameter only so
+// validate-map-sources.mjs can assert both worlds.
+// marker: 'badge' — drawn as a bitmap badge (see placeColors.dovec for why no hue is free).
+function dovecPins(projects) {
+  return (projects || [])
+    .filter(p => p && p.location_precision === 'exact'
+      && typeof p.latitude === 'number' && typeof p.longitude === 'number'
+      && Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+    .map(p => ({
+      id:      `dovec:${p.id}`,
+      kind:    'dovec',
+      marker:  'badge',
+      row:     p,
+      lat:     p.latitude,
+      lng:     p.longitude,
+      color:   placeColors.dovec.text,
+      colorBg: placeColors.dovec.bg,
+      isDuty:  false,
+    }))
+}
+
 export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = false,
                                  exploreLive = MODULE_FLAGS.explore,
                                  petHotelLive = PET_HOTEL_LIVE,
                                  petPartners = PET_PARTNERS,
                                  eateryLive = EATERY_LIVE,
                                  eateryPartners = [],
-                                 eateryGates = { 'crunchy-express': CRUNCHY_EXPRESS_LIVE } }) {
+                                 eateryGates = { 'crunchy-express': CRUNCHY_EXPRESS_LIVE },
+                                 dovecLive = DOVEC_PARTNER_LIVE,
+                                 dovecProjects = [] }) {
   const health = healthPins(facilities, dutyFacilityId)
   const sources = HEALTH_TYPES.map(type => ({
     key:      `health:${type}`,
@@ -254,6 +281,16 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
       color:    placeColors.petHotel.text,
       colorBg:  placeColors.petHotel.bg,
       pins:     petHotelPins(petPartners),
+    })
+  }
+
+  if (dovecLive) {
+    sources.push({
+      key:      'dovec',
+      labelKey: 'dovecMapChip',
+      color:    placeColors.dovec.text,
+      colorBg:  placeColors.dovec.bg,
+      pins:     dovecPins(dovecProjects),
     })
   }
 
