@@ -45,3 +45,11 @@ export function officialVisitView(ov, now = new Date()) {
     updated: /^\d{4}-\d{2}$/.test(ov.updated || '') ? ov.updated : null,
   }
 }
+
+// The fee line, worded once for the place page and the map pin sheet. `tr` is a key → string
+// lookup (t bound to the language), so this file stays free of the i18n bundle.
+export function officialFeeText(fee, tr) {
+  if (!fee) return null
+  if (fee.full === 0 && fee.student === 0) return tr('ovFree')
+  return tr('ovFee').replace('{full}', fee.full).replace('{student}', fee.student)
+}

@@ -308,3 +308,17 @@ export function applyOpenNow(pins, on, dutyWindows = null) {
   if (!on) return pins
   return pins.filter(p => p.kind !== 'health' || isOpenNow(p.row, dutyWindows) === true)
 }
+
+// "Müze & Ören Yeri" (EEMD visiting data, places.official_visit). Applicability is read off
+// the GATED pins, so a dark heritage group draws no chip; and like Open now, the chip never
+// renders while it would filter the map to nothing.
+export function officialVisitApplicable(pins) {
+  return pins.some(p => p.kind === 'place' && !!p.row.official_visit)
+}
+
+// A MODE, unlike Open now: only EEMD sites stay. A beach passing through would defeat the
+// chip, whose whole question is "which museums and ancient sites can I visit".
+export function applyOfficialVisit(pins, on) {
+  if (!on) return pins
+  return pins.filter(p => p.kind === 'place' && !!p.row.official_visit)
+}
