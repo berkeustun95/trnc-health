@@ -73,9 +73,11 @@ BEGIN
     ALTER TABLE public.places ADD CONSTRAINT places_official_visit_shape CHECK (
       official_visit IS NULL OR (
         jsonb_typeof(official_visit) = 'object'
+        -- ?& first: ->> on a missing key is NULL, and a CHECK that evaluates to NULL passes.
+        AND official_visit ?& ARRAY['status', 'source_url', 'updated']
         AND official_visit->>'status' IN ('open', 'closed')
         AND official_visit->>'source_url' LIKE 'https://eemd.gov.ct.tr/%'
-        AND official_visit->>'updated' ~ '^[0-9]{4}-[0-9]{2}$'));
+        AND official_visit->>'updated' ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'));
   END IF;
 END $$;
 
@@ -164,6 +166,8 @@ DECLARE
   v_upd_name  text;
   v_svc       jsonb;
   v_shape_ok  boolean := false;
+  v_keys_ok   boolean := false;
+  v_month_ok  boolean := false;
 BEGIN
   -- Column + constraint + trigger, read from the catalogs.
   SELECT data_type INTO v_def FROM information_schema.columns
@@ -233,6 +237,14 @@ BEGIN
       UPDATE public.places SET official_visit = '{"status":"maybe","source_url":"https://example.com","updated":"x"}' WHERE id = v_id;
     EXCEPTION WHEN check_violation THEN v_shape_ok := true;
     END;
+    BEGIN
+      UPDATE public.places SET official_visit = '{"status":"open"}' WHERE id = v_id;
+    EXCEPTION WHEN check_violation THEN v_keys_ok := true;
+    END;
+    BEGIN
+      UPDATE public.places SET official_visit = '{"status":"open","source_url":"https://eemd.gov.ct.tr/z","updated":"2026-13"}' WHERE id = v_id;
+    EXCEPTION WHEN check_violation THEN v_month_ok := true;
+    END;
     RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM IS DISTINCT FROM 'ZZ_PROBE_ROLLBACK' THEN RAISE; END IF;
@@ -249,6 +261,8 @@ BEGIN
     RAISE EXCEPTION 'probe: the no-session path could not write official_visit (%)', v_svc;
   END IF;
   IF NOT v_shape_ok THEN RAISE EXCEPTION 'probe: a malformed official_visit was accepted'; END IF;
+  IF NOT v_keys_ok  THEN RAISE EXCEPTION 'probe: an official_visit missing source_url/updated was accepted'; END IF;
+  IF NOT v_month_ok THEN RAISE EXCEPTION 'probe: official_visit.updated month 13 was accepted'; END IF;
   IF EXISTS (SELECT 1 FROM public.places WHERE name LIKE 'zz official probe%') THEN
     RAISE EXCEPTION 'probe rows survived the rollback';
   END IF;
@@ -264,7 +278,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261155_places_official_visit.sql', '5189564ed519ac5bacf0ba847bde563f2f032f3e0bb34d5c7c33f197623faf82')
+VALUES ('20261155_places_official_visit.sql', '2d2bddfac8e18a2185a342fd5954bcf2fcbcdcf71d17c9f4121abac320c9c8e3')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -280,8 +294,19 @@ NOTIFY pgrst, 'reload schema';
 --   SELECT id, hidden_reason FROM public.places WHERE id = '613c310f-c118-4668-9ea1-e5b4494164e9';   -- expect 'duplicate'
 --
 -- ─── Rollback ───────────────────────────────────────────────────────────────
---   Un-hide (SQL editor as postgres, guard_place_moderation disabled around it as above):
+--   Un-hide — paste ALL of it as one script (SQL editor, role postgres). Without BEGIN/COMMIT a
+--   failed UPDATE would leave the moderation guard disabled:
+--     BEGIN;
+--     SET LOCAL lock_timeout = '5s';
+--     LOCK TABLE public.places IN ACCESS EXCLUSIVE MODE;
+--     ALTER TABLE public.places DISABLE TRIGGER guard_place_moderation;
 --     UPDATE public.places SET hidden_at = NULL, hidden_reason = NULL WHERE id = '613c310f-c118-4668-9ea1-e5b4494164e9';
+--     ALTER TABLE public.places ENABLE TRIGGER guard_place_moderation;
+--     DO $$ BEGIN
+--       IF (SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'public.places'::regclass
+--            AND tgname = 'guard_place_moderation') IS DISTINCT FROM 'O' THEN
+--         RAISE EXCEPTION 'guard_place_moderation not re-enabled'; END IF; END $$;
+--     COMMIT;
 --   (Moved check-ins are not moved back: they were at the same museum.)
 --   DROP TRIGGER IF EXISTS places_guard_official_visit ON public.places;
 --   DROP FUNCTION IF EXISTS public.places_guard_official_visit();
