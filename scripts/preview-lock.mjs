@@ -5,6 +5,8 @@
 //   node scripts/preview-lock.mjs release <holder>             # after YOUR phone check
 //   node scripts/preview-lock.mjs status
 //   node scripts/preview-lock.mjs check                        # in ota:preview: needs ADA_PREVIEW_HOLDER
+//   node scripts/preview-lock.mjs check --if-phone             # in start/android: the same, only while the
+//                                                              # test phone is attached over adb
 //
 // WHY (2026-11-01): the Preview channel is shared and the newest update wins on the phone. One
 // session published its Preview minutes after another's; the second session's device check then
@@ -21,6 +23,9 @@ import { openSync, writeSync, closeSync, readFileSync, unlinkSync, existsSync } 
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
+
+// The test phone (S20+, SM-G985F) by hardware serial: its Wi-Fi debugging address changes on every pairing.
+const TEST_PHONE_SERIAL = 'R58N602DHYT'
 
 const DIR = process.env.ADA_LOCK_DIR || join(homedir(), 'ObsidianVault', '10-ada', 'locks')
 const FILE = join(DIR, 'preview-phone.lock.json')
@@ -81,13 +86,26 @@ if (cmd === 'release') {
   process.exit(0)
 }
 
+// Is the test phone reachable over adb? A dev bundle (npm start / npm run android) reaches it that way:
+// Metro over `adb reverse`, or the Expo Go / dev-client launch. No adb or no phone → nothing to guard.
+function testPhoneAttached() {
+  const adb = join(process.env.ANDROID_HOME || join(homedir(), 'Library', 'Android', 'sdk'), 'platform-tools', 'adb')
+  const out = gitOr(`"${adb}" devices`, '')
+  const serials = out.split('\n').slice(1).map(l => l.trim().split(/\s+/)).filter(([, st]) => st === 'device').map(([id]) => id)
+  return serials.some(id => gitOr(`"${adb}" -s "${id}" shell getprop ro.serialno`, '').trim() === TEST_PHONE_SERIAL)
+}
+
 if (cmd === 'check') {
+  if (holderArg === '--if-phone' && !testPhoneAttached()) {
+    console.log('preview lock: test phone not attached over adb — not needed for this dev server')
+    process.exit(0)
+  }
   if (!existsSync(DIR)) { console.log(`preview lock: no lock directory on this machine (${DIR}) — not the test-phone Mac, skipped`); process.exit(0) }
   const me = process.env.ADA_PREVIEW_HOLDER
   const l = read()
   if (!l) {
     console.error('preview lock: REFUSED — nobody holds the lock. Take it first:')
-    console.error('  node scripts/preview-lock.mjs take <holder> "<what for>"  then  ADA_PREVIEW_HOLDER=<holder> npm run ota:preview')
+    console.error('  node scripts/preview-lock.mjs take <holder> "<what for>"  then  ADA_PREVIEW_HOLDER=<holder> npm run ota:preview  (or npm start / npm run android)')
     process.exit(1)
   }
   if (!me || l.holder !== me) {
