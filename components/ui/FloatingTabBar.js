@@ -18,10 +18,11 @@ const GAP_BELOW = 12
 // ground, PageCanvas) from the screen's bottom edge (under the Android nav bar, which is
 // edge-to-edge and draws its own contrast scrim over whatever is behind it — the ground, now,
 // not content) up to the bar's middle, then FADE_H of pageBase → transparent. A stretched PNG,
-// not stepped views (8 steps drew visible bands over dark event photos) and not expo-linear-gradient (a native module). Scroll
-// content pads by the footprint + FADE_H so its last row clears it.
+// not stepped views (8 steps drew visible bands over dark event photos) and not
+// expo-linear-gradient (a native module). Scroll content pads by the footprint + FADE_H so its
+// last row clears it.
 export const FADE_H = 32
-const CANVAS_FADE = require('../../assets/oli-scenes/canvas-fade.png')   // colors.pageBase, alpha 0 → 1 (scripts/generate-page-canvas.mjs)
+const CANVAS_FADE = require('../../assets/oli-scenes/canvas-fade.png')   // pageBase, alpha 0 → 1
 
 // The vertical space the bar occupies above the screen's bottom edge. Screens that must
 // not be covered pad by this; Home scrolls under it and pads its content instead.

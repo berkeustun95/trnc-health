@@ -17,14 +17,17 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
 - Home: `screens/HomeScreen.js` (redesign branch of it), `components/home/redesign/`.
 - Never invent a value. A value that is not a token needs its own reason in a comment, like the existing
   ones in theme.js. Legacy tokens (`colors.bg`, `spacing`, `radius`, `shadow`, `fontSize`) are for
-  unmigrated screens only; new work uses the redesign roles (`canvas`, `card`, `type`, `radii`, `space`, `elevation`).
+  unmigrated screens only; new work uses the redesign roles (`PageCanvas`, `card`, `type`, `radii`, `space`, `elevation`).
 
 ## 1. Light mode only
 `app.config.js` sets `userInterfaceStyle: 'light'`. No dark variants, no `useColorScheme` branches.
 
 ## 2. Mix v2 Home (HOME_V2_LIVE + REDESIGN_LIVE, both true)
-- Page ground: `colors.canvas` `#F4F6F5`. White cards (`colors.card`) separate from it by
-  `elevation.card` only (the two are 1.09:1). Never add a second background surface.
+- Page ground: Base C (Berke, 2026-11-01), drawn by `components/ui/PageCanvas.js`: `colors.pageBase`
+  `#F8F6F1` with a fixed top gradient `pageTop` → `pageMid` (260pt) → pageBase (640pt); a page in a Home
+  group passes `group` for its ink fade; partner screens get the base only. Cards stay white
+  (`colors.card`). `colors.canvas` `#F4F6F5` is the legacy ground of screens not yet migrated.
+  Never add a second background surface.
 - Order (`screens/HomeScreen.js` renderHubRedesign): `RedesignHero` photo band → `OliBar` → widgets
   (duty / event, `Widgets.js`) → `DuyurularBanner` → favourites → the four `ServicePanels` → bottom ad slot.
 - Event banner (`EventBanner`): date line + title in ONE dark band at the TOP of the card (Berke approved

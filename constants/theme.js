@@ -38,7 +38,7 @@ export const colors = {
   // ─── Redesign roles (feat/redesign, Slice 0) ──────────────────────────────
   // Added BESIDE the legacy names rather than over them: `bg` and friends stay until each
   // screen is migrated in its own slice, so no untouched screen changes colour by accident.
-  canvas:        '#F4F6F5',   // page ground; white cards separate from it by elevation.card only (1.09:1)
+  canvas:        '#F4F6F5',   // legacy page ground, for screens not yet on PageCanvas (Base C, below)
   // Base C (Berke, 2026-11-01): the page ground drawn by components/ui/PageCanvas.js. pageBase
   // is the flat ground; pageTop → pageMid → pageBase is the top gradient (pageCanvas below).
   // scripts/generate-page-canvas.mjs bakes the PNGs from these: change one, rerun it.
