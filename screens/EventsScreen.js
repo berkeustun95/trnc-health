@@ -25,6 +25,7 @@ import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { formatPetDate } from '../constants/petsContent'
+import { maybeListedFilter, isEventOver } from '../utils/eventVisibility'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
   RemoteImage,
@@ -609,15 +610,17 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
   const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    // Listed until end_date, or 06:00 Cyprus the morning after for events with no end — the
+    // same rule as the Home strip (utils/eventVisibility.js).
+    const now = new Date()
     const { data, error } = await supabase
       .from('events')
       .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
       .eq('status', 'approved')
-      .gte('start_date', cutoff)
+      .or(maybeListedFilter(now))
       .order('start_date', { ascending: true })
     setLoadError(!!error)
-    setEvents(error ? [] : (data ?? []))
+    setEvents(error ? [] : (data ?? []).filter(e => !isEventOver(e, now)))
     setLoading(false)
   }, [])
   const retry = () => { setLoading(true); load() }
