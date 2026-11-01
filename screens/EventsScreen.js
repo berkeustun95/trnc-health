@@ -25,7 +25,7 @@ import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { formatPetDate } from '../constants/petsContent'
-import { maybeListedFilter, isEventOver } from '../utils/eventVisibility'
+import { maybeListedFilter, isEventOver, eventOverlaps, isRunningFromEarlierDay, ongoingEndLabel } from '../utils/eventVisibility'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
   RemoteImage,
@@ -95,9 +95,8 @@ const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return 
 const endOfDay   = d => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x }
 const addDays    = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 
-// Every window is anchored at today 00:00 rather than `now`, so an event that
-// already started earlier today still matches — consistent with the feed's
-// existing 24h grace on start_date.
+// Every window is anchored at today 00:00 rather than `now`; matchesDate counts an event in a
+// window while it is LISTED inside it (eventOverlaps), so a running event matches too.
 function dateRange(key, pickedDate) {
   const today = startOfDay(new Date())
   const dow = today.getDay() // 0 = Sunday, 6 = Saturday
@@ -133,8 +132,9 @@ function dateRange(key, pickedDate) {
 function matchesDate(event, key, pickedDate) {
   const range = dateRange(key, pickedDate)
   if (!range) return true
-  const s = new Date(event.start_date)
-  return s >= range.from && s <= range.to
+  // Listed at some point inside the range, not only STARTING in it: a festival running today
+  // is in "Bugün" (utils/eventVisibility.js, the same rule as the list itself).
+  return eventOverlaps(event, range.from, range.to)
 }
 
 // Card-level time. Deliberately no all-day heuristic: a 00:00 start is real for
@@ -221,7 +221,9 @@ function EventCard({ event, lang, onPress }) {
         <View style={s.infoRow}>
           <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
           <Text style={s.infoText} numberOfLines={1}>
-            {formatEventTime(event.start_date, event.end_date)}
+            {isRunningFromEarlierDay(event)
+              ? t('eventOngoingUntil', lang).replace('{date}', ongoingEndLabel(event.end_date, dateLocale(lang)))
+              : formatEventTime(event.start_date, event.end_date)}
           </Text>
         </View>
       </View>
