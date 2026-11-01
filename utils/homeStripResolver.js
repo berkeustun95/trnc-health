@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
 import { LANG_CODES, dateLocale } from '../constants/i18n.js'
 import { assembleStripSlides } from './stripSlides.js'
-import { maybeListedFilter, isEventOver } from './eventVisibility.js'
+import { maybeListedFilter, isEventOver, isRunningFromEarlierDay, startsSoon } from './eventVisibility.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
@@ -230,6 +230,8 @@ async function readEventsToday(now, lang) {
     sponsored: false,
     action: { type: 'events', id: e.id },
     startsAt: new Date(e.start_date).getTime(),
+    // Running since an earlier day: the banner chip says "Devam ediyor · <end>" (Widgets.js).
+    ongoingUntil: isRunningFromEarlierDay(e, now) ? e.end_date : null,
   }
 }
 
@@ -354,7 +356,8 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
   try {
     const e = await readEventsToday(now, lang)
     if (e) {
-      const withinSoon = e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000
+      // Not "starting soon" once it has started (startsSoon) — a running event is on the strip now.
+      const withinSoon = startsSoon({ start_date: e.startsAt }, now, STRIP_SOON_HOURS)
       const { startsAt, ...item } = e
       return { ...item, soon: withinSoon }
     }
@@ -456,7 +459,7 @@ async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }
   }
   try {
     const e = (await readEventsToday(now, lang)) || (await readNextEvent(now, lang))
-    if (e) return { ...e, soon: e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000 }
+    if (e) return { ...e, soon: startsSoon({ start_date: e.startsAt }, now, STRIP_SOON_HOURS) }
   } catch { /* fall through */ }
   try {
     if (!pins) pins = await readPins()

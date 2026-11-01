@@ -6,6 +6,7 @@ import { t, tCount, dateLocale } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
+import { ongoingEndLabel } from '../../../utils/eventVisibility'
 import { Bone, IconButton, RemoteImage } from '../../ui'
 import { PlaceholderTag, eateryImageUrl } from '../../EateryBits'
 
@@ -162,7 +163,10 @@ function eventChip(startsAt, lang) {
 function bannerParts(item, lang) {
   const title = item.generic ? t(item.titleKey, lang) : item.title
   const isEvent = item.kind === 'event' && !item.generic
-  const chip = isEvent && item.startsAt ? eventChip(item.startsAt, lang) : null
+  // Running since an earlier day: no start time, "Devam ediyor · <end date>" (utils/eventVisibility.js).
+  const chip = isEvent && item.ongoingUntil
+    ? { text: t('eventOngoingUntil', lang).replace('{date}', ongoingEndLabel(item.ongoingUntil, dateLocale(lang))), future: false }
+    : isEvent && item.startsAt ? eventChip(item.startsAt, lang) : null
   const time = chip ? chip.text : isEvent && item.subtitle ? item.subtitle : null
   const sponsorSub = item.eaterySlug && item.subtitle ? item.subtitle : null
   const tag = item.sponsored ? t('stripSponsored', lang) : item.soon ? t('stripStartingSoon', lang) : null

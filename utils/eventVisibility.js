@@ -76,3 +76,44 @@ export function maybeListedFilter(now = new Date()) {
   const since = new Date(midnightAsUtc - cyprusParts(new Date(midnightAsUtc - 3 * H)).offsetMs)
   return `end_date.gte.${now.toISOString()},and(end_date.is.null,start_date.gte.${since.toISOString()})`
 }
+
+// ─── Running events (Berke, 2026-11-01) ──────────────────────────────────────────────────
+// Started on an EARLIER Cyprus day and has an end_date still ahead: the cards say
+// "Devam ediyor · <end date>" instead of a start time nobody needs any more. A no-end event
+// carried past midnight is not one: there is no end date to show.
+function cyprusDayKey(instant) {
+  const { y, m, d } = cyprusParts(instant)
+  return y * 10000 + m * 100 + d
+}
+
+export function isRunningFromEarlierDay(event, now = new Date()) {
+  if (!event?.end_date || !isEventOnNow(event, now)) return false
+  return cyprusDayKey(new Date(event.start_date)) < cyprusDayKey(now)
+}
+
+// The end date for that label, in the reader's locale ('en-GB-u-ca-gregory' → "4 November";
+// Turkish "4 Kasım"); the year only when it is not the current one. Cyprus calendar day.
+export function ongoingEndLabel(endDate, locale, now = new Date()) {
+  const e = new Date(endDate)
+  if (Number.isNaN(e.getTime())) return ''
+  const opts = { day: 'numeric', month: 'long', timeZone: TZ }
+  if (cyprusParts(e).y !== cyprusParts(now).y) opts.year = 'numeric'
+  try { return e.toLocaleDateString(locale, opts) }
+  catch { const { d, m, y } = cyprusParts(e); return opts.year ? `${d}.${m}.${y}` : `${d}.${m}.` }
+}
+
+// Date filters ("Bugün", "Bu hafta sonu", …): an event belongs to a range when it is listed at
+// some point inside it — started by the range's end and not over before its start — so a
+// festival running today is in "Bugün", not only events that START today.
+export function eventOverlaps(event, from, to) {
+  const s = new Date(event?.start_date)
+  const until = eventListedUntil(event)
+  return !Number.isNaN(s.getTime()) && !!until && s.getTime() <= to.getTime() && until.getTime() > from.getTime()
+}
+
+// Home strip: "starting soon" only for an event that has NOT started — a running one is not
+// about to start (2026-11-01: the shared rule let running events onto the strip).
+export function startsSoon(event, now, soonHours) {
+  const delta = new Date(event?.start_date).getTime() - now.getTime()
+  return delta >= 0 && delta <= soonHours * H
+}
