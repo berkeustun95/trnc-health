@@ -172,7 +172,7 @@ const s = StyleSheet.create({
   airlineRowBody:    { fontSize: 13, color: colors.textSecondary, fontFamily: 'Inter_400Regular', lineHeight: 19 },
 
   airlineNote:       { flexDirection: 'row', gap: 6, marginBottom: 4, paddingHorizontal: 2 },
-  airlineNoteText:   { fontSize: 12, color: colors.textSecondary, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  airlineNoteText:   { fontSize: 12, color: colors.textSecondaryOnPage, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
 
   warningCard:       { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 14, marginBottom: 10, ...shadow },
   warningCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
