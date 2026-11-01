@@ -1,6 +1,8 @@
-// EEMD visiting info (utils/officialVisit.js): season window, closed sites, Sunday note.
+// EEMD visiting info (utils/officialVisit.js): season window, closed sites, Sunday note; and the
+// Keşfet map's "Müze & Ören Yeri" chip (constants/mapSources.js).
 //   node scripts/test-official-visit.mjs
-import { officialVisitView, cyprusDate } from '../utils/officialVisit.js'
+import { officialVisitView, cyprusDate, officialFeeText } from '../utils/officialVisit.js'
+import { buildMapSources, selectedPins, officialVisitApplicable, applyOfficialVisit, applyOpenNow } from '../constants/mapSources.js'
 
 let bad = 0
 const t = (name, got, want) => {
@@ -30,6 +32,42 @@ t('closed: no fee, no hours, no note', (({ closed, fee, hours, sundayFree }) => 
 t('link-only site: no note, keeps link', (({ sundayFree, sourceUrl }) => ({ sundayFree, sourceUrl }))(officialVisitView(linkOnly)), { sundayFree: false, sourceUrl: 'https://eemd.gov.ct.tr/z' })
 t('no data → null', officialVisitView(null), null)
 t('malformed updated is dropped', officialVisitView({ ...open, updated: 'Ekim' }).updated, null)
+
+// Fee line: one wording for the place page and the map pin sheet.
+const tr = k => ({ ovFree: 'Ücretsiz', ovFee: 'Tam {full} TL · Öğrenci {student} TL' })[k]
+t('fee line', officialFeeText({ full: 150, student: 50 }, tr), 'Tam 150 TL · Öğrenci 50 TL')
+t('free site', officialFeeText({ full: 0, student: 0 }, tr), 'Ücretsiz')
+t('no fee → no line', officialFeeText(null, tr), null)
+
+// ─── Map chip ───────────────────────────────────────────────────────────────
+const place = (id, category, official_visit = null) => ({ id, category, latitude: 35.3, longitude: 33.3, official_visit })
+const heritage = [
+  place('bellapais', 'religious_site', open), place('othello', 'castle_fortress', closed),
+  place('salamis', 'ancient_ruins', linkOnly),
+  ...Array.from({ length: 6 }, (_, i) => place(`mon${i}`, 'monument')),          // heritage, no EEMD data
+]
+const PLACES = [...heritage, place('beach', 'beach')]
+const FAC = [{ id: 'f1', type: 'pharmacy', status: 'active', provider_id: 'p', latitude: 35.2, longitude: 33.4 }]
+const opts = { facilities: FAC, places: PLACES, dutyFacilityId: null, petHotelLive: false, eateryLive: false }
+const ids = pins => pins.map(p => p.id).sort()
+const live = buildMapSources({ ...opts, exploreLive: true })
+const all = selectedPins(live, new Set())
+
+t('chip off: map unchanged', applyOfficialVisit(all, false).length, all.length)
+t('chip on: only places with official_visit (open, closed, link-only)', ids(applyOfficialVisit(all, true)),
+  ['place:bellapais', 'place:othello', 'place:salamis'])
+t('chip on: drops beaches, plain heritage and health pins',
+  applyOfficialVisit(all, true).some(p => p.kind !== 'place' || p.row.category === 'beach' || p.row.category === 'monument'), false)
+t('chip on + a Kategori pick: intersects, never widens', ids(applyOfficialVisit(selectedPins(live, new Set(['explore:nature'])), true)), [])
+t('chip renders when a visible pin has EEMD data', officialVisitApplicable(all), true)
+t('no EEMD data anywhere → no chip (never a dead chip)', officialVisitApplicable(selectedPins(buildMapSources({ ...opts, exploreLive: true,
+  places: PLACES.map(p => ({ ...p, official_visit: null })) }), new Set())), false)
+// The gate: with Explore dark only nature is live, so the heritage EEMD sites are not pins
+// and the chip cannot appear (it reads the GATED pins, not the fetched rows).
+const dark = selectedPins(buildMapSources({ ...opts, exploreLive: false }), new Set())
+t('Explore dark: no EEMD pin, no chip', [applyOfficialVisit(dark, true).length, officialVisitApplicable(dark)], [0, false])
+t('with Open now on as well: still only EEMD sites', ids(applyOfficialVisit(applyOpenNow(all, true), true)),
+  ['place:bellapais', 'place:othello', 'place:salamis'])
 
 if (bad) { console.error(`\n${bad} failing`); process.exit(1) }
 console.log('\nall passing')

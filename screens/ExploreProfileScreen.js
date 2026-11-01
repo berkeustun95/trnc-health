@@ -17,7 +17,7 @@ import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
 import { VISITNCY_SOURCE, creditUrl, creditBrand } from '../constants/walkingRoutes'
 import { logCreditTap } from '../components/WalkingRoutes'
-import { officialVisitView } from '../utils/officialVisit'
+import { officialVisitView, officialFeeText } from '../utils/officialVisit'
 import { monthNames } from '../constants/months'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
@@ -101,10 +101,7 @@ function OfficialVisitCard({ data, lang }) {
             <View style={r.ovRow}>
               <Ionicons name="ticket-outline" size={16} color={C.textSecondary} />
               <View style={r.ovRowBody}>
-                <Text style={r.ovText}>
-                  {v.fee.full === 0 && v.fee.student === 0 ? t('ovFree', lang)
-                    : t('ovFee', lang).replace('{full}', v.fee.full).replace('{student}', v.fee.student)}
-                </Text>
+                <Text style={r.ovText}>{officialFeeText(v.fee, k => t(k, lang))}</Text>
                 {!!y && <Text style={r.ovMeta}>{t('ovUpdated', lang).replace('{date}', `${monthNames(lang)[mo - 1]} ${y}`)}</Text>}
               </View>
             </View>

@@ -33,7 +33,7 @@ import { supabase, isGuest } from '../lib/supabase'
 import { BROWSE_COLS, placeName } from './ExploreScreen'
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
-  TRNC_CENTER,
+  officialVisitApplicable, applyOfficialVisit, TRNC_CENTER,
 } from '../constants/mapSources'
 import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
@@ -51,6 +51,7 @@ import { EateryLogo, PlaceholderTag } from '../components/EateryBits'
 import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
 import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import { CHIP_CAP, CHIP_CAP_NARROW } from '../components/home/redesign/RedesignHero'
+import { officialVisitView, officialFeeText } from '../utils/officialVisit'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_ION = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
@@ -165,7 +166,7 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, showRoutes, routesMode, onRoutes, lang }) {
+function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, lang }) {
   return (
     <ScrollView
       horizontal
@@ -195,6 +196,16 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
           color={ROUTE_COLOR}
           colorBg="#E0F2F1"
           onPress={onRoutes}
+        />
+      )}
+      {canOfficial && (
+        <Chip
+          label={t('ovFilter', lang)}
+          ionicon={GROUP_META.heritage.icon}
+          active={!routesMode && officialOnly}
+          color={GROUP_META.heritage.colorToken.text}
+          colorBg={GROUP_META.heritage.colorToken.bg}
+          onPress={onOfficial}
         />
       )}
       {/* Hidden while no facility has parseable hours — see openNowApplicable(). */}
@@ -246,7 +257,13 @@ function pinCardContent(pin, lang) {
     }
   }
   const photo = row.cover_image_url || row.photos?.[0]
+  // EEMD, as on the place page: the closed badge, or the fee for an open site (fee only — a
+  // seasonal schedule needs the page's "check the official page" context).
+  const ov = officialVisitView(row.official_visit)
   return {
+    visit: ov?.closed ? { closed: true, text: t('ovClosed', lang) }
+      : ov?.fee ? { closed: false, text: officialFeeText(ov.fee, k => t(k, lang)) }
+      : null,
     image: photo ? { uri: photo } : null,
     title: placeName(row, lang),
     // The badge speaks the Kategori filter's vocabulary — the GROUP the pin is filtered by
@@ -267,7 +284,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
 
   const tc = { bg: pin.colorBg, text: pin.color }
 
-  const { image, title, badge, sub, open, placeholder, unpublished } = pinCardContent(pin, lang)
+  const { image, title, badge, sub, open, visit, placeholder, unpublished } = pinCardContent(pin, lang)
   const isEatery = pin.kind === 'eatery'
 
   if (REDESIGN) {
@@ -289,6 +306,17 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
             <Text style={r.name} numberOfLines={2}>{title}</Text>
             {sub ? <Text style={r.sub} numberOfLines={1}>{sub}</Text> : null}
             {open ? <Text style={[r.sub, open.tone === 'ok' ? r.subOk : open.tone === 'warn' ? r.subWarn : null]} numberOfLines={2}>{open.text}</Text> : null}
+            {visit?.closed ? (
+              <View style={r.closed}>
+                <Ionicons name="lock-closed" size={12} color={colors.dangerInk} />
+                <Text style={r.closedText} numberOfLines={1}>{visit.text}</Text>
+              </View>
+            ) : visit ? (
+              <View style={r.fee}>
+                <Ionicons name="ticket-outline" size={14} color={colors.textSecondary} />
+                <Text style={r.sub} numberOfLines={1}>{visit.text}</Text>
+              </View>
+            ) : null}
           </View>
           <IconButton icon="close" onPress={onClose} accessibilityLabel={t('uiClose', lang)} color={colors.textSecondary} style={r.close} />
         </View>
@@ -317,6 +345,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
           <Text style={s.name} numberOfLines={1}>{title}</Text>
           {sub ? <Text style={s.sub} numberOfLines={1}>{sub}</Text> : null}
           {open ? <Text style={s.sub} numberOfLines={1}>{open.text}</Text> : null}
+          {visit ? <Text style={[s.sub, visit.closed && { color: colors.dangerInk }]} numberOfLines={1}>{visit.text}</Text> : null}
         </View>
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
@@ -396,6 +425,7 @@ export default function ExploreMapScreen({
   // the path that most needs the gate on it.
   const [selectedKeys, setSelectedKeys] = useState(() => new Set(snap?.selectedKeys ?? []))
   const [openNow, setOpenNow] = useState(snap?.openNow ?? false)
+  const [officialOnly, setOfficialOnly] = useState(snap?.officialOnly ?? false)
 
   const review   = EXPLORE_REVIEW && isAdmin
   const routesOn = routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: EXPLORE_REVIEW, isAdmin })
@@ -669,9 +699,12 @@ export default function ExploreMapScreen({
   // Filtering happens HERE, before the index is built — not on the rendered clusters.
   // Cluster a superset and the bubbles count content the user has filtered out, so a
   // cluster reading "12" opens onto 4 pins.
+  const canOfficial = useMemo(() => officialVisitApplicable(sources.flatMap(s => s.pins)), [sources])
   const pins = useMemo(
-    () => applyOpenNow(selectedPins(sources, selectedKeys), openNow && canOpenNow, dutyWindows),
-    [sources, selectedKeys, openNow, canOpenNow, dutyWindows]
+    () => applyOfficialVisit(
+      applyOpenNow(selectedPins(sources, selectedKeys), openNow && canOpenNow, dutyWindows),
+      officialOnly && canOfficial),
+    [sources, selectedKeys, openNow, canOpenNow, dutyWindows, officialOnly, canOfficial]
   )
 
   // Pin sources load at different times (facilities are a prop; places and eatery rows are
@@ -690,12 +723,12 @@ export default function ExploreMapScreen({
   // Every handoff off this map goes through here, so every one of them comes back to it.
   const handOff = useCallback((go, pinId = null) => {
     returnSnapshot = {
-      region, selectedKeys: [...selectedKeys], openNow, routesMode,
+      region, selectedKeys: [...selectedKeys], openNow, officialOnly, routesMode,
       routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
       walkNext: walk ? walk.next : null, follow,
     }
     go()
-  }, [region, selectedKeys, openNow, routesMode, selectedRoute, walk, follow])
+  }, [region, selectedKeys, openNow, officialOnly, routesMode, selectedRoute, walk, follow])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -835,6 +868,15 @@ export default function ExploreMapScreen({
         openNow={openNow}
         canOpenNow={canOpenNow}
         onOpenNow={() => { setSelected(null); leaveRoutes(); setOpenNow(v => !v) }}
+        officialOnly={officialOnly}
+        canOfficial={canOfficial}
+        onOfficial={() => {
+          setSelected(null); leaveRoutes()
+          // Turning it on under a Kategori pick with no EEMD site (e.g. Sağlık alone) would blank
+          // the map; widen the pick to Tümü instead.
+          if (!officialOnly && !officialVisitApplicable(selectedPins(sources, selectedKeys))) setSelectedKeys(new Set())
+          setOfficialOnly(v => !v)
+        }}
         showRoutes={showRoutesChip}
         routesMode={routesMode}
         onRoutes={() => (routesMode ? leaveRoutes() : enterRoutes())}
@@ -958,6 +1000,10 @@ const r = StyleSheet.create({
   sub:       { ...type.small, color: colors.textSecondary },
   subOk:     { color: colors.primaryDark },
   subWarn:   { color: colors.dangerInk },
+  fee:       { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  closed:    { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 2,
+               paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, backgroundColor: colors.dangerLight },
+  closedText: { ...type.caption, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk },
   close:     { marginTop: -10, marginRight: -10 },
   segment:   { backgroundColor: colors.cardBg, borderRadius: radii.pill, ...elevation.floating },
   segItem:   { borderRadius: radii.pill },
