@@ -41,8 +41,8 @@
     "zustand": "^5.0.14"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
+    "start": "node scripts/preview-lock.mjs check --if-phone && expo start",
+    "android": "node scripts/preview-lock.mjs check --if-phone && expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "hotels:search-check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hotel-search.mjs",

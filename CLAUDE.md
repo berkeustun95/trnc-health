@@ -103,6 +103,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   lock held by another session): take the lock BEFORE `screenshot-android.sh --prep` (the Metro link), `npm start` /
   `npm run android` aimed at the phone, or opening any project in Expo Go or a dev client on it — and when you
   release, leave ADA Preview in front (`am force-stop host.exp.exponent`), not your dev bundle.
+  `npm start` / `npm run android` enforce it (`preview-lock.mjs check --if-phone`) while the test phone (serial
+  R58N602DHYT) is attached over adb: run them as `ADA_PREVIEW_HOLDER=<holder> npm start`. Expo Go by QR with no adb
+  link cannot be seen by any script — the rule still applies.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
