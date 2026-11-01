@@ -106,6 +106,13 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   `npm start` / `npm run android` enforce it (`preview-lock.mjs check --if-phone`) while the test phone (serial
   R58N602DHYT) is attached over adb: run them as `ADA_PREVIEW_HOLDER=<holder> npm start`. Expo Go by QR with no adb
   link cannot be seen by any script — the rule still applies.
+- **ONE production publish at a time — the production lock** (Berke, 2026-11-01: two sessions each had a production go;
+  both preflights read production before either update landed, and the slower one replaced the other a minute later,
+  dropping the map chip). Before `npm run ota`: `node scripts/preview-lock.mjs --production take <holder> "<what for>"`,
+  publish with `ADA_PRODUCTION_HOLDER=<holder> npm run ota` (refuses unless you hold it), keep it until the IDs are read
+  back with `eas update:view`, then `--production release <holder>`. Held by someone else → wait, then re-read what
+  production runs: your HEAD must contain it (the preflight refuses otherwise). Never `--force` without Berke's word.
+  Separate file (vault `locks/production-ota.lock.json`) from the preview lock; one session may hold both.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is

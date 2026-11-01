@@ -16,6 +16,19 @@
 // Taking it is an exclusive create (open 'wx'): two sessions cannot both get it. It never expires
 // on its own: a stale lock is released by its holder, or with --force on Berke's word (log it).
 //
+// ─── --production: the same lock for `npm run ota` ──────────────────────────────────────────
+//
+//   node scripts/preview-lock.mjs --production take <holder> "<what for>"   # before npm run ota
+//   node scripts/preview-lock.mjs --production release <holder>             # after the IDs are read back
+//   node scripts/preview-lock.mjs --production check                        # in ota: needs ADA_PRODUCTION_HOLDER
+//
+// WHY (2026-11-01): two sessions each had a production go. Both preflights read production before
+// either publish landed, so both saw their HEAD contain it; the slower export (7 min) landed a
+// minute after the other and silently replaced it (46d63ffb → 4056472e dropped the map chip).
+// Held for the whole publish, the lock serialises them, and the second preflight then sees the
+// first update and refuses unless HEAD contains it (check-ota-preflight.mjs). Separate file, so a
+// Preview check on the phone never blocks a production publish or the reverse.
+
 // Hermes publishes only runtime-1.4.0 Previews (ada-publish), which this phone's 1.4.2 build never
 // loads, and has no vault: `check` there finds no lock directory and passes, saying so.
 
@@ -28,8 +41,11 @@ import { execSync } from 'node:child_process'
 const TEST_PHONE_SERIAL = 'R58N602DHYT'
 
 const DIR = process.env.ADA_LOCK_DIR || join(homedir(), 'ObsidianVault', '10-ada', 'locks')
-const FILE = join(DIR, 'preview-phone.lock.json')
-const [cmd, holderArg, ...rest] = process.argv.slice(2)
+const PROD = process.argv.includes('--production')
+const FILE = join(DIR, PROD ? 'production-ota.lock.json' : 'preview-phone.lock.json')
+const NAME = PROD ? 'production lock' : 'preview lock'
+const HOLDER_ENV = PROD ? 'ADA_PRODUCTION_HOLDER' : 'ADA_PREVIEW_HOLDER'
+const [cmd, holderArg, ...rest] = process.argv.slice(2).filter(a => a !== '--production')
 
 function read() {
   try { return JSON.parse(readFileSync(FILE, 'utf8')) } catch { return null }
@@ -47,13 +63,13 @@ function gitOr(cmdline, fallback) {
 
 if (cmd === 'status') {
   const l = read()
-  console.log(l ? `preview lock: HELD by ${describe(l)}` : 'preview lock: free')
+  console.log(l ? `${NAME}: HELD by ${describe(l)}` : NAME + ': free')
   process.exit(0)
 }
 
 if (cmd === 'take') {
-  if (!holderArg) { console.error('preview lock: take <holder> "<what for>"'); process.exit(2) }
-  if (!existsSync(DIR)) { console.error(`preview lock: ${DIR} does not exist — this is not the Mac with the vault`); process.exit(2) }
+  if (!holderArg) { console.error(NAME + ': take <holder> "<what for>"'); process.exit(2) }
+  if (!existsSync(DIR)) { console.error(`${NAME}: ${DIR} does not exist — this is not the Mac with the vault`); process.exit(2) }
   const lock = {
     holder: holderArg, purpose: rest.join(' '), since: new Date().toISOString(),
     worktree: process.cwd(), branch: gitOr('git rev-parse --abbrev-ref HEAD', null),
@@ -61,13 +77,13 @@ if (cmd === 'take') {
   try {
     const fd = openSync(FILE, 'wx')
     writeSync(fd, JSON.stringify(lock, null, 2) + '\n'); closeSync(fd)
-    console.log(`preview lock: TAKEN by ${describe(lock)}`)
+    console.log(`${NAME}: TAKEN by ${describe(lock)}`)
     process.exit(0)
   } catch (e) {
     if (e.code !== 'EEXIST') throw e
     const l = read()
-    if (l?.holder === holderArg) { console.log(`preview lock: already yours — ${describe(l)}`); process.exit(0) }
-    console.error(`preview lock: REFUSED — held by ${l ? describe(l) : '(unreadable lock file)'}`)
+    if (l?.holder === holderArg) { console.log(`${NAME}: already yours — ${describe(l)}`); process.exit(0) }
+    console.error(`${NAME}: REFUSED — held by ${l ? describe(l) : '(unreadable lock file)'}`)
     console.error(`  Wait for it, or ask the holder to release. File: ${FILE}`)
     process.exit(1)
   }
@@ -76,13 +92,13 @@ if (cmd === 'take') {
 if (cmd === 'release') {
   const force = rest.includes('--force')
   const l = read()
-  if (!l) { console.log('preview lock: already free'); process.exit(0) }
+  if (!l) { console.log(NAME + ': already free'); process.exit(0) }
   if (l.holder !== holderArg && !force) {
-    console.error(`preview lock: REFUSED — held by ${describe(l)}, not ${holderArg}. Only Berke's word justifies --force.`)
+    console.error(`${NAME}: REFUSED — held by ${describe(l)}, not ${holderArg}. Only Berke's word justifies --force.`)
     process.exit(1)
   }
   unlinkSync(FILE)
-  console.log(`preview lock: RELEASED (was ${describe(l)})${force && l.holder !== holderArg ? ' — FORCED, log it in the vault' : ''}`)
+  console.log(`${NAME}: RELEASED (was ${describe(l)})${force && l.holder !== holderArg ? ' — FORCED, log it in the vault' : ''}`)
   process.exit(0)
 }
 
@@ -97,24 +113,26 @@ function testPhoneAttached() {
 
 if (cmd === 'check') {
   if (holderArg === '--if-phone' && !testPhoneAttached()) {
-    console.log('preview lock: test phone not attached over adb — not needed for this dev server')
+    console.log(NAME + ': test phone not attached over adb — not needed for this dev server')
     process.exit(0)
   }
-  if (!existsSync(DIR)) { console.log(`preview lock: no lock directory on this machine (${DIR}) — not the test-phone Mac, skipped`); process.exit(0) }
-  const me = process.env.ADA_PREVIEW_HOLDER
+  if (!existsSync(DIR)) { console.log(`${NAME}: no lock directory on this machine (${DIR}) — not the test-phone Mac, skipped`); process.exit(0) }
+  const me = process.env[HOLDER_ENV]
   const l = read()
   if (!l) {
-    console.error('preview lock: REFUSED — nobody holds the lock. Take it first:')
-    console.error('  node scripts/preview-lock.mjs take <holder> "<what for>"  then  ADA_PREVIEW_HOLDER=<holder> npm run ota:preview  (or npm start / npm run android)')
+    console.error(NAME + ': REFUSED — nobody holds the lock. Take it first:')
+    console.error(PROD
+      ? '  node scripts/preview-lock.mjs --production take <holder> "<what for>"  then  ADA_PRODUCTION_HOLDER=<holder> npm run ota'
+      : '  node scripts/preview-lock.mjs take <holder> "<what for>"  then  ADA_PREVIEW_HOLDER=<holder> npm run ota:preview  (or npm start / npm run android)')
     process.exit(1)
   }
   if (!me || l.holder !== me) {
-    console.error(`preview lock: REFUSED — held by ${describe(l)}${me ? `, not ${me}` : ' (set ADA_PREVIEW_HOLDER to your holder name)'}`)
+    console.error(`${NAME}: REFUSED — held by ${describe(l)}${me ? `, not ${me}` : ` (set ${HOLDER_ENV} to your holder name)`}`)
     process.exit(1)
   }
-  console.log(`preview lock: yours (${describe(l)})`)
+  console.log(`${NAME}: yours (${describe(l)})`)
   process.exit(0)
 }
 
-console.error('preview lock: take <holder> "<what for>" | release <holder> [--force] | status | check')
+console.error(NAME + ': take <holder> "<what for>" | release <holder> [--force] | status | check')
 process.exit(2)
