@@ -75,7 +75,7 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
         </View>
       )}
       {loading ? (
-        <View style={r.list}><RowSkeleton count={5} /></View>
+        <View style={r.list}><View style={[r.skeleton, elevation.card]}><RowSkeleton count={5} /></View></View>
       ) : notifications.length === 0 ? (
         <EmptyState icon="notifications-outline" category="city" title={t('noNewNotifications', lang)} />
       ) : (
@@ -215,6 +215,7 @@ const s = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
+  skeleton:    { backgroundColor: C.card, borderRadius: radii.md, paddingHorizontal: 14, paddingVertical: 4 },
   safe:        { flex: 1 },
   actions:     { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 8 },
   pushOff:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8,

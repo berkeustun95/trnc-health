@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageCanvas from '../components/ui/PageCanvas'
+import SplashStatusBar from '../components/SplashStatusBar'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -57,6 +58,7 @@ export default function AgeIneligibleScreen({ lang, onDone }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <SplashStatusBar style="dark" />
       <View style={s.wrap}>
         <View style={s.icon}>
           <Ionicons name="information-circle-outline" size={30} color={colors.textSecondary} />

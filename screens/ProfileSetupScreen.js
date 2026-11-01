@@ -1364,7 +1364,7 @@ const redesignS = StyleSheet.create({
   helpBtnText:   { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.tintLifestyleFg },
   langBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 12,
                    backgroundColor: colors.card, borderColor: colors.fieldBorder, borderWidth: 1, borderRadius: radii.pill },
-  langBtnText:   { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, letterSpacing: 0.4 },
+  langBtnText:   { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4 },
   stepLabel:     { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondaryOnPage, marginBottom: 4 },
   title:         { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 18 },
   introScene:    { height: 132, borderRadius: radii.widget, overflow: 'hidden', marginBottom: 18, backgroundColor: '#084B4A' },
@@ -1401,7 +1401,7 @@ const redesignS = StyleSheet.create({
                    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   termsText:     { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
   optInText:     { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  optInHint:     { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginTop: 4 },
+  optInHint:     { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4 },
   legalFooter:   { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginTop: 16 },
   legalFooterLink:{ color: colors.primaryDark, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
   footer:        { flexShrink: 0, flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
@@ -1419,6 +1419,7 @@ const redesignS = StyleSheet.create({
   helpRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52,
                    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   helpRowText:   { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
-  helpNote:      { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, marginTop: 14 },
+  helpNote:      { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 14 },
+  legalFallback: { fontSize: 12, lineHeight: 17, color: colors.textSecondaryOnPage, marginTop: 4 },
 })
 const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

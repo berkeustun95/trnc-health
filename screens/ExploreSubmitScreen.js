@@ -15,6 +15,7 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { SUBMITTABLE_CATEGORIES, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import MapPinPicker from '../components/MapPinPicker'
 import { ScreenHeader, PageCanvas } from '../components/ui'
+import SplashStatusBar from '../components/SplashStatusBar'
 import { resolveRegion } from '../utils/resolveRegion'
 
 function decode(base64) {
@@ -210,6 +211,7 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, i
     return (
       <PageCanvas>
       <SafeAreaView style={[s.safe, s.safeCenter]} edges={['top', 'bottom']}>
+        <SplashStatusBar style="dark" />
         <SuccessState lang={lang} onBack={onBack} note={initialFix ? t('checkinAddedNote', lang) : null} />
       </SafeAreaView>
       </PageCanvas>

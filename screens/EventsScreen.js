@@ -970,7 +970,7 @@ const rd = StyleSheet.create({
   skeletons:     { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
   banner:        { marginBottom: 0 },
   detailSafe:    { flex: 1 },
-  posterFallback:{ height: 200, backgroundColor: CAT.explore.bg, justifyContent: 'center', alignItems: 'center' },
+  posterFallback:{ height: 200, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
   sheet:         { backgroundColor: C.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet,
                    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, minHeight: 300 },
   tag:           { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radii.pill,

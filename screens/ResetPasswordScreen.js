@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import PageCanvas from '../components/ui/PageCanvas'
+import SplashStatusBar from '../components/SplashStatusBar'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -38,6 +39,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
   return (
     <PageCanvas>
     <SafeAreaView style={s.safe}>
+      <SplashStatusBar style="dark" />
       <KeyboardAwareForm>
       <View style={s.container}>
         {!done && (

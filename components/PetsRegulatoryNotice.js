@@ -49,11 +49,12 @@ const s = StyleSheet.create({
   // themselves were in doubt, which is the opposite of what this says.
   //
   // backgroundColor explicit: borderWidth + borderRadius on Android can render an opaque
-  // background without it, and this is intended to be unfilled.
+  // background without it. White since Base C (2026-11-02): an unfilled border vanishes on the
+// page ground (colors.border is 1.12:1 on pageTop).
   wrap:  { flexDirection: 'row', gap: 10, padding: 12, marginBottom: 14,
            borderRadius: radius.card, borderWidth: 1, borderColor: colors.border,
-           backgroundColor: 'transparent' },
+           backgroundColor: colors.card },
   body:  { flex: 1 },
   title: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 3 },
-  text:  { fontSize: 12.5, lineHeight: 18, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  text:  { fontSize: 12.5, lineHeight: 18, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 })

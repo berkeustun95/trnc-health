@@ -25,7 +25,7 @@ export default function ScreenHeader({ title, subtitle, onBack, lang, actions = 
             variant={onPhoto ? 'frosted' : 'plain'} color={light && !onPhoto ? '#FFFFFF' : undefined} />
         : <View style={s.spacer} />}
       <View style={s.titles}>
-        {!!title && <Text style={[s.title, light && s.light]} numberOfLines={1} accessibilityRole="header">{title}</Text>}
+        {!!title && <Text style={[s.title, light && s.light]} numberOfLines={2} accessibilityRole="header">{title}</Text>}
         {!!subtitle && <Text style={[s.subtitle, light && s.light]} numberOfLines={1}>{subtitle}</Text>}
       </View>
       {actions.slice(0, 2).map(a => onPhoto
