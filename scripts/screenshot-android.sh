@@ -10,8 +10,9 @@
 # Mac only: the Hermes server has no device and ADA has no react-native-web. .screenshots/ is gitignored;
 # never commit screenshots under docs/ (GitHub Pages is public).
 set -euo pipefail
-# The phone is shared: only the preview-lock holder may drive it (CLAUDE.md, 2026-11-01).
-node "$(dirname "$0")/preview-lock.mjs" check >&2 || { echo "screenshot-android: take the preview lock first (scripts/preview-lock.mjs)" >&2; exit 1; }
+# The phone is shared: only the preview-lock holder may drive it (CLAUDE.md, 2026-11-01). That includes a dev
+# bundle: --prep links Metro to the phone for Expo Go, so it is gated like every other command here.
+node "$(dirname "$0")/preview-lock.mjs" check >&2 || { echo "screenshot-android: take the preview lock first (scripts/preview-lock.mjs) — Expo Go and dev bundles on the test phone need it too" >&2; exit 1; }
 
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 ADB="$SDK/platform-tools/adb"
