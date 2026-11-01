@@ -41,7 +41,9 @@ import { partnerAsset } from '../constants/partnerAssets'
 import { colors, shadow, ellipsizeSlack, type, radii, elevation, placeColors } from '../constants/theme'
 import { Button, IconButton, CategoryIcon, RemoteImage, useTabBarFootprint } from '../components/ui'
 import { t } from '../constants/i18n'
-import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE } from '../constants/flags'
+import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE, DOVEC_PARTNER_LIVE } from '../constants/flags'
+import { loadDovecProjects } from '../utils/loadDovecProjects'
+import { DOVEC_STATUS } from '../constants/dovec'
 import { useRouteMedal } from '../utils/routeMedals'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
@@ -101,6 +103,22 @@ function regionToBBox(region) {
     region.longitude + region.longitudeDelta / 2,
     region.latitude  + region.latitudeDelta  / 2,
   ]
+}
+
+// A Döveç project pin: a teal badge, not a tinted default marker (placeColors.dovec explains why
+// no hue is free). Same snapshot rule as ClusterMarker below: track briefly, then stop.
+function DovecMarker({ pin, onPress }) {
+  const [tracks, setTracks] = useState(true)
+  useEffect(() => {
+    const id = setTimeout(() => setTracks(false), 300)
+    return () => clearTimeout(id)
+  }, [])
+  return (
+    <Marker coordinate={{ latitude: pin.lat, longitude: pin.lng }} tracksViewChanges={tracks}
+      onPress={onPress} anchor={{ x: 0.5, y: 0.5 }} accessibilityLabel={pin.row.name}>
+      <View style={cl.dovec}><Ionicons name="business" size={16} color="#fff" /></View>
+    </Marker>
+  )
 }
 
 // Android renders a custom-child Marker from a snapshot taken on first layout. With
@@ -231,6 +249,18 @@ function pinCardContent(pin, lang) {
     badge: t('petHotelDogBoarding', lang),
     sub:   REGION_LABEL_KEY[row.district] ? t(REGION_LABEL_KEY[row.district], lang) : null,
   }
+  if (pin.kind === 'dovec') {
+    // Partner data (property_projects), rendered as synced: their name, their cover, their status.
+    const status = DOVEC_STATUS[row.project_status]
+    return {
+      image: row.coverSource || null,
+      title: row.name,
+      badge: t('dovecMapChip', lang),
+      sub:   [status ? t(status.labelKey, lang) : null,
+              row.construction_progress != null && row.project_status !== 'delivered' ? `${row.construction_progress}%` : null,
+              REGION_LABEL_KEY[row.district] ? t(REGION_LABEL_KEY[row.district], lang) : null].filter(Boolean).join(' · '),
+    }
+  }
   if (pin.kind === 'eatery') {
     // Partner data (eatery_partners), never a Google place name. The logo is drawn by EateryLogo.
     const open = eateryOpenStatus(row, lang)
@@ -273,6 +303,7 @@ function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
   if (REDESIGN) {
     const icon = isHealth ? (TYPE_ION[row.type] || 'medical-outline')
       : pin.kind === 'place' ? (GROUP_META[categoryToGroup(row.category)]?.icon || 'location-outline')
+      : pin.kind === 'dovec' ? 'business-outline'
       : 'paw-outline'
     return (
       <View style={[r.card, bottom != null && { bottom }]}>
@@ -350,6 +381,9 @@ export default function ExploreMapScreen({
   onSelectPetHotel,
   // Opens EateryPartnerScreen (App.js). An eatery pin exists only while EATERY is true; App.js re-checks it.
   onSelectEatery,
+  // Opens DovecPartnerScreen on that project (App.js). A Döveç pin exists only while
+  // DOVEC_PARTNER_LIVE is true (constants/mapSources.js); App.js re-checks it.
+  onSelectDovec,
   // ─── THE DIRECTORY'S SECOND ENTRANCE ──────────────────────────────────────
   // Until 2026-09-11 the browsable places directory had exactly ONE non-admin entrance:
   // the `explore` tile on Home. This tab showed the same content as a map and offered no
@@ -389,6 +423,7 @@ export default function ExploreMapScreen({
 
   const [places, setPlaces]   = useState([])
   const [eateryRows, setEateryRows] = useState([])
+  const [dovecRows, setDovecRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
   // Empty set = "All". See selectedPins(): All is the UNION OF VISIBLE SOURCES, never a
@@ -504,6 +539,16 @@ export default function ExploreMapScreen({
     let active = true
     loadEateryPartners('id, slug, name, category, region, lat, lng, logo_path, opening_hours')
       .then(({ rows }) => { if (active) setEateryRows(rows) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  // Döveç project pins: projects only (no units). A failed read draws no Döveç pin, nothing else changes.
+  useEffect(() => {
+    if (!DOVEC_PARTNER_LIVE) return
+    let active = true
+    loadDovecProjects()
+      .then(({ projects }) => { if (active) setDovecRows(projects) })
       .catch(() => {})
     return () => { active = false }
   }, [])
@@ -658,8 +703,9 @@ export default function ExploreMapScreen({
 
   const sources = useMemo(
     () => buildMapSources({ facilities, places, dutyFacilityId, isAdmin,
-      eateryLive: EATERY, eateryPartners: eateryRows, eateryGates: EATERY_GATES }),
-    [facilities, places, dutyFacilityId, isAdmin, eateryRows]
+      eateryLive: EATERY, eateryPartners: eateryRows, eateryGates: EATERY_GATES,
+      dovecLive: DOVEC_PARTNER_LIVE, dovecProjects: dovecRows }),
+    [facilities, places, dutyFacilityId, isAdmin, eateryRows, dovecRows]
   )
 
   // Applicability is computed over ALL pins, not the current selection, so the Open-now
@@ -814,6 +860,9 @@ export default function ExploreMapScreen({
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
           }
           const pin = c.properties.pin
+          if (pin.marker === 'badge') {
+            return <DovecMarker key={pin.id} pin={pin} onPress={e => { e.stopPropagation(); setSelected(pin) }} />
+          }
           return (
             <Marker
               key={pin.id}
@@ -910,6 +959,7 @@ export default function ExploreMapScreen({
             if (pin.kind === 'place') { handOff(() => onSelectPlace?.(pin.row), pin.id); return }
             if (pin.kind === 'pethotel') { handOff(() => onSelectPetHotel?.(pin.row), pin.id); return }
             if (pin.kind === 'eatery') { handOff(() => onSelectEatery?.(pin.row), pin.id); return }
+            if (pin.kind === 'dovec') { handOff(() => onSelectDovec?.(pin.row), pin.id); return }
             // Health keeps the claimed / unclaimed split the tab has always had: an
             // unclaimed facility has no provider and opens the unclaimed sheet instead.
             if (pin.row.provider_id) handOff(() => onSelectFacility?.(pin.row), pin.id)
@@ -968,6 +1018,9 @@ const r = StyleSheet.create({
 const cl = StyleSheet.create({
   bubble: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderWidth: 2.5, borderColor: '#fff', ...shadow },
   count:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  // A rounded SQUARE, so it never reads as a teal cluster bubble (which is round and carries a count).
+  dovec:  { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: colors.primary, borderWidth: 2.5, borderColor: '#fff', ...shadow },
 })
 
 const s = StyleSheet.create({

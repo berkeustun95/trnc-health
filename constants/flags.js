@@ -725,3 +725,16 @@ export const EATERY_LIVE = true
 // Crunchy Express — the first eatery partner inside Yeme-İçme (PET_HOTEL_LIVE precedent).
 // Requires EATERY_LIVE: a live partner in a dark section is a guard failure (eatery:check).
 export const CRUNCHY_EXPRESS_LIVE = true
+
+// Döveç Construction partner (Döveç Group): partner page, Explore map pins for its projects, the Home
+// slot, and the tracked Call / WhatsApp buttons. One switch for all four (PET_HOTEL_LIVE precedent: a
+// partner, not a module, so no waitlist and no MODULE_FLAGS key). The data side is dark on its own too:
+// the Döveç estate_agencies row is 'pending' and sync-dovec writes pending rows until go-live.
+// Preview locally by flipping this UNCOMMITTED, with EXPO_PUBLIC_DOVEC_MOCK=1 for the fixture data.
+// Do not flip until, in order (supabase/functions/sync-dovec/PLUG-IN.md):
+//   1. 20261153 + 20261154 applied, verify_schema green.
+//   2. The real API connected, sync-dovec + dovec-images run clean, rows verified while pending.
+//   3. Go-live UPDATE (agency + rows -> active) in the same release step as this flip.
+//   4. Turkish device pass with this flipped LOCALLY.
+//   5. Both files in ONE commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs).
+export const DOVEC_PARTNER_LIVE = false

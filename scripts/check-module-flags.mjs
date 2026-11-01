@@ -293,6 +293,9 @@ const EXPECTED_SCALARS = {
   EATERY_LIVE:           true,
   // Crunchy Express partner. Needs EATERY_LIVE; scripts/check-eatery-partners.mjs enforces that.
   CRUNCHY_EXPRESS_LIVE:  true,
+  // Döveç partner (page, map pins, Home slot, tracked contact). A flip shows a partner to every user;
+  // the go-live UPDATE that publishes its rows must ride the same release (PLUG-IN.md).
+  DOVEC_PARTNER_LIVE:    false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

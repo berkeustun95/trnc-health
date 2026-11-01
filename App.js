@@ -32,7 +32,7 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE, DOVEC_PARTNER_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
 import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
@@ -81,6 +81,7 @@ import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
 import TowingScreen from './screens/TowingScreen'
 import EhliyetScreen from './screens/EhliyetScreen'
+import DovecPartnerScreen from './screens/DovecPartnerScreen'
 import EateryScreen from './screens/EateryScreen'
 import EsimScreen from './screens/EsimScreen'
 import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
@@ -674,6 +675,11 @@ export default function App() {
   const [eateryFromMap, setEateryFromMap] = useState(false)
   useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false) } }, [showEatery])
   const closeEateryPartner = () => { if (eateryFromMap) setShowEatery(false); setEateryPartner(null) }
+  // Döveç partner page (DOVEC_PARTNER_LIVE). dovecOpenProject: the project a map pin asked for; the
+  // screen opens on it and back then closes the whole screen (one press back to the map).
+  const [showDovec, setShowDovec] = useState(false)
+  const [dovecOpenProject, setDovecOpenProject] = useState(null)
+  useEffect(() => { if (!showDovec) setDovecOpenProject(null) }, [showDovec])
   const [showStudentHub, setShowStudentHub] = useState(false)
   // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
   // by the screen rather than here, so a tap that arrives before the hub mounts is not lost.
@@ -755,6 +761,7 @@ export default function App() {
   const transportBackRef = useRef(null)
   const duyurularBackRef = useRef(null)
   const eateryPartnerBackRef = useRef(null)
+  const dovecBackRef = useRef(null)
   const eateryListBackRef = useRef(null)     // the "Ne yesem?" quiz page (a layer above the Yeme-İçme list)
   const insuranceBackRef = useRef(null)
   const groomingBackRef = useRef(null)
@@ -1120,6 +1127,8 @@ export default function App() {
       // Towing before Garages: Garages opens it on top of itself (slice 10).
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showEhliyet) { setShowEhliyet(false); return true }
+      // Project page -> list inside the screen (dovecBackRef); a pin-opened project closes the screen.
+      if (showDovec) { if (dovecBackRef.current?.()) return true; setShowDovec(false); return true }
       // Partner page before the list: back steps partner -> list -> Home.
       if (eateryPartner) { if (eateryPartnerBackRef.current?.()) return true; if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
       if (showEatery) { if (eateryListBackRef.current?.()) return true; setShowEatery(false); return true }
@@ -1159,7 +1168,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showDovec, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2524,6 +2533,9 @@ export default function App() {
   } else if (showEhliyet && EHLIYET) {
     // Dark module: no ComingSoon fallback (no waitlist). EHLIYET is true only when the flag is live or on dev / ADA Preview.
     content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} />
+  } else if (showDovec && DOVEC_PARTNER_LIVE) {
+    // Partner, not a module: no ComingSoon fallback, nothing at all while the flag is off.
+    content = <DovecPartnerScreen lang={lang} onBack={() => setShowDovec(false)} backRef={dovecBackRef} openProjectId={dovecOpenProject} />
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} session={session} dateOfBirth={profile?.date_of_birth ?? null} onRequireAccount={requireAccount} partner={eateryPartner} onOpenPartner={setEateryPartner}
@@ -2633,6 +2645,7 @@ export default function App() {
             onShowExplore={() => setShowExplore(true)}
             onShowTransport={() => setShowTransport(true)}
             onShowDuyurular={() => setShowDuyurular(true)}
+            onShowDovec={() => setShowDovec(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
             onShowGarages={() => setShowGarages(true)}
@@ -2724,6 +2737,8 @@ export default function App() {
                 onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
                 // EATERY re-checked at the render site; eateryFromMap makes back return here in one press.
                 onSelectEatery={row => { setShowEatery(true); setEateryOpenSlug(row.slug); setEateryFromMap(true) }}
+                // DOVEC_PARTNER_LIVE re-checked at the render site; the screen opens on this project.
+                onSelectDovec={row => { setDovecOpenProject(row.id); setShowDovec(true) }}
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}

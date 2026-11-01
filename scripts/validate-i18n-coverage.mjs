@@ -264,6 +264,10 @@ const SURFACES = [
   'screens/EventsScreen.js',
   // Ehliyet (driving schools), added with the screen so a blank action label fails here.
   'screens/EhliyetScreen.js',
+  // Döveç partner (2026-11-01): the page, its Home slot, and the map pin card's status line.
+  'screens/DovecPartnerScreen.js',
+  'components/home/redesign/DovecHomeSlot.js',
+  'constants/dovec.js',
   // ─── Redesign (feat/redesign). Added with the redesigned Home so the guard sees its keys;
   // before this the 24 new keys were checked only by hand. homeGroups carries labelKey /
   // titleKey maps; the ui components carry the shared uiRetry / uiClose / uiLoadFailed.
@@ -357,6 +361,8 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // Döveç: French uses the same word for the construction-progress label.
+  'dovecProgress': { French: '"Construction" is the French word too' },
   // Ehliyet action labels: product names, shown untranslated in every locale.
   'ehliyetInstagram': { Turkish: 'Instagram is a brand name', Arabic: 'Instagram is a brand name', Russian: 'Instagram is a brand name', Greek: 'Instagram is a brand name', French: 'Instagram is a brand name', Spanish: 'Instagram is a brand name', German: 'Instagram is a brand name', Persian: 'Instagram is a brand name' },
   'ehliyetWhatsApp': { Turkish: 'WhatsApp is a brand name', Arabic: 'WhatsApp is a brand name', Russian: 'WhatsApp is a brand name', Greek: 'WhatsApp is a brand name', French: 'WhatsApp is a brand name', Spanish: 'WhatsApp is a brand name', German: 'WhatsApp is a brand name', Persian: 'WhatsApp is a brand name' },
