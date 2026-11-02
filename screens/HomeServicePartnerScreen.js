@@ -117,7 +117,7 @@ export default function HomeServicePartnerScreen({
   }
 
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView style={st.safe} edges={['top']}>
       {REDESIGN ? (
         <UiHeader onBack={onBack} title={row.name} lang={lang} />
@@ -249,7 +249,7 @@ export default function HomeServicePartnerScreen({
               <Text style={s.rowLabel}>{t('hsCall', lang)}</Text>
               <View style={s.rowRight}>
                 <Text style={[s.rowValue, s.rowValueLink]}>{row.phone}</Text>
-                <Ionicons name="call-outline" size={15} color={colors.primaryDark} />
+                <Ionicons name="call-outline" size={15} color={colors.primary} />
               </View>
             </TouchableOpacity>
           )}
@@ -258,7 +258,7 @@ export default function HomeServicePartnerScreen({
               <Text style={s.rowLabel}>{t('hsWhatsApp', lang)}</Text>
               <View style={s.rowRight}>
                 <Text style={[s.rowValue, s.rowValueLink]}>{row.whatsapp}</Text>
-                <Ionicons name="logo-whatsapp" size={15} color={colors.primaryDark} />
+                <Ionicons name="logo-whatsapp" size={15} color={colors.primary} />
               </View>
             </TouchableOpacity>
           )}
@@ -317,7 +317,7 @@ const s = StyleSheet.create({
   heroLogo:     { marginBottom: 10 },
   heroName:     { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   coverageRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  coverageText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
+  coverageText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   block:        { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
   blockTitle:   { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
@@ -344,10 +344,10 @@ const s = StyleSheet.create({
   projectTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
                   marginBottom: 10 },
   pairWrap:     { marginBottom: 14 },
-  pairLabel:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
+  pairLabel:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                   marginBottom: 6 },
   pairRow:      { flexDirection: 'row', gap: 8 },
-  extraTitle:   { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage,
+  extraTitle:   { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                   marginTop: 2, marginBottom: 8 },
   // paddingRight equals the gap so the last frame has the same breathing room as the
   // space between frames; without it the strip ends flush against the screen edge and
@@ -364,9 +364,9 @@ const s = StyleSheet.create({
 
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                   paddingVertical: 6, gap: 12 },
-  rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
+  rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   rowValue:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  rowValueLink: { color: colors.primaryDark },
+  rowValueLink: { color: colors.primary },
   rowRight:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
 
   contactBar:   { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row',

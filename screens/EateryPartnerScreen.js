@@ -314,8 +314,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
   const tabsH = useRef(0)
-  // Base C: the tabs are transparent over the page ground until they pin, then take pageTop (the ground at the top of
-  // the screen) so they read as one block with the header; a solid band mid-page would be a second ground.
+  // Base C: the tabs are transparent until they pin, then take pageBase (the partner page's flat ground) so the menu
+  // scrolling under them is covered.
   const tabsY = useRef(null)
   const stuckRef = useRef(false)
   const [tabsStuck, setTabsStuck] = useState(false)
@@ -485,7 +485,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   }, [startInBasket, ordering, lines.length])
 
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={showBanner ? [] : ['top']}>
       <View style={s.under} {...(basketOpen || quizOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       {showBanner
@@ -640,18 +640,18 @@ const s = StyleSheet.create({
   hourDay:   { ...type.body, color: colors.textSecondary, flexShrink: 1 },
   hourVal:   { ...type.body, color: colors.textPrimary, flexShrink: 0 },
   actions:   { gap: space[8] },
-  previewHint: { ...type.small, color: colors.textSecondaryOnPage, textAlign: 'center' },
+  previewHint: { ...type.small, color: colors.textSecondary, textAlign: 'center' },
   menuSec:   { marginTop: space[12] },
   menuSecNext: { marginTop: space[20] },
   secTitle:  { ...type.sectionHeading, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.sm, paddingVertical: space[8], paddingHorizontal: space[12], marginBottom: space[4] },
   secCount:  { fontFamily: font.regular, color: colors.textSecondary },
   tabsWrap:  { marginHorizontal: -16, backgroundColor: 'transparent', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  tabsStuck: { backgroundColor: colors.pageTop },
+  tabsStuck: { backgroundColor: colors.pageBase },
   tabsContent: { paddingHorizontal: 16 },
   tab:       { minHeight: 44, paddingHorizontal: space[12], justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  tabOn:     { borderBottomColor: colors.primaryDark },
-  tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondaryOnPage },
-  tabTextOn: { color: colors.primaryDark },
+  tabOn:     { borderBottomColor: colors.primary },
+  tabText:   { ...type.body, fontFamily: font.semibold, color: colors.textSecondary },
+  tabTextOn: { color: colors.primary },
   itemRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[12], paddingVertical: space[8] },
   itemText:  { flex: 1, minWidth: 0 },
   itemName:  { ...type.rowTitle, color: colors.textPrimary },

@@ -445,7 +445,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
   if (apartment.minNights > 1) chips.push(['calendar-outline', fill(t('nhMinStay', lang), apartment.minNights)])
 
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView ref={rootRef} collapsable={false} style={s.safe} edges={['top']}>
       {REDESIGN ? (
         <ScreenHeader title={partner.name} onBack={onBack} lang={lang} />
@@ -581,7 +581,7 @@ const s = StyleSheet.create({
   buildingName:{ ...type.rowTitle, color: colors.textPrimary },
   mapBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TAP, alignSelf: 'flex-start' },
   mapBtnText:  { ...type.body, fontFamily: 'Inter_700Bold', color: colors.primary },
-  directNote:  { ...type.meta, color: colors.textSecondaryOnPage, textAlign: 'center', marginTop: 2, marginBottom: 8 },
+  directNote:  { ...type.meta, color: colors.textSecondary, textAlign: 'center', marginTop: 2, marginBottom: 8 },
 
   contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12,
                  backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },

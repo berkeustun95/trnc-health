@@ -8,12 +8,15 @@ import { colors, pageCanvas } from '../../constants/theme'
 //
 // A PNG, not expo-linear-gradient (a native module), so this ships by OTA. Baked from the
 // tokens by scripts/generate-page-canvas.mjs.
+//
+// `flat`: pageBase only, no gradient. Partner pages (Berke, 2026-11-02): the partner's own
+// grey text sits straight on the ground there and read washed out on the teal.
 const BASE = require('../../assets/page-canvas/base.png')
 
-export default function PageCanvas({ style, children }) {
+export default function PageCanvas({ flat = false, style, children }) {
   return (
     <View style={[s.root, style]}>
-      <Image source={BASE} resizeMode="stretch" style={s.base} />
+      {!flat && <Image source={BASE} resizeMode="stretch" style={s.base} />}
       {children}
     </View>
   )

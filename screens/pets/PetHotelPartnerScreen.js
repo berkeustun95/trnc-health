@@ -73,7 +73,7 @@ function ContactRow({ icon, label, value, onPress }) {
       <Text style={s.rowLabel}>{label}</Text>
       <View style={s.rowRight}>
         {!!value && <Text style={[s.rowValue, s.rowValueLink]} numberOfLines={1}>{value}</Text>}
-        <Ionicons name={icon} size={15} color={colors.primaryDark} />
+        <Ionicons name={icon} size={15} color={colors.primary} />
       </View>
     </TouchableOpacity>
   )
@@ -158,7 +158,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   }
 
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* S5 (partner rule, small changes only): the ADA header on the redesign. The partner's
           logo, photos, colours, links, section order and labels are untouched. */}
@@ -372,7 +372,7 @@ const legacyS = StyleSheet.create({
                   paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   typePillText: { fontSize: 11.5, fontFamily: 'Inter_700Bold', color: colors.primary },
   metaItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
+  metaText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   stripWrap:    { marginTop: 14, marginHorizontal: -16 },
   // paddingHorizontal equals the content padding so the first frame lines up with the text
@@ -383,7 +383,7 @@ const legacyS = StyleSheet.create({
 
   block:        { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
   blockTitle:   { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
-                  color: colors.textSecondaryOnPage, fontFamily: 'Inter_700Bold', marginBottom: 10 },
+                  color: colors.textSecondary, fontFamily: 'Inter_700Bold', marginBottom: 10 },
 
   about:        { fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
 
@@ -395,7 +395,7 @@ const legacyS = StyleSheet.create({
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   serviceBody:  { flex: 1 },
   serviceTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 3 },
-  serviceText:  { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
+  serviceText:  { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   mapsBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                   borderWidth: 1.5, borderColor: colors.primaryDark, borderRadius: radius.sm,
@@ -404,12 +404,12 @@ const legacyS = StyleSheet.create({
 
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                   paddingVertical: 7, gap: 12 },
-  rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, flexShrink: 0 },
+  rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flexShrink: 0 },
   // textAlign right: a practical value that wraps (ru/el/es/fr/ar/fa at 320dp, measured
   // 2026-09-24) must hug the right edge like the single-line values above and below it,
   // not start mid-row. Contact-row values are single-line, so they are unchanged.
   rowValue:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
-  rowValueLink: { color: colors.primaryDark },
+  rowValueLink: { color: colors.primary },
   rowRight:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
 
   contactBar:   { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row',
@@ -425,7 +425,7 @@ const legacyS = StyleSheet.create({
 
 // S5 redesign overrides — shape and spacing only (partner rule): the ADA page ground, 44–48pt
 // buttons on the redesign radius. Every colour, label, link and position is unchanged (except
-// ADA's own label/link tokens on the page ground: on-page variants, Base C 2026-11-01); the
+// the maps button in primaryDark, approved by Berke 2026-11-02); the
 // WhatsApp is WhatsApp's dark green #075E54 (7.67:1; was #25D366, 1.98:1) — approved 2026-10-01.
 const redesignS = StyleSheet.create({
   safe:     { flex: 1 },

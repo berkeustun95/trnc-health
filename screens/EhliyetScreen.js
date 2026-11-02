@@ -167,7 +167,7 @@ export default function EhliyetScreen({ lang, onBack }) {
   }
 
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScreenHeader lang={lang} title={t('menuEhliyet', lang)} onBack={onBack} />
       {loading ? (

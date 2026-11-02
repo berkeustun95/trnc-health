@@ -244,7 +244,7 @@ export default function ConnectivityLandingScreen({ lang, onBack, onOperatorLoad
   }
 
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScreenHeader title={t('connTitle', lang)} onBack={onBack} lang={lang} />
 
