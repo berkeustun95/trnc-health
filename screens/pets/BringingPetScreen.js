@@ -5,7 +5,7 @@ import { useScrollMemory } from '../../utils/scrollMemory'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import BackButton from '../../components/BackButton'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import PetsRegulatoryNotice from '../../components/PetsRegulatoryNotice'
 import PetsStaleNotice from '../../components/PetsStaleNotice'
 import VetDeptActions from '../../components/VetDeptActions'
@@ -135,12 +135,9 @@ export default function BringingPetScreen({ lang, onBack, onNavigate }) {
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.headerTitle}>{t('petsBringTitle', lang)}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title={t('petsBringTitle', lang)} onBack={onBack} lang={lang} />
 
       <ScrollView {...scrollMem} style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -265,6 +262,7 @@ export default function BringingPetScreen({ lang, onBack, onNavigate }) {
         <PetsDisclaimer lang={lang} />
       </ScrollView>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -276,9 +274,7 @@ const s = StyleSheet.create({
   timelineBody:  { flex: 1 },
   timelineTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
   timelineSub:   { fontSize: 13, color: colors.textSecondary, fontFamily: 'Inter_400Regular' },
-  safe:                 { flex: 1, backgroundColor: colors.bg },
-  header:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
+  safe:                 { flex: 1 },
   scroll:               { flex: 1 },
   scrollContent:        { padding: 16, paddingBottom: 48 },
 
@@ -296,7 +292,7 @@ const s = StyleSheet.create({
   countryNote:          { flexDirection: 'row', gap: 8, backgroundColor: colors.primaryLight, borderRadius: radius.sm, padding: 12, marginBottom: 12 },
   countryNoteText:      { fontSize: 13, color: colors.primary, fontFamily: 'Inter_400Regular', lineHeight: 18, flex: 1 },
 
-  sectionHeader:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginBottom: 10, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionHeader:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, marginBottom: 10, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
 
   stepCard:             { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 14, flexDirection: 'row', gap: 12, marginBottom: 8, ...shadow },
   stepNumWrap:          { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', flexShrink: 0, marginTop: 1 },
@@ -328,5 +324,5 @@ const s = StyleSheet.create({
   contactBtnText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   disclaimer:           { flexDirection: 'row', gap: 8, marginTop: 24, paddingHorizontal: 4 },
-  disclaimerText:       { fontSize: 12, color: colors.textSecondary, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  disclaimerText:       { fontSize: 12, color: colors.textSecondaryOnPage, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
 })

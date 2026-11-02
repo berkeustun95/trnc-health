@@ -43,7 +43,7 @@ function AuthFrame({ children }) {
     )
   }
   // Light status-bar icons over the teal band at the top.
-  return <View style={{ flex: 1, backgroundColor: colors.canvas }}><SplashStatusBar style="light" />{children}</View>
+  return <View style={{ flex: 1, backgroundColor: colors.pageBase }}><SplashStatusBar style="light" />{children}</View>
 }
 
 function AuthHead({ title, top }) {

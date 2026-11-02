@@ -7,7 +7,7 @@ import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
 import { colors, type, space, listBottomPad } from '../constants/theme'
-import { ScreenHeader, ErrorState, Card, CardSkeleton } from '../components/ui'
+import { ScreenHeader, ErrorState, Card, CardSkeleton, PageCanvas } from '../components/ui'
 import { EateryLogo, PlaceholderTag, useReduceMotion } from '../components/EateryBits'
 import { QuizEntryCard, QuizPage } from '../components/EateryQuiz'
 import { quizHasMains, quizSteps, QUIZ_GENERAL } from '../constants/eateryQuiz'
@@ -103,6 +103,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
   }, [attempt])
 
   const list = (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.shown} {...(quizOpen === true ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
@@ -122,6 +123,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
           onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)} onOpenDish={openDish} onOpenMenu={openMenu} onOpenBasket={openBasket} />
       )}
     </SafeAreaView>
+    </PageCanvas>
   )
 
   // One stable tree: the list never remounts when a partner opens (its quiz state and scroll position survive).
@@ -139,10 +141,10 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
 }
 
 const s = StyleSheet.create({
-  stack:    { flex: 1, backgroundColor: colors.canvas },
+  stack:    { flex: 1, backgroundColor: colors.pageBase },
   shown:    { flex: 1 },
   hidden:   { flex: 1, display: 'none' },
-  safe:     { flex: 1, backgroundColor: colors.canvas },
+  safe:     { flex: 1 },
   content:  { paddingHorizontal: 16, paddingTop: space[8], gap: 14 },
   row:      { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   text:     { flex: 1 },

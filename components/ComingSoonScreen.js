@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
-import BackButton from './BackButton'
+import { ScreenHeader, PageCanvas } from './ui'
 
 // Reusable "Coming soon" gate screen for marketplace modules that are empty in
 // prod. Content-light (mascot + message) so an empty module reads as deliberate,
@@ -86,12 +86,9 @@ export default function ComingSoonScreen({ lang, moduleKey, titleKey, session, o
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.headerTitle} numberOfLines={1}>{t(titleKey, lang)}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title={t(titleKey, lang)} onBack={onBack} lang={lang} />
 
       <View style={s.body}>
         <View style={s.mascotWrap}>
@@ -108,13 +105,12 @@ export default function ComingSoonScreen({ lang, moduleKey, titleKey, session, o
         {renderNotify()}
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.bg },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
+  safe:         { flex: 1 },
 
   body:         { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 48 },
   mascotWrap:   { width: 132, height: 132, borderRadius: 66, backgroundColor: colors.tintServiceBg, alignItems: 'center', justifyContent: 'center', marginBottom: 20, ...shadow },
@@ -124,17 +120,17 @@ const s = StyleSheet.create({
   badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, textTransform: 'uppercase', letterSpacing: 0.6 },
 
   title:        { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
-  bodyText:     { fontSize: 15, color: colors.textSecondary, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
+  bodyText:     { fontSize: 15, color: colors.textSecondaryOnPage, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
 
   notifyWrap:   { alignSelf: 'stretch', alignItems: 'center', marginTop: 28 },
   notifyLoading:{ marginTop: 28, height: 52, justifyContent: 'center' },
   notifyBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch', backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, ...shadow },
   notifyBtnDisabled: { opacity: 0.6 },
   notifyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
-  hint:         { fontSize: 13, color: colors.textSecondary, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 12 },
+  hint:         { fontSize: 13, color: colors.textSecondaryOnPage, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 12 },
 
   joinedPill:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 28, backgroundColor: colors.cardBg, borderRadius: 24, paddingVertical: 12, paddingHorizontal: 20, ...shadow },
   joinedPillText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
-  errorText:    { fontSize: 13, color: colors.danger, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 12 },
+  errorText:    { fontSize: 13, color: colors.dangerInkOnPage, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 12 },
 })

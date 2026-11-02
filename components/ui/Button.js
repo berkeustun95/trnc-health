@@ -77,5 +77,5 @@ const s = StyleSheet.create({
   // ratio relative to its own fill.
   off:     { opacity: 0.45 },
   label:   { ...type.rowTitle },
-  hint:    { ...type.meta, color: colors.textSecondary, marginTop: 6, textAlign: 'center' },
+  hint:    { ...type.meta, color: colors.textSecondaryOnPage, marginTop: 6, textAlign: 'center' },
 })
