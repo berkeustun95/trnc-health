@@ -8,7 +8,7 @@ import { NORTH_HOUSES, NH_BUILDINGS, NH_APARTMENTS, NH_FROM_PRICE, nhBuilding } 
 import { partnerAsset, partnerLogo } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
 
-// The Günlük Kiralık tab body: the partner, its apartments, check-in / check-out, its four buildings.
+// The Günlük Kiralık tab body: the partner, its apartments, check-in / check-out, its three buildings.
 // A free listing — no deal band, no ADA code, no ad slot, no map of ours (the building maps are the
 // partner's own links, opened as-is). Config: constants/dailyRentals.js.
 //
