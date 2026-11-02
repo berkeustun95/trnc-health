@@ -26,7 +26,7 @@ ok('  ...selecting adult_only (otherwise every partner fails closed to the 18+ g
 ok('  ...selecting the menu-item photo embed for the hero (eatery_menu_items(photo_path, section_order, sort_order, id))', /loadEateryPartners\('[^']*eatery_menu_items\([^)]*\bphoto_path\b[^)]*\bsection_order\b[^)]*\bsort_order\b[^)]*\bid\b[^)]*\)[^']*'\)/.test(home), '')
 ok('  ...and still passes promosEligible to resolveStripSlides (paid promos + adult partners)', /resolveStripSlides\(\{[^}]*promosEligible/.test(home), '')
 ok('partner slides carry no Sponsorlu flag; the DB promo keeps it', !/sponsored:\s*true/.test(rd('utils/stripSlides.js')) && /sponsored/.test(rd('utils/homeStripResolver.js')), '')
-ok('the band row renders for the ÖRNEK / ÖNİZLEME tags even without a Sponsorlu tag', /\(!!time \|\| !!tag \|\| !!item\.placeholder \|\| !!item\.unpublished\)/.test(rd('components/home/redesign/Widgets.js')), '')
+ok('the band row renders for the ÖRNEK / ÖNİZLEME tags even without a Sponsorlu tag (ÖNİZLEME hidden only in the owner-demo Preview build)', /\(!!time \|\| !!tag \|\| !!item\.placeholder \|\| \(!!item\.unpublished && !EATERY_DEMO\)\)/.test(rd('components/home/redesign/Widgets.js')), '')
 ok('HomeScreen renders StripSlider', /<StripSlider\b/.test(home), '')
 ok('the old single-card eateryGate is gone', !/eateryGate/.test(home) && !/eateryGate/.test(rd('utils/homeStripResolver.js')), '')
 { const h = rd('screens/HomeScreen.js'), m = h.match(/const stripPaused = ([^\n]*)/)

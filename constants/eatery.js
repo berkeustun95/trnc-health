@@ -154,21 +154,45 @@ export const eateryOrdersByWhatsapp = p => p?.order_method === 'whatsapp'
 export function eateryListMode(p, nums) {
   if (eateryOrdersByWhatsapp(p)) return eateryOrderDigits(nums?.whatsapp) ? 'whatsapp' : null
   if (p?.order_method === 'phone') return eateryContacts(p, nums).some(c => c.action === 'call') ? 'phone' : null
-  return null   // 'website' has no list either: the order is placed on the partner's own site (eaterySiteOrderUrl)
+  if (eateryOrdersOnWebsite(p)) return 'website'   // the basket hands off to the partner's site (eaterySiteCartUrl)
+  return null
 }
 
-// Website partners (20261157): the order is placed on the partner's own site, opened in the in-app browser. Every outbound
-// link carries ADA's UTM tags so the partner can count us too. Only utm_* is ever added: some partner sites read other query
-// keys (pasatiempocy.com switches to a partner table menu on ?partner= / ?venue= / ?table=). No per-dish URL exists today.
+// Website partners (20261157): the ADA basket hands off to the partner's own site, opened in the in-app browser, as
+// ?cart=<their id>:<qty>,... (20261159 partner_item_id; Berke 2026-11-02). Every outbound link carries ADA's UTM tags so the
+// partner can count us too. Only cart + utm_* are ever added: pasatiempocy.com switches to a partner table menu on
+// ?partner= / ?venue= / ?table=.
 export const EATERY_UTM = 'utm_source=ada&utm_medium=app&utm_campaign=yeme-icme'
 export const eateryOrdersOnWebsite = p => p?.order_method === 'website' && !!https(p?.website_url)
-export function eaterySiteOrderUrl(p) {
+const PARTNER_ITEM_ID = /^[A-Za-z0-9_-]{1,64}$/
+function siteUrl(p, query) {
   if (!eateryOrdersOnWebsite(p)) return null
   const site = https(p.website_url)
   const hash = site.indexOf('#')
-  const base = hash < 0 ? site : site.slice(0, hash)
+  const base = (hash < 0 ? site : site.slice(0, hash)).replace(/^(https:\/\/[^/?]+)(?=\?|$)/, '$1/')   // bare host -> host/
   const frag = hash < 0 ? '' : site.slice(hash)
-  return base + (base.includes('?') ? '&' : '?') + EATERY_UTM + frag
+  return base + (base.includes('?') ? '&' : '?') + query + frag
+}
+export const eaterySiteOrderUrl = p => siteUrl(p, EATERY_UTM)
+// The site's host for the order button ("Sipariş ver — pasatiempocy.com"); null when there is no site.
+export const eaterySiteHost = p => (eateryOrdersOnWebsite(p) ? https(p.website_url).replace(/^https:\/\/(www\.)?/, '').split(/[/?#]/)[0] : null)
+// lines = basketLines(...) built from the VISIBLE menu (eateryMenuSections already drops 18+ items for a minor), so an item
+// the viewer cannot see can never be sent. Lines without a valid partner id are skipped; quantities of one id are summed.
+export function eaterySiteCartLines(lines) {
+  const by = new Map()
+  for (const l of lines || []) {
+    const id = l?.item?.partner_item_id
+    if (typeof id !== 'string' || !PARTNER_ITEM_ID.test(id) || !(l.qty > 0)) continue
+    const e = by.get(id) || { id, qty: 0, itemId: l.id }   // itemId: our eatery_menu_items.id, for the tap log
+    e.qty += Math.floor(l.qty)
+    by.set(id, e)
+  }
+  return [...by.values()]
+}
+export function eaterySiteCartUrl(p, lines) {
+  const cart = eaterySiteCartLines(lines)
+  if (!cart.length) return eaterySiteOrderUrl(p)
+  return siteUrl(p, 'cart=' + cart.map(c => `${c.id}:${c.qty}`).join(',') + '&' + EATERY_UTM)
 }
 
 // The partner's own colour for the order-on-site button, or null (= ADA primary) when it is missing, malformed or too light

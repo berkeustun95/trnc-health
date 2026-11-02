@@ -3,7 +3,7 @@
 import * as B from '../utils/eateryBasketCore.js'
 import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eaterySiteCartUrl, eaterySiteHost, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk } from '../constants/eatery.js'
 import { heroPathOf } from '../utils/stripSlides.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
@@ -665,34 +665,44 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('wiring: phone partner call button is relabelled eateryOrderByPhone', /c\.action === 'call' && orderByPhone \? 'eateryOrderByPhone'/.test(ps), true)
 }
 
-// Website partners (20261157): no list, a hand-off to the partner's own site with ADA's UTM tags and nothing else.
+// Website partners (20261157 / 20261159): the ADA basket, handed off to the partner's own site as ?cart=<their id>:<qty> plus
+// ADA's UTM tags and nothing else (pasatiempocy.com reads partner / venue / table).
 {
   const web = { id: 'p', order_method: 'website', website_url: 'https://pasatiempocy.com', phone: '+90 539 112 72 72', brand_color: '#994b17', is_active: true }
-  eq('website: no list / basket, whatever numbers exist (Preview swaps in a test number too)', [
-    eateryListMode(web, eateryContactNumbers(web, {})), eateryListMode(web, eateryContactNumbers(web, { isPreview: true, testNumber: '+90 533 111 22 33' })), eateryOrdersByWhatsapp(web)], [null, null, false])
+  eq('website: list mode "website" (a basket), whatever numbers exist; never a WhatsApp send', [
+    eateryListMode(web, eateryContactNumbers(web, {})), eateryListMode(web, eateryContactNumbers(web, { isPreview: true, testNumber: '+90 533 111 22 33' })), eateryOrdersByWhatsapp(web),
+    eateryListMode({ ...web, website_url: null }, eateryContactNumbers(web, {}))], ['website', 'website', false, null])
   eq('website: helper true only with an https site', [eateryOrdersOnWebsite(web), eateryOrdersOnWebsite({ ...web, website_url: null }), eateryOrdersOnWebsite({ ...web, website_url: 'http://x.com' }), eateryOrdersOnWebsite({ ...web, order_method: 'phone' }), eateryOrdersOnWebsite(null)], [true, false, false, false, false])
   eq('website: the UTM string', EATERY_UTM, 'utm_source=ada&utm_medium=app&utm_campaign=yeme-icme')
-  eq('website: UTM appended (bare, with a query, with a fragment, trailing slash)', [
+  eq('website: UTM appended (bare host gets a slash, with a query, with a fragment, trailing slash)', [
     eaterySiteOrderUrl(web), eaterySiteOrderUrl({ ...web, website_url: 'https://x.com/m?lang=en' }), eaterySiteOrderUrl({ ...web, website_url: 'https://x.com/#menu' }), eaterySiteOrderUrl({ ...web, website_url: 'https://x.com/' })],
-    ['https://pasatiempocy.com?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme', 'https://x.com/m?lang=en&utm_source=ada&utm_medium=app&utm_campaign=yeme-icme',
+    ['https://pasatiempocy.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme', 'https://x.com/m?lang=en&utm_source=ada&utm_medium=app&utm_campaign=yeme-icme',
      'https://x.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme#menu', 'https://x.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme'])
-  const keys = [...new URL(eaterySiteOrderUrl(web)).searchParams.keys()]
-  eq('website: only utm_* keys go out (pasatiempocy.com reads partner / venue / table)', keys.every(k => k.startsWith('utm_')) && !keys.some(k => ['partner', 'venue', 'table'].includes(k)), true)
-  eq('website: non-website partners get no site order url', [eaterySiteOrderUrl({ ...web, order_method: 'whatsapp' }), eaterySiteOrderUrl({ ...web, order_method: 'phone' })], [null, null])
+  const L = (pid, qty, id = 1) => ({ id, qty, item: { partner_item_id: pid } })
+  eq('cart: Berke\'s exact shape, their ids, quantities summed per id, unknown / unsafe ids and qty 0 skipped', eaterySiteCartUrl(web, [L('imu48g3e10d4im', 2), L('imu48g6xqa19y1', 1), L('imu48g3e10d4im', 1), L(null, 3), L('a,b', 1), L('imu6xr5v4id0ky', 0)]),
+    'https://pasatiempocy.com/?cart=imu48g3e10d4im:3,imu48g6xqa19y1:1&utm_source=ada&utm_medium=app&utm_campaign=yeme-icme')
+  eq('cart: no mappable line -> the site with UTM only; not a website partner -> null', [eaterySiteCartUrl(web, []), eaterySiteCartUrl(web, [L(null, 1)]), eaterySiteCartUrl({ ...web, order_method: 'whatsapp' }, [L('x', 1)])],
+    ['https://pasatiempocy.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme', 'https://pasatiempocy.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme', null])
+  const keys = [...new URL(eaterySiteCartUrl(web, [L('abc', 1)])).searchParams.keys()]
+  eq('cart: only cart + utm_* keys go out (never partner / venue / table)', keys.every(k => k === 'cart' || k.startsWith('utm_')) && !keys.some(k => ['partner', 'venue', 'table'].includes(k)), true)
+  eq('host for the button', [eaterySiteHost(web), eaterySiteHost({ ...web, website_url: 'https://www.x.com/m?a=1' }), eaterySiteHost({ ...web, order_method: 'phone' })], ['pasatiempocy.com', 'x.com', null])
   eq('brand ink: #994b17 passes AA on white text; light / malformed / missing -> null (ADA primary)', [eateryBrandInk('#994b17'), eateryBrandInk('#ffcc00'), eateryBrandInk('brown'), eateryBrandInk(null), eateryBrandInk('#994b1')], ['#994b17', null, null, null, null])
   const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   const qz = fs.readFileSync(new URL('../components/EateryQuiz.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   const es = fs.readFileSync(new URL('../utils/eaterySite.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
-  eq('wiring: the site hand-off logs order_website with the dish, behind CONTACT_LOGGING, only for live non-fixture rows', /if \(CONTACT_LOGGING && !partner\.placeholder && partner\.is_active !== false\) logContactEvent\('eatery', partner\.id, 'order_website', null, null, itemId\)/.test(es), true)
-  eq('wiring: the log line comes BEFORE the browser opens', es.indexOf("'order_website'") > 0 && es.indexOf("'order_website'") < es.indexOf('openBrowserAsync'), true)
-  eq('wiring: expo-web-browser is required inside the function, with a Linking fallback', /export async function openEaterySite[\s\S]*require\('expo-web-browser'\)[\s\S]*Linking\.openURL\(url\)/.test(es) && !/^import[^\n]*expo-web-browser/m.test(es), true)
-  eq('wiring: partner page — header CTA, per-dish button, generic website contact hidden, never on a fixture', [
-    /const siteOrdering = !partner\.placeholder && eateryOrdersOnWebsite\(partner\)\s*&& orderAgeGate\(\{ adultOnly: partner\.adult_only, guest: isGuest\(session\), dob: dateOfBirth \}\) == null/.test(ps), /\{siteOrdering && \(\s*<View style=\{s\.siteCta\}>/.test(ps),
-    /onSite=\{siteOrdering \? onSite : undefined\}/.test(ps), /contacts\.filter\(c => !\(siteOrdering && c\.action === 'website'\)\)/.test(ps)], [true, true, true, true])
-  eq('wiring: the per-dish button only for an orderable dish', /if \(onSite && eateryOrderable\(item\)\)/.test(ps), true)
-  eq('wiring: quiz result card hands off website dishes (never alongside a basket)', /\{site && !canOrder && \(/.test(qz) && /site=\{eateryOrdersOnWebsite\(d\.partner\) && d\.partner\.adult_only === false\}/.test(qz) && /openEaterySite\(partner, item\.id\)/.test(qz), true)
-  eq('i18n: the three website keys in all 9 languages', ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa'].every(l => ['eateryOrderOnSite', 'eateryOrderOnSiteA11y', 'eateryOrderOnSiteHint'].every(k => t(k, ({ en: 'English', tr: 'Turkish', ar: 'Arabic', ru: 'Russian', el: 'Greek', fr: 'French', es: 'Spanish', de: 'German', fa: 'Persian' })[l]) !== k)), true)
-  eq('i18n: Turkish button text', t('eateryOrderOnSite', 'Turkish'), 'Sitede sipariş ver')
+  const eo = fs.readFileSync(new URL('../components/EateryOrder.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('wiring: every basket line is logged as order_website with its dish, behind CONTACT_LOGGING, only for live non-fixture rows', /for \(const c of eaterySiteCartLines\(lines\)\) if \(CONTACT_LOGGING && !partner\.placeholder && partner\.is_active !== false\) logContactEvent\('eatery', partner\.id, 'order_website', null, null, c\.itemId\)/.test(es), true)
+  eq('wiring: the log line comes BEFORE the browser opens; the URL is the cart URL', es.indexOf("'order_website'") > 0 && es.indexOf("'order_website'") < es.indexOf('openBrowserAsync') && /const url = eaterySiteCartUrl\(partner, lines\)/.test(es), true)
+  eq('wiring: expo-web-browser is required inside the function, with a Linking fallback', /export async function openEaterySite[\s\S]*require\('expo-web-browser'\)[\s\S]*if \(!WebBrowser\?\.openBrowserAsync\) \{\s*try \{ await Linking\.openURL\(url\)/.test(es) && !/^import[^\n]*expo-web-browser/m.test(es) && es.split('Linking.openURL').length === 2, true)
+  eq('wiring: the hand-off reads `lines` (the visible, age-filtered basket), never the raw store', /openEaterySite\(partner, lines\)/.test(ps) && !/openEaterySite\(partner, basket/.test(ps) && /orderAgeGate\(\{ adultOnly: partner\.adult_only, guest: isGuest\(session\), dob: dateOfBirth \}\)\) return/.test(ps), true)
+  eq('wiring: no per-dish site button, no header CTA, the generic website contact is back', [/SiteOrderButton|siteOrdering|\bonSite\b/.test(ps), /contacts\.map\(c => \(/.test(ps)], [false, true])
+  eq('wiring: basket page — website branch hides delivery + note, sends to the site, keeps the 18+ gate first', [
+    /\{!phone && !site && <DeliveryCard/.test(eo), /\{!phone && !site && \(\s*<Card>/.test(eo), /\) : ageGate \? null : site \? \(\s*<Button fullWidth icon="open-outline"[^\n]*onPress=\{onSiteOrder\}/.test(eo)], [true, true, true])
+  eq('wiring: demo hand-off only under EATERY_DEMO (Preview build + EXPO_PUBLIC_EATERY_DEMO=1)', /if \(!EATERY_DEMO\) \{ open\(\); return \}/.test(ps) && /if \(openingRef\.current \|\|/.test(ps), true)
+  eq('wiring: quiz has no site pill (website dishes use the basket: Sepete ekle)', /openEaterySite|site && !canOrder/.test(qz), false)
+  eq('i18n: website keys in all 9 languages', ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa'].every(l => ['eateryOrderOnSite', 'eateryOrderOnSiteHint', 'eateryHandoffTitle', 'eateryDemoLabel'].every(k => t(k, ({ en: 'English', tr: 'Turkish', ar: 'Arabic', ru: 'Russian', el: 'Greek', fr: 'French', es: 'Spanish', de: 'German', fa: 'Persian' })[l]) !== k)), true)
+  eq('i18n: Turkish texts', [t('eateryOrderOnSite', 'Turkish').replace('{host}', 'pasatiempocy.com'), t('eateryHandoffTitle', 'Turkish').replace('{host}', 'pasatiempocy.com'), t('eateryQuizAddToBasket', 'Turkish')],
+    ['Sipariş ver — pasatiempocy.com', 'Sepetin pasatiempocy.com sitesine aktarılıyor', 'Sepete ekle'])
 }
 
 // 18+ menu items (eatery_menu_items.adult_only, 20261157; Berke 2026-11-02): adults see them, guests / no DOB / under-18 do not.
@@ -713,7 +723,7 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   const es = fs.readFileSync(new URL('../screens/EateryScreen.js', import.meta.url), 'utf8')
   eq('wiring: the partner page passes the viewer\'s age to the menu, and COLS selects adult_only', [
-    /const adultOk = eateryAdultItemsOk\(\{ guest: isGuest\(session\), dob: dateOfBirth \}\)/.test(ps), /eateryMenuSections\(partner, \{ adultOk \}\)/.test(ps), /is_available, adult_only, photo_path/.test(es)], [true, true, true])
+    /const adultOk = eateryAdultItemsOk\(\{ guest: isGuest\(session\), dob: dateOfBirth \}\)/.test(ps), /eateryMenuSections\(partner, \{ adultOk \}\)/.test(ps), /is_available, adult_only, partner_item_id, photo_path/.test(es)], [true, true, true])
 }
 
 // ── "Listem" wording: a phone partner never reads basket keys (sheet CTA, per-dish count, a11y, stale block) ──

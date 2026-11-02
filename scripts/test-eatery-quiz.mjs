@@ -280,7 +280,7 @@ eq('top-level companions = the top dish\'s', Q.quizMatch([C], { ...ANY, extra: [
   eq('screen: QuizPage gets rows={quizRows} and scoped', has(/<QuizPage[^>]*rows=\{quizRows\}[^>]*\bscoped\b/), true)
   eq('screen: banner only when not placeholder and quizHasMains([partner])', has(/const showQuizBanner = !partner\.placeholder && quizHasMains\(\[partner\]\)/), true)
   eq('screen: banner rendered behind showQuizBanner', has(/\{showQuizBanner && <PartnerQuizBanner/), true)
-  eq('screen: tabsIndex counts the site CTA and the banner', has(/const tabsIndex = 1 \+ \(siteOrdering \? 1 : 0\) \+ \(showQuizBanner \? 1 : 0\) \+ \(gallery\.length > 0 \? 1 : 0\)/), true)
+  eq('screen: tabsIndex counts the banner', has(/const tabsIndex = 1 \+ \(showQuizBanner \? 1 : 0\) \+ \(gallery\.length > 0 \? 1 : 0\)/), true)
 }
 
 if (bad) { console.log(`\n${bad} FAILED`); process.exit(1) }

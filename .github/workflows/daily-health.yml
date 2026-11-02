@@ -87,3 +87,8 @@ jobs:
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-eatery-daily.mjs
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partners.mjs --daily
+      # Website partners (2026-11-02): every stored partner_item_id (the ?cart= ids) still exists on the partner's own site.
+      # Service key, GET only: inactive partners included. Red on a missing id, an item without one, or any failed read.
+      - name: eatery:partner-ids
+        if: success() || failure()
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partner-ids.mjs

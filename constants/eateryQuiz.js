@@ -103,7 +103,7 @@ export function quizCandidates(rows, answers = null, cfg = QUIZ_GENERAL) {
   const out = []
   for (const partner of rows || []) {
     for (const item of partner?.eatery_menu_items || []) {
-      if (!item || !cfg.roles.includes(item.role) || !filled(item.name) || !eateryOrderable(item)) continue
+      if (!item || item.adult_only === true || !cfg.roles.includes(item.role) || !filled(item.name) || !eateryOrderable(item)) continue   // never an 18+ item (the quiz is open to minors)
       if (answers && !(cfg.base(item, answers) && cfg.relax.every(k => k.pass(item, answers)))) continue
       out.push({ item, partner })
     }

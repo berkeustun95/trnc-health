@@ -9,6 +9,7 @@ import { untilTr } from '../../../utils/turkishTime'
 import { ongoingEndLabel } from '../../../utils/eventVisibility'
 import { Bone, IconButton, RemoteImage } from '../../ui'
 import { PlaceholderTag, eateryImageUrl } from '../../EateryBits'
+import { EATERY_DEMO } from '../../../utils/eateryBasket'
 
 // Home v3 tiles: two equal cards, 104pt. Duty is the V2 live-strip card (photo, icon badge
 // top-left, dark band); Acil Numaralar is solid health red. Each band carries its title and
@@ -219,7 +220,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss, remember 
             lower part sits under the floating tab bar, so a bottom band hid the title. */}
         <View onLayout={e => setBandH(Math.ceil(e.nativeEvent.layout.height))}
           style={[s.bannerBand, showFrame && s.bannerBandPartner, showFrame && showHero && s.bannerBandOverHero, item.kind === 'notice' && !!onDismiss && s.bannerBandDismiss]}>
-          {(!!time || !!tag || !!item.placeholder || !!item.unpublished) && (
+          {(!!time || !!tag || !!item.placeholder || (!!item.unpublished && !EATERY_DEMO)) && (
             <View style={s.bandMeta}>
               {!!time && (
                 <>
