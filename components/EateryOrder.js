@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, Platform, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, Platform, Modal, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, sheetFadeVisible, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice } from '../constants/eatery'
+import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, sheetFadeVisible, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice, eaterySiteHost } from '../constants/eatery'
 import MapView from 'react-native-maps'
 import { MAP_PROVIDER } from '../utils/googleMap'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
@@ -370,10 +370,39 @@ function DeliveryCard({ lang, delivery, onDelivery, onAddress, open }) {
   )
 }
 
+// Owner-demo only (EATERY_DEMO, utils/eateryBasket.js): "your basket is being sent to <site>", the lines and the total, held
+// briefly before the partner's site opens. Not dismissable (it closes itself); production never renders it.
+export function SiteHandoff({ visible, partner, lines, totalText, lang }) {
+  const host = eaterySiteHost(partner) || ''
+  return (
+    <Modal visible={visible === true} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+      <View style={st.handoffScrim}>
+        <View style={st.handoffCard} accessibilityLiveRegion="polite">
+          <EateryLogo partner={partner} width={48} height={48} radius={radii.pill} decorative />
+          <Text style={st.handoffTitle} accessibilityRole="header">{t('eateryHandoffTitle', lang).replace('{host}', () => host)}</Text>
+          <View style={st.handoffLines}>
+            {lines.map(l => (
+              <View key={l.key} style={st.handoffLine}>
+                <Text style={st.handoffQty}>{l.qty}×</Text>
+                <Text style={st.handoffName} numberOfLines={2}>{l.name}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={st.handoffTotalRow}>
+            <Text style={st.totalLabel}>{t('eateryOrderTotal', lang)}</Text>
+            <Text style={st.totalVal}>{totalText}</Text>
+          </View>
+          <Text style={st.handoffDemo}>{t('eateryDemoLabel', lang)}</Text>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 // "Sepetim": slides in over the partner page and slides out again (reduced motion: no slide either way). The parent
 // keeps it mounted until onClosed, so Android back / the iOS edge swipe (EateryPartnerScreen's backRef flips `open`)
 // animate out too. The scroll area holds everything but the footer, which stays pinned above the nav bar / keyboard.
-export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
+export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, onSiteOrder, lines, onQty, onEditLine, formatMoney, totalText, note, onNote, delivery, onDelivery, onAddress, covered = false, onClear, onSend, onClose, onClosed, reduce, sending = false, orderError = null, ageGate = null, onSignIn }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   const kbTop = useKeyboardTop()
@@ -424,6 +453,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
   const focusReveal = useCallback(ref => { onFocusInput(ref); if (hadKb.current) { setTimeout(reveal, 60) } }, [onFocusInput, reveal])
   const empty = lines.length === 0
   const phone = mode === 'phone'   // "Listem": the same lines, read out on the call; no delivery, note or send
+  const site = mode === 'website'  // website partner: the basket hands off to the partner's own site, which handles checkout
   const stale = lines.some(l => l.stale)   // an option that no longer exists: nothing is sent until that line is edited or removed
   const msgKey = phone ? (stale ? 'eateryListStaleBlock' : null) : ageGate ? 'eateryOrderAdultOnly' : stale ? 'eateryOptStaleBlock' : orderError ? ORDER_ERR_KEY[orderError] : null
   const tone = !ageGate && (stale || ['generic', 'rate', 'account'].includes(orderError)) ? 'bad' : 'calm'   // a state or a refreshed basket is not an alarm
@@ -462,8 +492,9 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
                 ))}
               </Card>
               <Button variant="text" icon="trash-outline" title={t(phone ? 'eateryListClear' : 'eateryBasketClear', lang)} onPress={onClear} style={st.clear} />
-              {!phone && <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />}
-              {!phone && (
+              {!phone && !site && <DeliveryCard lang={lang} delivery={delivery} onDelivery={onDelivery} onAddress={onAddress} open={open === true} />}
+              {site && <Text style={st.listHint}>{t('eateryOrderOnSiteHint', lang).replace('{host}', () => eaterySiteHost(partner) || '')}</Text>}
+              {!phone && !site && (
                 <Card>
                   <Text style={st.noteLabel}>{t('eateryOrderNote', lang)}</Text>
                   <TextInput ref={noteInput} style={st.input} value={note} onChangeText={onNote} maxLength={ORDER_NOTE_MAX} multiline
@@ -488,7 +519,9 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
                 <Text style={st.listHint}>{t('eateryListHint', lang)}</Text>
                 <Button fullWidth icon="call-outline" title={t('eateryOrderByPhone', lang)} onPress={onCall} disabled={stale} />
               </>
-            ) : ageGate ? null : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
+            ) : ageGate ? null : site ? (
+              <Button fullWidth icon="open-outline" title={t('eateryOrderOnSite', lang).replace('{host}', () => eaterySiteHost(partner) || '')} onPress={onSiteOrder} disabled={stale} />
+            ) : <Button fullWidth icon="logo-whatsapp" title={t('eateryOrderSend', lang)} loadingTitle={t('eateryOrderSending', lang)} onPress={onSend} loading={sending}
               disabled={!ready || stale} disabledHint={!orderError && !stale && deliveryKey && kbTop == null ? t(deliveryKey, lang) : undefined} />}
             <View accessibilityLiveRegion="polite">
               {!!msgKey && msgKey !== 'eateryOrderErrAccount' && <Text style={[st.errText, tone === 'bad' ? st.errBad : ageGate ? st.errCalm : st.errInfo]}>{t(msgKey, lang)}</Text>}
@@ -505,6 +538,15 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
 }
 
 const st = StyleSheet.create({
+  handoffScrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: space[24] },
+  handoffCard: { alignSelf: 'stretch', backgroundColor: colors.card, borderRadius: radii.lg, padding: space[24], alignItems: 'center', gap: space[12] },
+  handoffTitle: { ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center' },
+  handoffLines: { alignSelf: 'stretch', gap: space[8] },
+  handoffLine: { flexDirection: 'row', gap: space[8] },
+  handoffQty: { ...type.rowTitle, color: colors.primaryDark, minWidth: 32 },
+  handoffName: { ...type.body, color: colors.textPrimary, flex: 1 },
+  handoffTotalRow: { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: space[12] },
+  handoffDemo: { ...type.meta, color: colors.textSecondary },
   add:       { minHeight: TAP, paddingHorizontal: space[16], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], borderRadius: radii.pill, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
   addText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark },
   row:       { flexDirection: 'row', alignItems: 'center', gap: space[4] },

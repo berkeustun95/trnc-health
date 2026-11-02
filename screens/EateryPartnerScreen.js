@@ -7,17 +7,17 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryOrdersOnWebsite, eateryBrandInk, eateryAdultItemsOk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryAdultItemsOk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
-import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press, TAP } from '../constants/theme'
+import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { openEaterySite } from '../utils/eaterySite'
 import { supabase, isGuest } from '../lib/supabase'
-import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, dishUsesSheet, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { IS_PREVIEW, EATERY_DEMO, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, dishUsesSheet, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
-import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage } from '../components/EateryOrder'
+import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage, SiteHandoff } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains, partnerQuizConfig } from '../constants/eateryQuiz'
@@ -32,6 +32,8 @@ import { BannerPhoto, BannerBar, BannerHead, BAR_SOLID_AT } from '../components/
 // nothing behind it is absent, never degraded. Fixture partners (partner.placeholder) are labelled
 // and NEVER log a contact tap or take an order. Order via WhatsApp: a dish with a price gets a quantity control, the
 // basket (in memory, utils/eateryBasket.js) becomes ONE Turkish wa.me message; ADA takes no payment and keeps nothing.
+
+const HANDOFF_MS = 2800   // owner-demo hand-off screen: long enough to read the lines, short enough not to feel stuck
 
 const CONTACT_UI = {
   call:     { icon: 'call-outline',      labelKey: 'petHotelCall',       variant: 'primary' },
@@ -99,22 +101,9 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
   )
 }
 
-// "Sitede sipariş ver" (website partners, 20261157): the partner's own colour when it holds 4.5:1 under white text, else ADA
-// primary. compact = the per-dish pill under a menu row; otherwise the full-width call to action under the header.
-function SiteOrderButton({ ink, title, label, compact, onPress }) {
-  return (
-    <Pressable onPress={() => { try { haptic() } catch { /* never blocks the hand-off */ } onPress() }} accessibilityRole="link" accessibilityLabel={label || title}
-      accessibilityHint={label ? undefined : title} style={({ pressed }) => [compact ? s.siteBtnCompact : s.siteBtn, { backgroundColor: ink }, pressed && { opacity: press.small }]}>
-      <Ionicons name="bag-handle-outline" size={compact ? 16 : 18} color={colors.onPrimary} />
-      <Text style={compact ? s.siteBtnTextCompact : s.siteBtnText} numberOfLines={1}>{title}</Text>
-      <Ionicons name="open-outline" size={compact ? 14 : 16} color={colors.onPrimary} />
-    </Pressable>
-  )
-}
-
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions, phone, siteInk, onSite }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions, phone }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   const row = (
@@ -127,16 +116,6 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
       {price ? <Text style={s.itemPrice}>{price}</Text> : <Text style={s.itemPricePending}>{t('eateryPricePending', lang)}</Text>}
     </View>
   )
-  if (onSite && eateryOrderable(item)) {
-    return (
-      <View>
-        {row}
-        <View style={s.itemOrder}>
-          <SiteOrderButton compact ink={siteInk} title={t('eateryOrderOnSite', lang)} label={t('eateryOrderOnSiteA11y', lang).replace('{name}', () => item.name)} onPress={() => onSite(item.id)} />
-        </View>
-      </View>
-    )
-  }
   if (!ordering || !eateryOrderable(item)) return row
   return (
     <View>
@@ -244,13 +223,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const listMode = eateryListMode(partner, nums)
   const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
-  // Website partners: no list; the header and every orderable dish hand off to the partner's site (utils/eaterySite.js).
-  // An adult_only partner keeps the same 18+ gate as the basket (guests, no DOB and under-18s get no hand-off).
-  const siteOrdering = !partner.placeholder && eateryOrdersOnWebsite(partner)
-    && orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth }) == null
-  const siteInk = eateryBrandInk(partner.brand_color) || colors.primary
-  const onSite = useCallback(itemId => { openEaterySite(partner, itemId) }, [partner])
   const callUrl = contacts.find(c => c.action === 'call')?.url
+  // Website partner: "Sipariş ver — <site>" hands the visible basket off to the partner's site (utils/eaterySite.js). The owner-demo
+  // build first shows the hand-off screen for HANDOFF_MS (EATERY_DEMO, Preview only).
+  const [handoff, setHandoff] = useState(false)
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
     if (!ordering) return []
@@ -260,6 +236,15 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
   const orderCount = lines.reduce((n, l) => n + l.qty, 0)
   const orderTotalText = formatMoney(orderTotal(lines))
+  const handoffTimer = useRef(null)
+  useEffect(() => () => clearTimeout(handoffTimer.current), [])
+  const siteOrder = useCallback(() => {
+    if (listMode !== 'website' || lines.length === 0 || lines.some(l => l.stale)) return
+    if (!EATERY_DEMO) { openEaterySite(partner, lines); return }
+    setHandoff(true)
+    clearTimeout(handoffTimer.current)
+    handoffTimer.current = setTimeout(() => { setHandoff(false); openEaterySite(partner, lines) }, HANDOFF_MS)
+  }, [listMode, lines, partner])
   const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
   const [basketShown, setBasketShown] = useState(false)
   // "Ne yesem?" scoped to this partner: a layer over the page (rows = just this partner), closed by Back first.
@@ -340,7 +325,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
   const showTabs = sections.length >= 2
-  const tabsIndex = 1 + (siteOrdering ? 1 : 0) + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [site CTA], [pager], [quiz banner], tabs
+  const tabsIndex = 1 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], [quiz banner], tabs
   const scrollRef = useRef(null)
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
@@ -539,13 +524,6 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>}
 
-        {siteOrdering && (
-          <View style={s.siteCta}>
-            <SiteOrderButton ink={siteInk} title={t('eateryOrderOnSite', lang)} onPress={() => onSite(null)} />
-            <Text style={s.siteHint}>{t('eateryOrderOnSiteHint', lang).replace('{partner}', () => partner.name)}</Text>
-          </View>
-        )}
-
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
 
         {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
@@ -565,8 +543,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 </Text>
                 {sec.items.map(i => {
                   const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
-                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} phone={listMode === 'phone'}
-                    siteInk={siteInk} onSite={siteOrdering ? onSite : undefined} />
+                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} phone={listMode === 'phone'} />
                   return i.id === focusId
                     ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
                     : <Fragment key={i.id}>{row}</Fragment>
@@ -604,12 +581,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
         {contacts.length > 0 && (
           <View style={s.actions}>
-            {contacts.filter(c => !(siteOrdering && c.action === 'website')).map(c => (
+            {contacts.map(c => (
               <Button key={c.action} fullWidth variant={CONTACT_UI[c.action].variant}
                 icon={CONTACT_UI[c.action].icon} title={t(c.action === 'call' && orderByPhone ? 'eateryOrderByPhone' : CONTACT_UI[c.action].labelKey, lang)}
                 onPress={() => go(c.action, c.url)} />
             ))}
-            {IS_PREVIEW && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
+            {IS_PREVIEW && !EATERY_DEMO && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
           </View>
         )}
 
@@ -617,9 +594,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} mode={listMode} />}
       </View>
       {ordering && basketShown === true && (
-        <BasketPage partner={partner} lang={lang} mode={listMode} onCall={() => { if (callUrl) go('call', callUrl) }} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
+        <BasketPage partner={partner} lang={lang} mode={listMode} onCall={() => { if (callUrl) go('call', callUrl) }} onSiteOrder={siteOrder} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onAddress={openEditor} covered={editor.open === true} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
+      <SiteHandoff visible={handoff === true} partner={partner} lines={lines} totalText={orderTotalText} lang={lang} />
       {whatsappOrdering && editor.shown === true && (
         <AddressEditor key={editor.key} lang={lang} open={editor.open === true} step={editor.step} pickerOpen={editor.picker === true} seed={editor.seed} reduce={reduce}
           onStep={n => setEditor(e => ({ ...e, step: n }))} onPicker={v => setEditor(e => ({ ...e, picker: v }))}
@@ -690,12 +668,6 @@ const s = StyleSheet.create({
   itemPrice: { ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   itemPricePending: { ...type.small, color: colors.textSecondary, flexShrink: 0 },
   itemOrder: { alignItems: 'flex-end', marginBottom: space[4] },
-  siteCta: { gap: space[8] },
-  siteBtn: { minHeight: TAP + 4, borderRadius: radii.md, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  siteBtnText: { ...type.rowTitle, color: colors.onPrimary, flexShrink: 1 },
-  siteBtnCompact: { minHeight: TAP, borderRadius: radii.pill, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' },
-  siteBtnTextCompact: { ...type.small, fontFamily: font.semibold, color: colors.onPrimary, flexShrink: 1 },
-  siteHint: { ...type.small, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: space[8] },
   focusRow:  { marginHorizontal: -space[8], paddingHorizontal: space[8], borderRadius: radii.sm },
   focusMark: { ...StyleSheet.absoluteFillObject, borderRadius: radii.sm, backgroundColor: colors.primaryLight },
   menuBtn:   { marginTop: space[16] },
