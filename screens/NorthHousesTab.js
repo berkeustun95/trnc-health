@@ -109,7 +109,7 @@ export default function NorthHousesTab({ lang, onOpenApartment, bottomPad = 24 }
         <Text style={s.heroSub}>{t(partner.heroSubKey, lang)}</Text>
         <Text style={s.fromPrice}>{fill(t('nhFromNight', lang), NH_FROM_PRICE)}</Text>
         <IconLine icon="logo-whatsapp">{t(partner.waHoursKey, lang)}</IconLine>
-        <Text style={s.note}>{t('nhDirectNote', lang)}</Text>
+        <Text style={s.note}>{t('nhDirectNote', lang).replace('{partner}', () => partner.name)}</Text>
       </Card>
 
       <SectionTitle>{t('nhApartmentsTitle', lang)}</SectionTitle>
