@@ -410,8 +410,9 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 // HIDDEN AGAIN 2026-10-30 (Berke, urgent): went live by OTA 01a189c0 without the partner's WRITTEN OK or a logo.
 // ⛔ Goes live ONLY after BOTH arrive from North Houses: their written OK to be listed, and a proper logo (never the
 // WhatsApp badge). The table, 20261148 retention job and privacy 2026-10-30 stay as they are (harmless while hidden).
-// ADA Preview keeps showing it (NORTH_HOUSES_PREVIEW / NORTH_HOUSES_FORM_PREVIEW in constants/redesign.js).
-export const NORTH_HOUSES_LIVE = false
+// LIVE AGAIN 2026-11-02: written OK + logo received 2026-11-02 (North Houses is run by Alkent Emlak & Danışmanlık;
+// the logo is Alkent's mark). Content re-checked against northcyprusbnb.com the same day.
+export const NORTH_HOUSES_LIVE = true
 
 // Production switch for North Houses' booking-request form on the apartment screen (it saves a row in
 // partner_booking_requests and opens WhatsApp). Also needs NORTH_HOUSES_LIVE for the tab to exist.
@@ -425,7 +426,9 @@ export const NORTH_HOUSES_LIVE = false
 // The screen reads NORTH_HOUSES_FORM = NORTH_HOUSES && (this || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW));
 // IS_PREVIEW_BUILD is a runtime read of extra.appVariant, which only APP_VARIANT=preview sets. A dev build
 // needs the local flip like every gated screen. NOT a MODULE_FLAGS key: it gates nothing else and reveals nothing.
-export const NORTH_HOUSES_FORM_LIVE = false
+// LIVE 2026-11-02: 20261143 + 20261148 APPLIED, verify_schema QUERY 1 all checks pass, purge cron OK
+// (supabase-migration-status run 41424092687); privacy 2026-10-30 published at getadaapp.com/privacy.
+export const NORTH_HOUSES_FORM_LIVE = true
 
 // Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
 // from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no

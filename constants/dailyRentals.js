@@ -43,7 +43,10 @@ export const NORTH_HOUSES = {
   // ONE number for WhatsApp and calls (partner, 2026-10-29); wa.me takes its digits, Ara dials it as is.
   phone:   '+905338470666',
 
+  // Alkent's mark (they run North Houses); the display name stays North Houses. `logo` = the mark
+  // alone for small squares, `logoFull` = mark + ALKENT where there is room.
   logo:       'northhouses/logo',
+  logoFull:   'northhouses/logo-full',
   logoOnDark: null,
 
   taglineKey:  'nhTagline',
@@ -63,7 +66,7 @@ export const NH_BUILDINGS = [
   { id: 'tezer',    name: 'Tezer Plaza',          blurbKey: 'nhBldTezer',    mapUrl: 'https://maps.app.goo.gl/6Ejg8MtNPTbRWPNu8' },
   { id: 'yasemin',  name: 'Yasemin Residens',     blurbKey: 'nhBldYasemin',  mapUrl: 'https://maps.app.goo.gl/to8CfXwjGYXZPoK87' },
   { id: 'mine',     name: 'Mine Apt',             blurbKey: 'nhBldMine',     mapUrl: 'https://maps.app.goo.gl/s6unWTFjT9nxptZY7' },
-  { id: 'kaymakli', name: 'North Houses Kaymaklı', blurbKey: 'nhBldKaymakli', mapUrl: 'https://share.google/n86C6uuTgJerjpF3o' },
+  { id: 'kaymakli', name: 'North Houses Kaymaklı', blurbKey: 'nhBldKaymakli', mapUrl: 'https://maps.app.goo.gl/bzXsQuvxxi6hX9na6' },
 ]
 export const nhBuilding = id => NH_BUILDINGS.find(b => b.id === id)
 
@@ -85,10 +88,28 @@ const photos = key => Array.from({ length: 8 }, (_, i) => `northhouses/${key}-${
 
 export const NH_APARTMENTS = [
   {
+    key: 'ys', slug: 'lefkosa-gunluk-kiralik-studio-daire', buildingId: 'yasemin', kind: 'studio',
+    nameKey: 'nhAptYSName', descKey: 'nhAptYSDesc',
+    bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
+    price: 35, cleaningFee: 40, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
+    amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
+    photos: photos('ys'),
+  },
+  {
+    key: 't1', slug: 'lefkosa-gunluk-kiralik-daire-2-yatak-odali', buildingId: 'tezer', kind: 'twoPlusOne',
+    nameKey: 'nhAptT1Name', descKey: 'nhAptT1Desc',
+    bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
+    price: 45, cleaningFee: 50, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
+    amenityKeys: ['nhAmWifiT1', 'nhAmNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmKitchenEquip', 'nhAmLinen'],
+    photos: photos('t1'),
+  },
+  {
     key: 'y1', slug: 'yasemin-2plus1', buildingId: 'yasemin', kind: 'twoPlusOne',
     nameKey: 'nhAptY1Name', descKey: 'nhAptY1Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
-    price: 60, cleaningFee: 50, deposit: 100, minNights: 1,
+    price: 50, cleaningFee: 50, deposit: 100, minNights: 1,
     electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmDoubleEachRoom', 'nhAmAllRoomsAc', 'nhAmWorkArea', 'nhAmHotWater247', 'nhAmKitchen', 'nhAmSmartTv', 'nhAmWifiY1'],
     photos: photos('y1'),
@@ -97,19 +118,10 @@ export const NH_APARTMENTS = [
     key: 'y2', slug: 'yasemin-2plus1-plus', buildingId: 'yasemin', kind: 'twoPlusOne',
     nameKey: 'nhAptY2Name', descKey: 'nhAptY2Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
-    price: 60, cleaningFee: 50, deposit: 100, minNights: 1,
+    price: 55, cleaningFee: 50, deposit: 100, minNights: 1,
     electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmWifiNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
     photos: photos('y2'),
-  },
-  {
-    key: 'ys', slug: 'lefkosa-gunluk-kiralik-studio-daire', buildingId: 'yasemin', kind: 'studio',
-    nameKey: 'nhAptYSName', descKey: 'nhAptYSDesc',
-    bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
-    price: 35, cleaningFee: 40, deposit: 100, minNights: 1,
-    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
-    amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
-    photos: photos('ys'),
   },
   {
     key: 'ms', slug: 'lefkosa-gunluk-kiralik-studio-daire-dereboyu', buildingId: 'mine', kind: 'studio',
@@ -121,19 +133,10 @@ export const NH_APARTMENTS = [
     photos: photos('ms'),
   },
   {
-    key: 't1', slug: 'lefkosa-gunluk-kiralik-daire-2-yatak-odali', buildingId: 'tezer', kind: 'twoPlusOne',
-    nameKey: 'nhAptT1Name', descKey: 'nhAptT1Desc',
-    bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
-    price: 60, cleaningFee: 50, deposit: 100, minNights: 1,
-    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
-    amenityKeys: ['nhAmWifiT1', 'nhAmNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmKitchenEquip', 'nhAmLinen'],
-    photos: photos('t1'),
-  },
-  {
     key: 'm1', slug: 'lefkosa-gunluk-kiralik-daire-iki-yatak-odali', buildingId: 'mine', kind: 'twoPlusOne',
     nameKey: 'nhAptM1Name', descKey: 'nhAptM1Desc',
     bedrooms: 2, beds: { double: 1, single: 2 }, guests: 4,
-    price: 50, cleaningFee: 50, deposit: 100, minNights: 1,
+    price: 45, cleaningFee: 50, deposit: 100, minNights: 1,
     electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
     amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
     photos: photos('m1'),
@@ -173,8 +176,8 @@ export function nhWaMessage(aptNameTr, buildingName) {
   return `${nhWaLead(aptNameTr, buildingName)} için rezervasyon hakkında bilgi almak istiyorum.`
 }
 
-// The apartment's page on their site. Turkish gets /tr/daireler/<slug> (the site 307s that to
-// its canonical /tr/apartments/<slug>), everyone else the English page. utm_campaign is the
+// The apartment's page on their site. Turkish gets /tr/daireler/<slug> (the URL the site's own TR
+// links use; it loads directly, re-checked 2026-11-02), everyone else the English page. utm_campaign is the
 // partner slug and utm_content the apartment, so their own analytics can see ADA as a source
 // and which apartment was opened — a query string, no SDK, nothing stored on our side.
 export function nhWebsiteUrl(apartment, langCode) {
