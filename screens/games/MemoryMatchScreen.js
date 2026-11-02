@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import ScreenHeader from '../../components/ScreenHeader'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize, shadow, gameColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -153,6 +153,7 @@ export default function MemoryMatchScreen({ lang, onBack }) {
   const bestForDiff = best[diff]
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <ScreenHeader onBack={onBack} lang={lang} title={t('gamesMemoryTitle', lang)} />
 
@@ -223,11 +224,12 @@ export default function MemoryMatchScreen({ lang, onBack }) {
         )}
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: colors.bg },
+  safe:      { flex: 1 },
   body:      { flex: 1, padding: spacing.md },
 
   diffRow:   { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.border, borderRadius: radius.lg, padding: 4, marginBottom: spacing.md },
@@ -237,7 +239,7 @@ const s = StyleSheet.create({
   diffTextActive: { color: colors.textPrimary },
 
   statsRow:  { flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.md },
-  stat:      { fontSize: fontSize.md, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  stat:      { fontSize: fontSize.md, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
   statNum:   { fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   board:     { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },

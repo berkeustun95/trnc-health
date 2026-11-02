@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import ScreenHeader from '../../components/ScreenHeader'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize, shadow, gameColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -159,6 +159,7 @@ export default function SudokuScreen({ lang, onBack }) {
   }
 
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <ScreenHeader onBack={onBack} lang={lang} title={t('gamesSudokuTitle', lang)} />
 
@@ -266,18 +267,19 @@ export default function SudokuScreen({ lang, onBack }) {
             { key: 'erase', icon: 'backspace-outline',   label: t('gamesSudokuErase', lang), onPress: erase },
           ].map(b => (
             <TouchableOpacity key={b.key} style={[s.helperBtn, b.active && s.helperBtnActive]} onPress={b.onPress} activeOpacity={0.75}>
-              <Ionicons name={b.icon} size={22} color={b.active ? colors.primary : colors.textSecondary} />
-              <Text style={[s.helperLabel, b.active && { color: colors.primary }]}>{b.label}</Text>
+              <Ionicons name={b.icon} size={22} color={b.active ? colors.primaryDark : colors.textSecondary} />
+              <Text style={[s.helperLabel, b.active && { color: colors.primaryDark }]}>{b.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: colors.bg },
+  safe:      { flex: 1 },
   body:      { flex: 1, padding: spacing.md },
 
   diffRow:   { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.border, borderRadius: radius.lg, padding: 4, marginBottom: spacing.sm },
@@ -287,7 +289,7 @@ const s = StyleSheet.create({
   diffTextActive: { color: colors.textPrimary },
 
   infoRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  timer:     { fontSize: fontSize.md, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  timer:     { fontSize: fontSize.md, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
   timerNum:  { fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   checkPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.lg, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border },
   checkPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -323,5 +325,5 @@ const s = StyleSheet.create({
   helperRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: spacing.md },
   helperBtn: { alignItems: 'center', gap: 3, paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.md },
   helperBtnActive: { backgroundColor: colors.primaryLight },
-  helperLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
+  helperLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.textSecondaryOnPage },
 })
