@@ -134,7 +134,7 @@ export default function HomeServicePartnerScreen({
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: 120 + insets.bottom }]}>
         <View style={s.hero}>
           <View style={s.badge}>
-            <Ionicons name="ribbon-outline" size={12} color={colors.accent} />
+            <Ionicons name="ribbon-outline" size={12} color={colors.tintLifestyleFg} />
             <Text style={s.badgeText}>{t('hsPartnerBadge', lang)}</Text>
           </View>
           <PartnerLogoStrip
@@ -313,7 +313,7 @@ const s = StyleSheet.create({
   badge:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4,
                   backgroundColor: colors.accentLight, paddingHorizontal: 8, paddingVertical: 3,
                   borderRadius: 10, marginBottom: 12 },
-  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
+  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintLifestyleFg },   // accent on accentLight is 2.17
   heroLogo:     { marginBottom: 10 },
   heroName:     { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   coverageRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },

@@ -270,7 +270,7 @@ const legacyS = StyleSheet.create({
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   planTitle:{ flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   discount: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: colors.successLight },
-  discountText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.success },
+  discountText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.successInk },
   seq:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
   seqPair:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   seqItem:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

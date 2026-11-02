@@ -178,7 +178,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
           if (id === 'hero') return (
             <View key={id} style={[s.hero, heroTheme && { borderBottomColor: heroTheme.rule }]}>
               <View style={[s.badge, heroTheme && { backgroundColor: heroTheme.fill, borderWidth: 1, borderColor: heroTheme.rule }]}>
-                <Ionicons name="ribbon-outline" size={12} color={heroTheme ? heroTheme.text : colors.accent} />
+                <Ionicons name="ribbon-outline" size={12} color={heroTheme ? heroTheme.text : colors.tintLifestyleFg} />
                 <Text style={[s.badgeText, heroTheme && { color: heroTheme.text }]}>{t('petHotelBadge', lang)}</Text>
               </View>
 
@@ -202,7 +202,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               <Text style={s.heroName}>{partner.name}</Text>
               <View style={s.heroMetaRow}>
                 <View style={[s.typePill, heroTheme && { backgroundColor: heroTheme.fill, borderWidth: 1, borderColor: heroTheme.rule }]}>
-                  <Ionicons name="paw" size={11} color={heroTheme ? heroTheme.text : colors.primary} />
+                  <Ionicons name="paw" size={11} color={heroTheme ? heroTheme.text : colors.primaryDark} />
                   <Text style={[s.typePillText, heroTheme && { color: heroTheme.text }]}>{t('petHotelDogBoarding', lang)}</Text>
                 </View>
                 {!!districtKey && (
@@ -364,13 +364,13 @@ const legacyS = StyleSheet.create({
   badge:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4,
                   backgroundColor: colors.accentLight, paddingHorizontal: 8, paddingVertical: 3,
                   borderRadius: 10, marginBottom: 12 },
-  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
+  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintLifestyleFg },
   heroName:     { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   // flexWrap, because Turkish "Köpek pansiyonu" beside a district name overflows 320dp.
   heroMetaRow:  { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 },
   typePill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight,
                   paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  typePillText: { fontSize: 11.5, fontFamily: 'Inter_700Bold', color: colors.primary },
+  typePillText: { fontSize: 11.5, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   metaItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
