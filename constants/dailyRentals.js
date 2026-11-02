@@ -88,10 +88,8 @@ export const nhBuilding = id => NH_BUILDINGS.find(b => b.id === id)
 // price = the nightly rate in the site's booking panel, shown as "from" next to the site's own
 // "prices may vary" note. cleaningFee / deposit / minNights are the same panel's figures.
 // `electricity` (absent = the page states no charge): kWh a day included, then €/kWh, from each apartment's own page.
-// amenityKeys are the site's list in the site's order.
-// REMOVED 2026-11-02 at the partner's request, before launch: the Kaymaklı building and its apartment
-// (north-houses-aladag-sk-kucuk-kaymakli-lefkosa) — config, photos, map link and every string. The
-// partner_booking_requests CHECK still allows that slug; nothing sends it (scripts/check-dorms.mjs).
+// amenityKeys are the site's list in the site's order. The site also lists a Kaymaklı building and
+// apartment; the partner asked for both to stay out of ADA (2026-11-02).
 const photos = key => Array.from({ length: 8 }, (_, i) => `northhouses/${key}-${String(i + 1).padStart(2, '0')}`)
 
 export const NH_APARTMENTS = [

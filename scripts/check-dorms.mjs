@@ -763,22 +763,26 @@ check(/^https:\/\//.test(NORTH_HOUSES.website), `website must be https`)
 check(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(NORTH_HOUSES.email), `email malformed`)
 
 // The six apartments: EXACTLY these slugs, and every one inside the DB CHECK on
-// partner_booking_requests.apartment (20261143). The CHECK still allows the Kaymaklı slug, removed from
-// the app at the partner's request (2026-11-02): a wider CHECK is harmless, a narrower one would drop rows.
-const NH_DB_CHECK_SLUGS = [
+// partner_booking_requests.apartment, READ from 20261143 (the newest migration that defines it). The
+// CHECK still allows the Kaymaklı slug, removed from the app at the partner's request (2026-11-02): a
+// wider CHECK is harmless, a narrower one refuses the insert.
+const nhCheckSql = readFileSync(resolve(ROOT, 'supabase/migrations/20261143_partner_booking_requests.sql'), 'utf8')
+const nhCheckIn = /partner_booking_requests_apartment_check CHECK \(apartment IN \(([^)]*)\)/.exec(nhCheckSql)
+check(!!nhCheckIn, `could not read partner_booking_requests_apartment_check from 20261143`)
+const NH_DB_CHECK_SLUGS = nhCheckIn ? [...nhCheckIn[1].matchAll(/'([^']+)'/g)].map(m => m[1]) : []
+check(NH_DB_CHECK_SLUGS.length >= 6, `CONTROL: read ${NH_DB_CHECK_SLUGS.length} slug(s) from the apartment CHECK`)
+const NH_EXPECTED_SLUGS = [
   'yasemin-2plus1', 'yasemin-2plus1-plus', 'lefkosa-gunluk-kiralik-studio-daire',
   'lefkosa-gunluk-kiralik-studio-daire-dereboyu', 'lefkosa-gunluk-kiralik-daire-2-yatak-odali',
-  'lefkosa-gunluk-kiralik-daire-iki-yatak-odali', 'north-houses-aladag-sk-kucuk-kaymakli-lefkosa',
+  'lefkosa-gunluk-kiralik-daire-iki-yatak-odali',
 ]
-const NH_EXPECTED_SLUGS = NH_DB_CHECK_SLUGS.filter(s => s !== 'north-houses-aladag-sk-kucuk-kaymakli-lefkosa')
 check(NH_APARTMENTS.length === 6, `expected exactly 6 apartments, found ${NH_APARTMENTS.length}`)
 check([...NH_SLUGS].sort().join('|') === [...NH_EXPECTED_SLUGS].sort().join('|'),
   `apartment slugs differ from the expected six.\n    config:   ${NH_SLUGS.join(', ')}\n    expected: ${NH_EXPECTED_SLUGS.join(', ')}`)
 for (const slug of NH_SLUGS) check(NH_DB_CHECK_SLUGS.includes(slug), `${slug} is not allowed by the partner_booking_requests CHECK`)
 check(new Set(NH_SLUGS).size === NH_SLUGS.length && new Set(NH_APARTMENTS.map(a => a.key)).size === NH_APARTMENTS.length,
   `duplicate apartment slug or key`)
-check(NH_BUILDINGS.length === 3, `expected 3 buildings, found ${NH_BUILDINGS.length}`)
-check(!NH_BUILDINGS.some(b => /kaymakl/i.test(b.id + b.name)), `the Kaymaklı building was removed at the partner's request (2026-11-02)`)
+check(NH_BUILDINGS.map(b => b.id).join('|') === 'tezer|yasemin|mine', `buildings must be exactly tezer, yasemin, mine (Kaymaklı removed 2026-11-02), found ${NH_BUILDINGS.map(b => b.id).join(', ')}`)
 for (const b of NH_BUILDINGS) {
   check(/^https:\/\/(maps\.app\.goo\.gl|share\.google)\//.test(b.mapUrl || ''), `building ${b.id}: mapUrl is not the partner's own short link: ${b.mapUrl}`)
   check(!!b.name && !!b.blurbKey, `building ${b.id}: name or blurbKey missing`)
@@ -916,6 +920,10 @@ for (const key of new Set([...nhKeys, ...nhTableKeys])) {
     if (/\{partner\}/.test(t(key, 'English'))) check(v.includes('{partner}') && !v.includes('North Houses'), `i18n: ${key} lost its {partner} placeholder (or names North Houses) in ${l}`)
   }
   check(nhUseSrc.includes(key), `i18n: ${key} is in the table but nothing references it (dead key)`)
+}
+for (const l of LANGS) {
+  const digits = (t('nhHeroSub', l).match(/\d+/g) || [])
+  check(digits.length === 1 && Number(digits[0]) === NH_BUILDINGS.length, `i18n: nhHeroSub in ${l} counts ${digits.join(',') || 'no'} location(s), NH_BUILDINGS has ${NH_BUILDINGS.length}`)
 }
 
 // The screens, as text (they import react-native, so Node cannot): no map, no ad slot, no deal
