@@ -72,8 +72,10 @@ const withDishPhoto = i => ({
 })
 
 // Available items grouped by section, in section_order then sort_order (id breaks ties).
-export function eateryMenuSections(p) {
-  const items = (p?.eatery_menu_items || []).filter(i => i && i.is_available !== false && filled(i.name))
+// adultOk: may this viewer see 18+ items (eatery_menu_items.adult_only, 20261157)? Default false: an 18+ item is shown only
+// when the caller says so (eateryAdultItemsOk). EateryScreen COLS always selects the column (check-required-columns gates it).
+export function eateryMenuSections(p, { adultOk = false } = {}) {
+  const items = (p?.eatery_menu_items || []).filter(i => i && i.is_available !== false && filled(i.name) && (adultOk || i.adult_only !== true))
   const by = new Map()
   for (const i of items) {
     if (!by.has(i.section)) by.set(i.section, { title: i.section, order: i.section_order ?? 0, items: [] })
@@ -152,7 +154,30 @@ export const eateryOrdersByWhatsapp = p => p?.order_method === 'whatsapp'
 export function eateryListMode(p, nums) {
   if (eateryOrdersByWhatsapp(p)) return eateryOrderDigits(nums?.whatsapp) ? 'whatsapp' : null
   if (p?.order_method === 'phone') return eateryContacts(p, nums).some(c => c.action === 'call') ? 'phone' : null
-  return null
+  return null   // 'website' has no list either: the order is placed on the partner's own site (eaterySiteOrderUrl)
+}
+
+// Website partners (20261157): the order is placed on the partner's own site, opened in the in-app browser. Every outbound
+// link carries ADA's UTM tags so the partner can count us too. Only utm_* is ever added: some partner sites read other query
+// keys (pasatiempocy.com switches to a partner table menu on ?partner= / ?venue= / ?table=). No per-dish URL exists today.
+export const EATERY_UTM = 'utm_source=ada&utm_medium=app&utm_campaign=yeme-icme'
+export const eateryOrdersOnWebsite = p => p?.order_method === 'website' && !!https(p?.website_url)
+export function eaterySiteOrderUrl(p) {
+  if (!eateryOrdersOnWebsite(p)) return null
+  const site = https(p.website_url)
+  const hash = site.indexOf('#')
+  const base = hash < 0 ? site : site.slice(0, hash)
+  const frag = hash < 0 ? '' : site.slice(hash)
+  return base + (base.includes('?') ? '&' : '?') + EATERY_UTM + frag
+}
+
+// The partner's own colour for the order-on-site button, or null (= ADA primary) when it is missing, malformed or too light
+// for white text (WCAG AA 4.5:1). #994b17 (Pasatiempo) is 6.2:1.
+export function eateryBrandInk(hex) {
+  if (typeof hex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hex)) return null
+  const lin = c => { const v = parseInt(hex.slice(c, c + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }
+  const L = 0.2126 * lin(1) + 0.7152 * lin(3) + 0.0722 * lin(5)
+  return 1.05 / (L + 0.05) >= 4.5 ? hex : null
 }
 
 // wa.me wants digits only (country code first). Same rule as eateryContacts(); null when too short to dial.
@@ -300,6 +325,9 @@ export function isAdultForOrder(dob, now = new Date()) {
 }
 
 // null = may order; else why not: 'guest' | 'no_dob' | 'under_18'. Only an adult_only partner gates.
+// 18+ menu items (Berke, 2026-11-02): adults only. Guests, accounts without a birth date and under-18s do not see them.
+export const eateryAdultItemsOk = ({ guest, dob, now }) => orderAgeGate({ adultOnly: true, guest, dob, now }) == null
+
 export function orderAgeGate({ adultOnly, guest, dob, now }) {
   if (adultOnly !== true) return null
   if (guest) return 'guest'

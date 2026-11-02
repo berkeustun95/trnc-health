@@ -3,7 +3,7 @@ import { View, Text, Image, Pressable, ScrollView, Animated, Easing, Accessibili
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
-import { formatPrice, eateryListMode, eateryItemOptions } from '../constants/eatery'
+import { formatPrice, eateryListMode, eateryItemOptions, eateryOrdersOnWebsite } from '../constants/eatery'
 import { QUIZ_GENERAL, quizSteps, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, haptic, PageCanvas } from './ui'
@@ -11,6 +11,7 @@ import { EateryLogo, eateryImageUrl } from './EateryBits'
 import { QtyStepper, DishOptionsSheet, OrderBar } from './EateryOrder'
 import { partnerContactNumbers, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
 import { subscribe } from '../utils/eateryBasketCore'
+import { openEaterySite } from '../utils/eaterySite'
 
 // ─── Yeme-İçme: "Ne yesem?" (dish finder) ───────────────────────────────────
 // The matching is constants/eateryQuiz.js (pure, tested); this file is the entry card and the page. The page is a
@@ -149,7 +150,7 @@ function SideRow({ item, text, qty, orderable, hasOpts, lang, onToggle, phone })
   )
 }
 
-function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
+function ResultCard({ entry, lang, canOrder, phone, site, basket, reduce, scoped, onPress, onOpenPartner, onQty, onOptions }) {
   const { item, partner, companions } = entry
   const price = formatPrice(item.price, item.currency, lang)
   const pork = item.protein === 'pork'
@@ -198,6 +199,12 @@ function ResultCard({ entry, lang, canOrder, phone, basket, reduce, scoped, onPr
         <Text style={st.partnerName} numberOfLines={1}>{partner.name}</Text>
         <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
       </Pressable>}
+      {site && !canOrder && (
+        <View style={st.orderRow}>
+          <PillButton filled icon="open-outline" title={t('eateryOrderOnSite', lang)}
+            label={t('eateryOrderOnSiteA11y', lang).replace('{name}', () => item.name)} onPress={() => openEaterySite(partner, item.id)} />
+        </View>
+      )}
       {canOrder && (
         <View style={st.orderRow}>
           {qty < 1 || hasOpts
@@ -366,7 +373,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, config = QU
                   <View style={st.cards}>
                     {result?.dishes.map(d => (
                       <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
-                        canOrder={canOrder(d.partner)} phone={d.partner.order_method === 'phone'} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
+                        canOrder={canOrder(d.partner)} phone={d.partner.order_method === 'phone'} site={eateryOrdersOnWebsite(d.partner) && d.partner.adult_only === false} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>

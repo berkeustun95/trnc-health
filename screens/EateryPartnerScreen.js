@@ -7,12 +7,13 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryOrdersOnWebsite, eateryBrandInk, eateryAdultItemsOk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
-import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
+import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
+import { openEaterySite } from '../utils/eaterySite'
 import { supabase, isGuest } from '../lib/supabase'
 import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, dishUsesSheet, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
@@ -98,9 +99,22 @@ function DishThumb({ item, name, lang, reduce, onOpen, onFail }) {
   )
 }
 
+// "Sitede sipariş ver" (website partners, 20261157): the partner's own colour when it holds 4.5:1 under white text, else ADA
+// primary. compact = the per-dish pill under a menu row; otherwise the full-width call to action under the header.
+function SiteOrderButton({ ink, title, label, compact, onPress }) {
+  return (
+    <Pressable onPress={() => { try { haptic() } catch { /* never blocks the hand-off */ } onPress() }} accessibilityRole="link" accessibilityLabel={label || title}
+      accessibilityHint={label ? undefined : title} style={({ pressed }) => [compact ? s.siteBtnCompact : s.siteBtn, { backgroundColor: ink }, pressed && { opacity: press.small }]}>
+      <Ionicons name="bag-handle-outline" size={compact ? 16 : 18} color={colors.onPrimary} />
+      <Text style={compact ? s.siteBtnTextCompact : s.siteBtnText} numberOfLines={1}>{title}</Text>
+      <Ionicons name="open-outline" size={compact ? 14 : 16} color={colors.onPrimary} />
+    </Pressable>
+  )
+}
+
 // Name and price keep their places in every row (name left, price on the right edge); a row with a
 // photo only gains a leading thumbnail, a row without one is exactly the text-only row.
-const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions, phone }) {
+const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFail, onOpenPhoto, ordering, qty, sheet, onQty, onOptions, phone, siteInk, onSite }) {
   const price = formatPrice(item.price, item.currency, lang)
   const hasPhoto = !failed && (!!item.photoPath || item.photoPlaceholder)
   const row = (
@@ -113,6 +127,16 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
       {price ? <Text style={s.itemPrice}>{price}</Text> : <Text style={s.itemPricePending}>{t('eateryPricePending', lang)}</Text>}
     </View>
   )
+  if (onSite && eateryOrderable(item)) {
+    return (
+      <View>
+        {row}
+        <View style={s.itemOrder}>
+          <SiteOrderButton compact ink={siteInk} title={t('eateryOrderOnSite', lang)} label={t('eateryOrderOnSiteA11y', lang).replace('{name}', () => item.name)} onPress={() => onSite(item.id)} />
+        </View>
+      </View>
+    )
+  }
   if (!ordering || !eateryOrderable(item)) return row
   return (
     <View>
@@ -203,7 +227,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const nums = partnerContactNumbers(partner)
   const contacts = eateryContacts(partner, nums)
   const menuUrl = eateryMenuUrl(partner)
-  const sections = useMemo(() => eateryMenuSections(partner), [partner])
+  const adultOk = eateryAdultItemsOk({ guest: isGuest(session), dob: dateOfBirth })
+  const sections = useMemo(() => eateryMenuSections(partner, { adultOk }), [partner, adultOk])
   const gallery = eateryPhotos(partner, 'gallery')
   const menuPhotos = eateryPhotos(partner, 'menu')
   const week = eateryWeek(partner)
@@ -219,6 +244,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const listMode = eateryListMode(partner, nums)
   const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
+  // Website partners: no list; the header and every orderable dish hand off to the partner's site (utils/eaterySite.js).
+  // An adult_only partner keeps the same 18+ gate as the basket (guests, no DOB and under-18s get no hand-off).
+  const siteOrdering = !partner.placeholder && eateryOrdersOnWebsite(partner)
+    && orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth }) == null
+  const siteInk = eateryBrandInk(partner.brand_color) || colors.primary
+  const onSite = useCallback(itemId => { openEaterySite(partner, itemId) }, [partner])
   const callUrl = contacts.find(c => c.action === 'call')?.url
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
@@ -508,6 +539,13 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>}
 
+        {siteOrdering && (
+          <View style={s.siteCta}>
+            <SiteOrderButton ink={siteInk} title={t('eateryOrderOnSite', lang)} onPress={() => onSite(null)} />
+            <Text style={s.siteHint}>{t('eateryOrderOnSiteHint', lang).replace('{partner}', () => partner.name)}</Text>
+          </View>
+        )}
+
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
 
         {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
@@ -527,7 +565,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 </Text>
                 {sec.items.map(i => {
                   const row = <MenuItemRow item={i} lang={lang} reduce={reduce} failed={!!failedDishes[i.id]} onFail={failDish} onOpenPhoto={setViewing}
-                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} phone={listMode === 'phone'} />
+                    ordering={ordering} qty={dishQty(basket, i.id)} sheet={dishUsesSheet(basket, i.id, eateryItemOptions(i).length > 0)} onQty={onQty} onOptions={openOptions} phone={listMode === 'phone'}
+                    siteInk={siteInk} onSite={siteOrdering ? onSite : undefined} />
                   return i.id === focusId
                     ? <View key={i.id} ref={focusRef} collapsable={false} style={s.focusRow}>{marked === i.id && <FocusMark reduce={reduce} />}{row}</View>
                     : <Fragment key={i.id}>{row}</Fragment>
@@ -565,7 +604,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
         {contacts.length > 0 && (
           <View style={s.actions}>
-            {contacts.map(c => (
+            {contacts.filter(c => !(siteOrdering && c.action === 'website')).map(c => (
               <Button key={c.action} fullWidth variant={CONTACT_UI[c.action].variant}
                 icon={CONTACT_UI[c.action].icon} title={t(c.action === 'call' && orderByPhone ? 'eateryOrderByPhone' : CONTACT_UI[c.action].labelKey, lang)}
                 onPress={() => go(c.action, c.url)} />
@@ -651,6 +690,12 @@ const s = StyleSheet.create({
   itemPrice: { ...type.rowTitle, fontVariant: ['tabular-nums'], color: colors.textPrimary, flexShrink: 0 },
   itemPricePending: { ...type.small, color: colors.textSecondary, flexShrink: 0 },
   itemOrder: { alignItems: 'flex-end', marginBottom: space[4] },
+  siteCta: { gap: space[8] },
+  siteBtn: { minHeight: TAP + 4, borderRadius: radii.md, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  siteBtnText: { ...type.rowTitle, color: colors.onPrimary, flexShrink: 1 },
+  siteBtnCompact: { minHeight: TAP, borderRadius: radii.pill, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' },
+  siteBtnTextCompact: { ...type.small, fontFamily: font.semibold, color: colors.onPrimary, flexShrink: 1 },
+  siteHint: { ...type.small, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: space[8] },
   focusRow:  { marginHorizontal: -space[8], paddingHorizontal: space[8], borderRadius: radii.sm },
   focusMark: { ...StyleSheet.absoluteFillObject, borderRadius: radii.sm, backgroundColor: colors.primaryLight },
   menuBtn:   { marginTop: space[16] },
