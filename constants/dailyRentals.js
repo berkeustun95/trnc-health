@@ -37,7 +37,9 @@ export const NORTH_HOUSES = {
   // ⚠ THIS EXACT VALUE IS THE DB CHECK in partner_booking_requests (20261143) AND utm_campaign.
   slug: 'north_houses',
 
-  name:    'North Houses',
+  // Display name, the operator's own (Alkent's request, 2026-11-02); a proper noun, never translated.
+  // Code names, flags, slug and the building / apartment names stay North Houses.
+  name:    'Alkent Emlak & Danışmanlık',
   website: 'https://www.northcyprusbnb.com',
   email:   'book@northcyprusbnb.com',
   // ONE number for WhatsApp and calls (partner, 2026-10-29); wa.me takes its digits, Ara dials it as is.
