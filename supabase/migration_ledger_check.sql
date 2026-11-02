@@ -271,7 +271,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261155_places_official_visit.sql', '2d2bddfac8e18a2185a342fd5954bcf2fcbcdcf71d17c9f4121abac320c9c8e3'),
   ('20261156_eemd_place_descriptions_i18n.sql', '30c73ff617e34e3cabfd7a088bc8118be6d3792c6d0eef3c59f9f188f092d63d'),
   ('20261157_eatery_order_website.sql', 'f76da3162f38ccaa51e8d81e6614833382c7e78a3b8614a44e02c67b1126f71c'),
-  ('20261158_pasatiempo_data.sql', '815c439290448f682ac51342361caf9184cd5b7a622f6a8c26ddfc82597479a2')
+  ('20261158_pasatiempo_data.sql', '95dc36abf7e48fd7a23140e71377a077cb5e25b19ccdae433b6ffbd1a36a0cbf')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

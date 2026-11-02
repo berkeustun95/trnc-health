@@ -4549,7 +4549,7 @@ const translations = {
     eateryOrderByPhone: "Telefonla sipariş ver",
     eateryOrderOnSite: "Sitede sipariş ver",
     eateryOrderOnSiteA11y: "{name}: restoranın sitesinde sipariş ver",
-    eateryOrderOnSiteHint: "{partner} kendi web sitesinde açılır. Siparişini orada tamamlarsın.",
+    eateryOrderOnSiteHint: "{partner} web sitesi açılır. Siparişini orada tamamlarsın.",
     eateryListTitle: "Listem",
     eateryListHint: "Aradığında listeni restorana oku. Siparişi restoran telefonda alır, ADA ödeme almaz.",
     eateryListClear: "Listeyi temizle",
