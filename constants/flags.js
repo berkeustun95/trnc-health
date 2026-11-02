@@ -414,7 +414,7 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 // the logo is Alkent's mark). Content re-checked against northcyprusbnb.com the same day.
 // HELD 2026-11-02 (Berke): off in the Base C release; goes live after his go, with the Alkent display name (#279).
 // LIVE 2026-11-02 on Berke's go (Preview dd60b945 OK), shipped on its own after the Base C release. Content
-// re-checked against northcyprusbnb.com at the flip: all 7 apartments, map links, check-in/out, phone unchanged.
+// re-checked against northcyprusbnb.com at the flip: the 6 listed apartments, map links, check-in/out, phone unchanged.
 export const NORTH_HOUSES_LIVE = true
 
 // Production switch for North Houses' booking-request form on the apartment screen (it saves a row in
