@@ -467,7 +467,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
 const s = StyleSheet.create({
   ddRow: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 10, flexShrink: 0 },
-  partnerOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
+  partnerOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.pageBase },
   safe:         { flex: 1, backgroundColor: colors.bg },
 
   scroll:       { padding: 20, paddingBottom: 40 },

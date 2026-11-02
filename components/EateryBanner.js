@@ -6,9 +6,13 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 import { EATERY_CATEGORY_KEY, EATERY_BANNER_H, BANNER_BAR_ROW } from '../constants/eatery'
 import { colors, type, space, elevation, motion } from '../constants/theme'
 import { Card, IconButton, RemoteImage } from './ui'
-import { HEADER_SCRIM, SCRIM_FADE } from './ui/ModuleScreen'
+import { SCRIM_FADE } from './ui/ModuleScreen'
 import SplashStatusBar from './SplashStatusBar'
 import { EateryLogo, PlaceholderTag } from './EateryBits'
+
+// Darker than ModuleScreen's HEADER_SCRIM (0.5): there is no module tint under it, so white over a white
+// photo pixel was 3.95; 0.55 is 4.74.
+const BANNER_SCRIM = 0.55
 
 // Partner page photo banner: the photo sits behind the scroll (BannerPhoto), the head card overlaps its bottom edge
 // (BannerHead), and a fixed bar (BannerBar) switches from white-on-scrim to a canvas bar at BAR_SOLID_AT (a threshold, not a scroll
@@ -46,9 +50,9 @@ export function BannerBar({ lang, onBack, solid, reduce }) {
     <View pointerEvents="box-none" style={[s.bar, { height: insets.top + BANNER_BAR_ROW, paddingTop: insets.top }]}>
       <SplashStatusBar style={solid ? 'dark' : 'light'} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: whiteOp }]}>
-        <View style={[s.band, { height: insets.top + BANNER_BAR_ROW, backgroundColor: `rgba(0,0,0,${HEADER_SCRIM})` }]} />
+        <View style={[s.band, { height: insets.top + BANNER_BAR_ROW, backgroundColor: `rgba(0,0,0,${BANNER_SCRIM})` }]} />
         <Image source={DARK_FADE} resizeMode="stretch"
-          style={[s.band, { top: insets.top + BANNER_BAR_ROW, height: SCRIM_FADE, opacity: HEADER_SCRIM / 0.6 }]} />
+          style={[s.band, { top: insets.top + BANNER_BAR_ROW, height: SCRIM_FADE, opacity: BANNER_SCRIM / 0.6 }]} />
       </Animated.View>
       <Animated.View pointerEvents="none" style={[s.canvas, { opacity: canvasOp }]} />
       <View style={s.row}>
@@ -93,7 +97,8 @@ const s = StyleSheet.create({
   tint:       { position: 'absolute', left: 0, right: 0, width: '100%', bottom: 0, height: BANNER_TINT_H, opacity: BANNER_TINT, transform: [{ scaleY: -1 }] },
   band:       { position: 'absolute', top: 0, left: 0, right: 0, width: '100%' },
   bar:        { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  canvas:     { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas },
+  canvas:     { ...StyleSheet.absoluteFillObject, backgroundColor: colors.pageBase,
+                borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   row:        { height: BANNER_BAR_ROW, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[16], gap: space[12] },
   back:       { backgroundColor: colors.card },
   titleBox:   { flex: 1, height: BANNER_BAR_ROW },

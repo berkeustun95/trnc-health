@@ -10,7 +10,7 @@ import DormRoomSheet from '../components/DormRoomSheet'
 import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
 import { colors, shadow, radius, readableOn, radii, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader } from '../components/ui'
+import { ScreenHeader, PageCanvas } from '../components/ui'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { dormSections, dormWaMessage, dormWebsiteUrl, SECTION_ORDER, COLLAPSIBLE } from '../constants/dorms'
@@ -305,6 +305,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
   const HERO_ASPECT = 16 / 9
 
   return (
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={['top']}>
       {REDESIGN ? (
         <ScreenHeader title={partner.name} onBack={onBack} lang={lang} />
@@ -604,6 +605,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
       <DormRoomSheet room={openRoom} partner={partner} lang={lang} region={region}
         onClose={() => setOpenRoom(null)} />
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -745,7 +747,7 @@ const legacyS = StyleSheet.create({
 // Every label, position, link, colour (accent, WhatsApp green, teal), photo crop and logo
 // size is unchanged.
 const redesignS = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: colors.canvas },
+  safe:          { flex: 1 },
   collapseHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: TAP },
   row:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TAP + 4,
                    paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },

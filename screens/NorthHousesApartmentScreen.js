@@ -6,7 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../components/BackButton'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
-import { Card, ScreenHeader } from '../components/ui'
+import { Card, ScreenHeader, PageCanvas } from '../components/ui'
 import { colors, radii, type, TAP } from '../constants/theme'
 import { PILL_ALPHA } from '../components/ui/ModuleScreen'
 import { REDESIGN } from '../constants/redesign'
@@ -449,6 +449,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
   if (apartment.minNights > 1) chips.push(['calendar-outline', fill(t('nhMinStay', lang), apartment.minNights)])
 
   return (
+    <PageCanvas flat>
     <SafeAreaView ref={rootRef} collapsable={false} style={s.safe} edges={['top']}>
       {REDESIGN ? (
         <ScreenHeader title={partner.name} onBack={onBack} lang={lang} />
@@ -545,11 +546,12 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
 
       <PhotoViewer photos={apartment.photos} start={viewerAt} lang={lang} onClose={() => setViewerAt(null)} />
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: colors.canvas },
+  safe:        { flex: 1 },
   navbar:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
   navTitle:    { flex: 1, textAlign: 'center', ...type.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   navSpacer:   { width: 40 },

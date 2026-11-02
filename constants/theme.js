@@ -63,6 +63,7 @@ export const colors = {
   onPrimary:     '#FFFFFF',
   success:       '#2E9E5B',
   successLight:  '#E6F5ED',
+  successInk:    '#1D7441',   // success TEXT on successLight (5.14); success itself is 3.03 there
   danger:        '#D1495B',
   dangerLight:   '#FAEAEC',
 

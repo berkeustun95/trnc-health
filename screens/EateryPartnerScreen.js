@@ -10,7 +10,7 @@ import {
   eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage } from '../components/ui'
+import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
 import { supabase, isGuest } from '../lib/supabase'
@@ -128,7 +128,7 @@ const MenuItemRow = memo(function MenuItemRow({ item, lang, reduce, failed, onFa
 
 // Own memo component: an active-tab change re-renders this row only, never the 46 dish rows.
 // Tab positions inside the row are measured with measureLayout when the active tab changes.
-const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeight, reduce }) {
+const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onMeasure, reduce }) {
   const scrollRef = useRef(null)
   const tabRefs = useRef([])
   const tabsViewW = useRef(0)
@@ -141,7 +141,7 @@ const SectionTabs = memo(function SectionTabs({ titles, active, onSelect, onHeig
     }, () => {})
   }, [active, reduce])
   return (
-    <View style={s.tabsWrap} onLayout={e => onHeight(e.nativeEvent.layout.height)}>
+    <View style={s.tabsWrap} onLayout={e => onMeasure(e.nativeEvent.layout.height)}>
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist"
         onLayout={e => { tabsViewW.current = e.nativeEvent.layout.width }} contentContainerStyle={s.tabsContent}>
         {titles.map((title, i) => (
@@ -478,6 +478,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   }, [startInBasket, ordering, lines.length])
 
   return (
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={showBanner ? [] : ['top']}>
       <View style={s.under} {...(basketOpen || quizOpen ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       {showBanner
@@ -511,7 +512,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
         {showQuizBanner && <PartnerQuizBanner lang={lang} partnerName={partner.name} onPress={() => { setQuizShown(true); setQuizOpen(true) }} />}
 
-        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onHeight={setTabsH} reduce={reduce} />}
+        {showTabs && <SectionTabs titles={sectionTitles} active={activeSec} onSelect={selectSection} onMeasure={setTabsH} reduce={reduce} />}
 
         {hasMenu && (
           <Card>
@@ -601,11 +602,12 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
         bottom={insets.bottom + (lines.length > 0 ? SNACK_ABOVE_BAR : space[16])} />
       <DishPhotoViewer item={viewing} lang={lang} reduce={reduce} onFail={failDish} onClose={() => setViewing(null)} />
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: colors.canvas },
+  safe:      { flex: 1 },
   under:     { flex: 1 },
   content:   { paddingHorizontal: 16, paddingTop: space[8], gap: 14 },
   head:      { flexDirection: 'row', alignItems: 'center', gap: space[16] },
@@ -636,7 +638,7 @@ const s = StyleSheet.create({
   menuSecNext: { marginTop: space[20] },
   secTitle:  { ...type.sectionHeading, color: colors.primaryDark, backgroundColor: colors.primaryLight, borderRadius: radii.sm, paddingVertical: space[8], paddingHorizontal: space[12], marginBottom: space[4] },
   secCount:  { fontFamily: font.regular, color: colors.textSecondary },
-  tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  tabsWrap:  { marginHorizontal: -16, backgroundColor: colors.pageBase, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   tabsContent: { paddingHorizontal: 16 },
   tab:       { minHeight: 44, paddingHorizontal: space[12], justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
   tabOn:     { borderBottomColor: colors.primary },

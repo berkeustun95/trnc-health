@@ -10,7 +10,7 @@ import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import AddressBookSheet, { KindWell, addressLabel } from './AddressBookSheet'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, press, motion, TAP, withAlpha } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage, BottomSheet } from './ui'
+import { ScreenHeader, Card, Button, RemoteImage, BottomSheet, PageCanvas } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 
 // ─── Yeme-İçme: order via WhatsApp (the basket is utils/eateryBasket.js, the message constants/eatery.js) ───
@@ -435,6 +435,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
   }, [msgKey])
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+      <PageCanvas flat>
       <SafeAreaView style={st.page} edges={['top']} {...(covered ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
         <ScreenHeader lang={lang} title={t(phone ? 'eateryListTitle' : 'eateryBasketTitle', lang)} onBack={onClose} />
         <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={[st.content, empty && { paddingBottom: insets.bottom + space[16] }]}
@@ -498,6 +499,7 @@ export function BasketPage({ partner, lang, open, mode = 'whatsapp', onCall, lin
           </View>
         )}
       </SafeAreaView>
+      </PageCanvas>
     </Animated.View>
   )
 }
@@ -532,7 +534,7 @@ const st = StyleSheet.create({
   extraPrice:{ ...type.small, fontVariant: ['tabular-nums'], color: colors.textSecondary },
   bar:       { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },
   barSummary:{ ...type.rowTitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
-  page:      { flex: 1, backgroundColor: colors.canvas },
+  page:      { flex: 1 },
   scroll:    { flex: 1 },
   content:   { paddingHorizontal: space[16], paddingTop: space[8], paddingBottom: space[16], gap: space[12] },
   footer:    { flexShrink: 0, backgroundColor: colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space[16], paddingTop: space[12], gap: space[8] },

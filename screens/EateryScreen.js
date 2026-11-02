@@ -7,7 +7,7 @@ import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
 import { colors, type, space, listBottomPad } from '../constants/theme'
-import { ScreenHeader, ErrorState, Card, CardSkeleton, PageCanvas } from '../components/ui'
+import { ScreenHeader, ErrorState, Card, CardSkeleton, ModuleScreen } from '../components/ui'
 import { EateryLogo, PlaceholderTag, useReduceMotion } from '../components/EateryBits'
 import { QuizEntryCard, QuizPage } from '../components/EateryQuiz'
 import { quizHasMains, quizSteps, QUIZ_GENERAL } from '../constants/eateryQuiz'
@@ -103,7 +103,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
   }, [attempt])
 
   const list = (
-    <PageCanvas>
+    <ModuleScreen topic="eatery">
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.shown} {...(quizOpen === true ? { importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true } : null)}>
       <ScreenHeader lang={lang} title={t('menuEatery', lang)} onBack={onBack} />
@@ -123,7 +123,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
           onClose={() => setQuizOpen(false)} onClosed={() => setQuizShown(false)} onOpenDish={openDish} onOpenMenu={openMenu} onOpenBasket={openBasket} />
       )}
     </SafeAreaView>
-    </PageCanvas>
+    </ModuleScreen>
   )
 
   // One stable tree: the list never remounts when a partner opens (its quiz state and scroll position survive).
