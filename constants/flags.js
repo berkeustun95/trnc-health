@@ -399,8 +399,8 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 // ⚠ DO NOT FLIP until ALL of these hold, in this order:
 //   1. North Houses' WRITTEN OK to list them. There is no deal yet: a free listing, so no ADA code,
 //      no discount, no deal band anywhere in this tab.
-//   2. The content re-checked against northcyprusbnb.com (prices, check-in / check-out, the four map
-//      links, the 56 photos). It was copied on 2026-10-28 and prices move with season.
+//   2. The content re-checked against northcyprusbnb.com (prices, check-in / check-out, the three map
+//      links, the 48 photos). It was copied on 2026-10-28 and prices move with season.
 //   3. ONLY IF the request form ships (NORTH_HOUSES_FORM_LIVE, below): 20261143_partner_booking_requests
 //      applied and its verify_schema rows OK, plus the form's own preconditions on that flag. The listing itself writes nothing but contact_events
 //      taps, which already pass their live CHECKs (module 'accommodation', actions whatsapp /
