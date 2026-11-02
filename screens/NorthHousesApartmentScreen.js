@@ -31,7 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // is on AND (NORTH_HOUSES_FORM_LIVE, or ADA Preview).
 
 const PHOTO_ASPECT = 4 / 3
-// Alkent's full lockup (1200x782): wide enough that ALKENT reads, small enough to sit as a sign-off.
+// Alkent's full lockup (420x274): wide enough that ALKENT reads, small enough to sit as a sign-off.
 const OPERATOR_W = 132
 const OPERATOR_H = 86
 const eur = n => `€${n}`
@@ -517,7 +517,7 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
           )}
 
           <View style={s.operator}>
-            <PartnerLogoStrip source={partnerAsset(partner.logoFull)} name={partner.name} width={OPERATOR_W} height={OPERATOR_H} />
+            <PartnerLogoStrip source={partnerAsset(partner.logoFull)} name="Alkent Emlak & Danışmanlık" width={OPERATOR_W} height={OPERATOR_H} />
           </View>
           <Text style={s.directNote}>{t('nhDirectNote', lang)}</Text>
         </View>

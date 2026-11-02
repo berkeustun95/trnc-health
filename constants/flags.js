@@ -426,8 +426,8 @@ export const NORTH_HOUSES_LIVE = true
 // The screen reads NORTH_HOUSES_FORM = NORTH_HOUSES && (this || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW));
 // IS_PREVIEW_BUILD is a runtime read of extra.appVariant, which only APP_VARIANT=preview sets. A dev build
 // needs the local flip like every gated screen. NOT a MODULE_FLAGS key: it gates nothing else and reveals nothing.
-// LIVE 2026-11-02: 20261148 APPLIED + purge cron OK (supabase-migration-status run 41424092687), privacy
-// 2026-10-30 published at getadaapp.com/privacy.
+// LIVE 2026-11-02: 20261143 + 20261148 APPLIED, verify_schema QUERY 1 all checks pass, purge cron OK
+// (supabase-migration-status run 41424092687); privacy 2026-10-30 published at getadaapp.com/privacy.
 export const NORTH_HOUSES_FORM_LIVE = true
 
 // Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read

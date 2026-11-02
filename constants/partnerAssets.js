@@ -159,8 +159,8 @@ export const PARTNER_ASSETS = {
   // Photos are the partner's own, from northcyprusbnb.com (2026-10-28); written OK received 2026-11-02.
   // The logo is the operator's (Alkent Emlak & Danışmanlık, received 2026-11-02), cut out of their
   // embossed-paper mockup: alpha keyed on saturation, edge colour taken from solid gold (no paper halo).
-  // `logo` is the A+house mark alone (512 square, the 56pt card); `logo-full` adds ALKENT (1200x782,
-  // the apartment screen). The EMLAK & DANIŞMANLIK line is left out: ~5pt at that size. Photos are the
+  // `logo` is the A+house mark alone (256 square, the 56pt card); `logo-full` adds ALKENT (420x274,
+  // 132pt on the apartment screen). Both 256-colour palette PNGs. The EMLAK & DANIŞMANLIK line is left out: ~5pt at that size. Photos are the
   // site's 1920 px originals re-encoded at 1440 px on the long edge (JPEG q82, 2026-10-29), metadata
   // stripped. Site gallery order, 8 per apartment: `<apartment key>-NN`; -01 is the living room for all
   // seven, so it is the card cover. Six are portraits (1080x1440): the 4:3 pager crops them (cover) and

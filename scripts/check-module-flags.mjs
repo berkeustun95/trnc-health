@@ -235,8 +235,8 @@ const EXPECTED_SCALARS = {
   // Oteller (KITOB hotels). Baselined because a flip publishes a third-party
   // association's name and badge — permission first, see the precondition list on the flag.
   HOTELS_LIVE:           true,   // live at unfreeze (KITOB approved 2026-10-04)
-  // Günlük Kiralık (North Houses). Dark until the partner's written OK, a content re-check and the
-  // Turkish device pass; a working-tree true would put an unlisted partner's tab in front of every user.
+  // Günlük Kiralık (North Houses). Hidden 2026-10-30 for want of the partner's written OK and a logo;
+  // both received 2026-11-02, content re-checked and Turkish device pass the same day.
   NORTH_HOUSES_LIVE:     true,   // live 2026-11-02 (written OK + logo received 2026-11-02)
   // Production switch for the booking-request form (needs 20261148 applied + privacy wording published).
   // ADA Preview has its own switch (NORTH_HOUSES_FORM_PREVIEW, constants/redesign.js).

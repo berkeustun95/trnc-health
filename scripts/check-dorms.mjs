@@ -785,9 +785,11 @@ for (const k of ['taglineKey', 'heroSubKey', 'waHoursKey', 'priceNoteKey', 'chec
   check(!!NORTH_HOUSES[k], `NORTH_HOUSES.${k} missing`)
   if (NORTH_HOUSES[k]) nhKeys.add(NORTH_HOUSES[k])
 }
-const nhLogo = nhAssetWired(NORTH_HOUSES.logo)
-check(!!nhLogo, `logo asset ${NORTH_HOUSES.logo} is not wired in partnerAssets.js`)
-check(!!nhAssetWired(NORTH_HOUSES.logoFull), `logoFull asset ${NORTH_HOUSES.logoFull} is not wired in partnerAssets.js`)
+for (const field of ['logo', 'logoFull']) {
+  const m = nhAssetWired(NORTH_HOUSES[field])
+  check(!!m, `${field} asset ${NORTH_HOUSES[field]} is not wired in partnerAssets.js`)
+  if (m) check(existsSync(resolve(ROOT, 'constants', m[1])), `${field}: ${NORTH_HOUSES[field]} -> ${m[1]} is not on disk`)
+}
 let nhPhotos = 0
 for (const b of NH_BUILDINGS) nhKeys.add(b.blurbKey)
 for (const a of NH_APARTMENTS) {
