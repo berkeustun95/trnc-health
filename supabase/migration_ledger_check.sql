@@ -270,8 +270,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261152_bidda_badadez_activate.sql', '1fd494a57352c3c671a963ad231c498f7c7e4a6e21ff3930abd46292c8405d96'),
   ('20261155_places_official_visit.sql', '2d2bddfac8e18a2185a342fd5954bcf2fcbcdcf71d17c9f4121abac320c9c8e3'),
   ('20261156_eemd_place_descriptions_i18n.sql', '30c73ff617e34e3cabfd7a088bc8118be6d3792c6d0eef3c59f9f188f092d63d'),
-  ('20261157_eatery_order_website.sql', 'f76da3162f38ccaa51e8d81e6614833382c7e78a3b8614a44e02c67b1126f71c'),
-  ('20261158_pasatiempo_data.sql', '41af1ed40d3012b8790ffb47da94bb39bc523f90b5d73f16fbfbd7b99c7a6d53')
+  ('20261157_eatery_order_website.sql', 'b232e10420b85cda34749901523f57154b6f4f151c1a844143a5608c47790297'),
+  ('20261158_pasatiempo_data.sql', '08fd2658bf202dc4cc1870f59bd0a9119e9825d87500daa747e3f9bcb6f8046e')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

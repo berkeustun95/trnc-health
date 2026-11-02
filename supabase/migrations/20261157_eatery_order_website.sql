@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261157 — Yeme-İçme: order_method 'website' + eatery_partners.brand_color + contact_events.item_id / 'order_website'
+-- 20261157 — Yeme-İçme: order_method 'website' + brand_color + eatery_menu_items.adult_only + contact_events.item_id / 'order_website'
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- SCHEMA ONLY. No partner row is created here (20261158 seeds Pasatiempo, the first website partner).
@@ -14,6 +14,10 @@
 -- (3) contact_events.item_id bigint NULL: the dish a handoff tap came from. CHECK: NULL, or module = 'eatery' and > 0.
 --     No foreign key (same as entity_id: a counter must never block or cascade on a menu change).
 --     contact_events_action_check gains 'order_website' (the "Sitede sipariş ver" tap).
+-- (4) eatery_menu_items.adult_only boolean NOT NULL DEFAULT false: an 18+ item (alcohol). The app hides it, and its order button,
+--     from guests, accounts without a birth date and under-18s; adults see the full menu (Berke, 2026-11-02). Every existing
+--     item reads false (asserted). This is a DISPLAY rule, not a secret: the row stays readable under the same policies, like
+--     the partner's own public website. Unrelated to eatery_partners.adult_only (that one gates the partner's Home slide).
 --
 -- ANONYMITY (20260910's contract, utils/logContactEvent.js RULE TWO): the risk is a RECURRING KEY tied to a person.
 -- item_id names a restaurant's dish, the same for everyone who taps it: same class as entity_id (the partner) and
@@ -23,6 +27,7 @@
 --   • eatery_partners: NO policy or grant change. brand_color rides under the table-level SELECT grant (anon +
 --     authenticated, guests included) and the existing RLS (active rows for everyone; inactive ones only with the ADA
 --     Preview key). Writes stay service_role only: asserted that anon / authenticated cannot write the column.
+--   • eatery_menu_items: NO policy or grant change; adult_only rides under the table-level SELECT grant. Writes service_role only.
 --   • contact_events: anon and authenticated may now also INSERT item_id (column grant), exactly like lang (20261112).
 --     Nobody but admin reads (ce_select_admin, unchanged); nobody updates or deletes; created_at stays unwritable.
 --     The policy set (4) is asserted unchanged.
@@ -38,6 +43,7 @@
 --   ALTER TABLE public.contact_events DROP COLUMN item_id;   -- also drops contact_events_item_id_check
 --   (action CHECK and order_method CHECK: re-add the 20261123 / 20261144 sets, after removing any rows using the new values)
 --   ALTER TABLE public.eatery_partners DROP COLUMN brand_color;
+--   ALTER TABLE public.eatery_menu_items DROP COLUMN adult_only;
 --
 -- Apply: gh workflow run supabase-migrate -f file=20261157_eatery_order_website.sql (dry), then -f apply=true
 -- (Berke approves production-db). ADDs columns ⇒ ends with NOTIFY pgrst (after COMMIT and RESET ROLE).
@@ -93,6 +99,11 @@ BEGIN
     RAISE EXCEPTION 'pre-state: eatery_partners.brand_color exists as % nullable=% default=% (want text NULL, no default). Nothing applied.', v_t.data_type, v_t.is_nullable, v_t.column_default;
   END IF;
   SELECT data_type, is_nullable, column_default INTO v_t FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'eatery_menu_items' AND column_name = 'adult_only';
+  IF FOUND AND (v_t.data_type IS DISTINCT FROM 'boolean' OR v_t.is_nullable IS DISTINCT FROM 'NO' OR v_t.column_default IS DISTINCT FROM 'false') THEN
+    RAISE EXCEPTION 'pre-state: eatery_menu_items.adult_only exists as % nullable=% default=% (want boolean NOT NULL DEFAULT false). Nothing applied.', v_t.data_type, v_t.is_nullable, v_t.column_default;
+  END IF;
+  SELECT data_type, is_nullable, column_default INTO v_t FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'contact_events' AND column_name = 'item_id';
   IF FOUND AND (v_t.data_type IS DISTINCT FROM 'bigint' OR v_t.is_nullable IS DISTINCT FROM 'YES' OR v_t.column_default IS NOT NULL) THEN
     RAISE EXCEPTION 'pre-state: contact_events.item_id exists as % nullable=% default=% (want bigint NULL, no default). Nothing applied.', v_t.data_type, v_t.is_nullable, v_t.column_default;
@@ -107,6 +118,8 @@ BEGIN
   PERFORM set_config('ada.m1157_ce_policies', coalesce(array_to_string(v_names, ','), ''), true);
 
   PERFORM set_config('ada.m1157_create_md5', md5(pg_get_functiondef('public.create_eatery_order(uuid,jsonb,text)'::regprocedure)), true);
+  PERFORM set_config('ada.m1157_items',
+    (SELECT md5(COALESCE(string_agg((to_jsonb(i) - 'adult_only')::text, ',' ORDER BY i.id), '')) FROM public.eatery_menu_items i), true);
   PERFORM set_config('ada.m1157_partners',
     (SELECT md5(COALESCE(string_agg((to_jsonb(p) - 'brand_color')::text, ',' ORDER BY p.id), '')) FROM public.eatery_partners p), true);
 END $$;
@@ -127,6 +140,12 @@ ALTER TABLE public.eatery_partners ADD  CONSTRAINT eatery_partners_brand_color_c
 
 COMMENT ON COLUMN public.eatery_partners.brand_color IS
   'The partner''s own colour as lower-case #rrggbb: in-app browser toolbar and the order-on-site button. NULL = ADA theme. 20261157.';
+
+-- ─── (4) eatery_menu_items.adult_only ───────────────────────────────────────
+ALTER TABLE public.eatery_menu_items ADD COLUMN IF NOT EXISTS adult_only boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN public.eatery_menu_items.adult_only IS
+  'true = an 18+ item (alcohol): the app hides it and its order button from guests, accounts without a birth date and under-18s; adults see it. A display rule, not access control (the row stays readable). Default false. 20261157.';
 
 -- ─── (3) contact_events: 'order_website' + item_id ──────────────────────────
 ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_action_check;
@@ -193,6 +212,24 @@ BEGIN
   SELECT array_agg(policyname::text ORDER BY policyname) INTO v_names FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_partners';
   IF v_names IS DISTINCT FROM ARRAY['eatery_partners_select_active','eatery_partners_select_preview'] THEN
     RAISE EXCEPTION 'after: eatery_partners policies are %', v_names;
+  END IF;
+  -- eatery_menu_items.adult_only: boolean NOT NULL DEFAULT false, every existing item false and otherwise untouched, clients read-only.
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'eatery_menu_items'
+                  AND column_name = 'adult_only' AND data_type = 'boolean' AND is_nullable = 'NO' AND column_default = 'false') THEN
+    RAISE EXCEPTION 'after: eatery_menu_items.adult_only is not boolean NOT NULL DEFAULT false';
+  END IF;
+  IF (SELECT md5(COALESCE(string_agg((to_jsonb(i) - 'adult_only')::text, ',' ORDER BY i.id), '')) FROM public.eatery_menu_items i)
+     IS DISTINCT FROM current_setting('ada.m1157_items', true) THEN
+    RAISE EXCEPTION 'after: an existing eatery_menu_items row changed';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id WHERE i.adult_only AND p.slug <> 'pasatiempo') THEN
+    RAISE EXCEPTION 'after: an item outside pasatiempo is adult_only';
+  END IF;
+  IF NOT (has_column_privilege('anon', 'public.eatery_menu_items', 'adult_only', 'SELECT')
+      AND has_column_privilege('authenticated', 'public.eatery_menu_items', 'adult_only', 'SELECT'))
+     OR has_column_privilege('anon', 'public.eatery_menu_items', 'adult_only', 'INSERT,UPDATE,REFERENCES')
+     OR has_column_privilege('authenticated', 'public.eatery_menu_items', 'adult_only', 'INSERT,UPDATE,REFERENCES') THEN
+    RAISE EXCEPTION 'after: client privileges on eatery_menu_items.adult_only are not SELECT-only';
   END IF;
   SELECT array_agg(policyname::text ORDER BY policyname) INTO v_names FROM pg_policies WHERE schemaname = 'public' AND tablename = 'contact_events';
   IF coalesce(array_to_string(v_names, ','), '') IS DISTINCT FROM current_setting('ada.m1157_ce_policies', true) THEN
@@ -296,7 +333,7 @@ BEGIN
      OR EXISTS (SELECT 1 FROM public.eatery_partners WHERE id = v_partner) THEN
     RAISE EXCEPTION 'probe rows survived';
   END IF;
-  RAISE NOTICE '20261157: order_method {phone,website,whatsapp}; brand_color + item_id added; create_eatery_order, partner rows and policies unchanged';
+  RAISE NOTICE '20261157: order_method {phone,website,whatsapp}; brand_color + menu adult_only + item_id added; create_eatery_order, partner rows and policies unchanged';
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -310,7 +347,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261157_eatery_order_website.sql', 'f76da3162f38ccaa51e8d81e6614833382c7e78a3b8614a44e02c67b1126f71c')
+VALUES ('20261157_eatery_order_website.sql', 'b232e10420b85cda34749901523f57154b6f4f151c1a844143a5608c47790297')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

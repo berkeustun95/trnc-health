@@ -199,6 +199,8 @@ WITH report AS (
     ('20261151_eatery_partners_banner_path','eatery_partners','banner_path'),
     -- 20261157: the partner's own colour (nullable, lower-case hex); website ordering itself is an H token.
     ('20261157_eatery_order_website','eatery_partners','brand_color'),
+    -- 20261157: an 18+ menu item (alcohol), hidden from guests / no DOB / under-18 by the app; shape is an H token.
+    ('20261157_eatery_order_website','eatery_menu_items','adult_only'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -4269,6 +4271,17 @@ WITH report AS (
                           FROM pg_constraint c WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_item_id_check'), false)
           AND COALESCE(has_column_privilege('anon', to_regclass('public.contact_events'), 'item_id', 'INSERT')
                    AND has_column_privilege('authenticated', to_regclass('public.contact_events'), 'item_id', 'INSERT'), false))
+    UNION ALL SELECT '20261157_eatery_order_website','eatery_menu_items.adult_only: boolean NOT NULL DEFAULT false, clients read-only, 18+ items only at website partners, once 1157 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql')
+      OR (COALESCE((SELECT a.atttypid = 'boolean'::regtype AND a.attnotnull FROM pg_attribute a
+                     WHERE a.attrelid = to_regclass('public.eatery_menu_items') AND a.attname = 'adult_only' AND NOT a.attisdropped), false)
+          AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) = 'false' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                         WHERE d.adrelid = to_regclass('public.eatery_menu_items') AND a.attname = 'adult_only'), false)
+          AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'adult_only', 'SELECT')
+                   AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'adult_only', 'INSERT,UPDATE,REFERENCES')
+                   AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'adult_only', 'INSERT,UPDATE,REFERENCES'), false)
+          AND NOT EXISTS (SELECT 1 FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
+                           WHERE (to_jsonb(i)->>'adult_only')::boolean AND to_jsonb(p)->>'order_method' IS DISTINCT FROM 'website'))
     -- ── 1158: Pasatiempo seed. Asserts only what the file fixed for good: website ordering, a partner pin (never Google), the brand
     --    colour, at least one menu item and no item options (no basket). Address, logo, photos, hours, menu and is_active change later.
     UNION ALL SELECT '20261158_pasatiempo_data','pasatiempo: order_method website, pin source partner, brand_color #994b17, >= 1 menu item, 0 item options, once 1158 is applied',
