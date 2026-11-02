@@ -3,7 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../../components/BackButton'
 import { REDESIGN } from '../../constants/redesign'
-import { ScreenHeader } from '../../components/ui'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import PartnerLogoStrip from '../../components/PartnerLogoStrip'
 import { colors, shadow, radius, radii } from '../../constants/theme'
 import { t, tCount, LANG_CODES } from '../../constants/i18n'
@@ -158,6 +158,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   }
 
   return (
+    <PageCanvas flat>
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* S5 (partner rule, small changes only): the ADA header on the redesign. The partner's
           logo, photos, colours, links, section order and labels are untouched. */}
@@ -177,7 +178,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
           if (id === 'hero') return (
             <View key={id} style={[s.hero, heroTheme && { borderBottomColor: heroTheme.rule }]}>
               <View style={[s.badge, heroTheme && { backgroundColor: heroTheme.fill, borderWidth: 1, borderColor: heroTheme.rule }]}>
-                <Ionicons name="ribbon-outline" size={12} color={heroTheme ? heroTheme.text : colors.accent} />
+                <Ionicons name="ribbon-outline" size={12} color={heroTheme ? heroTheme.text : colors.tintLifestyleFg} />
                 <Text style={[s.badgeText, heroTheme && { color: heroTheme.text }]}>{t('petHotelBadge', lang)}</Text>
               </View>
 
@@ -201,7 +202,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               <Text style={s.heroName}>{partner.name}</Text>
               <View style={s.heroMetaRow}>
                 <View style={[s.typePill, heroTheme && { backgroundColor: heroTheme.fill, borderWidth: 1, borderColor: heroTheme.rule }]}>
-                  <Ionicons name="paw" size={11} color={heroTheme ? heroTheme.text : colors.primary} />
+                  <Ionicons name="paw" size={11} color={heroTheme ? heroTheme.text : colors.primaryDark} />
                   <Text style={[s.typePillText, heroTheme && { color: heroTheme.text }]}>{t('petHotelDogBoarding', lang)}</Text>
                 </View>
                 {!!districtKey && (
@@ -295,7 +296,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               {!!sec.location.address && <Text style={s.about}>{sec.location.address}</Text>}
               {!!sec.location.mapsUrl && (
                 <TouchableOpacity style={s.mapsBtn} onPress={openMaps} activeOpacity={0.85}>
-                  <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                  <Ionicons name="navigate-outline" size={16} color={colors.primaryDark} />
                   <Text style={s.mapsBtnText}>{t('petHotelDirections', lang)}</Text>
                 </TouchableOpacity>
               )}
@@ -345,6 +346,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
         )}
       </View>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -362,13 +364,13 @@ const legacyS = StyleSheet.create({
   badge:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4,
                   backgroundColor: colors.accentLight, paddingHorizontal: 8, paddingVertical: 3,
                   borderRadius: 10, marginBottom: 12 },
-  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
+  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintLifestyleFg },
   heroName:     { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   // flexWrap, because Turkish "Köpek pansiyonu" beside a district name overflows 320dp.
   heroMetaRow:  { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 },
   typePill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight,
                   paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  typePillText: { fontSize: 11.5, fontFamily: 'Inter_700Bold', color: colors.primary },
+  typePillText: { fontSize: 11.5, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   metaItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
@@ -396,9 +398,9 @@ const legacyS = StyleSheet.create({
   serviceText:  { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   mapsBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.sm,
+                  borderWidth: 1.5, borderColor: colors.primaryDark, borderRadius: radius.sm,
                   paddingVertical: 11, marginTop: 10, backgroundColor: 'transparent' },
-  mapsBtnText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
+  mapsBtnText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                   paddingVertical: 7, gap: 12 },
@@ -422,12 +424,13 @@ const legacyS = StyleSheet.create({
 })
 
 // S5 redesign overrides — shape and spacing only (partner rule): the ADA page ground, 44–48pt
-// buttons on the redesign radius. Every colour, label, link and position is unchanged; the
+// buttons on the redesign radius. Every colour, label, link and position is unchanged (except
+// the maps button in primaryDark, approved by Berke 2026-11-02); the
 // WhatsApp is WhatsApp's dark green #075E54 (7.67:1; was #25D366, 1.98:1) — approved 2026-10-01.
 const redesignS = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: colors.canvas },
+  safe:     { flex: 1 },
   mapsBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44,
-              borderWidth: 1.5, borderColor: colors.primary, borderRadius: radii.md, marginTop: 10, backgroundColor: 'transparent' },
+              borderWidth: 1.5, borderColor: colors.primaryDark, borderRadius: radii.md, marginTop: 10, backgroundColor: 'transparent' },
   waBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
               backgroundColor: '#075E54', borderRadius: radii.md },
   callBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,

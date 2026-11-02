@@ -1037,7 +1037,7 @@ const legacyCs = StyleSheet.create({
 // the dorm card is a partner surface (logo strip, order, accent dot untouched).
 const redesignCs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: 'transparent' },
-  detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas, zIndex: 20, elevation: 20 },
+  detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.pageBase, zIndex: 20, elevation: 20 },
   intentTab:           { minHeight: TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radii.pill,
                          backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
   intentTabActive:     { backgroundColor: colors.primary, borderColor: colors.primary },

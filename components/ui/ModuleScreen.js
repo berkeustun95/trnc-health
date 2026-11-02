@@ -42,6 +42,11 @@ export const MODULE_PHOTO = {
   // header's ℹ︎ button (DUY_PHOTO_CREDIT, constants/duyurular.js). Left-anchored 1:2 crop
   // (x 0–4080 of 6120) so the gate stays whole on a phone, resized to 1200×2400.
   duyurular:      require('../../assets/backgrounds/ada-bg-duyurular.jpg'),
+  // Generated for ADA from Berke's briefs (2026-11-02): 768×1376 sources, centred 637-wide crop
+  // resized to 704×1520, WebP q72. Notifications: the phone's maker logo painted out (no logos).
+  eatery:         require('../../assets/backgrounds/ada-bg-eatery.webp'),
+  notifications:  require('../../assets/backgrounds/ada-bg-notifications.webp'),
+  studentHub:     require('../../assets/backgrounds/ada-bg-student-hub.webp'),
 }
 
 // fullBleed: the photo from the very top, under the status bar — main's Sağlık facility list

@@ -8,7 +8,8 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader, Button, EmptyState, RowSkeleton } from '../components/ui'
+import { ScreenHeader, Button, EmptyState, RowSkeleton, ModuleScreen } from '../components/ui'
+import { CARD_BG } from '../components/ui/ModuleScreen'
 import { colors as C, type, radii, elevation, press } from '../constants/theme'
 import { notificationRoute } from '../utils/notificationRoute'
 
@@ -63,18 +64,19 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
   const listMem = useScrollMemory('notifs')
   const unread = notifications.filter(n => !n.read).length
   return (
+    <ModuleScreen topic="notifications">
     <SafeAreaView style={r.safe} edges={['top']}>
       <ScreenHeader title={t('notifications', lang)} onBack={onBack} lang={lang} />
       <PushOffRow lang={lang} onEnablePush={onEnablePush} />
       {notifications.length > 0 && (
         <View style={r.actions}>
           {unread > 0
-            ? <Button variant="text" icon="checkmark-done-outline" title={t('markAllRead', lang)} onPress={onMarkAllRead} />
-            : <Button variant="text" icon="trash-outline" title={t('clearAll', lang)} onPress={onClearAll} />}
+            ? <Button variant="secondary" icon="checkmark-done-outline" title={t('markAllRead', lang)} onPress={onMarkAllRead} />
+            : <Button variant="secondary" icon="trash-outline" title={t('clearAll', lang)} onPress={onClearAll} />}
         </View>
       )}
       {loading ? (
-        <View style={r.list}><RowSkeleton count={5} /></View>
+        <View style={r.list}><View style={[r.skeleton, elevation.card]}><RowSkeleton count={5} /></View></View>
       ) : notifications.length === 0 ? (
         <EmptyState icon="notifications-outline" category="city" title={t('noNewNotifications', lang)} />
       ) : (
@@ -110,6 +112,7 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
         />
       )}
     </SafeAreaView>
+    </ModuleScreen>
   )
 }
 
@@ -213,13 +216,14 @@ const s = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: C.canvas },
-  actions:     { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 8 },
+  skeleton:    { backgroundColor: CARD_BG, borderRadius: radii.card, paddingHorizontal: 14, paddingVertical: 4 },
+  safe:        { flex: 1 },
+  actions:     { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginBottom: 8 },
   pushOff:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8,
-                 paddingLeft: 14, paddingRight: 4, minHeight: 48, borderRadius: radii.md, backgroundColor: C.card, ...elevation.card },
+                 paddingLeft: 14, paddingRight: 4, minHeight: 48, borderRadius: radii.card, backgroundColor: CARD_BG, ...elevation.card },
   pushOffText: { ...type.small, color: C.textSecondary, flex: 1 },
   list:        { paddingHorizontal: 16, paddingBottom: 32 },
-  card:        { backgroundColor: C.card, borderRadius: radii.md, padding: 14, marginBottom: 8,
+  card:        { backgroundColor: CARD_BG, borderRadius: radii.card, padding: 14, marginBottom: 8,
                  flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   dot:         { width: 9, height: 9, borderRadius: 4.5, backgroundColor: C.dangerInk, marginTop: 6 },
   dotRead:     { backgroundColor: 'transparent' },

@@ -12,7 +12,7 @@ import { partnerLogo, partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
 import { REDESIGN } from '../constants/redesign'
 import { colors as C, type } from '../constants/theme'
-import { ScreenHeader as UiHeader, ContactBar } from '../components/ui'
+import { ScreenHeader as UiHeader, ContactBar, PageCanvas } from '../components/ui'
 
 // The partner detail screen. Structure mirrors TowingDetailScreen — navbar, hero, a stack
 // of bordered blocks, a fixed contact bar — because that is the shape this app already
@@ -117,6 +117,7 @@ export default function HomeServicePartnerScreen({
   }
 
   return (
+    <PageCanvas flat>
     <SafeAreaView style={st.safe} edges={['top']}>
       {REDESIGN ? (
         <UiHeader onBack={onBack} title={row.name} lang={lang} />
@@ -133,7 +134,7 @@ export default function HomeServicePartnerScreen({
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: 120 + insets.bottom }]}>
         <View style={s.hero}>
           <View style={s.badge}>
-            <Ionicons name="ribbon-outline" size={12} color={colors.accent} />
+            <Ionicons name="ribbon-outline" size={12} color={colors.tintLifestyleFg} />
             <Text style={s.badgeText}>{t('hsPartnerBadge', lang)}</Text>
           </View>
           <PartnerLogoStrip
@@ -294,6 +295,7 @@ export default function HomeServicePartnerScreen({
       </View>
       )}
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
@@ -311,7 +313,7 @@ const s = StyleSheet.create({
   badge:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4,
                   backgroundColor: colors.accentLight, paddingHorizontal: 8, paddingVertical: 3,
                   borderRadius: 10, marginBottom: 12 },
-  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
+  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintLifestyleFg },   // accent on accentLight is 2.17
   heroLogo:     { marginBottom: 10 },
   heroName:     { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   coverageRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
@@ -381,7 +383,7 @@ const s = StyleSheet.create({
 // Redesign: page canvas, kit header and bar, Inter section titles. Nothing about the partner
 // (logo strip, badge, gallery, copy, order) is restyled here.
 const r = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: C.canvas },
+  safe:       { flex: 1 },
   block:      { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
   blockTitle: { ...type.rowTitle, color: C.textPrimary, marginBottom: 10 },
   contactBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10,

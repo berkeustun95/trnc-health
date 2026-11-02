@@ -464,7 +464,7 @@ function PropertyDetailRedesign({
   // The agency row (logo or name) sits on top of the sticky bar, as in the legacy bar.
   const barH = 10 + LOGO_H + 10 + TAP + 10
   return (
-    <PageCanvas>
+    <PageCanvas flat>
     <SafeAreaView style={rs.root} edges={['top']}>
       {/* The gallery starts below the status bar, so the icons sit on the light ground. */}
       <SplashStatusBar style="dark" />

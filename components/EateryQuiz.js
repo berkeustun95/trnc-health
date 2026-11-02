@@ -6,7 +6,7 @@ import { t } from '../constants/i18n'
 import { formatPrice, eateryListMode, eateryItemOptions } from '../constants/eatery'
 import { QUIZ_GENERAL, quizSteps, quizToggle, quizMatch, quizSideOrderable, quizBasketSummary, quizBarPartner } from '../constants/eateryQuiz'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
-import { ScreenHeader, Card, Button, RemoteImage, haptic } from './ui'
+import { ScreenHeader, Card, Button, RemoteImage, haptic, PageCanvas } from './ui'
 import { EateryLogo, eateryImageUrl } from './EateryBits'
 import { QtyStepper, DishOptionsSheet, OrderBar } from './EateryOrder'
 import { partnerContactNumbers, getBasket, changeQty, setLine, lineKey, dishQty, dishKeys, getLastAdded } from '../utils/eateryBasket'
@@ -311,6 +311,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, config = QU
 
   return (
     <Animated.View collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+      <PageCanvas>
       <SafeAreaView style={st.page} edges={['top']}>
         <ScreenHeader lang={lang} title={t('eateryQuizCardTitle', lang)} onBack={goBack} />
         <View style={st.progress}>
@@ -392,6 +393,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, config = QU
           </View>
         )}
       </SafeAreaView>
+      </PageCanvas>
     </Animated.View>
   )
 }
@@ -406,20 +408,20 @@ const st = StyleSheet.create({
   bannerLead: { fontFamily: font.semibold },
   entryText:  { flex: 1 },
   entryTitle: { ...type.rowTitle, color: colors.textPrimary },
-  entryBody:  { ...type.small, color: colors.textSecondary, marginTop: 2 },
-  page:       { flex: 1, backgroundColor: colors.canvas },
-  progress:   { flexShrink: 0, backgroundColor: colors.canvas, zIndex: 1, paddingHorizontal: space[16], paddingTop: space[4], paddingBottom: space[12], gap: space[8] },
+  entryBody:  { ...type.small, color: colors.textSecondaryOnPage, marginTop: 2 },
+  page:       { flex: 1 },
+  progress:   { flexShrink: 0, zIndex: 1, paddingHorizontal: space[16], paddingTop: space[4], paddingBottom: space[12], gap: space[8] },
   dots:       { flexDirection: 'row', gap: space[4] },
   dot:        { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.border },
   dotOn:      { backgroundColor: colors.primary },
-  step:       { ...type.meta, color: colors.textSecondary },
+  step:       { ...type.meta, color: colors.textSecondaryOnPage },
   scroll:     { flex: 1 },
   content:    { paddingHorizontal: space[16], paddingTop: space[4], gap: space[16] },
   question:   { flex: 1, ...type.detailTitle, color: colors.textPrimary },
   qRow:       { flexDirection: 'row', alignItems: 'center', gap: space[12] },
   qMascot:    { width: 56, height: 56, flexShrink: 0 },
-  hint:       { ...type.small, color: colors.textSecondary, marginTop: -space[8] },
-  hintHit:    { color: colors.dangerInk, fontFamily: font.semibold },
+  hint:       { ...type.small, color: colors.textSecondaryOnPage, marginTop: -space[8] },
+  hintHit:    { color: colors.dangerInkOnPage, fontFamily: font.semibold },
   grid:       { gap: space[12] },
   gridWrap:   { flexDirection: 'row', flexWrap: 'wrap' },
   fullW:      { width: '100%' },
@@ -430,7 +432,7 @@ const st = StyleSheet.create({
   tileOn:     { backgroundColor: colors.primaryLight },
   tileLocked: { backgroundColor: colors.soft },
   emojiLocked:{ opacity: 0.5 },
-  tileTextLocked: { color: colors.textSecondary },
+  tileTextLocked: { color: colors.textSecondaryOnPage },
   tileBorder: { ...StyleSheet.absoluteFillObject, borderRadius: radii.tile, borderWidth: 2, borderColor: colors.primary, backgroundColor: 'transparent' },
   icon:       { width: 40, height: 40, marginVertical: 1 },   // emoji line box is 38 tall: the Q3 icons sit in the same row height
   emoji:      { fontSize: 30, lineHeight: 38 },
@@ -446,17 +448,17 @@ const st = StyleSheet.create({
   resultText: { flex: 1, gap: 4 },
   dishName:   { ...type.rowTitle, color: colors.textPrimary },
   partnerRow: { minHeight: TAP, flexDirection: 'row', alignItems: 'center', gap: space[8], marginTop: space[4] },
-  partnerName:{ flexShrink: 1, ...type.small, color: colors.textSecondary },
+  partnerName:{ flexShrink: 1, ...type.small, color: colors.textSecondaryOnPage },
   price:      { ...type.body, fontFamily: font.semibold, fontVariant: ['tabular-nums'], color: colors.textPrimary },
   pork:       { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radii.pill, paddingHorizontal: space[8], paddingVertical: space[4], backgroundColor: colors.dangerLight },
-  porkText:   { ...type.meta, color: colors.dangerInk, flexShrink: 1 },
+  porkText:   { ...type.meta, color: colors.dangerInkOnPage, flexShrink: 1 },
   side:       { gap: space[4], marginTop: space[12], paddingTop: space[12], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   sideRow:    { flexDirection: 'row', alignItems: 'center', gap: space[8] },
   sideText:   { flex: 1, ...type.small, color: colors.textPrimary },
   relaxed:    { flexDirection: 'row', alignItems: 'flex-start', gap: space[8], padding: space[12], borderRadius: radii.md, backgroundColor: colors.primaryLight },
   relaxedText:{ flex: 1, ...type.small, color: colors.primaryDark },
   empty:      { alignItems: 'center', paddingVertical: space[24], gap: space[12] },
-  emptyText:  { ...type.body, color: colors.textSecondary, textAlign: 'center' },
+  emptyText:  { ...type.body, color: colors.textSecondaryOnPage, textAlign: 'center' },
   retry:      { marginTop: space[4] },
   pill:       { alignSelf: 'flex-start', minHeight: TAP, paddingHorizontal: space[16], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[4], borderRadius: radii.pill },
   pillFilled: { backgroundColor: colors.primary },

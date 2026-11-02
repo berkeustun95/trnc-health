@@ -4,7 +4,7 @@ import { useScrollMemory } from '../../utils/scrollMemory'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import BackButton from '../../components/BackButton'
+import { ScreenHeader, PageCanvas } from '../../components/ui'
 import PetsRegulatoryNotice from '../../components/PetsRegulatoryNotice'
 import PetsStaleNotice from '../../components/PetsStaleNotice'
 import VetDeptActions from '../../components/VetDeptActions'
@@ -49,12 +49,9 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
   // scroll — App.js swaps whole pets pages, so this one remounts (utils/scrollMemory.js).
   const scrollMem = useScrollMemory('pets:owning')
   return (
+    <PageCanvas>
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.headerTitle}>{t('petsOwningTitle', lang)}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title={t('petsOwningTitle', lang)} onBack={onBack} lang={lang} />
 
       <ScrollView {...scrollMem} style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -112,16 +109,15 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
         <PetsDisclaimer lang={lang} />
       </ScrollView>
     </SafeAreaView>
+    </PageCanvas>
   )
 }
 
 const s = StyleSheet.create({
-  safe:              { flex: 1, backgroundColor: colors.bg },
-  header:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle:       { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
+  safe:              { flex: 1 },
   scroll:            { flex: 1 },
   scrollContent:     { padding: 16, paddingBottom: 48 },
-  sectionHeader:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginBottom: 10, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionHeader:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, marginBottom: 10, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
 
   infoCard:          { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 14, marginBottom: 4, ...shadow },
   infoCardBody:      { fontSize: 13, color: colors.textSecondary, fontFamily: 'Inter_400Regular', lineHeight: 19 },
@@ -146,5 +142,5 @@ const s = StyleSheet.create({
   contactBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   disclaimer:        { flexDirection: 'row', gap: 8, marginTop: 24, paddingHorizontal: 4 },
-  disclaimerText:    { fontSize: 12, color: colors.textSecondary, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  disclaimerText:    { fontSize: 12, color: colors.textSecondaryOnPage, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
 })

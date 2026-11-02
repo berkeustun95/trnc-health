@@ -9,7 +9,7 @@ import { addAddress, updateAddress, deleteAddress, setLastUsed, ADDRESS_BOOK_MAX
 import { quietFix, useLocate } from '../utils/deliveryLocate'
 import useKeyboardTop from '../utils/useKeyboardTop'
 import { colors, font, type, radii, space, elevation, press, motion, TAP } from '../constants/theme'
-import { ScreenHeader, Button, ConfirmDialog } from './ui'
+import { ScreenHeader, Button, ConfirmDialog, PageCanvas } from './ui'
 import DeliveryPinPicker from './DeliveryPinPicker'
 
 // "Yeni adres / Adresi düzenle": a full page layered over Sepetim (an overlay, not a Modal: the permission explanation screen is
@@ -272,6 +272,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
   const showMap = step === 2 && pickerOpen && !!pickerStart
   return (
     <Animated.View ref={rootRef} collapsable={false} style={[StyleSheet.absoluteFill, { transform: [{ translateX: slide }] }]} accessibilityViewIsModal>
+      <PageCanvas flat>
       <SafeAreaView style={s.page} edges={['top']}>
         <ScreenHeader lang={lang} title={title} onBack={onBack} />
         <View style={s.progress} accessible accessibilityRole="progressbar" accessibilityLabel={progress} accessibilityValue={{ min: 1, max: STEPS, now: step }}>
@@ -367,6 +368,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
           </>
         )}
       </SafeAreaView>
+      </PageCanvas>
       <ConfirmDialog visible={confirmDel === true} lang={lang} destructive title={t('eateryAddrDeleteTitle', lang)} confirmLabel={t('eateryAddrDeleteYes', lang)}
         loading={deleting} error={confirmDel ? saveErr : null} onConfirm={remove} onCancel={() => setConfirmDel(false)} />
     </Animated.View>
@@ -374,7 +376,7 @@ export default function AddressEditor({ lang, open, step, pickerOpen, seed, redu
 }
 
 const s = StyleSheet.create({
-  page:      { flex: 1, backgroundColor: colors.canvas },
+  page:      { flex: 1 },
   progress:  { flexShrink: 0, gap: space[8], paddingHorizontal: space[16], paddingVertical: space[8] },
   progressText:{ ...type.meta, color: colors.textSecondary },
   segs:      { flexDirection: 'row', gap: space[8] },
