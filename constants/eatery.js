@@ -183,9 +183,11 @@ export function eaterySiteCartLines(lines) {
   for (const l of lines || []) {
     const id = l?.item?.partner_item_id
     if (typeof id !== 'string' || !PARTNER_ITEM_ID.test(id) || !(l.qty > 0)) continue
-    by.set(id, (by.get(id) || 0) + Math.floor(l.qty))
+    const e = by.get(id) || { id, qty: 0, itemId: l.id }   // itemId: our eatery_menu_items.id, for the tap log
+    e.qty += Math.floor(l.qty)
+    by.set(id, e)
   }
-  return [...by].map(([id, qty]) => ({ id, qty }))
+  return [...by.values()]
 }
 export function eaterySiteCartUrl(p, lines) {
   const cart = eaterySiteCartLines(lines)

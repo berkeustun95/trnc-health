@@ -34,6 +34,7 @@ import { BannerPhoto, BannerBar, BannerHead, BAR_SOLID_AT } from '../components/
 // basket (in memory, utils/eateryBasket.js) becomes ONE Turkish wa.me message; ADA takes no payment and keeps nothing.
 
 const HANDOFF_MS = 2800   // owner-demo hand-off screen: long enough to read the lines, short enough not to feel stuck
+const HANDOFF_FADE_MS = 400
 
 const CONTACT_UI = {
   call:     { icon: 'call-outline',      labelKey: 'petHotelCall',       variant: 'primary' },
@@ -237,14 +238,19 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const orderCount = lines.reduce((n, l) => n + l.qty, 0)
   const orderTotalText = formatMoney(orderTotal(lines))
   const handoffTimer = useRef(null)
+  const openingRef = useRef(false)   // one hand-off at a time: a fast double tap must not open the site twice or log twice
   useEffect(() => () => clearTimeout(handoffTimer.current), [])
   const siteOrder = useCallback(() => {
-    if (listMode !== 'website' || lines.length === 0 || lines.some(l => l.stale)) return
-    if (!EATERY_DEMO) { openEaterySite(partner, lines); return }
+    if (openingRef.current || listMode !== 'website' || lines.length === 0 || lines.some(l => l.stale)) return
+    if (orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })) return   // second guard (BasketPage hides it)
+    openingRef.current = true
+    const open = () => openEaterySite(partner, lines).finally(() => { openingRef.current = false })
+    if (!EATERY_DEMO) { open(); return }
     setHandoff(true)
     clearTimeout(handoffTimer.current)
-    handoffTimer.current = setTimeout(() => { setHandoff(false); openEaterySite(partner, lines) }, HANDOFF_MS)
-  }, [listMode, lines, partner])
+    // The Modal fades out first: iOS refuses to present the browser over a Modal that is still on screen.
+    handoffTimer.current = setTimeout(() => { setHandoff(false); handoffTimer.current = setTimeout(open, HANDOFF_FADE_MS) }, HANDOFF_MS)
+  }, [listMode, lines, partner, session, dateOfBirth])
   const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
   const [basketShown, setBasketShown] = useState(false)
   // "Ne yesem?" scoped to this partner: a layer over the page (rows = just this partner), closed by Back first.

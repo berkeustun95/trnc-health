@@ -691,18 +691,18 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   const qz = fs.readFileSync(new URL('../components/EateryQuiz.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   const es = fs.readFileSync(new URL('../utils/eaterySite.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
   const eo = fs.readFileSync(new URL('../components/EateryOrder.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
-  eq('wiring: every basket line is logged as order_website with its dish, behind CONTACT_LOGGING, only for live non-fixture rows', /for \(const l of lines\) if \(CONTACT_LOGGING && !partner\.placeholder && partner\.is_active !== false\) logContactEvent\('eatery', partner\.id, 'order_website', null, null, l\.id\)/.test(es), true)
+  eq('wiring: every basket line is logged as order_website with its dish, behind CONTACT_LOGGING, only for live non-fixture rows', /for \(const c of eaterySiteCartLines\(lines\)\) if \(CONTACT_LOGGING && !partner\.placeholder && partner\.is_active !== false\) logContactEvent\('eatery', partner\.id, 'order_website', null, null, c\.itemId\)/.test(es), true)
   eq('wiring: the log line comes BEFORE the browser opens; the URL is the cart URL', es.indexOf("'order_website'") > 0 && es.indexOf("'order_website'") < es.indexOf('openBrowserAsync') && /const url = eaterySiteCartUrl\(partner, lines\)/.test(es), true)
-  eq('wiring: expo-web-browser is required inside the function, with a Linking fallback', /export async function openEaterySite[\s\S]*require\('expo-web-browser'\)[\s\S]*Linking\.openURL\(url\)/.test(es) && !/^import[^\n]*expo-web-browser/m.test(es), true)
-  eq('wiring: the hand-off reads `lines` (the visible, age-filtered basket), never the raw store', /openEaterySite\(partner, lines\)/.test(ps) && !/openEaterySite\(partner, basket/.test(ps), true)
+  eq('wiring: expo-web-browser is required inside the function, with a Linking fallback', /export async function openEaterySite[\s\S]*require\('expo-web-browser'\)[\s\S]*if \(!WebBrowser\?\.openBrowserAsync\) \{\s*try \{ await Linking\.openURL\(url\)/.test(es) && !/^import[^\n]*expo-web-browser/m.test(es) && es.split('Linking.openURL').length === 2, true)
+  eq('wiring: the hand-off reads `lines` (the visible, age-filtered basket), never the raw store', /openEaterySite\(partner, lines\)/.test(ps) && !/openEaterySite\(partner, basket/.test(ps) && /orderAgeGate\(\{ adultOnly: partner\.adult_only, guest: isGuest\(session\), dob: dateOfBirth \}\)\) return/.test(ps), true)
   eq('wiring: no per-dish site button, no header CTA, the generic website contact is back', [/SiteOrderButton|siteOrdering|\bonSite\b/.test(ps), /contacts\.map\(c => \(/.test(ps)], [false, true])
   eq('wiring: basket page — website branch hides delivery + note, sends to the site, keeps the 18+ gate first', [
     /\{!phone && !site && <DeliveryCard/.test(eo), /\{!phone && !site && \(\s*<Card>/.test(eo), /\) : ageGate \? null : site \? \(\s*<Button fullWidth icon="open-outline"[^\n]*onPress=\{onSiteOrder\}/.test(eo)], [true, true, true])
-  eq('wiring: demo hand-off only under EATERY_DEMO (Preview build + EXPO_PUBLIC_EATERY_DEMO=1)', /if \(!EATERY_DEMO\) \{ openEaterySite\(partner, lines\); return \}/.test(ps), true)
+  eq('wiring: demo hand-off only under EATERY_DEMO (Preview build + EXPO_PUBLIC_EATERY_DEMO=1)', /if \(!EATERY_DEMO\) \{ open\(\); return \}/.test(ps) && /if \(openingRef\.current \|\|/.test(ps), true)
   eq('wiring: quiz has no site pill (website dishes use the basket: Sepete ekle)', /openEaterySite|site && !canOrder/.test(qz), false)
   eq('i18n: website keys in all 9 languages', ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa'].every(l => ['eateryOrderOnSite', 'eateryOrderOnSiteHint', 'eateryHandoffTitle', 'eateryDemoLabel'].every(k => t(k, ({ en: 'English', tr: 'Turkish', ar: 'Arabic', ru: 'Russian', el: 'Greek', fr: 'French', es: 'Spanish', de: 'German', fa: 'Persian' })[l]) !== k)), true)
   eq('i18n: Turkish texts', [t('eateryOrderOnSite', 'Turkish').replace('{host}', 'pasatiempocy.com'), t('eateryHandoffTitle', 'Turkish').replace('{host}', 'pasatiempocy.com'), t('eateryQuizAddToBasket', 'Turkish')],
-    ['Sipariş ver — pasatiempocy.com', 'Sepetiniz pasatiempocy.com adresine aktarılıyor', 'Sepete ekle'])
+    ['Sipariş ver — pasatiempocy.com', 'Sepetin pasatiempocy.com sitesine aktarılıyor', 'Sepete ekle'])
 }
 
 // 18+ menu items (eatery_menu_items.adult_only, 20261157; Berke 2026-11-02): adults see them, guests / no DOB / under-18 do not.
