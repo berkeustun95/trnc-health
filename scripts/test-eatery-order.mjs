@@ -3,7 +3,7 @@
 import * as B from '../utils/eateryBasketCore.js'
 import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eateryBrandInk, EATERY_UTM } from '../constants/eatery.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -662,6 +662,36 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('wiring: the phone call logs through go(\'call\') only; no new contact action', /onCall=\{\(\) => \{ if \(callUrl\) go\('call', callUrl\) \}\}/.test(ps), true)
   eq('wiring: quiz canOrder is eateryListMode (whatsapp or phone list)', /const canOrder = p => eateryListMode\(p, partnerContactNumbers\(p\)\) != null/.test(qz), true)
   eq('wiring: phone partner call button is relabelled eateryOrderByPhone', /c\.action === 'call' && orderByPhone \? 'eateryOrderByPhone'/.test(ps), true)
+}
+
+// Website partners (20261157): no list, a hand-off to the partner's own site with ADA's UTM tags and nothing else.
+{
+  const web = { id: 'p', order_method: 'website', website_url: 'https://pasatiempocy.com', phone: '+90 539 112 72 72', brand_color: '#994b17', is_active: true }
+  eq('website: no list / basket, whatever numbers exist (Preview swaps in a test number too)', [
+    eateryListMode(web, eateryContactNumbers(web, {})), eateryListMode(web, eateryContactNumbers(web, { isPreview: true, testNumber: '+90 533 111 22 33' })), eateryOrdersByWhatsapp(web)], [null, null, false])
+  eq('website: helper true only with an https site', [eateryOrdersOnWebsite(web), eateryOrdersOnWebsite({ ...web, website_url: null }), eateryOrdersOnWebsite({ ...web, website_url: 'http://x.com' }), eateryOrdersOnWebsite({ ...web, order_method: 'phone' }), eateryOrdersOnWebsite(null)], [true, false, false, false, false])
+  eq('website: the UTM string', EATERY_UTM, 'utm_source=ada&utm_medium=app&utm_campaign=yeme-icme')
+  eq('website: UTM appended (bare, with a query, with a fragment, trailing slash)', [
+    eaterySiteOrderUrl(web), eaterySiteOrderUrl({ ...web, website_url: 'https://x.com/m?lang=en' }), eaterySiteOrderUrl({ ...web, website_url: 'https://x.com/#menu' }), eaterySiteOrderUrl({ ...web, website_url: 'https://x.com/' })],
+    ['https://pasatiempocy.com?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme', 'https://x.com/m?lang=en&utm_source=ada&utm_medium=app&utm_campaign=yeme-icme',
+     'https://x.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme#menu', 'https://x.com/?utm_source=ada&utm_medium=app&utm_campaign=yeme-icme'])
+  const keys = [...new URL(eaterySiteOrderUrl(web)).searchParams.keys()]
+  eq('website: only utm_* keys go out (pasatiempocy.com reads partner / venue / table)', keys.every(k => k.startsWith('utm_')) && !keys.some(k => ['partner', 'venue', 'table'].includes(k)), true)
+  eq('website: non-website partners get no site order url', [eaterySiteOrderUrl({ ...web, order_method: 'whatsapp' }), eaterySiteOrderUrl({ ...web, order_method: 'phone' })], [null, null])
+  eq('brand ink: #994b17 passes AA on white text; light / malformed / missing -> null (ADA primary)', [eateryBrandInk('#994b17'), eateryBrandInk('#ffcc00'), eateryBrandInk('brown'), eateryBrandInk(null), eateryBrandInk('#994b1')], ['#994b17', null, null, null, null])
+  const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const qz = fs.readFileSync(new URL('../components/EateryQuiz.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const es = fs.readFileSync(new URL('../utils/eaterySite.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  eq('wiring: the site hand-off logs order_website with the dish, behind CONTACT_LOGGING, only for live non-fixture rows', /if \(CONTACT_LOGGING && !partner\.placeholder && partner\.is_active !== false\) logContactEvent\('eatery', partner\.id, 'order_website', null, null, itemId\)/.test(es), true)
+  eq('wiring: the log line comes BEFORE the browser opens', es.indexOf("'order_website'") > 0 && es.indexOf("'order_website'") < es.indexOf('openBrowserAsync'), true)
+  eq('wiring: expo-web-browser is required inside the function, with a Linking fallback', /export async function openEaterySite[\s\S]*require\('expo-web-browser'\)[\s\S]*Linking\.openURL\(url\)/.test(es) && !/^import[^\n]*expo-web-browser/m.test(es), true)
+  eq('wiring: partner page — header CTA, per-dish button, generic website contact hidden, never on a fixture', [
+    /const siteOrdering = !partner\.placeholder && eateryOrdersOnWebsite\(partner\)/.test(ps), /\{siteOrdering && \(\s*<View style=\{s\.siteCta\}>/.test(ps),
+    /onSite=\{siteOrdering \? onSite : undefined\}/.test(ps), /contacts\.filter\(c => !\(siteOrdering && c\.action === 'website'\)\)/.test(ps)], [true, true, true, true])
+  eq('wiring: the per-dish button only for an orderable dish', /if \(onSite && eateryOrderable\(item\)\)/.test(ps), true)
+  eq('wiring: quiz result card hands off website dishes (never alongside a basket)', /\{site && !canOrder && \(/.test(qz) && /site=\{eateryOrdersOnWebsite\(d\.partner\)\}/.test(qz) && /openEaterySite\(partner, item\.id\)/.test(qz), true)
+  eq('i18n: the three website keys in all 9 languages', ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa'].every(l => ['eateryOrderOnSite', 'eateryOrderOnSiteA11y', 'eateryOrderOnSiteHint'].every(k => t(k, ({ en: 'English', tr: 'Turkish', ar: 'Arabic', ru: 'Russian', el: 'Greek', fr: 'French', es: 'Spanish', de: 'German', fa: 'Persian' })[l]) !== k)), true)
+  eq('i18n: Turkish button text', t('eateryOrderOnSite', 'Turkish'), 'Sitede sipariş ver')
 }
 
 // ── "Listem" wording: a phone partner never reads basket keys (sheet CTA, per-dish count, a11y, stale block) ──

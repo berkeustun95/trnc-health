@@ -112,5 +112,26 @@ const stored = w => JSON.parse(w.store.get(OUTBOX_KEY) || '[]')
   await ob3.flush(); await settle()
   t('lang: survives the queue across a restart', [...w3.server.values()][0]?.lang === 'German', JSON.stringify([...w3.server.values()]))
 }
+// 8. item_id (20261157): the dish of an eatery order-on-site tap. Same contract as lang: sent when given, NO key otherwise
+//    (every other module's taps keep working against a database without the column), only a positive integer, kept
+//    across a restart.
+{
+  const w = world(); const ob = make(w)
+  ob.record('eatery', 'p1', 'order_website', null, null, 42)
+  ob.record('eatery', 'p2', 'order_website')
+  ob.record('towing', 't1', 'call', 'nicosia')
+  ob.record('eatery', 'p3', 'order_website', null, null, '42')
+  ob.record('eatery', 'p4', 'order_website', null, null, 0); await settle()
+  const by = id => [...w.server.values()].find(r => r.entity_id === id)
+  t('item_id: sent when given', by('p1')?.item_id === 42, JSON.stringify(by('p1')))
+  t('item_id: no key when not given (partner-level tap)', !!by('p2') && !('item_id' in by('p2')), JSON.stringify(by('p2')))
+  t('item_id: no key on another module', !!by('t1') && !('item_id' in by('t1')), JSON.stringify(by('t1')))
+  t('item_id: a string or 0 is never sent', !!by('p3') && !!by('p4') && !('item_id' in by('p3')) && !('item_id' in by('p4')), JSON.stringify([by('p3'), by('p4')]))
+  const w2 = world({ online: false }); const ob2 = make(w2)
+  ob2.record('eatery', 'p5', 'order_website', null, null, 7); await settle()
+  const w3 = world({ stored: stored(w2) }); const ob3 = make(w3)
+  await ob3.flush(); await settle()
+  t('item_id: survives the queue across a restart', [...w3.server.values()][0]?.item_id === 7, JSON.stringify([...w3.server.values()]))
+}
 console.log(bad ? `\n  ${bad} failure(s).` : '\n  contact outbox: OK')
 process.exit(bad ? 1 : 0)

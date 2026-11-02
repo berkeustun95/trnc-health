@@ -119,11 +119,12 @@ try {
 } catch (e) { warn(e) }
 
 // lang: the app language (full English name, LANGUAGES key). Only connectivity passes it (20261112).
-export function logContactEvent(module, entityId, action, region = null, lang = null) {
+// itemId: the eatery dish (eatery_menu_items.id) of an order-on-site tap (20261157). A dish, never a person: RULE TWO stands.
+export function logContactEvent(module, entityId, action, region = null, lang = null, itemId = null) {
   try {
     // entityId is NOT NULL in the table; a null here would be a rejected round-trip.
     if (!module || !entityId || !action) return
-    outbox.record(module, entityId, action, region, lang)
+    outbox.record(module, entityId, action, region, lang, itemId)
   } catch (e) {
     warn(e)
   }

@@ -22,7 +22,7 @@ export const MAX_EVENTS = 50
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 export function createOutbox({ send, storage, uuid, now = () => Date.now(), warn = () => {} }) {
-  let queue = []                 // [{ id, module, entity_id, action, region, lang?, t }] oldest first
+  let queue = []                 // [{ id, module, entity_id, action, region, lang?, item_id?, t }] oldest first
   let loaded = false
   let loading = null
   let flushing = false
@@ -70,6 +70,8 @@ export function createOutbox({ send, storage, uuid, now = () => Date.now(), warn
         const row = { id: e.id, module: e.module, entity_id: e.entity_id, action: e.action, region: e.region }
         // No lang key unless one was given: a row naming the column fails on a DB without it (20261112).
         if (e.lang) row.lang = e.lang
+        // Same for item_id (20261157): only an eatery order-on-site tap from a dish carries it.
+        if (e.item_id) row.item_id = e.item_id
         outcome = await send(row)
       } catch (err) { warn(err); outcome = 'retry' }
       if (outcome === 'delivered' || outcome === 'duplicate' || outcome === 'drop') {
@@ -83,9 +85,10 @@ export function createOutbox({ send, storage, uuid, now = () => Date.now(), warn
   }
 
   // Synchronous by contract (RULE ONE). Returns the tap's id.
-  function record(module, entityId, action, region = null, lang = null) {
+  function record(module, entityId, action, region = null, lang = null, itemId = null) {
     const e = { id: uuid(), module, entity_id: entityId, action, region: region || null, t: now() }
     if (lang) e.lang = lang
+    if (Number.isInteger(itemId) && itemId > 0) e.item_id = itemId
     queue.push(e)
     trim()
     Promise.resolve()
