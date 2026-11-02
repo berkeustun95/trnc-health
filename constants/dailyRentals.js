@@ -43,7 +43,10 @@ export const NORTH_HOUSES = {
   // ONE number for WhatsApp and calls (partner, 2026-10-29); wa.me takes its digits, Ara dials it as is.
   phone:   '+905338470666',
 
+  // Alkent's mark (they run North Houses); the display name stays North Houses. `logo` = the mark
+  // alone for small squares, `logoFull` = mark + ALKENT where there is room.
   logo:       'northhouses/logo',
+  logoFull:   'northhouses/logo-full',
   logoOnDark: null,
 
   taglineKey:  'nhTagline',
@@ -85,6 +88,24 @@ const photos = key => Array.from({ length: 8 }, (_, i) => `northhouses/${key}-${
 
 export const NH_APARTMENTS = [
   {
+    key: 'ys', slug: 'lefkosa-gunluk-kiralik-studio-daire', buildingId: 'yasemin', kind: 'studio',
+    nameKey: 'nhAptYSName', descKey: 'nhAptYSDesc',
+    bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
+    price: 35, cleaningFee: 40, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
+    amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
+    photos: photos('ys'),
+  },
+  {
+    key: 't1', slug: 'lefkosa-gunluk-kiralik-daire-2-yatak-odali', buildingId: 'tezer', kind: 'twoPlusOne',
+    nameKey: 'nhAptT1Name', descKey: 'nhAptT1Desc',
+    bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
+    price: 45, cleaningFee: 50, deposit: 100, minNights: 1,
+    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
+    amenityKeys: ['nhAmWifiT1', 'nhAmNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmKitchenEquip', 'nhAmLinen'],
+    photos: photos('t1'),
+  },
+  {
     key: 'y1', slug: 'yasemin-2plus1', buildingId: 'yasemin', kind: 'twoPlusOne',
     nameKey: 'nhAptY1Name', descKey: 'nhAptY1Desc',
     bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
@@ -103,15 +124,6 @@ export const NH_APARTMENTS = [
     photos: photos('y2'),
   },
   {
-    key: 'ys', slug: 'lefkosa-gunluk-kiralik-studio-daire', buildingId: 'yasemin', kind: 'studio',
-    nameKey: 'nhAptYSName', descKey: 'nhAptYSDesc',
-    bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
-    price: 35, cleaningFee: 40, deposit: 100, minNights: 1,
-    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
-    amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
-    photos: photos('ys'),
-  },
-  {
     key: 'ms', slug: 'lefkosa-gunluk-kiralik-studio-daire-dereboyu', buildingId: 'mine', kind: 'studio',
     nameKey: 'nhAptMSName', descKey: 'nhAptMSDesc',
     bedrooms: null, beds: { double: 1, single: 0 }, guests: 2,
@@ -119,15 +131,6 @@ export const NH_APARTMENTS = [
     electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
     amenityKeys: ['nhAmFastWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmAirport'],
     photos: photos('ms'),
-  },
-  {
-    key: 't1', slug: 'lefkosa-gunluk-kiralik-daire-2-yatak-odali', buildingId: 'tezer', kind: 'twoPlusOne',
-    nameKey: 'nhAptT1Name', descKey: 'nhAptT1Desc',
-    bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
-    price: 45, cleaningFee: 50, deposit: 100, minNights: 1,
-    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
-    amenityKeys: ['nhAmWifiT1', 'nhAmNetflix', 'nhAmInverterAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater', 'nhAmKitchenEquip', 'nhAmLinen'],
-    photos: photos('t1'),
   },
   {
     key: 'm1', slug: 'lefkosa-gunluk-kiralik-daire-iki-yatak-odali', buildingId: 'mine', kind: 'twoPlusOne',
@@ -173,8 +176,8 @@ export function nhWaMessage(aptNameTr, buildingName) {
   return `${nhWaLead(aptNameTr, buildingName)} için rezervasyon hakkında bilgi almak istiyorum.`
 }
 
-// The apartment's page on their site. Turkish gets /tr/daireler/<slug> (the site 307s that to
-// its canonical /tr/apartments/<slug>), everyone else the English page. utm_campaign is the
+// The apartment's page on their site. Turkish gets /tr/daireler/<slug> (the URL the site's own TR
+// links use; it loads directly, re-checked 2026-11-02), everyone else the English page. utm_campaign is the
 // partner slug and utm_content the apartment, so their own analytics can see ADA as a source
 // and which apartment was opened — a query string, no SDK, nothing stored on our side.
 export function nhWebsiteUrl(apartment, langCode) {

@@ -156,13 +156,17 @@ export const PARTNER_ASSETS = {
   'kktcell/yenihat':          require('../assets/partners/kktcell/kktcell-yenihat.png'),  // 533x600
 
   // ─── North Houses (Günlük Kiralık) ───────────────────────────────────────
-  // Logo and photos are the partner's own, from northcyprusbnb.com (2026-10-28); the partner's written
-  // OK is still PENDING (precondition 1 of NORTH_HOUSES_LIVE in constants/flags.js). Photos are the
+  // Photos are the partner's own, from northcyprusbnb.com (2026-10-28); written OK received 2026-11-02.
+  // The logo is the operator's (Alkent Emlak & Danışmanlık, received 2026-11-02), cut out of their
+  // embossed-paper mockup: alpha keyed on saturation, edge colour taken from solid gold (no paper halo).
+  // `logo` is the A+house mark alone (512 square, the 56pt card); `logo-full` adds ALKENT (1200x782,
+  // the apartment screen). The EMLAK & DANIŞMANLIK line is left out: ~5pt at that size. Photos are the
   // site's 1920 px originals re-encoded at 1440 px on the long edge (JPEG q82, 2026-10-29), metadata
   // stripped. Site gallery order, 8 per apartment: `<apartment key>-NN`; -01 is the living room for all
   // seven, so it is the card cover. Six are portraits (1080x1440): the 4:3 pager crops them (cover) and
   // the full-screen viewer shows them whole.
   'northhouses/logo': require('../assets/partners/northhouses/logo.png'),
+  'northhouses/logo-full': require('../assets/partners/northhouses/logo-full.png'),
   'northhouses/y1-01': require('../assets/partners/northhouses/y1-01.jpg'),
   'northhouses/y1-02': require('../assets/partners/northhouses/y1-02.jpg'),
   'northhouses/y1-03': require('../assets/partners/northhouses/y1-03.jpg'),

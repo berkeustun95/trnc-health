@@ -787,6 +787,7 @@ for (const k of ['taglineKey', 'heroSubKey', 'waHoursKey', 'priceNoteKey', 'chec
 }
 const nhLogo = nhAssetWired(NORTH_HOUSES.logo)
 check(!!nhLogo, `logo asset ${NORTH_HOUSES.logo} is not wired in partnerAssets.js`)
+check(!!nhAssetWired(NORTH_HOUSES.logoFull), `logoFull asset ${NORTH_HOUSES.logoFull} is not wired in partnerAssets.js`)
 let nhPhotos = 0
 for (const b of NH_BUILDINGS) nhKeys.add(b.blurbKey)
 for (const a of NH_APARTMENTS) {

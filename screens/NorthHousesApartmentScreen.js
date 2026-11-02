@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../components/BackButton'
+import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { Card, ScreenHeader } from '../components/ui'
 import { colors, radii, type, TAP } from '../constants/theme'
 import { PILL_ALPHA } from '../components/ui/ModuleScreen'
@@ -30,6 +31,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // is on AND (NORTH_HOUSES_FORM_LIVE, or ADA Preview).
 
 const PHOTO_ASPECT = 4 / 3
+// Alkent's full lockup (1200x782): wide enough that ALKENT reads, small enough to sit as a sign-off.
+const OPERATOR_W = 132
+const OPERATOR_H = 86
 const eur = n => `€${n}`
 const fill = (text, n) => text.replace('{n}', String(n))
 const COMMA_DECIMAL = ['Turkish', 'Russian', 'Greek', 'French', 'Spanish', 'German']
@@ -512,6 +516,9 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
             <RequestForm apartment={apartment} building={building} lang={lang} onFieldFocus={revealField} />
           )}
 
+          <View style={s.operator}>
+            <PartnerLogoStrip source={partnerAsset(partner.logoFull)} name={partner.name} width={OPERATOR_W} height={OPERATOR_H} />
+          </View>
           <Text style={s.directNote}>{t('nhDirectNote', lang)}</Text>
         </View>
       </ScrollView>
@@ -579,6 +586,7 @@ const s = StyleSheet.create({
   buildingName:{ ...type.rowTitle, color: colors.textPrimary },
   mapBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TAP, alignSelf: 'flex-start' },
   mapBtnText:  { ...type.body, fontFamily: 'Inter_700Bold', color: colors.primary },
+  operator:    { alignItems: 'center', marginTop: 6, marginBottom: 10 },
   directNote:  { ...type.meta, color: colors.textSecondary, textAlign: 'center', marginTop: 2, marginBottom: 8 },
 
   contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12,
