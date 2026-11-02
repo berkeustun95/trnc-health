@@ -27,7 +27,7 @@ code and this file ever disagree, the code is the authority: re-read it and fix 
   `#F8F6F1` with a fixed top gradient `pageTop` → `pageMid` (260pt) → pageBase (640pt); the same on
   every non-photo ADA page: no per-group tint (group colour lives in chips and icons). Secondary
   text sitting directly on it is `colors.textSecondaryOnPage`; inside white cards it stays
-  `textSecondary`. **Partner pages** (Dorm, Eatery partner incl. its banner bar and pinned tabs,
+  `textSecondary`. **Partner pages** (Dorm, Novest PropertyDetail, Eatery partner incl. its banner bar and pinned tabs,
   the Eatery basket and AddressEditor, HomeService partner, Pet Hotel, Ehliyet, KKTCELL landing,
   North Houses) use `<PageCanvas flat>`: pageBase only, no gradient, with their original
   `textSecondary` / `primary` / `dangerInk` (Berke 2026-11-02: grey text read washed out on the
