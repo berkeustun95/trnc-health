@@ -71,8 +71,8 @@ t('applies cleanly (pre/post-state, probes, positive controls green)', await app
 t('order_method set', await set(db, 'public.eatery_partners', 'eatery_partners_order_method_check'), ['phone', 'website', 'whatsapp'])
 t('action set = 12 + order_website', await set(db, 'public.contact_events', 'contact_events_action_check'), [...ACTS12, 'order_website'].sort())
 t('create_eatery_order byte-identical', await createDef(db), before)
-t('columns', await q(db, `SELECT table_name t, column_name c, data_type ty, is_nullable n FROM information_schema.columns WHERE (table_name, column_name) IN (('eatery_partners','brand_color'),('contact_events','item_id')) ORDER BY 1`),
-  [{ t: 'contact_events', c: 'item_id', ty: 'bigint', n: 'YES' }, { t: 'eatery_partners', c: 'brand_color', ty: 'text', n: 'YES' }])
+t('columns', await q(db, `SELECT table_name t, column_name c, data_type ty, is_nullable n FROM information_schema.columns WHERE (table_name, column_name) IN (('eatery_partners','brand_color'),('contact_events','item_id'),('eatery_menu_items','adult_only')) ORDER BY 1`),
+  [{ t: 'contact_events', c: 'item_id', ty: 'bigint', n: 'YES' }, { t: 'eatery_menu_items', c: 'adult_only', ty: 'boolean', n: 'NO' }, { t: 'eatery_partners', c: 'brand_color', ty: 'text', n: 'YES' }])
 t('no probe row survived', (await q(db, `SELECT (SELECT count(*) FROM public.contact_events)::int ce, (SELECT count(*) FROM public.eatery_partners WHERE slug LIKE 'zz-%')::int p`))[0], { ce: 0, p: 0 })
 t('ledger row written', (await q(db, `SELECT count(*)::int n FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql'`))[0].n, 1)
 await db.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql'`)
@@ -103,6 +103,8 @@ await refused('brand_color CHECK allows upper case', mutant('color', [[`brand_co
 await refused('brand_color writable by anon', mutant('colgrant', [[`COMMENT ON COLUMN public.eatery_partners.brand_color IS`, `GRANT UPDATE (brand_color) ON public.eatery_partners TO anon;\nCOMMENT ON COLUMN public.eatery_partners.brand_color IS`]]), 'client privileges on brand_color are not SELECT-only')
 await refused('create_eatery_order touched', mutant('fn', [[`-- ─── Post-state + rolled-back probes`, `ALTER FUNCTION public.create_eatery_order(uuid,jsonb,text) SET work_mem = '64kB';\n-- ─── Post-state + rolled-back probes`]]), 'create_eatery_order changed')
 await refused('an existing partner row changed', mutant('row', [[`-- ─── Post-state + rolled-back probes`, `UPDATE public.eatery_partners SET name = name || ' x';\n-- ─── Post-state + rolled-back probes`]]), 'an existing eatery_partners row changed')
+await refused('menu adult_only defaults to true', mutant('adflt', [[`ADD COLUMN IF NOT EXISTS adult_only boolean NOT NULL DEFAULT false;`, `ADD COLUMN IF NOT EXISTS adult_only boolean NOT NULL DEFAULT true;`]]), 'eatery_menu_items.adult_only is not boolean NOT NULL DEFAULT false')
+await refused('menu adult_only writable by authenticated', mutant('adgrant', [[`COMMENT ON COLUMN public.eatery_menu_items.adult_only IS`, `GRANT UPDATE (adult_only) ON public.eatery_menu_items TO authenticated;\nCOMMENT ON COLUMN public.eatery_menu_items.adult_only IS`]]), 'eatery_menu_items.adult_only are not SELECT-only')
 await refused('a contact_events policy added', mutant('pol', [[`-- ─── Post-state + rolled-back probes`, `CREATE POLICY zz ON public.contact_events FOR SELECT TO anon USING (true);\n-- ─── Post-state + rolled-back probes`]]), 'contact_events policies changed')
 
 console.log('PRE-STATE DRIFT (each must be refused)')

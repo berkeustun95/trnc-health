@@ -72,8 +72,10 @@ const withDishPhoto = i => ({
 })
 
 // Available items grouped by section, in section_order then sort_order (id breaks ties).
-export function eateryMenuSections(p) {
-  const items = (p?.eatery_menu_items || []).filter(i => i && i.is_available !== false && filled(i.name))
+// adultOk: may this viewer see 18+ items (eatery_menu_items.adult_only, 20261157)? Default false: an 18+ item is shown only
+// when the caller says so (eateryAdultItemsOk). EateryScreen COLS always selects the column (check-required-columns gates it).
+export function eateryMenuSections(p, { adultOk = false } = {}) {
+  const items = (p?.eatery_menu_items || []).filter(i => i && i.is_available !== false && filled(i.name) && (adultOk || i.adult_only !== true))
   const by = new Map()
   for (const i of items) {
     if (!by.has(i.section)) by.set(i.section, { title: i.section, order: i.section_order ?? 0, items: [] })
@@ -323,6 +325,9 @@ export function isAdultForOrder(dob, now = new Date()) {
 }
 
 // null = may order; else why not: 'guest' | 'no_dob' | 'under_18'. Only an adult_only partner gates.
+// 18+ menu items (Berke, 2026-11-02): adults only. Guests, accounts without a birth date and under-18s do not see them.
+export const eateryAdultItemsOk = ({ guest, dob, now }) => orderAgeGate({ adultOnly: true, guest, dob, now }) == null
+
 export function orderAgeGate({ adultOnly, guest, dob, now }) {
   if (adultOnly !== true) return null
   if (guest) return 'guest'

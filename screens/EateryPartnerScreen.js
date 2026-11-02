@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryOrdersOnWebsite, eateryBrandInk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryOrdersOnWebsite, eateryBrandInk, eateryAdultItemsOk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press, TAP } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
@@ -227,7 +227,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const nums = partnerContactNumbers(partner)
   const contacts = eateryContacts(partner, nums)
   const menuUrl = eateryMenuUrl(partner)
-  const sections = useMemo(() => eateryMenuSections(partner), [partner])
+  const adultOk = eateryAdultItemsOk({ guest: isGuest(session), dob: dateOfBirth })
+  const sections = useMemo(() => eateryMenuSections(partner, { adultOk }), [partner, adultOk])
   const gallery = eateryPhotos(partner, 'gallery')
   const menuPhotos = eateryPhotos(partner, 'menu')
   const week = eateryWeek(partner)

@@ -22,6 +22,7 @@ const REQUIRED = [
   ['places', 'official_visit', '20261155_places_official_visit.sql'],
   // 20261157 — screens/EateryScreen.js COLS (a missing column empties Yeme-İçme for every user)
   ['eatery_partners', 'brand_color', '20261157_eatery_order_website.sql'],
+  ['eatery_menu_items', 'adult_only', '20261157_eatery_order_website.sql'],
 ]
 const PROD_REF = 'jeihxnwqytnxtytgkzgf'
 

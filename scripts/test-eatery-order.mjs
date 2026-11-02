@@ -3,7 +3,8 @@
 import * as B from '../utils/eateryBasketCore.js'
 import { t } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eateryBrandInk, EATERY_UTM } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk } from '../constants/eatery.js'
+import { heroPathOf } from '../utils/stripSlides.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
 
@@ -692,6 +693,27 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('wiring: quiz result card hands off website dishes (never alongside a basket)', /\{site && !canOrder && \(/.test(qz) && /site=\{eateryOrdersOnWebsite\(d\.partner\) && d\.partner\.adult_only === false\}/.test(qz) && /openEaterySite\(partner, item\.id\)/.test(qz), true)
   eq('i18n: the three website keys in all 9 languages', ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa'].every(l => ['eateryOrderOnSite', 'eateryOrderOnSiteA11y', 'eateryOrderOnSiteHint'].every(k => t(k, ({ en: 'English', tr: 'Turkish', ar: 'Arabic', ru: 'Russian', el: 'Greek', fr: 'French', es: 'Spanish', de: 'German', fa: 'Persian' })[l]) !== k)), true)
   eq('i18n: Turkish button text', t('eateryOrderOnSite', 'Turkish'), 'Sitede sipariş ver')
+}
+
+// 18+ menu items (eatery_menu_items.adult_only, 20261157; Berke 2026-11-02): adults see them, guests / no DOB / under-18 do not.
+{
+  const NOW = new Date('2026-11-02T12:00:00Z')
+  const p = { eatery_menu_items: [
+    { id: 1, section: 'Burgerler', section_order: 1, name: 'Smash', sort_order: 1, adult_only: false },
+    { id: 2, section: 'Biralar', section_order: 2, name: 'Corona', sort_order: 1, adult_only: true },
+    { id: 3, section: 'Meşrubatlar', section_order: 3, name: 'Fanta', sort_order: 1 } ] }
+  const names = o => eateryMenuSections(p, o).flatMap(x => x.items.map(i => i.name))
+  eq('18+: hidden by default and for a non-adult; shown to an adult; an item without the field stays', [names(), names({ adultOk: false }), names({ adultOk: true })],
+    [['Smash', 'Fanta'], ['Smash', 'Fanta'], ['Smash', 'Corona', 'Fanta']])
+  eq('18+: an all-adult section disappears for a minor (no empty "Biralar" header)', eateryMenuSections(p).map(x => x.title), ['Burgerler', 'Meşrubatlar'])
+  eq('18+ ok: adult account yes; guest, no DOB, 17-year-old no', [
+    eateryAdultItemsOk({ guest: false, dob: '1990-05-01', now: NOW }), eateryAdultItemsOk({ guest: true, dob: '1990-05-01', now: NOW }),
+    eateryAdultItemsOk({ guest: false, dob: null, now: NOW }), eateryAdultItemsOk({ guest: false, dob: '2009-01-01', now: NOW })], [true, false, false, false])
+  eq('Home hero never uses an 18+ photo', heroPathOf([{ id: 1, section_order: 1, sort_order: 1, photo_path: 'beer.jpg', adult_only: true }, { id: 2, section_order: 2, sort_order: 1, photo_path: 'bowl.jpg', adult_only: false }]), 'bowl.jpg')
+  const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')
+  const es = fs.readFileSync(new URL('../screens/EateryScreen.js', import.meta.url), 'utf8')
+  eq('wiring: the partner page passes the viewer\'s age to the menu, and COLS selects adult_only', [
+    /const adultOk = eateryAdultItemsOk\(\{ guest: isGuest\(session\), dob: dateOfBirth \}\)/.test(ps), /eateryMenuSections\(partner, \{ adultOk \}\)/.test(ps), /is_available, adult_only, photo_path/.test(es)], [true, true, true])
 }
 
 // ── "Listem" wording: a phone partner never reads basket keys (sheet CTA, per-dish count, a11y, stale block) ──

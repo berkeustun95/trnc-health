@@ -934,6 +934,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('eatery_menu_items', 'protein', false, NULL, 'text'),
     ('eatery_menu_items', 'spicy', false, NULL, 'boolean'),
     ('eatery_menu_items', 'portion', false, NULL, 'text'),
+    ('eatery_menu_items', 'adult_only', true, 'false', 'boolean'),
     ('eatery_photos', 'id', false, NULL, 'bigint'),
     ('eatery_photos', 'partner_id', true, NULL, 'uuid'),
     ('eatery_photos', 'kind', true, NULL, 'text'),

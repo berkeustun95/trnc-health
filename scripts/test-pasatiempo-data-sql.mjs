@@ -70,6 +70,8 @@ t('partner', (await q(db, `SELECT slug, is_active, order_method, adult_only, bra
 t('menu rows = the file\'s menu entries (83)', [(await q(db, `SELECT count(*)::int n FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = 'pasatiempo'`))[0].n, menuCount], [83, 83])
 t('no alcoholic section is tagged', (await q(db, `SELECT count(*)::int n FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
    WHERE p.slug = 'pasatiempo' AND i.section IN ('Kokteyller','Şaraplar','Rakı','Biralar','Craft Biralar','Sert İçkiler') AND i.role IS NOT NULL`))[0].n, 0)
+t('adult_only = exactly the drink sections (35); every other item false', (await q(db, `SELECT count(*) FILTER (WHERE i.adult_only)::int a, count(*) FILTER (WHERE i.adult_only <> (i.section IN ('Kokteyller','Şaraplar','Rakı','Biralar','Craft Biralar','Sert İçkiler')))::int wrong
+   FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id WHERE p.slug = 'pasatiempo'`))[0], { a: 35, wrong: 0 })
 t('bacon + meatball dishes untagged', (await q(db, `SELECT count(*)::int n FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
    WHERE p.slug = 'pasatiempo' AND (i.name LIKE '%Bacon%' OR i.name LIKE '%Meatball%') AND i.role IS NULL`))[0].n, 4)
 t('other partners untouched', await others(db), before)
@@ -86,16 +88,17 @@ const TOK = `SELECT x.c AS check_name, x.ok FROM (SELECT ''::text AS t, ''::text
 const tokens = async (d) => (await q(d, TOK)).map(r => r.ok)
 {
   const pre = await ready({ with1157: false })
-  t('before 1157: 4 tokens, all vacuously true', await tokens(pre), [true, true, true, true])
+  t('before 1157: 5 tokens, all vacuously true', await tokens(pre), [true, true, true, true, true])
   const d = await ready()
-  t('after 1157, before 1158: all true', await tokens(d), [true, true, true, true])
+  t('after 1157, before 1158: all true', await tokens(d), [true, true, true, true, true])
   await applyFile(d, F1158)
-  t('after 1158: all true', await tokens(d), [true, true, true, true])
+  t('after 1158: all true', await tokens(d), [true, true, true, true, true])
   await d.exec(`ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_action_check;
     ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_action_check CHECK (action IN ('call','order_website'));
     UPDATE public.eatery_partners SET brand_color = NULL WHERE slug = 'pasatiempo';
-    REVOKE INSERT (item_id) ON public.contact_events FROM anon;`)
-  t('broken action set / colour / grant: those three tokens go RED', await tokens(d), [true, false, false, false])
+    REVOKE INSERT (item_id) ON public.contact_events FROM anon;
+    INSERT INTO public.eatery_menu_items (partner_id, section, name, adult_only) SELECT id, 'Drinks', 'Beer', true FROM public.eatery_partners WHERE slug = 'crunchy-express';`)
+  t('broken action set / colour / grant / menu adult item: those four tokens go RED', await tokens(d), [true, false, false, false, false])
 }
 
 console.log('MUTANTS (each must be refused; activation is caught first by the DB: an active partner needs a logo, 20261115)')
@@ -118,6 +121,7 @@ await refused('seeded ACTIVE', mutant('active', [[`DATE '2026-11-02', 20, false,
 await refused('seeded as phone', mutant('phone', [[`DATE '2026-11-02', 20, false, 'website'`, `DATE '2026-11-02', 20, false, 'phone'`]]), 'differs from this file')
 await refused('adult_only flipped', mutant('adult', [[`'website', false, '#994b17');`, `'website', true, '#994b17');`]]), 'differs from this file')
 await refused('a menu row dropped by the insert', mutant('drop', [[`      FROM jsonb_array_elements(v_menu) e;\n  END IF;`, `      FROM jsonb_array_elements(v_menu) e OFFSET 1;\n  END IF;`]]), 'menu is not exactly')
+await refused('an alcoholic item left visible to minors', mutant('adfalse', [[`"name": "Mojito", "sort_order": 1, "description": null, "price": 440, "is_available": true, "role": null, "protein": null, "spicy": null, "portion": null, "adult_only": true}`, `"name": "Mojito", "sort_order": 1, "description": null, "price": 440, "is_available": true, "role": null, "protein": null, "spicy": null, "portion": null, "adult_only": false}`]]), 'Nothing applied')
 await refused('another partner touched', mutant('other', [[`  -- ── Post-state: nothing else moved ──`, `  UPDATE public.eatery_partners SET sort_order = sort_order + 1 WHERE id <> c_id;\n  -- ── Post-state: nothing else moved ──`]]), 'another partner or its menu changed')
 await refused('activated at the end', mutant('act2', [[`  -- ── Post-state: nothing else moved ──`, `  UPDATE public.eatery_partners SET is_active = true WHERE id = c_id;\n  -- ── Post-state: nothing else moved ──`]]), 'eatery_partners_launch_complete_check')
 await refused('visibility check removed (anon count forced)', mutant('vis', [[`IF v_anon_p <> 0 OR v_anon_i <> 0`, `IF v_anon_p <> 0 OR v_anon_i <> 0 OR true`]]), 'inactive partner visible')
