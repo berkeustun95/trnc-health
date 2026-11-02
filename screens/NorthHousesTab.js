@@ -100,7 +100,7 @@ export default function NorthHousesTab({ lang, onOpenApartment, bottomPad = 24 }
     <ScrollView contentContainerStyle={[s.content, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
       <Card padding={16} style={s.block}>
         <View style={s.head}>
-          <PartnerLogoStrip source={partnerLogo(partner)} name={partner.name} width={LOGO} height={LOGO} />
+          <PartnerLogoStrip source={partnerLogo(partner)} name={null} width={LOGO} height={LOGO} />
           <View style={s.headText}>
             <Text style={s.partnerName}>{partner.name}</Text>
             <Text style={s.tagline}>{t(partner.taglineKey, lang)}</Text>
@@ -109,7 +109,7 @@ export default function NorthHousesTab({ lang, onOpenApartment, bottomPad = 24 }
         <Text style={s.heroSub}>{t(partner.heroSubKey, lang)}</Text>
         <Text style={s.fromPrice}>{fill(t('nhFromNight', lang), NH_FROM_PRICE)}</Text>
         <IconLine icon="logo-whatsapp">{t(partner.waHoursKey, lang)}</IconLine>
-        <Text style={s.note}>{t('nhDirectNote', lang)}</Text>
+        <Text style={s.note}>{t('nhDirectNote', lang).replace('{partner}', () => partner.name)}</Text>
       </Card>
 
       <SectionTitle>{t('nhApartmentsTitle', lang)}</SectionTitle>

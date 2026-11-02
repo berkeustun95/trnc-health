@@ -518,9 +518,9 @@ export default function NorthHousesApartmentScreen({ apartment, lang, onBack }) 
           )}
 
           <View style={s.operator}>
-            <PartnerLogoStrip source={partnerAsset(partner.logoFull)} name="Alkent Emlak & Danışmanlık" width={OPERATOR_W} height={OPERATOR_H} />
+            <PartnerLogoStrip source={partnerAsset(partner.logoFull)} name={null} width={OPERATOR_W} height={OPERATOR_H} />
           </View>
-          <Text style={s.directNote}>{t('nhDirectNote', lang)}</Text>
+          <Text style={s.directNote}>{t('nhDirectNote', lang).replace('{partner}', () => partner.name)}</Text>
         </View>
       </ScrollView>
 

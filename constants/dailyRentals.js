@@ -1,5 +1,7 @@
 // Günlük Kiralık (daily rentals) — the third top tab of Emlak & Konaklama, and its one partner:
-// North Houses (northcyprusbnb.com), four buildings in Lefkoşa, seven apartment types.
+// North Houses (northcyprusbnb.com), four buildings in Lefkoşa, seven apartment types. Shown to
+// guests under its operator's name, Alkent Emlak & Danışmanlık (NORTH_HOUSES.name, 2026-11-02);
+// North Houses stays the code name and the building / apartment names, as on their site.
 //
 // A COPY OF THE DORM SHAPE, NOT A PARAMETRIZATION OF IT (decided 2026-10-28). Alasia's screens
 // stay byte-untouched: dormWaMessage always appends a "Kaynak: ADA · Kod: ADA-…" line, the dorm
@@ -37,13 +39,18 @@ export const NORTH_HOUSES = {
   // ⚠ THIS EXACT VALUE IS THE DB CHECK in partner_booking_requests (20261143) AND utm_campaign.
   slug: 'north_houses',
 
-  name:    'North Houses',
+  // Display name, the operator's own (Alkent's request, 2026-11-02); a proper noun, never translated.
+  // Code names, flags, slug and the building / apartment names stay North Houses. No-break spaces
+  // round the & so a wrapped title breaks as "Alkent / Emlak & Danışmanlık", never after the &.
+  // The ONLY copy of the name: nhDirectNote takes it through {partner} in all nine locales. A rename
+  // re-reads two of them: French writes d'{partner} (vowel) and Greek την {partner} (η εταιρεία).
+  name:    'Alkent Emlak\u00A0&\u00A0Danışmanlık',
   website: 'https://www.northcyprusbnb.com',
   email:   'book@northcyprusbnb.com',
   // ONE number for WhatsApp and calls (partner, 2026-10-29); wa.me takes its digits, Ara dials it as is.
   phone:   '+905338470666',
 
-  // Alkent's mark (they run North Houses); the display name stays North Houses. `logo` = the mark
+  // Alkent's mark, matching the display name above. `logo` = the mark
   // alone for small squares, `logoFull` = mark + ALKENT where there is room.
   logo:       'northhouses/logo',
   logoFull:   'northhouses/logo-full',
