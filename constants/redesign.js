@@ -55,10 +55,10 @@ const CRUNCHY_EXPRESS_PREVIEW = true
 export const CRUNCHY_EXPRESS = CRUNCHY_EXPRESS_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CRUNCHY_EXPRESS_PREVIEW)
 export const EATERY_PREVIEW_DATA = (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
 
-// North Houses (Günlük Kiralık) before go-live: ADA Preview shows the tab and the booking-request
-// form; production shows neither while NORTH_HOUSES_LIVE / NORTH_HOUSES_FORM_LIVE stay false. No
-// __DEV__ on the listing: Expo Go still needs the local flip, as before. scripts/check-dorms.mjs
-// asserts both reads. Set either _PREVIEW to false if ADA Preview must stop showing it.
+// North Houses (Günlük Kiralık). LIVE since 2026-11-02: NORTH_HOUSES_LIVE / NORTH_HOUSES_FORM_LIVE are
+// true, so the _PREVIEW switches below change nothing until a LIVE flag goes back to false (they are
+// the seam that keeps Preview showing it if production is hidden again, as on 2026-10-30). No
+// __DEV__ on the listing. scripts/check-dorms.mjs asserts both reads.
 const NORTH_HOUSES_PREVIEW = true
 export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)
 const NORTH_HOUSES_FORM_PREVIEW = true
