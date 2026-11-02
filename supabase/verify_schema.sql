@@ -197,6 +197,10 @@ WITH report AS (
     ('20261144_eatery_order_method','eatery_partners','order_method'),
     -- 20261151: optional full-width header photo path (nullable, no DEFAULT); state asserted by an H token.
     ('20261151_eatery_partners_banner_path','eatery_partners','banner_path'),
+    -- 20261157: the partner's own colour (nullable, lower-case hex); website ordering itself is an H token.
+    ('20261157_eatery_order_website','eatery_partners','brand_color'),
+    -- 20261157: an 18+ menu item (alcohol), hidden from guests / no DOB / under-18 by the app; shape is an H token.
+    ('20261157_eatery_order_website','eatery_menu_items','adult_only'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -472,6 +476,8 @@ WITH report AS (
     ('1087_notifications_conversation_id','notifications','conversation_id'),
     -- 1112. App language on a KKTCELL handoff tap. The outbox sends it only for connectivity taps.
     ('1112_contact_events_connectivity','contact_events','lang'),
+    -- 1157. The dish a website-order handoff tap came from (eatery only). The outbox sends it only for those taps.
+    ('20261157_eatery_order_website','contact_events','item_id'),
     -- 1113. The new eSIM landing reads every one of these (lib/connectivity.js fetchLinks).
     ('1113_connectivity_links','connectivity_links','id'),
     ('1113_connectivity_links','connectivity_links','operator_id'),
@@ -828,8 +834,11 @@ WITH report AS (
     ('20261134_eatery_item_options','eatery_item_options_price_check'),
     ('20261134_eatery_item_options','eatery_item_options_max_qty_check'),
     ('20261134_eatery_item_options','eatery_item_options_remove_shape_check'),
-    -- 20261144: its allowed set (whatsapp, phone) is an H token.
+    -- 20261144: its allowed set (whatsapp, phone; + website since 20261157) is an H token.
     ('20261144_eatery_order_method','eatery_partners_order_method_check'),
+    -- 20261157: brand_color hex shape and item_id eatery-only; meanings are H tokens.
+    ('20261157_eatery_order_website','eatery_partners_brand_color_check'),
+    ('20261157_eatery_order_website','contact_events_item_id_check'),
     -- 20261151: same expression as logo_path_check; equality with it is an H token.
     ('20261151_eatery_partners_banner_path','eatery_partners_banner_path_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
@@ -4088,6 +4097,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
       IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps','menu',
                                  'order_whatsapp','route_complete','website','whatsapp']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql') -- EATERY-ORDER-WEBSITE:supersede (one count, one owner: the 1157 token owns the set once the ledger records it)
     UNION ALL SELECT '20261123_eatery_dish_tags_order_whatsapp','eatery_menu_items role/protein/portion CHECK vocabularies are exactly the agreed sets',
       COALESCE((SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
@@ -4231,6 +4241,56 @@ WITH report AS (
                     WHERE p.slug = 'crunchy-express'
                       AND ((left(md5(o.id::text), 6) = '508028' AND o.created_at >= timestamptz '2026-10-22 14:44:40+00' AND o.created_at < timestamptz '2026-10-22 14:45:40+00')
                         OR (left(md5(o.id::text), 6) = '9397de' AND o.created_at >= timestamptz '2026-10-22 16:15:00+00' AND o.created_at < timestamptz '2026-10-22 16:16:00+00')))
+    -- ── 1157: order_method 'website', eatery_partners.brand_color, contact_events.item_id + 'order_website'. Vacuously true until
+    --    the ledger records the file; then it OWNS the order_method set and the action set (the 1144 / 1123 counts supersede).
+    UNION ALL SELECT '20261157_eatery_order_website','order_method CHECK is exactly {phone,website,whatsapp} and validated; create_eatery_order still refuses every method but whatsapp, once 1157 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql')
+      OR (COALESCE((SELECT c.convalidated AND (SELECT array_agg(DISTINCT m[1] ORDER BY m[1]) FROM regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m)
+                                              IS NOT DISTINCT FROM ARRAY['phone','website','whatsapp']
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_order_method_check'), false)
+          AND COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text)')) LIKE '%IF v_partner.order_method IS DISTINCT FROM ''whatsapp'' THEN%', false))
+    UNION ALL SELECT '20261157_eatery_order_website','contact_events action vocabulary is exactly the 13-action set (incl. order_website), once 1157 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql')
+      OR (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+            FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+           WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_action_check')
+         IS NOT DISTINCT FROM ARRAY['book','call','call_secondary','email','facebook','instagram','maps','menu',
+                                    'order_website','order_whatsapp','route_complete','website','whatsapp']
+    UNION ALL SELECT '20261157_eatery_order_website','brand_color: text NULL, no default, CHECK lower-case #rrggbb, clients read-only; item_id: bigint NULL, eatery-only CHECK, INSERT for anon + authenticated, no FK, once 1157 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql')
+      OR (COALESCE((SELECT a.atttypid = 'text'::regtype AND NOT a.attnotnull FROM pg_attribute a
+                     WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'brand_color' AND NOT a.attisdropped), false)
+          AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%#[0-9a-f]{6}$%' AND pg_get_constraintdef(c.oid) NOT LIKE '%~*%' AND c.convalidated
+                          FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_brand_color_check'), false)
+          AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_partners'), 'brand_color', 'SELECT')
+                   AND NOT has_column_privilege('anon', to_regclass('public.eatery_partners'), 'brand_color', 'INSERT,UPDATE,REFERENCES')
+                   AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_partners'), 'brand_color', 'INSERT,UPDATE,REFERENCES'), false)
+          AND COALESCE((SELECT a.atttypid = 'bigint'::regtype AND NOT a.attnotnull FROM pg_attribute a
+                         WHERE a.attrelid = to_regclass('public.contact_events') AND a.attname = 'item_id' AND NOT a.attisdropped), false)
+          AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''eatery''::text%' AND pg_get_constraintdef(c.oid) LIKE '%item_id > 0%' AND c.convalidated
+                          FROM pg_constraint c WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_item_id_check'), false)
+          AND COALESCE(has_column_privilege('anon', to_regclass('public.contact_events'), 'item_id', 'INSERT')
+                   AND has_column_privilege('authenticated', to_regclass('public.contact_events'), 'item_id', 'INSERT'), false))
+    UNION ALL SELECT '20261157_eatery_order_website','eatery_menu_items.adult_only: boolean NOT NULL DEFAULT false, clients read-only, 18+ items only at website partners, once 1157 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql')
+      OR (COALESCE((SELECT a.atttypid = 'boolean'::regtype AND a.attnotnull FROM pg_attribute a
+                     WHERE a.attrelid = to_regclass('public.eatery_menu_items') AND a.attname = 'adult_only' AND NOT a.attisdropped), false)
+          AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) = 'false' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                         WHERE d.adrelid = to_regclass('public.eatery_menu_items') AND a.attname = 'adult_only'), false)
+          AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'adult_only', 'SELECT')
+                   AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'adult_only', 'INSERT,UPDATE,REFERENCES')
+                   AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'adult_only', 'INSERT,UPDATE,REFERENCES'), false)
+          AND NOT EXISTS (SELECT 1 FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
+                           WHERE (to_jsonb(i)->>'adult_only')::boolean AND to_jsonb(p)->>'order_method' IS DISTINCT FROM 'website'))
+    -- ── 1158: Pasatiempo seed. Asserts only what the file fixed for good: website ordering, a partner pin (never Google), the brand
+    --    colour, at least one menu item and no item options (no basket). Address, logo, photos, hours, menu and is_active change later.
+    UNION ALL SELECT '20261158_pasatiempo_data','pasatiempo: order_method website, pin source partner, brand_color #994b17, >= 1 menu item, 0 item options, once 1158 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261158_pasatiempo_data.sql')
+      OR COALESCE((SELECT to_jsonb(p)->>'order_method' = 'website' AND p.geocode_source = 'partner' AND p.lat IS NOT NULL
+                          AND to_jsonb(p)->>'brand_color' = '#994b17'
+                          AND EXISTS(SELECT 1 FROM public.eatery_menu_items i WHERE i.partner_id = p.id)
+                          AND NOT EXISTS(SELECT 1 FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.partner_id = p.id)
+                     FROM public.eatery_partners p WHERE p.slug = 'pasatiempo'), false)
     -- ── 1144: eatery_partners.order_method + create_eatery_order refuses phone partners. Same discipline as the blocks below:
     --    only to_regclass / to_regprocedure / catalogs, COALESCE around every subquery, red until applied, never an error.
     --    It sits OUTSIDE every other migration's slice on purpose (the 1134 / 1132 / 1125 / 1135-1137 probes cut their own).
@@ -4241,7 +4301,8 @@ WITH report AS (
                        WHERE d.adrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_method')
       AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.contype = 'c' AND pg_get_constraintdef(c.oid) LIKE '%order_method%') = 1
       AND COALESCE((SELECT c.convalidated AND pg_get_constraintdef(c.oid) LIKE '%whatsapp%' AND pg_get_constraintdef(c.oid) LIKE '%phone%'
-                           AND (SELECT count(DISTINCT m[1]) FROM regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m) = 2
+                           AND ((SELECT count(DISTINCT m[1]) FROM regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m) = 2
+                                OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql')) -- EATERY-ORDER-WEBSITE:supersede (the 1157 token owns the set once applied)
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_partners') AND c.conname = 'eatery_partners_order_method_check'), false)
       AND COALESCE((SELECT NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_method' AND a.attacl IS NOT NULL)), false)
     UNION ALL SELECT '20261144_eatery_order_method','create_eatery_order body: p.order_method selected, unconditional order_not_supported refusal (no previewer clause) AFTER partner_unavailable and BEFORE the adult_only / order_requires_account checks; the 1134 options + 1132 test shapes survive; COMMENT ends 20261144.',
