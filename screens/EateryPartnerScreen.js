@@ -340,7 +340,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
   const showTabs = sections.length >= 2
-  const tabsIndex = 1 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], [quiz banner], tabs
+  const tabsIndex = 1 + (siteOrdering ? 1 : 0) + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [site CTA], [pager], [quiz banner], tabs
   const scrollRef = useRef(null)
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
