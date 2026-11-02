@@ -908,6 +908,7 @@ for (const key of new Set([...nhKeys, ...nhTableKeys])) {
     const v = hasOwnTranslation(key, l) ? t(key, l) : ''
     check(typeof v === 'string' && v.trim().length > 0 && v !== key, `i18n: ${key} is empty in ${l}`)
     if (/\{n\}/.test(t(key, 'English'))) check(v.includes('{n}'), `i18n: ${key} lost its {n} placeholder in ${l}`)
+    if (/\{partner\}/.test(t(key, 'English'))) check(v.includes('{partner}') && !v.includes('North Houses'), `i18n: ${key} lost its {partner} placeholder (or names North Houses) in ${l}`)
   }
   check(nhUseSrc.includes(key), `i18n: ${key} is in the table but nothing references it (dead key)`)
 }

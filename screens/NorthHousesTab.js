@@ -100,7 +100,7 @@ export default function NorthHousesTab({ lang, onOpenApartment, bottomPad = 24 }
     <ScrollView contentContainerStyle={[s.content, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
       <Card padding={16} style={s.block}>
         <View style={s.head}>
-          <PartnerLogoStrip source={partnerLogo(partner)} name={partner.name} width={LOGO} height={LOGO} />
+          <PartnerLogoStrip source={partnerLogo(partner)} name={null} width={LOGO} height={LOGO} />
           <View style={s.headText}>
             <Text style={s.partnerName}>{partner.name}</Text>
             <Text style={s.tagline}>{t(partner.taglineKey, lang)}</Text>

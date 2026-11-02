@@ -42,7 +42,8 @@ export const NORTH_HOUSES = {
   // Display name, the operator's own (Alkent's request, 2026-11-02); a proper noun, never translated.
   // Code names, flags, slug and the building / apartment names stay North Houses. No-break spaces
   // round the & so a wrapped title breaks as "Alkent / Emlak & Danışmanlık", never after the &.
-  // The ONLY copy of the name: nhDirectNote takes it through {partner} in all nine locales.
+  // The ONLY copy of the name: nhDirectNote takes it through {partner} in all nine locales. A rename
+  // re-reads two of them: French writes d'{partner} (vowel) and Greek την {partner} (η εταιρεία).
   name:    'Alkent Emlak\u00A0&\u00A0Danışmanlık',
   website: 'https://www.northcyprusbnb.com',
   email:   'book@northcyprusbnb.com',
