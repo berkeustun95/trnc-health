@@ -215,14 +215,6 @@ export const PARTNER_ASSETS = {
   'northhouses/m1-06': require('../assets/partners/northhouses/m1-06.jpg'),
   'northhouses/m1-07': require('../assets/partners/northhouses/m1-07.jpg'),
   'northhouses/m1-08': require('../assets/partners/northhouses/m1-08.jpg'),
-  'northhouses/a4-01': require('../assets/partners/northhouses/a4-01.jpg'),
-  'northhouses/a4-02': require('../assets/partners/northhouses/a4-02.jpg'),
-  'northhouses/a4-03': require('../assets/partners/northhouses/a4-03.jpg'),
-  'northhouses/a4-04': require('../assets/partners/northhouses/a4-04.jpg'),
-  'northhouses/a4-05': require('../assets/partners/northhouses/a4-05.jpg'),
-  'northhouses/a4-06': require('../assets/partners/northhouses/a4-06.jpg'),
-  'northhouses/a4-07': require('../assets/partners/northhouses/a4-07.jpg'),
-  'northhouses/a4-08': require('../assets/partners/northhouses/a4-08.jpg'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)

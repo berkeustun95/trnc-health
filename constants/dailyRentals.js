@@ -1,5 +1,5 @@
 // Günlük Kiralık (daily rentals) — the third top tab of Emlak & Konaklama, and its one partner:
-// North Houses (northcyprusbnb.com), four buildings in Lefkoşa, seven apartment types. Shown to
+// North Houses (northcyprusbnb.com), three buildings in Lefkoşa, six apartment types. Shown to
 // guests under its operator's name, Alkent Emlak & Danışmanlık (NORTH_HOUSES.name, 2026-11-02);
 // North Houses stays the code name and the building / apartment names, as on their site.
 //
@@ -67,17 +67,16 @@ export const NORTH_HOUSES = {
   checkLateKey:  'nhCheckLate',
 }
 
-// ─── THE FOUR BUILDINGS, in the site's order ─────────────────────────────────
+// ─── THE THREE BUILDINGS, in the site's order ─────────────────────────────────
 // `mapUrl` is THEIR link, opened as-is. `name` is a proper noun and is never translated.
 export const NH_BUILDINGS = [
   { id: 'tezer',    name: 'Tezer Plaza',          blurbKey: 'nhBldTezer',    mapUrl: 'https://maps.app.goo.gl/6Ejg8MtNPTbRWPNu8' },
   { id: 'yasemin',  name: 'Yasemin Residens',     blurbKey: 'nhBldYasemin',  mapUrl: 'https://maps.app.goo.gl/to8CfXwjGYXZPoK87' },
   { id: 'mine',     name: 'Mine Apt',             blurbKey: 'nhBldMine',     mapUrl: 'https://maps.app.goo.gl/s6unWTFjT9nxptZY7' },
-  { id: 'kaymakli', name: 'North Houses Kaymaklı', blurbKey: 'nhBldKaymakli', mapUrl: 'https://maps.app.goo.gl/bzXsQuvxxi6hX9na6' },
 ]
 export const nhBuilding = id => NH_BUILDINGS.find(b => b.id === id)
 
-// ─── THE SEVEN APARTMENT TYPES, in the site's order ──────────────────────────
+// ─── THE SIX APARTMENT TYPES, in the site's order ──────────────────────────
 //
 // `slug` = the site's own path segment AND the partner_booking_requests.apartment CHECK, so it
 // can never be renamed here without a migration. `key` is the short id used in i18n keys and
@@ -89,8 +88,10 @@ export const nhBuilding = id => NH_BUILDINGS.find(b => b.id === id)
 // price = the nightly rate in the site's booking panel, shown as "from" next to the site's own
 // "prices may vary" note. cleaningFee / deposit / minNights are the same panel's figures.
 // `electricity` (absent = the page states no charge): kWh a day included, then €/kWh, from each apartment's own page.
-// amenityKeys are the site's list in the site's order (Kaymaklı's list is empty on the site in
-// both languages: it shows none, nothing is invented).
+// amenityKeys are the site's list in the site's order.
+// REMOVED 2026-11-02 at the partner's request, before launch: the Kaymaklı building and its apartment
+// (north-houses-aladag-sk-kucuk-kaymakli-lefkosa) — config, photos, map link and every string. The
+// partner_booking_requests CHECK still allows that slug; nothing sends it (scripts/check-dorms.mjs).
 const photos = key => Array.from({ length: 8 }, (_, i) => `northhouses/${key}-${String(i + 1).padStart(2, '0')}`)
 
 export const NH_APARTMENTS = [
@@ -147,15 +148,6 @@ export const NH_APARTMENTS = [
     electricity: { freeKwhPerDay: 7, eurPerKwh: 0.37 },
     amenityKeys: ['nhAmWifiNetflix', 'nhAmAc', 'nhAmKitchen', 'nhAmWasher', 'nhAmParking', 'nhAmHotWater'],
     photos: photos('m1'),
-  },
-  {
-    key: 'a4', slug: 'north-houses-aladag-sk-kucuk-kaymakli-lefkosa', buildingId: 'kaymakli', kind: 'twoPlusOne',
-    nameKey: 'nhAptA4Name', descKey: 'nhAptA4Desc',
-    bedrooms: 2, beds: { double: 2, single: 0 }, guests: 4,
-    price: 45, cleaningFee: 50, deposit: 100, minNights: 2,
-    electricity: { freeKwhPerDay: 7, eurPerKwh: 0.30 },
-    amenityKeys: [],
-    photos: photos('a4'),
   },
 ]
 
