@@ -201,6 +201,8 @@ WITH report AS (
     ('20261157_eatery_order_website','eatery_partners','brand_color'),
     -- 20261157: an 18+ menu item (alcohol), hidden from guests / no DOB / under-18 by the app; shape is an H token.
     ('20261157_eatery_order_website','eatery_menu_items','adult_only'),
+    -- 20261159: the partner's own dish id (website basket hand-off ?cart=); meaning is an H token.
+    ('20261159_eatery_menu_items_partner_item_id','eatery_menu_items','partner_item_id'),
     ('1115_eatery_partners','eatery_menu_items','id'),
     ('1115_eatery_partners','eatery_menu_items','partner_id'),
     ('1115_eatery_partners','eatery_menu_items','section'),
@@ -839,6 +841,8 @@ WITH report AS (
     -- 20261157: brand_color hex shape and item_id eatery-only; meanings are H tokens.
     ('20261157_eatery_order_website','eatery_partners_brand_color_check'),
     ('20261157_eatery_order_website','contact_events_item_id_check'),
+    -- 20261159: URL-safe partner dish id.
+    ('20261159_eatery_menu_items_partner_item_id','eatery_menu_items_partner_item_id_check'),
     -- 20261151: same expression as logo_path_check; equality with it is an H token.
     ('20261151_eatery_partners_banner_path','eatery_partners_banner_path_check'),
     -- Duyurular (1102): registered ahead of the apply; red until it runs.
@@ -1172,6 +1176,8 @@ WITH report AS (
     ('1108_driving_schools','driving_school_branches_school_idx'),
     -- Yeme-Icme eatery partners (1115): registered ahead of the apply; red until it runs.
     ('1115_eatery_partners','eatery_menu_items_partner_idx'),
+    -- 20261159: one partner never maps two dishes to one of its ids (partial: NULLs free).
+    ('20261159_eatery_menu_items_partner_item_id','eatery_menu_items_partner_item_id_uniq'),
     ('1115_eatery_partners','eatery_photos_partner_idx'),
     ('20261125_eatery_orders','eatery_orders_created_by_created_at_idx'),
     ('20261125_eatery_orders','eatery_orders_partner_created_at_idx'),
@@ -4282,6 +4288,22 @@ WITH report AS (
                    AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'adult_only', 'INSERT,UPDATE,REFERENCES'), false)
           AND NOT EXISTS (SELECT 1 FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
                            WHERE (to_jsonb(i)->>'adult_only')::boolean AND to_jsonb(p)->>'order_method' IS DISTINCT FROM 'website'))
+    UNION ALL SELECT '20261159_eatery_menu_items_partner_item_id','partner_item_id: text NULL, URL-safe CHECK, partial UNIQUE (partner_id, partner_item_id), clients read-only, once 1159 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261159_eatery_menu_items_partner_item_id.sql')
+      OR (COALESCE((SELECT a.atttypid = 'text'::regtype AND NOT a.attnotnull FROM pg_attribute a
+                     WHERE a.attrelid = to_regclass('public.eatery_menu_items') AND a.attname = 'partner_item_id' AND NOT a.attisdropped), false)
+          AND COALESCE((SELECT c.convalidated AND pg_get_constraintdef(c.oid) LIKE '%A-Za-z0-9_-%' FROM pg_constraint c
+                         WHERE c.conrelid = to_regclass('public.eatery_menu_items') AND c.conname = 'eatery_menu_items_partner_item_id_check'), false)
+          AND COALESCE((SELECT x.indisunique AND x.indpred IS NOT NULL FROM pg_index x
+                         WHERE x.indexrelid = to_regclass('public.eatery_menu_items_partner_item_id_uniq')), false)
+          AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'partner_item_id', 'SELECT')
+                   AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'partner_item_id', 'INSERT,UPDATE,REFERENCES')
+                   AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'partner_item_id', 'INSERT,UPDATE,REFERENCES'), false))
+    UNION ALL SELECT '20261160_pasatiempo_owner_data','pasatiempo: address set, pin source partner, every item carries a partner_item_id, once 1160 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261160_pasatiempo_owner_data.sql')
+      OR COALESCE((SELECT p.address IS NOT NULL AND p.geocode_source = 'partner'
+                          AND NOT EXISTS (SELECT 1 FROM public.eatery_menu_items i WHERE i.partner_id = p.id AND to_jsonb(i)->>'partner_item_id' IS NULL)
+                     FROM public.eatery_partners p WHERE p.slug = 'pasatiempo'), false)
     -- ── 1158: Pasatiempo seed. Asserts only what the file fixed for good: website ordering, a partner pin (never Google), the brand
     --    colour, at least one menu item and no item options (no basket). Address, logo, photos, hours, menu and is_active change later.
     UNION ALL SELECT '20261158_pasatiempo_data','pasatiempo: order_method website, pin source partner, brand_color #994b17, >= 1 menu item, 0 item options, once 1158 is applied',
