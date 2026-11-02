@@ -12,6 +12,8 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
 import MascotIntroCard from '../components/MascotIntroCard'
+import { ModuleScreen, ScreenHeader as KitHeader } from '../components/ui'
+import { CARD_BG } from '../components/ui/ModuleScreen'
 import ContentReportMenu from '../components/ContentReportMenu'
 import StudentProfileScreen from './StudentProfileScreen'
 import ConversationsScreen from './ConversationsScreen'
@@ -816,9 +818,9 @@ export default function StudentHubScreen({
 
   return (
     <View style={s.root}>
+    <ModuleScreen topic="studentHub">
     <SafeAreaView style={s.safe} edges={['top']}>
-      <PageBackground topic="newcomer_essentials" />
-      <ScreenHeader onBack={onBack} lang={lang} title={t('menuStudentHub', lang)} />
+      <KitHeader onBack={onBack} lang={lang} title={t('menuStudentHub', lang)} />
 
       <View style={s.introWrap}>
         <MascotIntroCard
@@ -901,6 +903,7 @@ export default function StudentHubScreen({
         </View>
       )}
     </SafeAreaView>
+    </ModuleScreen>
     {overlays}
     </View>
   )
@@ -912,7 +915,7 @@ const s = StyleSheet.create({
   layer: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   tabPane: { flex: 1 },
   tabHidden: { display: 'none' },
-  safe: { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1 },
   introWrap: { paddingHorizontal: 16, marginBottom: 16 },
 
   segment: {
@@ -975,7 +978,7 @@ const s = StyleSheet.create({
   chipTextActive: { color: colors.surface },
 
   uniCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: CARD_BG,
     borderRadius: radius.card,
     padding: 16,
     marginTop: 12,
@@ -987,11 +990,12 @@ const s = StyleSheet.create({
   uniDetailName: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 26 },
   uniMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
 
-  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, paddingHorizontal: 16, gap: 10,
+               marginTop: 12, backgroundColor: CARD_BG, borderRadius: radius.card },
   emptyText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
 
   errorWrap: {
-    backgroundColor: colors.surface,
+    backgroundColor: CARD_BG,
     borderRadius: radius.card,
     padding: 24,
     marginTop: 12,
