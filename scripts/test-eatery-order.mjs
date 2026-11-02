@@ -686,10 +686,10 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('wiring: the log line comes BEFORE the browser opens', es.indexOf("'order_website'") > 0 && es.indexOf("'order_website'") < es.indexOf('openBrowserAsync'), true)
   eq('wiring: expo-web-browser is required inside the function, with a Linking fallback', /export async function openEaterySite[\s\S]*require\('expo-web-browser'\)[\s\S]*Linking\.openURL\(url\)/.test(es) && !/^import[^\n]*expo-web-browser/m.test(es), true)
   eq('wiring: partner page — header CTA, per-dish button, generic website contact hidden, never on a fixture', [
-    /const siteOrdering = !partner\.placeholder && eateryOrdersOnWebsite\(partner\)/.test(ps), /\{siteOrdering && \(\s*<View style=\{s\.siteCta\}>/.test(ps),
+    /const siteOrdering = !partner\.placeholder && eateryOrdersOnWebsite\(partner\)\s*&& orderAgeGate\(\{ adultOnly: partner\.adult_only, guest: isGuest\(session\), dob: dateOfBirth \}\) == null/.test(ps), /\{siteOrdering && \(\s*<View style=\{s\.siteCta\}>/.test(ps),
     /onSite=\{siteOrdering \? onSite : undefined\}/.test(ps), /contacts\.filter\(c => !\(siteOrdering && c\.action === 'website'\)\)/.test(ps)], [true, true, true, true])
   eq('wiring: the per-dish button only for an orderable dish', /if \(onSite && eateryOrderable\(item\)\)/.test(ps), true)
-  eq('wiring: quiz result card hands off website dishes (never alongside a basket)', /\{site && !canOrder && \(/.test(qz) && /site=\{eateryOrdersOnWebsite\(d\.partner\)\}/.test(qz) && /openEaterySite\(partner, item\.id\)/.test(qz), true)
+  eq('wiring: quiz result card hands off website dishes (never alongside a basket)', /\{site && !canOrder && \(/.test(qz) && /site=\{eateryOrdersOnWebsite\(d\.partner\) && d\.partner\.adult_only === false\}/.test(qz) && /openEaterySite\(partner, item\.id\)/.test(qz), true)
   eq('i18n: the three website keys in all 9 languages', ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa'].every(l => ['eateryOrderOnSite', 'eateryOrderOnSiteA11y', 'eateryOrderOnSiteHint'].every(k => t(k, ({ en: 'English', tr: 'Turkish', ar: 'Arabic', ru: 'Russian', el: 'Greek', fr: 'French', es: 'Spanish', de: 'German', fa: 'Persian' })[l]) !== k)), true)
   eq('i18n: Turkish button text', t('eateryOrderOnSite', 'Turkish'), 'Sitede sipariş ver')
 }

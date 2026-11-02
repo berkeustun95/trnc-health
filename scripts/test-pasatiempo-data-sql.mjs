@@ -42,7 +42,7 @@ const t = (name, got, want) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
 }
 const dir = mkdtempSync(join(tmpdir(), 'pt-'))
-const ready = async ({ with1157 = true } = {}) => {
+const ready = async ({ with1157 = true, activeCrunchy = false } = {}) => {
   // Prod order: 1115 state + seed, then 1116 (its pre-state wants the 1115 policy set), then the 1120 policies, then the chain.
   const d = await freshDb(BASE + '\n' + PRIOR.slice(s0, s1))
   { const r = await applyFile(d, M('20261116_eatery_dish_photos.sql')); if (!r.ok) throw new Error('1116 did not apply: ' + r.msg) }
@@ -53,13 +53,15 @@ const ready = async ({ with1157 = true } = {}) => {
   { const r = await applyFile(d, M('20261123_eatery_dish_tags_order_whatsapp.sql')); if (!r.ok) throw new Error('1123 did not apply: ' + r.msg) }
   for (const f of CHAIN) { const r = await applyFile(d, f); if (!r.ok) throw new Error(f + ' did not apply: ' + r.msg) }
   if (with1157) { const r = await applyFile(d, F1157); if (!r.ok) throw new Error('1157 did not apply: ' + r.msg) }
+  // A live partner, so the positive control has something to see (prod has two). Crunchy gets the launch-complete fields first.
+  if (activeCrunchy) await d.exec(`UPDATE public.eatery_partners SET lat = 35.2, lng = 33.36, geocode_source = 'partner', logo_path = 'crunchy-express/logo.png', menu_verified_on = DATE '2026-11-01', is_active = true WHERE slug = 'crunchy-express'`)
   return d
 }
 const q = async (d, sql) => (await d.query(sql)).rows
 const menuCount = (SQL.match(/^  \{"section": /gm) || []).length
 
 console.log('20261158_pasatiempo_data — real file after the 1115 → 1157 chain')
-const db = await ready()
+const db = await ready({ activeCrunchy: true })
 const others = async (d) => (await q(d, `SELECT md5(string_agg(to_jsonb(p)::text, ',' ORDER BY p.id)) m FROM public.eatery_partners p WHERE slug <> 'pasatiempo'`))[0].m
 const before = await others(db)
 t('applies cleanly (pre/post-state, visibility + positive control green)', await applyFile(db, F1158), { ok: true, msg: null })
@@ -119,6 +121,7 @@ await refused('a menu row dropped by the insert', mutant('drop', [[`      FROM j
 await refused('another partner touched', mutant('other', [[`  -- ── Post-state: nothing else moved ──`, `  UPDATE public.eatery_partners SET sort_order = sort_order + 1 WHERE id <> c_id;\n  -- ── Post-state: nothing else moved ──`]]), 'another partner or its menu changed')
 await refused('activated at the end', mutant('act2', [[`  -- ── Post-state: nothing else moved ──`, `  UPDATE public.eatery_partners SET is_active = true WHERE id = c_id;\n  -- ── Post-state: nothing else moved ──`]]), 'eatery_partners_launch_complete_check')
 await refused('visibility check removed (anon count forced)', mutant('vis', [[`IF v_anon_p <> 0 OR v_anon_i <> 0`, `IF v_anon_p <> 0 OR v_anon_i <> 0 OR true`]]), 'inactive partner visible')
+await refused('anon RLS hides every partner (positive control must notice)', mutant('rls', [[`  -- ── Visibility: production roles see nothing`, `  CREATE POLICY zz_hide ON public.eatery_partners AS RESTRICTIVE FOR SELECT TO anon USING (false);\n  -- ── Visibility: production roles see nothing`]]), 'positive control failed: anon sees', { activeCrunchy: true })
 await refused('1157 not applied', F1158, '20261157_eatery_order_website.sql is not in the ledger', { with1157: false })
 
 if (bad) { console.log(`\n${bad} FAILED`); process.exit(1) }

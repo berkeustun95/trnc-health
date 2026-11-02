@@ -17,8 +17,8 @@ export async function openEaterySite(partner, itemId = null) {
   try {
     const WebBrowser = require('expo-web-browser')
     await WebBrowser.openBrowserAsync(url, {
-      toolbarColor: eateryBrandInk(partner.brand_color) || colors.primary,   // Android Custom Tabs
-      controlsColor: eateryBrandInk(partner.brand_color) || colors.primary,  // iOS SFSafariViewController tint
+      toolbarColor: eateryBrandInk(partner.brand_color) || colors.primary,   // the bar: Custom Tabs, SFSafariViewController
+      controlsColor: colors.onPrimary,                                         // iOS buttons on that bar (never brand on brand)
       dismissButtonStyle: 'close',
       enableBarCollapsing: true,
     })

@@ -244,7 +244,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
   // Website partners: no list; the header and every orderable dish hand off to the partner's site (utils/eaterySite.js).
+  // An adult_only partner keeps the same 18+ gate as the basket (guests, no DOB and under-18s get no hand-off).
   const siteOrdering = !partner.placeholder && eateryOrdersOnWebsite(partner)
+    && orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth }) == null
   const siteInk = eateryBrandInk(partner.brand_color) || colors.primary
   const onSite = useCallback(itemId => { openEaterySite(partner, itemId) }, [partner])
   const callUrl = contacts.find(c => c.action === 'call')?.url

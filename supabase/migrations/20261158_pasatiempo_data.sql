@@ -157,6 +157,7 @@ DECLARE
   v_active_before text; v_active_after text;
   v_pos_p int; v_pos_i int;
   v_anon_p int; v_anon_i int; v_auth_p int; v_auth_i int;
+  v_live int; v_anon_live int;
 BEGIN
   -- ── Pre-state ──
   IF NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261157_eatery_order_website.sql') THEN
@@ -241,9 +242,11 @@ BEGIN
   -- ── Visibility: production roles see nothing (postgres = positive control) ──
   SELECT count(*) INTO v_pos_p FROM public.eatery_partners WHERE id = c_id;
   SELECT count(*) INTO v_pos_i FROM public.eatery_menu_items WHERE partner_id = c_id;
+  SELECT count(*) INTO v_live FROM public.eatery_partners WHERE is_active;
   SET LOCAL ROLE anon;
   PERFORM set_config('request.jwt.claims', '', true);
   PERFORM set_config('request.headers', '', true);
+  SELECT count(*) INTO v_anon_live FROM public.eatery_partners;
   SELECT count(*) INTO v_anon_p FROM public.eatery_partners WHERE id = c_id;
   SELECT count(*) INTO v_anon_i FROM public.eatery_menu_items WHERE partner_id = c_id;
   RESET ROLE;
@@ -256,6 +259,10 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   IF v_pos_p IS DISTINCT FROM 1 OR v_pos_i IS DISTINCT FROM 83 THEN
     RAISE EXCEPTION 'positive control failed: postgres sees % partner / % items', v_pos_p, v_pos_i;
+  END IF;
+  -- Positive control through RLS: anon sees exactly the live partners (a policy that hid everything would pass the 0s below).
+  IF v_anon_live IS DISTINCT FROM v_live THEN
+    RAISE EXCEPTION 'positive control failed: anon sees % partners, % are active', v_anon_live, v_live;
   END IF;
   IF v_anon_p <> 0 OR v_anon_i <> 0 OR v_auth_p <> 0 OR v_auth_i <> 0 THEN
     RAISE EXCEPTION 'inactive partner visible: anon % / %, authenticated % / %', v_anon_p, v_anon_i, v_auth_p, v_auth_i;
@@ -276,7 +283,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261158_pasatiempo_data.sql', '95dc36abf7e48fd7a23140e71377a077cb5e25b19ccdae433b6ffbd1a36a0cbf')
+VALUES ('20261158_pasatiempo_data.sql', '41af1ed40d3012b8790ffb47da94bb39bc523f90b5d73f16fbfbd7b99c7a6d53')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

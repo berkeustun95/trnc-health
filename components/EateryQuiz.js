@@ -373,7 +373,7 @@ export function QuizPage({ lang, open, rows, reduce, scoped = false, config = QU
                   <View style={st.cards}>
                     {result?.dishes.map(d => (
                       <ResultCard key={d.item.id} entry={d} lang={lang} reduce={reduce}
-                        canOrder={canOrder(d.partner)} phone={d.partner.order_method === 'phone'} site={eateryOrdersOnWebsite(d.partner)} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
+                        canOrder={canOrder(d.partner)} phone={d.partner.order_method === 'phone'} site={eateryOrdersOnWebsite(d.partner) && d.partner.adult_only === false} basket={getBasket(d.partner.id)} onQty={onQty} onOptions={onOptions} scoped={scoped}
                         onPress={() => onOpenDish(d.partner, d.item.id)} onOpenPartner={() => onOpenMenu(d.partner)} />
                     ))}
                   </View>
