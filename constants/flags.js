@@ -412,7 +412,8 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 // WhatsApp badge). The table, 20261148 retention job and privacy 2026-10-30 stay as they are (harmless while hidden).
 // LIVE AGAIN 2026-11-02: written OK + logo received 2026-11-02 (North Houses is run by Alkent Emlak & Danışmanlık;
 // the logo is Alkent's mark). Content re-checked against northcyprusbnb.com the same day.
-export const NORTH_HOUSES_LIVE = true
+// HELD 2026-11-02 (Berke): off in the Base C release; goes live after his go, with the Alkent display name (#279).
+export const NORTH_HOUSES_LIVE = false
 
 // Production switch for North Houses' booking-request form on the apartment screen (it saves a row in
 // partner_booking_requests and opens WhatsApp). Also needs NORTH_HOUSES_LIVE for the tab to exist.
@@ -428,7 +429,8 @@ export const NORTH_HOUSES_LIVE = true
 // needs the local flip like every gated screen. NOT a MODULE_FLAGS key: it gates nothing else and reveals nothing.
 // LIVE 2026-11-02: 20261143 + 20261148 APPLIED, verify_schema QUERY 1 all checks pass, purge cron OK
 // (supabase-migration-status run 41424092687); privacy 2026-10-30 published at getadaapp.com/privacy.
-export const NORTH_HOUSES_FORM_LIVE = true
+// HELD 2026-11-02 (Berke) with NORTH_HOUSES_LIVE: preconditions still hold, flip both back on his go.
+export const NORTH_HOUSES_FORM_LIVE = false
 
 // Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
 // from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no
