@@ -1,0 +1,21 @@
+{
+  "logo": "logo.png",
+  "dishes": {
+    "Coca Cola Zero": "coca-cola-zero.jpg",
+    "Crispy Chicken Bowl": "crispy-chicken-bowl.jpg",
+    "Crispy Chicken Wrap": "crispy-chicken-wrap.jpg",
+    "Fajita Wrap": "fajita-wrap.jpg",
+    "Falafel Wrap": "falafel-wrap.jpg",
+    "Fanta": "fanta.jpg",
+    "Fues tea limon": "fues-tea-limon.jpg",
+    "Grilled Chicken Bowl": "grilled-chicken-bowl.jpg",
+    "Grilled Chicken Combo Bowl": "grilled-chicken-combo-bowl.jpg",
+    "Grilled Chicken Wrap": "grilled-chicken-wrap.jpg",
+    "Meatball Bowl": "meatball-bowl.jpg",
+    "Meatball Combo Bowl": "meatball-combo-bowl.jpg",
+    "Mushrooms & Falafel Bowl": "mushrooms-falafel-bowl.jpg",
+    "Mushrooms Wrap": "mushrooms-wrap.jpg",
+    "Smash Burger Wrap": "smash-burger-wrap.jpg",
+    "Umami Wrap": "umami-wrap.jpg"
+  }
+}
