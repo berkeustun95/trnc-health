@@ -82,9 +82,11 @@ t('still 83 rows after re-apply', (await q(db, `SELECT count(*)::int n FROM publ
 
 console.log('verify_schema.sql 1157 / 1158 tokens (sliced from the file, not retyped)')
 const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
-const va = VS.indexOf('    -- ── 1157: order_method'), vb = VS.indexOf('    -- ── 1144: eatery_partners.order_method', va)
+const va = VS.indexOf('    -- ── 1157: order_method'), vc = VS.indexOf("    UNION ALL SELECT '20261159_", va), vd = VS.indexOf("    -- ── 1158: Pasatiempo seed.", va)
+const vb = VS.indexOf('    -- ── 1144: eatery_partners.order_method', va)
 if (va < 0 || vb < va) { bad++; console.log('  ✗ verify_schema 1157 anchors missing') }
-const TOK = `SELECT x.c AS check_name, x.ok FROM (SELECT ''::text AS t, ''::text AS c, true AS ok WHERE false\n${VS.slice(va, vb)}) x(t, c, ok)`
+// 1157 + 1158 tokens only (1159 / 1160 sit between them and have their own test).
+const TOK = `SELECT x.c AS check_name, x.ok FROM (SELECT ''::text AS t, ''::text AS c, true AS ok WHERE false\n${VS.slice(va, vc)}${VS.slice(vd, vb)}) x(t, c, ok)`
 const tokens = async (d) => (await q(d, TOK)).map(r => r.ok)
 {
   const pre = await ready({ with1157: false })
