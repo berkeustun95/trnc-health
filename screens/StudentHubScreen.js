@@ -14,13 +14,14 @@ import ContentCard from '../components/ContentCard'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { ModuleScreen, ScreenHeader as KitHeader } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
+import SplashStatusBar from '../components/SplashStatusBar'
 import ContentReportMenu from '../components/ContentReportMenu'
 import StudentProfileScreen from './StudentProfileScreen'
 import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
 import { MODULE_FLAGS, CONNECTIVITY_LIVE } from '../constants/flags'
 import Avatar, { prefetchAvatars } from '../components/Avatar'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, radii } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { normalize } from '../constants/oliIntents'
@@ -391,7 +392,7 @@ function BasicsTab({ lang, tasks, tasksFailed, offline, progress, onRetryTasks, 
       {tasks === null && tasksFailed ? (
         <LoadError lang={lang} onRetry={onRetryTasks} />
       ) : (
-        <ContentCard>
+        <ContentCard style={s.photoCard}>
           <SectionTitle text={t('studentArrivalTitle', lang)} />
           {offline ? <OfflineNotice lang={lang} /> : null}
           {tasks === null
@@ -402,7 +403,7 @@ function BasicsTab({ lang, tasks, tasksFailed, offline, progress, onRetryTasks, 
         </ContentCard>
       )}
 
-      <ContentCard style={s.secondCard}>
+      <ContentCard style={[s.photoCard, s.secondCard]}>
         <SectionTitle text={t('studentNewcomerTitle', lang)} />
         <Text style={s.crossText}>{t('studentNewcomerBody', lang)}</Text>
         <TouchableOpacity style={s.linkBtnGhost} onPress={onShowNewcomerEssentials} activeOpacity={0.8}>
@@ -756,6 +757,8 @@ export default function StudentHubScreen({
   const openTask = openSlug ? tasks?.find(task => task.slug === openSlug) : null
   const overlays = (
     <>
+      {/* The hub's ModuleScreen asks for light icons; every overlay is on a light ground. */}
+      {!!(openUni || openTask || openStudentId || openConv || composeWith) && <SplashStatusBar style="dark" />}
       {openUni && (
         <View style={s.layer}>
           <UniversityDetail
@@ -827,6 +830,7 @@ export default function StudentHubScreen({
           module="welcome_guide"
           title={t('studentHubTitle', lang)}
           subtitle={t('studentHubSubtitle', lang)}
+          style={s.photoCard}
         />
       </View>
 
@@ -979,7 +983,7 @@ const s = StyleSheet.create({
 
   uniCard: {
     backgroundColor: CARD_BG,
-    borderRadius: radius.card,
+    borderRadius: radii.card,
     padding: 16,
     marginTop: 12,
     ...shadow,
@@ -991,12 +995,12 @@ const s = StyleSheet.create({
   uniMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
 
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, paddingHorizontal: 16, gap: 10,
-               marginTop: 12, backgroundColor: CARD_BG, borderRadius: radius.card },
+               marginTop: 12, backgroundColor: CARD_BG, borderRadius: radii.card },
   emptyText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
 
   errorWrap: {
     backgroundColor: CARD_BG,
-    borderRadius: radius.card,
+    borderRadius: radii.card,
     padding: 24,
     marginTop: 12,
     alignItems: 'center',
@@ -1026,6 +1030,8 @@ const s = StyleSheet.create({
   retryText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.surface },
 
   secondCard: { marginTop: 16 },
+  // The main page's legacy cards on the module photo: ModuleScreen's 93% white, the kit's photo radius.
+  photoCard: { backgroundColor: CARD_BG, borderRadius: radii.card },
 
   // ─── Student list (slice 4) ───────────────────────────────────────────────
   studentRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
@@ -1073,7 +1079,7 @@ const s = StyleSheet.create({
   taskTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   taskSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: 2 },
   taskCount: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, flexShrink: 0 },
-  taskCountDone: { color: colors.success },
+  taskCountDone: { color: colors.successInk },
   taskPendingText: { flex: 1, fontSize: 14, fontStyle: 'italic', color: colors.textSecondary },
 
   // Opaque, because the detail view shows it directly over the PageBackground photo.
