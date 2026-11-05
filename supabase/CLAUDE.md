@@ -29,9 +29,9 @@ Incident backstories: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
 
 ## Public logs
 - ⚠ **Actions logs on this repo are public (Berke, 2026-11-05). Probes and migrations print no user totals and no user ids.**
-  `supabase-migrate` prints the whole file in its dry job, and `supabase-readonly` prints every result, so a count or id in a
-  file, a message or a result is published. Results belong only in the vault log. A delete of listed users selects by
-  signature and compares a hash of the reviewed list.
+  `supabase-migrate` prints the whole file in its dry job, so a count or id in a migration or its messages is published. A delete
+  of listed users selects by signature and compares a hash of the reviewed list. `supabase-readonly` seals every result: open
+  one with `node scripts/readonly-results.mjs <run-id>`, which appends it to the vault (private key on Berke's Mac only).
 
 ## Migrations (applied by the `supabase-migrate` workflow)
 - **Applied only by `gh workflow run supabase-migrate -f file=<FULL file name>.sql`** (dry by default:
