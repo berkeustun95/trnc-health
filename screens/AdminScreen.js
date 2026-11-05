@@ -360,6 +360,7 @@ function FeedHealthBanner({ lastSeenAt }) {
 // Numbers come from admin_user_counts() (20261161): the client cannot read auth.users.
 
 // Berke's own test accounts, all signed-up. A conservative estimate, taken off the totals only.
+// Which platform each is on is unknown, so they come off Unknown for the three to add up to accounts.
 const TEST_ACCOUNTS = 10
 
 const formatCount = n => n.toLocaleString('en-US')
@@ -491,10 +492,14 @@ function UserCounts({ onOpenTools, onOpenReports }) {
         <StatCard label="Guests" value={formatCount(counts.guests)} />
       </View>
 
-      <Text style={[s.sectionTitle, { marginTop: 20 }]}>Platform · users signed in now</Text>
-      <View style={s.statsGrid}>
-        <StatCard label="iOS" value={formatCount(counts.ios_users)} />
-        <StatCard label="Android" value={formatCount(counts.android_users)} />
+      <Text style={[s.sectionTitle, { marginTop: 20 }]}>Platform · signed-up accounts</Text>
+      <View style={[s.newRow, { marginBottom: 0 }]}>
+        {[['iPhone', counts.platform_ios], ['Android', counts.platform_android], ['Unknown', counts.platform_unknown - TEST_ACCOUNTS]].map(([label, value]) => (
+          <View key={label} style={s.newCard}>
+            <Text style={s.newValue}>{formatCount(value)}</Text>
+            <Text style={s.statLabel}>{label}</Text>
+          </View>
+        ))}
       </View>
 
       {toolsLink}
