@@ -28,7 +28,7 @@ eq('the timeout is the 2 seconds Berke asked for', BROWSER_OPEN_TIMEOUT_MS, 2000
 { const r = rig({}); await tick(); r.timeUp(); eq('no tab within the time: the same link in the system browser, once', [await r.run, r.system], ['system', ['https://x.test/']]); eq('  the listener is released', r.listeners.size, 0) }
 { const r = rig({}); await tick(); r.leave('active'); r.timeUp(); eq('"active" is not leaving: still falls back', [await r.run, r.system], ['system', ['https://x.test/']]) }
 { const r = rig({ opens: () => Promise.reject(new Error('refused')) }); await tick(); eq('Android refuses the tab: system browser at once', [await r.run, r.system], ['system', ['https://x.test/']]) }
-{ const r = rig({ opens: () => Promise.reject(new Error('refused')), systemFails: true }); await tick(); let threw = false; try { await r.run } catch { threw = true } eq('the system browser fails too: the caller hears it', threw, true) }
+{ const r = rig({ opens: () => Promise.reject(new Error('refused')), systemFails: true }); let threw = false; try { await r.run } catch { threw = true } eq('the system browser fails too: the caller hears it', threw, true) }
 { const r = rig({ platform: 'ios' }); eq('iOS: never the system browser (SFSafariViewController keeps ADA active)', [await r.run, r.system, r.listeners.size], ['in-app', [], 0]) }
 { const r = rig({ platform: 'ios', opens: () => Promise.reject(new Error('refused')) }); let threw = false; try { await r.run } catch { threw = true } eq('iOS refused: thrown to the caller, not stacked in Safari', [threw, r.system], [true, []]) }
 
