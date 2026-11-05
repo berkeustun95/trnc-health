@@ -27,6 +27,12 @@ Incident backstories: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
 - A migration file is intent, not evidence. `pg_get_functiondef`, `pg_get_constraintdef`,
   `pg_policies`, `information_schema` are the authority; quote which one you read.
 
+## Public logs
+- ⚠ **Actions logs on this repo are public (Berke, 2026-11-05). Probes and migrations print no user totals and no user ids.**
+  `supabase-migrate` prints the whole file in its dry job, and `supabase-readonly` prints every result, so a count or id in a
+  file, a message or a result is published. Results belong only in the vault log. A delete of listed users selects by
+  signature and compares a hash of the reviewed list.
+
 ## Migrations (applied by the `supabase-migrate` workflow)
 - **Applied only by `gh workflow run supabase-migrate -f file=<FULL file name>.sql`** (dry by default:
   prints the SQL and checks the ledger), then again with `-f apply=true`. No Mac holds a credential.
