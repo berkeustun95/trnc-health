@@ -5,6 +5,7 @@ import {
   Modal, TextInput, Switch, ScrollView, Alert, Linking, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import SplashStatusBar from '../components/SplashStatusBar'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -405,14 +406,18 @@ function DailyBars({ daily }) {
 function UserCounts({ onOpenTools, onOpenReports }) {
   const [counts, setCounts] = useState(null)
   const [pendingReports, setPendingReports] = useState(0)
+  const [novestLastSeen, setNovestLastSeen] = useState(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
-    const [{ data, error }, { count, error: reportsError }] = await Promise.all([
+    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }] = await Promise.all([
       supabase.rpc('admin_user_counts'),
       supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('properties').select('last_seen_at')
+        .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
     ])
+    setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
     setPendingReports(reportsError ? null : count)
@@ -452,6 +457,7 @@ function UserCounts({ onOpenTools, onOpenReports }) {
     return (
       <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
         {reportsRow}
+        <FeedHealthBanner lastSeenAt={novestLastSeen} />
         <View style={s.allClearBox}>
           <Text style={s.allClearText}>User counts could not be loaded.</Text>
           <TouchableOpacity onPress={refresh} activeOpacity={0.7}>
@@ -470,6 +476,7 @@ function UserCounts({ onOpenTools, onOpenReports }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
     >
       {reportsRow}
+      <FeedHealthBanner lastSeenAt={novestLastSeen} />
       <View style={s.totalCard}>
         <Text style={s.totalValue}>{formatCount(counts.total - TEST_ACCOUNTS)}</Text>
         <Text style={s.statLabel}>Total users (test accounts excluded)</Text>
@@ -4581,6 +4588,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
   if (!toolsOpen) {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
+        <SplashStatusBar style="dark" />
         <View style={s.container}>
           <View style={s.header}>
             <View style={s.headerLeft}>
@@ -4602,6 +4610,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <SplashStatusBar style="dark" />
       <View style={s.container}>
         <View style={s.header}>
           <TouchableOpacity style={s.headerLeft} onPress={() => setToolsOpen(false)} activeOpacity={0.7} accessibilityLabel="Back to user counts">
