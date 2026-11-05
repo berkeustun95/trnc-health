@@ -24,6 +24,7 @@
 // would keep working while only one stayed right.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { callerHoldsSecretKey } from '../_shared/cron-auth.mjs'
 import { readAllResult } from '../_shared/read-all-rows.mjs'
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
@@ -82,7 +83,10 @@ function assertHomogeneous(label: string, rows: Record<string, unknown>[]) {
   }
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req: Request) => {
+  if (!callerHoldsSecretKey(req, (k: string) => Deno.env.get(k))) {
+    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
   const started = Date.now()
   const log: string[] = []
   const say = (s: string) => { log.push(s); console.log(s) }

@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { callerHoldsSecretKey } from '../_shared/cron-auth.mjs'
 import { profileReadKinds, readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { pushOutcome, RUN_DEADLINE_MS, sendBatch } from './push.ts'
@@ -72,7 +73,10 @@ async function finishRun(supabase: any, id: number | null, patch: Record<string,
   }
 }
 
-serve(async () => {
+serve(async (req: Request) => {
+  if (!callerHoldsSecretKey(req, (k: string) => Deno.env.get(k))) {
+    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
   const runStartedAt = Date.now()
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
