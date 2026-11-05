@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       actions: read       # duyurular:health reads duyurular-fetch's own runs (question 5)
+      issues: write       # the alert step below
       checks: read        # …and the latest run's annotations: "chain completed via AIA" notices (info only)
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -60,6 +61,9 @@ jobs:
         run: |
           node scripts/check-novest-descriptions.mjs --self
           npm run -s novest:text
+      - name: duty push sent recently
+        if: success() || failure()
+        run: node scripts/check-duty-push-staleness.mjs
       - name: notify:health
         if: success() || failure()
         run: npm run -s notify:health
@@ -92,3 +96,29 @@ jobs:
       - name: eatery:partner-ids
         if: success() || failure()
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partner-ids.mjs
+
+      # GitHub emails a scheduled job's failure to whoever last edited the schedule, which is a bot, so a red run told
+      # nobody: Novest and the duty push were down for days. One issue stays open while anything is red, and Berke is
+      # mentioned only when the set of failing checks changes. Step names only: this repo and its issues are public.
+      - name: Alert Berke
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          failing=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
+            --jq '[.jobs[].steps[] | select(.conclusion == "failure") | "- " + .name] | sort | join("\n")')
+          title='Daily health is red'
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number,body \
+            --jq '.[0] // empty')
+          num=$(jq -r '.number // empty' <<<"$issue")
+          if [ -z "$failing" ]; then
+            [ -z "$num" ] || gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment 'All checks are green again.'
+            exit 0
+          fi
+          body=$(printf 'Failing checks:\n\n%s\n\nLatest run: %s/%s/actions/runs/%s' "$failing" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [ -z "$num" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"$'\n\n@berkeustun95'
+          elif [ "$(jq -r '.body' <<<"$issue" | sed -n '/^- /p')" != "$failing" ]; then
+            gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the failing checks changed:"$'\n\n'"$failing"
+          fi
