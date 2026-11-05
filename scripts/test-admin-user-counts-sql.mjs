@@ -20,7 +20,8 @@ const edge = (unit, offset) => `(date_trunc('${unit}', now() AT TIME ZONE ${ZONE
 const FIXTURE = `
 ALTER TABLE auth.users ADD COLUMN is_anonymous boolean NOT NULL DEFAULT false, ADD COLUMN created_at timestamptz,
   ADD COLUMN deleted_at timestamptz, ADD COLUMN email text;
-CREATE TABLE auth.sessions (id bigserial PRIMARY KEY, user_id uuid NOT NULL, user_agent text, not_after timestamptz);
+CREATE TABLE auth.sessions (id bigserial PRIMARY KEY, user_id uuid NOT NULL, user_agent text, not_after timestamptz,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz, refreshed_at timestamp);
 CREATE TABLE public.profiles (id uuid PRIMARY KEY REFERENCES auth.users(id), role text NOT NULL DEFAULT 'customer');
 CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path TO 'public' AS $f$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
@@ -31,15 +32,16 @@ INSERT INTO auth.users (id, is_anonymous, created_at, email) VALUES
   ('${GUEST}', true, now() - interval '400 days', NULL),
   ('${BOTH}', false, now() - interval '400 days', 'both@example.com');
 INSERT INTO public.profiles (id, role) VALUES ('${ADMIN}', 'admin'), ('${CUSTOMER}', 'customer'), ('${GUEST}', 'customer'), ('${BOTH}', 'customer');
-INSERT INTO auth.sessions (user_id, user_agent, not_after) VALUES
-  ('${CUSTOMER}', 'ADA/1 CFNetwork/1568 Darwin/24', NULL),
-  ('${CUSTOMER}', 'ADA/1 CFNetwork/1568 Darwin/24', now() + interval '1 day'),
-  ('${GUEST}', 'okhttp/4.12.0', NULL),
-  ('${BOTH}', 'okhttp/4.12.0', NULL),
-  ('${BOTH}', 'ADA/1 CFNetwork/1568 Darwin/24', NULL),
-  ('${ADMIN}', 'okhttp/4.12.0', now() - interval '1 day'),
-  ('${ADMIN}', 'Mozilla/5.0', NULL),
-  ('${ADMIN}', NULL, NULL);
+INSERT INTO auth.sessions (user_id, user_agent, not_after, refreshed_at) VALUES
+  ('${CUSTOMER}', 'ADA/1 CFNetwork/1568 Darwin/24', NULL, now() - interval '2 days'),
+  ('${CUSTOMER}', 'ADA/1 CFNetwork/1568 Darwin/24', now() + interval '1 day', now() - interval '1 day'),
+  ('${CUSTOMER}', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', NULL, now()),
+  ('${GUEST}', 'okhttp/4.12.0', NULL, now()),
+  ('${BOTH}', 'ADA/1 CFNetwork/1568 Darwin/24', NULL, now() - interval '3 days'),
+  ('${BOTH}', 'okhttp/4.12.0', NULL, now()),
+  ('${ADMIN}', 'okhttp/4.12.0', now() - interval '1 day', now()),
+  ('${ADMIN}', 'Mozilla/5.0 (Windows NT 10.0)', NULL, now()),
+  ('${ADMIN}', NULL, NULL, now());
 `
 // Rows on each side of the Nicosia boundaries, for the second run. A row at a boundary minus one minute belongs to the period before.
 const EDGES = `
@@ -74,10 +76,12 @@ console.log('20261161 — real file')
   const a = await call(d, 'authenticated', ADMIN)
   const c = a.rows[0].c
   t('admin gets the exact key set, counts only', Object.keys(c).sort(),
-    ['accounts', 'android_users', 'daily', 'guests', 'ios_users', 'new_month', 'new_today', 'new_week', 'total'])
+    ['accounts', 'daily', 'guests', 'new_month', 'new_today', 'new_week', 'platform_android', 'platform_ios', 'platform_unknown', 'total'])
   t('total, accounts, guests', [c.total, c.accounts, c.guests], [4, 3, 1])
-  t('iOS: two users, duplicate sessions counted once', c.ios_users, 2)
-  t('Android: two users; expired session and other agents ignored', c.android_users, 2)
+  t('iPhone: duplicate sessions count once, a newer desktop browser does not displace the phone', c.platform_ios, 1)
+  t('Android: a user on both platforms lands on their newest session; a guest is not counted', c.platform_android, 1)
+  t('Unknown: expired phone session and desktop browser only', c.platform_unknown, 1)
+  t('the three add up to accounts', c.platform_ios + c.platform_android + c.platform_unknown, c.accounts)
   t('daily has 30 days, oldest first, zero-filled', [c.daily.length, c.daily[0].day < c.daily[29].day, c.daily.every(x => x.n === 0)], [30, true, true])
   t('no email or id anywhere in the payload', /@example|00000000-0000/.test(JSON.stringify(c)), false)
 }
@@ -92,6 +96,20 @@ console.log('20261161 — real file')
   t('this month excludes the row one minute before the 1st', c.new_month, 1 + (prior[0] >= b.m ? 1 : 0) + (prior[1] >= b.m ? 1 : 0))
   t('the last daily bucket is today', c.daily[29].n, 1)
   t('yesterday bucket holds the row before midnight', c.daily[28].n >= 1, true)
+}
+
+{
+  const phones = `
+INSERT INTO auth.users (id, created_at, email) VALUES
+  ('20000000-0000-4000-8000-000000000001', now() - interval '400 days', 'a@example.com'),
+  ('20000000-0000-4000-8000-000000000002', now() - interval '400 days', 'b@example.com');
+INSERT INTO auth.sessions (user_id, user_agent) VALUES
+  ('20000000-0000-4000-8000-000000000001', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Safari/604.1'),
+  ('20000000-0000-4000-8000-000000000002', 'Mozilla/5.0 (Linux; Android 15; SM-A556B) Chrome/130.0 Mobile');
+`
+  const { d } = await ready(FIXTURE + phones)
+  const c = (await call(d, 'authenticated', ADMIN)).rows[0].c
+  t('phone browsers land on their platform', [c.platform_ios, c.platform_android, c.platform_unknown], [2, 2, 1])
 }
 
 console.log('mutants (each must be refused or caught)')
@@ -111,10 +129,15 @@ const mutant = (name, from, to) => {
   t('without the anon revoke the file refuses itself', r.msg, 'anon can still EXECUTE admin_user_counts')
 }
 {
-  const { r } = await ready(FIXTURE, mutant('no-deleted-filter', "FROM auth.users\n     WHERE deleted_at IS NULL\n  ), live", "FROM auth.users\n  ), live"))
+  const { r } = await ready(FIXTURE, mutant('no-deleted-filter', "FROM auth.users\n     WHERE deleted_at IS NULL\n  ), classified", "FROM auth.users\n  ), classified"))
   t('control: the positive control sees nothing wrong without soft-deleted rows', r.ok, true)
-  const { r: r2 } = await ready(FIXTURE + EDGES, mutant('no-deleted-filter2', "FROM auth.users\n     WHERE deleted_at IS NULL\n  ), live", "FROM auth.users\n  ), live"))
+  const { r: r2 } = await ready(FIXTURE + EDGES, mutant('no-deleted-filter2', "FROM auth.users\n     WHERE deleted_at IS NULL\n  ), classified", "FROM auth.users\n  ), classified"))
   t('with a soft-deleted row, dropping the filter fails the add-up check', r2.ok, false)
+}
+
+{
+  const { d, r } = await ready(FIXTURE, mutant('guests-placed', 'WHERE NOT u.is_anonymous AND u.deleted_at IS NULL', 'WHERE u.deleted_at IS NULL'))
+  t('counting guests in the buckets is caught by the fixture', r.ok === false || (await call(d, 'authenticated', ADMIN)).rows[0].c.platform_android !== 1, true)
 }
 
 console.log(bad ? `\nFAILED: ${bad}` : '\nall passed')

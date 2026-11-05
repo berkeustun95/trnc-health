@@ -10,9 +10,12 @@
 -- WHAT IT WRITES: nothing. STABLE, and no table, column, policy or row changes here.
 --
 -- Days, weeks (Monday) and months are Europe/Nicosia, the day a TRNC reader means by "today".
--- ios_users / android_users count people with a live session on that platform, read from
--- auth.sessions.user_agent with the classes in supabase/probe_previewer_sessions.sql. They are
--- not installs: a signed-out user is in neither, a user on both platforms is in both.
+-- platform_ios + platform_android + platform_unknown = accounts, one bucket per signed-up account.
+-- The bucket is the newest live session that names a phone in auth.sessions.user_agent: the app
+-- (okhttp, CFNetwork/Darwin) or a phone browser (Android, iPhone/iPad), which is how an email
+-- confirmation link shows up. Unknown = signed out, or only a desktop browser (probes 2026-11-05:
+-- 138 of 193 accounts on the app classes alone; the non-app sessions were Mozilla, and node/curl on
+-- guests only). These are not installs.
 -- The 10 test accounts are NOT subtracted here. AdminScreen owns that constant.
 --
 -- Apply: supabase-migrate. New function, so it ends with NOTIFY pgrst after COMMIT.
@@ -44,12 +47,21 @@ BEGIN
     SELECT is_anonymous, created_at AT TIME ZONE 'Europe/Nicosia' AS created_local
       FROM auth.users
      WHERE deleted_at IS NULL
-  ), live AS (
-    SELECT user_id,
-           user_agent ILIKE '%okhttp%' AS is_android,
-           user_agent ILIKE '%CFNetwork%' OR user_agent ILIKE '%Darwin%' AS is_ios
-      FROM auth.sessions
-     WHERE not_after IS NULL OR not_after > now()
+  ), classified AS (
+    SELECT s.user_id, coalesce(s.refreshed_at, s.updated_at, s.created_at) AS last_used,
+           CASE WHEN s.user_agent ILIKE '%okhttp%' OR s.user_agent ILIKE '%Android%' THEN 'android'
+                WHEN s.user_agent ILIKE '%CFNetwork%' OR s.user_agent ILIKE '%Darwin%'
+                  OR s.user_agent ILIKE '%iPhone%' OR s.user_agent ILIKE '%iPad%' THEN 'ios'
+           END AS platform
+      FROM auth.sessions s
+      JOIN auth.users u ON u.id = s.user_id
+     WHERE NOT u.is_anonymous AND u.deleted_at IS NULL
+       AND (s.not_after IS NULL OR s.not_after > now())
+  ), placed AS (
+    SELECT DISTINCT ON (user_id) user_id, platform
+      FROM classified
+     WHERE platform IS NOT NULL
+     ORDER BY user_id, last_used DESC NULLS LAST
   )
   SELECT jsonb_build_object(
     'total',         (SELECT count(*) FROM people),
@@ -58,8 +70,9 @@ BEGIN
     'new_today',     (SELECT count(*) FROM people WHERE created_local >= v_today),
     'new_week',      (SELECT count(*) FROM people WHERE created_local >= date_trunc('week', v_now)),
     'new_month',     (SELECT count(*) FROM people WHERE created_local >= date_trunc('month', v_now)),
-    'ios_users',     (SELECT count(DISTINCT user_id) FROM live WHERE is_ios),
-    'android_users', (SELECT count(DISTINCT user_id) FROM live WHERE is_android),
+    'platform_ios',     (SELECT count(*) FROM placed WHERE platform = 'ios'),
+    'platform_android', (SELECT count(*) FROM placed WHERE platform = 'android'),
+    'platform_unknown', (SELECT count(*) FROM people WHERE NOT is_anonymous) - (SELECT count(*) FROM placed),
     'daily', (
       SELECT jsonb_agg(jsonb_build_object('day', to_char(d.day, 'YYYY-MM-DD'), 'n', d.n) ORDER BY d.day)
         FROM (
@@ -124,6 +137,10 @@ BEGIN
      OR (v_counts->>'accounts')::bigint + (v_counts->>'guests')::bigint IS DISTINCT FROM v_total THEN
     RAISE EXCEPTION 'counts do not add up: % against % users', v_counts - 'daily', v_total;
   END IF;
+  IF (v_counts->>'platform_ios')::bigint + (v_counts->>'platform_android')::bigint + (v_counts->>'platform_unknown')::bigint
+     IS DISTINCT FROM (v_counts->>'accounts')::bigint OR (v_counts->>'platform_unknown')::bigint < 0 THEN
+    RAISE EXCEPTION 'platform buckets do not add up to accounts: %', v_counts - 'daily';
+  END IF;
   IF jsonb_array_length(v_counts->'daily') IS DISTINCT FROM 30 THEN
     RAISE EXCEPTION 'daily must carry 30 days, got %', jsonb_array_length(v_counts->'daily');
   END IF;
@@ -141,7 +158,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261161_admin_user_counts.sql', 'd3efdb391ae858da1cf1daaca4efab42d1a9353689b7ebf6f8433c890a1470c0')
+VALUES ('20261161_admin_user_counts.sql', 'd8da6f8bd352526c45d48be7478f853f8f5a7025f170d61be2313a6ad08900e9')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
