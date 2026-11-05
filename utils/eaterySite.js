@@ -1,8 +1,9 @@
-import { Linking } from 'react-native'
+import { AppState, Linking, Platform } from 'react-native'
 import { logContactEvent } from './logContactEvent'
 import { CONTACT_LOGGING } from './eateryBasket'
 import { eaterySiteCartUrl, eaterySiteCartLines, eateryBrandInk } from '../constants/eatery'
 import { colors } from '../constants/theme'
+import { openWithFallback } from './browserFallback'
 
 // "Sipariş ver — <site>": a website partner's basket hand-off (20261157 / 20261159). One door for the basket page.
 // lines = basketLines(...) of the VISIBLE menu. Every dish that goes into the cart link is logged once, BEFORE the browser opens
@@ -23,13 +24,13 @@ export async function openEaterySite(partner, lines = []) {
     try { await Linking.openURL(url); return true } catch { return false }
   }
   try {
-    await WebBrowser.openBrowserAsync(url, {
+    await openWithFallback({ platform: Platform.OS, appState: AppState, openSystem: u => Linking.openURL(u), url, open: () => WebBrowser.openBrowserAsync(url, {
       toolbarColor: eateryBrandInk(partner.brand_color) || colors.primary,   // the bar: Custom Tabs, SFSafariViewController
       controlsColor: colors.onPrimary,                                         // iOS buttons on that bar (never brand on brand)
       dismissButtonStyle: 'close',
       enableBarCollapsing: true,
       createTask: false,   // Android: the tab lives in ADA's task, not a throwaway one (default) that dies when the user leaves it
-    })
+    }) })
     return true
   } catch {
     return false
