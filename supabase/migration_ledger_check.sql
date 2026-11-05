@@ -275,7 +275,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261159_eatery_menu_items_partner_item_id.sql', '7ba41ec8e5793fa7d64560dd0020d78ca6c6a2cab5030477d2e5c6e63fa71087'),
   ('20261160_pasatiempo_owner_data.sql', '867f7a7ef5fc302ef7aea920a2f85afedf86e211daff77fd62a6f4187619cc1c'),
   ('20261161_admin_user_counts.sql', 'd8da6f8bd352526c45d48be7478f853f8f5a7025f170d61be2313a6ad08900e9'),
-  ('20261162_delete_script_guests.sql', '2f203e58f71328cbfb65d8417a28a5717f5f8f3c29c3670e144f1144f4b9d12a')
+  ('20261162_delete_script_guests.sql', 'cae86fa32f492ea65d99c539d6447262c920edf1af6a0999ae024da0bda15de9')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
