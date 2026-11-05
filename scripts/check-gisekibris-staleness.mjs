@@ -39,11 +39,17 @@
 // NOT in pre-push. CLAUDE.md is explicit: a push must not be blocked because
 // content is running low — that is data operations, and a guard that blocks
 // unrelated work gets disabled. Run it from the scheduled job and by hand.
+//
+// It deletes the guest it signs in as, so it writes production: Actions only. Without the
+// delete every run left a guest user behind, counted as a real one on the admin screen.
 import { createClient } from '@supabase/supabase-js'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+
+prodWriteGuard({ wouldWrite: true, workflow: 'gisekibris-feed' })
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE = 'gisekibris'
@@ -109,22 +115,30 @@ console.log(`    ${total} rows · ${approved} approved`)
 // auth.uid() and `read approved events` is TO authenticated, so a bare anon key
 // reads ZERO by design and would be the wrong instrument here.
 const guest = createClient(URL_, ANON, { auth:{persistSession:false, autoRefreshToken:false} })
-const { error: sErr } = await guest.auth.signInAnonymously()
+const { data: signIn, error: sErr } = await guest.auth.signInAnonymously()
 if (sErr) {
   problems.push(`could not open a guest session: ${sErr.message}`)
   console.log(`  ⛔ guest sign-in failed: ${sErr.message}`)
 } else {
-  const cutoff = new Date(Date.now() - 24*60*60*1000).toISOString()
-  const { count: visible, error: vErr } = await guest.from('events')
-    .select('*', {count:'exact', head:true})
-    .eq('status','approved').gte('start_date', cutoff)
-  if (vErr) {
-    problems.push(`guest read failed: ${vErr.message}`)
-    console.log(`  ⛔ guest read failed: ${vErr.message}`)
-  } else {
-    const ok = (visible ?? 0) > 0
-    if (!ok) problems.push('a guest sees ZERO events in the 24h window — the Events screen is empty for every user')
-    console.log(`  ${ok ? '✓' : '⛔'} a guest sees ${visible} event(s) in the now−24h window`)
+  try {
+    const cutoff = new Date(Date.now() - 24*60*60*1000).toISOString()
+    const { count: visible, error: vErr } = await guest.from('events')
+      .select('*', {count:'exact', head:true})
+      .eq('status','approved').gte('start_date', cutoff)
+    if (vErr) {
+      problems.push(`guest read failed: ${vErr.message}`)
+      console.log(`  ⛔ guest read failed: ${vErr.message}`)
+    } else {
+      const ok = (visible ?? 0) > 0
+      if (!ok) problems.push('a guest sees ZERO events in the 24h window — the Events screen is empty for every user')
+      console.log(`  ${ok ? '✓' : '⛔'} a guest sees ${visible} event(s) in the now−24h window`)
+    }
+  } finally {
+    const { error: dErr } = await admin.auth.admin.deleteUser(signIn.user.id)
+    if (dErr) {
+      problems.push(`could not delete the health-check guest: ${dErr.message}`)
+      console.log(`  ⛔ guest delete failed: ${dErr.message}`)
+    }
   }
 }
 

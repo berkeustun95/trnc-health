@@ -5,21 +5,24 @@
 //
 // Proves the chain the app depends on: profiles.push_token → Expo push service → FCM (Android)
 // or APNs (iOS) → device. The token is looked up through the Management API's READ-ONLY
-// endpoint (supabase_read_only_user) and never printed — only its platform shape and last 4.
+// endpoint (supabase_read_only_user). Actions logs are public, so the account, token and ticket
+// are sealed: open them with `node scripts/readonly-results.mjs <run-id>`.
 // Writes nothing to the database. The Expo RECEIPT is fetched too: a ticket only says Expo
 // accepted the message; the receipt says whether FCM/APNs did (InvalidCredentials,
 // DeviceNotRegistered … show up only there).
 //
 // kind=messages sends the Student Hub payload with no conversation_id ({screen:'conversation',
 // type:'message'}): tapping it must open Student Hub → Messages (the "old push" path).
+import { readFileSync } from 'node:fs'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+import { seal } from './lib/readonly-seal.mjs'
 
 prodWriteGuard({ wouldWrite: false, workflow: 'push-test' })
 
 const fail = m => { console.error(`::error::${m}`); process.exit(1) }
 const email = (process.argv[2] || '').trim().toLowerCase()
 const kind = process.argv[3] || 'plain'
-if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail(`Refused: ${JSON.stringify(email)} is not an email.`)
+if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
 if (!['plain', 'messages'].includes(kind)) fail(`Refused: kind must be plain or messages, got ${kind}.`)
 const token = process.env.SUPABASE_ACCESS_TOKEN
 const ref = /^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(process.env.SUPABASE_URL ?? '')?.[1]
@@ -35,10 +38,8 @@ const rows = await r.json().catch(() => null)
 if (!r.ok || !Array.isArray(rows)) fail(`Lookup failed (HTTP ${r.status}).`)
 if (rows.length !== 1) fail(`Expected exactly 1 account for that email, found ${rows.length}.`)
 const { id, role, push_token: pt, preferred_language: lang } = rows[0]
-console.log(`account ${id.slice(0, 8)}… · role ${role} · language ${lang}`)
 if (!pt) fail('That account has no push_token: open the app signed in on the device, allow notifications, retry.')
-if (!/^ExponentPushToken\[.+\]$/.test(pt)) fail(`push_token is not an Expo push token (shape ${pt.slice(0, 18)}…).`)
-console.log(`token: ExponentPushToken[…${pt.slice(-5, -1)}]`)
+if (!/^ExponentPushToken\[.+\]$/.test(pt)) fail('push_token is not an Expo push token.')
 
 const tr = lang === 'Turkish'
 const data = kind === 'messages' ? { screen: 'conversation', type: 'message' } : {}
@@ -50,7 +51,9 @@ const send = await fetch('https://exp.host/--/api/v2/push/send', {
                               : (tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.') }),
 })
 const ticket = (await send.json().catch(() => ({})))?.data
-console.log(`ticket: ${JSON.stringify(ticket)}`)
+const publicKey = readFileSync('scripts/lib/readonly-results.pub', 'utf8')
+console.log(seal(JSON.stringify({ account: `${id.slice(0, 8)}…`, role, language: lang, token: `…${pt.slice(-5, -1)}`, ticket }), publicKey))
+console.log(`ticket: ${ticket?.status ?? 'none'}`)
 if (ticket?.status !== 'ok') fail(`Expo refused the message: ${ticket?.details?.error ?? ticket?.message ?? send.status}`)
 
 // Receipts appear after the provider answers; poll briefly.
@@ -60,7 +63,7 @@ for (let i = 0; i < 6; i++) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [ticket.id] }) })
   const receipt = (await rr.json().catch(() => ({})))?.data?.[ticket.id]
   if (receipt) {
-    console.log(`receipt: ${JSON.stringify(receipt)}`)
+    console.log(`receipt: ${receipt.status}`)
     if (receipt.status !== 'ok') fail(`Delivery refused by FCM/APNs: ${receipt.details?.error ?? receipt.message}`)
     console.log('✓ accepted by FCM/APNs — now check the device.')
     process.exit(0)
