@@ -28,6 +28,7 @@ export async function openEaterySite(partner, lines = []) {
       controlsColor: colors.onPrimary,                                         // iOS buttons on that bar (never brand on brand)
       dismissButtonStyle: 'close',
       enableBarCollapsing: true,
+      createTask: false,   // Android: the tab lives in ADA's task, not a throwaway one (default) that dies when the user leaves it
     })
     return true
   } catch {
