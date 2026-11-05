@@ -47,9 +47,9 @@ const res = await fetch(`${url}/functions/v1/apple-token`, {
 const body = await res.json().catch(() => ({}))
 
 if (res.ok && body.revoked === true) {
-  console.log(`REVOKED — Apple authorisation for ${userId} is revoked and the stored token deleted. Safe to delete the user now.`)
+  console.log(`REVOKED — Apple authorisation for this user is revoked and the stored token deleted. Safe to delete the user now.`)
 } else if (res.ok && body.reason === 'no_token') {
-  console.log(`NOTHING STORED for ${userId} — not an Apple user, or the sign-in exchange never landed. Deleting cannot make this worse.`)
+  console.log(`NOTHING STORED for this user — not an Apple user, or the sign-in exchange never landed. Deleting cannot make this worse.`)
 } else {
   console.error(`NOT REVOKED (HTTP ${res.status}): ${body.reason ?? body.error ?? 'unknown'}. Do NOT delete the user yet — once deleted, this can never be revoked.`)
   process.exit(1)
