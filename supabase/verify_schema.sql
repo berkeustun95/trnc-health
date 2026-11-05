@@ -645,6 +645,8 @@ WITH report AS (
     -- be banned on, and the admin queue says the content no longer exists.
     ('1033_reviews_author_not_public','get_my_review'),
     ('1033_reviews_author_not_public','admin_content_author'),
+    -- 1161. The only path from auth.users to the admin user-counts screen.
+    ('1161_admin_user_counts','admin_user_counts'),
     ('1045_places_source','places_guard_source'),
     ('1155_places_official_visit','places_guard_official_visit'),
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
@@ -1360,6 +1362,8 @@ WITH report AS (
     -- read, so the failure looks like the app forgetting something rather than a 42501.
     ('1033_reviews_author_not_public','get_my_review'),
     ('1033_reviews_author_not_public','admin_content_author'),
+    -- 1161. Missing = the admin user-counts screen shows an error and no numbers.
+    ('1161_admin_user_counts','admin_user_counts'),
     -- 1056. Without these the medal is never saved and other students never see a badge;
     -- both would read as "nobody has walked a route".
     ('1056_route_medals','award_route_medal'),
@@ -4299,6 +4303,15 @@ WITH report AS (
           AND COALESCE(has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'partner_item_id', 'SELECT')
                    AND NOT has_column_privilege('anon', to_regclass('public.eatery_menu_items'), 'partner_item_id', 'INSERT,UPDATE,REFERENCES')
                    AND NOT has_column_privilege('authenticated', to_regclass('public.eatery_menu_items'), 'partner_item_id', 'INSERT,UPDATE,REFERENCES'), false))
+    -- ── 1161: reads auth.users for the admin screen, so an ungated or anon-callable copy would publish user totals to anyone.
+    UNION ALL SELECT '20261161_admin_user_counts','admin_user_counts: DEFINER, search_path pinned, is_admin gated, no anon or PUBLIC EXECUTE, authenticated EXECUTE, once 1161 is applied',
+      NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261161_admin_user_counts.sql')
+      OR COALESCE((SELECT p.prosecdef AND p.proconfig::text ILIKE '%search_path=public%'
+                          AND pg_get_functiondef(p.oid) LIKE '%IF NOT is_admin() THEN%'
+                          AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
+                          AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+                     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                    WHERE n.nspname = 'public' AND p.proname = 'admin_user_counts'), false)
     UNION ALL SELECT '20261160_pasatiempo_owner_data','pasatiempo: address set, pin source partner, every item carries a partner_item_id, once 1160 is applied',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261160_pasatiempo_owner_data.sql')
       OR COALESCE((SELECT p.address IS NOT NULL AND p.geocode_source = 'partner'
