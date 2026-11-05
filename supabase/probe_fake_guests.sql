@@ -71,7 +71,7 @@ WITH windows(a, b) AS (VALUES
   SELECT DISTINCT u.relname, (x::text)::uuid AS user_id
     FROM uid_cols u
    CROSS JOIN LATERAL unnest(xpath('//u/text()', query_to_xml(
-     format('select distinct %I as u from %I.%I where %I is not null', u.attname, u.nspname, u.relname, u.attname), false, true, ''))) x
+     format('select distinct %I as u from %I.%I where %I is not null', u.attname, u.nspname, u.relname, u.attname), false, false, ''))) x
 ), sess AS (
   SELECT user_id,
          bool_or(user_agent ILIKE 'node%' OR user_agent ILIKE 'curl%') AS script_session,
