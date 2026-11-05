@@ -118,6 +118,8 @@ globalThis.fetch = async (input: Request | URL | string, init: RequestInit = {})
 // ── load the function, capture its handler ──
 Deno.env.set('SUPABASE_URL', 'https://supa.test')
 Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', SERVICE)
+const SECRET_KEY = 'sb_secret_test'
+Deno.env.set('SUPABASE_SECRET_KEYS', JSON.stringify({ default: SECRET_KEY }))
 let handler: (r: Request) => Promise<Response>
 ;(Deno as any).serve = (h: any) => { handler = h; return { finished: Promise.resolve(), shutdown() {} } }
 await import('../supabase/functions/google-places/index.ts')
@@ -203,7 +205,8 @@ await db.exec(`INSERT INTO public.checkins (user_id, google_place_id, checked_in
   UPDATE public.google_place_pins SET latitude = 1, fetched_at = now() - interval '21 days' WHERE google_place_id = 'ChIJcafe000000000001';
   INSERT INTO public.google_place_pins VALUES ('ChIJfaraway000000001', 9, 9, now() - interval '2 days');`)
 googleLog.length = 0
-x = await call({ action: 'refresh' }, SERVICE)
+x = await call({ action: 'refresh' }, SERVICE); ok('refresh with the legacy service_role JWT -> 403', x.status === 403, x)
+x = await call({ action: 'refresh' }, SECRET_KEY)
 ok('refresh: 1 refreshed, 2 removed (Google 404 + now a pharmacy)', x.status === 200 && x.body.refreshed === 1 && x.body.removed === 2, x)
 x = await q(`SELECT google_place_id, latitude, fetched_at > now() - interval '1 minute' AS fresh FROM public.google_place_pins ORDER BY 1`)
 ok('cafe pin re-read from Google (lat 35.1) and re-dated; young pin untouched; others gone',

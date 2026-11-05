@@ -3,9 +3,10 @@
 //   POST { action: 'nearby',  lat, lng, lang }                → { places: [{ id, name, lat, lng, type }] }
 //   POST { action: 'details', ids: [...≤20], lang }           → { names: { [id]: name | null } }
 //   POST { action: 'checkin', placeId, lat, lng, accuracy }   → { ok, already, id } | { error: CODE }
-//   POST { action: 'refresh' }  (cron, service_role key only) → { refreshed, removed }
+//   POST { action: 'refresh' }  (cron, secret key only) → { refreshed, removed }
 //
-// Who: verify_jwt = true, and the caller's uid comes from auth.getUser() on THAT JWT — never
+// Who: verify_jwt = false (it cannot read a sb_secret_ key, see _shared/cron-auth.mjs). The caller's uid comes from
+// auth.getUser() on THAT JWT, which is the check for every user action — never
 // from the body. nearby and checkin refuse guests (is_anonymous); details serves guests too
 // (a pin tap on the map). Every Google call is counted first by claim_google_places_call()
 // (per-user and global daily caps, 20261093): Google bills per call.
@@ -24,6 +25,7 @@
 // body), goes to Google once (nearby, rounded to 4 decimals ≈ 10 m — the policy's figure) or into check_in_google() for the
 // distance check (never stored), and is dropped. Failures log a status code only.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { callerHoldsSecretKey } from '../_shared/cron-auth.mjs'
 
 const PLACES = 'https://places.googleapis.com/v1'
 const RADIUS_M = 100
@@ -49,12 +51,6 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 // ~11 m at this latitude: the precision the privacy policy states ("about 10 metres").
 const r4 = (n: number) => Math.round(n * 1e4) / 1e4
-function jwtRole(jwt: string) {
-  try {
-    const p = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(p + '='.repeat((4 - p.length % 4) % 4)))?.role ?? null
-  } catch { return null }
-}
 const isFix = (lat: number, lng: number) =>
   Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
 
@@ -108,10 +104,8 @@ Deno.serve(async req => {
   try { b = await req.json() } catch { return json(400, { error: 'body' }) }
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
 
-  // The gateway (verify_jwt) has already checked the signature, so the role claim can be read
-  // as-is: only the service_role key (the cron's Vault secret) carries 'service_role'.
   if (b?.action === 'refresh') {
-    return jwtRole(jwt) === 'service_role' ? refresh(key) : json(403, { error: 'forbidden' })
+    return callerHoldsSecretKey(req, k => Deno.env.get(k)) ? refresh(key) : json(403, { error: 'forbidden' })
   }
 
   const { data: { user } = { user: null }, error: authErr } = await admin.auth.getUser(jwt)
