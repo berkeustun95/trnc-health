@@ -117,6 +117,6 @@ SELECT jsonb_build_object(
        'fields', (SELECT jsonb_agg(k ORDER BY k) FROM jsonb_object_keys(shape) k)) AS t
      FROM tiered WHERE tier NOT LIKE '6%' GROUP BY tier, shape ORDER BY tier, count(*) DESC) q),
   'rows_tables_tiers_1_to_5', (SELECT jsonb_agg(DISTINCT r.relname) FROM rows_by_user r JOIN tiered t ON t.id = r.user_id WHERE t.tier NOT LIKE '6%'),
-  'blocking_fks', (SELECT jsonb_agg(c.conrelid::regclass::text || ':' || k.confdeltype) FROM pg_constraint k JOIN pg_class c2 ON c2.oid = k.conrelid
-      JOIN pg_constraint c ON c.oid = k.oid WHERE k.contype = 'f' AND k.confrelid IN ('auth.users'::regclass, 'public.profiles'::regclass) AND k.confdeltype IN ('a','r'))
+  'blocking_fks', (SELECT jsonb_agg(k.conrelid::regclass::text || ':' || k.confdeltype::text) FROM pg_constraint k
+      WHERE k.contype = 'f' AND k.confrelid IN ('auth.users'::regclass, 'public.profiles'::regclass) AND k.confdeltype IN ('a','r'))
 ) AS report;
