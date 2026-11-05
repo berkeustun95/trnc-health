@@ -22,7 +22,7 @@ function tabCameUp({ appState, ms, bounceMs, setTimer, now }) {
 export async function openWithFallback({ platform, appState, openSystem, url, open, ms = BROWSER_OPEN_TIMEOUT_MS, bounceMs = BROWSER_BOUNCE_MS, setTimer = setTimeout, now = Date.now }) {
   if (platform !== 'android') { await open(); return 'in-app' }
   const up = tabCameUp({ appState, ms, bounceMs, setTimer, now })   // listening BEFORE the open: a fast tab must not be missed
-  // TEST ONLY, reverted in the next commit: pretend the browser showed nothing.
+  try { await open() } catch { await openSystem(url); return 'system' }
   if (await up) return 'in-app'
   await openSystem(url)
   return 'system'
