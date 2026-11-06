@@ -605,7 +605,8 @@ function DashboardTab({ onNavigate }) {
       <FeedHealthBanner lastSeenAt={stats.novestLastSeen} />
       <View style={s.statsGrid}>
         <StatCard label="Facilities" value={stats.facilities} />
-        <StatCard label="Users" value={stats.users} />
+        {/* profiles has one row per auth user (handle_new_user), so this matches the admin home's total. */}
+        <StatCard label="Users" value={stats.users == null ? null : formatCount(stats.users - TEST_ACCOUNTS)} />
       </View>
 
       <Text style={[s.sectionTitle, { marginTop: 24 }]}>eSIM waitlist</Text>
