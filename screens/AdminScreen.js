@@ -2,15 +2,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  Modal, TextInput, Switch, ScrollView, Alert, Linking,
+  Modal, TextInput, Switch, ScrollView, Alert, Linking, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import SplashStatusBar from '../components/SplashStatusBar'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { storageObjectPath } from '../utils/facilityUtils'
+import { addBackListener } from '../utils/backHandler'
 import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
 import GaragesScreen from './GaragesScreen'
@@ -352,6 +354,163 @@ function FeedHealthBanner({ lastSeenAt }) {
         </Text>
       </View>
     </View>
+  )
+}
+
+// ─── User counts (the admin home) ───────────────────────────────────────────
+// Numbers come from admin_user_counts() (20261161): the client cannot read auth.users.
+
+// Berke's own test accounts, all signed-up. A conservative estimate, taken off the totals only.
+// Which platform each is on is unknown, so they come off Unknown for the three to add up to accounts.
+const TEST_ACCOUNTS = 10
+
+const formatCount = n => n.toLocaleString('en-US')
+
+function DailyBars({ daily }) {
+  const [selected, setSelected] = useState(null)
+  const peak = Math.max(...daily.map(d => d.n))
+  const shortDay = iso => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const picked = selected && daily.find(d => d.day === selected)
+
+  return (
+    <View style={s.trendCard}>
+      <View style={s.trendHead}>
+        <Text style={s.trendTitle}>Daily new users <Text style={s.statLabel}>· 30 days</Text></Text>
+        <Text style={s.statLabel}>{picked ? `${shortDay(picked.day)}: ${picked.n}` : `peak ${peak}`}</Text>
+      </View>
+      <View style={s.trendBars}>
+        {daily.map(d => (
+          <TouchableOpacity
+            key={d.day}
+            style={s.trendSlot}
+            activeOpacity={0.7}
+            onPress={() => setSelected(selected === d.day ? null : d.day)}
+            accessibilityLabel={`${shortDay(d.day)}: ${d.n}`}
+          >
+            <View style={[
+              s.trendBar,
+              { height: peak > 0 ? `${(d.n / peak) * 100}%` : 0 },
+              selected === d.day && { backgroundColor: colors.primaryDark },
+            ]} />
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={s.trendAxis}>
+        <Text style={s.statLabel}>{shortDay(daily[0].day)}</Text>
+        <Text style={s.statLabel}>{shortDay(daily[daily.length - 1].day)}</Text>
+      </View>
+    </View>
+  )
+}
+
+function UserCounts({ onOpenTools, onOpenReports }) {
+  const [counts, setCounts] = useState(null)
+  const [pendingReports, setPendingReports] = useState(0)
+  const [novestLastSeen, setNovestLastSeen] = useState(null)
+  const [failed, setFailed] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = useCallback(async () => {
+    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }] = await Promise.all([
+      supabase.rpc('admin_user_counts'),
+      supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('properties').select('last_seen_at')
+        .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
+    ])
+    setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
+    setFailed(!!error)
+    if (!error) setCounts(data)
+    setPendingReports(reportsError ? null : count)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const refresh = async () => {
+    setRefreshing(true)
+    await load()
+    setRefreshing(false)
+  }
+
+  const toolsLink = (
+    <TouchableOpacity style={s.toolsLink} onPress={onOpenTools} activeOpacity={0.7}>
+      <Text style={s.toolsLinkText}>All admin tools</Text>
+      <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+    </TouchableOpacity>
+  )
+
+  // null = the queue could not be read. That shows too: a silent zero would hide the 24h SLA.
+  const reportsRow = pendingReports !== 0 && (
+    <TouchableOpacity style={s.urgencyCard} onPress={onOpenReports} activeOpacity={0.75}>
+      <View style={[s.urgencyDot, { backgroundColor: colors.danger }]} />
+      <Text style={s.urgencyLabel}>{pendingReports === null ? 'Reports queue could not be checked' : 'Reported content — 24h SLA'}</Text>
+      {pendingReports !== null && (
+        <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
+          <Text style={s.urgencyCount}>{pendingReports}</Text>
+        </View>
+      )}
+      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+
+  if (!counts) {
+    if (!failed) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+    return (
+      <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+        {reportsRow}
+        <FeedHealthBanner lastSeenAt={novestLastSeen} />
+        <View style={s.allClearBox}>
+          <Text style={s.allClearText}>User counts could not be loaded.</Text>
+          <TouchableOpacity onPress={refresh} activeOpacity={0.7}>
+            <Text style={s.toolsLinkText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+        {toolsLink}
+      </ScrollView>
+    )
+  }
+
+  return (
+    <ScrollView
+      contentContainerStyle={s.tabContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+    >
+      {reportsRow}
+      <FeedHealthBanner lastSeenAt={novestLastSeen} />
+      <View style={s.totalCard}>
+        <Text style={s.totalValue}>{formatCount(counts.total - TEST_ACCOUNTS)}</Text>
+        <Text style={s.statLabel}>Total users (test accounts excluded)</Text>
+      </View>
+
+      <View style={s.newRow}>
+        {[['Today', counts.new_today], ['This week', counts.new_week], ['This month', counts.new_month]].map(([label, value]) => (
+          <View key={label} style={s.newCard}>
+            <Text style={s.newValue}>{formatCount(value)}</Text>
+            <Text style={s.statLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <DailyBars daily={counts.daily} />
+
+      <Text style={[s.sectionTitle, { marginTop: 20 }]}>Accounts vs guests</Text>
+      <View style={s.statsGrid}>
+        <StatCard label="Signed-up accounts" value={formatCount(counts.accounts - TEST_ACCOUNTS)} />
+        <StatCard label="Guests" value={formatCount(counts.guests)} />
+      </View>
+
+      <Text style={[s.sectionTitle, { marginTop: 20 }]}>Platform · signed-up accounts</Text>
+      <View style={[s.newRow, { marginBottom: 0 }]}>
+        {[['iPhone', counts.platform_ios], ['Android', counts.platform_android], ['Unknown', counts.platform_unknown - TEST_ACCOUNTS]].map(([label, value]) => (
+          <View key={label} style={s.newCard}>
+            <Text style={s.newValue}>{formatCount(value)}</Text>
+            <Text style={s.statLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {toolsLink}
+    </ScrollView>
   )
 }
 
@@ -4417,16 +4576,47 @@ function ModerationTab() {
 
 export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor }) {
   const [tab, setTab] = useState('Dashboard')
+  const [toolsOpen, setToolsOpen] = useState(false)
   const navigateTo = t => setTab(t)
+
+  useEffect(() => {
+    if (!toolsOpen) return
+    const sub = addBackListener(() => { setToolsOpen(false); return true })
+    return () => sub.remove()
+  }, [toolsOpen])
+
+  if (!toolsOpen) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <SplashStatusBar style="dark" />
+        <View style={s.container}>
+          <View style={s.header}>
+            <View style={s.headerLeft}>
+              <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.headerIcon} resizeMode="contain" />
+              <Text style={s.headerLabel}>Admin</Text>
+            </View>
+            <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+              <Text style={s.signOutText}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+          <UserCounts
+            onOpenTools={() => { setTab('Dashboard'); setToolsOpen(true) }}
+            onOpenReports={() => { setTab('Reports'); setToolsOpen(true) }}
+          />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <SplashStatusBar style="dark" />
       <View style={s.container}>
         <View style={s.header}>
-          <View style={s.headerLeft}>
-            <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.headerIcon} resizeMode="contain" />
-            <Text style={s.headerLabel}>Admin</Text>
-          </View>
+          <TouchableOpacity style={s.headerLeft} onPress={() => setToolsOpen(false)} activeOpacity={0.7} accessibilityLabel="Back to user counts">
+            <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+            <Text style={s.headerLabel}>User counts</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
             <Text style={s.signOutText}>Sign out</Text>
           </TouchableOpacity>
@@ -4539,6 +4729,21 @@ const s = StyleSheet.create({
   tabBtnTextActive:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
 
   tabContent:         { paddingBottom: 40 },
+
+  totalCard:          { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
+  totalValue:         { fontSize: 40, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
+  newRow:             { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  newCard:            { flex: 1, backgroundColor: colors.cardBg, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, ...shadow },
+  newValue:           { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
+  trendCard:          { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, ...shadow },
+  trendHead:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 },
+  trendTitle:         { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  trendBars:          { height: 72, flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: 1, borderBottomColor: colors.border },
+  trendSlot:          { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 1 },
+  trendBar:           { backgroundColor: colors.primary, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
+  trendAxis:          { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  toolsLink:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 14, marginTop: 8 },
+  toolsLinkText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   listContent:        { paddingBottom: 40 },
   sectionTitle:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
 
