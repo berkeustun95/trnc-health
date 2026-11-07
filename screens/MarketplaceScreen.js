@@ -55,7 +55,6 @@ function ListingCard({ item, cover, lang, onPress }) {
         { icon: 'location-outline', text: t(HS_DISTRICT_LABEL_KEY[item.district], lang) },
         { icon: 'pricetag-outline', text: t(MK_CONDITION[item.condition]?.labelKey, lang) },
       ]}
-      badge={item.is_free ? t('mkFree', lang) : null}
       onPress={onPress}
       lang={lang}
     />
@@ -177,7 +176,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
         </View>
         <FilterBar>
           <Dropdown
-            label={t('ddCategory', lang)}
+            label={t('ddCategory', lang)} searchPlaceholder={t('mkSearchCategory', lang)}
             options={MK_CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
             value={category} onChange={setCategory} lang={lang}
           />

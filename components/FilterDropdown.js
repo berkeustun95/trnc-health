@@ -30,6 +30,7 @@ export default function FilterDropdown({
   selectedLabel = null,          // overrides the trigger text (e.g. a picked date)
   extraAction = null,            // { label, icon, onPress }
   allowAll = true,               // false: a required choice — no "Tümü" row (Towing's region)
+  searchPlaceholder = null,      // the >10-option search box's hint; default is the app-wide name/address one
   variant = 'pill',              // 'field': full-width form field
   open: openProp, onOpenChange,  // optional controlled open state
   style,
@@ -98,7 +99,7 @@ export default function FilterDropdown({
             <View style={st.searchWrap}>
               <Feather name="search" size={15} color={colors.textSecondary} />
               <TextInput style={st.search} value={query} onChangeText={setQuery}
-                placeholder={t('searchPlaceholder', lang)} placeholderTextColor={colors.textSecondary} />
+                placeholder={searchPlaceholder || t('searchPlaceholder', lang)} placeholderTextColor={colors.textSecondary} />
             </View>
           )}
           <ScrollView style={st.list} keyboardShouldPersistTaps="handled">

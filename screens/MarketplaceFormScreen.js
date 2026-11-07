@@ -53,6 +53,8 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
   const [progress, setProgress]   = useState(null)
   const [error, setError]         = useState(null)
   const uid = session?.user?.id
+  // A fixed field clears the message about it (and any other): the next save re-checks everything.
+  useEffect(() => { setError(null) }, [title, category, condition, district, isFree, price, desc, rulesOk, picked.length, removed.length])
 
   useEffect(() => {
     if (!editingId) return
@@ -171,7 +173,7 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
 
             <Label text={t('ddCategory', lang)} />
             <FilterDropdown variant="field" allowAll={false} lang={lang} label={t('ddCategory', lang)}
-              options={MK_CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))} value={category} onChange={setCategory} />
+              searchPlaceholder={t('mkSearchCategory', lang)} options={MK_CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))} value={category} onChange={setCategory} />
 
             <Label text={t('mkCondition', lang)} />
             <FilterDropdown variant="field" allowAll={false} lang={lang} label={t('mkCondition', lang)}
@@ -226,7 +228,7 @@ const s = StyleSheet.create({
   safe:        { flex: 1 },
   scroll:      { padding: 20, paddingBottom: 48 },
   labelRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, marginBottom: 8 },
-  label:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, textTransform: 'uppercase', letterSpacing: 0.6 },
+  label:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, letterSpacing: 0.2 },
   hint:        { ...type.caption, color: colors.textSecondaryOnPage },
   note:        { ...type.caption, color: colors.textSecondaryOnPage, marginTop: 6 },
   input:       { backgroundColor: colors.card, borderRadius: radii.input || 12, borderWidth: 1, borderColor: colors.border,
