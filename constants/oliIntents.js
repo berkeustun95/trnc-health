@@ -157,7 +157,32 @@ export const OLI_INTENTS = [
   },
 ]
 
-const BY_ID = OLI_INTENTS.reduce((m, i) => { m[i.id] = i; return m }, {})
+// Guided chat only (OLI_CHAT, components/OliChatSheet.js). Kept out of OLI_INTENTS on purpose: the search sheet reads
+// that list in production, so an entry there would change live Oli cards while the chat is still dark. Array order is
+// priority, as above: 'nearby' sits before 'beaches' so "beaches near me" asks for places near you; 'eatery' goes last.
+const CHAT_NEARBY = {
+  id: 'nearby', msgKey: 'oliChatNearby', titleKey: 'menuExplore',
+  keywords: ['near me', 'nearby', 'around me', 'close to me', 'near here',
+    'yakin', 'yakinimda', 'yakinlarda', 'civarda', 'etrafimda', 'cevrede',
+    'рядом', 'поблизости', 'in der nahe', 'in meiner nahe', 'pres de moi', 'a proximite', 'cerca de mi', 'por aqui',
+    'بالقرب', 'قريب مني', 'نزدیک', 'نزدیک من', 'κοντα μου', 'εδω κοντα'],
+}
+const CHAT_EATERY = {
+  id: 'eatery', msgKey: 'oliChatEatery', titleKey: 'menuEatery',
+  keywords: ['restaurant', 'restaurants', 'food', 'eat', 'eating', 'dinner', 'lunch', 'breakfast', 'cafe', 'takeaway', 'pizza', 'burger',
+    'yemek', 'restoran', 'kafe', 'lokanta', 'kahvalti', 'aksam yemegi', 'ogle yemegi', 'paket servis', 'yeme icme', 'yesem', 'yiyelim',
+    'ресторан', 'еда', 'кафе', 'поесть', 'essen', 'restaurants', 'manger', 'nourriture', 'comida', 'restaurante', 'comer',
+    'مطعم', 'طعام', 'مقهى', 'رستوران', 'غذا', 'کافه', 'εστιατοριο', 'φαγητο', 'καφε'],
+}
+export const OLI_CHAT_INTENTS = [
+  ...OLI_INTENTS.slice(0, OLI_INTENTS.findIndex(i => i.id === 'beaches')),
+  CHAT_NEARBY,
+  ...OLI_INTENTS.slice(OLI_INTENTS.findIndex(i => i.id === 'beaches')),
+  CHAT_EATERY,
+]
+
+const BY_ID = OLI_CHAT_INTENTS.reduce((m, i) => { m[i.id] = i; return m }, {})
+// Chat-only ids resolve too; the search sheet only ever asks for ids from OLI_INTENTS (its CHIPS).
 export const getIntent = (id) => BY_ID[id]
 
 // Match a keyword against the normalized query. Short keywords (<=4 chars, e.g.
@@ -204,12 +229,12 @@ export function stripWakeWord(q) {
 
 // The single resolver boundary. Returns matched intents (most-relevant order =
 // array order), capped. Empty array ⇒ caller shows the no-match fallback.
-export function resolveOliQuery(text, { limit = 3 } = {}) {
+export function resolveOliQuery(text, { limit = 3, intents = OLI_INTENTS } = {}) {
   const q = stripWakeWord(normalize(text))
   if (!q) return []
   const words = q.split(' ').filter(Boolean)
   const matches = []
-  for (const intent of OLI_INTENTS) {
+  for (const intent of intents) {
     if (intent.keywords.some(kw => keywordHits(kw, q, words))) matches.push(intent)
     if (matches.length >= limit) break
   }

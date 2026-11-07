@@ -33,7 +33,7 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
-import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY } from './constants/redesign'
+import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT } from './constants/redesign'
 import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
@@ -131,6 +131,7 @@ import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import OliSearchSheet from './components/OliSearchSheet'
+import OliChatSheet from './components/OliChatSheet'
 import { EmergencySheet, MunicipalSheet, LanguageSheet, AboutSheet } from './components/shell/Sheets'
 import { SettingsGroups, GuestProfile } from './components/shell/Settings'
 import { ConfirmDialog } from './components/ui'
@@ -2919,6 +2920,9 @@ export default function App() {
       case 'municipal':     setShowMunicipalModal(true); break
       case 'emergency':     setShowEmergencyModal(true); break
       case 'towing':        setShowTowing(true); break
+      // Reached only from the guided chat (OLI_CHAT): neither id is in OLI_INTENTS, which the search sheet uses.
+      case 'nearby':        setShowExplore(true); break
+      case 'eatery':        setShowEatery(true); break
     }
   }
 
@@ -3013,8 +3017,12 @@ export default function App() {
       />
       {oliVisible && (
         REDESIGN
-          ? <OliSearchSheet lang={lang} userLocation={userLocation} onNavigate={oliNavigate} onOpenResult={openSearchResult}
-              onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
+          ? OLI_CHAT
+            ? <OliChatSheet lang={lang} userLocation={userLocation} userId={session?.user?.id ?? null} isGuest={!session || isGuest(session)}
+                onNavigate={oliNavigate} onOpenResult={openSearchResult} onOpenEvent={id => { oliNavigate(null); openEventFromHome(id) }}
+                onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
+            : <OliSearchSheet lang={lang} userLocation={userLocation} onNavigate={oliNavigate} onOpenResult={openSearchResult}
+                onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
           : <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}
 

@@ -166,6 +166,9 @@ const EXPECTED_SCALARS = {
   // Boot splash for production users (Preview has it on via extra.appVariant). Flipped on device
   // for recordings, so baselined: a working-tree `true` must not ride out on an unrelated OTA.
   BOOT_SPLASH_LIVE:      true,   // live 2026-10-25
+  // Ask Oli guided chat (20261163). A working-tree flip swaps every user's Oli sheet for the chat and starts
+  // saving chat text the live privacy policy may not describe yet — the policy publish is part of its go-live.
+  OLI_CHAT_LIVE:         false,
   PROFILE_GATE_LIVE:     true,   // live 2026-09-02
   // Heading text in the profile wizard. Neither value is a launch — false ships the
   // headingless form, true ships the headed one — but it is compared on device by

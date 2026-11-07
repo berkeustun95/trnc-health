@@ -719,6 +719,14 @@ export const SOCIAL_AUTH_LIVE = true
 // privacy line on getadaapp.com/privacy + store Audio answers (vault 2026-10-08 note).
 export const VOICE_INPUT = true   // on from the 1.4.0 store build (2026-10-09); runtime 1.4.0 fences older binaries
 
+// ─── ASK OLI GUIDED CHAT ────────────────────────────────────────────────────
+// Ask Oli as a guided chat (components/OliChatSheet.js): keyword match + tap-chips, answers only from ADA's own
+// tables (utils/oliAnswers.js), NO AI provider. Signed-in users' chat is saved (oli_messages, 20261163, 90 days).
+// Off = the search sheet (OliSearchSheet), exactly as today. ADA Preview and dev bundles get the chat through
+// OLI_CHAT in constants/redesign.js. Before flipping: 20261163 applied, the privacy text live (docs/ via main,
+// web/ via web:deploy, in-app via the OTA), store forms checked (vault 2026-11-07_oli-ai-chat-plan.md).
+export const OLI_CHAT_LIVE = false
+
 // Yeme-İçme (Eateries) section. false = no Home tile and no way in. NOT a MODULE_FLAGS key: no
 // waitlist to collect and no notify path — the HOTELS_LIVE reasoning. Dev bundles and ADA Preview
 // open it through EATERY in constants/redesign.js. Do not flip until, in order:
