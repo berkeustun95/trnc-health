@@ -1,6 +1,6 @@
 -- Live baseline for the marketplace migrations (vault 2026-11-07_marketplace-plan.md): the bodies
 -- they redefine (md5 = the drift guard each migration asserts), the constraints/indexes/policies
--- they touch, bucket settings, and whether storage.objects blocks direct DELETE. Schema only:
+-- they touch, bucket settings, and the triggers on storage.objects. Schema only:
 -- no user rows, no counts of users (public Actions logs).
 select json_build_object(
   'version', version(),
@@ -26,7 +26,7 @@ select json_build_object(
                   to_regclass('public.content_reports'), to_regclass('public.profiles'), to_regclass('storage.objects'))),
   'policies', (select json_agg(json_build_object('t', tablename, 'n', policyname, 'perm', permissive, 'cmd', cmd, 'roles', roles, 'qual', qual, 'chk', with_check) order by tablename, policyname)
                 from pg_policies where (schemaname = 'public' and tablename in ('conversations','messages','content_reports','blocks','notifications'))),
-  'storage_policy_count', (select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects'),
+  'storage_policy_names', (select json_agg(policyname order by policyname) from pg_policies where schemaname = 'storage' and tablename = 'objects'),
   'buckets', (select json_agg(json_build_object('id', id, 'public', public, 'limit', file_size_limit, 'mimes', allowed_mime_types) order by id) from storage.buckets),
   'profile_cols', (select json_agg(column_name || ' ' || data_type order by ordinal_position) from information_schema.columns
                 where table_schema = 'public' and table_name = 'profiles'),
