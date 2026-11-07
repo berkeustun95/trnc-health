@@ -686,6 +686,7 @@ WITH report AS (
     ('20261165_vehicles','vehicle_images_guard'),
     ('20261165_vehicles','renew_vehicle'),
     ('20261165_vehicles','expire_vehicles'),
+    ('20261165_vehicles','my_vehicles'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -1373,8 +1374,9 @@ WITH report AS (
   FROM (VALUES
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','get_google_place_pins'),
-    -- Araçlar renew (20261165): registered ahead of the apply; red until it runs.
+    -- Araçlar renew + my listings (20261165): registered ahead of the apply; red until it runs.
     ('20261165_vehicles','renew_vehicle'),
+    ('20261165_vehicles','my_vehicles'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','check_in'),
     ('1092_checkins','get_checkin_feed'),
@@ -2127,12 +2129,12 @@ WITH report AS (
         AND pg_get_constraintdef(oid) NOT LIKE '%''duty''%'
         AND pg_get_constraintdef(oid) NOT LIKE '%''emergency''%'
         AND pg_get_constraintdef(oid) NOT LIKE '%''health''%')
-    -- ► BUMPED FROM 36 TO 40 BY 20261165 (the four vehicle_images_* policies), same commit; red until it applies.
-    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 40 policies, all named, none unknown, none missing',
+    -- ► BUMPED FROM 36 TO 39 BY 20261165 (the three vehicle_images_* policies), same commit; red until it applies.
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 39 policies, all named, none unknown, none missing',
       (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects') = 40
+        WHERE schemaname='storage' AND tablename='objects') = 39
       AND (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 40
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 39
       AND (SELECT count(*) FROM pg_policies
              WHERE schemaname='storage' AND tablename='objects'
                AND policyname NOT IN (
@@ -2147,7 +2149,7 @@ WITH report AS (
                  'provider_documents_owner_select','provider_documents_owner_update',
                  'towing_logos_admin_delete','towing_logos_admin_insert','towing_logos_admin_update',
                  'towing_logos_public_read',
-                 'vehicle_images_delete_own','vehicle_images_select_own','vehicle_images_update_own','vehicle_images_upload',
+                 'vehicle_images_delete','vehicle_images_select','vehicle_images_upload',
                  'Providers manage own facility images','Public facility image read',
                  'estate_agent_documents_admin_read','organizer delete own event images',
                  'property_images_delete','property_images_public','provider_credentials_admin_read',
@@ -5650,14 +5652,29 @@ WITH report AS (
     AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.expire_vehicles()'), 'EXECUTE'), false)
     AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicles') AND tgname = 'vehicles_guard' AND tgenabled <> 'D'), false)
     AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicle_images') AND tgname = 'vehicle_images_guard' AND tgenabled <> 'D'), false)
-  UNION ALL SELECT '20261165_vehicles','bucket vehicle-images: public, 5 MB, jpeg/png/webp; exactly 4 vehicle_images_* storage policies, each own-folder and guest-guarded, upload excludes partner/',
+  UNION ALL SELECT '20261165_vehicles','bucket vehicle-images: public, 5 MB, jpeg/png/webp; exactly 3 vehicle_images_* storage policies (no UPDATE), each guest-guarded and tied to the caller''s listing; upload only into a PENDING one',
     COALESCE((SELECT public AND file_size_limit = 5242880 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
                 FROM storage.buckets WHERE id = 'vehicle-images'), false)
-    AND COALESCE((SELECT count(*) = 4 AND bool_and(coalesce(qual,'') || coalesce(with_check,'') LIKE '%foldername%'
-                                          AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_anonymous_session()%')
+    AND COALESCE((SELECT count(*) = 3 AND NOT bool_or(cmd = 'UPDATE')
+                         AND bool_and(coalesce(qual,'') || coalesce(with_check,'') LIKE '%my_vehicle_status(%'
+                                  AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_anonymous_session()%')
                     FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
                      AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%vehicle-images%'), false)
-    AND COALESCE((SELECT with_check LIKE '%partner%' FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'vehicle_images_upload'), false)
+    AND COALESCE((SELECT with_check LIKE '%''pending''%' FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'vehicle_images_upload'), false)
+  UNION ALL SELECT '20261165_vehicles','vehicles.owner_id is readable by no client; my_vehicles() is the owner''s path (authenticated only)',
+    COALESCE(NOT has_column_privilege('anon', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
+         AND NOT has_column_privilege('authenticated', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
+         AND has_column_privilege('anon', to_regclass('public.vehicles'), 'contact_phone', 'SELECT'), false)
+    AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.my_vehicles()'), 'EXECUTE')
+             AND has_function_privilege('authenticated', to_regprocedure('public.my_vehicles()'), 'EXECUTE'), false)
+  -- Every SECURITY DEFINER function that writes or reads vehicles skips the client rules in vehicles_guard (it runs as
+  -- postgres). The set is pinned so a new one is a reviewed decision, not an accident (security review 2026-11-07, N1).
+  UNION ALL SELECT '20261165_vehicles','the SECURITY DEFINER functions that touch vehicles are exactly the five reviewed ones',
+    COALESCE((SELECT array_agg(n.nspname || '.' || p.proname ORDER BY n.nspname, p.proname)
+                FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+               WHERE p.prosecdef AND n.nspname IN ('public', 'private') AND p.prosrc ~* '\mvehicles\M')
+      IS NOT DISTINCT FROM ARRAY['private.my_open_vehicle_count','private.my_vehicle_status','public.auto_hide_reported_content',
+                                 'public.my_vehicles','public.renew_vehicle'], false)
   UNION ALL SELECT '20261165_vehicles','contact_events module vocabulary is exactly the 17-module set (incl. cars)',
     (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
        FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m

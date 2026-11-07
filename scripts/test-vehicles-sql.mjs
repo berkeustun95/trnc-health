@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { freshDb, applyFile as applyRaw } from './migration-harness.mjs'
 
 const mig = f => fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url))
@@ -187,8 +188,16 @@ async function behaviour(d) {
 
   // ── Visibility of pending ────────────────────────────────────────────────
   t('anon sees no pending listing', await countVisible(d, 'anon'), 0)
-  t('another user sees none of the owner\'s pending listings', n(await as(d, 'owner2', `SELECT count(*) n FROM public.vehicles WHERE owner_id = '${U.owner}'`)), 0)
-  t('the owner sees their own 3', n(await as(d, 'owner', `SELECT count(*) n FROM public.vehicles WHERE owner_id = '${U.owner}'`)), 3)
+  t('another user sees none of the owner\'s pending listings', n(await as(d, 'owner2', `SELECT count(*) n FROM public.vehicles WHERE id IN ('${v1}', '${v2}', '${v3}')`)), 0)
+  t('the owner sees their own 3 through my_vehicles()', n(await as(d, 'owner', `SELECT count(*) n FROM public.my_vehicles()`)), 3)
+  t('my_vehicles() returns only the caller\'s own (owner2: their rental)', n(await as(d, 'owner2', `SELECT count(*) n FROM public.my_vehicles()`)), 1)
+  t('anon cannot call my_vehicles()', (await as(d, 'anon', `SELECT * FROM public.my_vehicles()`)).ok, false)
+  t('a guest gets nothing from my_vehicles()', n(await as(d, 'owner', `SELECT count(*) n FROM public.my_vehicles()`, { guest: true })), 0)
+  t('no client can read owner_id (anon)', /permission denied/.test((await as(d, 'anon', 'SELECT owner_id FROM public.vehicles')).msg), true)
+  t('no client can read owner_id (signed in)', /permission denied/.test((await as(d, 'owner', 'SELECT owner_id FROM public.vehicles')).msg), true)
+  t('select * is refused, named columns work (positive control)', [(await as(d, 'owner', 'SELECT * FROM public.vehicles')).ok, (await as(d, 'owner', 'SELECT id, make FROM public.vehicles')).ok], [false, true])
+  t('a multi-row insert past the cap is refused as a whole', (await as(d, 'owner2', LISTING({ model: 'A' }).replace(' RETURNING id', '') + ', ' + LISTING({ model: 'B' }).replace(/^.*VALUES /s, '').replace(' RETURNING id', '') + ', ' + LISTING({ model: 'C' }).replace(/^.*VALUES /s, ''))).msg, 'VEHICLE_LIMIT')
+  t('…and wrote nothing (owner2 still has 1)', n(await as(d, 'owner2', `SELECT count(*) n FROM public.my_vehicles()`)), 1)
   t('the admin sees all 4', await countVisible(d, 'admin'), 4)
   t('ADA Preview does not see pending private listings', await countVisible(d, 'anon', { preview: true }), 0)
 
@@ -203,19 +212,20 @@ async function behaviour(d) {
   t('the admin cannot edit listing content', (await as(d, 'admin', `UPDATE public.vehicles SET price = 1 WHERE id = '${v1}'`)).msg, 'VEHICLE_FIELD_LOCKED')
 
   // ── Photos ───────────────────────────────────────────────────────────────
-  const img = (vid, who, file) => `INSERT INTO public.vehicle_images (vehicle_id, storage_path, sort_order) VALUES ('${vid}', '${U[who]}/${vid}/${file}', 0)`
-  t('photos cannot be added to an approved listing', (await as(d, 'owner', img(v1, 'owner', 'a.jpg'))).ok, false)
-  t('the owner adds a photo to their pending listing', (await as(d, 'owner', img(v2, 'owner', 'a.jpg'))).ok, true)
-  t('a photo path outside <uid>/<vehicle>/ is refused', (await as(d, 'owner', `INSERT INTO public.vehicle_images (vehicle_id, storage_path) VALUES ('${v2}', 'partner/x/${v2}.jpg')`)).ok, false)
-  t('another user cannot add photos to the owner\'s listing', (await as(d, 'owner2', img(v2, 'owner2', 'b.jpg'))).ok, false)
+  const img = vid => `INSERT INTO public.vehicle_images (vehicle_id, storage_path, sort_order) VALUES ('${vid}', '${vid}/${randomUUID()}.jpg', 0)`
+  t('photos cannot be added to an approved listing', (await as(d, 'owner', img(v1))).ok, false)
+  t('the owner adds a photo to their pending listing', (await as(d, 'owner', img(v2))).ok, true)
+  t('a photo path outside <vehicle>/<uuid>.<ext> is refused', (await as(d, 'owner', `INSERT INTO public.vehicle_images (vehicle_id, storage_path) VALUES ('${v2}', '${U.owner}/${v2}/a.jpg')`)).ok, false)
+  t('a photo path under another listing is refused', (await as(d, 'owner', `INSERT INTO public.vehicle_images (vehicle_id, storage_path) VALUES ('${v2}', '${v3}/${randomUUID()}.jpg')`)).ok, false)
+  t('another user cannot add photos to the owner\'s listing', (await as(d, 'owner2', img(v2))).ok, false)
   t('anon cannot see photos of a pending listing', n(await as(d, 'anon', 'SELECT count(*) n FROM public.vehicle_images')), 0)
-  for (let i = 1; i < 8; i++) await as(d, 'owner', img(v2, 'owner', `p${i}.jpg`))
+  for (let i = 1; i < 8; i++) await as(d, 'owner', img(v2))
   t('8 photos reached', n(await as(d, 'owner', `SELECT count(*) n FROM public.vehicle_images WHERE vehicle_id = '${v2}'`)), 8)
-  t('the 9th photo is refused', (await as(d, 'owner', img(v2, 'owner', 'p9.jpg'))).msg, 'VEHICLE_PHOTO_LIMIT')
+  t('the 9th photo is refused', (await as(d, 'owner', img(v2))).msg, 'VEHICLE_PHOTO_LIMIT')
   t('the admin approves the photographed listing', (await as(d, 'admin', `UPDATE public.vehicles SET status = 'active' WHERE id = '${v2}'`)).ok, true)
   t('anon now sees exactly that listing', (await as(d, 'anon', 'SELECT id FROM public.vehicles')).rows.map(r => r.id), [v2])
   t('…and its 8 photos', n(await as(d, 'anon', 'SELECT count(*) n FROM public.vehicle_images')), 8)
-  t('anon cannot add photos', (await as(d, 'anon', img(v2, 'owner', 'z.jpg'))).ok, false)
+  t('anon cannot add photos', (await as(d, 'anon', img(v2))).ok, false)
 
   // ── Edits go back to review ──────────────────────────────────────────────
   t('the owner edits the approved listing\'s price', (await as(d, 'owner', `UPDATE public.vehicles SET price = 9000 WHERE id = '${v2}'`)).ok, true)
@@ -242,7 +252,7 @@ async function behaviour(d) {
   t('past expires_at, anon stops seeing it before any job runs', await countVisible(d, 'anon'), 0)
   t('a client cannot run the expiry job', (await as(d, 'owner', 'SELECT public.expire_vehicles()')).ok, false)
   t('the job expires exactly that one listing', (await as(d, 'postgres', 'SELECT public.expire_vehicles() r')).rows[0].r, { expired: 1 })
-  t('the owner holds 2 open listings (one active, one pending)', n(await as(d, 'owner', `SELECT count(*) n FROM public.vehicles WHERE status IN ('pending','active')`)), 2)
+  t('the owner holds 2 open listings (one active, one pending)', n(await as(d, 'owner', `SELECT count(*) n FROM public.my_vehicles() WHERE status IN ('pending','active')`)), 2)
   t('anon cannot renew', (await as(d, 'anon', `SELECT public.renew_vehicle('${v2}')`)).ok, false)
   t('a guest cannot renew', (await as(d, 'owner', `SELECT public.renew_vehicle('${v2}')`, { guest: true })).msg, 'NOT_SIGNED_IN')
   t('another user cannot renew it', (await as(d, 'owner2', `SELECT public.renew_vehicle('${v2}')`)).msg, 'VEHICLE_NOT_FOUND')
@@ -292,14 +302,24 @@ async function behaviour(d) {
   t('…visible again', n(await as(d, 'anon', `SELECT count(*) n FROM public.vehicles WHERE id = '${v2}'`)), 1)
 
   // ── Storage, contact taps, notify ────────────────────────────────────────
-  const obj = (who, name, opts) => as(d, who, `INSERT INTO storage.objects (bucket_id, name) VALUES ('vehicle-images', '${name}')`, opts)
-  t('upload into your own folder', (await obj('owner', `${U.owner}/${v4}/a.jpg`)).ok, true)
-  t('upload into someone else\'s folder is refused', (await obj('owner', `${U.owner2}/${v4}/a.jpg`)).ok, false)
-  t('upload into partner/ is refused', (await obj('owner', `partner/x/a.jpg`)).ok, false)
-  t('a guest cannot upload', (await obj('guest', `${U.guest}/x/a.jpg`, { guest: true })).ok, false)
-  t('the owner can see (and so remove) their own file', n(await as(d, 'owner', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'vehicle-images'`)), 1)
-  t('another user cannot list the owner\'s files', n(await as(d, 'owner2', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'vehicle-images'`)), 0)
-  t('the owner deletes their own file', (await as(d, 'owner', `DELETE FROM storage.objects WHERE bucket_id = 'vehicle-images' RETURNING id`)).rows.length, 1)
+  // v4 is the owner's PENDING listing, v2 their APPROVED one.
+  const obj = (who, name, opts) => as(d, who, `INSERT INTO storage.objects (bucket_id, name) VALUES ('vehicle-images', '${name}') RETURNING id`, opts)
+  const f4 = `${v4}/${randomUUID()}.jpg`
+  t('upload into your own pending listing', (await obj('owner', f4)).ok, true)
+  t('upload into your own APPROVED listing is refused (no photo swap after review)', (await obj('owner', `${v2}/${randomUUID()}.jpg`)).ok, false)
+  t('upload into someone else\'s pending listing is refused', (await obj('owner2', `${v4}/${randomUUID()}.jpg`)).ok, false)
+  t('upload into a folder with no listing is refused (not an image host)', (await obj('owner', `${randomUUID()}/${randomUUID()}.jpg`)).ok, false)
+  t('a non-random file name is refused', (await obj('owner', `${v4}/a.jpg`)).ok, false)
+  t('upload into partner/ is refused', (await obj('owner', `partner/x/${randomUUID()}.jpg`)).ok, false)
+  t('a guest cannot upload', (await obj('owner', `${v4}/${randomUUID()}.jpg`, { guest: true })).ok, false)
+  t('the owner sees (and so can remove) their listing\'s file', n(await as(d, 'owner', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'vehicle-images'`)), 1)
+  t('another user cannot list it', n(await as(d, 'owner2', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'vehicle-images'`)), 0)
+  t('nobody can overwrite a file (no UPDATE policy)', (await as(d, 'owner', `UPDATE storage.objects SET name = name WHERE bucket_id = 'vehicle-images' RETURNING id`)).rows.length, 0)
+  t('the owner deletes their pending listing\'s file', (await as(d, 'owner', `DELETE FROM storage.objects WHERE name = '${f4}' RETURNING id`)).rows.length, 1)
+  const live = `${v2}/${randomUUID()}.jpg`
+  await as(d, 'postgres', `INSERT INTO storage.objects (bucket_id, name) VALUES ('vehicle-images', '${live}')`)
+  t('the owner cannot delete an approved listing\'s file', (await as(d, 'owner', `DELETE FROM storage.objects WHERE name = '${live}' RETURNING id`)).rows.length, 0)
+  t('an admin can delete any listing file', (await as(d, 'admin', `DELETE FROM storage.objects WHERE name = '${live}' RETURNING id`)).rows.length, 1)
   t('contact_events accepts module cars', (await as(d, 'postgres', `INSERT INTO public.contact_events (module, entity_id, action) VALUES ('cars', 'x', 'call')`)).ok, true)
   t('contact_events still accepts eatery (control)', (await as(d, 'postgres', `INSERT INTO public.contact_events (module, entity_id, action) VALUES ('eatery', 'x', 'call')`)).ok, true)
   t('waitlist notification title in Turkish', (await as(d, 'postgres', `SELECT public.module_notif_text('title', 'cars', 'Turkish') x`)).rows[0].x, "ADA'da yeni: Araçlar")
@@ -361,7 +381,10 @@ await refused('photoless policy made permissive', mutantFile(1, 'perm', 'CREATE 
 await refused('preview policy without NOT is_active', mutantFile(1, 'prev', 'FOR SELECT TO anon, authenticated USING (NOT is_active AND (SELECT public.is_previewer()));\nDROP POLICY IF EXISTS dealers_select_admin', 'FOR SELECT TO anon, authenticated USING ((SELECT public.is_previewer()));\nDROP POLICY IF EXISTS dealers_select_admin'))
 await refused('status added to the INSERT grant', mutantFile(1, 'grant', 'region, area, description, contact_phone, whatsapp) ON public.vehicles TO authenticated;', 'region, area, description, contact_phone, whatsapp, status) ON public.vehicles TO authenticated;'))
 await refused('listing guard made SECURITY DEFINER', mutantFile(1, 'def', 'RETURNS trigger\nLANGUAGE plpgsql\nSET search_path = public\nAS $function$\nDECLARE\n  v_uid     uuid := auth.uid();\n  v_refusal text;\n  v_edited', 'RETURNS trigger\nLANGUAGE plpgsql\nSECURITY DEFINER\nSET search_path = public\nAS $function$\nDECLARE\n  v_uid     uuid := auth.uid();\n  v_refusal text;\n  v_edited'))
-await refused('storage upload policy loses the guest guard', mutantFile(1, 'stg', "    AND (storage.foldername(name))[1] <> 'partner'\n    AND NOT (select public.is_anonymous_session())\n  );\nDROP POLICY IF EXISTS \"vehicle_images_update_own\"", "    AND (storage.foldername(name))[1] <> 'partner'\n  );\nDROP POLICY IF EXISTS \"vehicle_images_update_own\""))
+await refused('storage upload policy loses the guest guard', mutantFile(1, 'stg', "    AND private.my_vehicle_status((storage.foldername(name))[1]) = 'pending'\n    AND NOT (select public.is_anonymous_session())\n  );\nDROP POLICY IF EXISTS \"vehicle_images_select\"", "    AND private.my_vehicle_status((storage.foldername(name))[1]) = 'pending'\n  );\nDROP POLICY IF EXISTS \"vehicle_images_select\""))
+await refused('storage upload no longer tied to a PENDING listing (photo swap)', mutantFile(1, 'swap', "    AND private.my_vehicle_status((storage.foldername(name))[1]) = 'pending'\n    AND NOT (select public.is_anonymous_session())\n  );\nDROP POLICY IF EXISTS \"vehicle_images_select\"", "    AND private.my_vehicle_status((storage.foldername(name))[1]) IS NOT NULL\n    AND NOT (select public.is_anonymous_session())\n  );\nDROP POLICY IF EXISTS \"vehicle_images_select\""))
+await refused('owner_id readable again', mutantFile(1, 'oid', 'GRANT SELECT (id, intent, source,', 'GRANT SELECT (owner_id, id, intent, source,'))
+await refused('an overwrite (UPDATE) storage policy added', mutantFile(1, 'upd', 'DROP POLICY IF EXISTS "vehicle_images_select" ON storage.objects;', 'CREATE POLICY "vehicle_images_update" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = \'vehicle-images\' AND NOT (select public.is_anonymous_session()) AND private.my_vehicle_status((storage.foldername(name))[1]) IS NOT NULL);\nDROP POLICY IF EXISTS "vehicle_images_select" ON storage.objects;'))
 await refused('dealers get a client write policy', mutantFile(1, 'dw', 'DROP POLICY IF EXISTS dealers_select_admin ON public.dealers;', 'CREATE POLICY dealers_write ON public.dealers FOR INSERT TO authenticated WITH CHECK (true);\nDROP POLICY IF EXISTS dealers_select_admin ON public.dealers;'))
 await refused('live contact_events list differs (eatery missing in production)', RELEASE, FIXTURE({ contactMods: MODS16.filter(m => m !== 'eatery') }))
 await refused('auto-hide gains more than the vehicle branch', mutantFile(2, 'ah', "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  END IF;", "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  ELSIF NEW.content_type = 'profile' THEN\n    NULL;\n  END IF;"))

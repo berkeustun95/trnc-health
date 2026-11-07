@@ -51,7 +51,9 @@
 --   renew_vehicle(id): the owner puts an active or expired private listing back to active for 30 days
 --     from now (cap re-checked when it was expired). SECURITY DEFINER, own rows only, no guests.
 --   vehicle_images: the owner adds / reorders / deletes photos of their own listing while it is
---     'pending', storage path under '<their uid>/<vehicle id>/'; max 8 per listing. Admins may delete.
+--     'pending', storage path '<vehicle id>/<random uuid>.<ext>'; max 8 per listing. Admins may delete.
+--   my_vehicles(): the owner's own listings in every state. vehicles.owner_id itself is NOT readable by
+--     any client (column grant), so a seller's account id never becomes public.
 --   Writes by service_role / postgres (imports, cron, the RPC) skip the client rules in the trigger:
 --     it branches on current_user, which is 'authenticated'/'anon' only for a direct client statement.
 --
@@ -62,8 +64,11 @@
 -- ─── STORAGE: bucket vehicle-images ─────────────────────────────────────────
 --   Public read (listing photos are public), 5 MB per file, jpeg/png/webp. The app compresses with the
 --   image picker (quality 0.6) until expo-image-manipulator ships with the next store build.
---   Writes: signed-in non-guests into their own '<uid>/' folder only (insert, update, delete, and SELECT
---   of their own folder, which Storage's remove() needs); 'partner/' (mirrored import photos) is service_role only.
+--   Files live at '<vehicle id>/<random uuid>.<ext>' (no uploader id in a public URL). A signed-in non-guest
+--   may add or delete files only for a listing they own that is still PENDING (so an approved listing's photos
+--   cannot be swapped, and the bucket is no general image host); nobody can overwrite (no UPDATE policy).
+--   Owners may SELECT their own listings' files (remove() needs it); admins may SELECT and DELETE any.
+--   'partner/…' (mirrored import photos) is service_role only.
 --
 -- ─── contact_events ─────────────────────────────────────────────────────────
 --   module 'cars' added, or the Ara / WhatsApp taps would be dropped silently.
@@ -104,7 +109,7 @@ BEGIN
                                    'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport'] THEN
     RAISE EXCEPTION 'REFUSING: contact_events_module_check is not the 20261115 list: %. Rebuild from the live definition. Nothing applied.', v_def;
   END IF;
-  -- Remember the storage.objects policy count to prove exactly four were added.
+  -- Remember the storage.objects policy count to prove exactly three were added.
   PERFORM set_config('mig1165.storage_policies',
     (SELECT count(*)::text FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'), true);
 END $$;
@@ -288,6 +293,22 @@ ALTER FUNCTION private.vehicle_poster_refusal() OWNER TO postgres;
 REVOKE ALL ON FUNCTION private.vehicle_poster_refusal() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private.vehicle_poster_refusal() TO authenticated;
 
+-- The status of the caller's OWN listing, NULL for anyone else's (or a guest, or a non-uuid). The photo policies
+-- (table rows and storage objects) use it, because clients cannot read vehicles.owner_id themselves.
+CREATE OR REPLACE FUNCTION private.my_vehicle_status(p_vehicle text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT v.status FROM public.vehicles v
+   WHERE v.id::text = p_vehicle AND v.owner_id = auth.uid() AND NOT public.is_anonymous_session()
+$$;
+ALTER FUNCTION private.my_vehicle_status(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.my_vehicle_status(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.my_vehicle_status(text) TO authenticated;
+
 -- The caller's own listings that count toward the cap of 3.
 CREATE OR REPLACE FUNCTION private.my_open_vehicle_count()
 RETURNS integer
@@ -405,7 +426,7 @@ BEGIN
   END IF;
 
   IF v_edited THEN
-    v_text := NEW.make || '  ' || NEW.model || '  ' || coalesce(NEW.description, '');
+    v_text := NEW.make || '  ' || NEW.model || '  ' || NEW.region || '  ' || coalesce(NEW.area, '') || '  ' || coalesce(NEW.description, '');
     IF contains_blocked_term(v_text) THEN RAISE EXCEPTION 'BLOCKED_TERM' USING ERRCODE = 'P0001'; END IF;
     IF contains_payment_solicitation(v_text) THEN RAISE EXCEPTION 'BLOCKED_PAYMENT' USING ERRCODE = 'P0001'; END IF;
   END IF;
@@ -480,6 +501,25 @@ GRANT EXECUTE ON FUNCTION public.renew_vehicle(uuid) TO authenticated;
 COMMENT ON FUNCTION public.renew_vehicle(uuid) IS
   'Owner puts their active or expired private listing back to active for 30 days from now. No guests; banned / under-18 / no-DOB refused; cap of 3 re-checked when it was expired. 20261165.';
 
+-- ─── The owner's own listings ───────────────────────────────────────────────
+-- owner_id is not readable by clients (column grant below), so "my listings" is this RPC, not a filter.
+CREATE OR REPLACE FUNCTION public.my_vehicles()
+RETURNS SETOF public.vehicles
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+  SELECT * FROM vehicles
+   WHERE owner_id = auth.uid() AND auth.uid() IS NOT NULL AND NOT is_anonymous_session()
+   ORDER BY created_at DESC
+$function$;
+ALTER FUNCTION public.my_vehicles() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.my_vehicles() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.my_vehicles() TO authenticated;
+COMMENT ON FUNCTION public.my_vehicles() IS
+  'The caller''s own listings in every state (İlanlarım). Signed-in non-guests only; nobody else''s rows. 20261165.';
+
 -- ─── Expiry ─────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.expire_vehicles()
 RETURNS jsonb
@@ -514,7 +554,13 @@ ALTER TABLE public.vehicle_images  ENABLE ROW LEVEL SECURITY;
 -- Supabase default privileges hand anon/authenticated ALL on a new public table; these REVOKEs are what make
 -- the grants below mean anything.
 REVOKE ALL ON TABLE public.vehicle_sources, public.dealers, public.vehicles, public.vehicle_images FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.vehicle_sources, public.dealers, public.vehicles, public.vehicle_images TO anon, authenticated;
+GRANT SELECT ON public.vehicle_sources, public.dealers, public.vehicle_images TO anon, authenticated;
+-- Every column but owner_id: a seller's account id is not public (it resolves to a name elsewhere; 20261033).
+-- Clients select named columns, never *; owners reach their own rows through my_vehicles().
+GRANT SELECT (id, intent, source, source_site, source_url, external_id, content_hash, dealer_id, make, model, year, km, fuel,
+              gearbox, body_type, colour, steering, price, currency, price_per_day, region, area, description, contact_phone,
+              whatsapp, status, rejection_reason, published_at, expires_at, hidden_at, hidden_reason, created_at, updated_at)
+  ON public.vehicles TO anon, authenticated;
 GRANT INSERT (intent, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, price_per_day,
               region, area, description, contact_phone, whatsapp) ON public.vehicles TO authenticated;
 GRANT UPDATE (intent, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, price_per_day,
@@ -604,24 +650,17 @@ DROP POLICY IF EXISTS vehicle_images_insert_own ON public.vehicle_images;
 CREATE POLICY vehicle_images_insert_own ON public.vehicle_images
   FOR INSERT TO authenticated
   WITH CHECK (NOT (SELECT public.is_anonymous_session())
-              AND storage_path LIKE (SELECT auth.uid())::text || '/' || vehicle_id::text || '/%'
-              AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_images.vehicle_id
-                            AND v.owner_id = (SELECT auth.uid()) AND v.status = 'pending'));
+              AND storage_path ~ ('^' || vehicle_id::text || '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$')
+              AND private.my_vehicle_status(vehicle_id::text) = 'pending');
 DROP POLICY IF EXISTS vehicle_images_update_own ON public.vehicle_images;
 CREATE POLICY vehicle_images_update_own ON public.vehicle_images
   FOR UPDATE TO authenticated
-  USING (NOT (SELECT public.is_anonymous_session())
-         AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_images.vehicle_id
-                       AND v.owner_id = (SELECT auth.uid()) AND v.status = 'pending'))
-  WITH CHECK (NOT (SELECT public.is_anonymous_session())
-         AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_images.vehicle_id
-                       AND v.owner_id = (SELECT auth.uid()) AND v.status = 'pending'));
+  USING (NOT (SELECT public.is_anonymous_session()) AND private.my_vehicle_status(vehicle_id::text) = 'pending')
+  WITH CHECK (NOT (SELECT public.is_anonymous_session()) AND private.my_vehicle_status(vehicle_id::text) = 'pending');
 DROP POLICY IF EXISTS vehicle_images_delete_own ON public.vehicle_images;
 CREATE POLICY vehicle_images_delete_own ON public.vehicle_images
   FOR DELETE TO authenticated
-  USING (NOT (SELECT public.is_anonymous_session())
-         AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_images.vehicle_id
-                       AND v.owner_id = (SELECT auth.uid()) AND v.status = 'pending'));
+  USING (NOT (SELECT public.is_anonymous_session()) AND private.my_vehicle_status(vehicle_id::text) = 'pending');
 DROP POLICY IF EXISTS vehicle_images_delete_admin ON public.vehicle_images;
 CREATE POLICY vehicle_images_delete_admin ON public.vehicle_images
   FOR DELETE TO authenticated USING ((SELECT public.is_admin()));
@@ -632,46 +671,35 @@ VALUES ('vehicle-images', 'vehicle-images', true, 5242880, ARRAY['image/jpeg','i
 ON CONFLICT (id) DO UPDATE
   SET public = true, file_size_limit = 5242880, allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp'];
 
+-- Path: <vehicle id>/<random uuid>.<ext>. A file can only be ADDED to, or DELETED from, a listing the caller owns
+-- while it is PENDING (under review), so an approved listing's photos can never be swapped, and the bucket is no
+-- general image host. No UPDATE policy at all: no overwrite (upload with upsert: false). The owner can SELECT
+-- (Storage's remove() reads before it deletes) their own listings' files; admins can SELECT + DELETE any.
+-- No uploader id in any public URL. partner/… (mirrored imports) never matches a listing id: service_role only.
 DROP POLICY IF EXISTS "vehicle_images_upload" ON storage.objects;
 CREATE POLICY "vehicle_images_upload" ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (
     bucket_id = 'vehicle-images'
-    AND (storage.foldername(name))[1] = (select auth.uid())::text
-    AND (storage.foldername(name))[1] <> 'partner'
+    AND name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$'
+    AND private.my_vehicle_status((storage.foldername(name))[1]) = 'pending'
     AND NOT (select public.is_anonymous_session())
   );
-DROP POLICY IF EXISTS "vehicle_images_update_own" ON storage.objects;
-CREATE POLICY "vehicle_images_update_own" ON storage.objects
-  FOR UPDATE TO authenticated
-  USING (
-    bucket_id = 'vehicle-images'
-    AND (storage.foldername(name))[1] = (select auth.uid())::text
-    AND NOT (select public.is_anonymous_session())
-  )
-  WITH CHECK (
-    bucket_id = 'vehicle-images'
-    AND (storage.foldername(name))[1] = (select auth.uid())::text
-    AND (storage.foldername(name))[1] <> 'partner'
-    AND NOT (select public.is_anonymous_session())
-  );
--- Storage's remove() reads the object under RLS before deleting it, so the owner needs SELECT on their own folder.
--- Own folder only: the public URL serves everyone else (public bucket), and nobody can list other people's files.
-DROP POLICY IF EXISTS "vehicle_images_select_own" ON storage.objects;
-CREATE POLICY "vehicle_images_select_own" ON storage.objects
+DROP POLICY IF EXISTS "vehicle_images_select" ON storage.objects;
+CREATE POLICY "vehicle_images_select" ON storage.objects
   FOR SELECT TO authenticated
   USING (
     bucket_id = 'vehicle-images'
-    AND (storage.foldername(name))[1] = (select auth.uid())::text
     AND NOT (select public.is_anonymous_session())
+    AND (private.my_vehicle_status((storage.foldername(name))[1]) IS NOT NULL OR (select public.is_admin()))
   );
-DROP POLICY IF EXISTS "vehicle_images_delete_own" ON storage.objects;
-CREATE POLICY "vehicle_images_delete_own" ON storage.objects
+DROP POLICY IF EXISTS "vehicle_images_delete" ON storage.objects;
+CREATE POLICY "vehicle_images_delete" ON storage.objects
   FOR DELETE TO authenticated
   USING (
     bucket_id = 'vehicle-images'
-    AND (storage.foldername(name))[1] = (select auth.uid())::text
     AND NOT (select public.is_anonymous_session())
+    AND (private.my_vehicle_status((storage.foldername(name))[1]) = 'pending' OR (select public.is_admin()))
   );
 
 -- ─── contact_events: module 'cars' ──────────────────────────────────────────
@@ -742,7 +770,7 @@ BEGIN
        OR has_table_privilege('anon', 'public.' || v_t, 'DELETE') OR has_table_privilege('anon', 'public.' || v_t, 'TRUNCATE') THEN
       RAISE EXCEPTION 'anon can write %', v_t;
     END IF;
-    IF NOT has_table_privilege('anon', 'public.' || v_t, 'SELECT') THEN RAISE EXCEPTION 'positive control: anon cannot read %', v_t; END IF;
+    IF NOT has_any_column_privilege('anon', ('public.' || v_t)::regclass, 'SELECT') THEN RAISE EXCEPTION 'positive control: anon cannot read %', v_t; END IF;
     IF has_table_privilege('authenticated', 'public.' || v_t, 'TRUNCATE') THEN RAISE EXCEPTION 'authenticated can TRUNCATE %', v_t; END IF;
   END LOOP;
   IF EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attnum > 0 AND NOT a.attisdropped
@@ -751,6 +779,17 @@ BEGIN
     RAISE EXCEPTION 'authenticated can write a column of vehicle_sources or dealers';
   END IF;
   IF has_table_privilege('authenticated', 'public.vehicles', 'DELETE') THEN RAISE EXCEPTION 'authenticated can DELETE vehicles'; END IF;
+  -- The seller's account id is not readable by any client; the listing id is (positive control).
+  IF has_column_privilege('anon', 'public.vehicles', 'owner_id', 'SELECT') OR has_column_privilege('authenticated', 'public.vehicles', 'owner_id', 'SELECT')
+     OR has_table_privilege('anon', 'public.vehicles', 'SELECT') OR has_table_privilege('authenticated', 'public.vehicles', 'SELECT') THEN
+    RAISE EXCEPTION 'a client can read vehicles.owner_id';
+  END IF;
+  IF NOT has_column_privilege('anon', 'public.vehicles', 'id', 'SELECT') OR NOT has_column_privilege('anon', 'public.vehicles', 'contact_phone', 'SELECT') THEN
+    RAISE EXCEPTION 'positive control: anon cannot read the listing columns';
+  END IF;
+  IF has_function_privilege('anon', 'public.my_vehicles()', 'EXECUTE') OR NOT has_function_privilege('authenticated', 'public.my_vehicles()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'my_vehicles(): anon may call it, or authenticated may not';
+  END IF;
   SELECT string_agg(a.attname, ',' ORDER BY a.attname) INTO v_names FROM pg_attribute a
    WHERE a.attrelid = to_regclass('public.vehicles') AND a.attnum > 0 AND NOT a.attisdropped
      AND has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT');
@@ -775,17 +814,18 @@ BEGIN
   IF (SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.vehicles_guard()')) THEN
     RAISE EXCEPTION 'vehicles_guard must be SECURITY INVOKER (it branches on current_user)';
   END IF;
-  IF has_function_privilege('anon', 'private.vehicle_poster_refusal()', 'EXECUTE') OR has_function_privilege('anon', 'private.my_open_vehicle_count()', 'EXECUTE') THEN
+  IF has_function_privilege('anon', 'private.vehicle_poster_refusal()', 'EXECUTE') OR has_function_privilege('anon', 'private.my_open_vehicle_count()', 'EXECUTE')
+     OR has_function_privilege('anon', 'private.my_vehicle_status(text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'anon can EXECUTE a private vehicles helper';
   END IF;
 
   -- Triggers: exactly one user trigger on each written table.
   SELECT string_agg(pg_get_triggerdef(oid), ' | ') INTO v_def FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicles') AND NOT tgisinternal;
-  IF v_def IS DISTINCT FROM 'CREATE TRIGGER vehicles_guard BEFORE INSERT OR UPDATE ON public.vehicles FOR EACH ROW EXECUTE FUNCTION vehicles_guard()' THEN
+  IF v_def NOT LIKE 'CREATE TRIGGER vehicles_guard BEFORE INSERT OR UPDATE ON public.vehicles FOR EACH ROW EXECUTE FUNCTION %vehicles_guard()' THEN
     RAISE EXCEPTION 'vehicles triggers: %', v_def;
   END IF;
   SELECT string_agg(pg_get_triggerdef(oid), ' | ') INTO v_def FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicle_images') AND NOT tgisinternal;
-  IF v_def IS DISTINCT FROM 'CREATE TRIGGER vehicle_images_guard BEFORE INSERT ON public.vehicle_images FOR EACH ROW EXECUTE FUNCTION vehicle_images_guard()' THEN
+  IF v_def NOT LIKE 'CREATE TRIGGER vehicle_images_guard BEFORE INSERT ON public.vehicle_images FOR EACH ROW EXECUTE FUNCTION %vehicle_images_guard()' THEN
     RAISE EXCEPTION 'vehicle_images triggers: %', v_def;
   END IF;
 
@@ -795,21 +835,24 @@ BEGIN
     RAISE EXCEPTION 'dealers / vehicle_sources is_active must DEFAULT false';
   END IF;
 
-  -- Storage: exactly four new policies, all scoped to the bucket and to the caller's own folder; the bucket itself.
+  -- Storage: exactly three new policies, all scoped to the bucket, guest-guarded and tied to a listing; the bucket itself.
   SELECT count(*) INTO v_n FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects';
-  IF v_n IS DISTINCT FROM current_setting('mig1165.storage_policies')::int + 4 THEN
-    RAISE EXCEPTION 'storage.objects policies: % before, % after (want +4)', current_setting('mig1165.storage_policies'), v_n;
+  IF v_n IS DISTINCT FROM current_setting('mig1165.storage_policies')::int + 3 THEN
+    RAISE EXCEPTION 'storage.objects policies: % before, % after (want +3)', current_setting('mig1165.storage_policies'), v_n;
   END IF;
   SELECT count(*), string_agg(policyname, ', ' ORDER BY policyname) INTO v_n, v_names FROM pg_policies
    WHERE schemaname = 'storage' AND tablename = 'objects' AND coalesce(qual, '') || coalesce(with_check, '') LIKE '%vehicle-images%';
-  IF v_n IS DISTINCT FROM 4 THEN RAISE EXCEPTION 'vehicle-images storage policies: % (want 4): %', v_n, v_names; END IF;
+  IF v_n IS DISTINCT FROM 3 THEN RAISE EXCEPTION 'vehicle-images storage policies: % (want 3): %', v_n, v_names; END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'vehicle_images_%' AND cmd = 'UPDATE') THEN
+    RAISE EXCEPTION 'a vehicle-images UPDATE policy exists: photos must not be overwritable';
+  END IF;
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'vehicle_images_%'
               AND ((coalesce(qual, '') || coalesce(with_check, '')) NOT LIKE '%is_anonymous_session()%'
-                OR (coalesce(qual, '') || coalesce(with_check, '')) NOT LIKE '%foldername%')) THEN
-    RAISE EXCEPTION 'a vehicle-images storage policy lacks the guest guard or the folder pin';
+                OR (coalesce(qual, '') || coalesce(with_check, '')) NOT LIKE '%my_vehicle_status(%')) THEN
+    RAISE EXCEPTION 'a vehicle-images storage policy lacks the guest guard or the listing tie';
   END IF;
-  IF (SELECT with_check FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'vehicle_images_upload') NOT LIKE '%partner%' THEN
-    RAISE EXCEPTION 'vehicle_images_upload lost the partner/ exclusion';
+  IF (SELECT with_check FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'vehicle_images_upload') NOT LIKE '%''pending''%' THEN
+    RAISE EXCEPTION 'vehicle_images_upload no longer requires a pending listing';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'vehicle-images' AND public AND file_size_limit = 5242880) THEN
     RAISE EXCEPTION 'bucket vehicle-images is missing or not public / 5 MB';
@@ -838,7 +881,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261165_vehicles.sql', 'd132386325002a2cc69e2898b6e7f46c531e7d0f915fef57656e40869a71adf0')
+VALUES ('20261165_vehicles.sql', '506b0ba0508ed32f2232a1db064dad8457126a4b98b84cf8265e57c1b3894178')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -850,13 +893,14 @@ NOTIFY pgrst, 'reload schema';
 
 -- ─── Verification after applying (read-only, run alone) ─────────────────────
 --   verify_schema QUERY 1: the 20261165_vehicles rows must read OK; QUERY 2: expire-vehicles;
---   QUERY 3: vehicle_sources 3, dealers 3, vehicles 8 (+1 from 20261166), vehicle_images 5; QUERY 4: +4 storage policies.
+--   QUERY 3: vehicle_sources 3, dealers 3, vehicles 8 (+1 from 20261166), vehicle_images 5; QUERY 4: +3 storage policies.
 --
 -- ─── Rollback ───────────────────────────────────────────────────────────────
 --   SELECT cron.unschedule('expire-vehicles');
---   DROP POLICY "vehicle_images_upload" ON storage.objects; DROP POLICY "vehicle_images_update_own" ON storage.objects;
---   DROP POLICY "vehicle_images_delete_own" ON storage.objects; DROP POLICY "vehicle_images_select_own" ON storage.objects; DELETE FROM storage.buckets WHERE id = 'vehicle-images';
+--   DROP POLICY "vehicle_images_upload" ON storage.objects; DROP POLICY "vehicle_images_select" ON storage.objects;
+--   DROP POLICY "vehicle_images_delete" ON storage.objects; DELETE FROM storage.buckets WHERE id = 'vehicle-images';
 --   DROP TABLE public.vehicle_images, public.vehicles, public.dealers, public.vehicle_sources;
 --   DROP FUNCTION public.vehicles_guard(), public.vehicle_images_guard(), public.renew_vehicle(uuid), public.expire_vehicles(),
---     private.vehicle_has_photo(uuid), private.vehicle_poster_refusal(), private.my_open_vehicle_count();
+--     private.vehicle_has_photo(uuid), private.vehicle_poster_refusal(), private.my_open_vehicle_count(),
+--     private.my_vehicle_status(text), public.my_vehicles();
 --   Restore contact_events_module_check without 'cars' (the 20261115 list); delete the schema_migrations_applied row.
