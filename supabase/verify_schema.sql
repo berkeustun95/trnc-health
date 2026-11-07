@@ -58,6 +58,8 @@ WITH report AS (
     ('20261125_eatery_orders','eatery_orders'),
     -- Duty push run log (20261141): registered ahead of the apply; red until it runs.
     ('20261141_duty_push_runs','duty_push_runs'),
+    -- Weekend digest run log (20261175): registered ahead of the apply; red until it runs.
+    ('20261175_weekend_digest','weekend_digest_runs'),
     -- Partner booking requests (20261143): registered ahead of the apply; red until it runs.
     ('20261143_partner_booking_requests','partner_booking_requests'),
     -- Server-marked test orders (1132): registered ahead of the apply; red until it runs.
@@ -266,6 +268,20 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs','error_kinds'),
     -- 20261142: registered ahead of the apply; red until it runs.
     ('20261142_duty_push_runs_partial_retries','duty_push_runs','push_retries'),
+    -- 20261175: weekend digest switch + run log; registered ahead of the apply; red until it runs.
+    ('20261175_weekend_digest','profiles','weekend_digest'),
+    ('20261175_weekend_digest','weekend_digest_runs','id'),
+    ('20261175_weekend_digest','weekend_digest_runs','started_at'),
+    ('20261175_weekend_digest','weekend_digest_runs','finished_at'),
+    ('20261175_weekend_digest','weekend_digest_runs','mode'),
+    ('20261175_weekend_digest','weekend_digest_runs','outcome'),
+    ('20261175_weekend_digest','weekend_digest_runs','events'),
+    ('20261175_weekend_digest','weekend_digest_runs','notified'),
+    ('20261175_weekend_digest','weekend_digest_runs','notif_batches_failed'),
+    ('20261175_weekend_digest','weekend_digest_runs','push_attempted'),
+    ('20261175_weekend_digest','weekend_digest_runs','push_ok'),
+    ('20261175_weekend_digest','weekend_digest_runs','push_errors'),
+    ('20261175_weekend_digest','weekend_digest_runs','error_kinds'),
     -- 20261163: oli_messages (exact column set asserted in H).
     ('20261163_oli_messages','oli_messages','id'),
     ('20261163_oli_messages','oli_messages','user_id'),
@@ -528,6 +544,7 @@ WITH report AS (
   FROM (VALUES
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
     ('1103_duty_push_famagusta','duty_push_due'),
+    ('20261177_weekend_digest_schedule','weekend_digest_due'),
     ('1103_duty_push_famagusta','duty_thursday_closing_local'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','check_in_google'),

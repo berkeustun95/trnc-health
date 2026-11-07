@@ -87,14 +87,15 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
           showsVerticalScrollIndicator={false}
           contentContainerStyle={r.list}
           renderItem={({ item }) => {
-            const duty = notificationRoute(item) === 'duty'
+            const route = notificationRoute(item)
+            const duty = route === 'duty'
             return (
               <TouchableOpacity
                 style={[r.card, elevation.card]}
                 activeOpacity={press.card}
                 accessibilityRole="button"
                 accessibilityState={{ selected: !item.read }}
-                onPress={() => { onMarkRead?.(item); if (duty) onNotifPress?.(item) }}
+                onPress={() => { onMarkRead?.(item); if (route) onNotifPress?.(item) }}
               >
                 {/* One unread colour app-wide: dangerInk, the same as the bell's badge. */}
                 <View style={[r.dot, item.read && r.dotRead]} />
@@ -105,6 +106,7 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
                   </View>
                   <Text style={r.body}>{item.body}</Text>
                   {duty && <Text style={r.hint}>{t('tapViewDuty', lang)}</Text>}
+                  {route === 'weekend' && <Text style={r.hint}>{t('tapViewWeekend', lang)}</Text>}
                 </View>
               </TouchableOpacity>
             )
@@ -165,12 +167,13 @@ function NotificationsLegacy({ notifications, loading, lang, onBack, onMarkAllRe
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.list}
           renderItem={({ item }) => {
-            const isDuty = notificationRoute(item) === 'duty'
+            const route = notificationRoute(item)
+            const isDuty = route === 'duty'
             return (
               <TouchableOpacity
                 style={[s.card, !item.read && s.cardUnread]}
                 activeOpacity={0.75}
-                onPress={() => { onMarkRead?.(item); if (isDuty) onNotifPress?.(item) }}
+                onPress={() => { onMarkRead?.(item); if (route) onNotifPress?.(item) }}
               >
                 {!item.read && <View style={s.unreadDot} />}
                 <View style={s.cardBody}>

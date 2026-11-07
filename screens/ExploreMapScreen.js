@@ -429,7 +429,8 @@ export default function ExploreMapScreen({
   onSelectEvent,
   // Opens Oteller pre-searched to one hotel (its card + booking button). Hotels layer exists only when passed.
   onOpenHotel,
-  initialEventsMode = false,   // the Explore landing's "Bu hafta" opens straight into events
+  initialEventsMode = false,
+  initialEventRange = null,    // the weekend push opens events on 'weekend'   // the Explore landing's "Bu hafta" opens straight into events
   initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
   underTabBar = false,         // Keşfet tab (redesign): the floating tab bar covers the bottom of the map
   dutyWindows = null,          // today's duty windows by facility id (App, dutyWindowsFor): on duty = open
@@ -471,7 +472,7 @@ export default function ExploreMapScreen({
   const [routesError, setRoutesError]     = useState(false)
   const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? initialRoutesMode)
   const [eventsMode, setEventsMode]       = useState(snap?.eventsMode ?? initialEventsMode)
-  const [eventRange, setEventRange]       = useState(snap?.eventRange ?? DEFAULT_EVENT_RANGE)
+  const [eventRange, setEventRange]       = useState(snap?.eventRange ?? initialEventRange ?? DEFAULT_EVENT_RANGE)
   const [eventVenue, setEventVenue]       = useState(null)
   const [eventRows, setEventRows]         = useState([])
   const [hotelsMode, setHotelsMode]       = useState(snap?.hotelsMode ?? false)
