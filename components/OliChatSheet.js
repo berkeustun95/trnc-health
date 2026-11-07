@@ -204,7 +204,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
     return null
   }
 
-  const empty = !messages.length && history !== 'loading' && history !== 'error'
+  const empty = !messages.length && history !== 'loading'
   const canSend = !!input.trim() && !busy
 
   return (
@@ -222,10 +222,12 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
           <IconButton icon="close" onPress={closeSheet} accessibilityLabel={t('uiClose', lang)} />
         </View>
 
+        {history === 'error' && (
+          // A history that would not load never blocks the chat: Oli still answers, the retry is here.
+          <View style={s.historyErr}><ErrorState lang={lang} onRetry={loadHistory} /></View>
+        )}
         {history === 'loading' ? (
           <View style={s.pad}><RowSkeleton count={4} /></View>
-        ) : history === 'error' ? (
-          <ErrorState lang={lang} onRetry={loadHistory} />
         ) : empty ? (
           <ScrollView contentContainerStyle={s.home} keyboardShouldPersistTaps="handled">
             <Image source={require('../assets/oli-button.png')} style={s.homeImg} resizeMode="cover" />
@@ -294,6 +296,7 @@ const s = StyleSheet.create({
   headImg:    { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, marginRight: 4 },
   headTitle:  { ...type.sheetTitle, color: colors.textPrimary, flex: 1 },
   pad:        { padding: 16 },
+  historyErr: { flexShrink: 0 },
   home:       { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 24 },
   homeImg:    { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primaryLight, marginBottom: 14 },
   greeting:   { ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
