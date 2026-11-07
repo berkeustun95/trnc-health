@@ -26,5 +26,10 @@ UNION ALL SELECT 'column:profiles.' || column_name, data_type
   FROM information_schema.columns
  WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name IN ('date_of_birth', 'ugc_banned_until', 'role')
 UNION ALL SELECT 'schema private', CASE WHEN to_regnamespace('private') IS NULL THEN 'missing' ELSE 'exists' END
+UNION ALL SELECT 'schema usage:' || r || '.' || sch, CASE WHEN to_regnamespace(sch) IS NULL THEN 'no schema' ELSE has_schema_privilege(r, sch, 'USAGE')::text END
+  FROM unnest(ARRAY['anon', 'authenticated']) r, unnest(ARRAY['private', 'storage']) sch
+UNION ALL SELECT 'execute:authenticated.' || f, CASE WHEN to_regprocedure(f) IS NULL THEN 'missing' ELSE has_function_privilege('authenticated', to_regprocedure(f), 'EXECUTE')::text END
+  FROM unnest(ARRAY['public.is_admin()', 'public.is_anonymous_session()', 'public.contains_blocked_term(text)',
+                    'public.contains_payment_solicitation(text)', 'public.is_previewer()']) f
 UNION ALL SELECT 'cron job:' || jobname, schedule FROM cron.job WHERE jobname LIKE '%vehicle%'
 ORDER BY 1;
