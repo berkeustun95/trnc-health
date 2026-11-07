@@ -188,6 +188,8 @@ export const HOME_MODULES = [
   // Driving schools (MODULE_FLAGS.ehliyet). Dark: the tile shows only through HomeScreen's `unlocked` Set on dev / ADA Preview.
   { id: 'ehliyet',            icon: 'id-card-outline',          tint: 'standard', labelKey: 'menuEhliyet',
     gridLabel: { key: 'menuEhliyet', lines: 2 } },   // per-language size: Russian / German break mid-word at 11pt (GRID_LABEL_FIT)
+  // Dükkân (MODULE_FLAGS.marketplace). Dark: the tile shows only through HomeScreen's `unlocked` Set on dev / ADA Preview.
+  { id: 'marketplace',        icon: 'storefront-outline',       tint: 'standard', labelKey: 'menuMarketplace' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
   { id: 'grooming',           icon: 'cut-outline',              tint: 'standard', labelKey: 'menuGrooming' },

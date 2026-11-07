@@ -40,6 +40,7 @@ const GATES = {
   towing:        () => MODULE_FLAGS.towing !== false,
   // === true, not !== false: a dark module's gate fails closed. Dev / Preview unlock it in HomeScreen.
   ehliyet:       () => MODULE_FLAGS.ehliyet === true,
+  marketplace:   () => MODULE_FLAGS.marketplace === true,
   hotels:        () => HOTELS_LIVE === true,
   // EATERY is EATERY_LIVE || dev || ADA Preview (constants/redesign.js): the tile shows there before the flag flips.
   eatery:        () => EATERY === true,
@@ -75,7 +76,7 @@ export function isLive(id, unlocked) {
 export const HOME_GROUPS = [
   { key: 'health',   titleKey: 'hrGroupHealth',  ids: ['duty', 'health', 'emergency'] },
   { key: 'explore',  titleKey: 'hrGroupExplore', ids: ['exploreTab', 'events', 'liveScores', 'walkingRoutes', 'hotels', 'eatery', 'games'] },
-  { key: 'homeLife', titleKey: 'hrGroupHome',    ids: ['accommodation', 'homeServices', 'pets', 'insurance',
+  { key: 'homeLife', titleKey: 'hrGroupHome',    ids: ['accommodation', 'homeServices', 'marketplace', 'pets', 'insurance',
                                                         'studentHub' /* ★ */] },
   { key: 'city',     titleKey: 'hrGroupCity',    ids: ['transport', 'esim', 'municipal',
                                                         'towing' /* ★ */, 'ehliyet', 'exchangeRates' /* ★ */,

@@ -449,6 +449,27 @@ $function$;
 REVOKE ALL ON FUNCTION public.admin_set_listing_hidden(uuid, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_set_listing_hidden(uuid, boolean) TO authenticated;
 
+-- The seller's username for listings the CALLER can see (profiles are owner-read only). display_name is
+-- the public username (Student Hub, reviews); nothing else of the profile leaves. At most 100 ids per call.
+CREATE OR REPLACE FUNCTION public.marketplace_seller_names(p_listing_ids uuid[])
+ RETURNS TABLE(listing_id uuid, display_name text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT l.id, p.display_name
+    FROM marketplace_listings l
+    JOIN profiles p ON p.id = l.owner_id
+   WHERE auth.uid() IS NOT NULL
+     AND cardinality(p_listing_ids) <= 100
+     AND l.id = ANY (p_listing_ids)
+     AND ((l.deleted_at IS NULL AND l.hidden_at IS NULL AND l.expires_at > now() AND NOT marketplace_blocked_with(l.owner_id))
+          OR l.owner_id = auth.uid()
+          OR is_admin());
+$function$;
+REVOKE ALL ON FUNCTION public.marketplace_seller_names(uuid[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.marketplace_seller_names(uuid[]) TO authenticated;
+
 -- ─── 4. Photos ──────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.marketplace_photos (
   id            uuid        NOT NULL DEFAULT gen_random_uuid(),
@@ -706,7 +727,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261168_marketplace_listings.sql', 'ea13333d44eae8925c2626296fe0175a7a21bc4e8524237316cfdbc9dff6b9ff')
+VALUES ('20261168_marketplace_listings.sql', '7f6d96d6b2d84aadbdf8f45f61613a5fd0c6329a15565f9ff8425a1140786bbb')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

@@ -277,7 +277,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261161_admin_user_counts.sql', 'd8da6f8bd352526c45d48be7478f853f8f5a7025f170d61be2313a6ad08900e9'),
   ('20261162_delete_script_guests.sql', 'cae86fa32f492ea65d99c539d6447262c920edf1af6a0999ae024da0bda15de9'),
   ('20261163_oli_messages.sql', 'e608791a9ad77125b090e5dba67278c3e652e719ce51ccaed2294e5d029071e0'),
-  ('20261168_marketplace_listings.sql', 'ea13333d44eae8925c2626296fe0175a7a21bc4e8524237316cfdbc9dff6b9ff'),
+  ('20261168_marketplace_listings.sql', '7f6d96d6b2d84aadbdf8f45f61613a5fd0c6329a15565f9ff8425a1140786bbb'),
   ('20261169_marketplace_messaging.sql', 'aa708e0d021fe1691cfcf6c0e6a9184de8938a72b6447453ec6562ef2a76d1e0')
 )
 SELECT * FROM (

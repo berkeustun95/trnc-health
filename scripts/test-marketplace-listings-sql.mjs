@@ -222,6 +222,14 @@ const CASES = [
     const direct = await as(db, 'C', `UPDATE profiles SET marketplace_notice_at = now() WHERE id = '${U.C}'`)
     return r.ok && at === '2026-11-07' && errIs(direct, 'MARKETPLACE_NOTICE_SERVER_ONLY') && errIs(await as(db, 'G', `SELECT accept_marketplace_notice('2026-11-07')`), 'AUTH_REQUIRED')
   }],
+  ['seller name: only for listings the caller can see', async db => {
+    const id = await listing(db)
+    const name = async w => (await as(db, w, `SELECT display_name FROM marketplace_seller_names(ARRAY['${id}']::uuid[])`)).value
+    const before = [await name('B'), await name('G')]
+    await as(db, 'B', `INSERT INTO content_reports (reporter_id, content_type, content_id, reason) VALUES ('${U.B}', 'listing', '${id}', 'spam')`)
+    return before[0] === 'Ayla' && before[1] === 'Ayla' && (await name('C')) === null && (await name('A')) === 'Ayla'
+      && !(await as(db, null, `SELECT * FROM marketplace_seller_names(ARRAY['${id}']::uuid[])`)).ok
+  }],
   // ── no age oracle ──
   ['i_am_adult answers only for the caller', async db =>
     (await as(db, 'A', 'SELECT i_am_adult()')).value === true && (await as(db, 'M', 'SELECT i_am_adult()')).value === false
