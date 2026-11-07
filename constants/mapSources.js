@@ -60,6 +60,14 @@ export const TRNC_CENTER = {
   longitudeDelta: 2.0,
 }
 
+// Inside the default frame = in North Cyprus for this purpose. A user elsewhere (Istanbul, the
+// south) opens on the island, not on their own street.
+export function inTrncFrame(lat, lng) {
+  return Math.abs(lat - TRNC_CENTER.latitude)  <= TRNC_CENTER.latitudeDelta / 2
+      && Math.abs(lng - TRNC_CENTER.longitude) <= TRNC_CENTER.longitudeDelta / 2
+}
+export const NEAR_ME_DELTA = 0.12
+
 // Explore is REACHABLE — the outer gate App.js applies before rendering ExploreScreen.
 // `live` defaults to the real flag. It is an explicit parameter ONLY so the guard can
 // assert BOTH worlds after launch — without it, the day explore went live the

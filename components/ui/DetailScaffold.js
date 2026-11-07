@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -30,10 +31,18 @@ export default function DetailScaffold({
 }) {
   const insets = useSafeAreaInsets()
   const c = CAT[tag?.category] || CAT.city
+  // Once the sheet reaches the top bar, a solid band sits behind it: without one the tag and title
+  // scrolled under the frosted back button (visible through it), and light status icons sat on white.
+  const [covered, setCovered] = useState(false)
+  const onScroll = e => {
+    scrollProps?.onScroll?.(e)
+    const next = e.nativeEvent.contentOffset.y > DETAIL_PHOTO_H - 28 - 56
+    if (next !== covered) setCovered(next)
+  }
   return (
     <PageCanvas>
-      <SplashStatusBar style={photo ? 'light' : 'dark'} />
-      <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <SplashStatusBar style={photo && !covered ? 'light' : 'dark'} />
+      <ScrollView {...scrollProps} onScroll={onScroll} scrollEventThrottle={scrollProps?.scrollEventThrottle ?? 32} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
         <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: photo ? c.bg : 'transparent' }]}>
           {photo
             ? <RemoteImage source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
@@ -51,6 +60,7 @@ export default function DetailScaffold({
           {children}
         </View>
       </ScrollView>
+      {covered && <View style={[s.band, { height: insets.top + 60 }]} pointerEvents="none" />}
       <View style={[s.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
         <IconButton icon="chevron-back" variant="frosted" onPress={onBack} accessibilityLabel={t('back', lang)} />
         {headerRight}
@@ -73,6 +83,8 @@ const s = StyleSheet.create({
   tagText:  { ...type.meta, fontFamily: 'Inter_700Bold' },
   title:    { ...type.pageTitle, color: colors.textPrimary },
   subtitle: { ...type.body, color: colors.textSecondary, marginTop: 4 },
+  band:     { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.card,
+              borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   topBar:   { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
   sticky:   { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.card, paddingHorizontal: 16,
               paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, ...elevation.floating },
