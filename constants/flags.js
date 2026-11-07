@@ -725,7 +725,7 @@ export const VOICE_INPUT = true   // on from the 1.4.0 store build (2026-10-09);
 // Off = the search sheet (OliSearchSheet), exactly as today. ADA Preview and dev bundles get the chat through
 // OLI_CHAT in constants/redesign.js. Before flipping: 20261163 applied, the privacy text live (docs/ via main,
 // web/ via web:deploy, in-app via the OTA), store forms checked (vault 2026-11-07_oli-ai-chat-plan.md).
-export const OLI_CHAT_LIVE = false
+export const OLI_CHAT_LIVE = true   // live 2026-11-07 (Berke GO; device pass on Preview 7bf46297)
 
 // Yeme-İçme (Eateries) section. false = no Home tile and no way in. NOT a MODULE_FLAGS key: no
 // waitlist to collect and no notify path — the HOTELS_LIVE reasoning. Dev bundles and ADA Preview
