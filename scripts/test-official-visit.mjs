@@ -2,7 +2,7 @@
 // Keşfet map's "Müze & Ören Yeri" chip (constants/mapSources.js).
 //   node scripts/test-official-visit.mjs
 import { officialVisitView, cyprusDate, officialFeeText } from '../utils/officialVisit.js'
-import { buildMapSources, selectedPins, officialVisitApplicable, applyOfficialVisit, applyOpenNow } from '../constants/mapSources.js'
+import { buildMapSources, selectedPins, officialVisitApplicable, applyOfficialVisit, applyOpenNow, pinOpenNow, openNowApplicable } from '../constants/mapSources.js'
 
 let bad = 0
 const t = (name, got, want) => {
@@ -66,8 +66,23 @@ t('no EEMD data anywhere → no chip (never a dead chip)', officialVisitApplicab
 // and the chip cannot appear (it reads the GATED pins, not the fetched rows).
 const dark = selectedPins(buildMapSources({ ...opts, exploreLive: false }), new Set())
 t('Explore dark: no EEMD pin, no chip', [applyOfficialVisit(dark, true).length, officialVisitApplicable(dark)], [0, false])
-t('with Open now on as well: still only EEMD sites', ids(applyOfficialVisit(applyOpenNow(all, true), true)),
-  ['place:bellapais', 'place:othello', 'place:salamis'])
+// Stage 2 (2026-11-07): Open now drops a site EEMD lists as closed; out of season (November) the
+// others are unknown and stay.
+const nov = new Date('2026-11-11T10:00:00Z')
+t('with Open now on as well: EEMD sites minus the closed one', ids(applyOfficialVisit(applyOpenNow(all, true, null, nov), true)),
+  ['place:bellapais', 'place:salamis'])
+const pin = ov => ({ kind: 'place', row: { official_visit: ov } })
+const wedNoon = new Date('2026-07-15T09:00:00Z'), wedNight = new Date('2026-07-15T18:30:00Z'), sunNoon = new Date('2026-07-19T09:00:00Z')
+const weekdayOnly = { ...open, hours: { ...open.hours, weekends: false } }
+t('pinOpenNow: in season, inside hours → open; after close → closed', [pinOpenNow(pin(open), null, wedNoon), pinOpenNow(pin(open), null, wedNight)], [true, false])
+t('pinOpenNow: weekday-only site on a Sunday → closed; weekend site → open', [pinOpenNow(pin(weekdayOnly), null, sunNoon), pinOpenNow(pin(open), null, sunNoon)], [false, true])
+t('pinOpenNow: out of season → unknown (null); closed status → false; no data → null',
+  [pinOpenNow(pin(open), null, nov), pinOpenNow(pin(closed), null, nov), pinOpenNow({ kind: 'place', row: {} }, null, nov)], [null, false, null])
+const eat = h => ({ kind: 'eatery', row: { opening_hours: h } })
+const daily = Object.fromEntries(['mon','tue','wed','thu','fri','sat','sun'].map(d => [d, { open: '11:00', close: '23:00' }]))
+t('pinOpenNow: eatery hours → open at noon, closed at 07:00; no hours → null',
+  [pinOpenNow(eat(daily), null, wedNoon), pinOpenNow(eat(daily), null, new Date('2026-07-15T04:00:00Z')), pinOpenNow(eat(null), null, wedNoon)], [true, false, null])
+t('Open now chip appears for an eatery with hours alone', openNowApplicable([eat(daily)], null, wedNoon), true)
 
 if (bad) { console.error(`\n${bad} failing`); process.exit(1) }
 console.log('\nall passing')

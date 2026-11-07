@@ -226,7 +226,7 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
           onPress={onRoutes}
         />
       )}
-      {/* Hidden while no facility has parseable hours — see openNowApplicable(). */}
+      {/* Hidden while no pin can answer (no hours anywhere) — see openNowApplicable(). */}
       {canOpenNow && (
         <Chip
           label={t('openNow', lang)}
