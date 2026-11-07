@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ─── Araçlar Preview seed: one INACTIVE test dealer, six cars, eleven CC0 photos ─
+// ─── Araçlar Preview seed: one INACTIVE test dealer, six cars, eight CC0 photos ─
 //
 //   node scripts/seed-araclar-preview.mjs --dry          # plan only (the default in CI too)
 //   gh workflow run araclar-preview-seed                 # dry, in CI
@@ -41,7 +41,8 @@ const CARS = [
   car('0c2e4a6b-8d1f-4a3c-9e50-b1d3f5a7c901', { intent: 'sale', make: 'Toyota', model: 'Yaris Hybrid', year: 2021, km: 28500, fuel: 'hybrid', gearbox: 'automatic', body_type: 'hatchback', colour: 'white', steering: 'right', price: 13950, currency: 'GBP', region: 'kyrenia', area: 'alsancak' },
     ['3c1e2f6a-6b7d-4f0e-9a51-0e7c2b8d4a01']),
   car('1d3f5b7c-9e2a-4b4d-8f61-c2e4a6b8d902', { intent: 'sale', make: 'Mercedes-Benz', model: 'C 200', year: 1995, km: 186000, fuel: 'petrol', gearbox: 'automatic', body_type: 'sedan', colour: 'beige', steering: 'left', price: 4250, currency: 'GBP', region: 'nicosia', area: 'batikent' },
-    ['9b2d4c7e-1a3f-4e6b-8c20-5d9e7f1a2b02', '5e8a1b3c-7d2f-4a9e-b614-2c3d4e5f6a03', 'd4f6a8b0-2c1e-4b3d-9e57-6a7b8c9d0e04', '71a3c5e7-9b0d-4f2a-8c46-1e2f3a4b5c05']),
+    // Side view only: the front and rear shots of this car show a readable plate (security review, 2026-11-07).
+    ['71a3c5e7-9b0d-4f2a-8c46-1e2f3a4b5c05']),
   car('2e4a6c8d-0f3b-4c5e-9a72-d3f5b7c9e003', { intent: 'rent', make: 'Hyundai', model: 'Tucson', year: 2017, km: 74000, fuel: 'diesel', gearbox: 'automatic', body_type: 'suv', colour: 'silver', steering: 'left', price_per_day: 45, currency: 'GBP', region: 'famagusta', area: 'merkez' },
     ['a8c0e2f4-6b1d-4c3e-9f58-7a8b9c0d1e06']),
   car('3f5b7d9e-1a4c-4d6f-8b83-e4a6c8d0f104', { intent: 'sale', make: 'Volkswagen', model: 'Golf 1.4', year: 2003, km: 210000, fuel: 'petrol', gearbox: 'manual', body_type: 'hatchback', colour: 'silver', steering: 'right', price: 285000, currency: 'TRY', region: 'kyrenia', area: 'bogaz' },
@@ -125,6 +126,11 @@ if (d2.is_active !== false) fail('read back: the test dealer is not inactive')
 // Production must not see any of it.
 const { data: seen, error: anonErr } = await anon.from('vehicles').select('id').in('id', ids)
 if (anonErr) fail(`anon read: ${anonErr.message}`)
-const { data: seenDealer } = await anon.from('dealers').select('id').eq('id', DEALER.id)
-if (seen.length || seenDealer?.length) fail(`LEAK: anon sees ${seen.length} seeded car(s) and ${seenDealer?.length ?? 0} dealer row(s)`)
-console.log(`read back: dealer inactive, ${back.length}/${CARS.length} cars active with all their photos; anon sees 0 cars, 0 dealer rows`)
+const { data: seenDealer, error: anonDealerErr } = await anon.from('dealers').select('id').eq('id', DEALER.id)
+if (anonDealerErr) fail(`anon dealer read: ${anonDealerErr.message}`)
+const { data: seenImages, error: anonImgErr } = await anon.from('vehicle_images').select('id').in('vehicle_id', ids)
+if (anonImgErr) fail(`anon photo-row read: ${anonImgErr.message}`)
+if (seen.length || seenDealer.length || seenImages.length) {
+  fail(`LEAK: anon sees ${seen.length} seeded car(s), ${seenDealer.length} dealer row(s), ${seenImages.length} photo row(s)`)
+}
+console.log(`read back: dealer inactive, ${back.length}/${CARS.length} cars active with all their photos; anon sees 0 cars, 0 dealer rows, 0 photo rows`)
