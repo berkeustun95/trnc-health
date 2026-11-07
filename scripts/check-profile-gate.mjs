@@ -57,7 +57,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MIGRATIONS = resolve(ROOT, 'supabase/migrations')
 const SCHEMA_FILE = '20261001_profile_completion_schema.sql'
 const RPC_FILE = '20261002_display_name_availability_rpc.sql'
-const MESSAGING_FILE = '20261029_student_messaging.sql'
+// 20261164 moved ADULT_AGE out of may_initiate_by_age() into private.is_adult_on(), and redefined
+// may_initiate_by_age() to call it. That file holds BOTH current bodies.
+const MESSAGING_FILE = '20261164_shared_adult_age.sql'
 
 const fails = []
 const notes = []
@@ -104,24 +106,43 @@ function fnBody(text, name) {
 }
 
 // ─── 1b. ADULT_AGE — the same contract, for the messaging age rule ───────────
-// Slice 6's rule (adults cannot initiate with under-18s) lives in may_initiate_by_age().
-// Same shape as MIN_SIGNUP_AGE above and same reason it cannot be a CHECK constraint.
+// Slice 6's rule (adults cannot initiate with under-18s) lives in may_initiate_by_age(), which
+// since 20261164 takes the age from private.is_adult_on() — also used by the Araçlar listing
+// guard. Same shape as MIN_SIGNUP_AGE above and same reason it cannot be a CHECK constraint.
 {
+  const helper = (() => {
+    const start = MESSAGING_SQL.indexOf('FUNCTION private.is_adult_on(')
+    if (start < 0) return null
+    const open = MESSAGING_SQL.indexOf('$function$', start)
+    const close = MESSAGING_SQL.indexOf('$function$', open + 10)
+    return open < 0 || close < 0 ? null : MESSAGING_SQL.slice(open + 10, close)
+  })()
   const body = fnBody(MESSAGING_SQL, 'may_initiate_by_age')
-  if (!body) {
-    fail(`could not find may_initiate_by_age() in ${MESSAGING_FILE}`)
+  if (!helper) {
+    fail(`could not find private.is_adult_on() in ${MESSAGING_FILE}`)
   } else {
-    const m = body.match(/current_date\s*-\s*interval\s*'(\d+)\s+years'/)
+    const m = helper.match(/p_today\s*-\s*interval\s*'(\d+)\s+years'/)
     if (!m) {
-      fail(`the age rule is missing from may_initiate_by_age(). Adults could then ` +
+      fail(`the age rule is missing from private.is_adult_on(). Adults could then ` +
            `initiate contact with under-18s, which is the one non-negotiable rule in ` +
-           `slice 6.`)
+           `slice 6, and under-18s could post car listings.`)
     } else if (Number(m[1]) !== ADULT_AGE) {
       fail(`ADULT_AGE disagrees: constants/profileGate.js says ${ADULT_AGE}, ` +
            `${MESSAGING_FILE} enforces ${m[1]}.`)
     } else {
       ok(`ADULT_AGE = ${ADULT_AGE} in both halves`)
     }
+    if (!/p_dob IS NOT NULL AND p_today IS NOT NULL/.test(helper)) {
+      fail('private.is_adult_on() no longer fails closed on a NULL date of birth')
+    }
+  }
+  if (!body) {
+    fail(`could not find may_initiate_by_age() in ${MESSAGING_FILE}`)
+  } else {
+    if (!/NOT private\.is_adult_on\(v_sender, current_date\)/.test(body) || !/private\.is_adult_on\(v_recipient, current_date\)/.test(body)) {
+      fail('may_initiate_by_age() no longer takes both ages from private.is_adult_on()')
+    }
+    if (/\d+\s+years/.test(body)) fail('may_initiate_by_age() carries its own age literal again — ADULT_AGE must have one home')
 
     // THE RULE MUST FAIL CLOSED ON A NULL date_of_birth. The naive form —
     // NOT (sender_is_adult AND recipient_is_minor) — allows every unknown age, because
