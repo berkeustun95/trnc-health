@@ -6,6 +6,7 @@ import { coarseCoord, haversineKm } from './facilityUtils'
 import { localDateKey } from './dutyStatus'
 import { dateLocale, t, LANG_CODES } from '../constants/i18n'
 import { EATERY_CATEGORY_KEY } from '../constants/eatery'
+import { REGION_LABEL_KEY } from '../constants/regions'
 
 // ─── Ask Oli answer providers ────────────────────────────────────────────────
 // The ONE seam between the chat sheet and whatever answers it. A provider is
@@ -109,7 +110,9 @@ async function eateryPartners(lang) {
   if (error) throw error
   return rows.slice(0, MAX_ITEMS).map(r => ({
     t: r.name,
-    s: [EATERY_CATEGORY_KEY[r.category] ? t(EATERY_CATEGORY_KEY[r.category], lang) : null, r.region].filter(Boolean).join(' · '),
+    // eatery_partners.region is a slug (nicosia, kyrenia…): shown through the district label, as everywhere else.
+    s: [EATERY_CATEGORY_KEY[r.category] ? t(EATERY_CATEGORY_KEY[r.category], lang) : null,
+        REGION_LABEL_KEY[r.region] ? t(REGION_LABEL_KEY[r.region], lang) : r.region].filter(Boolean).join(' · '),
     a: { nav: 'eatery' },
   }))
 }
