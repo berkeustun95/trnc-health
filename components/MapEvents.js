@@ -31,8 +31,11 @@ export function EventVenueMarker({ venue, active, onPress }) {
     <Marker coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} tracksViewChanges={tracks}
       anchor={{ x: 0.5, y: 0.5 }} zIndex={active ? 2 : 1}
       onPress={e => { e.stopPropagation(); onPress(venue) }}>
-      <View style={[m.pin, active && m.pinActive]}>
-        <Ionicons name={eventIcon(venue.events[0].category)} size={active ? 17 : 15} color="#fff" />
+      {/* The pad keeps the badge inside the marker bitmap: Android clips a child past its parent's box. */}
+      <View style={m.pad}>
+        <View style={[m.pin, active && m.pinActive]}>
+          <Ionicons name={eventIcon(venue.events[0].category)} size={active ? 17 : 15} color="#fff" />
+        </View>
         {n > 1 && <View style={m.badge}><Text style={m.badgeText}>{n}</Text></View>}
       </View>
     </Marker>
@@ -92,7 +95,8 @@ const m = StyleSheet.create({
   pin:       { width: 32, height: 32, borderRadius: 16, backgroundColor: EVENT_INK, borderWidth: 2, borderColor: '#fff',
                alignItems: 'center', justifyContent: 'center', ...elevation.floating },
   pinActive: { width: 38, height: 38, borderRadius: 19 },
-  badge:     { position: 'absolute', top: -6, right: -8, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+  pad:       { paddingTop: 8, paddingRight: 12, paddingLeft: 12, paddingBottom: 4, alignItems: 'center' },
+  badge:     { position: 'absolute', top: 1, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
                backgroundColor: '#fff', borderWidth: 1.5, borderColor: EVENT_INK, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: EVENT_INK },
 })
