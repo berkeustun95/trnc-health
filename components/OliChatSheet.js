@@ -224,7 +224,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
 
         {history === 'error' && (
           // A history that would not load never blocks the chat: Oli still answers, the retry is here.
-          <View style={s.historyErr}><ErrorState lang={lang} onRetry={loadHistory} /></View>
+          <View style={s.historyErr}><ErrorState lang={lang} compact onRetry={loadHistory} /></View>
         )}
         {history === 'loading' ? (
           <View style={s.pad}><RowSkeleton count={4} /></View>
