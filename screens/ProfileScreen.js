@@ -43,6 +43,7 @@ import LegalScreen from './LegalScreen'
 import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS, ROUTE_MEDALS_LIVE } from '../constants/flags'
 import { OwnRouteBadges } from '../components/RouteBadges'
 import MyCheckins from '../components/checkins/MyCheckins'
+import MuseumPassport from '../components/MuseumPassport'
 import { PRESET_AVATARS } from '../constants/avatars'
 import Avatar, { prefetchAvatars, invalidateAvatar } from '../components/Avatar'
 import BackButton from '../components/BackButton'
@@ -1320,6 +1321,12 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           {CHECKINS && (
             <MyCheckins session={session} lang={lang} sectionStyle={s.marketingSection}
               titleStyle={s.sectionTitle} rowStyle={s.marketingRow} labelStyle={s.marketingLabel} hintStyle={s.fieldHint} />
+          )}
+
+          {/* Müze Pasaportu: stamps come from the check-ins above, so it lives under the same gate. */}
+          {CHECKINS && (
+            <MuseumPassport session={session} lang={lang} sectionStyle={s.marketingSection}
+              titleStyle={s.sectionTitle} hintStyle={s.fieldHint} />
           )}
 
           {MODULE_FLAGS.studentHub && (
