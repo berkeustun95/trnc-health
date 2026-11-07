@@ -45,6 +45,9 @@ import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE } from '../constants/flags'
 import { useRouteMedal } from '../utils/routeMedals'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
+import { EventVenueMarker, EventStrip, EVENT_INK } from '../components/MapEvents'
+import { eventsInRange, venueGroups, MAP_EVENT_RANGES, DEFAULT_EVENT_RANGE } from '../constants/mapEvents'
+import { maybeListedFilter } from '../utils/eventVisibility'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 import OsmAttribution from '../components/OsmAttribution'
 import { EateryLogo, PlaceholderTag } from '../components/EateryBits'
@@ -166,7 +169,8 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, lang }) {
+function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, lang }) {
+  const layerMode = routesMode || eventsMode
   return (
     <ScrollView
       horizontal
@@ -182,7 +186,7 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
         lang={lang}
         multi
         options={sources.map(src => ({ value: src.key, label: t(src.labelKey, lang), count: src.pins.length, color: src.color }))}
-        values={routesMode ? [] : [...selectedKeys]}
+        values={layerMode ? [] : [...selectedKeys]}
         onChange={onSetKeys}
         style={{ marginRight: 8 }}
       />
@@ -191,10 +195,23 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
         <Chip
           label={t('ovFilter', lang)}
           ionicon={GROUP_META.heritage.icon}
-          active={!routesMode && officialOnly}
+          active={!layerMode && officialOnly}
           color={GROUP_META.heritage.colorToken.text}
           colorBg={GROUP_META.heritage.colorToken.bg}
           onPress={onOfficial}
+        />
+      )}
+      {/* Events: a MODE like routes — venue markers replace the pins (2026-11-07). Before Yürüyüş:
+          this week's events are the freshest thing on the map. */}
+      {showEvents && (
+        <Chip
+          label={t('menuEvents', lang)}
+          ionicon="calendar"
+          count={eventsCount}
+          active={eventsMode}
+          color={EVENT_INK}
+          colorBg="#F1EAFB"
+          onPress={onEvents}
         />
       )}
       {/* A MODE, not a filter: routes replace the pins while it is on, and any other chip
@@ -214,7 +231,7 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
         <Chip
           label={t('openNow', lang)}
           icon="clock"
-          active={!routesMode && openNow}
+          active={!layerMode && openNow}
           color={colors.success}
           colorBg={colors.successLight}
           onPress={onOpenNow}
@@ -394,6 +411,9 @@ export default function ExploreMapScreen({
   // Route medals (ROUTE_MEDALS_LIVE): who is walking, and the guest sign-in gate.
   session = null,
   onRequireAccount,
+  // Opens EventDetailScreen (App.js openEventFromMap). Events mode exists only when it is passed.
+  onSelectEvent,
+  initialEventsMode = false,   // the Explore landing's "Bu hafta" opens straight into events
   initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
   underTabBar = false,         // Keşfet tab (redesign): the floating tab bar covers the bottom of the map
   dutyWindows = null,          // today's duty windows by facility id (App, dutyWindowsFor): on duty = open
@@ -434,6 +454,10 @@ export default function ExploreMapScreen({
   const [legRows, setLegRows]             = useState([])
   const [routesError, setRoutesError]     = useState(false)
   const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? initialRoutesMode)
+  const [eventsMode, setEventsMode]       = useState(snap?.eventsMode ?? initialEventsMode)
+  const [eventRange, setEventRange]       = useState(snap?.eventRange ?? DEFAULT_EVENT_RANGE)
+  const [eventVenue, setEventVenue]       = useState(null)
+  const [eventRows, setEventRows]         = useState([])
   const [selectedRoute, setSelectedRoute] = useState(null)
   // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
   const [walk, setWalk] = useState(null)
@@ -585,6 +609,31 @@ export default function ExploreMapScreen({
   )
   const showRoutesChip = routesOn && (routeRows.length > 0 || routesError)
 
+  // Events: same columns as EventsScreen's list (EventDetailScreen gets the row it expects), listed
+  // events only. A failed read draws no chip; the rest of the map is untouched.
+  useEffect(() => {
+    if (!onSelectEvent) return
+    let active = true
+    supabase.from('events')
+      .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
+      .eq('status', 'approved')
+      .or(maybeListedFilter(new Date()))
+      .not('latitude', 'is', null)
+      .order('start_date', { ascending: true })
+      .then(({ data, error }) => { if (active && !error) setEventRows(data ?? []) })
+    return () => { active = false }
+  }, [!!onSelectEvent])
+  const eventCounts = useMemo(() => {
+    const now = new Date()
+    return Object.fromEntries(MAP_EVENT_RANGES.map(r => [r.key, eventsInRange(eventRows, r.key, now).length]))
+  }, [eventRows])
+  const rangedEvents = useMemo(() => eventsInRange(eventRows, eventRange), [eventRows, eventRange])
+  const eventVenues  = useMemo(() => venueGroups(rangedEvents), [rangedEvents])
+  const stripEvents  = useMemo(
+    () => (eventVenue ? eventVenues.find(v => v.key === eventVenue)?.events ?? [] : rangedEvents),
+    [eventVenue, eventVenues, rangedEvents]
+  )
+
   // Restore, NOT open: openRoute() would fitTo and fight the restored camera.
   useEffect(() => {
     const id = pendingRouteId.current
@@ -670,12 +719,33 @@ export default function ExploreMapScreen({
   }, [height])
 
   const enterRoutes = useCallback(() => {
+    setEventsMode(false)
+    setEventVenue(null)
     setSelected(null)
     setSelectedRoute(null)
     setRoutesMode(true)
     fitTo(routes.flatMap(fitRoute), 0.3)
   }, [routes, fitTo])
-  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null); setWalk(null) }, [])
+  const enterEvents = useCallback(() => {
+    setSelected(null)
+    setRoutesMode(false)
+    setSelectedRoute(null)
+    setWalk(null)
+    setEventVenue(null)
+    setEventsMode(true)
+  }, [])
+  // Frame the window's venues on entry and on every window change — not on a return from an event
+  // page (the restored camera wins). One venue: a street-level view, not fitToCoordinates' max zoom.
+  const skipEventFit = useRef(!!snap?.eventsMode)
+  useEffect(() => {
+    if (!eventsMode) return
+    if (skipEventFit.current) { if (eventVenues.length) skipEventFit.current = false; return }
+    const pts = eventVenues.map(v => ({ latitude: v.latitude, longitude: v.longitude }))
+    if (pts.length === 1) {
+      mapRef.current?.animateToRegion({ ...pts[0], latitudeDelta: 0.05, longitudeDelta: 0.05 }, 400)
+    } else fitTo(pts, 0.35)
+  }, [eventsMode, eventRange, eventVenues.length])
+  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null); setWalk(null); setEventsMode(false); setEventVenue(null) }, [])
 
   const startWalk = useCallback(() => {
     if (!selectedRoute) return
@@ -735,12 +805,12 @@ export default function ExploreMapScreen({
   // Every handoff off this map goes through here, so every one of them comes back to it.
   const handOff = useCallback((go, pinId = null) => {
     returnSnapshot = {
-      region, selectedKeys: [...selectedKeys], openNow, officialOnly, routesMode,
+      region, selectedKeys: [...selectedKeys], openNow, officialOnly, routesMode, eventsMode, eventRange,
       routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
       walkNext: walk ? walk.next : null, follow,
     }
     go()
-  }, [region, selectedKeys, openNow, officialOnly, routesMode, selectedRoute, walk, follow])
+  }, [region, selectedKeys, openNow, officialOnly, routesMode, eventsMode, eventRange, selectedRoute, walk, follow])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -830,7 +900,7 @@ export default function ExploreMapScreen({
         onPanDrag={() => { userMoved.current = true; if (walking && follow) setFollow(false) }}
         onRegionChangeComplete={setRegion}
         mapPadding={{ top: 0, right: 0, left: 0, bottom: mapBottom }}
-        onPress={() => setSelected(null)}
+        onPress={() => { setSelected(null); setEventVenue(null) }}
       >
         {routesMode && (
           <RouteOverlay
@@ -846,7 +916,10 @@ export default function ExploreMapScreen({
           />
         )}
         {/* Not EEMD sites: hidden while "Müze & Ören Yeri" is on (Open now leaves them, a modifier). */}
-        {!routesMode && GOOGLE_LAYER && !(officialOnly && canOfficial) && googlePins.map(g => (
+        {eventsMode && eventVenues.map(v => (
+          <EventVenueMarker key={`ev:${v.key}`} venue={v} active={v.key === eventVenue} onPress={vv => setEventVenue(vv.key)} />
+        ))}
+        {!routesMode && !eventsMode && GOOGLE_LAYER && !(officialOnly && canOfficial) && googlePins.map(g => (
           <Marker
             key={`g:${g.google_place_id}`}
             coordinate={{ latitude: g.latitude, longitude: g.longitude }}
@@ -855,7 +928,7 @@ export default function ExploreMapScreen({
             onPress={e => { e.stopPropagation(); setSelected(null); setGooglePlace({ id: g.google_place_id }) }}
           />
         ))}
-        {!routesMode && clusters.map(c => {
+        {!routesMode && !eventsMode && clusters.map(c => {
           if (c.properties.cluster) {
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
           }
@@ -893,6 +966,10 @@ export default function ExploreMapScreen({
         showRoutes={showRoutesChip}
         routesMode={routesMode}
         onRoutes={() => (routesMode ? leaveRoutes() : enterRoutes())}
+        showEvents={eventRows.length > 0}
+        eventsMode={eventsMode}
+        eventsCount={eventCounts[DEFAULT_EVENT_RANGE]}
+        onEvents={() => (eventsMode ? leaveRoutes() : enterEvents())}
         lang={lang}
       />
 
@@ -945,6 +1022,20 @@ export default function ExploreMapScreen({
             onScrollY={y => { panelScrollY.current = y }}
           />
         : <RoutePicker routes={routes} lang={lang} error={routesError} onSelectRoute={openRoute} bottom={panelBottom} />
+      )}
+
+      {eventsMode && (
+        <EventStrip
+          bottom={panelBottom}
+          events={stripEvents}
+          counts={eventCounts}
+          range={eventRange}
+          onRange={k => { setEventVenue(null); setEventRange(k) }}
+          venueKey={eventVenue}
+          onClearVenue={() => setEventVenue(null)}
+          onOpen={e => handOff(() => onSelectEvent?.(e))}
+          lang={lang}
+        />
       )}
 
       {loading && (

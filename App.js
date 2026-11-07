@@ -575,6 +575,8 @@ export default function App() {
   // Home's "Yürüyüş Rotaları" tile opens the Keşfet tab straight into routes mode. Cleared
   // whenever the tab bar is used, so a later plain visit opens the map as usual.
   const [mapRoutesMode, setMapRoutesMode] = useState(false)
+  // Same for events mode (the Explore landing's "Bu hafta" section), cleared with it.
+  const [mapEventsMode, setMapEventsMode] = useState(false)
   // City welcome: the pending decision, plus the region each deep-linked screen
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
@@ -2740,10 +2742,14 @@ export default function App() {
                 onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
                 // EATERY re-checked at the render site; eateryFromMap makes back return here in one press.
                 onSelectEatery={row => { setShowEatery(true); setEateryOpenSlug(row.slug); setEateryFromMap(true) }}
+                // The row the map already holds (EventsScreen's columns); eventFromHome makes back
+                // close Etkinlikler and land on the map again, as it lands on Home from the strip.
+                onSelectEvent={MODULE_FLAGS.events ? row => { setOpenedEvent(row); setEventFromHome(true); setShowEvents(true) } : undefined}
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}
                 initialRoutesMode={mapRoutesMode}
+                initialEventsMode={mapEventsMode}
               />
               </BLErrorBoundary>
             ) : (
@@ -2792,9 +2798,10 @@ export default function App() {
             if (!REDESIGN && tab === 'profile' && requireAccount('gateProfile')) return
             // Leaving Profile with unsaved edits asks first — the same guard as its back button.
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
-              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setActiveTab(tab) }); return
+              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setMapEventsMode(false); setActiveTab(tab) }); return
             }
             setMapRoutesMode(false)
+            setMapEventsMode(false)
             setActiveTab(tab)
           }
           return REDESIGN

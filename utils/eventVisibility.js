@@ -117,3 +117,42 @@ export function startsSoon(event, now, soonHours) {
   const delta = new Date(event?.start_date).getTime() - now.getTime()
   return delta >= 0 && delta <= soonHours * H
 }
+
+export const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+const endOfDay   = d => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x }
+const addDays    = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
+
+// Every window is anchored at today 00:00 rather than `now`; matchesDate counts an event in a
+// window while it is LISTED inside it (eventOverlaps), so a running event matches too.
+// Shared by Etkinlikler and the Keşfet map's events mode (2026-11-07), so their windows cannot drift.
+export function dateRange(key, pickedDate, now = new Date()) {
+  const today = startOfDay(now)
+  const dow = today.getDay() // 0 = Sunday, 6 = Saturday
+
+  switch (key) {
+    case 'today':
+      return { from: today, to: endOfDay(today) }
+
+    // If we are already inside the weekend, this is the REMAINDER of it — on a
+    // Sunday that means Sunday alone, never spilling into Monday. Otherwise it
+    // is the next Sat + Sun.
+    case 'weekend':
+      if (dow === 6) return { from: today, to: endOfDay(addDays(today, 1)) }
+      if (dow === 0) return { from: today, to: endOfDay(today) }
+      return { from: addDays(today, 6 - dow), to: endOfDay(addDays(today, 7 - dow)) }
+
+    // Monday-start week (TR convention), so it runs to the upcoming Sunday and
+    // is a strict superset of 'weekend'.
+    case 'week':
+      return { from: today, to: endOfDay(addDays(today, dow === 0 ? 0 : 7 - dow)) }
+
+    case 'month':
+      return { from: today, to: endOfDay(new Date(today.getFullYear(), today.getMonth() + 1, 0)) }
+
+    case 'picked':
+      return pickedDate ? { from: startOfDay(pickedDate), to: endOfDay(pickedDate) } : null
+
+    default:
+      return null
+  }
+}
