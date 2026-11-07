@@ -240,3 +240,110 @@ export function resolveOliQuery(text, { limit = 3, intents = OLI_INTENTS } = {})
   }
   return matches
 }
+
+// Place types for a typed "near me" in the chat ("plaj yakınımda" → beaches only). Read ONLY when the question
+// also hits a nearby keyword; with no type it stays "every place near you". Specific types come before the
+// groups, and every hit counts ("müze ve kale yakınımda" → both). cats are places.category (constants/
+// exploreCategories.js); eatery are eatery_partners.category, which have coordinates too. Short stems
+// (<=4 chars) match whole words only, so their Turkish/Russian suffixed forms are listed out.
+export const OLI_PLACE_TYPES = [
+  { id: 'beach', cats: ['beach'], labelKey: 'blFilterBeaches',
+    keywords: ['beach', 'beaches', 'sea', 'plaj', 'plaja', 'plajda', 'plajlar', 'plaji', 'kumsal', 'sahil', 'deniz',
+      'пляж', 'пляжи', 'пляжа', 'пляже', 'пляжей', 'море', 'strand', 'meer', 'plage', 'mer', 'playa', 'mar',
+      'شاطئ', 'الشاطئ', 'شواطئ', 'بحر', 'ساحل', 'دریا', 'παραλια', 'παραλιες', 'θαλασσα'] },
+  { id: 'nature_scenic', cats: ['nature_scenic'], labelKey: 'blCatNatureScenic',
+    keywords: ['nature', 'park', 'parks', 'viewpoint', 'scenic', 'hiking', 'picnic', 'doga', 'manzara', 'seyir', 'piknik',
+      'природа', 'парк', 'парки', 'natur', 'aussicht', 'wandern', 'parc', 'randonnee', 'naturaleza', 'parque', 'mirador',
+      'senderismo', 'طبيعة', 'حديقة', 'طبیعت', 'پارک', 'φυση', 'παρκο', 'πεζοπορια'] },
+  { id: 'castle_fortress', cats: ['castle_fortress'], labelKey: 'blCatCastleFortress',
+    keywords: ['castle', 'castles', 'fortress', 'fort', 'kale', 'kaleye', 'kalede', 'kaleler', 'kalesi',
+      'замок', 'замки', 'крепость', 'burg', 'burgen', 'festung', 'schloss', 'chateau', 'forteresse', 'castillo',
+      'fortaleza', 'قلعة', 'القلعة', 'قلعه', 'καστρο', 'καστρα', 'φρουριο'] },
+  { id: 'ancient_ruins', cats: ['ancient_ruins'], labelKey: 'blCatAncientRuins',
+    keywords: ['ruins', 'ruin', 'ancient', 'archaeological', 'oren', 'harabe', 'antik', 'руины', 'развалины', 'античн',
+      'ruine', 'ruinen', 'antike', 'ausgrabung', 'ruines', 'antique', 'archeolog', 'ruinas', 'antiguo', 'arqueolog',
+      'آثار', 'أطلال', 'خرابه', 'باستانی', 'αρχαια', 'ερειπια'] },
+  { id: 'museum', cats: ['museum'], labelKey: 'blCatMuseum',
+    keywords: ['museum', 'museums', 'muze', 'muzeye', 'muzede', 'muzeler', 'muzesi', 'музей', 'музея', 'музеев',
+      'museen', 'musee', 'museo', 'متحف', 'المتحف', 'متاحف', 'موزه', 'μουσειο', 'μουσεια'] },
+  { id: 'religious_site', cats: ['religious_site'], labelKey: 'blCatReligiousSite',
+    keywords: ['mosque', 'mosques', 'church', 'churches', 'monastery', 'temple', 'cami', 'camii', 'camiye', 'camide',
+      'camiler', 'kilise', 'manastir', 'мечеть', 'мечети', 'церковь', 'церкви', 'храм', 'монастырь', 'moschee',
+      'kirche', 'kirchen', 'kloster', 'mosquee', 'eglise', 'monastere', 'mezquita', 'iglesia', 'monasterio',
+      'مسجد', 'جامع', 'كنيسة', 'دير', 'کلیسا', 'τζαμι', 'εκκλησια', 'μοναστηρι'] },
+  { id: 'monument', cats: ['monument'], labelKey: 'blCatMonument',
+    keywords: ['monument', 'monuments', 'memorial', 'statue', 'anit', 'aniti', 'anitlar', 'heykel', 'памятник',
+      'монумент', 'denkmal', 'monumento', 'نصب', 'تمثال', 'یادبود', 'مجسمه', 'μνημειο', 'αγαλμα'] },
+  { id: 'cafe', cats: ['cafe'], eatery: ['cafe'], labelKey: 'exploreCatCafe',
+    keywords: ['cafe', 'cafes', 'coffee', 'kafe', 'kafeye', 'kafede', 'kafeler', 'kahve', 'kahveci', 'кафе', 'кофейня',
+      'кофе', 'kaffee', 'cafeteria', 'مقهى', 'قهوة', 'كافيه', 'کافه', 'قهوه', 'καφε', 'καφετερια'] },
+  { id: 'restaurant', cats: ['restaurant'], eatery: ['restaurant', 'fast_food'], labelKey: 'exploreCatRestaurant',
+    keywords: ['restaurant', 'restaurants', 'restoran', 'lokanta', 'ресторан', 'рестораны', 'restaurante',
+      'مطعم', 'مطاعم', 'رستوران', 'εστιατοριο'] },
+  { id: 'bakery', cats: ['bakery'], eatery: ['bakery', 'dessert'], labelKey: 'exploreCatBakery',
+    keywords: ['bakery', 'bakeries', 'bread', 'firin', 'firinci', 'pastane', 'пекарня', 'булочная', 'backerei',
+      'boulangerie', 'panaderia', 'مخبز', 'مخابز', 'نانوایی', 'φουρνος', 'αρτοποιειο'] },
+  { id: 'gym', cats: ['gym'], labelKey: 'exploreCatGym',
+    keywords: ['gym', 'fitness', 'workout', 'spor salonu', 'спортзал', 'фитнес', 'тренажерн', 'fitnessstudio',
+      'salle de sport', 'gimnasio', 'صالة رياضية', 'جيم', 'باشگاه', 'γυμναστηριο'] },
+  { id: 'sports_facility', cats: ['sports_facility'], labelKey: 'exploreCatSportsFacility',
+    keywords: ['stadium', 'sports', 'tennis', 'spor tesisi', 'stadyum', 'hali saha', 'стадион', 'спорткомплекс',
+      'sportanlage', 'stadion', 'sportplatz', 'stade', 'complexe sportif', 'estadio', 'polideportivo', 'ملعب',
+      'ورزشگاه', 'γηπεδο'] },
+  { id: 'pool', cats: ['pool'], labelKey: 'exploreCatPool',
+    keywords: ['pool', 'pools', 'swimming', 'havuz', 'yuzme', 'бассейн', 'schwimmbad', 'freibad', 'piscine', 'piscina',
+      'مسبح', 'استخر', 'πισινα'] },
+  { id: 'barber', cats: ['barber'], labelKey: 'exploreCatBarber',
+    keywords: ['barber', 'barbershop', 'haircut', 'berber', 'kuafor', 'барбершоп', 'парикмахерская', 'friseur',
+      'barbier', 'coiffeur', 'barberia', 'peluqueria', 'حلاق', 'آرایشگاه', 'κουρειο'] },
+  { id: 'laundry', cats: ['laundry'], labelKey: 'exploreCatLaundry',
+    keywords: ['laundry', 'laundromat', 'dry cleaning', 'camasirhane', 'kuru temizleme', 'прачечная', 'химчистка',
+      'wascherei', 'waschsalon', 'laverie', 'pressing', 'lavanderia', 'مغسلة', 'خشکشویی', 'لباسشویی', 'πλυντηριο'] },
+  { id: 'print_shop', cats: ['print_shop'], labelKey: 'exploreCatPrintShop',
+    keywords: ['print', 'printing', 'photocopy', 'copy shop', 'fotokopi', 'baski', 'matbaa', 'kirtasiye', 'печать',
+      'копицентр', 'типография', 'druckerei', 'copyshop', 'imprimerie', 'photocopie', 'imprenta', 'fotocopia',
+      'مطبعة', 'طباعة', 'چاپخانه', 'کپی', 'τυπογραφειο', 'φωτοτυπ'] },
+  // Groups: only when no specific type matched.
+  { id: 'heritage', group: true, cats: ['castle_fortress', 'ancient_ruins', 'museum', 'religious_site', 'monument'],
+    labelKey: 'exploreGroupHeritage',
+    keywords: ['historic', 'historical', 'history', 'heritage', 'sightseeing', 'landmark', 'landmarks', 'tarihi', 'tarih',
+      'gezilecek', 'исторические', 'история', 'достопримечательност', 'historisch', 'geschichte', 'sehenswurdigkeit',
+      'historique', 'patrimoine', 'historico', 'patrimonio', 'تاريخي', 'معالم', 'تاریخی', 'ιστορικ', 'αξιοθεατα'] },
+  { id: 'eat_drink', group: true, cats: ['cafe', 'restaurant', 'bakery'],
+    eatery: ['cafe', 'restaurant', 'fast_food', 'bakery', 'dessert'], labelKey: 'exploreGroupEatDrink',
+    keywords: ['food', 'eat', 'eating', 'yemek', 'yeme icme', 'yiyecek', 'еда', 'поесть', 'essen', 'manger', 'comida',
+      'comer', 'طعام', 'أكل', 'غذا', 'φαγητο'] },
+  { id: 'active', group: true, cats: ['gym', 'sports_facility', 'pool'], labelKey: 'exploreGroupActive',
+    keywords: ['sport', 'spor', 'спорт', 'deporte', 'رياضة', 'ورزش', 'αθλητισμος'] },
+]
+const PLACE_TYPE_BY_ID = OLI_PLACE_TYPES.reduce((m, p) => { m[p.id] = p; return m }, {})
+export const getPlaceType = (id) => PLACE_TYPE_BY_ID[id]
+const NEARBY = OLI_CHAT_INTENTS.find(i => i.id === 'nearby')
+
+// "plaj yakınımda" → ['beach']; [] when the text asks for no type, or does not say "near me" at all.
+export function nearbyPlaceTypes(text) {
+  const q = stripWakeWord(normalize(text))
+  if (!q) return []
+  const words = q.split(' ').filter(Boolean)
+  if (!asksNearby(q, words)) return []
+  const hits = OLI_PLACE_TYPES.filter(p => !p.group && p.keywords.some(kw => keywordHits(kw, q, words)))
+  if (hits.length) return hits.map(p => p.id)
+  const group = OLI_PLACE_TYPES.find(p => p.group && p.keywords.some(kw => keywordHits(kw, q, words)))
+  return group ? [group.id] : []
+}
+
+// A "near me" question is about places: "yakınımda ne var" is not "what's on" (events: 'ne var'), and English
+// "what is near me" is not Turkish "iş" (jobs: 'is'). Only those generic words step aside, so "eczane yakınımda"
+// still answers with the duty pharmacies.
+const NEAR_ME_GENERIC = new Set(['ne var', 'neler var', 'is'])
+const OLI_CHAT_NEAR_INTENTS = OLI_CHAT_INTENTS.map(i => ({ ...i, keywords: i.keywords.filter(k => !NEAR_ME_GENERIC.has(k)) }))
+const asksNearby = (q, words) => NEARBY.keywords.some(kw => keywordHits(kw, q, words))
+
+// The chat's resolver: the best intent, and the place types for a nearby answer.
+export function resolveOliChat(text) {
+  const q = stripWakeWord(normalize(text))
+  const words = q.split(' ').filter(Boolean)
+  if (!q || !asksNearby(q, words)) return { intent: resolveOliQuery(text, { limit: 1, intents: OLI_CHAT_INTENTS })[0], types: [] }
+  const types = nearbyPlaceTypes(text)
+  return { intent: types.length ? NEARBY : resolveOliQuery(text, { limit: 1, intents: OLI_CHAT_NEAR_INTENTS })[0], types }
+}

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { resolveOliQuery, getIntent, OLI_CHAT_INTENTS } from '../constants/oliIntents'
+import { resolveOliChat, getIntent, getPlaceType } from '../constants/oliIntents'
 import { maybeListedFilter, isEventOver } from './eventVisibility'
 import { loadEateryPartners } from './loadEateryPartners'
 import { coarseCoord, haversineKm } from './facilityUtils'
@@ -13,12 +13,13 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 //   { id, answer({ text, intentId, lang, userLocation, now }) → Promise<OliAnswer> }
 // and OliAnswer is what oli_messages.payload stores (20261163), so history renders the same whichever provider
 // wrote it:
-//   { v: 1, kind, intent, items: [{ t, s, a }], day }
+//   { v: 1, kind, intent, items: [{ t, s, a }], day, types? }
 //     kind    pharmacy | events | nearby | needLocation | eatery | route | search | noMatch | error
 //     intent  the matched intent id (constants/oliIntents.js), or null
 //     items   rows shown under the answer: t title, s subtitle, a action
 //             ({ nav: <oliNavigate target> } | { result: <search_content row> } | { event: <id> })
 //     day     the local date the rows were read (history shows older answers under their own date)
+//     types   nearby only, when the question named a place type: OLI_PLACE_TYPES ids ("plaj yakınımda" → ['beach'])
 // The sheet turns kind + intent into words with t(), in the language of the moment. A future AI provider (cloud
 // or on-phone) implements answer() with the same return shape; nothing else changes.
 //
@@ -29,8 +30,10 @@ export const ANSWER_VERSION = 1
 const MAX_ITEMS = 6
 const NEARBY_KM = 25
 
-const answerOf = (kind, intent = null, items = [], now = new Date()) =>
-  ({ v: ANSWER_VERSION, kind, intent, items, day: localDateKey(now) })
+const answerOf = (kind, intent = null, items = [], now = new Date(), types = []) =>
+  ({ v: ANSWER_VERSION, kind, intent, items, day: localDateKey(now), ...(types.length ? { types } : {}) })
+
+const distLabel = km => (km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`)
 
 function whenLabel(iso, lang) {
   const d = new Date(iso)
@@ -86,23 +89,37 @@ const placeName = (p, lang) => {
   return p.name ?? ''
 }
 
-async function placesNear(loc, lang) {
-  const { data, error } = await supabase.from('places')
+// With types, only those categories: places of those categories, plus eatery partners for the food types (they
+// carry coordinates; places has no cafés yet). Without types, every place, as before.
+async function placesNear(loc, lang, typeIds = []) {
+  const types = typeIds.map(getPlaceType).filter(Boolean)
+  const cats = types.flatMap(p => p.cats)
+  const eateryCats = types.flatMap(p => p.eatery ?? [])
+  let q = supabase.from('places')
     .select('id, category, name, name_i18n, region, latitude, longitude')
     .eq('status', 'active')
     .not('latitude', 'is', null)
-    .limit(1000)
+  if (cats.length) q = q.in('category', cats)
+  const [{ data, error }, partners] = await Promise.all([
+    q.limit(1000),
+    eateryCats.length ? loadEateryPartners('id, slug, name, category, lat, lng') : { rows: [], error: null },
+  ])
   if (error) throw error
-  return (data ?? [])
-    .map(p => ({ p, km: haversineKm(loc.latitude, loc.longitude, p.latitude, p.longitude) }))
+  if (partners.error) throw partners.error
+  const near = [
+    ...(data ?? []).map(p => ({
+      km: haversineKm(loc.latitude, loc.longitude, p.latitude, p.longitude),
+      title: placeName(p, lang),
+      a: { result: { module: p.category === 'beach' ? 'beach' : 'landmark', id: p.id } },
+    })),
+    ...partners.rows.filter(r => eateryCats.includes(r.category) && Number.isFinite(r.lat) && Number.isFinite(r.lng))
+      .map(r => ({ km: haversineKm(loc.latitude, loc.longitude, r.lat, r.lng), title: r.name, a: { nav: 'eatery' } })),
+  ]
+  return near
     .filter(x => Number.isFinite(x.km) && x.km <= NEARBY_KM)
     .sort((a, b) => a.km - b.km)
     .slice(0, MAX_ITEMS)
-    .map(({ p, km }) => ({
-      t: placeName(p, lang),
-      s: `${km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`}`,
-      a: { result: { module: p.category === 'beach' ? 'beach' : 'landmark', id: p.id } },
-    }))
+    .map(({ km, title, a }) => ({ t: title, s: distLabel(km), a }))
 }
 
 async function eateryPartners(lang) {
@@ -130,7 +147,7 @@ async function searchAda(text, loc) {
 export const guidedProvider = {
   id: 'guided',
   async answer({ text = '', intentId = null, lang, userLocation = null, now = new Date() }) {
-    const intent = intentId ? getIntent(intentId) : resolveOliQuery(text, { limit: 1, intents: OLI_CHAT_INTENTS })[0]
+    const { intent, types } = intentId ? { intent: getIntent(intentId), types: [] } : resolveOliChat(text)
     try {
       switch (intent?.id) {
         case 'pharmacy': return answerOf('pharmacy', 'pharmacy', await dutyToday(now), now)
@@ -138,7 +155,7 @@ export const guidedProvider = {
         case 'eatery':   return answerOf('eatery', 'eatery', await eateryPartners(lang), now)
         case 'nearby':
           if (!userLocation) return answerOf('needLocation', 'nearby', [], now)
-          return answerOf('nearby', 'nearby', await placesNear(userLocation, lang), now)
+          return answerOf('nearby', 'nearby', await placesNear(userLocation, lang, types), now, types)
         case undefined: break
         default:         return answerOf('route', intent.id, [], now)
       }
