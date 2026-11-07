@@ -24,6 +24,10 @@ const REQUIRED = [
   ['eatery_partners', 'brand_color', '20261157_eatery_order_website.sql'],
   ['eatery_menu_items', 'adult_only', '20261157_eatery_order_website.sql'],
   ['eatery_menu_items', 'partner_item_id', '20261159_eatery_menu_items_partner_item_id.sql'],
+  // 20261165 — Araçlar (screens/CarsScreen.js VEHICLE_COLS, constants/cars.js): the tables are new, one column each
+  ['vehicles', 'price_per_day', '20261165_vehicles.sql'],
+  ['dealers', 'logo_path', '20261165_vehicles.sql'],
+  ['vehicle_images', 'storage_path', '20261165_vehicles.sql'],
 ]
 const PROD_REF = 'jeihxnwqytnxtytgkzgf'
 

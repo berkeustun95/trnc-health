@@ -62,11 +62,18 @@ import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
 import { AD_SPONSORED_KEY } from '../constants/ads.js'
 import { PET_PARTNERS, PENDING_KEYS as PET_PENDING_KEYS, petPartnerSections } from '../constants/petPartners.js'
 import { REGULATORY_KEYS as PETS_REGULATORY_KEYS, REGULATORY_LOCALES } from '../constants/petsContent.js'
+import { FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // The surfaces this guard covers. Adding a file here widens the scope deliberately.
 const SURFACES = [
+  // Araçlar (S2, 2026-11-07): guarded while MODULE_FLAGS.cars is still false, before the flip. The enum labels
+  // reach the screens through label-key maps and are pulled in from constants/cars.js under viaVariable.
+  'screens/CarsScreen.js',
+  'screens/CarDetailScreen.js',
+  'screens/DealerScreen.js',
+  'components/cars/VehicleCard.js',
   // ⚠ ADDED 2026-09-20 WITH THE CAROUSEL REBUILD, IN THE SAME COMMIT — not after.
   //   Same argument as ProfileSetupScreen below: that is the only screen every user is
   //   FORCED through, and this is the other one. It is the FIRST screen of a fresh
@@ -357,6 +364,21 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // ─── Araçlar (cars), 2026-11-07: the same word in these languages ──────────────────
+  'carsFilterDistrict': { French: 'District is French (as ddDistrict)' },
+  'carsDescription': { French: 'Description is French' },
+  'carsFuelDiesel': { French: 'Diesel is the French word', German: 'Diesel is the German word' },
+  'carsFuelHybrid': { German: 'Hybrid is the German word' },
+  'carsFuelLpg': { Turkish: 'LPG is what Turkish says and writes' },
+  'carsGearManual': { Spanish: 'Manual is Spanish' },
+  'carsBodySedan': { Turkish: 'Sedan is the Turkish body-type name' },
+  'carsBodyHatchback': { Turkish: 'Hatchback is the Turkish body-type name (sahibinden, arabam)' },
+  'carsBodySuv': { Turkish: 'SUV is the body-type name used untranslated in this market', Greek: 'SUV is the body-type name used untranslated in this market', French: 'SUV is the body-type name used untranslated in this market', Spanish: 'SUV is the body-type name used untranslated in this market', German: 'SUV is the body-type name used untranslated in this market' },
+  'carsBodyCoupe': { Turkish: 'Coupe is the Turkish body-type name' },
+  'carsBodyMinivan': { Turkish: 'Minivan is the Turkish body-type name' },
+  'carsColourOrange': { French: 'Orange is French', German: 'Orange is German' },
+  'carsColourBeige': { French: 'Beige is French', Spanish: 'Beige is Spanish', German: 'Beige is German' },
+  'carsColourGold': { German: 'Gold is German' },
   // Ehliyet action labels: product names, shown untranslated in every locale.
   'ehliyetInstagram': { Turkish: 'Instagram is a brand name', Arabic: 'Instagram is a brand name', Russian: 'Instagram is a brand name', Greek: 'Instagram is a brand name', French: 'Instagram is a brand name', Spanish: 'Instagram is a brand name', German: 'Instagram is a brand name', Persian: 'Instagram is a brand name' },
   'ehliyetWhatsApp': { Turkish: 'WhatsApp is a brand name', Arabic: 'WhatsApp is a brand name', Russian: 'WhatsApp is a brand name', Greek: 'WhatsApp is a brand name', French: 'WhatsApp is a brand name', Spanish: 'WhatsApp is a brand name', German: 'WhatsApp is a brand name', Persian: 'WhatsApp is a brand name' },
@@ -655,6 +677,10 @@ const viaVariable = [
   // petsOtherNote) are bare strings in a NOTES_BY_COUNTRY array — not t('x'), not a *Key
   // field — so nothing else in this file can see them at all.
   ...PETS_REGULATORY_KEYS,
+  // Araçlar enum labels (fuel, gearbox, body, colour, steering, sale/rent/all), each a t(MAP[code]) lookup.
+  ...[FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY].flatMap(m => Object.values(m)),
+  // The result count goes through tCount (no literal t('…') to scan). _one/_other exist in every locale; ru's _few/_many have no English twin.
+  'carsResultCount_one', 'carsResultCount_other',
 ]
 
 const KEYS = [...new Set([...literal, ...viaVariable, ...SURFACE_PROP_KEYS])].filter(Boolean).sort()

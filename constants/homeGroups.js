@@ -13,7 +13,7 @@
 // A module that goes live loses its badge automatically.
 import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE, LIVE_SCORES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'
-import { EATERY } from './redesign'
+import { EATERY, CARS } from './redesign'
 
 // Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes
 // and live scores have no grid tile in V2 (so the pre-redesign ModuleGrid, which
@@ -43,6 +43,8 @@ const GATES = {
   hotels:        () => HOTELS_LIVE === true,
   // EATERY is EATERY_LIVE || dev || ADA Preview (constants/redesign.js): the tile shows there before the flag flips.
   eatery:        () => EATERY === true,
+  // CARS is MODULE_FLAGS.cars || dev || ADA Preview (constants/redesign.js). Not in COMING_SOON: production shows no tile.
+  cars:          () => CARS === true,
   liveScores:    () => LIVE_SCORES_LIVE === true,
   // eSIM is the face of Connectivity: while CONNECTIVITY_LIVE is false it only shows the
   // waitlist screen, and the brief says hidden connectivity must not show.
@@ -78,7 +80,7 @@ export const HOME_GROUPS = [
   { key: 'homeLife', titleKey: 'hrGroupHome',    ids: ['accommodation', 'homeServices', 'pets', 'insurance',
                                                         'studentHub' /* ★ */] },
   { key: 'city',     titleKey: 'hrGroupCity',    ids: ['transport', 'esim', 'municipal',
-                                                        'towing' /* ★ */, 'ehliyet', 'exchangeRates' /* ★ */,
+                                                        'towing' /* ★ */, 'ehliyet', 'cars', 'exchangeRates' /* ★ */,
                                                         'newcomerEssentials' /* ★ */, 'jobPostings'] },
 ]
 
