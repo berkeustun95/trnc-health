@@ -276,7 +276,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261160_pasatiempo_owner_data.sql', '867f7a7ef5fc302ef7aea920a2f85afedf86e211daff77fd62a6f4187619cc1c'),
   ('20261161_admin_user_counts.sql', 'd8da6f8bd352526c45d48be7478f853f8f5a7025f170d61be2313a6ad08900e9'),
   ('20261162_delete_script_guests.sql', 'cae86fa32f492ea65d99c539d6447262c920edf1af6a0999ae024da0bda15de9'),
-  ('20261163_oli_messages.sql', '1e18089fb93f1e3f021c82ee3f637da83c8dff4b74592b4ad4c67d4619aaa6dc')
+  ('20261163_oli_messages.sql', 'e608791a9ad77125b090e5dba67278c3e652e719ce51ccaed2294e5d029071e0')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

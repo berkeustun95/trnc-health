@@ -103,6 +103,12 @@ console.log('20261163 — real file')
   t('Alice is not limited by Bob\'s rows (positive control)', (await asRole(d, 'authenticated', ALICE, ins(ALICE, 'user', 'hi', null))).ok, true)
   await d.exec(`UPDATE public.oli_messages SET created_at = now() - interval '11 minutes' WHERE user_id = '${BOB}'`)
   t('once those rows are older than 10 minutes Bob may insert again', (await asRole(d, 'authenticated', BOB, ins(BOB, 'user', 'later', null))).ok, true)
+  // Daily cap: 400 rows in 24 hours, even when spread out so the 10-minute window never fills.
+  await d.exec(`INSERT INTO public.oli_messages (user_id, role, body, created_at)
+    SELECT '${ALICE}', 'user', 'old' || g, now() - interval '20 hours' + g * interval '1 second' FROM generate_series(1, 399) g`)
+  t('Alice at 400 rows in 24 h (none in the last 10 min but one) is refused', (await asRole(d, 'authenticated', ALICE, ins(ALICE, 'user', 'more', null))).msg, 'OLI_RATE_LIMIT')
+  await d.exec(`DELETE FROM public.oli_messages WHERE user_id = '${ALICE}' AND body LIKE 'old%'`)
+  t('…and allowed again below the daily cap (positive control)', (await asRole(d, 'authenticated', ALICE, ins(ALICE, 'user', 'more', null))).ok, true)
 
   t('authenticated cannot call the purge', (await asRole(d, 'authenticated', ALICE, 'SELECT public.purge_oli_messages()')).ok, false)
   await d.exec(`UPDATE public.oli_messages SET created_at = now() - interval '100 days' WHERE body = 'later'`)
@@ -140,6 +146,9 @@ await refused('purge callable by authenticated', mutant('exec',
   'REVOKE ALL ON FUNCTION public.purge_oli_messages() FROM PUBLIC, anon, authenticated;\nGRANT EXECUTE ON FUNCTION public.purge_oli_messages() TO authenticated;'))
 await refused('retention 9 days instead of 90', mutant('ret', "v_cut timestamptz := now() - interval '90 days';", "v_cut timestamptz := now() - interval '9 days';"))
 await refused('cron schedule changed', mutant('cron', "SELECT cron.schedule('purge-oli-messages', '57 3 * * *'", "SELECT cron.schedule('purge-oli-messages', '57 4 * * *'"))
+await refused('select policy ORs its terms (leaks every chat)', mutant('or',
+  'USING (user_id = (select auth.uid()) AND NOT (select public.is_anonymous_session()));\n\nDROP POLICY IF EXISTS "oli_insert_own"',
+  'USING (user_id = (select auth.uid()) OR NOT (select public.is_anonymous_session()));\n\nDROP POLICY IF EXISTS "oli_insert_own"'))
 await refused('rate-guard trigger removed', mutant('trg', 'CREATE TRIGGER oli_messages_rate_guard BEFORE INSERT', 'CREATE TRIGGER oli_messages_rate_guard AFTER INSERT'))
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')

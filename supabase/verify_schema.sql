@@ -5510,6 +5510,8 @@ WITH report AS (
     AND COALESCE((SELECT bool_and((coalesce(qual,'') || coalesce(with_check,'')) LIKE '%auth.uid()%'
                               AND (coalesce(qual,'') || coalesce(with_check,'')) LIKE '%is_anonymous_session()%')
                     FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE'), false)
+    AND COALESCE((SELECT NOT bool_or(upper(coalesce(qual,'') || ' ' || coalesce(with_check,'')) LIKE '% OR %')
+                    FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE'), false)
     AND COALESCE((SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE') = 3, false)
     AND COALESCE((SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'oli_messages') = 6, false)
     AND COALESCE((SELECT confdeltype = 'c' FROM pg_constraint WHERE conrelid = to_regclass('public.oli_messages') AND conname = 'oli_messages_user_id_fkey'), false)
@@ -5522,12 +5524,16 @@ WITH report AS (
     AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
                    WHERE a.attrelid = to_regclass('public.oli_messages') AND a.attnum > 0 AND NOT a.attisdropped
                      AND has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT')) = 'body,payload,role', false)
-  UNION ALL SELECT '20261163_oli_messages','purge_oli_messages + oli_messages_rate_guard: not client-callable; purge deletes created_at < now() - interval ''90 days''; guard refuses at 40 rows per 10 minutes; table comment states 90 days',
+  UNION ALL SELECT '20261163_oli_messages','purge_oli_messages + oli_messages_rate_guard: not client-callable; purge deletes created_at < now() - interval ''90 days''; guard locks per user and refuses at 40 rows per 10 minutes or 400 per 24 hours, as an ENABLED BEFORE INSERT trigger; table comment states 90 days',
     COALESCE((SELECT bool_and(NOT has_function_privilege('authenticated', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE'))
                 FROM unnest(ARRAY[to_regprocedure('public.purge_oli_messages()'), to_regprocedure('public.oli_messages_rate_guard()')]) f), false)
     AND COALESCE(pg_get_functiondef(to_regprocedure('public.purge_oli_messages()')) LIKE '%DELETE FROM public.oli_messages WHERE created_at < v_cut%'
          AND pg_get_functiondef(to_regprocedure('public.purge_oli_messages()')) LIKE '%v_cut timestamptz := now() - interval ''90 days''%', false)
-    AND COALESCE(pg_get_functiondef(to_regprocedure('public.oli_messages_rate_guard()')) LIKE '%interval ''10 minutes'') >= 40%', false)
+    AND COALESCE(pg_get_functiondef(to_regprocedure('public.oli_messages_rate_guard()')) LIKE '%interval ''10 minutes'') >= 40%'
+         AND pg_get_functiondef(to_regprocedure('public.oli_messages_rate_guard()')) LIKE '%interval ''24 hours'') >= 400%'
+         AND pg_get_functiondef(to_regprocedure('public.oli_messages_rate_guard()')) LIKE '%pg_advisory_xact_lock(%', false)
+    AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.oli_messages') AND NOT tgisinternal
+                    AND tgenabled <> 'D' AND pg_get_triggerdef(oid) LIKE '%BEFORE INSERT ON public.oli_messages FOR EACH ROW EXECUTE FUNCTION %oli_messages_rate_guard()%'), false)
     AND COALESCE(obj_description(to_regclass('public.oli_messages'), 'pg_class') LIKE '%90 days%', false)
   ) z
 

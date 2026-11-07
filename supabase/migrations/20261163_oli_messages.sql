@@ -31,10 +31,16 @@
 -- ─── ABUSE BOUND ────────────────────────────────────────────────────────────
 --   Anyone signed in can write into their OWN history, so without a bound one account could grow the table
 --   without limit. A BEFORE INSERT trigger refuses a row once the same user has 40 rows in the last 10
---   minutes (one exchange = 2 rows, so 20 questions in 10 minutes; a person tapping chips does not reach it).
---   It counts with the inserting role's own RLS view, which is exactly that user's rows (index below). The
---   app treats a refused insert as "not saved" and still shows the answer. body <= 500 chars, payload is a
---   JSON object <= 8000 bytes: the table CHECKs and the INSERT policy state the same bounds.
+--   minutes (one exchange = 2 rows, so 20 questions in 10 minutes; a person tapping chips does not reach it)
+--   or 400 rows in the last 24 hours. It first takes a per-user transaction advisory lock, so parallel
+--   requests from one account queue behind each other instead of each counting before the others commit
+--   (READ COMMITTED); different users never wait on each other. It counts with the inserting role's own RLS
+--   view, which is exactly that user's rows (index below). The app treats a refused insert as "not saved"
+--   and still shows the answer. Oli's answers are written by the client, so a user can put any JSON object
+--   into their own oli rows: it reaches only their own screen, and the app renders payload as data (known
+--   navigation targets only, no URLs). body <= 500 chars, payload is a
+--   JSON object <= 8000 bytes: the table CHECKs hold those bounds for every writer; the policies
+--   carry only "own rows AND not a guest", so the assertions below can refuse any OR in them.
 --
 -- Apply: gh workflow run supabase-migrate -f file=20261163_oli_messages.sql (dry), then -f apply=true
 -- (Berke approves production-db). Creates a table ⇒ ends with NOTIFY pgrst (after COMMIT and RESET ROLE).
@@ -87,9 +93,6 @@ CREATE POLICY "oli_insert_own" ON public.oli_messages
   WITH CHECK (
     user_id = (select auth.uid())
     AND NOT (select public.is_anonymous_session())
-    AND role IN ('user', 'oli')
-    AND (body IS NULL OR char_length(body) <= 500)
-    AND (payload IS NULL OR octet_length(payload::text) <= 8000)
   );
 
 DROP POLICY IF EXISTS "oli_delete_own" ON public.oli_messages;
@@ -102,15 +105,18 @@ CREATE POLICY "oli_no_update" ON public.oli_messages
   AS RESTRICTIVE FOR UPDATE TO public
   USING (false) WITH CHECK (false);
 
--- ─── Abuse bound: 40 rows per user per 10 minutes ───────────────────────────
+-- ─── Abuse bound: 40 rows per user per 10 minutes, 400 per 24 hours ─────────
 CREATE OR REPLACE FUNCTION public.oli_messages_rate_guard()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = public
 AS $function$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('oli_messages:' || NEW.user_id::text, 0));
   IF (SELECT count(*) FROM public.oli_messages
-       WHERE user_id = NEW.user_id AND created_at > now() - interval '10 minutes') >= 40 THEN
+       WHERE user_id = NEW.user_id AND created_at > now() - interval '10 minutes') >= 40
+     OR (SELECT count(*) FROM public.oli_messages
+       WHERE user_id = NEW.user_id AND created_at > now() - interval '24 hours') >= 400 THEN
     RAISE EXCEPTION 'OLI_RATE_LIMIT' USING ERRCODE = 'P0001';
   END IF;
   RETURN NEW;
@@ -214,10 +220,13 @@ BEGIN
   IF (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE') IS DISTINCT FROM 3 THEN
     RAISE EXCEPTION 'expected exactly 3 PERMISSIVE policies (select, insert, delete own): %', v_names;
   END IF;
-  -- Every permissive policy is scoped to the caller's own rows and excludes guests.
+  -- Every permissive policy is scoped to the caller's own rows and excludes guests, and joins its terms with AND
+  -- only: a policy that ORs them ("own rows OR not a guest") would leak every user's chat while still naming
+  -- both functions. Read from the rendered expressions, without depending on one major's exact rendering.
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE'
               AND ((coalesce(qual, '') || coalesce(with_check, '')) NOT LIKE '%auth.uid()%'
-                OR (coalesce(qual, '') || coalesce(with_check, '')) NOT LIKE '%is_anonymous_session()%')) THEN
+                OR (coalesce(qual, '') || coalesce(with_check, '')) NOT LIKE '%is_anonymous_session()%'
+                OR upper(coalesce(qual, '') || ' ' || coalesce(with_check, '')) LIKE '% OR %')) THEN
     RAISE EXCEPTION 'a permissive oli_messages policy is not own-rows + non-guest: %', v_names;
   END IF;
   RAISE NOTICE 'oli_messages policies (4): %', v_names;
@@ -261,6 +270,9 @@ BEGIN
 
   -- The trigger: exactly one user trigger on the table, BEFORE INSERT, calling the guard.
   SELECT count(*), string_agg(pg_get_triggerdef(oid), ' | ') INTO v_n, v_names FROM pg_trigger WHERE tgrelid = v_t AND NOT tgisinternal;
+  IF EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = v_t AND NOT tgisinternal AND tgenabled = 'D') THEN
+    RAISE EXCEPTION 'the oli_messages rate guard trigger is disabled';
+  END IF;
   IF v_n IS DISTINCT FROM 1 OR v_names NOT LIKE '%BEFORE INSERT ON public.oli_messages FOR EACH ROW EXECUTE FUNCTION %oli_messages_rate_guard()%' THEN
     RAISE EXCEPTION 'oli_messages triggers unexpected (% ): %', v_n, v_names;
   END IF;
@@ -292,7 +304,8 @@ BEGIN
     SELECT count(*) INTO v_old_left   FROM public.oli_messages WHERE id = v_old;
     SELECT count(*) INTO v_edge_left  FROM public.oli_messages WHERE id = v_edge;
     SELECT count(*) INTO v_fresh_left FROM public.oli_messages WHERE id = v_fresh;
-    RAISE NOTICE 'purge result %; 91-day row left=%, 89-day row left=%, fresh row left=%', v_res, v_old_left, v_edge_left, v_fresh_left;
+    -- v_res is not printed: on a re-run against a table holding real rows its 'deleted' would be a real-data count.
+    RAISE NOTICE 'purge probe: 91-day row left=%, 89-day row left=%, fresh row left=%', v_old_left, v_edge_left, v_fresh_left;
 
     DELETE FROM public.oli_messages WHERE id IN (v_old, v_edge, v_fresh);
 
@@ -316,7 +329,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261163_oli_messages.sql', '1e18089fb93f1e3f021c82ee3f637da83c8dff4b74592b4ad4c67d4619aaa6dc')
+VALUES ('20261163_oli_messages.sql', 'e608791a9ad77125b090e5dba67278c3e652e719ce51ccaed2294e5d029071e0')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
