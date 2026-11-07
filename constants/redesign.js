@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE } from './flags'
+import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE, OLI_CHAT_LIVE } from './flags'
 
 // The one switch every redesigned surface reads. On when:
 //   • REDESIGN_LIVE is flipped (go-live, both files in one commit — the flag guard), or
@@ -63,3 +63,9 @@ const NORTH_HOUSES_PREVIEW = true
 export const NORTH_HOUSES = NORTH_HOUSES_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_PREVIEW)
 const NORTH_HOUSES_FORM_PREVIEW = true
 export const NORTH_HOUSES_FORM = NORTH_HOUSES && (NORTH_HOUSES_FORM_LIVE || (IS_PREVIEW_BUILD && NORTH_HOUSES_FORM_PREVIEW))
+
+// Ask Oli guided chat before go-live: dev bundles and ADA Preview open the chat sheet; OLI_CHAT_LIVE stays off, so
+// production keeps the search sheet (preflight (c) keeps a production publish off the Preview config). Set
+// OLI_CHAT_PREVIEW to false if ADA Preview must go back to the search sheet.
+const OLI_CHAT_PREVIEW = true
+export const OLI_CHAT = OLI_CHAT_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && OLI_CHAT_PREVIEW)
