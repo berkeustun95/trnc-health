@@ -9528,7 +9528,7 @@ const translations = {
     nhAptM1Name: "Центральная полностью оборудованная квартира с 2 спальнями на улице Mehmet Akif",
     nhAptM1Desc: "Наша самая просторная квартира: премиальная 2+1 в здании Mine. Высокий уровень комфорта для семей и длительного проживания.",
     // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Барахолка",
+    menuMarketplace: "Лавка",
     mkSearch: "Поиск объявлений",
     mkClearSearch: "Очистить поиск",
     mkIntroTitle: "Покупайте и продавайте с рук",
