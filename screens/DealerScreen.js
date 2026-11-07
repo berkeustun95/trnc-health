@@ -9,7 +9,7 @@ import usePagedVehicles from '../utils/usePagedVehicles'
 import { colors, category as CAT, type, radii, elevation, listBottomPad } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { logContactEvent } from '../utils/logContactEvent'
-import { VEHICLE_COLS, telUrl, waUrl } from '../constants/cars'
+import { VEHICLE_COLS, telUrl, waUrl, contactRegion } from '../constants/cars'
 
 // A dealer (or rental company): who they are, how to reach them, then their cars — the same card
 // as the list. A car opened here stacks over this page (App.js carsStack), so back returns here.
@@ -22,7 +22,7 @@ const hostOf = url => String(url).replace(/^https?:\/\//, '').replace(/\/$/, '')
 function DealerHeader({ dealer, lang, total }) {
   const logo = photoUrl(dealer.logo_path)
   const place = placeLabel(dealer.region, dealer.area, lang)
-  const log = action => logContactEvent('cars', dealer.id, action, dealer.region)
+  const log = action => logContactEvent('cars', dealer.id, action, contactRegion(dealer.region))
   const actions = [
     dealer.phone && { kind: 'call', onPress: () => { log('call'); Linking.openURL(telUrl(dealer.phone)).catch(() => {}) },
       accessibilityLabel: `${t('call', lang)} ${dealer.phone}` },

@@ -10,7 +10,7 @@ import { colors, category as CAT, type, radii, elevation, TAP } from '../constan
 import { t } from '../constants/i18n'
 import { logContactEvent } from '../utils/logContactEvent'
 import {
-  BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY, sortedImages, carContact, telUrl, waUrl,
+  BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY, sortedImages, carContact, telUrl, waUrl, contactRegion,
 } from '../constants/cars'
 
 // One car. PropertyDetailRedesign's shape (photo gallery, white sheet over it, sticky contact bar)
@@ -113,8 +113,8 @@ export default function CarDetailScreen({ car, lang, onBack, onOpenDealer }) {
   const label = (map, code) => (map[code] ? t(map[code], lang) : code)
 
   // Logged on the line BEFORE the link (fire-and-forget, cannot throw): a metrics failure never costs the call.
-  const call = () => { logContactEvent('cars', car.id, 'call', car.region); Linking.openURL(telUrl(phone)).catch(() => {}) }
-  const openWhatsApp = () => { logContactEvent('cars', car.id, 'whatsapp', car.region); Linking.openURL(waUrl(whatsapp)).catch(() => {}) }
+  const call = () => { logContactEvent('cars', car.id, 'call', contactRegion(car.region)); Linking.openURL(telUrl(phone)).catch(() => {}) }
+  const openWhatsApp = () => { logContactEvent('cars', car.id, 'whatsapp', contactRegion(car.region)); Linking.openURL(waUrl(whatsapp)).catch(() => {}) }
   const actions = [
     phone && { kind: 'call', onPress: call, accessibilityLabel: `${t('call', lang)} ${phone}` },
     whatsapp && { kind: 'whatsapp', onPress: openWhatsApp },

@@ -112,6 +112,10 @@ export function carContact(car) {
   const d = car?.dealers
   return { phone: car?.contact_phone || d?.phone || null, whatsapp: car?.whatsapp || d?.whatsapp || null }
 }
+// contact_events.region has a CHECK on the seven REGIONS slugs; vehicles.region only a length CHECK.
+// Anything else goes as null, so an odd value can never get a tap row refused.
+const REGION_SLUGS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
+export const contactRegion = r => (REGION_SLUGS.includes(r) ? r : null)
 export const telUrl = phone => `tel:${phone}`
 export const waUrl = num => `https://wa.me/${String(num).replace(/\D/g, '')}`
 

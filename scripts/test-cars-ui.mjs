@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  priceOrFilter, fxComplete, tryPerUnit, carPrice, carContact, waUrl, pushCarsLayer, sortedImages, VEHICLE_COLS, PRICE_BANDS,
+  priceOrFilter, fxComplete, tryPerUnit, carPrice, carContact, waUrl, contactRegion, pushCarsLayer, sortedImages, VEHICLE_COLS, PRICE_BANDS,
 } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -45,6 +45,7 @@ check('contact falls back to the dealer', JSON.stringify(carContact({ contact_ph
   === JSON.stringify({ phone: '+90533', whatsapp: '+90544' }))
 check("listing's own number wins", carContact({ contact_phone: '+1', dealers: { phone: '+2' } }).phone === '+1')
 check('wa.me takes digits only', waUrl('+90 533 111-22-33') === 'https://wa.me/905331112233')
+check('contact region only a REGIONS slug', contactRegion('kyrenia') === 'kyrenia' && contactRegion('Girne') === null && contactRegion(null) === null)
 check('primary photo first', sortedImages([{ id: 1, sort_order: 0 }, { id: 2, sort_order: 5, is_primary: true }])[0].id === 2)
 
 const car = id => ({ kind: 'car', car: { id } }), dealer = id => ({ kind: 'dealer', dealer: { id } })
