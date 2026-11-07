@@ -1,0 +1,21 @@
+# Ask Oli render test + routing audit on every PR and push to main. The same `npm run test:oli` also runs first in
+# `npm run ota` and `npm run ota:preview`, so nothing ships without it. No secrets: the test mocks Supabase.
+name: oli-tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:oli
