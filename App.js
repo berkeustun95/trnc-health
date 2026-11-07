@@ -2255,7 +2255,11 @@ export default function App() {
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
       <BLErrorBoundary lang={lang}>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace}
+          // Stage 3 sections: events open their detail (back returns here); "Harita" opens the Keşfet tab in that mode.
+          onSelectEvent={MODULE_FLAGS.events ? row => { setOpenedEvent(row); setEventFromHome(true); setShowEvents(true) } : undefined}
+          onOpenMapEvents={MODULE_FLAGS.events ? () => { setShowExplore(false); setMapRoutesMode(false); setMapEventsMode(true); setActiveTab('map') } : undefined}
+          onOpenRoutes={EXPLORE_ROUTES_LIVE ? () => { setShowExplore(false); setMapEventsMode(false); setMapRoutesMode(true); setActiveTab('map') } : undefined} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
