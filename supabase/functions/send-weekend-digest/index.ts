@@ -49,6 +49,7 @@ serve(async (req) => {
     .lt('start_date', w.to.toISOString())
     .or(`end_date.gte.${w.from.toISOString()},and(end_date.is.null,start_date.gte.${new Date(w.from.getTime() - 18 * 3600_000).toISOString()})`)
     .order('start_date', { ascending: true })
+    .limit(500)   // one weekend: tens of rows
   if (evErr) {
     await finishRun(supabase, runId, { outcome: 'events_query_failed' })
     return new Response(JSON.stringify({ error: 'events read failed' }), { status: 500 })
@@ -60,7 +61,7 @@ serve(async (req) => {
   }
 
   const { data: placeRows } = await supabase.from('places')
-    .select('id, name, name_i18n, official_visit').eq('status', 'active').not('official_visit', 'is', null).order('id')
+    .select('id, name, name_i18n, official_visit').eq('status', 'active').not('official_visit', 'is', null).order('id').limit(500)   // ~33 EEMD sites
   const place = weekPick(((placeRows ?? []) as (DigestPlace & { official_visit: { status?: string } })[])
     .filter(p => p.official_visit?.status !== 'closed'), now)
 
