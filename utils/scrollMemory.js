@@ -12,12 +12,16 @@ import { useRef, useCallback } from 'react'
 //
 // Restores once the content is tall enough to reach the saved offset; if it never gets
 // that tall (the list shrank after a refresh) it stays at the furthest valid position.
+// For SETTLE_MS after the view attaches it keeps re-applying the offset as content grows, because
+// sections ABOVE the viewport that finish loading later (Profil's badges, check-ins) push the place
+// down after the first restore; outside that window it behaves as before.
 // A drag by the user ends the restore, so it never fights them.
 //
 // Keys live for the app session. The owner forgets its prefix when the module closes
 // (forgetScroll), so reopening a module starts at the top, as before.
 
 const offsets = new Map()
+const SETTLE_MS = 1500
 
 export function forgetScroll(prefix) {
   for (const k of [...offsets.keys()]) if (k.startsWith(prefix)) offsets.delete(k)
@@ -27,11 +31,12 @@ export function useScrollMemory(key) {
   const node = useRef(null)
   const done = useRef(false)
   const viewport = useRef(0)
+  const attachedAt = useRef(0)
   // A stable callback ref re-arms the restore whenever a NEW scroll view attaches — the hook
   // may live in a parent that stays mounted while the list itself remounts (a landing that
   // comes back after its category page).
   const ref = useCallback(n => {
-    if (n && n !== node.current) done.current = false
+    if (n && n !== node.current) { done.current = false; attachedAt.current = Date.now() }
     node.current = n
   }, [])
 
@@ -44,7 +49,7 @@ export function useScrollMemory(key) {
     const n = node.current
     if (n?.scrollToOffset) n.scrollToOffset({ offset: target, animated: false })
     else n?.scrollTo?.({ y: target, animated: false })
-    if (target >= y) done.current = true
+    if (target >= y && Date.now() - attachedAt.current > SETTLE_MS) done.current = true
   }
 
   return {
