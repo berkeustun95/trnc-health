@@ -10,7 +10,7 @@ import VehicleCard from '../components/cars/VehicleCard'
 import usePagedVehicles from '../utils/usePagedVehicles'
 import { loadKktcFx, todayStr } from '../utils/kktcFx'
 import { colors, type, radii, elevation, TAP, listBottomPad } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { t, tCount } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import {
   VEHICLE_COLS, CAR_MODES, INTENT_LABEL_KEY, PRICE_BANDS, YEAR_BANDS, CURRENCY_SYMBOL,
@@ -186,7 +186,7 @@ export default function CarsScreen({ lang, onBack, onOpenCar }) {
               maxToRenderPerBatch={4}
               removeClippedSubviews
               ListHeaderComponent={list.items.length > 0
-                ? <OnPhotoLabel style={s.count}>{t('carsResultCount', lang).replace('{n}', String(list.total))}</OnPhotoLabel>
+                ? <OnPhotoLabel style={s.count}>{tCount('carsResultCount', list.total, lang)}</OnPhotoLabel>
                 : null}
               ListEmptyComponent={
                 <EmptyState icon="car-outline" category="city" style={{ marginTop: 28 }}

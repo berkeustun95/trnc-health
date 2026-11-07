@@ -679,6 +679,8 @@ const viaVariable = [
   ...PETS_REGULATORY_KEYS,
   // Araçlar enum labels (fuel, gearbox, body, colour, steering, sale/rent/all), each a t(MAP[code]) lookup.
   ...[FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY].flatMap(m => Object.values(m)),
+  // The result count goes through tCount (no literal t('…') to scan). _one/_other exist in every locale; ru's _few/_many have no English twin.
+  'carsResultCount_one', 'carsResultCount_other',
 ]
 
 const KEYS = [...new Set([...literal, ...viaVariable, ...SURFACE_PROP_KEYS])].filter(Boolean).sort()
