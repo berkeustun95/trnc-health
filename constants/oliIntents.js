@@ -26,7 +26,8 @@ export const OLI_INTENTS = [
     id: 'pharmacy', msgKey: 'oliMsgPharmacy', titleKey: 'dutyPharmacies',
     keywords: ['pharmacy', 'pharmacies', 'chemist', 'drugstore', 'duty pharmacy', 'on duty', 'medicine', 'prescription',
       'eczane', 'nobetci eczane', 'nobetci', 'ilac', 'recete',
-      'аптека', 'дежурная аптека', 'лекарство', 'apotheke', 'pharmacie', 'farmacia', 'صيدلية', 'دواء', 'داروخانه'],
+      'аптека', 'дежурная аптека', 'лекарство', 'apotheke', 'pharmacie', 'farmacia', 'صيدلية', 'دواء', 'داروخانه',
+      'pharmacie de garde', 'bereitschaftsapotheke', 'аптеки', 'дежурные аптеки', 'φαρμακειο', 'φαρμακεια', 'εφημερευον', 'εφημερευοντα', 'مناوبة', 'نوبت دار', 'صيدليات'],
   },
   {
     id: 'clinic', msgKey: 'oliMsgClinic', titleKey: 'hubMedicalTitle',
@@ -34,7 +35,8 @@ export const OLI_INTENTS = [
       'doktor', 'klinik', 'hastane', 'dis', 'disci', 'hekim', 'saglik', 'muayene',
       'врач', 'больница', 'клиника', 'стоматолог', 'arzt', 'klinik', 'krankenhaus', 'zahnarzt',
       'medecin', 'clinique', 'hopital', 'dentiste', 'medico', 'clinica', 'hospital', 'dentista',
-      'طبيب', 'عيادة', 'مستشفى', 'اسنان', 'پزشک', 'دکتر', 'بیمارستان', 'دندانپزشک'],
+      'طبيب', 'عيادة', 'مستشفى', 'اسنان', 'پزشک', 'دکتر', 'بیمارستان', 'دندانپزشک',
+      'sante', 'медицина', 'γιατρο', 'γιατρος', 'ιατρικ', 'νοσοκομειο', 'οδοντιατρ', 'κλινικη', 'پزشکی', 'طبي', 'طبية', 'مرافق طبية'],
   },
   {
     id: 'emergency', msgKey: 'oliMsgEmergency', titleKey: 'menuEmergency',
@@ -42,21 +44,24 @@ export const OLI_INTENTS = [
       'acil', 'ambulans', 'polis', 'itfaiye', 'yardim',
       'скорая', 'полиция', 'помощь', 'пожар', 'notruf', 'krankenwagen', 'polizei', 'feuerwehr',
       'urgence', 'ambulance', 'police', 'emergencia', 'ambulancia', 'policia',
-      'طوارئ', 'اسعاف', 'شرطة', 'اورژانس', 'امبولانس', 'پلیس'],
+      'طوارئ', 'اسعاف', 'شرطة', 'اورژانس', 'امبولانس', 'پلیس',
+      'urgences', 'экстренн', 'службы спасения', 'εκτακτη αναγκη', 'εκτακτης αναγκης', 'ασθενοφορο', 'αστυνομια', 'πυροσβεστικη', 'اضطراری', 'آتش نشانی'],
   },
   {
     id: 'newcomer', msgKey: 'oliMsgNewcomer', titleKey: 'menuNewcomerEssentials',
     keywords: ['new', 'newcomer', 'guide', 'welcome', 'essentials', 'border', 'crossing', 'moving', 'settle', 'visa', 'residence', 'permit',
       'yeni', 'rehber', 'hos geldin', 'sinir', 'gecis', 'kapi', 'tasinma', 'oturum', 'vize', 'ikamet',
       'новичок', 'граница', 'гид', 'виза', 'neu', 'grenze', 'leitfaden', 'nouveau', 'frontiere', 'guide',
-      'nuevo', 'frontera', 'guia', 'جديد', 'حدود', 'دليل', 'تازه وارد', 'مرز', 'راهنما'],
+      'nuevo', 'frontera', 'guia', 'جديد', 'حدود', 'دليل', 'تازه وارد', 'مرز', 'راهنما',
+      'new here', 'just moved', 'moved here', 'yeni geldim', 'tasindim', 'erste schritte', 'willkommen', 'nouvel arrivant', 'recien llegado', 'переехал', 'οδηγος', 'καλωσορισμα', 'νεος στην κυπρο'],
   },
   {
     id: 'events', msgKey: 'oliMsgEvents', titleKey: 'menuEvents',
-    keywords: ['event', 'events', 'concert', 'festival', 'whats on', 'nightlife', 'party', 'gig', 'show',
+    keywords: ['event', 'events', 'concert', 'festival', 'whats on', 'nightlife', 'party', 'gig', 'shows', 'live music',
       'etkinlik', 'konser', 'festival', 'gece hayati', 'parti', 'neler var', 'ne var',
       'концерт', 'событие', 'вечеринка', 'veranstaltung', 'konzert', 'evenement', 'concert',
-      'evento', 'concierto', 'حفلة', 'فعالية', 'كونسير', 'کنسرت', 'رویداد', 'برنامه'],
+      'evento', 'concierto', 'حفلة', 'فعالية', 'كونسير', 'کنسرت', 'رویداد', 'برنامه',
+      'concerts', 'событи', 'фестиваль', 'εκδηλωσ', 'συναυλ', 'φεστιβαλ', 'حفلات', 'فعاليات'],
   },
   {
     id: 'homeServices', msgKey: 'oliMsgHomeServices', titleKey: 'menuHomeServices',
@@ -64,14 +69,16 @@ export const OLI_INTENTS = [
       'tesisatci', 'elektrikci', 'temizlik', 'tamir', 'tamirci', 'usta', 'ustasi', 'tadilat', 'boyaci', 'ev hizmet',
       'сантехник', 'электрик', 'уборка', 'ремонт', 'klempner', 'elektriker', 'reinigung',
       'plombier', 'electricien', 'menage', 'fontanero', 'electricista', 'limpieza',
-      'سباك', 'كهربائي', 'تنظيف', 'لوله', 'برق کار', 'نظافت'],
+      'سباك', 'كهربائي', 'تنظيف', 'لوله', 'برق کار', 'نظافت',
+      'renovation', 'reforma', 'umbau', 'handwerker', 'artisan', 'отделка', 'ανακαινιση', 'υδραυλικ', 'ηλεκτρολογ', 'بازسازی', 'تجديد'],
   },
   {
     id: 'jobs', msgKey: 'oliMsgJobs', titleKey: 'menuJobPostings',
     keywords: ['job', 'jobs', 'work', 'vacancy', 'hiring', 'employment', 'career', 'cv',
-      'is', 'isler', 'is ilani', 'kariyer', 'eleman', 'calismak', 'ise',
+      'isler', 'is ilani', 'is ilanlari', 'is ariyorum', 'is bul', 'is var mi', 'kariyer', 'eleman', 'calismak', 'ise',
       'работа', 'вакансия', 'arbeit', 'stelle', 'emploi', 'travail', 'trabajo', 'empleo',
-      'وظيفة', 'عمل', 'شغل', 'کار', 'استخدام'],
+      'وظيفة', 'عمل', 'شغل', 'کار', 'استخدام',
+      'работ', 'ваканси', 'δουλεια', 'εργασια', 'θεσεις εργασιας', 'شغلی', 'وظائف'],
   },
   {
     id: 'accommodation', msgKey: 'oliMsgAccommodation', titleKey: 'menuAccomTile',
@@ -117,7 +124,8 @@ export const OLI_INTENTS = [
       'villa', 'studio', 'penthouse', 'duplex', 'detached', 'bungalow',
       'studyo', 'dubleks', 'mustakil', 'konut', 'apartman', 'zemin kat',
       'вилла', 'студия', 'haus', 'maison', 'casa',
-      'فيلا', 'استوديو', 'ویلا', 'διαμερισμα', 'κατοικια', 'ακινητα'],
+      'فيلا', 'استوديو', 'ویلا', 'διαμερισμα', 'κατοικια', 'ακινητα',
+      'residences', 'immobilier', 'inmuebles', 'residencias', 'wohnheim', 'immobilien', 'общежити', 'недвижимост', 'ενοικιαση', 'ενοικιο', 'φοιτητικες εστιες', 'خوابگاه', 'املاک', 'للإيجار', 'إيجار'],
   },
   {
     id: 'pets', msgKey: 'oliMsgPets', titleKey: 'menuPets',
@@ -125,7 +133,8 @@ export const OLI_INTENTS = [
       'evcil', 'kopek', 'kedi', 'veteriner', 'hayvan',
       'собака', 'кошка', 'ветеринар', 'животное', 'hund', 'katze', 'tierarzt', 'haustier',
       'chien', 'chat', 'veterinaire', 'animal', 'perro', 'gato', 'veterinario', 'mascota',
-      'كلب', 'قطة', 'بيطري', 'حيوان', 'سگ', 'گربه', 'دامپزشک', 'حیوان'],
+      'كلب', 'قطة', 'بيطري', 'حيوان', 'سگ', 'گربه', 'دامپزشک', 'حیوان',
+      'animaux', 'haustiere', 'питомц', 'κατοικιδια', 'κτηνιατρ', 'σκυλος', 'γατα', 'حیوانات خانگی'],
   },
   {
     id: 'transport', msgKey: 'oliMsgTransport', titleKey: 'menuTransportation',
@@ -133,27 +142,31 @@ export const OLI_INTENTS = [
       'otobus', 'taksi', 'araba', 'ulasim', 'dolmus', 'kiralik araba', 'arac',
       'автобус', 'такси', 'машина', 'транспорт', 'bus', 'taxi', 'auto', 'transport',
       'voiture', 'autobus', 'coche', 'transporte', 'حافلة', 'تاكسي', 'سيارة', 'مواصلات',
-      'اتوبوس', 'تاکسی', 'ماشین', 'حمل و نقل'],
+      'اتوبوس', 'تاکسی', 'ماشین', 'حمل و نقل',
+      'ταξι', 'λεωφορειο', 'μεταφορες', 'حمل ونقل'],
   },
   {
     id: 'beaches', msgKey: 'oliMsgBeaches', titleKey: 'menuBeachesLandmarks',
     keywords: ['beach', 'beaches', 'landmark', 'landmarks', 'sightseeing', 'things to do', 'explore', 'attractions', 'sea', 'tourist',
       'plaj', 'sahil', 'gezilecek', 'gezi', 'deniz', 'tarihi yer', 'gorulecek',
       'пляж', 'достопримечательности', 'море', 'strand', 'sehenswurdigkeiten',
-      'plage', 'sites', 'playa', 'lugares', 'شاطئ', 'معالم', 'بحر', 'ساحل', 'دیدنی', 'جاهای دیدنی'],
+      'plage', 'sites', 'playa', 'lugares', 'شاطئ', 'معالم', 'بحر', 'ساحل', 'دیدنی', 'جاهای دیدنی',
+      'castle', 'castles', 'kale', 'kalesi', 'museum', 'muze', 'sehenswurdigkeit', 'достопримечательност', 'παραλια', 'παραλιες', 'αξιοθεατα', 'الشواطئ', 'سواحل', 'جاذبه'],
   },
   {
     id: 'exchange', msgKey: 'oliMsgExchange', titleKey: 'menuExchangeRates',
     keywords: ['exchange', 'exchange rate', 'rate', 'currency', 'money', 'convert', 'lira', 'forex', 'euro', 'dollar', 'pound',
       'kur', 'doviz', 'para', 'cevir', 'lira', 'kur cevir',
       'курс', 'валюта', 'деньги', 'обмен', 'wechselkurs', 'wahrung', 'geld',
-      'change', 'devise', 'taux', 'cambio', 'moneda', 'divisa', 'صرف', 'عملة', 'نقود', 'نرخ ارز', 'ارز', 'پول'],
+      'change', 'devise', 'taux', 'cambio', 'moneda', 'divisa', 'صرف', 'عملة', 'نقود', 'نرخ ارز', 'ارز', 'پول',
+      'ισοτιμια', 'ισοτιμιες', 'συναλλαγμα', 'الصرف', 'أسعار الصرف', 'курсы', 'валют'],
   },
   {
     id: 'municipal', msgKey: 'oliMsgMunicipal', titleKey: 'menuMunicipalities',
     keywords: ['municipality', 'municipalities', 'council', 'town hall', 'mayor',
       'belediye', 'muhtar', 'муниципалитет', 'gemeinde', 'rathaus', 'mairie', 'municipalite',
-      'municipio', 'ayuntamiento', 'بلدية', 'شهرداری'],
+      'municipio', 'ayuntamiento', 'بلدية', 'شهرداری',
+      'δημος', 'δημοι', 'δημαρχειο', 'мэрия', 'мэрии', 'البلديات', 'بلديات'],
   },
 ]
 
@@ -165,21 +178,31 @@ const CHAT_NEARBY = {
   keywords: ['near me', 'nearby', 'around me', 'close to me', 'near here',
     'yakin', 'yakinimda', 'yakinlarda', 'civarda', 'etrafimda', 'cevrede',
     'рядом', 'поблизости', 'in der nahe', 'in meiner nahe', 'pres de moi', 'a proximite', 'cerca de mi', 'por aqui',
-    'بالقرب', 'قريب مني', 'نزدیک', 'نزدیک من', 'κοντα μου', 'εδω κοντα'],
+    'بالقرب', 'قريب مني', 'قريبة', 'نزدیک', 'نزدیک من', 'κοντα μου', 'εδω κοντα',
+    // Explore: the tab's own name in every language (t('menuExplore')), its verbs, and "show me places" / "what to do".
+    'explore', 'exploring', 'things to do', 'what to do', 'show me places', 'places to visit', 'sightseeing',
+    'kesfet', 'kesfetmek', 'kesfedin', 'gezilecek yerler', 'yerleri goster', 'ne yapsam', 'ne yapilir', 'nereye gidilir',
+    'entdecken', 'entdecke', 'erkunden', 'was kann man', 'was tun', 'zeig mir orte',
+    'explorer', 'que faire', 'montre moi des lieux', 'lieux a visiter',
+    'explorar', 'que hacer', 'muestrame lugares', 'lugares para visitar',
+    'обзор', 'исследовать', 'что посмотреть', 'чем заняться', 'покажи места',
+    'εξερευν', 'δειξε μου μερη', 'τι να κανω', 'τι να δω',
+    'استكشاف', 'استكشف', 'أرني أماكن', 'ماذا أفعل', 'کاوش', 'نشانم بده', 'چه کار کنم'],
 }
 const CHAT_EATERY = {
   id: 'eatery', msgKey: 'oliChatEatery', titleKey: 'menuEatery',
   keywords: ['restaurant', 'restaurants', 'food', 'eat', 'eating', 'dinner', 'lunch', 'breakfast', 'cafe', 'takeaway', 'pizza', 'burger',
     'yemek', 'restoran', 'kafe', 'lokanta', 'kahvalti', 'aksam yemegi', 'ogle yemegi', 'paket servis', 'yeme icme', 'yesem', 'yiyelim',
     'ресторан', 'еда', 'кафе', 'поесть', 'essen', 'restaurants', 'manger', 'nourriture', 'comida', 'restaurante', 'comer',
-    'مطعم', 'طعام', 'مقهى', 'رستوران', 'غذا', 'کافه', 'εστιατοριο', 'φαγητο', 'καφε'],
+    'مطعم', 'طعام', 'مقهى', 'رستوران', 'غذا', 'کافه', 'εστιατοριο', 'φαγητο', 'καφε',
+    'φαω', 'να φαω', 'آكل', 'مأكولات', 'مشروبات', 'خوردن', 'نوشیدن'],
 }
-export const OLI_CHAT_INTENTS = [
-  ...OLI_INTENTS.slice(0, OLI_INTENTS.findIndex(i => i.id === 'beaches')),
-  CHAT_NEARBY,
-  ...OLI_INTENTS.slice(OLI_INTENTS.findIndex(i => i.id === 'beaches')),
-  CHAT_EATERY,
-]
+// Chat priority differs from OLI_INTENTS in two places: pets before clinic (Arabic "طبيب بيطري", a vet, contains
+// "doctor") and accommodation before newcomer (French "Résidences" prefix-matches newcomer's 'residence').
+const CHAT_ORDER = ['pharmacy', 'pets', 'clinic', 'emergency', 'accommodation', 'newcomer', 'events', 'homeServices', 'jobs',
+  'transport', 'nearby', 'beaches', 'exchange', 'municipal', 'eatery']
+const ALL_CHAT = [...OLI_INTENTS, CHAT_NEARBY, CHAT_EATERY]
+export const OLI_CHAT_INTENTS = CHAT_ORDER.map(id => ALL_CHAT.find(i => i.id === id))
 
 const BY_ID = OLI_CHAT_INTENTS.reduce((m, i) => { m[i.id] = i; return m }, {})
 // Chat-only ids resolve too; the search sheet only ever asks for ids from OLI_INTENTS (its CHIPS).
@@ -189,12 +212,14 @@ export const getIntent = (id) => BY_ID[id]
 // "is" = Turkish "iş", "geld" = German money) match whole words only, so they don't
 // fire inside longer words across languages ("geld" ⊄ Turkish "geldim"). Keywords of
 // 5+ chars allow prefix matching, so Turkish suffixes ("eczaneye", "doktora") still hit.
-function keywordHits(kw, q, words) {
+// partial: a typed word may be the START of a keyword too ("eczan" → 'eczane'), for the search sheet's as-you-type
+// results. The chat gets whole questions, where that rule misroutes ("Essen" → newcomer's 'essentials').
+function keywordHits(kw, q, words, partial = true) {
   const nkw = normalize(kw)
   if (!nkw) return false
   if (nkw.includes(' ')) return q.includes(nkw)
   if (nkw.length <= 4) return words.includes(nkw)
-  return words.some(w => w === nkw || w.startsWith(nkw) || (w.length >= 5 && nkw.startsWith(w)))
+  return words.some(w => w === nkw || w.startsWith(nkw) || (partial && w.length >= 5 && nkw.startsWith(w)))
 }
 
 // "Oli" said at the START of a query is a wake word, not part of it — and speech recognisers
@@ -321,29 +346,38 @@ export const getPlaceType = (id) => PLACE_TYPE_BY_ID[id]
 const NEARBY = OLI_CHAT_INTENTS.find(i => i.id === 'nearby')
 
 // "plaj yakınımda" → ['beach']; [] when the text asks for no type, or does not say "near me" at all.
+// The chat matches whole questions: punctuation and the Persian zero-width joiner split words ("kıbrıs'ı",
+// "d’urgence", "montre-moi", "حمل‌ونقل"), and a word must not match as the start of a longer keyword (partial false).
+const chatQuery = text => {
+  const q = stripWakeWord(normalize(String(text).replace(/[\u200c'’`´\-–—,.!?;:()·&/"«»¿¡؟،]+/g, ' ')))
+  // Arabic writes the article on the word ("الطوارئ"): each such word also counts without it.
+  const words = q.split(' ').filter(Boolean).flatMap(w => (w.length > 4 && w.startsWith('ال') ? [w, w.slice(2)] : [w]))
+  return { q, words }
+}
+const hits = (kw, { q, words }) => keywordHits(kw, q, words, false)
+
+// "plaj yakınımda" → ['beach']; [] when the text asks for no type, or does not say "near me" at all.
 export function nearbyPlaceTypes(text) {
-  const q = stripWakeWord(normalize(text))
-  if (!q) return []
-  const words = q.split(' ').filter(Boolean)
-  if (!asksNearby(q, words)) return []
-  const hits = OLI_PLACE_TYPES.filter(p => !p.group && p.keywords.some(kw => keywordHits(kw, q, words)))
-  if (hits.length) return hits.map(p => p.id)
-  const group = OLI_PLACE_TYPES.find(p => p.group && p.keywords.some(kw => keywordHits(kw, q, words)))
+  const cq = chatQuery(text)
+  if (!cq.q || !asksNearby(cq)) return []
+  const found = OLI_PLACE_TYPES.filter(p => !p.group && p.keywords.some(kw => hits(kw, cq)))
+  if (found.length) return found.map(p => p.id)
+  const group = OLI_PLACE_TYPES.find(p => p.group && p.keywords.some(kw => hits(kw, cq)))
   return group ? [group.id] : []
 }
 
-// A "near me" question is about places: "yakınımda ne var" is not "what's on" (events: 'ne var'), and English
-// "what is near me" is not Turkish "iş" (jobs: 'is'). Only those generic words step aside, so "eczane yakınımda"
-// still answers with the duty pharmacies.
-const NEAR_ME_GENERIC = new Set(['ne var', 'neler var', 'is'])
+// A "near me" / explore question is about places: "yakınımda ne var" is not "what's on" (events: 'ne var'), and
+// Persian "در قبرس چه کار کنم" (what to do) is not a job (jobs: 'کار'). Only those generic words step aside, so
+// "eczane yakınımda" still answers with the duty pharmacies.
+const NEAR_ME_GENERIC = new Set(['ne var', 'neler var', 'کار'])
 const OLI_CHAT_NEAR_INTENTS = OLI_CHAT_INTENTS.map(i => ({ ...i, keywords: i.keywords.filter(k => !NEAR_ME_GENERIC.has(k)) }))
-const asksNearby = (q, words) => NEARBY.keywords.some(kw => keywordHits(kw, q, words))
+const asksNearby = cq => NEARBY.keywords.some(kw => hits(kw, cq))
 
 // The chat's resolver: the best intent, and the place types for a nearby answer.
 export function resolveOliChat(text) {
-  const q = stripWakeWord(normalize(text))
-  const words = q.split(' ').filter(Boolean)
-  if (!q || !asksNearby(q, words)) return { intent: resolveOliQuery(text, { limit: 1, intents: OLI_CHAT_INTENTS })[0], types: [] }
+  const cq = chatQuery(text)
+  const resolve = intents => intents.find(i => i.keywords.some(kw => hits(kw, cq)))
+  if (!cq.q || !asksNearby(cq)) return { intent: resolve(OLI_CHAT_INTENTS), types: [] }
   const types = nearbyPlaceTypes(text)
-  return { intent: types.length ? NEARBY : resolveOliQuery(text, { limit: 1, intents: OLI_CHAT_NEAR_INTENTS })[0], types }
+  return { intent: types.length ? NEARBY : resolve(OLI_CHAT_NEAR_INTENTS), types }
 }
