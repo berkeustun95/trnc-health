@@ -42,6 +42,11 @@ WITH report AS (
   FROM (VALUES
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages'),
+    -- Araçlar car listings (20261165): registered ahead of the apply; red until it runs.
+    ('20261165_vehicles','vehicle_sources'),
+    ('20261165_vehicles','dealers'),
+    ('20261165_vehicles','vehicles'),
+    ('20261165_vehicles','vehicle_images'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_schools'),
     ('1108_driving_schools','driving_school_branches'),
@@ -268,6 +273,18 @@ WITH report AS (
     ('20261163_oli_messages','oli_messages','body'),
     ('20261163_oli_messages','oli_messages','payload'),
     ('20261163_oli_messages','oli_messages','created_at'),
+    -- 20261165: the columns the read policies, the guard and the report flow depend on (column count in H).
+    ('20261165_vehicles','vehicles','status'),
+    ('20261165_vehicles','vehicles','expires_at'),
+    ('20261165_vehicles','vehicles','owner_id'),
+    ('20261165_vehicles','vehicles','dealer_id'),
+    ('20261165_vehicles','vehicles','source_site'),
+    ('20261165_vehicles','vehicles','content_hash'),
+    ('20261165_vehicles','vehicles','hidden_at'),
+    ('20261165_vehicles','vehicles','hidden_reason'),
+    ('20261165_vehicles','dealers','is_active'),
+    ('20261165_vehicles','vehicle_sources','is_active'),
+    ('20261165_vehicles','vehicle_images','storage_path'),
     -- 20261143: partner_booking_requests (no identifier column; asserted as an absence in H).
     ('20261143_partner_booking_requests','partner_booking_requests','id'),
     ('20261143_partner_booking_requests','partner_booking_requests','partner'),
@@ -664,6 +681,12 @@ WITH report AS (
     -- 20261163: 90-day retention on oli_messages (the job is Q2) and the per-user insert rate guard.
     ('20261163_oli_messages','purge_oli_messages'),
     ('20261163_oli_messages','oli_messages_rate_guard'),
+    -- Araçlar (20261165): listing guard, photo guard, renew RPC, nightly expiry.
+    ('20261165_vehicles','vehicles_guard'),
+    ('20261165_vehicles','vehicle_images_guard'),
+    ('20261165_vehicles','renew_vehicle'),
+    ('20261165_vehicles','expire_vehicles'),
+    ('20261165_vehicles','my_vehicles'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -692,6 +715,10 @@ WITH report AS (
   FROM (VALUES
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages_rate_guard'),
+    -- Araçlar (20261165/20261166): registered ahead of the apply; red until it runs.
+    ('20261165_vehicles','vehicles_guard'),
+    ('20261165_vehicles','vehicle_images_guard'),
+    ('20261166_vehicles_moderation','guard_vehicle_moderation'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
@@ -839,6 +866,22 @@ WITH report AS (
     ('20261163_oli_messages','oli_messages_role_check'),
     ('20261163_oli_messages','oli_messages_shape_check'),
     ('20261163_oli_messages','oli_messages_payload_check'),
+    -- 20261165: Araçlar. Who owns a listing follows its source; prices follow intent; a source goes live only checked.
+    ('20261165_vehicles','vehicles_ownership_check'),
+    ('20261165_vehicles','vehicles_price_check'),
+    ('20261165_vehicles','vehicles_status_check'),
+    ('20261165_vehicles','vehicles_private_contact_check'),
+    ('20261165_vehicles','vehicles_phone_check'),
+    ('20261165_vehicles','vehicles_whatsapp_check'),
+    ('20261165_vehicles','vehicles_currency_check'),
+    ('20261165_vehicles','vehicles_external_key'),
+    ('20261165_vehicles','vehicles_owner_id_fkey'),
+    ('20261165_vehicles','vehicles_dealer_id_fkey'),
+    ('20261165_vehicles','vehicles_source_site_fkey'),
+    ('20261165_vehicles','vehicle_sources_checked_before_active'),
+    ('20261165_vehicles','vehicle_images_path_check'),
+    ('20261165_vehicles','vehicle_images_vehicle_id_fkey'),
+    ('20261165_vehicles','dealers_slug_key'),
     ('20261143_partner_booking_requests','partner_booking_requests_pkey'),
     ('20261143_partner_booking_requests','partner_booking_requests_partner_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_apartment_check'),
@@ -1195,6 +1238,12 @@ WITH report AS (
   FROM (VALUES
     -- Ask Oli chat history (20261163): one user's thread, newest first.
     ('20261163_oli_messages','oli_messages_user_created_idx'),
+    -- Araçlar (20261165): the browse list, an owner's listings, a dealer page, the expiry job, photo order.
+    ('20261165_vehicles','vehicles_browse_idx'),
+    ('20261165_vehicles','vehicles_owner_idx'),
+    ('20261165_vehicles','vehicles_dealer_idx'),
+    ('20261165_vehicles','vehicles_expiry_idx'),
+    ('20261165_vehicles','vehicle_images_vehicle_idx'),
     ('1095_institutions_country','institutions_country_idx'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_school_branches_school_idx'),
@@ -1325,6 +1374,9 @@ WITH report AS (
   FROM (VALUES
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','get_google_place_pins'),
+    -- Araçlar renew + my listings (20261165): registered ahead of the apply; red until it runs.
+    ('20261165_vehicles','renew_vehicle'),
+    ('20261165_vehicles','my_vehicles'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','check_in'),
     ('1092_checkins','get_checkin_feed'),
@@ -2077,11 +2129,12 @@ WITH report AS (
         AND pg_get_constraintdef(oid) NOT LIKE '%''duty''%'
         AND pg_get_constraintdef(oid) NOT LIKE '%''emergency''%'
         AND pg_get_constraintdef(oid) NOT LIKE '%''health''%')
-    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 36 policies, all named, none unknown, none missing',
+    -- ► BUMPED FROM 36 TO 39 BY 20261165 (the three vehicle_images_* policies), same commit; red until it applies.
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 39 policies, all named, none unknown, none missing',
       (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects') = 36
+        WHERE schemaname='storage' AND tablename='objects') = 39
       AND (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 36
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 39
       AND (SELECT count(*) FROM pg_policies
              WHERE schemaname='storage' AND tablename='objects'
                AND policyname NOT IN (
@@ -2096,6 +2149,7 @@ WITH report AS (
                  'provider_documents_owner_select','provider_documents_owner_update',
                  'towing_logos_admin_delete','towing_logos_admin_insert','towing_logos_admin_update',
                  'towing_logos_public_read',
+                 'vehicle_images_delete','vehicle_images_select','vehicle_images_upload',
                  'Providers manage own facility images','Public facility image read',
                  'estate_agent_documents_admin_read','organizer delete own event images',
                  'property_images_delete','property_images_public','provider_credentials_admin_read',
@@ -3183,13 +3237,14 @@ WITH report AS (
     -- the app that shows a stranger's name. Derived from the constraint text rather than
     -- compared to a remembered spelling: `IN (...)` and `= ANY (ARRAY[...])` are the same
     -- constraint printed two ways, and pinning either would fail on a correct database.
-    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile and message',
+    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile, message and vehicle',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c,
               LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
         WHERE c.conrelid = to_regclass('public.content_reports')
           AND c.conname = 'content_reports_content_type_check')
-      = ARRAY['answer','facility','message','place','profile','question','review']
+      = ARRAY['answer','facility','message','place','profile','question','review','vehicle']
+    -- ► BUMPED FROM 7 TO 8 BY 20261166 ('vehicle'), same commit as the widened CHECK; red until it applies.
     -- ► BUMPED FROM 6 TO 7 BY 20261029, in the same commit that widened the CHECK. The
     --   edit is the review moment, and it is the whole argument for pinning the derived
     --   array instead of a remembered name: this row went red the moment 'message' was
@@ -3365,12 +3420,16 @@ WITH report AS (
     -- end; if that default ever inverts, adults reach children and nothing else here
     -- would notice. `npm run profile:check` asserts the same shape against the FILE; this
     -- asserts it against the DATABASE, which is the half that is actually running.
-    UNION ALL SELECT '1029_student_messaging','may_initiate_by_age: DEFINER, 18 years, and falls through to RETURN false',
+    -- ► 20261164 moved the 18 into private.is_adult_on(); this token now asserts the CALL, and the
+    --   20261164 H token asserts the helper's own 18 and boundaries. Red until 20261164 applies.
+    UNION ALL SELECT '1029_student_messaging','may_initiate_by_age: DEFINER, ages via private.is_adult_on(), and falls through to RETURN false',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='may_initiate_by_age'
           AND p.prosecdef
           AND p.proconfig::text ILIKE '%search_path=public%'
-          AND p.prosrc LIKE '%interval ''18 years''%'
+          AND p.prosrc LIKE '%NOT private.is_adult_on(v_sender, current_date)%'
+          AND p.prosrc LIKE '%private.is_adult_on(v_recipient, current_date)%'
+          AND p.prosrc NOT LIKE '%18 years%'
           AND p.prosrc ~ 'RETURN false;\s*END;\s*$')
     -- (4) Enforced TWICE, and the second one is the point: a rule living only inside one
     -- function lasts exactly until somebody writes a second way to insert a message.
@@ -4083,6 +4142,7 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
       IS NOT DISTINCT FROM ARRAY['accommodation','connectivity','eatery','ehliyet','events','explore','garages','grooming',
                                  'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+      OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261165_vehicles.sql') -- CARS-CONTACT-EVENTS:supersede (one count, one owner: the 20261165 token owns the set once the ledger records it)
     UNION ALL SELECT '1115_eatery_partners','contact_events action vocabulary is exactly the 11-action set (incl. menu)',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
@@ -5535,6 +5595,105 @@ WITH report AS (
     AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.oli_messages') AND NOT tgisinternal
                     AND tgenabled <> 'D' AND pg_get_triggerdef(oid) LIKE '%BEFORE INSERT ON public.oli_messages FOR EACH ROW EXECUTE FUNCTION %oli_messages_rate_guard()%'), false)
     AND COALESCE(obj_description(to_regclass('public.oli_messages'), 'pg_class') LIKE '%90 days%', false)
+  -- 20261164: the one SQL home of ADULT_AGE. Registered ahead of the apply; RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261164_shared_adult_age','private.is_adult_on: IMMUTABLE, carries 18 years and the NULL guards, no client or PUBLIC EXECUTE',
+    COALESCE((SELECT p.provolatile = 'i'
+                 AND p.prosrc LIKE '%p_dob <= (p_today - interval ''18 years'')::date%'
+                 AND p.prosrc LIKE '%p_dob IS NOT NULL AND p_today IS NOT NULL%'
+               FROM pg_proc p WHERE p.oid = to_regprocedure('private.is_adult_on(date,date)')), false)
+    AND COALESCE((SELECT NOT has_function_privilege('anon', to_regprocedure('private.is_adult_on(date,date)'), 'EXECUTE')
+                     AND NOT has_function_privilege('authenticated', to_regprocedure('private.is_adult_on(date,date)'), 'EXECUTE')), false)
+    AND COALESCE((SELECT NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                                      WHERE p.oid = to_regprocedure('private.is_adult_on(date,date)') AND a.grantee = 0)), false)
+  -- 20261165: Araçlar listings. Registered ahead of the apply; RED UNTIL IT RUNS.
+  --   Public read = active, unexpired, dealer/source live; photoless and reported rows hidden by RESTRICTIVE policies;
+  --   preview reads only unpublished dealers/sources (20261120 contract); private posting through the guard.
+  UNION ALL SELECT '20261165_vehicles','Araçlar policy sets: vehicle_sources 3, dealers 3, vehicles 9 (2 RESTRICTIVE), vehicle_images 5; directory tables SELECT-only; preview policies paired with NOT is_active; vehicles has 34 columns',
+    COALESCE((SELECT count(*) = 3 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicle_sources' AND cmd = 'SELECT'), false)
+    AND COALESCE((SELECT count(*) = 3 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dealers' AND cmd = 'SELECT'), false)
+    AND COALESCE((SELECT count(*) = 0 FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('vehicle_sources','dealers') AND cmd <> 'SELECT'), false)
+    AND COALESCE((SELECT count(*) = 9 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles'), false)
+    AND COALESCE((SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies
+                   WHERE schemaname = 'public' AND tablename = 'vehicles' AND permissive = 'RESTRICTIVE')
+                 IS NOT DISTINCT FROM ARRAY['vehicles_hide_photoless','vehicles_hide_reported'], false)
+    AND COALESCE((SELECT count(*) = 5 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicle_images'), false)
+    AND COALESCE((SELECT bool_and(cmd = 'SELECT' AND qual LIKE '%NOT %is_active%') FROM pg_policies
+                   WHERE schemaname = 'public' AND tablename IN ('vehicle_sources','dealers','vehicles','vehicle_images')
+                     AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_previewer%'), false)
+    AND COALESCE((SELECT qual LIKE '%''active''%' AND qual LIKE '%expires_at > now()%' AND qual LIKE '%d.is_active%' AND qual LIKE '%s.is_active%'
+                    FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles' AND policyname = 'vehicles_select_public'), false)
+    AND COALESCE((SELECT bool_and(relrowsecurity) FROM pg_class
+                   WHERE oid IN (to_regclass('public.vehicle_sources'), to_regclass('public.dealers'), to_regclass('public.vehicles'), to_regclass('public.vehicle_images'))), false)
+    AND COALESCE((SELECT count(*) = 34 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'vehicles'), false)
+  UNION ALL SELECT '20261165_vehicles','Araçlar grants: anon reads only; authenticated INSERTs exactly the 18 listing fields, no DELETE on vehicles; no client write on dealers/sources; is_active DEFAULT false on both',
+    COALESCE((SELECT NOT bool_or(has_table_privilege('anon', t, x)) FROM unnest(ARRAY[to_regclass('public.vehicle_sources'), to_regclass('public.dealers'),
+               to_regclass('public.vehicles'), to_regclass('public.vehicle_images')]) t, unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) x), false)
+    AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+                   WHERE a.attrelid = to_regclass('public.vehicles') AND a.attnum > 0 AND NOT a.attisdropped
+                     AND has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT'))
+                 = 'area,body_type,colour,contact_phone,currency,description,fuel,gearbox,intent,km,make,model,price,price_per_day,region,steering,whatsapp,year', false)
+    AND COALESCE(NOT has_table_privilege('authenticated', to_regclass('public.vehicles'), 'DELETE'), false)
+    AND COALESCE((SELECT NOT bool_or(has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT,UPDATE')) FROM pg_attribute a
+                   WHERE a.attrelid IN (to_regclass('public.vehicle_sources'), to_regclass('public.dealers')) AND a.attnum > 0 AND NOT a.attisdropped), false)
+    AND COALESCE((SELECT bool_and(column_default = 'false') FROM information_schema.columns
+                   WHERE table_schema = 'public' AND table_name IN ('dealers','vehicle_sources') AND column_name = 'is_active'), false)
+  UNION ALL SELECT '20261165_vehicles','vehicles_guard: INVOKER (branches on current_user), refuses NO_DOB/UNDER_18/UGC_BANNED via the poster check, caps at 3 under a per-user lock, edits go back to pending; renew/expire/guards not anon-callable',
+    COALESCE((SELECT NOT p.prosecdef FROM pg_proc p WHERE p.oid = to_regprocedure('public.vehicles_guard()')), false)
+    AND COALESCE(pg_get_functiondef(to_regprocedure('public.vehicles_guard()')) LIKE '%current_user NOT IN (''anon'', ''authenticated'')%'
+             AND pg_get_functiondef(to_regprocedure('public.vehicles_guard()')) LIKE '%private.vehicle_poster_refusal()%'
+             AND pg_get_functiondef(to_regprocedure('public.vehicles_guard()')) LIKE '%my_open_vehicle_count() >= 3%'
+             AND pg_get_functiondef(to_regprocedure('public.vehicles_guard()')) LIKE '%pg_advisory_xact_lock(%'
+             AND pg_get_functiondef(to_regprocedure('public.vehicles_guard()')) LIKE '%NEW.status := ''pending''%', false)
+    AND COALESCE(pg_get_functiondef(to_regprocedure('private.vehicle_poster_refusal()')) LIKE '%private.is_adult_on(p.date_of_birth%'
+             AND pg_get_functiondef(to_regprocedure('private.vehicle_poster_refusal()')) LIKE '%UGC_BANNED%', false)
+    AND COALESCE((SELECT bool_and(NOT has_function_privilege('anon', f, 'EXECUTE')) FROM unnest(ARRAY[to_regprocedure('public.renew_vehicle(uuid)'),
+               to_regprocedure('public.expire_vehicles()'), to_regprocedure('public.vehicles_guard()'), to_regprocedure('public.vehicle_images_guard()'),
+               to_regprocedure('private.vehicle_poster_refusal()'), to_regprocedure('private.my_open_vehicle_count()')]) f), false)
+    AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.expire_vehicles()'), 'EXECUTE'), false)
+    AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicles') AND tgname = 'vehicles_guard' AND tgenabled <> 'D'), false)
+    AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicle_images') AND tgname = 'vehicle_images_guard' AND tgenabled <> 'D'), false)
+  UNION ALL SELECT '20261165_vehicles','bucket vehicle-images: public, 5 MB, jpeg/png/webp; exactly 3 vehicle_images_* storage policies (no UPDATE), each guest-guarded and tied to the caller''s listing; upload only into a PENDING one',
+    COALESCE((SELECT public AND file_size_limit = 5242880 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
+                FROM storage.buckets WHERE id = 'vehicle-images'), false)
+    AND COALESCE((SELECT count(*) = 3 AND NOT bool_or(cmd = 'UPDATE')
+                         AND bool_and(coalesce(qual,'') || coalesce(with_check,'') LIKE '%my_vehicle_status(%'
+                                  AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_anonymous_session()%')
+                    FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+                     AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%vehicle-images%'), false)
+    AND COALESCE((SELECT with_check LIKE '%''pending''%' FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'vehicle_images_upload'), false)
+  UNION ALL SELECT '20261165_vehicles','vehicles.owner_id is readable by no client; my_vehicles() is the owner''s path (authenticated only)',
+    COALESCE(NOT has_column_privilege('anon', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
+         AND NOT has_column_privilege('authenticated', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
+         AND has_column_privilege('anon', to_regclass('public.vehicles'), 'contact_phone', 'SELECT'), false)
+    AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.my_vehicles()'), 'EXECUTE')
+             AND has_function_privilege('authenticated', to_regprocedure('public.my_vehicles()'), 'EXECUTE'), false)
+  -- Every SECURITY DEFINER function that writes or reads vehicles skips the client rules in vehicles_guard (it runs as
+  -- postgres). The set is pinned so a new one is a reviewed decision, not an accident (security review 2026-11-07, N1).
+  UNION ALL SELECT '20261165_vehicles','the SECURITY DEFINER functions that touch vehicles are exactly the five reviewed ones',
+    COALESCE((SELECT array_agg(n.nspname || '.' || p.proname ORDER BY n.nspname, p.proname)
+                FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+               WHERE p.prosecdef AND n.nspname IN ('public', 'private') AND p.prosrc ~* '\mvehicles\M')
+      IS NOT DISTINCT FROM ARRAY['private.my_open_vehicle_count','private.my_vehicle_status','public.auto_hide_reported_content',
+                                 'public.my_vehicles','public.renew_vehicle'], false)
+  UNION ALL SELECT '20261165_vehicles','contact_events module vocabulary is exactly the 17-module set (incl. cars)',
+    (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+       FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+      WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+    IS NOT DISTINCT FROM ARRAY['accommodation','cars','connectivity','eatery','ehliyet','events','explore','garages','grooming',
+                               'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+  -- 20261166: vehicles in the report flow. Registered ahead of the apply; RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261166_vehicles_moderation','auto_hide_reported_content has the vehicle branch (and keeps its five); vehicles_hide_reported RESTRICTIVE; hidden_* guarded',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.auto_hide_reported_content()')) LIKE '%NEW.content_type = ''vehicle''%UPDATE vehicles%'
+         AND pg_get_functiondef(to_regprocedure('public.auto_hide_reported_content()')) LIKE '%UPDATE places%', false)
+    AND COALESCE((SELECT permissive = 'RESTRICTIVE' AND cmd = 'SELECT' AND qual LIKE '%hidden_at IS NULL%'
+                    FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles' AND policyname = 'vehicles_hide_reported'), false)
+    AND COALESCE((SELECT pg_get_triggerdef(oid) LIKE '%BEFORE UPDATE ON public.vehicles%guard_moderation_columns(''vehicle'')%'
+                    FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicles') AND tgname = 'guard_vehicle_moderation'), false)
+  -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
+    AND COALESCE(pg_get_functiondef(to_regprocedure('public.module_notif_text(text,text,text)')) LIKE '%(''cars'',''Turkish'',''Araçlar'')%'
+             AND pg_get_functiondef(to_regprocedure('public.module_notif_text(text,text,text)')) LIKE '%(''cars'',''Cars'')%', false)
   ) z
 
   UNION ALL
@@ -5636,6 +5795,9 @@ FROM (VALUES
   ('1051_app_versions','purge-app-update-events'),
   -- 90-day retention on duty_push_runs (20261141): counts only, but still a log that must not grow forever.
   ('20261141_duty_push_runs','purge-duty-push-runs'),
+  -- Araçlar (20261165): active → expired at 02:40 UTC. Visibility never waits for it (the read policy checks
+  -- expires_at); INACTIVE here means owners never see "expired" and cannot renew.
+  ('20261165_vehicles','expire-vehicles'),
   ('1093_checkins_google_places','purge-google-places-cache'),
   ('1093_checkins_google_places','google-places-refresh'),
   -- Re-created by 20261139 with a 60 s pg_net timeout (same schedule, Vault key, body); same for duty-push below.
