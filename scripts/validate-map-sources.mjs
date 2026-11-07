@@ -70,7 +70,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
-  TRNC_CENTER,
+  TRNC_CENTER, inTrncFrame,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
 import { colors, typeColors, placeColors } from '../constants/theme.js'
@@ -450,7 +450,9 @@ check('eateryPartnerVisible: a dark partner gate hides, no gate shows',
    eateryPartnerVisible({ slug: 'other' }, { 'crunchy-express': false })], [false, true, true])
 // Hue rule on the PIN colour (indigo), read off the built pin, against every other pin colour.
 const eaColor = eaPins(eaLive)[0]?.color
-const eaRivals = [...rivals.filter(([k]) => k !== 'eatery'), ['pet hotel', placeColors.petHotel.text]]
+// explore:eat_drink is the eatery hue ON PURPOSE (one Yeme & İçme chip, 2026-11-07): partners are told
+// apart by their pin shape, not a second colour, so the group is not a rival here.
+const eaRivals = [...rivals.filter(([k]) => k !== 'eatery' && k !== 'explore:eat_drink'), ['pet hotel', placeColors.petHotel.text]]
 const eaClose = eaRivals.filter(([, c]) => !eaColor || hueGap(eaColor, c) < 30)
   .map(([k, c]) => `${k} ${c} (${eaColor ? hueGap(eaColor, c).toFixed(1) : '?'} deg)`)
 check(`eatery pin hue ${eaColor ? hueOf(eaColor).toFixed(0) : '?'} is >= 30 deg from all ${eaRivals.length} other pins`, eaClose, [])
@@ -556,6 +558,11 @@ check('the map asks for location ONLY inside locate-me (never on open)',
   reqAt.length === 1 && locateStart > 0 && reqAt[0] > locateStart && reqAt[0] < locateEnd, true)
 check('review mode is __DEV__-folded (utils/exploreReview.js)',
   /export const EXPLORE_REVIEW = __DEV__ && /.test(REVIEW_SRC), true)
+
+// Opening on the user (2026-11-07): only inside the default frame, never on a user abroad.
+check('inTrncFrame: Lefkoşa, Girne, Karpaz, Lefke in; Istanbul, Limassol out',
+  [inTrncFrame(35.19, 33.36), inTrncFrame(35.34, 33.32), inTrncFrame(35.69, 34.57), inTrncFrame(35.11, 32.85),
+   inTrncFrame(41.01, 28.98), inTrncFrame(34.68, 33.04)], [true, true, true, true, false, false])
 
 if (problems.length) {
   console.error('\n  ┌─ MAP SOURCE GATE FAILED ───────────────────────────────────────┐')

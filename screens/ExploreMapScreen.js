@@ -33,7 +33,7 @@ import { supabase, isGuest } from '../lib/supabase'
 import { BROWSE_COLS, placeName } from './ExploreScreen'
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
-  officialVisitApplicable, applyOfficialVisit, TRNC_CENTER,
+  officialVisitApplicable, applyOfficialVisit, TRNC_CENTER, inTrncFrame, NEAR_ME_DELTA,
 } from '../constants/mapSources'
 import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
@@ -484,14 +484,25 @@ export default function ExploreMapScreen({
     userId: session?.user?.id ?? null, guest: !session || isGuest(session),
   })
 
+  const nearUser = userLocation && inTrncFrame(userLocation.latitude, userLocation.longitude)
   const initialRegion = useMemo(() => snap?.region ?? (
-    userLocation
+    nearUser
       ? { latitude: userLocation.latitude, longitude: userLocation.longitude,
-          latitudeDelta: 0.5, longitudeDelta: 0.5 }
+          latitudeDelta: NEAR_ME_DELTA, longitudeDelta: NEAR_ME_DELTA }
       : TRNC_CENTER
-  ), [userLocation, snap])
+  ), [nearUser, snap])
 
   const [region, setRegion] = useState(initialRegion)
+
+  // App.js resolves userLocation after this map has usually mounted, and initialRegion is read once:
+  // without this the map stayed on the whole-island frame. Only before the user has touched the map.
+  const userMoved = useRef(!!snap?.region)
+  useEffect(() => {
+    if (!nearUser || userMoved.current) return
+    userMoved.current = true
+    mapRef.current?.animateToRegion({ latitude: userLocation.latitude, longitude: userLocation.longitude,
+      latitudeDelta: NEAR_ME_DELTA, longitudeDelta: NEAR_ME_DELTA }, 500)
+  }, [nearUser])
 
   const [googlePins, setGooglePins] = useState([])
   const [googlePlace, setGooglePlace] = useState(null)   // { id } → GooglePlaceSheet
@@ -816,7 +827,7 @@ export default function ExploreMapScreen({
         // showsUserLocation alone would raise the permission prompt.
         showsUserLocation={locateOn ? (locGranted || walkStatus === 'granted') : (!!userLocation || (!!walk && walkStatus === 'granted'))}
         showsMyLocationButton={false}
-        onPanDrag={walking && follow ? () => setFollow(false) : undefined}
+        onPanDrag={() => { userMoved.current = true; if (walking && follow) setFollow(false) }}
         onRegionChangeComplete={setRegion}
         mapPadding={{ top: 0, right: 0, left: 0, bottom: mapBottom }}
         onPress={() => setSelected(null)}

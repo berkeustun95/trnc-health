@@ -37,7 +37,7 @@ export function categoryToGroup(category) {
 export const GROUP_META = {
   nature:    { icon: 'leaf-outline',      colorToken: placeColors.beach,    labelKey: 'exploreGroupNature' },
   heritage:  { icon: 'library-outline',   colorToken: placeColors.landmark, labelKey: 'exploreGroupHeritage' },
-  eat_drink: { icon: 'cafe-outline',      colorToken: placeColors.beach,    labelKey: 'exploreGroupEatDrink' },
+  eat_drink: { icon: 'cafe-outline',      colorToken: placeColors.eatery,    labelKey: 'exploreGroupEatDrink' },
   active:    { icon: 'barbell-outline',   colorToken: placeColors.beach,    labelKey: 'exploreGroupActive' },
   services:  { icon: 'construct-outline', colorToken: placeColors.beach,    labelKey: 'exploreGroupServices' },
 }
