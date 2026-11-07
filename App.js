@@ -33,7 +33,8 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
-import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT } from './constants/redesign'
+import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, CARS } from './constants/redesign'
+import { pushCarsLayer } from './constants/cars'
 import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
@@ -81,6 +82,9 @@ import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
 import TowingScreen from './screens/TowingScreen'
 import EhliyetScreen from './screens/EhliyetScreen'
+import CarsScreen from './screens/CarsScreen'
+import CarDetailScreen from './screens/CarDetailScreen'
+import DealerScreen from './screens/DealerScreen'
 import EateryScreen from './screens/EateryScreen'
 import EsimScreen from './screens/EsimScreen'
 import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
@@ -675,6 +679,12 @@ export default function App() {
   const [showGarages, setShowGarages] = useState(false)
   const [showTowing, setShowTowing] = useState(false)
   const [showEhliyet, setShowEhliyet] = useState(false)
+  // Araçlar: the list, plus the detail / dealer pages stacked over it (constants/cars.js pushCarsLayer).
+  const [showCars, setShowCars] = useState(false)
+  const [carsStack, setCarsStack] = useState([])
+  useEffect(() => { if (!showCars) setCarsStack([]) }, [showCars])
+  const openCarsLayer = layer => setCarsStack(st => pushCarsLayer(st, layer))
+  const closeCarsLayer = () => setCarsStack(st => st.slice(0, -1))
   const [showEatery, setShowEatery] = useState(false)
   const [eateryPartner, setEateryPartner] = useState(null)   // the partner row open inside Yeme-İçme
   // Explore map pin -> partner page. The pin hands a slug (its row has no menu / contacts); EateryScreen
@@ -1130,6 +1140,9 @@ export default function App() {
       // Towing before Garages: Garages opens it on top of itself (slice 10).
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showEhliyet) { setShowEhliyet(false); return true }
+      // Top layer first (car or dealer page), then the list: back walks the way the user came.
+      if (carsStack.length > 0) { closeCarsLayer(); return true }
+      if (showCars) { setShowCars(false); return true }
       // Partner page before the list: back steps partner -> list -> Home.
       if (eateryPartner) { if (eateryPartnerBackRef.current?.()) return true; if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
       if (showEatery) { if (eateryListBackRef.current?.()) return true; setShowEatery(false); return true }
@@ -1169,7 +1182,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2540,6 +2553,21 @@ export default function App() {
   } else if (showEhliyet && EHLIYET) {
     // Dark module: no ComingSoon fallback (no waitlist). EHLIYET is true only when the flag is live or on dev / ADA Preview.
     content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} />
+  } else if (showCars && CARS) {
+    // Dark module: no ComingSoon fallback. CARS is true only when the flag is live or on dev / ADA Preview.
+    // Each layer is an overlay over the still-mounted list (filters, pages, scroll kept).
+    content = (
+      <View style={{ flex: 1 }}>
+        <CarsScreen lang={lang} onBack={() => setShowCars(false)} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
+        {carsStack.map(layer => (
+          <View key={layer.kind + ':' + (layer.car?.id || layer.dealer?.id)} style={styles.moduleOverlay}>
+            {layer.kind === 'car'
+              ? <CarDetailScreen car={layer.car} lang={lang} onBack={closeCarsLayer} onOpenDealer={dealer => openCarsLayer({ kind: 'dealer', dealer })} />
+              : <DealerScreen dealer={layer.dealer} lang={lang} onBack={closeCarsLayer} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />}
+          </View>
+        ))}
+      </View>
+    )
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} session={session} dateOfBirth={profile?.date_of_birth ?? null} onRequireAccount={requireAccount} partner={eateryPartner} onOpenPartner={setEateryPartner}
@@ -2654,6 +2682,7 @@ export default function App() {
             onShowGarages={() => setShowGarages(true)}
             onShowTowing={() => setShowTowing(true)}
             onShowEhliyet={() => setShowEhliyet(true)}
+            onShowCars={() => setShowCars(true)}
             onShowEatery={() => setShowEatery(true)}
             overlayOpen={oliSheetOpen || showLangModal || showAboutSheet || showCoachMarks || showHomeCityAsk}
             onOpenEateryPartner={slug => { setShowEatery(true); setEateryOpenSlug(slug); setEateryFromMap(true) }}
@@ -2901,7 +2930,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowEatery(false); setEateryPartner(null)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowEatery(false); setEateryPartner(null)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -2933,7 +2962,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowEatery(false); setEateryPartner(null)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowEatery(false); setEateryPartner(null)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
