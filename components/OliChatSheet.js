@@ -115,6 +115,26 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
 
   useEffect(() => { onOpenChange?.(open); return () => onOpenChange?.(false) }, [open])
 
+  // ANDROID: this Modal is statusBarTranslucent, so its window is NOT resized by the keyboard (device test
+  // 2026-11-07: the composer sat behind it). Lift the composer by hand, as OliGuide does: RN reports the keyboard
+  // height minus the navigation bar, and the sheet reaches down behind that bar, so add insets.bottom back. iOS
+  // uses KeyboardAvoidingView below.
+  const [kbLift, setKbLift] = useState(0)
+  useEffect(() => {
+    if (!open || Platform.OS !== 'android') return
+    const show = Keyboard.addListener('keyboardDidShow', e => setKbLift((e.endCoordinates?.height ?? 0) + insets.bottom))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbLift(0))
+    return () => { show.remove(); hide.remove(); setKbLift(0) }
+  }, [open, insets.bottom])
+
+  // Newest message in view: after each message, the typing row and the keyboard opening. onContentSizeChange
+  // alone fired before the last bubble had its height and stopped short (device test 2026-11-07).
+  useEffect(() => {
+    if (!open) return
+    const id = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 120)
+    return () => clearTimeout(id)
+  }, [open, messages.length, busy, kbLift])
+
   async function send(text, intentId = null, label = null) {
     const body = (label ?? text).trim()
     if (!body || busy) return
@@ -260,7 +280,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
         {notSaved && <Text style={s.notSaved}>{t('oliChatNotSaved', lang)}</Text>}
         {!voice.available && <Text style={s.micHint}>{t('oliVoiceHint', lang)}</Text>}
 
-        <View style={[s.composer, { paddingBottom: insets.bottom + 10 }]}>
+        <View style={[s.composer, { paddingBottom: (kbLift || insets.bottom) + 10 }]}>
           <View style={[s.field, elevation.floating]}>
             <TextInput
               style={s.input}
