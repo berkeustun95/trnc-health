@@ -51,8 +51,8 @@ function walk(d) {
 // exist.
 //
 // ⚠ THE REGEX CASE IS NOT HYPOTHETICAL — it was this checker's second false positive.
-//   screens/ExchangeRatesScreen.js parses the KKTC central bank's XML with exactly that
-//   pattern, and the first version reported <Resmi_Kur> as an undefined component. Two
+//   screens/ExchangeRatesScreen.js parsed the KKTC central bank's XML with exactly that
+//   pattern (now in utils/kktcFx.js), and the first version reported <Resmi_Kur> as an undefined component. Two
 //   false positives in a checker whose whole job is to be believed is the argument for
 //   --self, not a footnote.
 //
@@ -260,7 +260,7 @@ const NEGATIVES = [
   ['a JSX closing tag is not a regex (</SafeAreaView> ate 29% of a file)',
    'screens/EstateAgentOnboardingScreen.js'],
   ['an XML tag inside a regex literal is not a component (<Resmi_Kur>)',
-   'screens/ExchangeRatesScreen.js'],
+   'utils/kktcFx.js'],
   ['a named import beside a default binds (import MapView, { Marker })',
    'screens/DormPartnerScreen.js'],
   ['a self-closing tag is not a regex (`size={16} />` ate a file)',

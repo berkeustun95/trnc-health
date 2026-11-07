@@ -248,6 +248,7 @@ export default function HomeScreen({
   garagesTileVisible,
   onShowTowing,
   onShowEhliyet,
+  onShowCars,
   onShowEatery,
   overlayOpen = false,   // App-level sheets over Home (Oli, language, about, tutorial, city ask): the strip slider holds still
   onOpenEateryPartner,
@@ -613,6 +614,7 @@ export default function HomeScreen({
     garages:            onShowGarages,
     towing:             onShowTowing,
     ehliyet:            onShowEhliyet,
+    cars:               onShowCars,
     eatery:             onShowEatery,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,

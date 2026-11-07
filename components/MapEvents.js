@@ -31,8 +31,10 @@ export function EventVenueMarker({ venue, active, onPress }) {
     <Marker coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} tracksViewChanges={tracks}
       anchor={{ x: 0.5, y: 0.5 }} zIndex={active ? 2 : 1}
       onPress={e => { e.stopPropagation(); onPress(venue) }}>
-      {/* The pad keeps the badge inside the marker bitmap: Android clips a child past its parent's box. */}
-      <View style={m.pad}>
+      {/* Badge in the row, not absolute: Android snapshots the marker from the wrapper's box and
+          cuts anything outside it. collapsable={false} keeps the background-less wrapper from being
+          flattened away, which cut the pin itself in half on device. */}
+      <View style={m.wrap} collapsable={false}>
         <View style={[m.pin, active && m.pinActive]}>
           <Ionicons name={eventIcon(venue.events[0].category)} size={active ? 17 : 15} color="#fff" />
         </View>
@@ -92,11 +94,12 @@ export function EventStrip({ events, counts, range, onRange, venueKey, onClearVe
 }
 
 const m = StyleSheet.create({
+  // No elevation: it lifted the pin above the badge, and marker snapshots drop shadows anyway.
   pin:       { width: 32, height: 32, borderRadius: 16, backgroundColor: EVENT_INK, borderWidth: 2, borderColor: '#fff',
-               alignItems: 'center', justifyContent: 'center', ...elevation.floating },
+               alignItems: 'center', justifyContent: 'center' },
   pinActive: { width: 38, height: 38, borderRadius: 19 },
-  pad:       { paddingTop: 8, paddingRight: 12, paddingLeft: 12, paddingBottom: 4, alignItems: 'center' },
-  badge:     { position: 'absolute', top: 1, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+  wrap:      { flexDirection: 'row', alignItems: 'flex-start', padding: 2 },
+  badge:     { marginLeft: -10, marginTop: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
                backgroundColor: '#fff', borderWidth: 1.5, borderColor: EVENT_INK, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: EVENT_INK },
 })
