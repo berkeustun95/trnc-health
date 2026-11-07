@@ -1,0 +1,149 @@
+{
+  "logo": "logo.png",
+  "dishes": {
+    "Bacon Smash Burger": "bacon-smash-burger.jpg",
+    "Beer Platter for 2 person": "beer-platter-for-2-person.jpg",
+    "Beer Platter for 3 person": "beer-platter-for-3-person.jpg",
+    "Beer Platter for 4 person": "beer-platter-for-4-person.jpg",
+    "Caramelised Onion Smash Burger": "caramelised-onion-smash-burger.jpg",
+    "Chicken Tenders": "chicken-tenders.jpg",
+    "Coca Cola": "coca-cola.jpg",
+    "Coca Cola Zero": "coca-cola-zero.jpg",
+    "Crafters IPA": "crafters-ipa.jpg",
+    "Crispy Chicken Bowl": "crispy-chicken-bowl.jpg",
+    "Crispy Chicken Burger": "crispy-chicken-burger.jpg",
+    "Crispy Chicken Garlic Burger": "crispy-chicken-garlic-burger.jpg",
+    "Crispy Chicken Wrap": "crispy-chicken-wrap.jpg",
+    "Fajita Wrap": "fajita-wrap.jpg",
+    "Falafel Wrap": "falafel-wrap.jpg",
+    "Fanta": "fanta.jpg",
+    "Fries": "fries.jpg",
+    "Fues tea limon": "fues-tea-limon.jpg",
+    "Garlic Aioli Smash Burger": "garlic-aioli-smash-burger.jpg",
+    "Grilled Chicken Bowl": "grilled-chicken-bowl.jpg",
+    "Grilled Chicken Burger": "grilled-chicken-burger.jpg",
+    "Grilled Chicken Combo Bowl": "grilled-chicken-combo-bowl.jpg",
+    "Grilled Chicken Wrap": "grilled-chicken-wrap.jpg",
+    "Meatball Bowl": "meatball-bowl.jpg",
+    "Meatball Combo Bowl": "meatball-combo-bowl.jpg",
+    "Munchie Fries": "munchie-fries.jpg",
+    "Mushroom Smash Burger": "mushroom-smash-burger.jpg",
+    "Mushrooms & Falafel Bowl": "mushrooms-falafel-bowl.jpg",
+    "Mushrooms Wrap": "mushrooms-wrap.jpg",
+    "Smash Burger Wrap": "smash-burger-wrap.jpg",
+    "Smash Cheeseburger": "smash-cheeseburger.jpg",
+    "Smash Felafel& Mushroom Burger": "smash-felafel-mushroom-burger.jpg",
+    "Sprite": "sprite.jpg",
+    "Umami Wrap": "umami-wrap.jpg"
+  },
+  "dishSizeWaivers": {
+    "Bacon Smash Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Beer Platter for 2 person": {
+      "minShortSide": 670,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x670 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Beer Platter for 3 person": {
+      "minShortSide": 667,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x667 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Beer Platter for 4 person": {
+      "minShortSide": 671,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x671 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Caramelised Onion Smash Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Chicken Tenders": {
+      "minShortSide": 671,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x671 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Coca Cola": {
+      "minShortSide": 637,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x637 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Crafters IPA": {
+      "minShortSide": 667,
+      "reason": "Owner's studio photo from pasatiempocy.com, 667x1000 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Crispy Chicken Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Crispy Chicken Garlic Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Fries": {
+      "minShortSide": 671,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x671 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Garlic Aioli Smash Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Grilled Chicken Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Munchie Fries": {
+      "minShortSide": 671,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x671 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Mushroom Smash Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Smash Cheeseburger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Smash Felafel& Mushroom Burger": {
+      "minShortSide": 731,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x731 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    },
+    "Sprite": {
+      "minShortSide": 637,
+      "reason": "Owner's studio photo from pasatiempocy.com, 1000x637 original; no larger version published.",
+      "approvedBy": "Berke",
+      "date": "2026-11-02"
+    }
+  }
+}

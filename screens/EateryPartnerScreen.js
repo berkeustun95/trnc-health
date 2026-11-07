@@ -7,16 +7,17 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryAdultItemsOk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
 import { EateryLogo, PlaceholderTag, PlaceholderFrame, PhotoPager, eateryImageUrl, useReduceMotion } from '../components/EateryBits'
 import { logContactEvent } from '../utils/logContactEvent'
+import { openEaterySite } from '../utils/eaterySite'
 import { supabase, isGuest } from '../lib/supabase'
-import { IS_PREVIEW, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, dishUsesSheet, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
+import { IS_PREVIEW, EATERY_DEMO, CONTACT_LOGGING, partnerContactNumbers, effectiveWhatsapp, useBasket, changeQty, setLine, lineKey, dishQty, dishUsesSheet, clearAll, undo, dropSnapshot } from '../utils/eateryBasket'
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
-import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage } from '../components/EateryOrder'
+import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage, SiteHandoff } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains, partnerQuizConfig } from '../constants/eateryQuiz'
@@ -31,6 +32,9 @@ import { BannerPhoto, BannerBar, BannerHead, BAR_SOLID_AT } from '../components/
 // nothing behind it is absent, never degraded. Fixture partners (partner.placeholder) are labelled
 // and NEVER log a contact tap or take an order. Order via WhatsApp: a dish with a price gets a quantity control, the
 // basket (in memory, utils/eateryBasket.js) becomes ONE Turkish wa.me message; ADA takes no payment and keeps nothing.
+
+const HANDOFF_MS = 2800   // owner-demo hand-off screen: long enough to read the lines, short enough not to feel stuck
+const HANDOFF_FADE_MS = 400
 
 const CONTACT_UI = {
   call:     { icon: 'call-outline',      labelKey: 'petHotelCall',       variant: 'primary' },
@@ -203,7 +207,8 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const nums = partnerContactNumbers(partner)
   const contacts = eateryContacts(partner, nums)
   const menuUrl = eateryMenuUrl(partner)
-  const sections = useMemo(() => eateryMenuSections(partner), [partner])
+  const adultOk = eateryAdultItemsOk({ guest: isGuest(session), dob: dateOfBirth })
+  const sections = useMemo(() => eateryMenuSections(partner, { adultOk }), [partner, adultOk])
   const gallery = eateryPhotos(partner, 'gallery')
   const menuPhotos = eateryPhotos(partner, 'menu')
   const week = eateryWeek(partner)
@@ -220,6 +225,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const ordering = listMode != null
   const orderByPhone = partner.order_method === 'phone'
   const callUrl = contacts.find(c => c.action === 'call')?.url
+  // Website partner: "Sipariş ver — <site>" hands the visible basket off to the partner's site (utils/eaterySite.js). The owner-demo
+  // build first shows the hand-off screen for HANDOFF_MS (EATERY_DEMO, Preview only).
+  const [handoff, setHandoff] = useState(false)
   const basket = useBasket(partner.id)
   const lines = useMemo(() => {
     if (!ordering) return []
@@ -229,6 +237,20 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const formatMoney = useCallback(n => formatPrice(n, orderCurrency, lang), [orderCurrency, lang])
   const orderCount = lines.reduce((n, l) => n + l.qty, 0)
   const orderTotalText = formatMoney(orderTotal(lines))
+  const handoffTimer = useRef(null)
+  const openingRef = useRef(false)   // one hand-off at a time: a fast double tap must not open the site twice or log twice
+  useEffect(() => () => clearTimeout(handoffTimer.current), [])
+  const siteOrder = useCallback(() => {
+    if (openingRef.current || listMode !== 'website' || lines.length === 0 || lines.some(l => l.stale)) return
+    if (orderAgeGate({ adultOnly: partner.adult_only, guest: isGuest(session), dob: dateOfBirth })) return   // second guard (BasketPage hides it)
+    openingRef.current = true
+    const open = () => openEaterySite(partner, lines).finally(() => { openingRef.current = false })
+    if (!EATERY_DEMO) { open(); return }
+    setHandoff(true)
+    clearTimeout(handoffTimer.current)
+    // The Modal fades out first: iOS refuses to present the browser over a Modal that is still on screen.
+    handoffTimer.current = setTimeout(() => { setHandoff(false); handoffTimer.current = setTimeout(open, HANDOFF_FADE_MS) }, HANDOFF_MS)
+  }, [listMode, lines, partner, session, dateOfBirth])
   const [basketOpen, setBasketOpen] = useState(false)     // the target; basketShown keeps the page mounted through its slide-out
   const [basketShown, setBasketShown] = useState(false)
   // "Ne yesem?" scoped to this partner: a layer over the page (rows = just this partner), closed by Back first.
@@ -570,7 +592,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
                 icon={CONTACT_UI[c.action].icon} title={t(c.action === 'call' && orderByPhone ? 'eateryOrderByPhone' : CONTACT_UI[c.action].labelKey, lang)}
                 onPress={() => go(c.action, c.url)} />
             ))}
-            {IS_PREVIEW && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
+            {IS_PREVIEW && !EATERY_DEMO && contacts.some(c => c.action === 'call' || c.action === 'whatsapp') && <Text style={s.previewHint}>{t('eateryTestNumberHint', lang)}</Text>}
           </View>
         )}
 
@@ -578,9 +600,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       {lines.length > 0 && <OrderBar count={orderCount} totalText={orderTotalText} lang={lang} onOpen={openBasket} mode={listMode} />}
       </View>
       {ordering && basketShown === true && (
-        <BasketPage partner={partner} lang={lang} mode={listMode} onCall={() => { if (callUrl) go('call', callUrl) }} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
+        <BasketPage partner={partner} lang={lang} mode={listMode} onCall={() => { if (callUrl) go('call', callUrl) }} onSiteOrder={siteOrder} open={basketOpen === true} onClosed={() => setBasketShown(false)} lines={lines} onQty={onQty} onEditLine={editLine} formatMoney={formatMoney} totalText={orderTotalText}
           note={note} onNote={setNote} delivery={delivery} onDelivery={onDelivery} onAddress={openEditor} covered={editor.open === true} onClear={clearBasket} onSend={sendOrder} sending={sending} orderError={orderError} ageGate={ageGate} onSignIn={() => onRequireAccount?.('gateEateryOrder')} onClose={() => setBasketOpen(false)} reduce={reduce} />
       )}
+      <SiteHandoff visible={handoff === true} partner={partner} lines={lines} totalText={orderTotalText} lang={lang} />
       {whatsappOrdering && editor.shown === true && (
         <AddressEditor key={editor.key} lang={lang} open={editor.open === true} step={editor.step} pickerOpen={editor.picker === true} seed={editor.seed} reduce={reduce}
           onStep={n => setEditor(e => ({ ...e, step: n }))} onPicker={v => setEditor(e => ({ ...e, picker: v }))}

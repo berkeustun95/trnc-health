@@ -393,7 +393,7 @@ DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edg
   from 2026-10-07); App Store privacy must add the SDK's data types (vault store-forms file) with that build.
 - ⚠ Never dispatch `20261078`/`20261069` check-ins files from old branches (deleted 2026-10-08).
 - Watch: `gh workflow run supabase-readonly -f file=supabase/readonly/checkins_launch_watch.sql` (calls vs caps,
-  check-ins, pins, notices, submissions). Function errors: Dashboard → Edge Functions → google-places → Logs.
+  check-ins, pins, notices, submissions; sealed, open with `node scripts/readonly-results.mjs <run-id>`). Function errors: Dashboard → Edge Functions → google-places → Logs.
 
 ## Team workflow (`.claude/agents/`)
 Every feature or bug request goes to **principal-engineer** first. Flow: Principal → senior-app-engineer /

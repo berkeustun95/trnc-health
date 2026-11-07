@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { t } from '../constants/i18n'
 import { colors, category, type, radii, withAlpha } from '../constants/theme'
 import { EATERY_BUCKET } from '../constants/eatery'
+import { EATERY_DEMO } from '../utils/eateryBasket'
 import { RemoteImage } from './ui'
 
 // Shared pieces of the two Yeme-İçme screens. Defined here, outside both screens, so a re-render
@@ -28,6 +29,7 @@ export const eateryImageUrl = path =>
 // Marks anything built from the Preview fixture (default label), or a real but inactive row only the previewer can read
 // (labelKey 'eateryUnpublishedTag'). Never shown for a live row.
 export function PlaceholderTag({ lang, style, lines = 2, short = false, labelKey = 'eateryPlaceholderTag' }) {
+  if (EATERY_DEMO && labelKey === 'eateryUnpublishedTag') return null   // owner-demo recording only (Preview build)
   const full = t(labelKey, lang)
   if (short) {
     // First word only ("ÖRNEK"): the thumbnail is a fixed 64pt, so the label is fixed-size and shrinks to fit, never clipped mid-word.

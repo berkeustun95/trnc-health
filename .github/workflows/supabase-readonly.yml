@@ -8,6 +8,8 @@
 #   gh workflow run supabase-readonly -f file=supabase/probe_<name>.sql --ref <branch>
 #
 # Only supabase/readonly/*.sql and supabase/probe_*.sql are accepted, from the ref you dispatch.
+# Results are sealed, because Actions logs are public. Open one on the Mac, which appends it to the vault:
+#   node scripts/readonly-results.mjs <run-id>
 
 name: supabase-readonly
 

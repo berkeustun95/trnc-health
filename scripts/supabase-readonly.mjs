@@ -12,10 +12,15 @@
 // ⚠ The token is the same SUPABASE_ACCESS_TOKEN the migrate workflow uses (Supabase personal tokens
 //   are not scope-limited). The read-only boundary is this endpoint + that role, proved each run.
 //
+// ⚠ RESULTS ARE SEALED. Actions logs on this repo are public, so nothing a query returns is printed in the
+//   clear, on success or failure. Open a result with `node scripts/readonly-results.mjs <run-id>`, which
+//   appends it to the vault. See scripts/lib/readonly-seal.mjs.
+//
 // Only committed files under supabase/readonly/ or supabase/probe_*.sql run. Probes that report via
 // RAISE EXCEPTION (the SQL editor's only reliable output) are printed as the report, exit 0.
 import { readFileSync } from 'node:fs'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+import { seal } from './lib/readonly-seal.mjs'
 
 prodWriteGuard({ wouldWrite: false, workflow: 'supabase-readonly' })
 
@@ -56,11 +61,15 @@ if (!p.bypasses_rls) console.log('⚠ RLS applies to this role: counts on RLS ta
 // 2 — the file.
 console.log(`\n── ${file} ──`)
 const r = await readOnly(readFileSync(file, 'utf8'))
+const publicKey = readFileSync('scripts/lib/readonly-results.pub', 'utf8')
 if (r.ok) {
-  console.log(JSON.stringify(r.json, null, 2))
+  console.log(seal(JSON.stringify(r.json, null, 2), publicKey))
 } else {
   const msg = r.json?.message ?? r.text
-  console.log(msg)
+  console.log(seal(msg, publicKey))
   // A probe's report arrives as its RAISE EXCEPTION text; anything else is a real failure.
-  if (!/^(supabase\/probe_)/.test(file) || !/READY/.test(msg)) process.exit(1)
+  if (!/^(supabase\/probe_)/.test(file) || !/READY/.test(msg)) {
+    console.error('::error::The query failed. The reason is in the sealed result above.')
+    process.exit(1)
+  }
 }
