@@ -94,8 +94,9 @@ export function EventStrip({ events, counts, range, onRange, venueKey, onClearVe
 }
 
 const m = StyleSheet.create({
+  // No elevation: it lifted the pin above the badge, and marker snapshots drop shadows anyway.
   pin:       { width: 32, height: 32, borderRadius: 16, backgroundColor: EVENT_INK, borderWidth: 2, borderColor: '#fff',
-               alignItems: 'center', justifyContent: 'center', ...elevation.floating },
+               alignItems: 'center', justifyContent: 'center' },
   pinActive: { width: 38, height: 38, borderRadius: 19 },
   wrap:      { flexDirection: 'row', alignItems: 'flex-start', padding: 2 },
   badge:     { marginLeft: -10, marginTop: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
