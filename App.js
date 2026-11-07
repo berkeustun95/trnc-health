@@ -32,7 +32,7 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, EXPLORE_ROUTES_LIVE, HOTELS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT } from './constants/redesign'
 import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
@@ -653,6 +653,7 @@ export default function App() {
   const [showEvents, setShowEvents] = useState(false)
   const [showAccommodation, setShowAccommodation] = useState(false)
   const [showHotels, setShowHotels] = useState(false)
+  const [hotelsQuery, setHotelsQuery] = useState('')   // set by a Keşfet hotel pin: Oteller opens searched to it
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
@@ -1117,7 +1118,7 @@ export default function App() {
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
-      if (showHotels) { setShowHotels(false); return true }
+      if (showHotels) { setShowHotels(false); setHotelsQuery(''); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (selectedFacility) { if (facilityBackRef.current?.()) return true; setSelectedFacility(null); return true }
       if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
@@ -2183,7 +2184,7 @@ export default function App() {
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />
     )
   } else if (showHotels) {
-    content = <HotelsScreen lang={lang} onClose={() => setShowHotels(false)} />
+    content = <HotelsScreen lang={lang} initialQuery={hotelsQuery} onClose={() => { setShowHotels(false); setHotelsQuery('') }} />
   } else if (showHomeServices) {
     content = (MODULE_FLAGS.homeServices || isAdmin)
       ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} backRef={homeServicesBackRef} />
@@ -2749,6 +2750,7 @@ export default function App() {
                 // The row the map already holds (EventsScreen's columns); eventFromHome makes back
                 // close Etkinlikler and land on the map again, as it lands on Home from the strip.
                 onSelectEvent={MODULE_FLAGS.events ? row => { setOpenedEvent(row); setEventFromHome(true); setShowEvents(true) } : undefined}
+                onOpenHotel={HOTELS_LIVE ? h => { setHotelsQuery(h.name); setShowHotels(true) } : undefined}
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}
