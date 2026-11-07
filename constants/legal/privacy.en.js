@@ -80,6 +80,8 @@ Location: ADA uses your device's location only if you allow it, and you can turn
 
 Microphone (Ask Oli): if you tap the microphone in Ask Oli, your speech is converted to text by your device's speech service. ADA never records or stores audio.
 
+Ask Oli chat: Ask Oli answers only from ADA's own information — listings, duty pharmacy rotas, events, places and partners — by matching your words to topics. It is not an AI, and what you type or say to Oli is not sent to any AI provider or other third party. If you are signed in, your questions and Oli's answers are saved to your account so that you can see them again. Your chat history is shown only to you, is deleted automatically after 90 days, and you can delete it at any time with “Delete my chat history” in Ask Oli. As a guest, your chat is not saved: it is kept only on your phone while the app is open.
+
 Usage data: we do not use analytics SDKs or third-party trackers. Section 5 describes the limited exception that applies if and when advertising is enabled in the app.
 
 2. WHY WE PROCESS YOUR DATA, AND ON WHAT LEGAL BASIS
@@ -96,6 +98,7 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Use your location to show what is near you: distance order, the map, search order and local weather — To give you the service you asked for. Legal basis: Performance of a contract with you
 • Count taps on businesses' contact buttons, with the district — To show businesses how many people contact them through ADA. Legal basis: Our legitimate interest in running and funding the service
 • Count booking requests sent to partners (apartment, dates, guests) — To show partners how many requests they get through ADA. Legal basis: Our legitimate interest in running and funding the service
+• Save your Ask Oli chat history so you can see it again — To give you the feature you use. Legal basis: Performance of a contract with you
 • Record the walking routes you complete and show your route badges — To give you the feature you use. Legal basis: Performance of a contract with you
 • Report monthly totals of completed walking routes to the Ministry of Tourism — To support the walking-routes programme we run with it. Legal basis: Our legitimate interest in running the service
 • Check that you are at a place when you check in, and show your check-ins to other signed-in users — To give you the feature you use. Legal basis: Performance of a contract with you
@@ -170,6 +173,7 @@ Different data is kept for different lengths of time.
 • Check-ins: retained for as long as your account is active, and deleted with it. A check-in you delete is removed at once.
 • Order records — 30 days: deleted automatically 30 days after the order was created. The verification page stops confirming an order 2 hours after it was created.
 • Booking requests — 12 months: the record of a request (apartment, dates, number of guests, time sent) is deleted automatically after 12 months.
+• Ask Oli chat history — 90 days: your questions and Oli's answers are deleted automatically 90 days after they were sent, at once if you use “Delete my chat history”, and with your account.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 
 8. AGE AND CHILDREN

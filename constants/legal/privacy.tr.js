@@ -80,6 +80,8 @@ Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bu
 
 Mikrofon (Oli'ye sor): Oli'ye sor alanındaki mikrofona dokunursanız, konuşmanız cihazınızın konuşma tanıma hizmeti tarafından yazıya çevrilir. ADA hiçbir zaman ses kaydetmez veya saklamaz.
 
+Oli'ye sor sohbeti: Oli'ye sor, sözlerinizi konularla eşleştirerek yalnızca ADA'nın kendi bilgileriyle — listeler, nöbetçi eczane çizelgeleri, etkinlikler, yerler ve iş ortakları — yanıt verir. Yapay zekâ değildir; Oli'ye yazdıklarınız veya söyledikleriniz hiçbir yapay zekâ sağlayıcısına ya da başka bir üçüncü tarafa gönderilmez. Giriş yaptıysanız, sorularınız ve Oli'nin yanıtları tekrar görebilmeniz için hesabınızda saklanır. Sohbet geçmişiniz yalnızca size gösterilir, 90 gün sonra otomatik olarak silinir ve Oli'ye sor içindeki “Sohbet geçmişimi sil” ile istediğiniz zaman silebilirsiniz. Misafir olarak sohbetiniz kaydedilmez: yalnızca uygulama açıkken telefonunuzda tutulur.
+
 Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları kullanmıyoruz. Uygulamada reklam etkinleştirildiğinde geçerli olacak sınırlı istisna 5. bölümde açıklanmıştır.
 
 2. VERİLERİNİZİ NEDEN VE HANGİ HUKUKİ DAYANAKLA İŞLİYORUZ
@@ -96,6 +98,7 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Yakınınızdakileri göstermek için konumunuzu kullanmak: uzaklık sırası, harita, arama sırası ve yerel hava durumu — İstediğiniz hizmeti sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • İşletmelerin iletişim düğmelerine yapılan dokunuşları bölgeyle birlikte saymak — İşletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
 • İş ortaklarına gönderilen rezervasyon taleplerini saymak (daire, tarihler, misafir sayısı) — İş ortaklarına ADA üzerinden kaç talep aldıklarını gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
+• Oli'ye sor sohbet geçmişinizi tekrar görebilmeniz için saklamak — Kullandığınız özelliği sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • Tamamladığınız yürüyüş rotalarını kaydetmek ve rota rozetlerinizi göstermek — Kullandığınız özelliği sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • Tamamlanan yürüyüş rotalarının aylık toplamlarını Turizm Bakanlığı'na bildirmek — Bakanlıkla birlikte yürüttüğümüz yürüyüş rotaları programını desteklemek için. Hukuki dayanak: Hizmeti yürütmeye ilişkin meşru menfaatimiz
 • Bir mekanda check-in yaptığınızda orada olduğunuzu kontrol etmek ve check-in'lerinizi giriş yapmış diğer kullanıcılara göstermek — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
@@ -170,6 +173,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
 • Sipariş kayıtları — 30 gün: siparişin oluşturulmasından 30 gün sonra otomatik olarak silinir. Doğrulama sayfası, siparişi oluşturulmasından 2 saat sonra artık doğrulamaz.
 • Rezervasyon talepleri — 12 ay: bir talebin kaydı (daire, tarihler, misafir sayısı, gönderilme zamanı) 12 ay sonra otomatik olarak silinir.
+• Oli'ye sor sohbet geçmişi — 90 gün: sorularınız ve Oli'nin yanıtları gönderildikten 90 gün sonra otomatik olarak, “Sohbet geçmişimi sil”i kullanırsanız hemen ve hesabınızla birlikte silinir.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
 8. YAŞ VE ÇOCUKLAR
