@@ -457,7 +457,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   dateValue: {
@@ -508,7 +507,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: 12,
   },
@@ -638,7 +636,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   rateRow: {

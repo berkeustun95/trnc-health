@@ -657,8 +657,7 @@ const legacyS = StyleSheet.create({
   block:       { marginBottom: 22 },
   blockTitle:  { fontSize: TYPE.section, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
                  marginBottom: 12 },
-  subTitle:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                 textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4, marginBottom: 8 },
+  subTitle:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginTop: 4, marginBottom: 8 },
   about:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 21 },
 
   // ─── Room cards ──────────────────────────────────────────────────────────
@@ -668,8 +667,7 @@ const legacyS = StyleSheet.create({
   roomName:    { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   roomAlt:     { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
   roomPriceRow:{ marginTop: 10 },
-  roomPriceLabel: { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
-                    textTransform: 'uppercase', letterSpacing: 0.4 },
+  roomPriceLabel: { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, letterSpacing: 0.4 },
   roomPrice:   { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
   yearNote:    { marginTop: 2, fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 

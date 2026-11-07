@@ -991,7 +991,7 @@ const legacyCs = StyleSheet.create({
   intentBadge:         { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: colors.primary },
   intentBadgeSale:     { backgroundColor: colors.success },
   intentBadgeShort:    { backgroundColor: colors.accent },
-  intentBadgeText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 },
+  intentBadgeText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.2 },
 
   imgCount:            { position: 'absolute', bottom: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)' },
   imgCountText:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
@@ -1004,7 +1004,7 @@ const legacyCs = StyleSheet.create({
   priceBadgeText:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
 
   specsRow:            { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  propType:            { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.3 },
+  propType:            { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.3 },
   specChip:            { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.surface },
   specText:            { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
@@ -1017,7 +1017,7 @@ const legacyCs = StyleSheet.create({
 
   overlay:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:               { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
-  sheetTitle:          { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 },
+  sheetTitle:          { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 14 },
 
   currencyChips:       { flexDirection: 'row', gap: 8, marginBottom: 16 },
   currencyChip:        { flex: 1, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' },
@@ -1057,7 +1057,7 @@ const redesignCs = StyleSheet.create({
   cardBody:            { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6 },
   title:               { ...type.rowTitle, color: colors.textPrimary },
   placeText:           { flex: 1, ...type.meta, color: colors.textSecondary },
-  propType:            { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.3 },
+  propType:            { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, letterSpacing: 0.3 },
   specChip:            { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.xs, backgroundColor: colors.soft },
   specText:            { ...type.meta, color: colors.textSecondary },
   agencyName:          { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, maxWidth: '45%' },

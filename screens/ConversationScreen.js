@@ -533,8 +533,7 @@ const s = StyleSheet.create({
   //   which is the treatment every other badge in this screen already uses.
   dayPill:   { alignSelf: 'center', backgroundColor: colors.surface, borderRadius: radius.sm,
                paddingHorizontal: 10, paddingVertical: 3, marginVertical: 10 },
-  dayLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-               textTransform: 'uppercase', letterSpacing: 0.6 },
+  dayLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2 },
 
   bubbleRow:       { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 8 },
   bubbleRowMine:   { justifyContent: 'flex-end' },

@@ -143,8 +143,7 @@ const s = StyleSheet.create({
 
   divider:      { height: 1, backgroundColor: colors.border, marginVertical: 18 },
 
-  sectionTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                  textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2 },
   sectionBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                   marginTop: 4, marginBottom: 12, lineHeight: 18 },
 

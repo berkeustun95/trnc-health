@@ -264,8 +264,7 @@ const legacyS = StyleSheet.create({
   // small screen, and capping it here is what stops the buttons being pushed off.
   scroll:   { maxHeight: 440 },
   scrollContent: { paddingBottom: 4 },
-  yearLabel: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-               textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 14, marginBottom: 8 },
+  yearLabel: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4, marginTop: 14, marginBottom: 8 },
   plan:     { backgroundColor: colors.cardBg, borderRadius: radius.md, padding: 14, marginBottom: 10 },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   planTitle:{ flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

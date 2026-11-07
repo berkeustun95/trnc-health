@@ -576,7 +576,7 @@ const p = StyleSheet.create({
 
   panel:      { padding: 16 },
   head:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  city:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: ROUTE_COLOR, textTransform: 'uppercase', letterSpacing: 0.4 },
+  city:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: ROUTE_COLOR, letterSpacing: 0.4 },
   name:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
   summary:    { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginTop: 8 },
   note:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4, lineHeight: 15 },

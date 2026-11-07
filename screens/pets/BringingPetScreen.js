@@ -292,7 +292,7 @@ const s = StyleSheet.create({
   countryNote:          { flexDirection: 'row', gap: 8, backgroundColor: colors.primaryLight, borderRadius: radius.sm, padding: 12, marginBottom: 12 },
   countryNoteText:      { fontSize: 13, color: colors.primary, fontFamily: 'Inter_400Regular', lineHeight: 18, flex: 1 },
 
-  sectionHeader:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, marginBottom: 10, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionHeader:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, marginBottom: 10, marginTop: 12, letterSpacing: 0.2 },
 
   stepCard:             { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 14, flexDirection: 'row', gap: 12, marginBottom: 8, ...shadow },
   stepNumWrap:          { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', flexShrink: 0, marginTop: 1 },
