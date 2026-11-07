@@ -3,7 +3,7 @@
 -- Catalog reads only: no user rows, no counts of user data.
 SELECT 'version' AS item, version() AS value
 UNION ALL SELECT 'fn:' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
-       'md5(prosrc)=' || md5(p.prosrc) || ' secdef=' || p.prosecdef || ' config=' || coalesce(p.proconfig::text, '') || E'\n' || p.prosrc
+       'md5(prosrc)=' || md5(p.prosrc) || ' secdef=' || p.prosecdef || ' config=' || coalesce(p.proconfig::text, '') || ' acl=' || coalesce(p.proacl::text, '<default>') || E'\n' || p.prosrc
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE (n.nspname = 'public' AND p.proname IN ('auto_hide_reported_content', 'guard_moderation_columns', 'may_initiate_by_age',
           'is_previewer', 'is_admin', 'get_my_role', 'is_anonymous_session', 'contains_blocked_term', 'contains_payment_solicitation'))
