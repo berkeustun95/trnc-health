@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Modal, View, Text, Image, TextInput, TouchableOpacity, FlatList, ScrollView, StyleSheet, Keyboard, Alert,
+import { Modal, View, Text, Image, TextInput, TouchableOpacity, FlatList, ScrollView, StyleSheet, Keyboard,
   KeyboardAvoidingView, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type, radii, elevation, press } from '../constants/theme'
 import { t, dateLocale } from '../constants/i18n'
-import { getIntent, OLI_CHAT_INTENTS } from '../constants/oliIntents'
+import { getIntent, getPlaceType, OLI_CHAT_INTENTS } from '../constants/oliIntents'
 import { oliProvider } from '../utils/oliAnswers'
 import { loadOliHistory, saveOliMessage, deleteOliHistory } from '../utils/oliHistory'
 import { localDateKey } from '../utils/dutyStatus'
-import { IconButton, ErrorState, RowSkeleton } from './ui'
+import { IconButton, ErrorState, RowSkeleton, ConfirmDialog } from './ui'
 import { useVoiceInput, MicButton } from './OliMic'
 
 // ─── Ask Oli guided chat (OLI_CHAT) ──────────────────────────────────────────
@@ -64,7 +64,8 @@ function safeAnswer(p) {
     : []
   if (kind === 'route') return intent ? { kind, intent, items: [] } : { kind: 'noMatch', intent: null, items: [] }
   if (!TEXT_KEY[kind]) return { kind: 'noMatch', intent: null, items: [] }
-  return { kind, intent, items }
+  const types = kind === 'nearby' && Array.isArray(p.types) ? p.types.map(getPlaceType).filter(Boolean) : []
+  return { kind, intent, items, types }
 }
 
 function dayLabel(iso, lang) {
@@ -88,6 +89,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [notSaved, setNotSaved] = useState(false)
+  const [del, setDel] = useState(null)                // null | { busy, error } while the delete confirm is open
   const listRef = useRef(null)
   const inputRef = useRef('')
   inputRef.current = input
@@ -153,15 +155,13 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
     if (canSave && (userErr || oliErr)) setNotSaved(true)
   }
 
-  function confirmDelete() {
-    Alert.alert(t('oliChatDeleteTitle', lang), t('oliChatDeleteBody', lang), [
-      { text: t('cancel', lang), style: 'cancel' },
-      { text: t('oliChatDeleteConfirm', lang), style: 'destructive', onPress: async () => {
-        const err = await deleteOliHistory(userId)
-        if (err) { Alert.alert(t('oliChatDeleteFailed', lang)); return }
-        setMessages([]); setNotSaved(false)
-      } },
-    ])
+  // The app's own dialog, not Alert.alert: Android's system dialog upper-cases its buttons without the locale, so
+  // Turkish "Sil" read "SIL" (device test 2026-11-07).
+  async function doDelete() {
+    setDel({ busy: true, error: null })
+    const err = await deleteOliHistory(userId)
+    if (err) { setDel({ busy: false, error: t('oliChatDeleteFailed', lang) }); return }
+    setDel(null); setMessages([]); setNotSaved(false)
   }
 
   function runAction(a) {
@@ -185,7 +185,12 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
   function renderOli(m) {
     const a = safeAnswer(m.payload)
     const [withItems, without] = TEXT_KEY[a.kind] ?? []
-    const text = a.kind === 'route' ? t(a.intent.msgKey, lang) : t(a.items.length ? withItems : without, lang)
+    const typeLabels = a.types.map(p => t(p.labelKey, lang)).join(', ')
+    const text = a.kind === 'route' ? t(a.intent.msgKey, lang)
+      : typeLabels ? t(a.items.length ? 'oliChatNearbyType' : 'oliChatNearbyTypeNone', lang).replace('{types}', typeLabels)
+      : t(a.items.length ? withItems : without, lang)
+    // Food-only types have their places on the Eatery page, not in Explore.
+    const goTo = a.types.length && a.types.every(p => p.eatery) ? getIntent('eatery') : a.intent
     return (
       <View style={s.oliRow}>
         <Image source={require('../assets/oli-button.png')} style={s.oliAvatar} resizeMode="cover" />
@@ -202,10 +207,10 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
               {!!it.a && <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
             </TouchableOpacity>
           ))}
-          {WITH_BUTTON.has(a.kind) && a.intent && (
+          {WITH_BUTTON.has(a.kind) && goTo && (
             <TouchableOpacity style={s.goBtn} activeOpacity={press.small} accessibilityRole="button"
-              onPress={() => runAction({ nav: a.intent.id })}>
-              <Text style={s.goText}>{t(a.intent.titleKey, lang)}</Text>
+              onPress={() => runAction({ nav: goTo.id })}>
+              <Text style={s.goText}>{t(goTo.titleKey, lang)}</Text>
               <Ionicons name="arrow-forward" size={15} color={colors.onPrimary} />
             </TouchableOpacity>
           )}
@@ -237,7 +242,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
           <Image source={require('../assets/oli-button.png')} style={s.headImg} resizeMode="cover" />
           <Text style={s.headTitle} accessibilityRole="header">{t('homeOliTitle', lang)}</Text>
           {canSave && messages.length > 0 && (
-            <IconButton icon="trash-outline" onPress={confirmDelete} accessibilityLabel={t('oliChatDelete', lang)} />
+            <IconButton icon="trash-outline" onPress={() => setDel({ busy: false, error: null })} accessibilityLabel={t('oliChatDelete', lang)} />
           )}
           <IconButton icon="close" onPress={closeSheet} accessibilityLabel={t('uiClose', lang)} />
         </View>
@@ -303,6 +308,9 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
         </View>
       </KeyboardAvoidingView>
       </View>
+      <ConfirmDialog visible={!!del} lang={lang} destructive title={t('oliChatDeleteTitle', lang)}
+        message={t('oliChatDeleteBody', lang)} confirmLabel={t('oliChatDeleteConfirm', lang)}
+        onConfirm={doDelete} onCancel={() => { if (!del?.busy) setDel(null) }} loading={del?.busy} error={del?.error} />
     </Modal>
   )
 }
