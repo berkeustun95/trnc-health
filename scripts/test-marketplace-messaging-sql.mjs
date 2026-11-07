@@ -7,9 +7,11 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile } from './migration-harness.mjs'
 
-const FIXTURE = readFileSync(fileURLToPath(new URL('./fixtures/messaging-live.sql', import.meta.url)), 'utf8')
 const MIGRATIONS = (process.env.MARKETPLACE_MIGRATIONS || '').split(' ').filter(Boolean)
   .map(f => fileURLToPath(new URL('../supabase/migrations/' + f, import.meta.url)))
+// With migrations: also the prerequisites they build on (Araçlar S1, storage, report constraints).
+const FIXTURE = ['./fixtures/messaging-live.sql', ...(MIGRATIONS.length ? ['./fixtures/marketplace-prereqs.sql'] : [])]
+  .map(f => readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8')).join('\n')
 
 const U = {
   A: 'a0000000-0000-4000-8000-00000000000a', B: 'b0000000-0000-4000-8000-00000000000b',
@@ -129,7 +131,7 @@ let failed = 0
 const check = (name, ok, got) => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  got: ' + JSON.stringify(got)}`) }
 
 // 0. The fixture IS the live system: its bodies hash to the probe's md5s.
-{
+if (!MIGRATIONS.length) {
   const LIVE_MD5 = {
     start_conversation: 'ebc64230658bf71451bd47d3abf236d7', send_message: '384abcad73aaa28c00d15a2dbf84a63d',
     list_conversations: 'da2984e37a90a7ceff8128b5d4bdafb0', notify_new_message: '3cd1e046ff8149cfb09214421c469f2b',
