@@ -131,7 +131,7 @@ import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import OliSearchSheet from './components/OliSearchSheet'
-import OliChatSheet from './components/OliChatSheet'
+import OliChatSheet, { OliErrorBoundary } from './components/OliChatSheet'
 import { EmergencySheet, MunicipalSheet, LanguageSheet, AboutSheet } from './components/shell/Sheets'
 import { SettingsGroups, GuestProfile } from './components/shell/Settings'
 import { ConfirmDialog } from './components/ui'
@@ -3018,9 +3018,13 @@ export default function App() {
       {oliVisible && (
         REDESIGN
           ? OLI_CHAT
-            ? <OliChatSheet lang={lang} userLocation={userLocation} userId={session?.user?.id ?? null} isGuest={!session || isGuest(session)}
-                onNavigate={oliNavigate} onOpenResult={openSearchResult} onOpenEvent={id => { oliNavigate(null); openEventFromHome(id) }}
-                onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
+            // If the chat itself throws, the app keeps running and the Oli bar opens the search sheet instead.
+            ? <OliErrorBoundary fallback={<OliSearchSheet lang={lang} userLocation={userLocation} onNavigate={oliNavigate}
+                onOpenResult={openSearchResult} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />}>
+                <OliChatSheet lang={lang} userLocation={userLocation} userId={session?.user?.id ?? null} isGuest={!session || isGuest(session)}
+                  onNavigate={oliNavigate} onOpenResult={openSearchResult} onOpenEvent={id => { oliNavigate(null); openEventFromHome(id) }}
+                  onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
+              </OliErrorBoundary>
             : <OliSearchSheet lang={lang} userLocation={userLocation} onNavigate={oliNavigate} onOpenResult={openSearchResult}
                 onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
           : <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
