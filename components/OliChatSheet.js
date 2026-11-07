@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Component, useEffect, useRef, useState } from 'react'
 import { Modal, View, Text, Image, TextInput, TouchableOpacity, FlatList, ScrollView, StyleSheet, Keyboard,
   KeyboardAvoidingView, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -62,8 +62,11 @@ function safeAnswer(p) {
     ? p.items.filter(i => i && typeof i.t === 'string').slice(0, 10)
         .map(i => ({ t: i.t, s: typeof i.s === 'string' ? i.s : '', a: safeAction(i.a) }))
     : []
-  if (kind === 'route') return intent ? { kind, intent, items: [] } : { kind: 'noMatch', intent: null, items: [] }
-  if (!TEXT_KEY[kind]) return { kind: 'noMatch', intent: null, items: [] }
+  // Every return has the same shape: a route answer without `types` crashed the render (production 2026-11-07,
+  // "i want to explore cyprus" → 'beaches' route → a.types.map of undefined).
+  const NO_MATCH = { kind: 'noMatch', intent: null, items: [], types: [] }
+  if (kind === 'route') return intent ? { kind, intent, items: [], types: [] } : NO_MATCH
+  if (!TEXT_KEY[kind]) return NO_MATCH
   const types = kind === 'nearby' && Array.isArray(p.types) ? p.types.map(getPlaceType).filter(Boolean) : []
   return { kind, intent, items, types }
 }
@@ -74,6 +77,60 @@ function dayLabel(iso, lang) {
   if (localDateKey(d) === localDateKey()) return t('oliChatToday', lang)
   try { return d.toLocaleDateString(dateLocale(lang), { weekday: 'short', day: 'numeric', month: 'short' }) }
   catch { return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}` }
+}
+
+// A render error anywhere under this shows `fallback` instead of taking the app down with it (an error boundary
+// is the only thing that stops a render throw from blanking the whole app). A new React `key` retries.
+export class OliErrorBoundary extends Component {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error) { console.warn('Oli render error:', error?.message) }
+  render() { return this.state.failed ? (this.props.fallback ?? null) : this.props.children }
+}
+
+function OliBubble({ text, children }) {
+  return (
+    <View style={s.oliRow}>
+      <Image source={require('../assets/oli-button.png')} style={s.oliAvatar} resizeMode="cover" />
+      <View style={[s.oliBubble, elevation.card]}>
+        <Text style={s.oliText}>{text}</Text>
+        {children}
+      </View>
+    </View>
+  )
+}
+
+function OliAnswer({ payload, lang, onAction }) {
+  const a = safeAnswer(payload)
+  const [withItems, without] = TEXT_KEY[a.kind] ?? []
+  const typeLabels = a.types.map(p => t(p.labelKey, lang)).join(', ')
+  const text = a.kind === 'route' ? t(a.intent.msgKey, lang)
+    : typeLabels ? t(a.items.length ? 'oliChatNearbyType' : 'oliChatNearbyTypeNone', lang).replace('{types}', typeLabels)
+    : t(a.items.length ? withItems : without, lang)
+  // Food-only types have their places on the Eatery page, not in Explore.
+  const goTo = a.types.length && a.types.every(p => p.eatery) ? getIntent('eatery') : a.intent
+  return (
+    <OliBubble text={text}>
+      {a.items.map((it, n) => (
+        <TouchableOpacity key={n} style={s.item} activeOpacity={press.small} disabled={!it.a}
+          accessibilityRole={it.a ? 'button' : 'text'} accessibilityLabel={[it.t, it.s].filter(Boolean).join(', ')}
+          onPress={() => onAction(it.a)}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.itemTitle} numberOfLines={2}>{it.t}</Text>
+            {!!it.s && <Text style={s.itemSub} numberOfLines={2}>{it.s}</Text>}
+          </View>
+          {!!it.a && <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
+        </TouchableOpacity>
+      ))}
+      {WITH_BUTTON.has(a.kind) && goTo && (
+        <TouchableOpacity style={s.goBtn} activeOpacity={press.small} accessibilityRole="button"
+          onPress={() => onAction({ nav: goTo.id })}>
+          <Text style={s.goText}>{t(goTo.titleKey, lang)}</Text>
+          <Ionicons name="arrow-forward" size={15} color={colors.onPrimary} />
+        </TouchableOpacity>
+      )}
+    </OliBubble>
+  )
 }
 
 let localSeq = 0
@@ -182,48 +239,15 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
   }
   if (busy) items.push({ kind: 'typing', key: 'typing' })
 
-  function renderOli(m) {
-    const a = safeAnswer(m.payload)
-    const [withItems, without] = TEXT_KEY[a.kind] ?? []
-    const typeLabels = a.types.map(p => t(p.labelKey, lang)).join(', ')
-    const text = a.kind === 'route' ? t(a.intent.msgKey, lang)
-      : typeLabels ? t(a.items.length ? 'oliChatNearbyType' : 'oliChatNearbyTypeNone', lang).replace('{types}', typeLabels)
-      : t(a.items.length ? withItems : without, lang)
-    // Food-only types have their places on the Eatery page, not in Explore.
-    const goTo = a.types.length && a.types.every(p => p.eatery) ? getIntent('eatery') : a.intent
-    return (
-      <View style={s.oliRow}>
-        <Image source={require('../assets/oli-button.png')} style={s.oliAvatar} resizeMode="cover" />
-        <View style={[s.oliBubble, elevation.card]}>
-          <Text style={s.oliText}>{text}</Text>
-          {a.items.map((it, n) => (
-            <TouchableOpacity key={n} style={s.item} activeOpacity={press.small} disabled={!it.a}
-              accessibilityRole={it.a ? 'button' : 'text'} accessibilityLabel={[it.t, it.s].filter(Boolean).join(', ')}
-              onPress={() => runAction(it.a)}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.itemTitle} numberOfLines={2}>{it.t}</Text>
-                {!!it.s && <Text style={s.itemSub} numberOfLines={2}>{it.s}</Text>}
-              </View>
-              {!!it.a && <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
-            </TouchableOpacity>
-          ))}
-          {WITH_BUTTON.has(a.kind) && goTo && (
-            <TouchableOpacity style={s.goBtn} activeOpacity={press.small} accessibilityRole="button"
-              onPress={() => runAction({ nav: goTo.id })}>
-              <Text style={s.goText}>{t(goTo.titleKey, lang)}</Text>
-              <Ionicons name="arrow-forward" size={15} color={colors.onPrimary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    )
-  }
-
   function renderItem({ item }) {
     switch (item.kind) {
       case 'day':    return <Text style={s.day}>{dayLabel(item.at, lang)}</Text>
       case 'user':   return <View style={s.userBubble}><Text style={s.userText}>{item.m.body}</Text></View>
-      case 'oli':    return renderOli(item.m)
+      case 'oli':    return (
+        <OliErrorBoundary fallback={<OliBubble text={t('oliChatNoMatch', lang)} />}>
+          <OliAnswer payload={item.m.payload} lang={lang} onAction={runAction} />
+        </OliErrorBoundary>
+      )
       case 'typing': return <Text style={s.typing} accessibilityLiveRegion="polite">{t('oliChatTyping', lang)}</Text>
     }
     return null
@@ -260,6 +284,8 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
             <Text style={s.notice}>{t(canSave ? 'oliChatNotice' : 'oliChatNoticeGuest', lang)}</Text>
           </ScrollView>
         ) : (
+          // A list-level failure keeps the sheet (chips, composer) usable; the next message retries the list.
+          <OliErrorBoundary key={messages.length} fallback={<View style={s.pad}><OliBubble text={t('oliChatNoMatch', lang)} /></View>}>
           <FlatList
             ref={listRef}
             data={items}
@@ -270,6 +296,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           />
+          </OliErrorBoundary>
         )}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
