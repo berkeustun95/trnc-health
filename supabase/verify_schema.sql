@@ -40,6 +40,8 @@ WITH report AS (
   SELECT 'A-table' section, e.m migration, e.o object,
          CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
   FROM (VALUES
+    -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
+    ('20261163_oli_messages','oli_messages'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_schools'),
     ('1108_driving_schools','driving_school_branches'),
@@ -259,6 +261,13 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs','error_kinds'),
     -- 20261142: registered ahead of the apply; red until it runs.
     ('20261142_duty_push_runs_partial_retries','duty_push_runs','push_retries'),
+    -- 20261163: oli_messages (exact column set asserted in H).
+    ('20261163_oli_messages','oli_messages','id'),
+    ('20261163_oli_messages','oli_messages','user_id'),
+    ('20261163_oli_messages','oli_messages','role'),
+    ('20261163_oli_messages','oli_messages','body'),
+    ('20261163_oli_messages','oli_messages','payload'),
+    ('20261163_oli_messages','oli_messages','created_at'),
     -- 20261143: partner_booking_requests (no identifier column; asserted as an absence in H).
     ('20261143_partner_booking_requests','partner_booking_requests','id'),
     ('20261143_partner_booking_requests','partner_booking_requests','partner'),
@@ -652,6 +661,9 @@ WITH report AS (
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
     ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
     ('1051_app_versions','purge_app_update_events'),
+    -- 20261163: 90-day retention on oli_messages (the job is Q2) and the per-user insert rate guard.
+    ('20261163_oli_messages','purge_oli_messages'),
+    ('20261163_oli_messages','oli_messages_rate_guard'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -678,6 +690,8 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
+    ('20261163_oli_messages','oli_messages_rate_guard'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
@@ -819,6 +833,12 @@ WITH report AS (
     ('20261141_duty_push_runs','duty_push_runs_finished_check'),
     ('20261142_duty_push_runs_partial_retries','duty_push_runs_retries_check'),
     -- 20261143: partner_booking_requests.
+    -- 20261163: oli_messages.
+    ('20261163_oli_messages','oli_messages_pkey'),
+    ('20261163_oli_messages','oli_messages_user_id_fkey'),
+    ('20261163_oli_messages','oli_messages_role_check'),
+    ('20261163_oli_messages','oli_messages_shape_check'),
+    ('20261163_oli_messages','oli_messages_payload_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_pkey'),
     ('20261143_partner_booking_requests','partner_booking_requests_partner_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_apartment_check'),
@@ -1173,6 +1193,8 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Ask Oli chat history (20261163): one user's thread, newest first.
+    ('20261163_oli_messages','oli_messages_user_created_idx'),
     ('1095_institutions_country','institutions_country_idx'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_school_branches_school_idx'),
@@ -5478,6 +5500,35 @@ WITH report AS (
     COALESCE(pg_get_functiondef(to_regprocedure('public.purge_partner_booking_requests()')) LIKE '%DELETE FROM public.partner_booking_requests WHERE created_at < v_cut%'
          AND pg_get_functiondef(to_regprocedure('public.purge_partner_booking_requests()')) LIKE '%v_cut timestamptz := now() - interval ''12 months''%', false)
     AND COALESCE(obj_description(to_regclass('public.partner_booking_requests'), 'pg_class') LIKE '%12 months%', false)
+  -- 20261163: oli_messages, the Ask Oli chat history. Registered ahead of the apply; RED UNTIL IT RUNS.
+  --   Own rows only for a signed-in non-guest (select/insert/delete), nobody updates, NO admin read; user_id comes from
+  --   DEFAULT auth.uid() and is outside the INSERT grant; 90-day purge; 40-rows-per-10-minutes guard.
+  UNION ALL SELECT '20261163_oli_messages','oli_messages: RLS on, exactly the 4 oli_* policies (3 permissive, each own-rows + non-guest), 6 columns, user_id cascades with auth.users',
+    COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.oli_messages')), false)
+    AND COALESCE((SELECT array_agg(policyname::text ORDER BY policyname) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages')
+        IS NOT DISTINCT FROM ARRAY['oli_delete_own','oli_insert_own','oli_no_update','oli_select_own'], false)
+    AND COALESCE((SELECT bool_and((coalesce(qual,'') || coalesce(with_check,'')) LIKE '%auth.uid()%'
+                              AND (coalesce(qual,'') || coalesce(with_check,'')) LIKE '%is_anonymous_session()%')
+                    FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE'), false)
+    AND COALESCE((SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'oli_messages' AND permissive = 'PERMISSIVE') = 3, false)
+    AND COALESCE((SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'oli_messages') = 6, false)
+    AND COALESCE((SELECT confdeltype = 'c' FROM pg_constraint WHERE conrelid = to_regclass('public.oli_messages') AND conname = 'oli_messages_user_id_fkey'), false)
+  UNION ALL SELECT '20261163_oli_messages','oli_messages grants: anon none; authenticated SELECT + DELETE + INSERT exactly (body,payload,role), no UPDATE',
+    COALESCE((SELECT NOT bool_or(has_table_privilege('anon', to_regclass('public.oli_messages'), x))
+                FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) x), false)
+    AND COALESCE(has_table_privilege('authenticated', to_regclass('public.oli_messages'), 'SELECT')
+             AND has_table_privilege('authenticated', to_regclass('public.oli_messages'), 'DELETE')
+             AND NOT has_table_privilege('authenticated', to_regclass('public.oli_messages'), 'UPDATE'), false)
+    AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+                   WHERE a.attrelid = to_regclass('public.oli_messages') AND a.attnum > 0 AND NOT a.attisdropped
+                     AND has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT')) = 'body,payload,role', false)
+  UNION ALL SELECT '20261163_oli_messages','purge_oli_messages + oli_messages_rate_guard: not client-callable; purge deletes created_at < now() - interval ''90 days''; guard refuses at 40 rows per 10 minutes; table comment states 90 days',
+    COALESCE((SELECT bool_and(NOT has_function_privilege('authenticated', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE'))
+                FROM unnest(ARRAY[to_regprocedure('public.purge_oli_messages()'), to_regprocedure('public.oli_messages_rate_guard()')]) f), false)
+    AND COALESCE(pg_get_functiondef(to_regprocedure('public.purge_oli_messages()')) LIKE '%DELETE FROM public.oli_messages WHERE created_at < v_cut%'
+         AND pg_get_functiondef(to_regprocedure('public.purge_oli_messages()')) LIKE '%v_cut timestamptz := now() - interval ''90 days''%', false)
+    AND COALESCE(pg_get_functiondef(to_regprocedure('public.oli_messages_rate_guard()')) LIKE '%interval ''10 minutes'') >= 40%', false)
+    AND COALESCE(obj_description(to_regclass('public.oli_messages'), 'pg_class') LIKE '%90 days%', false)
   ) z
 
   UNION ALL
@@ -5592,7 +5643,9 @@ FROM (VALUES
   -- Retention on eatery_orders (order proof): since 20261132 hourly at :40 (30 days real, 24 h TEST); schedule + command are the 1132 row below.
   ('20261125_eatery_orders','eatery-orders-retention'),
   -- 12-month retention on partner_booking_requests (20261148), 03:53 UTC daily; exact schedule + command are the 20261148 row below.
-  ('20261148_partner_booking_requests_retention','purge-partner-booking-requests')
+  ('20261148_partner_booking_requests_retention','purge-partner-booking-requests'),
+  -- 90-day retention on oli_messages (20261163), 03:57 UTC daily; exact schedule + command are the 20261163 row below.
+  ('20261163_oli_messages','purge-oli-messages')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -5634,6 +5687,16 @@ SELECT '20261148_partner_booking_requests_retention', 'purge-partner-booking-req
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-partner-booking-requests' AND active
                     AND schedule = '53 3 * * *'
                     AND btrim(command) = 'SELECT public.purge_partner_booking_requests()') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261163: purge-oli-messages runs daily at 03:57 and calls the purge function ───
+SELECT '20261163_oli_messages', 'purge-oli-messages: schedule 57 3 * * * and the exact purge call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-oli-messages') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-oli-messages' AND active
+                    AND schedule = '57 3 * * *'
+                    AND btrim(command) = 'SELECT public.purge_oli_messages()') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
