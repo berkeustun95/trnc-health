@@ -39,6 +39,7 @@ import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup, ICON_PIN } from '../co
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import { PlaceIconMarker, PartnerMarker } from '../components/MapIconPins'
+import { clearOfPartners } from '../utils/partnerClearance'
 import { colors, shadow, ellipsizeSlack, type, radii, elevation, placeColors } from '../constants/theme'
 import { Button, IconButton, CategoryIcon, RemoteImage, useTabBarFootprint } from '../components/ui'
 import { t } from '../constants/i18n'
@@ -116,7 +117,7 @@ function regionToBBox(region) {
 // tracksViewChanges false from the very first frame that snapshot can be empty, and the
 // bubble ships blank; leaving it true forever re-snapshots on every frame and stutters
 // the map. Track briefly, then stop. Module-level so it never remounts with the parent.
-function ClusterMarker({ cluster, onPress }) {
+function ClusterMarker({ cluster, drawAt, onPress }) {
   const [tracks, setTracks] = useState(true)
   const count = cluster.properties.point_count
 
@@ -130,7 +131,7 @@ function ClusterMarker({ cluster, onPress }) {
 
   return (
     <Marker
-      coordinate={{ latitude: lat, longitude: lng }}
+      coordinate={drawAt ?? { latitude: lat, longitude: lng }}
       tracksViewChanges={tracks}
       onPress={() => onPress(cluster)}
       anchor={{ x: 0.5, y: 0.5 }}
@@ -174,7 +175,7 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
+function ChipRow({ sources, selectedKeys, onSetKeys, servicesOn, onServices, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
   const layerMode = routesMode || eventsMode || hotelsMode
   return (
     <ScrollView
@@ -195,6 +196,17 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
         onChange={onSetKeys}
         style={{ marginRight: 8 }}
       />
+      {/* Services start OFF on the map (DEFAULT_OFF_KEYS, Berke 2026-11-08): this chip adds them. */}
+      {!layerMode && sources.some(src => src.key === 'explore:services') && (
+        <Chip
+          label={t(GROUP_META.services.labelKey, lang)}
+          ionicon={ICON_PIN.services.icon}
+          active={servicesOn}
+          color={GROUP_META.services.colorToken.text}
+          colorBg={GROUP_META.services.colorToken.bg}
+          onPress={onServices}
+        />
+      )}
       {/* Before Rotalar: the row scrolls, and the chip must be visible without a swipe (Berke, 2026-11-01). */}
       {canOfficial && (
         <Chip
@@ -465,6 +477,7 @@ export default function ExploreMapScreen({
   const [selectedKeys, setSelectedKeys] = useState(() => new Set(snap?.selectedKeys ?? []))
   const [openNow, setOpenNow] = useState(snap?.openNow ?? false)
   const [officialOnly, setOfficialOnly] = useState(snap?.officialOnly ?? false)
+  const [servicesOn, setServicesOn] = useState(snap?.servicesOn ?? false)   // DEFAULT_OFF_KEYS chip
 
   const review   = EXPLORE_REVIEW && isAdmin
   const routesOn = routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: EXPLORE_REVIEW, isAdmin })
@@ -824,9 +837,9 @@ export default function ExploreMapScreen({
   const canOfficial = useMemo(() => officialVisitApplicable(sources.flatMap(s => s.pins)), [sources])
   const pins = useMemo(
     () => applyOfficialVisit(
-      applyOpenNow(selectedPins(sources, selectedKeys), openNow && canOpenNow, dutyWindows),
+      applyOpenNow(selectedPins(sources, selectedKeys, servicesOn), openNow && canOpenNow, dutyWindows),
       officialOnly && canOfficial),
-    [sources, selectedKeys, openNow, canOpenNow, dutyWindows, officialOnly, canOfficial]
+    [sources, selectedKeys, servicesOn, openNow, canOpenNow, dutyWindows, officialOnly, canOfficial]
   )
 
   // Pin sources load at different times (facilities are a prop; places and eatery rows are
@@ -845,12 +858,12 @@ export default function ExploreMapScreen({
   // Every handoff off this map goes through here, so every one of them comes back to it.
   const handOff = useCallback((go, pinId = null) => {
     returnSnapshot = {
-      region, selectedKeys: [...selectedKeys], openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode,
+      region, selectedKeys: [...selectedKeys], servicesOn, openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode,
       routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
       walkNext: walk ? walk.next : null, follow,
     }
     go()
-  }, [region, selectedKeys, openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode, selectedRoute, walk, follow])
+  }, [region, selectedKeys, servicesOn, openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode, selectedRoute, walk, follow])
 
   // Partner eateries never cluster: they are drawn after the cluster layer, on top (Berke 2026-11-08).
   const partnerPins = useMemo(() => pins.filter(p => p.kind === 'eatery'), [pins])
@@ -865,8 +878,8 @@ export default function ExploreMapScreen({
   }, [pins])
 
   const clusters = useMemo(
-    () => index.getClusters(regionToBBox(region), regionToZoom(region, width)),
-    [index, region, width]
+    () => clearOfPartners(index.getClusters(regionToBBox(region), regionToZoom(region, width)), partnerPins, region, width, height),
+    [index, region, width, height, partnerPins]
   )
 
   // Hotels: read on first entry (102 rows, only the pin + card columns), clustered on their own index
@@ -1027,7 +1040,7 @@ export default function ExploreMapScreen({
         ))}
         {!routesMode && !eventsMode && !hotelsMode && clusters.map(c => {
           if (c.properties.cluster) {
-            return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
+            return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} drawAt={c.drawAt} onPress={expandCluster} />
           }
           const pin = c.properties.pin
           if (pin.kind === 'place' && ICON_PIN[pin.group]) {
@@ -1054,6 +1067,8 @@ export default function ExploreMapScreen({
         sources={sources}
         selectedKeys={selectedKeys}
         onSetKeys={keys => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set(keys)) }}
+        servicesOn={servicesOn}
+        onServices={() => { setSelected(null); leaveRoutes(); setServicesOn(v => !v) }}
         openNow={openNow}
         canOpenNow={canOpenNow}
         onOpenNow={() => { setSelected(null); leaveRoutes(); setOpenNow(v => !v) }}
@@ -1063,7 +1078,7 @@ export default function ExploreMapScreen({
           setSelected(null); leaveRoutes()
           // Turning it on under a Kategori pick with no EEMD site (e.g. Sağlık alone) would blank
           // the map; widen the pick to Tümü instead.
-          if (!officialOnly && !officialVisitApplicable(selectedPins(sources, selectedKeys))) setSelectedKeys(new Set())
+          if (!officialOnly && !officialVisitApplicable(selectedPins(sources, selectedKeys, servicesOn))) setSelectedKeys(new Set())
           setOfficialOnly(v => !v)
         }}
         showRoutes={showRoutesChip}
