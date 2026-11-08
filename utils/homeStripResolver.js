@@ -7,7 +7,7 @@ import { LANG_CODES, dateLocale } from '../constants/i18n.js'
 import { assembleStripSlides } from './stripSlides.js'
 import { maybeListedFilter, isEventOver, isRunningFromEarlierDay, startsSoon } from './eventVisibility.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
-import { readableTitle } from './readableTitle'
+import { readableTitle } from './readableTitle.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
 //
