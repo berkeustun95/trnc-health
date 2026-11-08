@@ -134,6 +134,15 @@ export function OliAnswer({ payload, lang, onAction }) {
   )
 }
 
+// A hung network ends a send as the error reply after SEND_TIMEOUT_MS, so the lock is released and the chat stays
+// usable; the question then counts as not saved, and no reply is stored without it.
+export const SEND_TIMEOUT_MS = 15000
+function withTimeout(promise, fallback) {
+  let timer
+  const late = new Promise(resolve => { timer = setTimeout(() => resolve(fallback), SEND_TIMEOUT_MS) })
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer))
+}
+
 let localSeq = 0
 const localKey = () => `l${Date.now()}-${localSeq++}`
 
@@ -211,10 +220,11 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
     setMessages(m => [...m, { key: localKey(), role: 'user', body, at: now.toISOString() }])
     try {
       const savedUser = canSave ? saveOliMessage({ role: 'user', body: body.slice(0, 500) }) : Promise.resolve(null)
+      const failed = { v: 1, kind: 'error', intent: null, items: [], day: localDateKey(now) }
       let answer
-      try { answer = await oliProvider.answer({ text: intentId ? '' : body, intentId, lang, userLocation, now }) }
-      catch { answer = { v: 1, kind: 'error', intent: null, items: [], day: localDateKey(now) } }
-      const userErr = await savedUser
+      try { answer = await withTimeout(oliProvider.answer({ text: intentId ? '' : body, intentId, lang, userLocation, now }), failed) }
+      catch { answer = failed }
+      const userErr = await withTimeout(savedUser, new Error('timeout'))
       // An 'error' answer is a moment, not something worth keeping.
       const savedOli = canSave && !userErr && answer.kind !== 'error' ? saveOliMessage({ role: 'oli', payload: answer }) : Promise.resolve(null)
       setMessages(m => [...m, { key: localKey(), role: 'oli', payload: answer, at: new Date().toISOString() }])

@@ -3,7 +3,7 @@
 // The production crash of 2026-11-07 (d82ac6e8: a route answer read a.types.map of undefined) fails here.
 //   npm run test:oli   (runs before every `npm run ota` and `npm run ota:preview`)
 import { render, screen, act, fireEvent } from '@testing-library/react-native'
-import OliChatSheet, { OliAnswer, OliErrorBoundary, TEXT_KEY } from '../components/OliChatSheet'
+import OliChatSheet, { OliAnswer, OliErrorBoundary, TEXT_KEY, SEND_TIMEOUT_MS } from '../components/OliChatSheet'
 import { t, LANGUAGES } from '../constants/i18n'
 import { getIntent } from '../constants/oliIntents'
 import { loadOliHistory, saveOliMessage } from '../utils/oliHistory'
@@ -249,6 +249,33 @@ describe('abuse', () => {
     await fireEvent.press(sendBtn())
     expect(oliProvider.answer).toHaveBeenCalledTimes(1)
     expect(saveOliMessage).not.toHaveBeenCalled()
+  })
+
+  test('a hung answer ends as the error reply and the chat answers again', async () => {
+    jest.useFakeTimers()
+    try {
+      oliProvider.answer.mockReturnValueOnce(new Promise(() => {}))
+      await openSheet()
+      await fireEvent.changeText(input(), 'events')
+      await tapNow(sendBtn())
+      await act(async () => { jest.advanceTimersByTime(SEND_TIMEOUT_MS + 10) })
+      expect(screen.getByText(t('oliChatError', 'English'))).toBeTruthy()
+      expect(roles()).toEqual(['user'])
+      await fireEvent.changeText(input(), 'events again')
+      await fireEvent.press(sendBtn())
+      expect(oliProvider.answer).toHaveBeenCalledTimes(2)
+    } finally { jest.useRealTimers() }
+  })
+
+  test('a hung history load ends as an error and the chat stays usable', async () => {
+    loadOliHistory.mockResolvedValueOnce({ rows: [], error: new Error('aborted') })
+    const openRef = { current: null }
+    await render(<OliChatSheet lang="English" userId="u-1" isGuest={false} openRef={openRef} closeRef={{ current: null }}
+      onNavigate={() => {}} onOpenResult={() => {}} onOpenEvent={() => {}} onOpenChange={() => {}} />)
+    await act(async () => { openRef.current() })
+    await fireEvent.changeText(input(), 'events')
+    await fireEvent.press(sendBtn())
+    expect(oliProvider.answer).toHaveBeenCalledTimes(1)
   })
 
   test('150 saved messages load and the chat still answers', async () => {
