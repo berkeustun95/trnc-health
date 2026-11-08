@@ -4684,6 +4684,15 @@ WITH report AS (
       AND COALESCE((SELECT NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners')
                                           AND a.attname = 'order_requires_account' AND a.attacl IS NOT NULL)), false)
       AND COALESCE((SELECT NOT bool_or(coalesce((to_jsonb(p) ->> 'order_requires_account')::boolean, false)) FROM public.eatery_partners p), true)
+    -- 20261178: registered ahead of the apply; red until it runs.
+    UNION ALL SELECT '20261178_places_staged_preview','places: status may be staged; places_select_preview_staged is the ONLY policy mentioning staged, a permissive SELECT TO anon+authenticated of staged AND is_previewer(); places_select still opens active',
+      COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%staged%' FROM pg_constraint WHERE conrelid = 'public.places'::regclass AND conname = 'places_status_check'), false)
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='places' AND policyname='places_select_preview_staged'
+        AND cmd = 'SELECT' AND permissive = 'PERMISSIVE' AND roles::text[] = ARRAY['anon','authenticated']::text[]
+        AND qual LIKE '%''staged''%' AND qual LIKE '%is_previewer()%' AND with_check IS NULL)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='places'
+        AND policyname <> 'places_select_preview_staged' AND coalesce(qual, '') || coalesce(with_check, '') LIKE '%staged%')
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='places' AND policyname='places_select' AND qual LIKE '%''active''%')
     UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2 SELECT policies; eatery_partners_select_preview is authenticated-only, is_previewer() AND inactive',
       (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners') = 2
       AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'

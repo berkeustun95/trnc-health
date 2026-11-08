@@ -35,9 +35,10 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   officialVisitApplicable, applyOfficialVisit, TRNC_CENTER, inTrncFrame, NEAR_ME_DELTA,
 } from '../constants/mapSources'
-import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../constants/exploreCategories'
+import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup, ICON_PIN } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
+import { PlaceIconMarker, PartnerMarker } from '../components/MapIconPins'
 import { colors, shadow, ellipsizeSlack, type, radii, elevation, placeColors } from '../constants/theme'
 import { Button, IconButton, CategoryIcon, RemoteImage, useTabBarFootprint } from '../components/ui'
 import { t } from '../constants/i18n'
@@ -851,9 +852,11 @@ export default function ExploreMapScreen({
     go()
   }, [region, selectedKeys, openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode, selectedRoute, walk, follow])
 
+  // Partner eateries never cluster: they are drawn after the cluster layer, on top (Berke 2026-11-08).
+  const partnerPins = useMemo(() => pins.filter(p => p.kind === 'eatery'), [pins])
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
-    idx.load(pins.map(p => ({
+    idx.load(pins.filter(p => p.kind !== 'eatery').map(p => ({
       type: 'Feature',
       properties: { pin: p },
       geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
@@ -1027,6 +1030,9 @@ export default function ExploreMapScreen({
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
           }
           const pin = c.properties.pin
+          if (pin.kind === 'place' && ICON_PIN[pin.group]) {
+            return <PlaceIconMarker key={pin.id} pin={pin} onPress={() => setSelected(pin)} />
+          }
           return (
             <Marker
               key={pin.id}
@@ -1037,6 +1043,9 @@ export default function ExploreMapScreen({
             />
           )
         })}
+        {!routesMode && !eventsMode && !hotelsMode && partnerPins.map(pin => (
+          <PartnerMarker key={pin.id} pin={pin} onPress={() => setSelected(pin)} />
+        ))}
       </MapView>
       {/* Facility pins are partly OSM-sourced (geocoding policy): ODbL credit. */}
       <OsmAttribution lang={lang} overlay style={underTabBar ? { bottom: (Platform.OS === 'ios' ? 26 : 6) + mapBottom } : undefined} />

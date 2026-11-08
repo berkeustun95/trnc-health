@@ -15,6 +15,7 @@ import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
 import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
+import OsmAttribution from '../components/OsmAttribution'
 import { VISITNCY_SOURCE, creditUrl, creditBrand } from '../constants/walkingRoutes'
 import { logCreditTap } from '../components/WalkingRoutes'
 import { officialVisitView, officialFeeText } from '../utils/officialVisit'
@@ -371,6 +372,9 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </TouchableOpacity>
           )}
 
+          {/* Free OSM listing (20261179): basic info from OpenStreetMap, ODbL credit on the page. */}
+          {place.source === 'osm' && <OsmAttribution lang={lang} style={r.osmCredit} />}
+
           {place.amenities?.length > 0 && (
             <View style={r.section}>
               <Text style={r.sectionTitle}>{t('blFacilitiesTitle', lang)}</Text>
@@ -546,6 +550,8 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </TouchableOpacity>
           )}
 
+          {place.source === 'osm' && <OsmAttribution lang={lang} style={s.osmCredit} />}
+
           {/* Amenities (any category, when non-empty) — was beach "facilities" */}
           {place.amenities?.length > 0 && (
             <View style={s.section}>
@@ -691,6 +697,7 @@ const s = StyleSheet.create({
 
   section:      { marginBottom: 20 },
   partnerCredit:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
+  osmCredit:         { alignSelf: 'flex-start', marginBottom: 20 },
   partnerCreditText: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
 
@@ -768,6 +775,7 @@ const r = StyleSheet.create({
   chipText:      { ...type.meta, color: CAT.explore.ink },
   desc:          { ...type.body, color: C.textPrimary, marginTop: 16 },
   partnerCredit:     { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, marginTop: 8 },
+  osmCredit:         { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 8 },
   partnerCreditText: { flexShrink: 1, ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.primaryDark },
   section:       { marginTop: 20 },
   sectionTitle:  { ...type.sectionHeading, color: C.textPrimary, marginBottom: -4 },
