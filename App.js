@@ -143,6 +143,7 @@ import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
 import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
+import { withReadableTitle } from './utils/readableTitle'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -938,7 +939,7 @@ export default function App() {
       const { data } = await supabase.from('events')
         .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
         .eq('id', id).eq('status', 'approved').maybeSingle()
-      if (data) { setOpenedEvent(data); setEventFromHome(true) }
+      if (data) { setOpenedEvent(withReadableTitle(data)); setEventFromHome(true) }
     } catch {}
     setShowEvents(true)
   }

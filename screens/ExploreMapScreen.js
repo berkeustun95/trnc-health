@@ -58,6 +58,7 @@ import { EATERY_CATEGORY_KEY, eateryOpenStatus } from '../constants/eatery'
 import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import { CHIP_CAP, CHIP_CAP_NARROW } from '../components/home/redesign/RedesignHero'
 import { officialVisitView, officialFeeText } from '../utils/officialVisit'
+import { withReadableTitle } from '../utils/readableTitle'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_ION = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
@@ -641,7 +642,7 @@ export default function ExploreMapScreen({
       .or(maybeListedFilter(new Date()))
       .not('latitude', 'is', null)
       .order('start_date', { ascending: true })
-      .then(({ data, error }) => { if (active && !error) setEventRows(data ?? []) })
+      .then(({ data, error }) => { if (active && !error) setEventRows((data ?? []).map(withReadableTitle)) })
     return () => { active = false }
   }, [!!onSelectEvent])
   const eventCounts = useMemo(() => {

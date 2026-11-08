@@ -31,6 +31,7 @@ import {
   RemoteImage, PageCanvas,
 } from '../components/ui'
 import { colors as C, category as CAT, type, radii, elevation, listBottomPad } from '../constants/theme'
+import { withReadableTitle } from '../utils/readableTitle'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -587,7 +588,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
       .or(maybeListedFilter(now))
       .order('start_date', { ascending: true })
     setLoadError(!!error)
-    setEvents(error ? [] : (data ?? []).filter(e => !isEventOver(e, now)))
+    setEvents(error ? [] : (data ?? []).filter(e => !isEventOver(e, now)).map(withReadableTitle))
     setLoading(false)
   }, [])
   const retry = () => { setLoading(true); load() }

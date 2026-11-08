@@ -34,6 +34,12 @@ const GALLERY_H    = 280
 
 // name_i18n[lang] if present, else fall through to the plain `name` column. NEVER an
 // empty string when name_i18n is NULL — café rows have name only.
+// amenities holds raw keys ('toilets', 'food_bar'); an unknown key reads as words, never as a code.
+const AMENITY_KEY = { parking: 'amenityParking', toilets: 'amenityToilets', sunbeds: 'amenitySunbeds', food_bar: 'amenityFoodBar', lifeguard: 'amenityLifeguard' }
+function amenityLabel(f, lang) {
+  return AMENITY_KEY[f] ? t(AMENITY_KEY[f], lang) : String(f).replace(/_/g, ' ')
+}
+
 function extractI18n(obj, lang) {
   if (!obj) return ''
   if (typeof obj !== 'object') return String(obj)
@@ -370,7 +376,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
               <Text style={r.sectionTitle}>{t('blFacilitiesTitle', lang)}</Text>
               <View style={r.badgeRow}>
                 {place.amenities.map((f, i) => (
-                  <View key={i} style={r.chip}><Text style={r.chipText}>{f}</Text></View>
+                  <View key={i} style={r.chip}><Text style={r.chipText}>{amenityLabel(f, lang)}</Text></View>
                 ))}
               </View>
             </View>
@@ -547,7 +553,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
               <View style={s.facilitiesWrap}>
                 {place.amenities.map((f, i) => (
                   <View key={i} style={s.facilityChip}>
-                    <Text style={s.facilityChipText}>{f}</Text>
+                    <Text style={s.facilityChipText}>{amenityLabel(f, lang)}</Text>
                   </View>
                 ))}
               </View>
