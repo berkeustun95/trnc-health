@@ -36,7 +36,7 @@ import { PET_PARTNERS } from './petPartners.js'
 import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, LIVE_TILE_GROUPS,
   categoryToGroup, groupVisible,
-} from './exploreCategories.js'
+ ICON_PIN } from './exploreCategories.js'
 
 // Default map framing: the WHOLE island, used by both map surfaces whenever there is no
 // userLocation to centre on.
@@ -131,6 +131,7 @@ function placePins(places) {
         kind:  'place',
         row:   p,
         group,
+        iconPin: !!ICON_PIN[group],
         lat:   p.latitude,
         lng:   p.longitude,
         color:   (GROUP_META[group]?.colorToken || placeColors.landmark).text,
@@ -285,10 +286,15 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
 // fetched" would look identical on screen today and would republish every dark-module row
 // the moment one exists. The gate must sit on the DEFAULT path, not only on the
 // explicitly-filtered one — the default is the path almost every user takes.
-export function selectedPins(sources, selectedKeys) {
+// Sources the map leaves OUT of "Tümü" until the user turns them on with their chip (Berke 2026-11-08:
+// the ~110 services pins swamp the city; the list page still shows them). `extraOn` = that chip.
+export const DEFAULT_OFF_KEYS = ['explore:services']
+
+export function selectedPins(sources, selectedKeys, extraOn = false) {
+  const off = s => DEFAULT_OFF_KEYS.includes(s.key)
   const active = (!selectedKeys || selectedKeys.size === 0)
-    ? sources
-    : sources.filter(s => selectedKeys.has(s.key))
+    ? sources.filter(s => extraOn || !off(s))
+    : sources.filter(s => selectedKeys.has(s.key) || (extraOn && off(s)))
   return active.flatMap(s => s.pins)
 }
 

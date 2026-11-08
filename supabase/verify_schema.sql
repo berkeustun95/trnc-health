@@ -4739,11 +4739,13 @@ WITH report AS (
                             FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('private.preview_key_hashes')), false))
     -- ► BUMPED FROM 4 TO 7 BY 20261165 (vehicle_sources, dealers, vehicles _select_preview), after the 2026-11-07 apply
     --   run 42416976779 went red on this row alone; the three follow the same contract, which the rest of the row asserts.
-    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (7 since 20261165: eatery_partners, eatery_menu_items, eatery_photos, eatery_item_options, vehicle_sources, dealers, vehicles _select_preview — supabase/readonly/previewer_policies.sql)',
+    -- 8 since 20261178: places_select_preview_staged pairs with the places form of "unpublished", status = 'staged'.
+    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with an unpublished condition — is_active, or status = ''staged'' on places (8 since 20261178: eatery_partners, eatery_menu_items, eatery_photos, eatery_item_options, vehicle_sources, dealers, vehicles _select_preview + places_select_preview_staged — supabase/readonly/previewer_policies.sql)',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
-      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 7
+      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 8
           AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE (coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%')
-                            AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL OR qual NOT LIKE '%is_active%')))
+                            AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL
+                                 OR (qual NOT LIKE '%is_active%' AND NOT (tablename = 'places' AND qual LIKE '%''staged''%')))))
     UNION ALL SELECT '1120_eatery_preview_key','eatery_partners_select_preview applies TO anon, authenticated',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
       OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'
@@ -5697,12 +5699,20 @@ WITH report AS (
              AND has_function_privilege('authenticated', to_regprocedure('public.my_vehicles()'), 'EXECUTE'), false)
   -- Every SECURITY DEFINER function that writes or reads vehicles skips the client rules in vehicles_guard (it runs as
   -- postgres). The set is pinned so a new one is a reviewed decision, not an accident (security review 2026-11-07, N1).
-  UNION ALL SELECT '20261165_vehicles','the SECURITY DEFINER functions that touch vehicles are exactly the five reviewed ones',
+  -- 20261181 made admin_content_author the sixth (it reads owner_id behind is_admin()). RED UNTIL 20261181 RUNS.
+  UNION ALL SELECT '20261165_vehicles','the SECURITY DEFINER functions that touch vehicles are exactly the six reviewed ones',
     COALESCE((SELECT array_agg(n.nspname || '.' || p.proname ORDER BY n.nspname, p.proname)
                 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                WHERE p.prosecdef AND n.nspname IN ('public', 'private') AND p.prosrc ~* '\mvehicles\M')
-      IS NOT DISTINCT FROM ARRAY['private.my_open_vehicle_count','private.my_vehicle_status','public.auto_hide_reported_content',
-                                 'public.my_vehicles','public.renew_vehicle'], false)
+      IS NOT DISTINCT FROM ARRAY['private.my_open_vehicle_count','private.my_vehicle_status','public.admin_content_author',
+                                 'public.auto_hide_reported_content','public.my_vehicles','public.renew_vehicle'], false)
+  -- 20261181: admin_content_author answers for 'vehicle' (Araçlar S3). Registered ahead of the apply; RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261181_vehicle_admin_author','admin_content_author has the vehicle branch, stays is_admin()-gated, DEFINER with search_path public, no anon EXECUTE',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.admin_content_author(text,uuid)')) LIKE '%WHEN ''vehicle''  THEN SELECT owner_id     INTO v_author FROM vehicles%'
+         AND pg_get_functiondef(to_regprocedure('public.admin_content_author(text,uuid)')) LIKE '%IF NOT is_admin() THEN%'
+         AND (SELECT prosecdef AND array_to_string(proconfig, ',') = 'search_path=public' FROM pg_proc
+               WHERE oid = to_regprocedure('public.admin_content_author(text,uuid)'))
+         AND NOT has_function_privilege('anon', to_regprocedure('public.admin_content_author(text,uuid)'), 'EXECUTE'), false)
   UNION ALL SELECT '20261165_vehicles','contact_events module vocabulary is exactly the 17-module set (incl. cars)',
     (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
        FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m

@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `ADA – Kuzey Kıbrıs Asistanı (Android paket adı com.berkeustun95.ada), Google Play'de P&D Digital tarafından yayımlanır ve Astarte Digital Trading Ltd. (KKTC, şirket no. MŞ29454) tarafından işletilir.
 
-Sürüm: 2026-10-30
-Son güncelleme: 30 Ekim 2026
+Sürüm: 2026-11-09
+Son güncelleme: 9 Kasım 2026
 
 KİM OLDUĞUMUZ
 
@@ -47,7 +47,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 
 Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersiniz ya da kendi yüklediğiniz bir görsel kullanılır; yüklenen görsel dosya depolamamızda saklanır.
 
-Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğunuz sorulara gelen cevapları gönderebilmek için saklanır. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
+Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğunuz sorulara gelen cevapları gönderebilmek için saklanır. Ayrıca isteğe bağlı Cuma notu için kullanılır: hafta sonunun etkinlikleri ve gezilecek bir yer; Profil → «Bilgilendirmeler ve fırsatlar» bölümünden kapatabilirsiniz. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
 

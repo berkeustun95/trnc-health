@@ -18,6 +18,7 @@ import { SectionHeader, RemoteImage } from './ui'
 import { useScrollMemory } from '../utils/scrollMemory'
 import { EVENT_INK } from './MapEvents'
 import { routeName } from './WalkingRoutes'
+import { withReadableTitle } from '../utils/readableTitle'
 
 const ROW_MAX = 10
 const NEAR_KM = 25
@@ -58,7 +59,7 @@ export default function ExploreSections({ places, userLocation, lang, placeName,
       supabase.from('events')
         .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
         .eq('status', 'approved').or(maybeListedFilter(new Date())).order('start_date', { ascending: true })
-        .then(({ data, error }) => { if (active && !error) setEvents(data ?? []) })
+        .then(({ data, error }) => { if (active && !error) setEvents((data ?? []).map(withReadableTitle)) })
     }
     if (EXPLORE_ROUTES_LIVE && onOpenRoutes) {
       supabase.from('walking_routes').select('id, region, name_i18n, sort_order, walking_route_stops(place_id)')
