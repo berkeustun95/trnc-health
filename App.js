@@ -25,7 +25,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
-import { fetchNotifications } from './utils/notificationRoute'
+import { fetchNotifications, notificationRoute } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
@@ -582,6 +582,7 @@ export default function App() {
   const [mapRoutesMode, setMapRoutesMode] = useState(false)
   // Same for events mode (the Explore landing's "Bu hafta" section), cleared with it.
   const [mapEventsMode, setMapEventsMode] = useState(false)
+  const [mapEventRange, setMapEventRange] = useState(null)   // the weekend push: events mode on 'Bu hafta sonu'
   // City welcome: the pending decision, plus the region each deep-linked screen
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
@@ -942,6 +943,12 @@ export default function App() {
       if (data) { setOpenedEvent(withReadableTitle(data)); setEventFromHome(true) }
     } catch {}
     setShowEvents(true)
+  }
+  // The Friday digest (push tap or its Bildirimler row): Keşfet, events mode, Bu hafta sonu. Every
+  // layer above the tabs closes, as the tab bar would.
+  function openWeekendOnMap() {
+    setShowNotifs(false); setShowExplore(false); setShowEvents(false)
+    setMapRoutesMode(false); setMapEventsMode(true); setMapEventRange('weekend'); setActiveTab('map')
   }
   function closeExploreBeach() { setShowExploreBeach(false); setExploreBeachRegion(null) }
 
@@ -1454,6 +1461,8 @@ export default function App() {
       const screen = data.screen
       if (screen === 'duty') {
         setShowDutyList(true)
+      } else if (screen === 'weekend') {
+        openWeekendOnMap()
       } else if (screen === 'profile') {
         setActiveTab('profile')
       } else if (screen === 'notifications') {
@@ -1480,6 +1489,7 @@ export default function App() {
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') setShowDutyList(true)
+      else if (screen === 'weekend') openWeekendOnMap()
       // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
       //   case for a message notification — the app is not usually already open when one
       //   arrives — and without this branch that tap landed on Home with no explanation.
@@ -2150,7 +2160,7 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
-      onNotifPress={() => setShowDutyList(true)}
+      onNotifPress={item => (notificationRoute(item) === 'weekend' ? openWeekendOnMap() : setShowDutyList(true))}
       onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
@@ -2752,6 +2762,8 @@ export default function App() {
             {EXPLORE_MAP_LIVE ? (
               <BLErrorBoundary lang={lang}>
               <ExploreMapScreen
+                // The weekend push may arrive while Keşfet is already open: initial props are read once, so remount.
+                key={mapEventRange ? `map:${mapEventRange}` : 'map'}
                 // The directory's second entrance — see the prop's note in that file. It
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
                 // hidden once this has been checked on device.
@@ -2786,6 +2798,7 @@ export default function App() {
                 onRequireAccount={requireAccount}
                 initialRoutesMode={mapRoutesMode}
                 initialEventsMode={mapEventsMode}
+                initialEventRange={mapEventRange}
               />
               </BLErrorBoundary>
             ) : (
@@ -2834,10 +2847,11 @@ export default function App() {
             if (!REDESIGN && tab === 'profile' && requireAccount('gateProfile')) return
             // Leaving Profile with unsaved edits asks first — the same guard as its back button.
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
-              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setMapEventsMode(false); setActiveTab(tab) }); return
+              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setMapEventsMode(false); setMapEventRange(null); setActiveTab(tab) }); return
             }
             setMapRoutesMode(false)
             setMapEventsMode(false)
+            setMapEventRange(null)
             setActiveTab(tab)
           }
           return REDESIGN
