@@ -159,7 +159,12 @@ if (APPLY && mIdx !== -1) {
 // This gate is future-proofing: there are no beach entries in the manifest today because
 // no compliant beach photo was found to exist. It is here so that adding one later fails
 // loudly instead of shipping quietly.
-const BEACH_LICENSES = ['Unsplash License', 'Pexels License']
+// 2026-11-08: the premise above no longer holds — ExploreProfileScreen renders PhotoCredit (creator,
+// licence link, source link) for every place in production, beaches included — and Berke approved the
+// first CC BY-SA beach photos with their credit shown. The gate now refuses only a licence the detail
+// page cannot honour: anything outside the CC set the credit renderer links, plus Unsplash / Pexels.
+const BEACH_LICENSES = ['Unsplash License', 'Pexels License', 'CC BY 2.0', 'CC BY 3.0', 'CC BY 4.0',
+  'CC BY-SA 2.0', 'CC BY-SA 3.0', 'CC BY-SA 4.0', 'CC0']
 
 const c = { r: s => `\x1b[31m${s}\x1b[0m`, g: s => `\x1b[32m${s}\x1b[0m`,
             y: s => `\x1b[33m${s}\x1b[0m`, d: s => `\x1b[2m${s}\x1b[0m`,

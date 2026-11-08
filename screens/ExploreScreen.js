@@ -29,6 +29,8 @@ import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { REDESIGN } from '../constants/redesign'
+import HeroCreditSheet from '../components/home/HeroCreditSheet'
+import { EXPLORE_PHOTO_CREDIT } from '../constants/exploreCover'
 import {
   ScreenHeader as KitHeader, FilterBar, ListCard, EmptyState, ErrorState, CardSkeleton,
   CategoryIcon, IconButton, ModuleScreen,
@@ -373,6 +375,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, onSelectEve
   // the group-tile landing — preserving the old Beaches-tile behavior (swap the engine, keep the nav).
   const rooted = initialCategory != null
   const [places,      setPlaces]      = useState([])
+  const [coverCreditOpen, setCoverCreditOpen] = useState(false)
   const [loading,     setLoading]     = useState(true)
   const [loadError,   setLoadError]   = useState(false)   // places fetch failed → ErrorState, never "no places"
   const [activeGroup, setActiveGroup] = useState(initialCategory ? categoryToGroup(initialCategory) : null)   // null = group-tile landing
@@ -629,6 +632,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, onSelectEve
             : [
                 hasSavedVisible && { icon: 'heart-outline', onPress: () => setShowSaved(true), accessibilityLabel: t('exploreSavedTitle', lang) },
                 hasSubs && { icon: 'document-text-outline', onPress: () => setShowMySubs(true), accessibilityLabel: t('exploreMySubmissions', lang) },
+                { icon: 'information-circle-outline', onPress: () => setCoverCreditOpen(true), accessibilityLabel: t('heroCreditTitle', lang) },
               ].filter(Boolean)}
         />
       ) : (<>
@@ -822,6 +826,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, onSelectEve
     <View style={s.root}>
       {body}
       {placeOverlay && <View style={s.placeOverlay}>{placeOverlay}</View>}
+      <HeroCreditSheet visible={coverCreditOpen} credit={EXPLORE_PHOTO_CREDIT} lang={lang} onClose={() => setCoverCreditOpen(false)} />
     </View>
   )
 }
