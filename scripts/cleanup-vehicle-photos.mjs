@@ -8,7 +8,8 @@
 // The go-live gate for private listings (Berke, 2026-11-07): a seller's photos must not outlive their listing.
 // Which listings and when is constants/cars.js photoCleanupReason(): removed after 3 days (final), rejected after 14
 // (the seller can fix and resubmit until then), hidden by reports after 30 (an admin can restore until then).
-// Expired listings keep their photos: they are one tap from renewed. Dealer and imported listings are never touched.
+// Expired listings keep their photos: they are one tap from renewed. Dealer and imported listings are never due, and
+// their folders are never "gone" because every listing of every source is read below.
 // Also swept: files in a listing folder that no vehicle_images row points at, older than a day (an upload whose row
 // insert failed), and whole folders whose listing no longer exists (the owner deleted their account: the rows
 // cascade, the files do not). partner/… (the dealer mirror) is never listed.
@@ -34,25 +35,29 @@ const now = Date.now()
 const errors = []
 const fail = (what, e) => errors.push(`${what}: ${String(e?.statusCode || e?.code || e?.message || e).slice(0, 60)}`)
 
-// Every private listing (any state): the candidates, and the set of ids that still exist for the folder sweep.
+// EVERY listing, all sources and states: a folder whose listing is missing from this set is deleted as gone, so a
+// partial set over-deletes. Hence no source filter (photoCleanupReason refuses non-private rows itself), and paging
+// runs until an EMPTY page: a short page may only mean the server caps rows per request (max_rows) below PAGE.
 const listings = []
-for (let from = 0; ; from += PAGE) {
+for (let from = 0; ; ) {
   const { data, error } = await db.from('vehicles')
     .select('id, source, status, updated_at, hidden_at, vehicle_images(id, storage_path)')
-    .eq('source', 'private').order('id').range(from, from + PAGE - 1)
+    .order('id').range(from, from + PAGE - 1)
   if (error) { console.error(`read vehicles: ${error.message}`); process.exit(2) }
+  if (!data.length) break
   listings.push(...data)
-  if (data.length < PAGE) break
+  from += data.length
 }
 const byId = new Map(listings.map(v => [v.id, v]))
 
 async function listFolder(prefix) {
   const out = []
-  for (let offset = 0; ; offset += PAGE) {
+  for (let offset = 0; ; ) {
     const { data, error } = await bucket.list(prefix, { limit: PAGE, offset, sortBy: { column: 'name', order: 'asc' } })
     if (error) throw error
+    if (!data.length) break
     out.push(...data)
-    if (data.length < PAGE) break
+    offset += data.length
   }
   return out
 }

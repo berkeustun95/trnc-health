@@ -39,8 +39,10 @@ if (stale.length) red.push(`an active listing is ${EXPIRE_SLACK_H}h+ past expiry
 // Earliest grace is the shortest one; anything older than that may be due. Then the shared rule decides.
 const since = new Date(now - Math.min(...Object.values(CLEANUP_GRACE_DAYS)) * 864e5).toISOString()
 const { data: gone, error: e3 } = await sb.from('vehicles')
-  .select('id, source, status, updated_at, hidden_at, vehicle_images(id)')
-  .eq('source', 'private').or(`status.in.(removed,rejected),hidden_at.not.is.null`).lt('updated_at', since).limit(1000)
+  // !inner: only listings that still hold photo rows, so cleaned ones (which pile up forever) never crowd the read.
+  .select('id, source, status, updated_at, hidden_at, vehicle_images!inner(id)')
+  .eq('source', 'private').or(`status.in.(removed,rejected),hidden_at.not.is.null`).lt('updated_at', since)
+  .order('updated_at', { ascending: true }).limit(1000)
 if (e3) { console.error('read cleanup:', e3.message); process.exit(2) }
 const late = gone.some(v => v.vehicle_images.length
   && photoCleanupReason(v, now - CLEANUP_SLACK_D * 864e5))

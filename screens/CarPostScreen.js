@@ -202,9 +202,10 @@ export default function CarPostScreen({ session, lang, car = null, profilePhone 
       const photosChanged = removed.length > 0 || photos.some(p => p.kind === 'new') || orderChanged
       if (!fieldsChanged && !photosChanged) { onBack(); return }
 
-      // An approved / expired / rejected listing goes back to review (the guard does this for a field edit; a
-      // photo-only edit asks for it, because the photo policies only open on a pending listing).
-      const patch = car.status === 'pending' ? payload : { ...payload, status: 'pending' }
+      // Always back to review: the guard does it for a field edit, and a photo-only edit must ask, because the photo
+      // policies only open on a pending listing. Unconditional, because `car` is İlanlarım's copy and the admin may have
+      // approved it since; pending → pending is no change to the guard.
+      const patch = { ...payload, status: 'pending' }
       const { data: upd, error: updErr } = await supabase.from('vehicles').update(patch).eq('id', car.id).select('id')
       if (updErr) throw updErr
       if (!upd?.length) throw new Error('VEHICLE_NOT_FOUND')

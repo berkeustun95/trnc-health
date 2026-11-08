@@ -798,6 +798,9 @@ function ReportsTab({ session }) {
             const row = contentByKey.get(`${type}:${id}`)
             if (row) row[col] = got[i].data ?? null
           })
+        } else if (type === 'vehicle') {
+          // No column fallback: vehicles.owner_id is unreadable to every client, so it would 42501 and say nothing.
+          for (const id of ids) { const row = contentByKey.get(`${type}:${id}`); if (row) row.authorUnresolved = true }
         } else {
           const { data: authors } = await supabase
             .from(CONTENT_TABLE[type]).select(`id, ${col}`).in('id', ids)
@@ -988,6 +991,10 @@ function ReportsTab({ session }) {
             {missing
               ? <Text style={s.reportMissing}>Content no longer exists — the author likely deleted their account. Dismiss to clear.</Text>
               : <Text style={s.reportBody}>{text || <Text style={s.reportMissing}>(rating only, no text)</Text>}</Text>}
+
+            {g.content?.authorUnresolved && (
+              <Text style={s.reportMissing}>The seller could not be resolved (admin_content_author failed), so Ban is not offered. Reload, or act from the Cars tab.</Text>
+            )}
 
             {readOnly && !missing && (
               <Text style={s.reportMissing}>
@@ -4045,7 +4052,7 @@ function PlaceClaimsTab({ session }) {
 // A listing with no photos is refused approval: vehicles_hide_photoless would keep it invisible to everyone anyway.
 const ADMIN_CAR_COLS = [
   'id, intent, source, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, price_per_day',
-  'region, area, description, contact_phone, whatsapp, status, rejection_reason, published_at, expires_at, hidden_at, created_at',
+  'region, area, description, contact_phone, whatsapp, status, rejection_reason, published_at, expires_at, hidden_at, created_at, updated_at',
   'dealers(name)', 'vehicle_images(id, storage_path, sort_order, is_primary)',
 ].join(', ')
 const CAR_FILTERS = ['pending', 'active', 'rejected', 'expired', 'all']
@@ -4117,10 +4124,15 @@ function CarsTab() {
     await recordNotification(ownerId, title, body)
   }
 
+  // Only the version on screen: the seller can edit a pending listing (text or photos) while it is open here, and every
+  // edit moves updated_at. Zero rows = it changed since it was loaded, so nothing is approved and the queue reloads.
   async function approve(car) {
     setBusy(car.id)
-    const ok = await updateOrAlert('vehicles', { status: 'active' }, car.id, 'Approve')
-    if (ok) await notifySeller(car, 'carsNotifApprovedTitle', 'carsNotifApprovedBody')
+    const { data, error } = await supabase.from('vehicles').update({ status: 'active' })
+      .eq('id', car.id).eq('updated_at', car.updated_at).select('id')
+    if (error) Alert.alert('Approve failed', error.message)
+    else if (!data?.length) Alert.alert('Listing changed', 'The seller edited this listing (or it was already handled) after it was loaded. Nothing was approved — check the new version.')
+    else await notifySeller(car, 'carsNotifApprovedTitle', 'carsNotifApprovedBody')
     setBusy(null); load()
   }
 
