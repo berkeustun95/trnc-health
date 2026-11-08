@@ -41,8 +41,9 @@ export function PartnerMarker({ pin, onPress }) {
   const tracks = useBriefTracking(loaded)
   return (
     <Marker coordinate={{ latitude: pin.lat, longitude: pin.lng }} tracksViewChanges={tracks} anchor={{ x: 0.5, y: 0.5 }}
-      // zIndex does not reach the native marker on the new architecture (prop or style, measured); the
-      // screen re-mounts this marker after the clusters instead (ExploreMapScreen partnerKey). Kept for iOS.
+      // ⚠ Android: zIndex does not reach the native marker on this build (legacy react-native-maps 1.20.1
+      // marker under the new-architecture interop; prop, style and re-mount all measured on the Preview
+      // phone). A pin or cluster just SOUTH of a partner can draw over it. Native fix, next store build.
       zIndex={1000} onPress={e => { e.stopPropagation(); onPress() }}>
       <View collapsable={false} style={m.partnerWrap}>
         <View collapsable={false} style={m.partner}>
