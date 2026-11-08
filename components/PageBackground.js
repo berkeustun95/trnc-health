@@ -11,7 +11,7 @@ const TOPIC_CONFIG = {
   pets:                { asset: require('../assets/backgrounds/ada-bg-pets.jpg') },
   home_services:       { asset: require('../assets/backgrounds/ada-bg-home-services.jpg') },
   insurance:           { asset: require('../assets/backgrounds/ada-bg-insurance.jpg') },
-  beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.jpg') },
+  beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-explore.jpg') },
   transportation:      { asset: require('../assets/backgrounds/ada-bg-transportation.jpg') },
   municipalities:      { asset: require('../assets/backgrounds/ada-bg-municipalities.png') },
   newcomer_essentials: { asset: require('../assets/backgrounds/ada-bg-transportation.jpg') },

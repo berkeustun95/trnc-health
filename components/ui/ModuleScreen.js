@@ -27,7 +27,8 @@ export const MODULE_PHOTO = {
   medical:        require('../../assets/backgrounds/ada-bg-medical-facilities.jpg'),
   duty:           require('../../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
   events:         require('../../assets/backgrounds/ada-bg-events.jpg'),
-  explore:        require('../../assets/backgrounds/ada-bg-beaches-landmarks.jpg'),
+  // Kyrenia harbour, Katerina Bot (Unsplash), Berke 2026-11-08; credit: constants/exploreCover.js.
+  explore:        require('../../assets/backgrounds/ada-bg-explore.jpg'),
   accommodation:  require('../../assets/backgrounds/ada-bg-accommodation.jpg'),
   homeServices:   require('../../assets/backgrounds/ada-bg-home-services.jpg'),
   pets:           require('../../assets/backgrounds/ada-bg-pets.jpg'),

@@ -191,6 +191,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   // least as easy as giving it, and a withdrawal that waits for a second tap is not.
   const [marketingOn, setMarketingOn]           = useState(false)
   const [marketingBusy, setMarketingBusy]       = useState(false)
+  // The Friday digest switch (20261175). Its own read: null (hidden) until the column answers, so this
+  // screen works in either order with the migration.
+  const [weekendOn, setWeekendOn]               = useState(null)
+  const [weekendBusy, setWeekendBusy]           = useState(false)
   // Same shape as marketing, for the same reason: being LISTED is a visibility choice, and
   // switching it off must not wait for a Save tap somebody may never make.
   const [listingOn, setListingOn]               = useState(false)
@@ -341,6 +345,23 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   //   returns no error. The row is read back and the switch follows what the DATABASE
   //   says, not what was sent, so a write that silently did nothing shows as unchanged
   //   rather than as success.
+  useEffect(() => {
+    if (!session?.user?.id) return
+    supabase.from('profiles').select('weekend_digest').eq('id', session.user.id).single()
+      .then(({ data, error }) => { if (!error && typeof data?.weekend_digest === 'boolean') setWeekendOn(data.weekend_digest) })
+  }, [session?.user?.id])
+
+  // Same read-back rule as the marketing switch below: the switch shows what the database holds.
+  async function toggleWeekend(next) {
+    if (weekendBusy) return
+    setWeekendBusy(true)
+    setWeekendOn(next)
+    const { data, error } = await supabase.from('profiles')
+      .update({ weekend_digest: next }).eq('id', session.user.id).select('weekend_digest').single()
+    setWeekendOn(error ? !next : data?.weekend_digest === true)
+    setWeekendBusy(false)
+  }
+
   async function toggleMarketing(next) {
     if (marketingBusy) return
     setMarketingBusy(true)
@@ -1451,6 +1472,20 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   accessibilityLabel={t('pgMarketingOptIn', lang)}
                 />
               </View>
+              {weekendOn !== null && (<>
+                <View style={s.marketingRow}>
+                  <Text style={s.marketingLabel}>{t('weekendDigestOptIn', lang)}</Text>
+                  <Switch
+                    value={weekendOn}
+                    onValueChange={toggleWeekend}
+                    disabled={weekendBusy}
+                    trackColor={{ true: colors.primary }}
+                    thumbColor="#fff"
+                    accessibilityLabel={t('weekendDigestOptIn', lang)}
+                  />
+                </View>
+                <Text style={s.fieldHint}>{t('weekendDigestHint', lang)}</Text>
+              </>)}
             </View>
           )}
 

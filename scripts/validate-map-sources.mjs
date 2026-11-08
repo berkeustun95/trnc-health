@@ -79,7 +79,7 @@ import { eateryPartnerVisible } from '../constants/eatery.js'
 import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey, stubsFor } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
-         NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
+         NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES, ICON_PIN } from '../constants/exploreCategories.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -372,7 +372,8 @@ const phColor = phOnLive.find(s => s.key === phKey)?.color
 // this guards. Built from the same tables mapSources.js colours pins with.
 const rivals = [['duty pharmacy', colors.accent],
   ...HEALTH_TYPES.map(t => [`health:${t}`, (typeColors[t] || typeColors.clinic).text]),
-  ...Object.entries(GROUP_META).map(([g, m]) => [`explore:${g}`, m.colorToken.text]),
+  // Icon-pin groups (ICON_PIN) draw a disc, never a default pin: their colour has no hue to collide.
+  ...Object.entries(GROUP_META).filter(([g]) => !ICON_PIN[g]).map(([g, m]) => [`explore:${g}`, m.colorToken.text]),
   ['eatery', placeColors.eatery.text]]
 const tooClose = rivals.filter(([, c]) => !phColor || hueGap(phColor, c) < 30)
   .map(([k, c]) => `${k} ${c} (${phColor ? hueGap(phColor, c).toFixed(0) : '?'} deg)`)

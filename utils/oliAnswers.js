@@ -7,6 +7,7 @@ import { localDateKey } from './dutyStatus'
 import { dateLocale, t, LANG_CODES } from '../constants/i18n'
 import { EATERY_CATEGORY_KEY } from '../constants/eatery'
 import { REGION_LABEL_KEY } from '../constants/regions'
+import { readableTitle } from './readableTitle.js'
 
 // ─── Ask Oli answer providers ────────────────────────────────────────────────
 // The ONE seam between the chat sheet and whatever answers it. A provider is
@@ -73,7 +74,7 @@ async function eventsThisWeek(now, lang) {
     .limit(30)
   if (error) throw error
   return (data ?? []).filter(e => !isEventOver(e, now)).slice(0, MAX_ITEMS).map(e => ({
-    t: e.title,
+    t: readableTitle(e.title),
     s: [whenLabel(e.start_date, lang), e.location].filter(Boolean).join(' · '),
     a: { event: e.id },
   }))

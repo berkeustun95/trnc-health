@@ -25,4 +25,6 @@
 
 export const EXPLORE_REVIEW = __DEV__ && process.env.EXPO_PUBLIC_DEV_EXPLORE_REVIEW === 'true'
 
-export const reviewStatuses = review => (review ? ['active', 'pending'] : ['active'])
+// 'staged' (20261178): imported, not published. RLS returns staged rows ONLY to ADA Preview (is_previewer()),
+// so asking for them is safe in every build — production gets back exactly what 'active' alone would.
+export const reviewStatuses = review => (review ? ['active', 'pending', 'staged'] : ['active', 'staged'])
