@@ -11,7 +11,7 @@ import { t } from '../constants/i18n'
 // Oteller, opened from its own Home tile (2026-10-09). It was the first tab of Emlak &
 // Konaklama; the list itself is HotelsTab, unchanged. This is only the chrome that module
 // gave it (same photo topic, same header), minus the tab bar.
-export default function HotelsScreen({ lang, onClose }) {
+export default function HotelsScreen({ lang, onClose, initialQuery = '' }) {
   const header = REDESIGN
     ? <RScreenHeader onBack={onClose} title={t('accomTabHotels', lang)} lang={lang} />
     : (
@@ -24,7 +24,7 @@ export default function HotelsScreen({ lang, onClose }) {
     <SafeAreaView style={REDESIGN ? s.safeOnPhoto : s.safe} edges={['top']}>
       {header}
       <View style={s.pane}>
-        <View style={StyleSheet.absoluteFill}><HotelsTab lang={lang} /></View>
+        <View style={StyleSheet.absoluteFill}><HotelsTab lang={lang} initialQuery={initialQuery} /></View>
       </View>
     </SafeAreaView>
   )

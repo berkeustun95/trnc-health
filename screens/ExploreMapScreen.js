@@ -46,6 +46,9 @@ import { useRouteMedal } from '../utils/routeMedals'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { EventVenueMarker, EventStrip, EVENT_INK } from '../components/MapEvents'
+import { HotelMarker, HotelCard, HOTEL_INK, HOTEL_COLUMNS } from '../components/MapHotels'
+import { NearNowPill, NearNowPanel } from '../components/MapNearNow'
+import { nearNow } from '../constants/nearNow'
 import { eventsInRange, venueGroups, MAP_EVENT_RANGES, DEFAULT_EVENT_RANGE } from '../constants/mapEvents'
 import { maybeListedFilter } from '../utils/eventVisibility'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
@@ -169,8 +172,8 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, lang }) {
-  const layerMode = routesMode || eventsMode
+function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
+  const layerMode = routesMode || eventsMode || hotelsMode
   return (
     <ScrollView
       horizontal
@@ -212,6 +215,17 @@ function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpen
           color={EVENT_INK}
           colorBg="#F1EAFB"
           onPress={onEvents}
+        />
+      )}
+      {/* KITOB hotels: their own layer, a mode like events (Berke 2026-11-07). */}
+      {showHotels && (
+        <Chip
+          label={t('accomTabHotels', lang)}
+          ionicon="bed"
+          active={hotelsMode}
+          color={HOTEL_INK}
+          colorBg="#FBF0E0"
+          onPress={onHotels}
         />
       )}
       {/* A MODE, not a filter: routes replace the pins while it is on, and any other chip
@@ -413,6 +427,8 @@ export default function ExploreMapScreen({
   onRequireAccount,
   // Opens EventDetailScreen (App.js openEventFromMap). Events mode exists only when it is passed.
   onSelectEvent,
+  // Opens Oteller pre-searched to one hotel (its card + booking button). Hotels layer exists only when passed.
+  onOpenHotel,
   initialEventsMode = false,   // the Explore landing's "Bu hafta" opens straight into events
   initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
   underTabBar = false,         // Keşfet tab (redesign): the floating tab bar covers the bottom of the map
@@ -458,6 +474,11 @@ export default function ExploreMapScreen({
   const [eventRange, setEventRange]       = useState(snap?.eventRange ?? DEFAULT_EVENT_RANGE)
   const [eventVenue, setEventVenue]       = useState(null)
   const [eventRows, setEventRows]         = useState([])
+  const [hotelsMode, setHotelsMode]       = useState(snap?.hotelsMode ?? false)
+  const [hotelRows, setHotelRows]         = useState([])
+  const [hotel, setHotel]                 = useState(null)
+  const [nearOpen, setNearOpen]           = useState(false)
+  const [myFix, setMyFix]                 = useState(null)   // locate-me's fix, when App.js has no location
   const [selectedRoute, setSelectedRoute] = useState(null)
   // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
   const [walk, setWalk] = useState(null)
@@ -694,6 +715,7 @@ export default function ExploreMapScreen({
       setLocGranted(true)
       const loc = (await Location.getLastKnownPositionAsync({ maxAge: 60000 }))
         ?? (await askedFix(Location.Accuracy.Balanced))
+      if (loc) setMyFix({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
       if (loc) mapRef.current?.animateCamera(
         { center: { latitude: loc.coords.latitude, longitude: loc.coords.longitude }, zoom: 16, altitude: 1500 },
         { duration: 600 })
@@ -719,6 +741,9 @@ export default function ExploreMapScreen({
   }, [height])
 
   const enterRoutes = useCallback(() => {
+    setHotelsMode(false)
+    setHotel(null)
+    setNearOpen(false)
     setEventsMode(false)
     setEventVenue(null)
     setSelected(null)
@@ -732,7 +757,20 @@ export default function ExploreMapScreen({
     setSelectedRoute(null)
     setWalk(null)
     setEventVenue(null)
+    setHotelsMode(false)
+    setHotel(null)
+    setNearOpen(false)
     setEventsMode(true)
+  }, [])
+  const enterHotels = useCallback(() => {
+    setSelected(null)
+    setRoutesMode(false)
+    setSelectedRoute(null)
+    setWalk(null)
+    setEventsMode(false)
+    setEventVenue(null)
+    setNearOpen(false)
+    setHotelsMode(true)
   }, [])
   // Frame the window's venues on entry and on every window change — not on a return from an event
   // page (the restored camera wins). One venue: a street-level view, not fitToCoordinates' max zoom.
@@ -745,7 +783,7 @@ export default function ExploreMapScreen({
       mapRef.current?.animateToRegion({ ...pts[0], latitudeDelta: 0.05, longitudeDelta: 0.05 }, 400)
     } else fitTo(pts, 0.35)
   }, [eventsMode, eventRange, eventVenues.length])
-  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null); setWalk(null); setEventsMode(false); setEventVenue(null) }, [])
+  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null); setWalk(null); setEventsMode(false); setEventVenue(null); setHotelsMode(false); setHotel(null) }, [])
 
   const startWalk = useCallback(() => {
     if (!selectedRoute) return
@@ -805,12 +843,12 @@ export default function ExploreMapScreen({
   // Every handoff off this map goes through here, so every one of them comes back to it.
   const handOff = useCallback((go, pinId = null) => {
     returnSnapshot = {
-      region, selectedKeys: [...selectedKeys], openNow, officialOnly, routesMode, eventsMode, eventRange,
+      region, selectedKeys: [...selectedKeys], openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode,
       routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
       walkNext: walk ? walk.next : null, follow,
     }
     go()
-  }, [region, selectedKeys, openNow, officialOnly, routesMode, eventsMode, eventRange, selectedRoute, walk, follow])
+  }, [region, selectedKeys, openNow, officialOnly, routesMode, eventsMode, eventRange, hotelsMode, selectedRoute, walk, follow])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -826,6 +864,53 @@ export default function ExploreMapScreen({
     () => index.getClusters(regionToBBox(region), regionToZoom(region, width)),
     [index, region, width]
   )
+
+  // Hotels: read on first entry (102 rows, only the pin + card columns), clustered on their own index
+  // so a hotel never merges with a place bubble. A failed read leaves the layer empty, nothing else.
+  useEffect(() => {
+    if (!hotelsMode || hotelRows.length) return
+    supabase.from('hotels').select(HOTEL_COLUMNS).range(0, 999)
+      .then(({ data, error }) => { if (!error) setHotelRows((data ?? []).filter(h => Number.isFinite(h.lat) && Number.isFinite(h.lng))) })
+  }, [hotelsMode])
+  const hotelIndex = useMemo(() => {
+    const idx = new Supercluster(CLUSTER_OPTS)
+    idx.load(hotelRows.map(h => ({ type: 'Feature', properties: { hotel: h }, geometry: { type: 'Point', coordinates: [h.lng, h.lat] } })))
+    return idx
+  }, [hotelRows])
+  const hotelClusters = useMemo(
+    () => (hotelsMode ? hotelIndex.getClusters(regionToBBox(region), regionToZoom(region, width)) : []),
+    [hotelsMode, hotelIndex, region, width]
+  )
+  const hotelFitted = useRef(!!snap?.hotelsMode)
+  useEffect(() => {
+    if (!hotelsMode) { hotelFitted.current = false; return }
+    if (hotelFitted.current || !hotelRows.length) return
+    hotelFitted.current = true
+    fitTo(hotelRows.map(h => ({ latitude: h.lat, longitude: h.lng })), 0.25)
+  }, [hotelsMode, hotelRows.length])
+  const expandHotelCluster = useCallback(c => {
+    const [lng, lat] = c.geometry.coordinates
+    const zoom = Math.min(hotelIndex.getClusterExpansionZoom(c.properties.cluster_id), CLUSTER_OPTS.maxZoom)
+    const longitudeDelta = (360 * (width / 256)) / Math.pow(2, zoom)
+    mapRef.current?.animateToRegion({ latitude: lat, longitude: lng, longitudeDelta, latitudeDelta: longitudeDelta * (height / width) }, 350)
+  }, [hotelIndex, width, height])
+
+  // Yakınımda şimdi: App's location, else the locate-me fix. Today's events come from the events read.
+  const nearPos = nearUser ? userLocation : myFix
+  const nearItems = useMemo(
+    () => (nearOpen ? nearNow({ pins: sources.flatMap(x => x.pins), events: eventRows, pos: nearPos, dutyWindows }) : []),
+    [nearOpen, sources, eventRows, nearPos, dutyWindows]
+  )
+  const closeNear = useCallback(() => setNearOpen(false), [])
+  const openNear = useCallback(item => {
+    setNearOpen(false)
+    if (item.kind === 'event') { handOff(() => onSelectEvent?.(item.event)); return }
+    const pin = item.pin
+    if (pin.kind === 'place') { handOff(() => onSelectPlace?.(pin.row), pin.id); return }
+    if (pin.kind === 'eatery') { handOff(() => onSelectEatery?.(pin.row), pin.id); return }
+    if (pin.row.provider_id) handOff(() => onSelectFacility?.(pin.row), pin.id)
+    else handOff(() => onSelectUnclaimed?.(pin.row), pin.id)
+  }, [handOff, onSelectEvent, onSelectPlace, onSelectEatery, onSelectFacility, onSelectUnclaimed])
 
   const expandCluster = useCallback(cluster => {
     const [lng, lat] = cluster.geometry.coordinates
@@ -900,7 +985,7 @@ export default function ExploreMapScreen({
         onPanDrag={() => { userMoved.current = true; if (walking && follow) setFollow(false) }}
         onRegionChangeComplete={setRegion}
         mapPadding={{ top: 0, right: 0, left: 0, bottom: mapBottom }}
-        onPress={() => { setSelected(null); setEventVenue(null) }}
+        onPress={() => { setSelected(null); setEventVenue(null); setHotel(null) }}
       >
         {routesMode && (
           <RouteOverlay
@@ -916,10 +1001,18 @@ export default function ExploreMapScreen({
           />
         )}
         {/* Not EEMD sites: hidden while "Müze & Ören Yeri" is on (Open now leaves them, a modifier). */}
+        {hotelsMode && hotelClusters.map(c => (c.properties.cluster
+          ? <HotelMarker key={`hc:${c.properties.cluster_id}`} count={c.properties.point_count}
+              coordinate={{ latitude: c.geometry.coordinates[1], longitude: c.geometry.coordinates[0] }}
+              onPress={() => expandHotelCluster(c)} />
+          : <HotelMarker key={`h:${c.properties.hotel.id}`} hotel={c.properties.hotel}
+              coordinate={{ latitude: c.properties.hotel.lat, longitude: c.properties.hotel.lng }}
+              onPress={() => setHotel(c.properties.hotel)} />
+        ))}
         {eventsMode && eventVenues.map(v => (
           <EventVenueMarker key={`ev:${v.key}`} venue={v} active={v.key === eventVenue} onPress={vv => setEventVenue(vv.key)} />
         ))}
-        {!routesMode && !eventsMode && GOOGLE_LAYER && !(officialOnly && canOfficial) && googlePins.map(g => (
+        {!routesMode && !eventsMode && !hotelsMode && GOOGLE_LAYER && !(officialOnly && canOfficial) && googlePins.map(g => (
           <Marker
             key={`g:${g.google_place_id}`}
             coordinate={{ latitude: g.latitude, longitude: g.longitude }}
@@ -928,7 +1021,7 @@ export default function ExploreMapScreen({
             onPress={e => { e.stopPropagation(); setSelected(null); setGooglePlace({ id: g.google_place_id }) }}
           />
         ))}
-        {!routesMode && !eventsMode && clusters.map(c => {
+        {!routesMode && !eventsMode && !hotelsMode && clusters.map(c => {
           if (c.properties.cluster) {
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
           }
@@ -970,6 +1063,9 @@ export default function ExploreMapScreen({
         eventsMode={eventsMode}
         eventsCount={eventCounts[DEFAULT_EVENT_RANGE]}
         onEvents={() => (eventsMode ? leaveRoutes() : enterEvents())}
+        showHotels={!!onOpenHotel}
+        hotelsMode={hotelsMode}
+        onHotels={() => (hotelsMode ? leaveRoutes() : enterHotels())}
         lang={lang}
       />
 
@@ -1036,6 +1132,19 @@ export default function ExploreMapScreen({
           onOpen={e => handOff(() => onSelectEvent?.(e))}
           lang={lang}
         />
+      )}
+
+      {hotelsMode && hotel && (
+        <HotelCard hotel={hotel} lang={lang} bottom={panelBottom} onClose={() => setHotel(null)}
+          onOpenHotels={() => { const h = hotel; setHotel(null); handOff(() => onOpenHotel?.(h)) }} />
+      )}
+
+      {/* Yakınımda şimdi: only on the plain map — every mode and pin card has the bottom to itself. */}
+      {!routesMode && !eventsMode && !hotelsMode && !selected && !googlePlace && (nearOpen
+        ? <NearNowPanel items={nearItems} hasPos={!!nearPos} locating={locating} onLocate={locateMe}
+            onOpen={openNear} onClose={closeNear} nameOf={placeName} lang={lang}
+            bottom={panelBottom} maxHeight={Math.round(height * 0.5)} />
+        : <NearNowPill lang={lang} bottom={panelBottom} onPress={() => setNearOpen(true)} />
       )}
 
       {loading && (
