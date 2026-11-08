@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar'
 import { REDESIGN, CHECKINS } from '../constants/redesign'
 import { useState, useEffect } from 'react'
-import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import { useScrollMemory } from '../utils/scrollMemory'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, FlatList, ActivityIndicator, Platform,
@@ -728,8 +728,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   // Android back used to skip straight past to Home (2026-09-27, slice 0).
   const dirty = hasChanges || draft != null
   // Legal is an early return: the profile's scroll comes back when it closes (slice 10).
-  const profileMem = useScrollMemory('profile:main')
-  useEffect(() => () => forgetScroll('profile:'), [])
+  // Profil is a TAB ROOT, so its place is kept for the app session: a module opened from here, or
+  // App swapping the whole page (Legal, settings screens), unmounts it, and forgetting on unmount
+  // sent every return to the top (Berke, 2026-11-08: back keeps your place). Keyed per account, so
+  // another sign-in on the same phone starts at the top.
+  const profileMem = useScrollMemory(`profile:main:${session?.user?.id ?? 'none'}`)
   const confirmLeave = proceed => {
     if (!dirty) { proceed(); return }
     Alert.alert(t('unsavedTitle', lang), t('unsavedBody', lang), [
