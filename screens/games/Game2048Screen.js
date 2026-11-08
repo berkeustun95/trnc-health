@@ -237,7 +237,7 @@ const s = StyleSheet.create({
 
   scoreRow:   { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   scoreBox:   { flex: 1, backgroundColor: colors.cardBg, borderRadius: radius.card, paddingVertical: spacing.sm, alignItems: 'center', ...shadow },
-  scoreLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  scoreLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, letterSpacing: 0.2 },
   scoreVal:   { fontSize: fontSize.lg, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
 
   boardWrap:  { position: 'relative' },

@@ -74,7 +74,10 @@ import TERMS_TR   from './terms.tr.js'
 // Bumped 2026-10-25 -> 2026-10-30 at the North Houses go-live: booking requests to partners (apartment, dates,
 // guests, time; no name or phone, no account or device identifier), the on-phone limit (3/hour, 10/day; WhatsApp
 // still opens), 12-month deletion (20261148), and the legal-basis row. New policy-updated notice text. Terms unchanged.
-export const LEGAL_VERSION = '2026-10-30'
+// Bumped 2026-10-30 -> 2026-11-09 for Explore stage 4: the push token also carries an optional Friday note
+// (weekend events + a place to visit), switchable in Profil → Bilgilendirmeler ve fırsatlar. New policy-updated
+// notice text. Terms unchanged (version line follows).
+export const LEGAL_VERSION = '2026-11-09'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue

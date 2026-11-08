@@ -259,7 +259,7 @@ const s = StyleSheet.create({
   stars:         { fontSize: 15, color: '#F5A623', letterSpacing: 1 },
   reviewDate:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   comment:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20, marginBottom: 8 },
-  verifiedTag:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  verifiedTag:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2 },
   emptyWrap:     { alignItems: 'center', paddingTop: 40, paddingHorizontal: 32 },
   emptyTitle:    { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   empty:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },

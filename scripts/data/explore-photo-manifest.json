@@ -26,6 +26,14 @@
     "be null — and 'own' with a non-null source_url is equally an error, so the exemption",
     "cannot be used to smuggle a photo past the check."
   ],
+  "_pass3_readme": [
+    "PASS 3 (2026-11-08) — the first two BEACH photos, chosen and approved by Berke (Golden Beach, Alagadı).",
+    "Both CC BY-SA 4.0 from Wikimedia Commons, geotagged at the beach. Resize only, never crop (see the script).",
+    "The beach licence gate was relaxed for CC licences: its premise — a credit-only renderer in production —",
+    "no longer holds; ExploreProfileScreen renders PhotoCredit (creator, licence link, source link) for every",
+    "place, beaches included. Escape and Glapsides keep no photo (Escape's only candidate was 800x600 from 2005;",
+    "Glapsides has no verifiable photo). Pass 2 moved to `_previous_pass_2`, pass 1 stays in `_previous_pass`."
+  ],
   "_pass2_readme": [
     "PASS 2 (2026-08-25) — 21 more places, one photo each. 8 -> 29 of 42 photographed.",
     "",
@@ -68,146 +76,41 @@
     "now appends ?utm_source=...&utm_campaign=imageinfo to ii.url; those are campaign",
     "analytics parameters, not part of the file address, and pass 1 predates them. Stripped."
   ],
-  "_previous_pass": [
+  "places": [
     {
-      "id": "7ecf2c84-2192-45c9-b075-a2ce115f842c",
-      "name": "Kyrenia Castle",
-      "category": "castle_fortress",
-      "region": "kyrenia",
-      "_note": "Provenance verified: the bucket file Kyrenia_Fortress_2.jpeg is Commons File:Kyrenia Fortress 2.JPG, and its artist + licence matched the photo_credits string already stored on the row. It was PRESERVED unresized in the first apply (2026-08-25) and re-mirrored immediately after, because at 2.4 MB it was ~5x the largest optimised photo and the only unoptimised image in the set. Its `src` is therefore OUR OWN bucket object, not Commons: the pixels are already ours, so re-fetching from Commons would be a pointless round trip. Kyrenia_Fortress_2.jpeg is NOT deleted — the saved rollback block for the first apply references it and must keep resolving. source_url still points at the Commons file page, which is where the licence and creator live.",
+      "id": "95b6d924-e3c0-40e4-a2bd-b55ca1a105ef",
+      "name": "Golden Beach (Altın Kumsal)",
+      "category": "beach",
+      "region": "karpaz",
       "photos": [
         {
-          "src": "https://jeihxnwqytnxtytgkzgf.supabase.co/storage/v1/object/public/place-photos/Kyrenia_Fortress_2.jpeg",
-          "credit": "Julian Nyča",
-          "license": "CC BY-SA 3.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Fortress_2.JPG",
-          "source": "commons"
-        },
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Kyrenia_Castle%2C_Kyrenia%2C_Northen_Cyprus_05.jpg",
+          "src": "https://upload.wikimedia.org/wikipedia/commons/1/15/Golden_Beach%2C_Karpaz%2C_Northern_Cyprus.jpg",
           "credit": "Michal Klajban",
           "license": "CC BY-SA 4.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Castle,_Kyrenia,_Northen_Cyprus_05.jpg",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Golden_Beach,_Karpaz,_Northern_Cyprus.jpg",
           "source": "commons"
         }
       ]
     },
     {
-      "id": "d773e658-95ac-48ba-ae53-5936374a976f",
-      "name": "St. Hilarion Castle",
-      "category": "castle_fortress",
+      "id": "fa39492b-57e6-4ebd-b22c-89a9cf20ffe2",
+      "name": "Alagadi Turtle Beach",
+      "category": "beach",
       "region": "kyrenia",
       "photos": [
         {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/a/af/Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
-          "credit": "Zairon",
+          "src": "https://upload.wikimedia.org/wikipedia/commons/f/fc/Alagadi_Turtle_Beach_in_2020.04.jpg",
+          "credit": "CAPTAIN RAJU",
           "license": "CC BY-SA 4.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
-          "source": "commons"
-        }
-      ]
-    },
-    {
-      "id": "d1d9761c-a9e8-4f62-8b3b-4c0b6b8fdf7c",
-      "name": "Bellapais Abbey",
-      "category": "religious_site",
-      "region": "kyrenia",
-      "photos": [
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Bellapais_Abbey_1.jpg",
-          "credit": "Jorge-11",
-          "license": "CC BY 2.0",
-          "license_url": "https://creativecommons.org/licenses/by/2.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Bellapais_Abbey_1.jpg",
-          "source": "commons"
-        }
-      ]
-    },
-    {
-      "id": "9abee5c9-0d44-4a34-abef-04e3260151d1",
-      "name": "Othello Castle",
-      "category": "castle_fortress",
-      "region": "famagusta",
-      "photos": [
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/3/39/Othello_Castle_Inside_1.jpg",
-          "credit": "Blcksprt",
-          "license": "CC BY-SA 4.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Othello_Castle_Inside_1.jpg",
-          "source": "commons"
-        }
-      ]
-    },
-    {
-      "id": "28f69a7c-48f1-4a51-b84e-37beda5e29b8",
-      "name": "Salamis Ancient City",
-      "category": "ancient_ruins",
-      "region": "famagusta",
-      "photos": [
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Ruins_of_Salamis%2C_Cyprus_%2827409306078%29.jpg",
-          "credit": "Mike McBey",
-          "license": "CC BY 2.0",
-          "license_url": "https://creativecommons.org/licenses/by/2.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Ruins_of_Salamis,_Cyprus_(27409306078).jpg",
-          "source": "commons"
-        }
-      ]
-    },
-    {
-      "id": "1100ad4c-a412-4528-b96d-c2543fd23b25",
-      "name": "Büyük Han (Great Inn)",
-      "category": "monument",
-      "region": "nicosia",
-      "photos": [
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/a/a7/B%C3%BCy%C3%BCk_Han_Cyprus_%2841914047980%29.jpg",
-          "credit": "dronepicr",
-          "license": "CC BY 2.0",
-          "license_url": "https://creativecommons.org/licenses/by/2.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:B%C3%BCy%C3%BCk_Han_Cyprus_(41914047980).jpg",
-          "source": "commons"
-        }
-      ]
-    },
-    {
-      "id": "aa7c1674-fd80-4d41-b242-ff41da225990",
-      "name": "Selimiye Mosque",
-      "category": "religious_site",
-      "region": "nicosia",
-      "photos": [
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Selimiye_mosque_Nicosia_%2829852320938%29.jpg",
-          "credit": "dronepicr",
-          "license": "CC BY 2.0",
-          "license_url": "https://creativecommons.org/licenses/by/2.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Selimiye_mosque_Nicosia_(29852320938).jpg",
-          "source": "commons"
-        }
-      ]
-    },
-    {
-      "id": "88def13a-3ee3-4c3b-bb7b-56bf15f27f33",
-      "name": "Kantara Castle",
-      "category": "castle_fortress",
-      "region": "iskele",
-      "photos": [
-        {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Kantara_Castle_%2844105075700%29.jpg",
-          "credit": "Mike McBey",
-          "license": "CC BY 2.0",
-          "license_url": "https://creativecommons.org/licenses/by/2.0/",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Kantara_Castle_(44105075700).jpg",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Alagadi_Turtle_Beach_in_2020.04.jpg",
           "source": "commons"
         }
       ]
     }
   ],
-  "places": [
+  "_previous_pass_2": [
     {
       "id": "2392247c-9cd3-446a-8eeb-588fdd9ea50a",
       "name": "Apostolos Andreas Monastery",
@@ -543,6 +446,145 @@
           "license": "CC BY-SA 4.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
           "source_url": "https://commons.wikimedia.org/wiki/File:Trikomo_Archaeology_Museum_31.jpg",
+          "source": "commons"
+        }
+      ]
+    }
+  ],
+  "_previous_pass": [
+    {
+      "id": "7ecf2c84-2192-45c9-b075-a2ce115f842c",
+      "name": "Kyrenia Castle",
+      "category": "castle_fortress",
+      "region": "kyrenia",
+      "_note": "Provenance verified: the bucket file Kyrenia_Fortress_2.jpeg is Commons File:Kyrenia Fortress 2.JPG, and its artist + licence matched the photo_credits string already stored on the row. It was PRESERVED unresized in the first apply (2026-08-25) and re-mirrored immediately after, because at 2.4 MB it was ~5x the largest optimised photo and the only unoptimised image in the set. Its `src` is therefore OUR OWN bucket object, not Commons: the pixels are already ours, so re-fetching from Commons would be a pointless round trip. Kyrenia_Fortress_2.jpeg is NOT deleted — the saved rollback block for the first apply references it and must keep resolving. source_url still points at the Commons file page, which is where the licence and creator live.",
+      "photos": [
+        {
+          "src": "https://jeihxnwqytnxtytgkzgf.supabase.co/storage/v1/object/public/place-photos/Kyrenia_Fortress_2.jpeg",
+          "credit": "Julian Nyča",
+          "license": "CC BY-SA 3.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Fortress_2.JPG",
+          "source": "commons"
+        },
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Kyrenia_Castle%2C_Kyrenia%2C_Northen_Cyprus_05.jpg",
+          "credit": "Michal Klajban",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Castle,_Kyrenia,_Northen_Cyprus_05.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "d773e658-95ac-48ba-ae53-5936374a976f",
+      "name": "St. Hilarion Castle",
+      "category": "castle_fortress",
+      "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/a/af/Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
+          "credit": "Zairon",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "d1d9761c-a9e8-4f62-8b3b-4c0b6b8fdf7c",
+      "name": "Bellapais Abbey",
+      "category": "religious_site",
+      "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Bellapais_Abbey_1.jpg",
+          "credit": "Jorge-11",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Bellapais_Abbey_1.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "9abee5c9-0d44-4a34-abef-04e3260151d1",
+      "name": "Othello Castle",
+      "category": "castle_fortress",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/3/39/Othello_Castle_Inside_1.jpg",
+          "credit": "Blcksprt",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Othello_Castle_Inside_1.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "28f69a7c-48f1-4a51-b84e-37beda5e29b8",
+      "name": "Salamis Ancient City",
+      "category": "ancient_ruins",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Ruins_of_Salamis%2C_Cyprus_%2827409306078%29.jpg",
+          "credit": "Mike McBey",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Ruins_of_Salamis,_Cyprus_(27409306078).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "1100ad4c-a412-4528-b96d-c2543fd23b25",
+      "name": "Büyük Han (Great Inn)",
+      "category": "monument",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/a/a7/B%C3%BCy%C3%BCk_Han_Cyprus_%2841914047980%29.jpg",
+          "credit": "dronepicr",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:B%C3%BCy%C3%BCk_Han_Cyprus_(41914047980).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "aa7c1674-fd80-4d41-b242-ff41da225990",
+      "name": "Selimiye Mosque",
+      "category": "religious_site",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Selimiye_mosque_Nicosia_%2829852320938%29.jpg",
+          "credit": "dronepicr",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Selimiye_mosque_Nicosia_(29852320938).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "88def13a-3ee3-4c3b-bb7b-56bf15f27f33",
+      "name": "Kantara Castle",
+      "category": "castle_fortress",
+      "region": "iskele",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Kantara_Castle_%2844105075700%29.jpg",
+          "credit": "Mike McBey",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kantara_Castle_(44105075700).jpg",
           "source": "commons"
         }
       ]

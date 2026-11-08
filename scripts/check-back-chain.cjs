@@ -59,7 +59,7 @@ const cases4=[
  ['SCROLL SPOT Hub <- Welcome Guide (guide closes, hub stays)', {...base, showStudentHub:true, showNewcomerEssentials:true}, {studentHubBackRef:()=>{throw new Error('hub asked')}}, r=>r.calls==='setShowNewcomerEssentials(false)'],
  ['S8 Guide card open -> closes card, not guide', {...base, showNewcomerEssentials:true}, {guideBackRef:()=>true}, r=>r.calls===''],
  ['S8 Rates over guide -> closes rates, guide stays', {...base, showNewcomerEssentials:true, showExchangeRates:true}, {guideBackRef:()=>{throw new Error('guide asked')}}, r=>r.calls==='setShowExchangeRates(false)'],
- ['Hotels (Home tile) -> closes hotels', {...base, showHotels:true}, {}, r=>r.r===true && r.calls==='setShowHotels(false)'],
+ ['Hotels (Home tile) -> closes hotels', {...base, showHotels:true}, {}, r=>r.r===true && r.calls==='setShowHotels(false) setHotelsQuery("")'],
  ['Günlük Kiralık apartment open over Konaklama -> closes the apartment only, NOT the module', {...base, showAccommodation:true, openedRental:{slug:'yasemin-2plus1'}}, {}, r=>r.r===true && r.calls==='setOpenedRental(null)'],
  ['Konaklama, no overlay open -> closes the module (the apartment overlay is not left holding back)', {...base, showAccommodation:true, openedRental:null}, {}, r=>r.r===true && r.calls==='setShowAccommodation(false)'],
  ['S10 Duty over notifications -> closes duty, notifs stay', {...base, showNotifs:true, showDutyList:true}, {}, r=>r.calls==='closeDutyList()'],

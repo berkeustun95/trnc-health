@@ -15,6 +15,7 @@ import { officialVisitView } from '../utils/officialVisit'
 import { formatPetDate } from '../constants/petsContent'
 import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
 import { SectionHeader, RemoteImage } from './ui'
+import { useScrollMemory } from '../utils/scrollMemory'
 import { EVENT_INK } from './MapEvents'
 import { routeName } from './WalkingRoutes'
 
@@ -89,9 +90,11 @@ export default function ExploreSections({ places, userLocation, lang, placeName,
   const photoOf = p => p.cover_image_url || p.photos?.[0] || null
   const iconOf = p => GROUP_META[categoryToGroup(p.category)]?.icon || 'location-outline'
   const seeAll = onPress => ({ label: t('filterAll', lang), onPress })
+  // The landing keeps its place when a place, event or category opened from it closes (as GroupTiles did).
+  const mem = useScrollMemory('explore:tiles')
 
   return (
-    <ScrollView contentContainerStyle={s.wrap} showsVerticalScrollIndicator={false}>
+    <ScrollView {...mem} contentContainerStyle={s.wrap} showsVerticalScrollIndicator={false}>
       {week.length > 0 && (
         <Row title={t('dateThisWeek', lang)} action={onOpenMapEvents ? { label: t('exploreViewMap', lang), onPress: onOpenMapEvents } : undefined}>
           {week.map(e => {

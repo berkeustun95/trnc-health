@@ -184,7 +184,7 @@ const s = StyleSheet.create({
   scrollBody:   { paddingBottom: 8, gap: 16 },
   section:      { gap: 4 },
   sectionHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  sectionTitle: { ...type.meta, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 1 },
+  sectionTitle: { ...type.meta, color: colors.textSecondary, letterSpacing: 0.2, flexShrink: 1 },
   rowWrap:      { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingBottom: 6 },
   row:          { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 6 },
   rowText:      { flex: 1, gap: 2 },

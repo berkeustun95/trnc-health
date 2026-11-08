@@ -201,8 +201,7 @@ const s = StyleSheet.create({
   districtText:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary },
 
   section:        { marginBottom: 24 },
-  sectionLabel:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  sectionLabel:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 10 },
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:           { flexDirection: 'row', alignItems: 'center', gap: 5,
                     backgroundColor: colors.primaryLight, borderRadius: 20,

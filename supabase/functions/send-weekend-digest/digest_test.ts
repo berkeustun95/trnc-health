@@ -56,6 +56,7 @@ Deno.test('readableTitle: ALL CAPS → normal casing, Turkish and English per wo
     readableTitle("DJ ARDA İLE YILBAŞI PARTİSİ LEFKOŞA'DA"),
     readableTitle('KKTC CUP 2026: EMU VS. NEU'),
     readableTitle('Murda Konseri'),
+    readableTitle('HÜSEYİN KIRMIZI PİYANO RESİTALİ'),
     readableTitle('ODTÜ'),
   ], [
     'Peppa Pig Çocuk Tiyatrosu',
@@ -64,6 +65,7 @@ Deno.test('readableTitle: ALL CAPS → normal casing, Turkish and English per wo
     "DJ Arda ile Yılbaşı Partisi Lefkoşa'da",
     'KKTC Cup 2026: EMU vs. NEU',
     'Murda Konseri',
+    'Hüseyin Kırmızı Piyano Resitali',
     'ODTÜ',
   ])
 })
