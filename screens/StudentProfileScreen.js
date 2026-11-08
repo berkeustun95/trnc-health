@@ -231,8 +231,7 @@ const s = StyleSheet.create({
   messageBtnText: { color: colors.surface, fontSize: 15, fontFamily: 'Inter_700Bold' },
 
   historyWrap:  { marginTop: 18 },
-  sectionTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                  textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
+  sectionTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 12 },
 
   divider:   { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 12, paddingTop: 12 },
   enrolRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },

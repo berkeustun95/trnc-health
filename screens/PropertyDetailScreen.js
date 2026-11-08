@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, category as CAT, type, radii, elevation, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { IconButton, InfoRow, ContactBar, Button, RemoteImage, PageCanvas } from '../components/ui'
+import { useCoveredTopBar, CoveredBand } from '../components/ui/DetailScaffold'
 import SplashStatusBar from '../components/SplashStatusBar'
 import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
@@ -437,6 +438,9 @@ function PropertyDetailRedesign({
 }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
+  // Same band as DetailScaffold: once the sheet (gallery − 28) reaches the back button, it gets a
+  // solid ground instead of sitting over the tag and the title (Berke, 2026-11-08).
+  const [covered, onScroll] = useCoveredTopBar(GALLERY_H - 28 - 56)
   const c = CAT.homeLife
   const hasCoords = prop.latitude != null && prop.longitude != null
   const actions = [
@@ -471,7 +475,7 @@ function PropertyDetailRedesign({
       {/* The overlays below are positioned against this View, not the SafeAreaView, so the
           back button sits 8pt under whatever top inset the host applied. */}
       <View style={{ flex: 1 }}>
-      <ScrollView showsVerticalScrollIndicator={false}
+      <ScrollView showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={32}
         contentContainerStyle={{ paddingBottom: barH + Math.max(insets.bottom, 12) + 16 }}>
         {images.length > 0 ? (
           <View>
@@ -594,6 +598,7 @@ function PropertyDetailRedesign({
         </View>
       </ScrollView>
 
+      <CoveredBand covered={covered} />
       <View style={rs.topBar} pointerEvents="box-none">
         <IconButton icon="chevron-back" variant="frosted" onPress={onBack} accessibilityLabel={t('back', lang)} />
       </View>
@@ -665,9 +670,9 @@ const ds = StyleSheet.create({
   body:               { padding: 20 },
   badgeRow:           { flexDirection: 'row', gap: 6, marginBottom: 10 },
   typeBadge:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.surface },
-  typeBadgeText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase' },
+  typeBadgeText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   intentBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.primaryLight },
-  intentBadgeText:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.3 },
+  intentBadgeText:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.3 },
 
   title:              { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 27 },
   price:              { fontSize: 24, fontFamily: 'Inter_700Bold', color: colors.primary, marginTop: 8 },
@@ -678,7 +683,7 @@ const ds = StyleSheet.create({
   devName:            { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4 },
 
   divider:            { height: 1, backgroundColor: colors.border, marginVertical: 20 },
-  sectionLabel:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+  sectionLabel:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 12 },
 
   factGrid:           { flexDirection: 'row', flexWrap: 'wrap' },
   fact:               { width: '50%', paddingVertical: 8, paddingRight: 12 },

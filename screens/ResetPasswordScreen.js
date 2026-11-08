@@ -112,7 +112,7 @@ const s = StyleSheet.create({
   cancelBtn:   { position: 'absolute', top: 16, right: 0, padding: 8 },
   title:       { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
   sub:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 22, marginBottom: 32 },
-  label:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
+  label:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, letterSpacing: 0.2, marginBottom: 7 },
   passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface, marginBottom: 18 },
   passwordInput:{ flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   eyeBtn:       { paddingHorizontal: 14 },

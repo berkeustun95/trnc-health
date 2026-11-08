@@ -256,7 +256,7 @@ const s = StyleSheet.create({
 
   inputCard:             { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16, marginBottom: 16, ...shadow },
   dateField:             { paddingVertical: 4 },
-  dateFieldLabel:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  dateFieldLabel:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 8 },
   dateFieldBtn:          { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: colors.border },
   dateFieldValue:        { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   dateFieldPlaceholder:  { color: colors.textSecondary },

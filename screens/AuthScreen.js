@@ -430,7 +430,7 @@ const legacy = StyleSheet.create({
   tabText:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   tabTextActive:     { fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   fieldGroup:        { marginBottom: 18 },
-  fieldLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
+  fieldLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 7 },
   passwordLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   forgotLink:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   input:             { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },

@@ -158,8 +158,7 @@ const s = StyleSheet.create({
   secondaryText:{ flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   pickWrap:     { marginTop: 14 },
-  pickLabel:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                  textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  pickLabel:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 6 },
   hint:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10 },
 
   later:        { alignSelf: 'center', marginTop: 14, paddingVertical: 6, paddingHorizontal: 12 },
