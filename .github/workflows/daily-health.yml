@@ -67,6 +67,10 @@ jobs:
       - name: notify:health
         if: success() || failure()
         run: npm run -s notify:health
+      # Araçlar (2026-11-08): approval queue < 48 h, the expire-vehicles cron ran, the nightly photo cleanup ran.
+      - name: cars:health
+        if: success() || failure()
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-cars-staleness.mjs
       # Duyurular (2026-10-11): pipeline alive (fetch < 2 h, no source failing 3+ runs, a new
       # item < 3 days, banner count readable as anon, no red duyurular-fetch run in 24 h) and
       # content not stale (≥ 50 visible, newest < 7 days, anon count = service count). Offline

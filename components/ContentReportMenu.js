@@ -66,6 +66,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
   // Slice 5 resolved the note that used to sit here: the profile page now passes
   // `blockUserId`, which turns the block row into block_user(uuid).
   const isProfile  = contentType === 'profile'
+  // A car listing (Araçlar): "report this listing", not "this content".
+  const isVehicle  = contentType === 'vehicle'
 
   function close() {
     setOpen(false)
@@ -188,8 +190,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
             {step === 'form' && (
               <>
-                <Text style={s.title}>{t(isMessage ? 'reportMessageTitle' : isProfile ? 'reportProfileTitle' : isFacility ? 'reportBusinessTitle' : 'reportTitle', lang)}</Text>
-                <Text style={s.sub}>{t(isMessage ? 'reportMessageSub' : isProfile ? 'reportProfileSub' : isFacility ? 'reportBusinessSub' : 'reportSubtitle', lang)}</Text>
+                <Text style={s.title}>{t(isMessage ? 'reportMessageTitle' : isProfile ? 'reportProfileTitle' : isFacility ? 'reportBusinessTitle' : isVehicle ? 'carsReportTitle' : 'reportTitle', lang)}</Text>
+                <Text style={s.sub}>{t(isMessage ? 'reportMessageSub' : isProfile ? 'reportProfileSub' : isFacility ? 'reportBusinessSub' : isVehicle ? 'carsReportSub' : 'reportSubtitle', lang)}</Text>
 
                 {REASONS.map(r => (
                   <TouchableOpacity

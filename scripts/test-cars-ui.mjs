@@ -8,6 +8,8 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   priceOrFilter, fxComplete, tryPerUnit, carPrice, carContact, waUrl, contactRegion, pushCarsLayer, sortedImages, VEHICLE_COLS, PRICE_BANDS,
+  normalizePhone, parseAmount, carFormError, carPayload, carForm, myCarState, canRenew, canEdit, daysLeft, openListingCount,
+  carErrorKey, photoCleanupReason, rejectionText, MY_VEHICLE_COLS, layerKey,
 } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -60,10 +62,85 @@ check('same car again pops back to it', ids(pushCarsLayer(st, car('a'))) === 'a'
 
 // The select must never ask for owner_id (no client grant: the whole read fails with 42501), nor '*'.
 check('select names columns, no owner_id, no *', !/owner_id|\*/.test(VEHICLE_COLS), VEHICLE_COLS)
-for (const f of ['screens/CarsScreen.js', 'screens/DealerScreen.js']) {
-  const src = readFileSync(resolve(ROOT, f), 'utf8')
+for (const f of ['screens/CarsScreen.js', 'screens/DealerScreen.js', 'screens/CarPostScreen.js', 'screens/MyCarsScreen.js']) {
+  const src = readFileSync(resolve(ROOT, f), 'utf8').replace(/\/\/.*$/gm, '')   // code only, not the comments about it
   check(`${f}: no select('*'), no owner_id, orders only by granted columns`,
     !/select\(\s*['"]\*/.test(src) && !src.includes('owner_id') && !/order\('(created_at|updated_at)'/.test(src))
+}
+
+// ─── S3: posting, İlanlarım, cleanup ─────────────────────────────────────────
+check('local TRNC mobile becomes +90', normalizePhone('0533 812 34 56') === '+905338123456', normalizePhone('0533 812 34 56'))
+check('international with spaces and dashes', normalizePhone('+44 7700-900123') === '+447700900123')
+check('00 prefix becomes +', normalizePhone('0090 533 812 3456') === '+905338123456')
+check('empty is null, letters are false', normalizePhone('  ') === null && normalizePhone('call me') === false)
+check('a + in the middle is false', normalizePhone('0533+123456') === false)
+check('every normalised number passes the DB CHECK', ['0533 812 34 56', '+44 7700 900123', '00905338123456', '05338123456'].every(p => /^\+?[0-9]{7,15}$/.test(normalizePhone(p))))
+check('amounts: grouping is ignored', parseAmount('12,500') === 12500 && parseAmount('12.500') === 12500 && parseAmount('12 500') === 12500)
+check('amounts: zero, negative and text are refused', parseAmount('0') === null && parseAmount('-5') === null && parseAmount('abc') === null)
+
+const good = { intent: 'sale', make: 'Toyota', model: 'Corolla', year: '2018', km: '65,000', fuel: 'petrol', gearbox: 'automatic',
+  body_type: 'sedan', colour: 'white', steering: 'right', price: '9,500', currency: 'GBP', region: 'kyrenia', area: '', description: '',
+  phone: '0533 812 34 56', whatsapp: '' }
+check('a complete form has no error', carFormError(good, 1, 2026) === null, carFormError(good, 1, 2026))
+check('no photo is refused', carFormError(good, 0, 2026) === 'carsPostErrPhotos')
+check('no contact is refused', carFormError({ ...good, phone: '', whatsapp: '' }, 1, 2026) === 'carsPostErrContact')
+check('a bad number is refused before the server', carFormError({ ...good, phone: 'abc' }, 1, 2026) === 'carsPostErrPhoneFormat')
+check('a year from the future is refused', carFormError({ ...good, year: '2029' }, 1, 2026) === 'carsPostErrYear')
+check('next year (new model year) is fine', carFormError({ ...good, year: '2027' }, 1, 2026) === null)
+check('missing specs are refused', carFormError({ ...good, fuel: null }, 1, 2026) === 'carsPostErrSpecs')
+check('rent over the daily cap is refused', carFormError({ ...good, intent: 'rent', price: '2000000' }, 1, 2026) === 'carsPostErrPrice')
+
+const p = carPayload(good)
+check('payload is exactly the 18 granted columns',
+  Object.keys(p).sort().join(',') === 'area,body_type,colour,contact_phone,currency,description,fuel,gearbox,intent,km,make,model,price,price_per_day,region,steering,whatsapp,year', Object.keys(p))
+check('sale: price set, daily price null', p.price === 9500 && p.price_per_day === null && p.km === 65000 && p.year === 2018)
+const pr = carPayload({ ...good, intent: 'rent', price: '45' })
+check('rent: daily price set, price null', pr.price === null && pr.price_per_day === 45)
+check('empty optional text becomes null, numbers normalised', p.area === null && p.description === null && p.whatsapp === null && p.contact_phone === '+905338123456')
+check('edit form round-trips through the payload', JSON.stringify(carPayload(carForm({ ...p, id: 'x', intent: 'sale' }))) === JSON.stringify(p))
+check('a new form prefills the profile phone in both fields', carForm(null, '+905338000000').whatsapp === '+905338000000')
+
+const NOW = Date.parse('2026-11-08T12:00:00Z'), day = 864e5, iso = ms => new Date(ms).toISOString()
+check('active past expiry reads expired', myCarState({ status: 'active', expires_at: iso(NOW - 1000) }, NOW) === 'expired')
+check('hidden wins over active', myCarState({ status: 'active', hidden_at: iso(NOW), expires_at: iso(NOW + day) }, NOW) === 'hidden')
+check('removed wins over hidden', myCarState({ status: 'removed', hidden_at: iso(NOW) }, NOW) === 'removed')
+check('renew: not on a fresh listing', canRenew({ status: 'active', expires_at: iso(NOW + 20 * day) }, NOW) === false)
+check('renew: in the last week', canRenew({ status: 'active', expires_at: iso(NOW + 6 * day) }, NOW) === true)
+check('renew: an expired one', canRenew({ status: 'expired', expires_at: iso(NOW - day) }, NOW) === true)
+check('renew: never pending / rejected / hidden', [{ status: 'pending' }, { status: 'rejected' }, { status: 'active', hidden_at: iso(NOW), expires_at: iso(NOW + day) }].every(c => !canRenew(c, NOW)))
+check('days left rounds up', daysLeft({ expires_at: iso(NOW + 1.2 * day) }, NOW) === 2)
+check('edit: not removed, not hidden', !canEdit({ status: 'removed' }, NOW) && !canEdit({ status: 'active', hidden_at: iso(NOW) }, NOW) && canEdit({ status: 'rejected' }, NOW))
+check('the cap counts pending + live private only', openListingCount([
+  { source: 'private', status: 'pending' }, { source: 'private', status: 'active', expires_at: iso(NOW + day) },
+  { source: 'private', status: 'active', expires_at: iso(NOW - day) }, { source: 'private', status: 'rejected' }, { source: 'private', status: 'removed' }], NOW) === 2)
+check('server codes map to keys', carErrorKey({ message: 'VEHICLE_LIMIT' }) === 'carsErrLimit' && carErrorKey({ message: 'UNDER_18' }) === 'carsErrUnder18'
+  && carErrorKey({ message: 'BLOCKED_TERM' }) === 'contentBlockedTerm' && carErrorKey({ message: 'boom' }) === 'carsErrGeneric' && carErrorKey(null) === 'carsErrGeneric')
+check('a rejection code is translated, a note is shown as written', rejectionText('photos', k => `<${k}>`) === '<carsRejectPhotos>' && rejectionText('Plate visible in photo 3', k => k) === 'Plate visible in photo 3')
+
+const v = (o) => ({ source: 'private', status: 'active', updated_at: iso(NOW), hidden_at: null, ...o })
+check('cleanup: removed after 3 days, not before', photoCleanupReason(v({ status: 'removed', updated_at: iso(NOW - 3 * day) }), NOW) === 'removed'
+  && photoCleanupReason(v({ status: 'removed', updated_at: iso(NOW - 2 * day) }), NOW) === null)
+check('cleanup: rejected after 14 days (the seller can still fix it before)', photoCleanupReason(v({ status: 'rejected', updated_at: iso(NOW - 14 * day) }), NOW) === 'rejected'
+  && photoCleanupReason(v({ status: 'rejected', updated_at: iso(NOW - 13 * day) }), NOW) === null)
+check('cleanup: hidden after 30 days (an admin can still restore it before)', photoCleanupReason(v({ hidden_at: iso(NOW - 30 * day) }), NOW) === 'hidden'
+  && photoCleanupReason(v({ hidden_at: iso(NOW - 29 * day) }), NOW) === null)
+check('cleanup: never expired, active or pending', ['expired', 'active', 'pending'].every(st => photoCleanupReason(v({ status: st, updated_at: iso(NOW - 400 * day) }), NOW) === null))
+check('cleanup: never a dealer or imported listing', ['dealer', 'import'].every(src => photoCleanupReason(v({ source: src, status: 'removed', updated_at: iso(NOW - 400 * day) }), NOW) === null))
+
+check('İlanlarım select: no owner_id, no *', !/owner_id|\*/.test(MY_VEHICLE_COLS), MY_VEHICLE_COLS)
+check('layer keys: mine is one page, post is per listing', layerKey({ kind: 'mine' }) === 'mine:' && layerKey({ kind: 'post' }) === 'post:new'
+  && layerKey({ kind: 'post', car: { id: 'a' } }) === 'post:a' && layerKey({ kind: 'car', car: { id: 'a' } }) === 'car:a')
+const st2 = pushCarsLayer(pushCarsLayer([], { kind: 'mine' }), { kind: 'post', car: { id: 'a' } })
+check('mine → edit, then mine again pops back to it', pushCarsLayer(st2, { kind: 'mine' }).length === 1)
+for (const f of ['screens/CarPostScreen.js', 'screens/MyCarsScreen.js']) {
+  const src = readFileSync(resolve(ROOT, f), 'utf8').replace(/\/\/.*$/gm, '')   // code only, not the comments about it
+  check(`${f}: never writes status/owner_id/source except the owner moves (pending, removed)`,
+    !/owner_id|source:\s*'|status:\s*'(active|rejected|expired)'/.test(src))
+}
+{
+  const admin = readFileSync(resolve(ROOT, 'screens/AdminScreen.js'), 'utf8')
+  check("admin: every vehicles read names its columns (select('*') on vehicles 42501s)", !/from\('vehicles'\)\.select\('\*'/.test(admin))
+  check("admin: 'vehicle' is in the Reports fetch list and AUTHOR_VIA_RPC", /'message', 'vehicle'\]\) \{/.test(admin) && /AUTHOR_VIA_RPC = new Set\(\['review', 'vehicle'\]\)/.test(admin))
 }
 
 console.log(bad ? `cars ui: ${bad} FAILED` : 'cars ui: OK')

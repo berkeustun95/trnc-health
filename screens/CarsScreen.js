@@ -71,7 +71,7 @@ function PricePillOff({ text, loading = false }) {
   )
 }
 
-export default function CarsScreen({ lang, onBack, onOpenCar }) {
+export default function CarsScreen({ lang, onBack, onOpenCar, onPost, onMine }) {
   const insets = useSafeAreaInsets()
   const [mode, setMode] = useState('sale')
   const [make, setMake] = useState(null)
@@ -139,7 +139,8 @@ export default function CarsScreen({ lang, onBack, onOpenCar }) {
   return (
     <ModuleScreen topic="cars">
       <SafeAreaView style={s.safe} edges={['top']}>
-        <ScreenHeader onBack={onBack} title={t('menuCars', lang)} lang={lang} />
+        <ScreenHeader onBack={onBack} title={t('menuCars', lang)} lang={lang}
+          actions={[{ icon: 'person-circle-outline', onPress: onMine, accessibilityLabel: t('carsMineTitle', lang) }]} />
         <ModeBar mode={mode} onChange={changeMode} lang={lang} />
         <FilterBar>
           <Dropdown label={t('carsFilterMake', lang)} lang={lang} options={makeOptions} value={make} onChange={setMake} />
@@ -176,7 +177,7 @@ export default function CarsScreen({ lang, onBack, onOpenCar }) {
               data={list.items}
               keyExtractor={c => c.id}
               renderItem={({ item }) => <VehicleCard car={item} lang={lang} onPress={() => onOpenCar(item)} />}
-              contentContainerStyle={[s.listContent, { paddingBottom: listBottomPad(insets) }]}
+              contentContainerStyle={[s.listContent, { paddingBottom: listBottomPad(insets) + TAP + 28 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.refresh} tintColor="#FFFFFF" colors={[colors.primary]} />}
               onEndReached={list.loadMore}
@@ -201,6 +202,12 @@ export default function CarsScreen({ lang, onBack, onOpenCar }) {
               }
             />
           )}
+          {/* İlan ver: the one way in for a private seller. Guests and under-18s are stopped in App.js before the form. */}
+          <TouchableOpacity style={[s.fab, { bottom: Math.max(insets.bottom, 12) + 12 }]} onPress={onPost} activeOpacity={0.88}
+            accessibilityRole="button" accessibilityLabel={t('carsPostCta', lang)}>
+            <Feather name="plus" size={20} color={colors.onPrimary} />
+            <Text style={s.fabText}>{t('carsPostCta', lang)}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </ModuleScreen>
@@ -224,4 +231,7 @@ const s = StyleSheet.create({
   pane:        { flex: 1 },
   listContent: { paddingHorizontal: 16, paddingTop: 4 },
   count:       { marginBottom: 10 },
+  fab:         { position: 'absolute', right: 16, flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TAP + 4,
+                 paddingHorizontal: 18, borderRadius: radii.pill, backgroundColor: colors.primary, ...elevation.floating },
+  fabText:     { ...type.body, fontFamily: 'Inter_700Bold', color: colors.onPrimary },
 })

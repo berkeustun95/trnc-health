@@ -16,6 +16,7 @@ import { addBackListener } from '../utils/backHandler'
 import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
 import GaragesScreen from './GaragesScreen'
+import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '../constants/cars'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
 // expire. Requires an admin storage.objects SELECT policy on the bucket.
@@ -86,7 +87,7 @@ const ROLES = ['customer', 'provider', 'admin']
 // Turning a partner OFF still needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
   'HomeServices',
-  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
+  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -403,20 +404,23 @@ function DailyBars({ daily }) {
   )
 }
 
-function UserCounts({ onOpenTools, onOpenReports }) {
+function UserCounts({ onOpenTools, onOpenReports, onOpenCars }) {
   const [counts, setCounts] = useState(null)
   const [pendingReports, setPendingReports] = useState(0)
+  const [pendingCars, setPendingCars] = useState(0)
   const [novestLastSeen, setNovestLastSeen] = useState(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
-    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }] = await Promise.all([
+    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }, { count: carsCount, error: carsError }] = await Promise.all([
       supabase.rpc('admin_user_counts'),
       supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('properties').select('last_seen_at')
         .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
+      supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     ])
+    setPendingCars(carsError ? null : carsCount)
     setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
@@ -452,11 +456,26 @@ function UserCounts({ onOpenTools, onOpenReports }) {
     </TouchableOpacity>
   )
 
+  // Pending car listings (Araçlar): the same red row, the same null = could-not-check rule.
+  const carsRow = pendingCars !== 0 && (
+    <TouchableOpacity style={s.urgencyCard} onPress={onOpenCars} activeOpacity={0.75}>
+      <View style={[s.urgencyDot, { backgroundColor: colors.danger }]} />
+      <Text style={s.urgencyLabel}>{pendingCars === null ? 'Car listings queue could not be checked' : 'Car listings to approve'}</Text>
+      {pendingCars !== null && (
+        <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
+          <Text style={s.urgencyCount}>{pendingCars}</Text>
+        </View>
+      )}
+      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+
   if (!counts) {
     if (!failed) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
     return (
       <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
         {reportsRow}
+        {carsRow}
         <FeedHealthBanner lastSeenAt={novestLastSeen} />
         <View style={s.allClearBox}>
           <Text style={s.allClearText}>User counts could not be loaded.</Text>
@@ -476,6 +495,7 @@ function UserCounts({ onOpenTools, onOpenReports }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
     >
       {reportsRow}
+      {carsRow}
       <FeedHealthBanner lastSeenAt={novestLastSeen} />
       <View style={s.totalCard}>
         <Text style={s.totalValue}>{formatCount(counts.total - TEST_ACCOUNTS)}</Text>
@@ -538,6 +558,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingGrooming },
         { count: pendingPlacesCount },
         { count: pendingJobPostings },
+        { count: pendingCars },
         { count: pendingReports },
         { count: esimTotal },
         { count: esimTourist },
@@ -560,6 +581,8 @@ function DashboardTab({ onNavigate }) {
         supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('type', 'grooming'),
         supabase.from('places').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('job_postings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        // select('id'), never '*': vehicles has a column grant without owner_id, and '*' would 42501.
+        supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'tourist'),
@@ -570,7 +593,7 @@ function DashboardTab({ onNavigate }) {
           .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       ])
       const pendingPlaces = pendingPlacesCount ?? 0
-      setStats({ novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
+      setStats({ novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingCars, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -598,6 +621,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingGrooming ?? 0)     > 0 && { label: 'Grooming providers pending',       count: stats.pendingGrooming,        tab: 'Grooming',     color: colors.primary },
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Places to review',                count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
+    (stats.pendingCars ?? 0)         > 0 && { label: 'Car listings to approve',          count: stats.pendingCars,            tab: 'Cars',         color: colors.danger },
   ].filter(Boolean)
 
   return (
@@ -663,23 +687,25 @@ const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam:
 //   thread around it and not the conversation metadata. Every action below runs off a
 //   pending report, so the policy is satisfied; if a report row were deleted mid-action,
 //   updateOrAlert's "0 rows changed — most likely an RLS policy" branch is what fires.
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles', message: 'messages' }
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles', message: 'messages', vehicle: 'vehicles' }
 // messages.sender_id is ON DELETE SET NULL, so a reported message whose author deleted
 // their account has NO author to ban. confirmBan already refuses on a null authorId.
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id' }
+// vehicles.owner_id is NULL for dealer and imported listings: there is no author to ban, and the button is not shown.
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id', vehicle: 'owner_id' }
 // Types whose author column the client may NOT read, so it comes from admin_content_author()
 // instead. reviews.customer_id is revoked by 20261033: it is the only person-uuid on a
 // truly public table, and once the Student Hub is live get_student_list() turns it into a
 // name — attributing an anonymous review of a clinic or a psychiatric hospital to somebody.
 // The column is still in AUTHOR_COL above because that is the key the resolved uuid is
 // written back under, and confirmBan reads it there.
-const AUTHOR_VIA_RPC = new Set(['review'])
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body' }
+// vehicles.owner_id is not client-readable at all (20261165); admin_content_author answers for it since 20261181.
+const AUTHOR_VIA_RPC = new Set(['review', 'vehicle'])
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body', vehicle: 'description' }
 // Columns only SOME tables have. messages carries deleted_at — the sender withdrew it —
 // and an admin who could not see that would judge a message the participants can no longer
 // see, without knowing it. Selecting it unconditionally would 42703 every other type and
 // empty the whole queue, which is the trap the profile branch below already documents.
-const EXTRA_COLS     = { message: ['deleted_at'] }
+const EXTRA_COLS     = { message: ['deleted_at'], vehicle: ['make', 'model', 'year', 'status'] }
 // Types whose remedy is not built. Read-only in triage: Dismiss is the only action.
 const READ_ONLY_REPORT_TYPES = ['profile']
 
@@ -732,7 +758,7 @@ function ReportsTab({ session }) {
     //   the maps but not here is silently never fetched: `g.content` stays null and the
     //   card renders "Content no longer exists — the author likely deleted their account",
     //   which is a lie an admin would act on by dismissing a real report.
-    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile', 'message']) {
+    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile', 'message', 'vehicle']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
       // profiles has no hidden_at/hidden_reason — selecting them would 42703 the whole
@@ -834,7 +860,7 @@ function ReportsTab({ session }) {
     await resolveReports(g, 'actioned')
     // Facilities are HIDDEN (recoverable), not deleted — say so, matching the owner
     // "listing hidden" banner. review/question/answer keep the "removed" wording.
-    if (g.contentType === 'facility' || g.contentType === 'place') {
+    if (g.contentType === 'facility' || g.contentType === 'place' || g.contentType === 'vehicle') {
       await notifyAuthor(g, 'notifListingHiddenTitle', 'notifListingHiddenBody')
     } else {
       await notifyAuthor(g, 'notifContentRemovedTitle', 'notifContentRemovedBody')
@@ -852,7 +878,7 @@ function ReportsTab({ session }) {
     await resolveReports(g, 'dismissed')
     // Only facilities get a restore push — the owner saw the "hidden" banner and
     // should learn it's back. review/question/answer restores stay silent (unchanged).
-    if (g.contentType === 'facility' || g.contentType === 'place') {
+    if (g.contentType === 'facility' || g.contentType === 'place' || g.contentType === 'vehicle') {
       await notifyAuthor(g, 'notifListingVisibleTitle', 'notifListingVisibleBody')
     }
     setBusy(null); load()
@@ -929,7 +955,10 @@ function ReportsTab({ session }) {
         // know that, both to read the exchange correctly and because Remove on something
         // already invisible to both people achieves nothing.
         const withdrawn   = !!g.content?.deleted_at
-        const text        = g.content?.[TEXT_COL[g.contentType]]
+        // A car listing reads as "Toyota Corolla 2018 — <description>": the description alone may be empty.
+        const text        = g.contentType === 'vehicle' && g.content
+          ? [`${g.content.make} ${g.content.model} ${g.content.year}`, g.content.description].filter(Boolean).join(' — ')
+          : g.content?.[TEXT_COL[g.contentType]]
         const readOnly    = READ_ONLY_REPORT_TYPES.includes(g.contentType)
         const reasonCount = g.reports.reduce((acc, r) => ({ ...acc, [r.reason]: (acc[r.reason] ?? 0) + 1 }), {})
         const isBusy      = busy === g.key
@@ -991,7 +1020,8 @@ function ReportsTab({ session }) {
                         <Text style={s.dangerGhostText}>Remove</Text>
                       </TouchableOpacity>
                   )}
-                  {!missing && !readOnly && g.contentType !== 'facility' && g.contentType !== 'place' && (
+                  {!missing && !readOnly && g.contentType !== 'facility' && g.contentType !== 'place'
+                    && !(g.contentType === 'vehicle' && !g.content?.owner_id) && (
                     <TouchableOpacity style={s.dangerGhostBtn} onPress={() => confirmBan(g)}>
                       <Text style={s.dangerGhostText}>Ban author</Text>
                     </TouchableOpacity>
@@ -4007,6 +4037,186 @@ function PlaceClaimsTab({ session }) {
 
 // ─── Job Postings Tab ────────────────────────────────────────────────────────
 
+// ─── Cars Tab (Araçlar private listings: approve / reject) ───────────────────
+// Private listings arrive pending (20261165). Approve = status 'active': vehicles_guard stamps published_at and a
+// 30-day expires_at. Reject = status 'rejected' + a reason the seller reads in İlanlarım (a REJECT_REASON_KEY code,
+// shown in their language, or a typed note verbatim). The seller is resolved through admin_content_author (20261181):
+// owner_id is not client-readable, so it is never in a select here (select('*') would 42501 the whole read).
+// A listing with no photos is refused approval: vehicles_hide_photoless would keep it invisible to everyone anyway.
+const ADMIN_CAR_COLS = [
+  'id, intent, source, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, price_per_day',
+  'region, area, description, contact_phone, whatsapp, status, rejection_reason, published_at, expires_at, hidden_at, created_at',
+  'dealers(name)', 'vehicle_images(id, storage_path, sort_order, is_primary)',
+].join(', ')
+const CAR_FILTERS = ['pending', 'active', 'rejected', 'expired', 'all']
+
+function CarRejectModal({ car, onConfirm, onCancel }) {
+  const [code, setCode] = useState(null)
+  const [note, setNote] = useState('')
+  const close = () => { setCode(null); setNote(''); onCancel() }
+  const confirm = () => { const r = note.trim() || code; if (!r) return; setCode(null); setNote(''); onConfirm(r) }
+  return (
+    <Modal visible={!!car} transparent animationType="fade" onRequestClose={close}>
+      <KeyboardAwareForm>
+        <TouchableOpacity style={s.rejectOverlay} activeOpacity={1} onPress={close}>
+          <TouchableOpacity style={s.rejectSheet} activeOpacity={1}>
+            <Text style={s.rejectTitle}>Reject "{car ? `${car.make} ${car.model}` : ''}"?</Text>
+            <Text style={s.rejectSub}>The seller sees the reason in İlanlarım, in their own language. A typed note replaces it and is shown as written.</Text>
+            <View style={[s.chipRow, { flexWrap: 'wrap', marginBottom: 10 }]}>
+              {Object.keys(REJECT_REASON_KEY).map(k => (
+                <TouchableOpacity key={k} style={[s.chip, code === k && s.chipActive]} onPress={() => setCode(code === k ? null : k)}>
+                  <Text style={[s.chipText, code === k && s.chipTextActive]}>{t(REJECT_REASON_KEY[k], 'English')}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput style={s.rejectInput} value={note} onChangeText={setNote} placeholder="Optional note instead (e.g. the plate is readable in photo 3)"
+              placeholderTextColor={colors.textSecondary} multiline maxLength={500} textAlignVertical="top" />
+            <View style={s.rejectBtnRow}>
+              <TouchableOpacity style={s.rejectCancelBtn} onPress={close}><Text style={s.rejectCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.rejectConfirmBtn, !(code || note.trim()) && { opacity: 0.45 }]} onPress={confirm} disabled={!(code || note.trim())}>
+                <Text style={s.rejectConfirmText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </KeyboardAwareForm>
+    </Modal>
+  )
+}
+
+function CarsTab() {
+  const [cars, setCars] = useState(null)
+  const [filter, setFilter] = useState('pending')
+  const [busy, setBusy] = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const load = useCallback(async () => {
+    setCars(null)
+    let q = supabase.from('vehicles').select(ADMIN_CAR_COLS)
+    if (filter === 'expired') {
+      q = q.or(`status.eq.expired,and(status.eq.active,expires_at.lt.${new Date().toISOString()})`)
+    } else if (filter !== 'all') {
+      q = q.eq('status', filter)
+    }
+    // The queue is oldest first (first come, first reviewed); every other view newest first.
+    const { data, error } = await q.order('created_at', { ascending: filter === 'pending' }).limit(100)
+    if (error) Alert.alert('Could not load car listings', error.message)
+    setCars(data ?? [])
+  }, [filter])
+  useEffect(() => { load() }, [load])
+
+  // In the SELLER's language, like notifyAuthor in the Reports tab.
+  async function notifySeller(car, titleKey, bodyKey, extra = '') {
+    const { data: ownerId } = await supabase.rpc('admin_content_author', { p_content_type: 'vehicle', p_content_id: car.id })
+    if (!ownerId) return
+    const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', ownerId).maybeSingle()
+    const lang = p?.preferred_language || 'English'
+    const title = t(titleKey, lang)
+    const body = t(bodyKey, lang).replace('{car}', `${car.make} ${car.model}`) + (extra ? `\n${extra(lang)}` : '')
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(ownerId, title, body)
+  }
+
+  async function approve(car) {
+    setBusy(car.id)
+    const ok = await updateOrAlert('vehicles', { status: 'active' }, car.id, 'Approve')
+    if (ok) await notifySeller(car, 'carsNotifApprovedTitle', 'carsNotifApprovedBody')
+    setBusy(null); load()
+  }
+
+  async function reject(car, reason) {
+    setRejectTarget(null)
+    setBusy(car.id)
+    const ok = await updateOrAlert('vehicles', { status: 'rejected', rejection_reason: reason }, car.id, 'Reject')
+    if (ok) await notifySeller(car, 'carsNotifRejectedTitle', 'carsNotifRejectedBody', lang => rejectionText(reason, k => t(k, lang)))
+    setBusy(null); load()
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+        <View style={[s.chipRow, { marginBottom: 12 }]}>
+          {CAR_FILTERS.map(f => (
+            <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+              <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      {!cars
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={cars}
+            keyExtractor={c => c.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} car listings.`} />}
+            renderItem={({ item }) => {
+              const photos = sortedImages(item.vehicle_images)
+              const amount = item.intent === 'rent' ? item.price_per_day : item.price
+              const pending = item.status === 'pending'
+              return (
+                <View style={s.card}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                    {photos.length === 0
+                      ? <Text style={[s.cardSub, { color: colors.danger }]}>No photos — cannot be approved (it would stay invisible).</Text>
+                      : photos.map(p => {
+                          const url = supabase.storage.from(VEHICLE_BUCKET).getPublicUrl(p.storage_path).data.publicUrl
+                          return (
+                            <TouchableOpacity key={p.id} onPress={() => Linking.openURL(url)} style={{ marginRight: 8 }}>
+                              <Image source={{ uri: url }} style={{ width: 120, height: 90, borderRadius: 8, backgroundColor: colors.border }} />
+                            </TouchableOpacity>
+                          )
+                        })}
+                  </ScrollView>
+                  <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardTitle}>{item.make} {item.model} · {item.year}</Text>
+                      <Text style={s.cardSub}>
+                        {item.intent === 'rent' ? 'Rent' : 'Sale'} · {item.currency} {amount}{item.intent === 'rent' ? '/day' : ''} · {item.km} km
+                      </Text>
+                      <Text style={s.cardSub}>{item.fuel} · {item.gearbox} · {item.body_type} · {item.colour} · {item.steering}-hand drive</Text>
+                      <Text style={s.cardSub}>{[item.region, item.area].filter(Boolean).join(' · ')}</Text>
+                      <Text style={s.cardSub}>
+                        {item.source === 'private' ? 'Private seller' : item.dealers?.name ?? item.source} · {[item.contact_phone && `tel ${item.contact_phone}`, item.whatsapp && `WA ${item.whatsapp}`].filter(Boolean).join(' · ') || 'no own number'}
+                      </Text>
+                      <Text style={s.cardSub}>Submitted {timeAgo(item.created_at)}{item.expires_at ? ` · expires ${new Date(item.expires_at).toLocaleDateString('en-GB')}` : ''}</Text>
+                      {!!item.hidden_at && <Text style={[s.cardSub, { color: colors.danger }]}>Hidden by reports — see the Reports tab</Text>}
+                      {item.status === 'rejected' && !!item.rejection_reason && (
+                        <Text style={[s.cardSub, { color: colors.danger }]}>Rejected: {rejectionText(item.rejection_reason, k => t(k, 'English'))}</Text>
+                      )}
+                    </View>
+                    <View style={[s.pillGrey, { backgroundColor: colors.border }]}>
+                      <Text style={[s.pillText, { color: colors.textPrimary }]}>{item.status}</Text>
+                    </View>
+                  </View>
+                  {!!item.description && <Text style={[s.reportBody, { marginTop: 8 }]}>{item.description}</Text>}
+                  {busy === item.id
+                    ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 10 }} />
+                    : (pending || item.status === 'active') && (
+                      <View style={s.reportActions}>
+                        {pending && (
+                          <TouchableOpacity style={[s.ghostBtn, photos.length === 0 && { opacity: 0.4 }]} disabled={photos.length === 0} onPress={() => approve(item)}>
+                            <Text style={s.ghostBtnText}>Approve</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                          <Text style={s.dangerGhostText}>{pending ? 'Reject' : 'Take down (reject)'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                </View>
+              )
+            }}
+          />
+        )}
+      <CarRejectModal car={rejectTarget} onCancel={() => setRejectTarget(null)} onConfirm={reason => reject(rejectTarget, reason)} />
+    </View>
+  )
+}
+
 function JobPostingsTab() {
   const [jobs,           setJobs]           = useState([])
   const [loading,        setLoading]        = useState(true)
@@ -4603,6 +4813,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           <UserCounts
             onOpenTools={() => { setTab('Dashboard'); setToolsOpen(true) }}
             onOpenReports={() => { setTab('Reports'); setToolsOpen(true) }}
+            onOpenCars={() => { setTab('Cars'); setToolsOpen(true) }}
           />
         </View>
       </SafeAreaView>
@@ -4697,6 +4908,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'Places'        && <PlacesTab />}
           {tab === 'PlaceClaims'   && <PlaceClaimsTab session={session} />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
+          {tab === 'Cars'          && <CarsTab />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>

@@ -5,6 +5,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { IconButton, InfoRow, ContactBar, RemoteImage, PageCanvas } from '../components/ui'
 import SplashStatusBar from '../components/SplashStatusBar'
+import ContentReportMenu from '../components/ContentReportMenu'
 import { photoUrl, placeLabel, priceLabel, kmLabel, fuelLabel, gearboxLabel } from '../components/cars/VehicleCard'
 import { colors, category as CAT, type, radii, elevation, TAP } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -100,7 +101,7 @@ function Fact({ label, value }) {
   )
 }
 
-export default function CarDetailScreen({ car, lang, onBack, onOpenDealer }) {
+export default function CarDetailScreen({ car, lang, onBack, onOpenDealer, onRequireAccount }) {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const [viewerAt, setViewerAt] = useState(null)
@@ -178,6 +179,8 @@ export default function CarDetailScreen({ car, lang, onBack, onOpenDealer }) {
 
           <View style={s.topBar} pointerEvents="box-none">
             <IconButton icon="chevron-back" variant="frosted" onPress={onBack} accessibilityLabel={t('back', lang)} />
+            {/* Guests are sent to sign up first (onRequireAccount); 3 distinct reporters hide the listing (20261166). */}
+            <ContentReportMenu contentType="vehicle" contentId={car.id} lang={lang} onRequireAccount={onRequireAccount} style={s.report} />
           </View>
 
           <View style={[s.sticky, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -214,6 +217,7 @@ const s = StyleSheet.create({
   description: { ...type.body, fontSize: 15, lineHeight: 23, color: colors.textPrimary },
   rows:        { marginTop: 16 },
   topBar:      { position: 'absolute', top: 8, left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
+  report:      { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.9)' },
   sticky:      { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.card, paddingHorizontal: 16, paddingTop: 10,
                  borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, ...elevation.floating },
   noContact:   { ...type.small, color: colors.textSecondary, textAlign: 'center', paddingVertical: 2 },
