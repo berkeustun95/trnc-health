@@ -1,7 +1,7 @@
-// Araçlar S1 (20261164 → 20261167) against the PGlite harness (PostgreSQL 18; prod is older, see supabase/CLAUDE.md).
+// Araçlar S1 (20261164 → 20261167) and S3 (20261181) against the PGlite harness (PostgreSQL 18; prod is older, see supabase/CLAUDE.md).
 // Applies the release in order on a fixture that stubs what production already has (profiles, is_admin, is_previewer,
 // the word filters, content_reports + the 20260712/20260824 moderation functions, contact_events, storage, pg_cron,
-// the 20261104 notify functions), then answers: who can post, read, edit, approve, renew and report what.
+// the 20261104 notify functions, 20261033's admin_content_author), then answers: who can post, read, edit, approve, renew and report what.
 // Red-first mutants prove the in-file assertions and the behaviour checks can fail.
 // Not wired into CI, like its siblings: run by hand.
 //
@@ -14,7 +14,8 @@ import { randomUUID } from 'node:crypto'
 import { freshDb, applyFile as applyRaw } from './migration-harness.mjs'
 
 const mig = f => fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url))
-const RELEASE = ['20261164_shared_adult_age.sql', '20261165_vehicles.sql', '20261166_vehicles_moderation.sql', '20261167_cars_waitlist_notify.sql'].map(mig)
+const RELEASE = ['20261164_shared_adult_age.sql', '20261165_vehicles.sql', '20261166_vehicles_moderation.sql', '20261167_cars_waitlist_notify.sql',
+  '20261181_vehicle_admin_author.sql'].map(mig)
 const read = f => readFileSync(mig(f), 'utf8')
 
 // Slice `CREATE … FUNCTION <name>(` up to its closing dollar-quote terminator, from an earlier migration.
@@ -29,6 +30,7 @@ const OLD_AGE = slice('20261036_age_oracle_needs_a_real_caller.sql', 'CREATE OR 
 const GUARD_MOD = slice('20260712_ugc_moderation.sql', 'CREATE OR REPLACE FUNCTION guard_moderation_columns()', '$$')
 const AUTO_HIDE = slice('20260824_place_moderation.sql', 'CREATE OR REPLACE FUNCTION auto_hide_reported_content()', '$$')
 const NOTIF_TXT = slice('20261104_duyurular_waitlist_notify.sql', 'CREATE OR REPLACE FUNCTION public.module_notif_text(', '$function$')
+const OLD_AUTHOR = slice('20261033_reviews_author_not_public.sql', 'CREATE OR REPLACE FUNCTION public.admin_content_author(', '$function$')
 const NOTIFY = slice('20261104_duyurular_waitlist_notify.sql', 'CREATE OR REPLACE FUNCTION public.notify_module_waitlist(', '$function$')
 
 const U = {
@@ -106,6 +108,9 @@ ${AUTO_HIDE}
 CREATE TRIGGER auto_hide_on_report AFTER INSERT ON public.content_reports FOR EACH ROW EXECUTE FUNCTION auto_hide_reported_content();
 
 ${OLD_AGE}
+${OLD_AUTHOR}
+REVOKE ALL ON FUNCTION public.admin_content_author(text, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_content_author(text, uuid) TO authenticated;
 ${NOTIF_TXT}
 ${NOTIFY}
 REVOKE EXECUTE ON FUNCTION public.notify_module_waitlist(text) FROM PUBLIC, anon;
@@ -323,14 +328,19 @@ async function behaviour(d) {
   t('contact_events accepts module cars', (await as(d, 'postgres', `INSERT INTO public.contact_events (module, entity_id, action) VALUES ('cars', 'x', 'call')`)).ok, true)
   t('contact_events still accepts eatery (control)', (await as(d, 'postgres', `INSERT INTO public.contact_events (module, entity_id, action) VALUES ('eatery', 'x', 'call')`)).ok, true)
   t('waitlist notification title in Turkish', (await as(d, 'postgres', `SELECT public.module_notif_text('title', 'cars', 'Turkish') x`)).rows[0].x, "ADA'da yeni: Araçlar")
+  // ── S3: the admin can resolve a listing's seller (Ban, approve / reject notices); nobody else can ──
+  t('admin_content_author resolves a private listing to its owner', (await as(d, 'admin', `SELECT public.admin_content_author('vehicle', '${v1}') = '${U.owner}' x`)).rows[0]?.x, true)
+  t('…a non-admin is refused', (await as(d, 'owner', `SELECT public.admin_content_author('vehicle', '${v1}') x`)).msg, 'ADMIN_ONLY')
+  t('…anon cannot call it', /permission denied/.test((await as(d, 'anon', `SELECT public.admin_content_author('vehicle', '${v1}') x`)).msg), true)
+  t('…the other branches still answer (profile)', (await as(d, 'admin', `SELECT public.admin_content_author('profile', '${U.owner}') = '${U.owner}' x`)).rows[0]?.x, true)
   t('owner account deletion removes their listings', (await as(d, 'postgres', `DELETE FROM auth.users WHERE id = '${U.owner2}'`)).ok, true)
   t('…none left', n(await as(d, 'postgres', `SELECT count(*) n FROM public.vehicles WHERE owner_id = '${U.owner2}'`)), 0)
 }
 
-console.log('Araçlar S1 — real files, in release order')
+console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const { d, r } = await ready()
-  t('the four files apply, including their own assertions', r, { ok: true, msg: null })
+  t('the five files apply, including their own assertions', r, { ok: true, msg: null })
   if (r.ok) await behaviour(d)
 }
 // ── verify_schema tokens: the release's own H tokens must read TRUE on the migrated fixture and not on a fresh one.
@@ -338,7 +348,7 @@ console.log('Araçlar S1 — real files, in release order')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const tokens = []
-  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
+  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|20261181_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
   let m
   while ((m = re.exec(vs))) {
     if (m[1].startsWith('10') && !/is_adult_on|vehicle/.test(m[2])) continue
@@ -388,6 +398,8 @@ await refused('an overwrite (UPDATE) storage policy added', mutantFile(1, 'upd',
 await refused('dealers get a client write policy', mutantFile(1, 'dw', 'DROP POLICY IF EXISTS dealers_select_admin ON public.dealers;', 'CREATE POLICY dealers_write ON public.dealers FOR INSERT TO authenticated WITH CHECK (true);\nDROP POLICY IF EXISTS dealers_select_admin ON public.dealers;'))
 await refused('live contact_events list differs (eatery missing in production)', RELEASE, FIXTURE({ contactMods: MODS16.filter(m => m !== 'eatery') }))
 await refused('auto-hide gains more than the vehicle branch', mutantFile(2, 'ah', "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  END IF;", "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  ELSIF NEW.content_type = 'profile' THEN\n    NULL;\n  END IF;"))
+await refused('admin_content_author gains more than the vehicle branch', mutantFile(4, 'aca', "    ELSE RAISE EXCEPTION 'UNSUPPORTED_CONTENT_TYPE: %', p_content_type;", "    WHEN 'dealer'   THEN v_author := NULL;\n    ELSE RAISE EXCEPTION 'UNSUPPORTED_CONTENT_TYPE: %', p_content_type;"))
+await refused('admin_content_author loses its admin gate', mutantFile(4, 'acg', "  IF NOT is_admin() THEN\n    RAISE EXCEPTION 'ADMIN_ONLY';\n  END IF;\n", ''))
 await refused('report hide policy made permissive', mutantFile(2, 'hr', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  AS RESTRICTIVE FOR SELECT', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  FOR SELECT'))
 await refused('notify allow-list loses duyurular while adding cars', mutantFile(3, 'nt', "'checkins','duyurular','cars') THEN", "'checkins','cars') THEN"))
 

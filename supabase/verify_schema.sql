@@ -5697,12 +5697,20 @@ WITH report AS (
              AND has_function_privilege('authenticated', to_regprocedure('public.my_vehicles()'), 'EXECUTE'), false)
   -- Every SECURITY DEFINER function that writes or reads vehicles skips the client rules in vehicles_guard (it runs as
   -- postgres). The set is pinned so a new one is a reviewed decision, not an accident (security review 2026-11-07, N1).
-  UNION ALL SELECT '20261165_vehicles','the SECURITY DEFINER functions that touch vehicles are exactly the five reviewed ones',
+  -- 20261181 made admin_content_author the sixth (it reads owner_id behind is_admin()). RED UNTIL 20261181 RUNS.
+  UNION ALL SELECT '20261165_vehicles','the SECURITY DEFINER functions that touch vehicles are exactly the six reviewed ones',
     COALESCE((SELECT array_agg(n.nspname || '.' || p.proname ORDER BY n.nspname, p.proname)
                 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                WHERE p.prosecdef AND n.nspname IN ('public', 'private') AND p.prosrc ~* '\mvehicles\M')
-      IS NOT DISTINCT FROM ARRAY['private.my_open_vehicle_count','private.my_vehicle_status','public.auto_hide_reported_content',
-                                 'public.my_vehicles','public.renew_vehicle'], false)
+      IS NOT DISTINCT FROM ARRAY['private.my_open_vehicle_count','private.my_vehicle_status','public.admin_content_author',
+                                 'public.auto_hide_reported_content','public.my_vehicles','public.renew_vehicle'], false)
+  -- 20261181: admin_content_author answers for 'vehicle' (Araçlar S3). Registered ahead of the apply; RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261181_vehicle_admin_author','admin_content_author has the vehicle branch, stays is_admin()-gated, DEFINER with search_path public, no anon EXECUTE',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.admin_content_author(text,uuid)')) LIKE '%WHEN ''vehicle''  THEN SELECT owner_id     INTO v_author FROM vehicles%'
+         AND pg_get_functiondef(to_regprocedure('public.admin_content_author(text,uuid)')) LIKE '%IF NOT is_admin() THEN%'
+         AND (SELECT prosecdef AND array_to_string(proconfig, ',') = 'search_path=public' FROM pg_proc
+               WHERE oid = to_regprocedure('public.admin_content_author(text,uuid)'))
+         AND NOT has_function_privilege('anon', to_regprocedure('public.admin_content_author(text,uuid)'), 'EXECUTE'), false)
   UNION ALL SELECT '20261165_vehicles','contact_events module vocabulary is exactly the 17-module set (incl. cars)',
     (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
        FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
