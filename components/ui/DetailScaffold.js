@@ -26,6 +26,23 @@ import PageCanvas from './PageCanvas'
 //                from a deeper screen (all reviews) returns to the same scroll position
 // Status icons: light over a photo, dark over any light ground (white measured 1.16–1.64 there).
 export const DETAIL_PHOTO_H = 260
+
+// The solid band behind a detail page's floating top bar, shared by every detail layout (this
+// scaffold, PropertyDetail's gallery page). `at`: the scroll offset where the sheet reaches the bar;
+// `forward`: the caller's own onScroll (scroll memory) still runs.
+export function useCoveredTopBar(at, forward) {
+  const [covered, setCovered] = useState(false)
+  const onScroll = e => {
+    forward?.(e)
+    const next = e.nativeEvent.contentOffset.y > at
+    if (next !== covered) setCovered(next)
+  }
+  return [covered, onScroll]
+}
+export function CoveredBand({ covered, top = 0 }) {
+  return covered ? <View style={[s.band, { height: top + 60 }]} pointerEvents="none" /> : null
+}
+
 export default function DetailScaffold({
   photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children, scrollProps,
 }) {
@@ -33,12 +50,7 @@ export default function DetailScaffold({
   const c = CAT[tag?.category] || CAT.city
   // Once the sheet reaches the top bar, a solid band sits behind it: without one the tag and title
   // scrolled under the frosted back button (visible through it), and light status icons sat on white.
-  const [covered, setCovered] = useState(false)
-  const onScroll = e => {
-    scrollProps?.onScroll?.(e)
-    const next = e.nativeEvent.contentOffset.y > DETAIL_PHOTO_H - 28 - 56
-    if (next !== covered) setCovered(next)
-  }
+  const [covered, onScroll] = useCoveredTopBar(DETAIL_PHOTO_H - 28 - 56, scrollProps?.onScroll)
   return (
     <PageCanvas>
       <SplashStatusBar style={photo && !covered ? 'light' : 'dark'} />
@@ -60,7 +72,7 @@ export default function DetailScaffold({
           {children}
         </View>
       </ScrollView>
-      {covered && <View style={[s.band, { height: insets.top + 60 }]} pointerEvents="none" />}
+      <CoveredBand covered={covered} top={insets.top} />
       <View style={[s.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
         <IconButton icon="chevron-back" variant="frosted" onPress={onBack} accessibilityLabel={t('back', lang)} />
         {headerRight}

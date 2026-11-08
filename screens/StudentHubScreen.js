@@ -1057,8 +1057,7 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.2,
     marginBottom: 14,
   },
 

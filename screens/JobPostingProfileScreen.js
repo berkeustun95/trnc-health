@@ -263,8 +263,7 @@ const s = StyleSheet.create({
   postedAge:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   section:           { marginBottom: 28 },
-  sectionLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                       textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+  sectionLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 12 },
 
   detailRow:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 8,
                        borderBottomWidth: 1, borderBottomColor: colors.border },
