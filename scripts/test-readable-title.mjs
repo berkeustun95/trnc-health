@@ -11,6 +11,9 @@ const CASES = [
   ["DJ ARDA İLE YILBAŞI PARTİSİ LEFKOŞA'DA", "DJ Arda ile Yılbaşı Partisi Lefkoşa'da"],
   ['KKTC CUP 2026: EMU VS. NEU', 'KKTC Cup 2026: EMU vs. NEU'],
   ['HÜSEYİN KIRMIZI PİYANO RESİTALİ', 'Hüseyin Kırmızı Piyano Resitali'],
+  // The real title, 2026-11-08: plain I typed for İ in PIYANO / RESITALI.
+  ['HÜSEYİN KIRMIZI PIYANO RESITALI / PIANO RECITAL', 'Hüseyin Kırmızı Piyano Resitali / Piano Recital'],
+  ['TIYATRO GECESİ', 'Tiyatro Gecesi'],
   ['Murda Konseri', 'Murda Konseri'],
   ['ODTÜ', 'ODTÜ'],
   ['  Jazz Night  ', 'Jazz Night'],
