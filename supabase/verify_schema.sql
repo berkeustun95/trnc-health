@@ -4738,11 +4738,13 @@ WITH report AS (
                             FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('private.preview_key_hashes')), false))
     -- ► BUMPED FROM 4 TO 7 BY 20261165 (vehicle_sources, dealers, vehicles _select_preview), after the 2026-11-07 apply
     --   run 42416976779 went red on this row alone; the three follow the same contract, which the rest of the row asserts.
-    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with is_active (7 since 20261165: eatery_partners, eatery_menu_items, eatery_photos, eatery_item_options, vehicle_sources, dealers, vehicles _select_preview — supabase/readonly/previewer_policies.sql)',
+    -- 8 since 20261178: places_select_preview_staged pairs with the places form of "unpublished", status = 'staged'.
+    UNION ALL SELECT '1120_eatery_preview_key','reuse contract: is_previewer() only in SELECT policies, each paired with an unpublished condition — is_active, or status = ''staged'' on places (8 since 20261178: eatery_partners, eatery_menu_items, eatery_photos, eatery_item_options, vehicle_sources, dealers, vehicles _select_preview + places_select_preview_staged — supabase/readonly/previewer_policies.sql)',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
-      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 7
+      OR ((SELECT count(*) FROM pg_policies WHERE coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%') = 8
           AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE (coalesce(qual, '') LIKE '%is_previewer()%' OR coalesce(with_check, '') LIKE '%is_previewer()%')
-                            AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL OR qual NOT LIKE '%is_active%')))
+                            AND (cmd IS DISTINCT FROM 'SELECT' OR with_check IS NOT NULL
+                                 OR (qual NOT LIKE '%is_active%' AND NOT (tablename = 'places' AND qual LIKE '%''staged''%')))))
     UNION ALL SELECT '1120_eatery_preview_key','eatery_partners_select_preview applies TO anon, authenticated',
       NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261120_eatery_preview_key.sql')
       OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='eatery_partners' AND policyname='eatery_partners_select_preview'
