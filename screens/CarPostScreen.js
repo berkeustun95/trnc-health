@@ -21,8 +21,9 @@ import {
 } from '../constants/cars'
 
 // ─── İlan ver / edit a private listing ──────────────────────────────────────
-// Row first, then photos: the storage and vehicle_images policies only admit a file into a listing the caller owns
-// while it is PENDING (20261165), so an approved listing's photos can never be swapped behind the reviewer's back.
+// Row first, then photos: a photo is only admitted into a listing the caller owns while it is PENDING (20261165; the
+// vehicle-photo function applies the same rule), so an approved listing's photos can never be swapped behind the
+// reviewer's back. Photos go through that function, which strips their location data first (20261182).
 // That is also why editing an approved listing sends it back to review: the row goes to pending on Save (never on
 // the first keystroke, so a listing does not go off the air while somebody is only looking), then the photos change.
 // Inserts and updates name only the 18 granted columns (carPayload); status / owner_id / source are the server's.
@@ -54,8 +55,7 @@ function decode(base64) {
   return buf
 }
 
-// The file name must be a uuid (the storage policy's path regex). expo-crypto when present; the fallback is fine
-// because the name protects nothing: the bucket is public and the listing's photos are meant to be seen.
+// A local key for a picked photo (the stored file is named by the vehicle-photo function). expo-crypto when present.
 function newUuid() {
   try {
     const Crypto = require('expo-crypto')
@@ -164,19 +164,18 @@ export default function CarPostScreen({ session, lang, car = null, profilePhone 
     setPhotos(p => [ph, ...p.filter(x => x.key !== ph.key)])
   }
 
+  // Through the vehicle-photo edge function, never straight to the bucket (20261182 closed that): the function strips
+  // every Exif / XMP block (GPS included) before the file is stored, then inserts the photo row as this user.
   async function uploadNew(vehicleId, list) {
     let failed = 0
     for (let i = 0; i < list.length; i++) {
       const ph = list[i]
       if (ph.kind !== 'new') continue
-      const path = `${vehicleId}/${newUuid()}.${ph.ext}`
-      const { error: upErr } = await supabase.storage.from(VEHICLE_BUCKET)
-        .upload(path, decode(ph.base64), { contentType: MIME[ph.ext], upsert: false })
-      if (upErr) { failed++; continue }
-      const { error: rowErr } = await supabase.from('vehicle_images')
-        .insert({ vehicle_id: vehicleId, storage_path: path, sort_order: i, is_primary: i === 0 })
-      // A file with no row is an orphan the nightly cleanup removes; the listing simply has one photo fewer.
-      if (rowErr) failed++
+      const { error: fnErr } = await supabase.functions.invoke('vehicle-photo', {
+        body: decode(ph.base64),
+        headers: { 'Content-Type': MIME[ph.ext], 'x-vehicle-id': vehicleId, 'x-sort-order': String(i), 'x-primary': i === 0 ? '1' : '0' },
+      })
+      if (fnErr) failed++
     }
     return failed
   }

@@ -1,0 +1,49 @@
+# ─── Araçlar: no stored car photo carries metadata (location data included) ──
+#
+# Go-live gate (Berke, 2026-11-08). New photos are stripped by the vehicle-photo edge function before they are stored;
+# this checks EVERY file already in the vehicle-images bucket and, with apply=true, strips the ones that need it, in
+# place. daily-health runs the same check (read-only) every morning. Engine: scripts/strip-vehicle-photo-metadata.mjs.
+# Logs: yes/no lines and error codes only (public repo).
+#
+#   gh workflow run araclar-photo-metadata                 # check only
+#   gh workflow run araclar-photo-metadata -f apply=true   # strip what needs it, then read each file back
+
+name: araclar-photo-metadata
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Strip in place (otherwise check only)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-araclar-photo-metadata, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_APPLY: ${{ inputs.apply }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: Stripper self-test (real encoder output with GPS)
+        run: node scripts/test-image-metadata.mjs
+      - name: Check / strip
+        run: |
+          if [ "$IN_APPLY" = "true" ]; then node scripts/strip-vehicle-photo-metadata.mjs --apply
+          else node scripts/strip-vehicle-photo-metadata.mjs --check; fi
