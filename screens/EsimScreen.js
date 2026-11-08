@@ -165,12 +165,12 @@ const s = StyleSheet.create({
   scroll:        { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 48 },
 
-  sectionHeader: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginBottom: 10, marginTop: 20, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionHeader: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginBottom: 10, marginTop: 20, letterSpacing: 0.2 },
 
   heroCard:      { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 20, alignItems: 'center', ...shadow },
   heroIconWrap:  { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.tintServiceBg, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   badge:         { backgroundColor: colors.tintServiceBg, borderRadius: 20, paddingVertical: 4, paddingHorizontal: 12, marginBottom: 12 },
-  badgeText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, textTransform: 'uppercase', letterSpacing: 0.6 },
+  badgeText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, letterSpacing: 0.2 },
   heroTitle:     { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   heroBody:      { fontSize: 14, color: colors.textSecondary, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 },
 

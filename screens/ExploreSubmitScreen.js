@@ -382,8 +382,7 @@ const s = StyleSheet.create({
   safeCenter: { justifyContent: 'center' },
 
   scroll:       { padding: 20, gap: 0, paddingBottom: 48 },
-  sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage,
-                  textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginTop: 20 },
+  sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, letterSpacing: 0.2, marginBottom: 8, marginTop: 20 },
 
   // Chips
   chipRow:    { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },

@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `ADA – North Cyprus Assistant (Android package com.berkeustun95.ada), published on Google Play by P&D Digital, operated by Astarte Digital Trading Ltd. (TRNC, company no. MŞ29454).
 
-Version: 2026-10-30
-Last updated: October 30, 2026
+Version: 2026-11-09
+Last updated: November 9, 2026
 
 WHO WE ARE
 
@@ -47,7 +47,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
 
-Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. You can disable this in your device settings at any time.
+Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. Also used for an optional Friday note with the weekend's events and a place to visit; turn it off in Profile → Updates and offers. You can disable this in your device settings at any time.
 
 Reviews, questions and answers you submit.
 

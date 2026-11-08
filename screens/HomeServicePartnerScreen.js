@@ -320,7 +320,7 @@ const s = StyleSheet.create({
   coverageText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   block:        { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
-  blockTitle:   { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
+  blockTitle:   { fontSize: 11, letterSpacing: 0.2,
                   color: colors.textSecondary, fontFamily: 'Inter_700Bold', marginBottom: 10 },
 
   about:        { fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular',

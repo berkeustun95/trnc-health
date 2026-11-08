@@ -25,12 +25,13 @@ import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { formatPetDate } from '../constants/petsContent'
-import { maybeListedFilter, isEventOver, eventOverlaps, isRunningFromEarlierDay, ongoingEndLabel } from '../utils/eventVisibility'
+import { maybeListedFilter, isEventOver, eventOverlaps, isRunningFromEarlierDay, ongoingEndLabel, dateRange, startOfDay } from '../utils/eventVisibility'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
   RemoteImage, PageCanvas,
 } from '../components/ui'
 import { colors as C, category as CAT, type, radii, elevation, listBottomPad } from '../constants/theme'
+import { withReadableTitle } from '../utils/readableTitle'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -91,43 +92,6 @@ const DATE_FILTERS = [
   { key: 'month',   labelKey: 'dateThisMonth' },
 ]
 
-const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
-const endOfDay   = d => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x }
-const addDays    = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
-
-// Every window is anchored at today 00:00 rather than `now`; matchesDate counts an event in a
-// window while it is LISTED inside it (eventOverlaps), so a running event matches too.
-function dateRange(key, pickedDate) {
-  const today = startOfDay(new Date())
-  const dow = today.getDay() // 0 = Sunday, 6 = Saturday
-
-  switch (key) {
-    case 'today':
-      return { from: today, to: endOfDay(today) }
-
-    // If we are already inside the weekend, this is the REMAINDER of it — on a
-    // Sunday that means Sunday alone, never spilling into Monday. Otherwise it
-    // is the next Sat + Sun.
-    case 'weekend':
-      if (dow === 6) return { from: today, to: endOfDay(addDays(today, 1)) }
-      if (dow === 0) return { from: today, to: endOfDay(today) }
-      return { from: addDays(today, 6 - dow), to: endOfDay(addDays(today, 7 - dow)) }
-
-    // Monday-start week (TR convention), so it runs to the upcoming Sunday and
-    // is a strict superset of 'weekend'.
-    case 'week':
-      return { from: today, to: endOfDay(addDays(today, dow === 0 ? 0 : 7 - dow)) }
-
-    case 'month':
-      return { from: today, to: endOfDay(new Date(today.getFullYear(), today.getMonth() + 1, 0)) }
-
-    case 'picked':
-      return pickedDate ? { from: startOfDay(pickedDate), to: endOfDay(pickedDate) } : null
-
-    default:
-      return null
-  }
-}
 
 function matchesDate(event, key, pickedDate) {
   const range = dateRange(key, pickedDate)
@@ -624,7 +588,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
       .or(maybeListedFilter(now))
       .order('start_date', { ascending: true })
     setLoadError(!!error)
-    setEvents(error ? [] : (data ?? []).filter(e => !isEventOver(e, now)))
+    setEvents(error ? [] : (data ?? []).filter(e => !isEventOver(e, now)).map(withReadableTitle))
     setLoading(false)
   }, [])
   const retry = () => { setLoading(true); load() }
@@ -924,10 +888,10 @@ const legacy = StyleSheet.create({
   detailTitle:        { fontSize: 24, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, marginBottom: 20, lineHeight: 30 },
   detailRow:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
   detailIconWrap:     { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  detailRowLabel:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  detailRowLabel:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 2 },
   detailRowValue:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20 },
   descBlock:          { marginTop: 8, padding: 16, backgroundColor: colors.bg, borderRadius: 14 },
-  descTitle:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
+  descTitle:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 8 },
   descText:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
 
   // Fullscreen viewer

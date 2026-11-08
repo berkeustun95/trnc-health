@@ -25,15 +25,17 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
-import { fetchNotifications } from './utils/notificationRoute'
+import { fetchNotifications, notificationRoute } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
-import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, MARKETPLACE } from './constants/redesign'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, EXPLORE_ROUTES_LIVE, HOTELS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
+import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, CARS, MARKETPLACE } from './constants/redesign'
+import { pushCarsLayer, layerKey } from './constants/cars'
+import { isAdultForOrder } from './constants/eatery'
 import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
@@ -81,6 +83,11 @@ import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
 import TowingScreen from './screens/TowingScreen'
 import EhliyetScreen from './screens/EhliyetScreen'
+import CarsScreen from './screens/CarsScreen'
+import CarDetailScreen from './screens/CarDetailScreen'
+import CarPostScreen from './screens/CarPostScreen'
+import MyCarsScreen from './screens/MyCarsScreen'
+import DealerScreen from './screens/DealerScreen'
 import MarketplaceScreen from './screens/MarketplaceScreen'
 import EateryScreen from './screens/EateryScreen'
 import EsimScreen from './screens/EsimScreen'
@@ -140,6 +147,7 @@ import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
 import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
+import { withReadableTitle } from './utils/readableTitle'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -576,6 +584,9 @@ export default function App() {
   // Home's "Yürüyüş Rotaları" tile opens the Keşfet tab straight into routes mode. Cleared
   // whenever the tab bar is used, so a later plain visit opens the map as usual.
   const [mapRoutesMode, setMapRoutesMode] = useState(false)
+  // Same for events mode (the Explore landing's "Bu hafta" section), cleared with it.
+  const [mapEventsMode, setMapEventsMode] = useState(false)
+  const [mapEventRange, setMapEventRange] = useState(null)   // the weekend push: events mode on 'Bu hafta sonu'
   // City welcome: the pending decision, plus the region each deep-linked screen
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
@@ -652,6 +663,7 @@ export default function App() {
   const [showEvents, setShowEvents] = useState(false)
   const [showAccommodation, setShowAccommodation] = useState(false)
   const [showHotels, setShowHotels] = useState(false)
+  const [hotelsQuery, setHotelsQuery] = useState('')   // set by a Keşfet hotel pin: Oteller opens searched to it
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
@@ -676,6 +688,33 @@ export default function App() {
   const [showGarages, setShowGarages] = useState(false)
   const [showTowing, setShowTowing] = useState(false)
   const [showEhliyet, setShowEhliyet] = useState(false)
+  // Araçlar: the list, plus the detail / dealer pages stacked over it (constants/cars.js pushCarsLayer).
+  const [showCars, setShowCars] = useState(false)
+  const [carsStack, setCarsStack] = useState([])
+  useEffect(() => { if (!showCars) setCarsStack([]) }, [showCars])
+  const openCarsLayer = layer => setCarsStack(st => pushCarsLayer(st, layer))
+  const closeCarsLayer = () => setCarsStack(st => st.slice(0, -1))
+  const [carsMineReload, setCarsMineReload] = useState(0)
+  // İlan ver / edit: signed-in adults only. The server refuses the rest too (vehicles_guard: NO_DOB / UNDER_18 /
+  // UGC_BANNED); checking here first spares somebody a long form that cannot be sent. ADULT_AGE via isAdultForOrder.
+  function openCarPost(car = null) {
+    if (requireAccount('carsPostAccount')) return
+    if (!profile?.date_of_birth) { requireProfileCompletion('carsPostNeedsDob'); return }
+    if (!isAdultForOrder(profile.date_of_birth)) { Alert.alert(t('carsPostTitle', lang), t('carsErrUnder18', lang)); return }
+    openCarsLayer({ kind: 'post', car })
+  }
+  function openMyCars() {
+    if (requireAccount('carsMineAccount')) return
+    openCarsLayer({ kind: 'mine' })
+  }
+  // After a save: the form closes and İlanlarım is where the listing's status lives, so it opens (or reloads) there.
+  function carSaved({ created, photoFailures }) {
+    setCarsStack(st => pushCarsLayer(st.filter(l => l.kind !== 'post'), { kind: 'mine' }))
+    setCarsMineReload(n => n + 1)
+    const body = t(created ? 'carsPostSentBody' : 'carsPostUpdatedBody', lang)
+    Alert.alert(t(created ? 'carsPostSentTitle' : 'carsPostUpdatedTitle', lang),
+      photoFailures ? `${body}\n\n${t('carsPostPhotoFailed', lang)}` : body)
+  }
   // Dükkân: null | 'browse' | 'mine' (Profil's İlanlarım row opens straight into the seller's list).
   const [showMarketplace, setShowMarketplace] = useState(null)
   const [showEatery, setShowEatery] = useState(false)
@@ -929,9 +968,15 @@ export default function App() {
       const { data } = await supabase.from('events')
         .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
         .eq('id', id).eq('status', 'approved').maybeSingle()
-      if (data) { setOpenedEvent(data); setEventFromHome(true) }
+      if (data) { setOpenedEvent(withReadableTitle(data)); setEventFromHome(true) }
     } catch {}
     setShowEvents(true)
+  }
+  // The Friday digest (push tap or its Bildirimler row): Keşfet, events mode, Bu hafta sonu. Every
+  // layer above the tabs closes, as the tab bar would.
+  function openWeekendOnMap() {
+    setShowNotifs(false); setShowExplore(false); setShowEvents(false)
+    setMapRoutesMode(false); setMapEventsMode(true); setMapEventRange('weekend'); setActiveTab('map')
   }
   function closeExploreBeach() { setShowExploreBeach(false); setExploreBeachRegion(null) }
 
@@ -1119,7 +1164,7 @@ export default function App() {
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
-      if (showHotels) { setShowHotels(false); return true }
+      if (showHotels) { setShowHotels(false); setHotelsQuery(''); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (selectedFacility) { if (facilityBackRef.current?.()) return true; setSelectedFacility(null); return true }
       if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
@@ -1134,6 +1179,9 @@ export default function App() {
       // Towing before Garages: Garages opens it on top of itself (slice 10).
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showEhliyet) { setShowEhliyet(false); return true }
+      // Top layer first (car or dealer page), then the list: back walks the way the user came.
+      if (carsStack.length > 0) { closeCarsLayer(); return true }
+      if (showCars) { setShowCars(false); return true }
       if (showMarketplace) { if (marketplaceBackRef.current?.()) return true; setShowMarketplace(null); return true }
       // Partner page before the list: back steps partner -> list -> Home.
       if (eateryPartner) { if (eateryPartnerBackRef.current?.()) return true; if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
@@ -1174,7 +1222,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1442,6 +1490,8 @@ export default function App() {
       const screen = data.screen
       if (screen === 'duty') {
         setShowDutyList(true)
+      } else if (screen === 'weekend') {
+        openWeekendOnMap()
       } else if (screen === 'profile') {
         setActiveTab('profile')
       } else if (screen === 'notifications') {
@@ -1468,6 +1518,7 @@ export default function App() {
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') setShowDutyList(true)
+      else if (screen === 'weekend') openWeekendOnMap()
       // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
       //   case for a message notification — the app is not usually already open when one
       //   arrives — and without this branch that tap landed on Home with no explanation.
@@ -2138,7 +2189,7 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
-      onNotifPress={() => setShowDutyList(true)}
+      onNotifPress={item => (notificationRoute(item) === 'weekend' ? openWeekendOnMap() : setShowDutyList(true))}
       onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
@@ -2186,7 +2237,7 @@ export default function App() {
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />
     )
   } else if (showHotels) {
-    content = <HotelsScreen lang={lang} onClose={() => setShowHotels(false)} />
+    content = <HotelsScreen lang={lang} initialQuery={hotelsQuery} onClose={() => { setShowHotels(false); setHotelsQuery('') }} />
   } else if (showHomeServices) {
     content = (MODULE_FLAGS.homeServices || isAdmin)
       ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} backRef={homeServicesBackRef} />
@@ -2258,7 +2309,11 @@ export default function App() {
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
       <BLErrorBoundary lang={lang}>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace}
+          // Stage 3 sections: events open their detail (back returns here); "Harita" opens the Keşfet tab in that mode.
+          onSelectEvent={MODULE_FLAGS.events ? row => { setOpenedEvent(row); setEventFromHome(true); setShowEvents(true) } : undefined}
+          onOpenMapEvents={MODULE_FLAGS.events ? () => { setShowExplore(false); setMapRoutesMode(false); setMapEventsMode(true); setActiveTab('map') } : undefined}
+          onOpenRoutes={EXPLORE_ROUTES_LIVE ? () => { setShowExplore(false); setMapEventsMode(false); setMapRoutesMode(true); setActiveTab('map') } : undefined} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
@@ -2545,6 +2600,28 @@ export default function App() {
   } else if (showEhliyet && EHLIYET) {
     // Dark module: no ComingSoon fallback (no waitlist). EHLIYET is true only when the flag is live or on dev / ADA Preview.
     content = <EhliyetScreen lang={lang} onBack={() => setShowEhliyet(false)} />
+  } else if (showCars && CARS) {
+    // Dark module: no ComingSoon fallback. CARS is true only when the flag is live or on dev / ADA Preview.
+    // Each layer is an overlay over the still-mounted list (filters, pages, scroll kept).
+    content = (
+      <View style={{ flex: 1 }}>
+        <CarsScreen lang={lang} onBack={() => setShowCars(false)} onOpenCar={car => openCarsLayer({ kind: 'car', car })}
+          onPost={() => openCarPost()} onMine={openMyCars} />
+        {carsStack.map(layer => (
+          <View key={layerKey(layer)} style={styles.moduleOverlay}>
+            {layer.kind === 'car'
+              ? <CarDetailScreen car={layer.car} lang={lang} onBack={closeCarsLayer} onOpenDealer={dealer => openCarsLayer({ kind: 'dealer', dealer })} onRequireAccount={requireAccount} />
+              : layer.kind === 'dealer'
+                ? <DealerScreen dealer={layer.dealer} lang={lang} onBack={closeCarsLayer} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
+                : layer.kind === 'mine'
+                  ? <MyCarsScreen lang={lang} reloadKey={carsMineReload} onBack={closeCarsLayer} onPost={() => openCarPost()}
+                      onEdit={car => openCarPost(car)} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
+                  : <CarPostScreen session={session} lang={lang} car={layer.car} profilePhone={profile?.phone ?? null}
+                      onBack={closeCarsLayer} onSaved={carSaved} />}
+          </View>
+        ))}
+      </View>
+    )
   } else if (showMarketplace && MARKETPLACE) {
     // Dükkân. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
     content = <MarketplaceScreen lang={lang} session={session} profile={profile} backRef={marketplaceBackRef}
@@ -2664,6 +2741,7 @@ export default function App() {
             onShowGarages={() => setShowGarages(true)}
             onShowTowing={() => setShowTowing(true)}
             onShowEhliyet={() => setShowEhliyet(true)}
+            onShowCars={() => setShowCars(true)}
             onShowMarketplace={() => setShowMarketplace('browse')}
             onShowEatery={() => setShowEatery(true)}
             overlayOpen={oliSheetOpen || showLangModal || showAboutSheet || showCoachMarks || showHomeCityAsk}
@@ -2726,6 +2804,8 @@ export default function App() {
             {EXPLORE_MAP_LIVE ? (
               <BLErrorBoundary lang={lang}>
               <ExploreMapScreen
+                // The weekend push may arrive while Keşfet is already open: initial props are read once, so remount.
+                key={mapEventRange ? `map:${mapEventRange}` : 'map'}
                 // The directory's second entrance — see the prop's note in that file. It
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
                 // hidden once this has been checked on device.
@@ -2751,10 +2831,16 @@ export default function App() {
                 onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
                 // EATERY re-checked at the render site; eateryFromMap makes back return here in one press.
                 onSelectEatery={row => { setShowEatery(true); setEateryOpenSlug(row.slug); setEateryFromMap(true) }}
+                // The row the map already holds (EventsScreen's columns); eventFromHome makes back
+                // close Etkinlikler and land on the map again, as it lands on Home from the strip.
+                onSelectEvent={MODULE_FLAGS.events ? row => { setOpenedEvent(row); setEventFromHome(true); setShowEvents(true) } : undefined}
+                onOpenHotel={HOTELS_LIVE ? h => { setHotelsQuery(h.name); setShowHotels(true) } : undefined}
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}
                 initialRoutesMode={mapRoutesMode}
+                initialEventsMode={mapEventsMode}
+                initialEventRange={mapEventRange}
               />
               </BLErrorBoundary>
             ) : (
@@ -2804,9 +2890,11 @@ export default function App() {
             if (!REDESIGN && tab === 'profile' && requireAccount('gateProfile')) return
             // Leaving Profile with unsaved edits asks first — the same guard as its back button.
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
-              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setActiveTab(tab) }); return
+              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setMapEventsMode(false); setMapEventRange(null); setActiveTab(tab) }); return
             }
             setMapRoutesMode(false)
+            setMapEventsMode(false)
+            setMapEventRange(null)
             setActiveTab(tab)
           }
           return REDESIGN
@@ -2913,7 +3001,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -2945,7 +3033,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -3301,7 +3389,7 @@ const styles = StyleSheet.create({
   headerIcon:       { width: 110, height: 54 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2 },
   memberIdValue:    { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: 2, marginTop: 6 },
   headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, gap: 2 },
@@ -3351,7 +3439,7 @@ const styles = StyleSheet.create({
   cardBody:         { padding: 16 },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
   dutyCardBadge:    { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
-  dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, letterSpacing: 0.2 },
   cardMain:         { flexDirection: 'row', alignItems: 'center' },
   cardNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
   cardActions:      { flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginLeft: 6, alignSelf: 'stretch', paddingVertical: 2 },

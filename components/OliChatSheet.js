@@ -34,7 +34,7 @@ const CHIPS = [
 
 const NAV_TARGETS = new Set(OLI_CHAT_INTENTS.map(i => i.id))
 const RESULT_MODULES = new Set(['medical', 'events', 'beach', 'landmark', 'homeServices', 'transport', 'jobPostings', 'towing'])
-const TEXT_KEY = {
+export const TEXT_KEY = {
   pharmacy: ['oliChatPharmacy', 'oliChatPharmacyNone'],
   events:   ['oliChatEvents', 'oliChatEventsNone'],
   eatery:   ['oliChatEatery', 'oliChatEateryNone'],
@@ -100,7 +100,7 @@ function OliBubble({ text, children }) {
   )
 }
 
-function OliAnswer({ payload, lang, onAction }) {
+export function OliAnswer({ payload, lang, onAction }) {
   const a = safeAnswer(payload)
   const [withItems, without] = TEXT_KEY[a.kind] ?? []
   const typeLabels = a.types.map(p => t(p.labelKey, lang)).join(', ')

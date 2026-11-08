@@ -1,0 +1,48 @@
+# ─── Araçlar Preview seed: one INACTIVE test dealer, six cars, CC0 photos ────
+#
+# Test data for ADA Preview (Berke, 2026-11-07). Production never shows it: the dealer stays is_active = false, so only
+# is_previewer() sessions read the cars (20261165). CI-only (scripts/lib/prod-write-guard.mjs). Dry by default. The
+# script refuses if the dealer is already active, verifies every upload byte-for-byte, and fails if anon can see a
+# single seeded row. Logs carry counts and fixed keys only.
+#
+#   gh workflow run araclar-preview-seed                  # dry: prints the plan
+#   gh workflow run araclar-preview-seed -f apply=true    # write (re-runnable: fixed ids upsert)
+
+name: araclar-preview-seed
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write to production (otherwise --dry)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-araclar-seed, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      IN_APPLY: ${{ inputs.apply }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: Seed
+        run: |
+          if [ "$IN_APPLY" = "true" ]; then node scripts/seed-araclar-preview.mjs --apply
+          else node scripts/seed-araclar-preview.mjs --dry; fi

@@ -4,74 +4,21 @@ import {
   useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { loadKktcFx, refreshKktcFx } from '../utils/kktcFx'
 
-// New cache key: the KKTC payload shape differs from the old Frankfurter one,
-// so a fresh key avoids parsing a stale incompatible cache after the OTA.
-const FX_CACHE_KEY = 'ada_kktc_fx_cache_v1'
-
-// ─── PINNED SCHEMA — KKTC Merkez Bankası daily FX feed ──────────────────────
-// Source: https://mb.gov.ct.tr/kur/gunluk.xml  (official TRNC Central Bank,
-// public, no API key, XML published since 2011). Parsed with regex against a
-// FIXED, government-controlled flat schema — deliberately no XML library.
-// Header:   <Kur_Tarihi> DD/MM/YYYY   <Gecerli_Tarih_Araligi> single date OR
-//           "DD/MM/YYYY - DD/MM/YYYY" (weekends/holidays span a range).
-// Per row:  <Resmi_Kur> … <Birim> <Sembol> <Doviz_Alis> <Doviz_Satis>
-//           <Efektif_Alis> <Efektif_Satis> … </Resmi_Kur>
-// If parseKktcFx() starts returning null, these element names likely changed —
-// diff against a fresh fetch of the URL above to diagnose.
-const FX_URL = 'https://mb.gov.ct.tr/kur/gunluk.xml'
-
-// Display order + flags. Adding a currency = one entry here (parser is generic).
+// Display order + flags. A new currency = one entry here + its code in FX_CODES (utils/kktcFx.js).
 const PAIRS = [
   { code: 'USD', flag: '🇺🇸' },
   { code: 'GBP', flag: '🇬🇧' },
   { code: 'EUR', flag: '🇪🇺' },
 ]
-const WANTED = PAIRS.map(p => p.code)
 const TRY_PAIR = { code: 'TRY', flag: '🇹🇷' }
-
-function tag(xml, name) {
-  const m = xml.match(new RegExp(`<${name}>([^<]*)</${name}>`))
-  return m ? m[1].trim() : null
-}
-
-function parseKktcFx(xml) {
-  if (!xml) return null
-  const date = tag(xml, 'Kur_Tarihi')
-  const validRange = tag(xml, 'Gecerli_Tarih_Araligi')
-  const rates = {}
-  const blocks = xml.match(/<Resmi_Kur>[\s\S]*?<\/Resmi_Kur>/g) || []
-  for (const block of blocks) {
-    const sym = tag(block, 'Sembol')
-    if (!sym || !WANTED.includes(sym)) continue
-    // Birim is the unit multiplier (e.g. JPY quotes per 100). Always divide so
-    // adding a Birim>1 currency later can never silently produce a 100× value.
-    const birim = parseFloat(tag(block, 'Birim')) || 1
-    const num = name => {
-      const v = parseFloat(tag(block, name))
-      return Number.isFinite(v) ? v / birim : null
-    }
-    rates[sym] = {
-      dovizAlis:    num('Doviz_Alis'),
-      dovizSatis:   num('Doviz_Satis'),
-      efektifAlis:  num('Efektif_Alis'),
-      efektifSatis: num('Efektif_Satis'),
-    }
-  }
-  if (!date || Object.keys(rates).length === 0) return null
-  return { date, validRange, rates }
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 // ─── Converter helpers ───────────────────────────────────────────────────────
 // The cap is a domain limit, not a display one — the rows step their font size
@@ -154,15 +101,6 @@ function formatRate(n) {
   return n.toFixed(4).replace(/(\.\d{2}\d*?)0+$/, '$1')
 }
 
-async function fetchKktcFx() {
-  const resp = await fetch(FX_URL)
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-  const xml = await resp.text()
-  const parsed = parseKktcFx(xml)
-  if (!parsed) throw new Error('parse failed')
-  return { ...parsed, fetchedOn: todayStr() }
-}
-
 export default function ExchangeRatesScreen({ lang, onBack }) {
   // cacheData shape: { date, validRange, rates: { USD, GBP, EUR }, fetchedOn }
   const [cacheData, setCacheData]     = useState(null)
@@ -178,28 +116,11 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
     let cancelled = false
 
     async function load() {
-      let cache = null
-      try {
-        const raw = await AsyncStorage.getItem(FX_CACHE_KEY)
-        if (raw) cache = JSON.parse(raw)
-      } catch (_) {}
-
-      if (cache && cache.fetchedOn === todayStr()) {
-        if (!cancelled) { setCacheData(cache); setLoading(false) }
-        return
-      }
-
-      try {
-        const fresh = await fetchKktcFx()
-        await AsyncStorage.setItem(FX_CACHE_KEY, JSON.stringify(fresh))
-        if (!cancelled) { setCacheData(fresh); setLoading(false) }
-      } catch (_) {
-        if (!cancelled) {
-          setCacheData(cache)
-          setFetchFailed(true)
-          setLoading(false)
-        }
-      }
+      const { data, failed } = await loadKktcFx()
+      if (cancelled) return
+      setCacheData(data)
+      if (failed) setFetchFailed(true)
+      setLoading(false)
     }
 
     load()
@@ -210,9 +131,7 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
     setLoading(true)
     setFetchFailed(false)
     try {
-      const fresh = await fetchKktcFx()
-      await AsyncStorage.setItem(FX_CACHE_KEY, JSON.stringify(fresh))
-      setCacheData(fresh)
+      setCacheData(await refreshKktcFx())
     } catch (_) {
       setFetchFailed(true)
     } finally {
@@ -538,7 +457,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   dateValue: {
@@ -589,7 +507,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: 12,
   },
@@ -719,7 +636,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   rateRow: {

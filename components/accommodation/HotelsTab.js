@@ -211,7 +211,7 @@ function HotelsComingSoon({ lang }) {
   )
 }
 
-export default function HotelsTab({ lang }) {
+export default function HotelsTab({ lang, initialQuery = '' }) {
   const [hotels, setHotels]     = useState([])
   const [loading, setLoading]   = useState(true)
   const [failed, setFailed]     = useState(false)
@@ -219,7 +219,7 @@ export default function HotelsTab({ lang }) {
   const [district, setDistrict] = useState(null)
   const [area, setArea]         = useState(null)
   const [sort, setSort]         = useState('recommended')
-  const [query, setQuery]       = useState('')
+  const [query, setQuery]       = useState(initialQuery)
   // The screen's SafeAreaView pads only the top, and Android draws edge-to-edge: without the
   // bottom inset the last card's buttons sit under the navigation bar.
   const insets = useSafeAreaInsets()
@@ -414,7 +414,7 @@ const legacyHs = StyleSheet.create({
   mascotWrap:    { width: 132, height: 132, borderRadius: 66, backgroundColor: colors.tintServiceBg, alignItems: 'center', justifyContent: 'center', marginBottom: 20, ...shadow },
   mascot:        { width: 116, height: 116, borderRadius: 58 },
   soonBadge:     { backgroundColor: colors.tintServiceBg, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 14, marginBottom: 14 },
-  soonBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, textTransform: 'uppercase', letterSpacing: 0.6 },
+  soonBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, letterSpacing: 0.2 },
   soonTitle:     { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
   soonBody:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
 })

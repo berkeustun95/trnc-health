@@ -29,12 +29,14 @@ import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE } from 
 import { eateryPartnerVisible } from './eatery.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
 import { parseIsOpen, isOpenNow } from '../utils/facilityUtils.js'
+import { openState, cyprusNow } from '../utils/towingHours.js'
+import { officialVisitView } from '../utils/officialVisit.js'
 import { typeColors, placeColors } from './theme.js'
 import { PET_PARTNERS } from './petPartners.js'
 import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, LIVE_TILE_GROUPS,
   categoryToGroup, groupVisible,
-} from './exploreCategories.js'
+ ICON_PIN } from './exploreCategories.js'
 
 // Default map framing: the WHOLE island, used by both map surfaces whenever there is no
 // userLocation to centre on.
@@ -59,6 +61,14 @@ export const TRNC_CENTER = {
   latitudeDelta:  0.9,
   longitudeDelta: 2.0,
 }
+
+// Inside the default frame = in North Cyprus for this purpose. A user elsewhere (Istanbul, the
+// south) opens on the island, not on their own street.
+export function inTrncFrame(lat, lng) {
+  return Math.abs(lat - TRNC_CENTER.latitude)  <= TRNC_CENTER.latitudeDelta / 2
+      && Math.abs(lng - TRNC_CENTER.longitude) <= TRNC_CENTER.longitudeDelta / 2
+}
+export const NEAR_ME_DELTA = 0.12
 
 // Explore is REACHABLE — the outer gate App.js applies before rendering ExploreScreen.
 // `live` defaults to the real flag. It is an explicit parameter ONLY so the guard can
@@ -121,6 +131,7 @@ function placePins(places) {
         kind:  'place',
         row:   p,
         group,
+        iconPin: !!ICON_PIN[group],
         lat:   p.latitude,
         lng:   p.longitude,
         color:   (GROUP_META[group]?.colorToken || placeColors.landmark).text,
@@ -275,10 +286,15 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
 // fetched" would look identical on screen today and would republish every dark-module row
 // the moment one exists. The gate must sit on the DEFAULT path, not only on the
 // explicitly-filtered one — the default is the path almost every user takes.
-export function selectedPins(sources, selectedKeys) {
+// Sources the map leaves OUT of "Tümü" until the user turns them on with their chip (Berke 2026-11-08:
+// the ~110 services pins swamp the city; the list page still shows them). `extraOn` = that chip.
+export const DEFAULT_OFF_KEYS = ['explore:services']
+
+export function selectedPins(sources, selectedKeys, extraOn = false) {
+  const off = s => DEFAULT_OFF_KEYS.includes(s.key)
   const active = (!selectedKeys || selectedKeys.size === 0)
-    ? sources
-    : sources.filter(s => selectedKeys.has(s.key))
+    ? sources.filter(s => extraOn || !off(s))
+    : sources.filter(s => selectedKeys.has(s.key) || (extraOn && off(s)))
   return active.flatMap(s => s.pins)
 }
 
@@ -292,21 +308,53 @@ export function selectedPins(sources, selectedKeys) {
 // that day: 0 of 393 active facilities had opening_hours at all. Do not delete as unused.
 // A pharmacy on today's duty roster also makes the chip applicable: during its window it is
 // open whatever its hours say (isOpenNow).
-export function openNowApplicable(pins, dutyWindows = null) {
-  return pins.some(p => p.kind === 'health'
-    && (parseIsOpen(p.row.opening_hours) !== null || !!dutyWindows?.has(p.row.id)))
+// Open right now, per pin: true / false, or null when nothing says (no hours, or an EEMD site
+// out of its published season). Stage 2 (2026-11-07) widened Open now from health-only:
+//   health  — regular hours + today's duty window (isOpenNow), as before
+//   eatery  — the partner's opening_hours (the same openState the eatery cards use)
+//   place   — EEMD official_visit: 'closed' is false; in season, weekday + open..close; else null
+// EEMD publishes one schedule per season and ADA holds only the summer one (04-01..10-31), so
+// in winter a museum is null (shown), never guessed closed.
+const toMin = hhmm => { const m = /^(\d{2}):(\d{2})$/.exec(hhmm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null }
+export function pinOpenNow(pin, dutyWindows = null, now = new Date()) {
+  if (pin.kind === 'health') {
+    if (parseIsOpen(pin.row.opening_hours) === null && !dutyWindows?.has(pin.row.id)) return null
+    return isOpenNow(pin.row, dutyWindows) === true
+  }
+  if (pin.kind === 'eatery') {
+    if (!pin.row.opening_hours || typeof pin.row.opening_hours !== 'object') return null
+    return openState(pin.row, now).state === 'open'
+  }
+  if (pin.kind === 'place' && pin.row.official_visit) {
+    const v = officialVisitView(pin.row.official_visit, now)
+    if (!v) return null
+    if (v.closed) return false
+    if (!v.hours) return null
+    const { day, minutes } = cyprusNow(now)
+    if ((day === 'sat' || day === 'sun') && v.hours.weekends !== true) return false
+    const open = toMin(v.hours.open), close = toMin(v.hours.close)
+    if (open == null || close == null) return null
+    return minutes >= open && minutes < close
+  }
+  return null
 }
 
-// Open-now is structurally HEALTH-ONLY: BROWSE_COLS does not select opening_hours, so a
-// place pin carries no hours to test. That is deliberate and must stay that way — widening
-// or narrowing that select on a whim is precisely how photo attribution silently broke.
-//
-// Non-health pins pass through UNFILTERED rather than being hidden. A beach has no opening
-// hours to be open or closed against; dropping it would turn a modifier into a mode and
-// leave the user staring at an empty map wondering which chip did it.
-export function applyOpenNow(pins, on, dutyWindows = null) {
+// The chip shows only while at least one pin can answer (Open now over a map where nothing has
+// hours would filter nothing and read as broken).
+export function openNowApplicable(pins, dutyWindows = null, now = new Date()) {
+  return pins.some(p => pinOpenNow(p, dutyWindows, now) !== null)
+}
+
+// A pin that is KNOWN closed goes; everything else stays. A beach has no hours to be open or
+// closed against; dropping it would turn a modifier into a mode and leave the user staring at an
+// empty map wondering which chip did it. Health keeps its stricter rule: a facility without
+// hours is not shown as open (unchanged since the chip shipped).
+export function applyOpenNow(pins, on, dutyWindows = null, now = new Date()) {
   if (!on) return pins
-  return pins.filter(p => p.kind !== 'health' || isOpenNow(p.row, dutyWindows) === true)
+  return pins.filter(p => {
+    const o = pinOpenNow(p, dutyWindows, now)
+    return p.kind === 'health' ? o === true : o !== false
+  })
 }
 
 // "Müze & Ören Yeri" (EEMD visiting data, places.official_visit). Applicability is read off

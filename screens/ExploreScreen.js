@@ -11,6 +11,7 @@ import MapView, { Marker } from 'react-native-maps'
 import { supabase } from '../lib/supabase'
 import ExploreSubmitScreen from './ExploreSubmitScreen'
 import ExploreMySubmissionsScreen from './ExploreMySubmissionsScreen'
+import ExploreSections from '../components/ExploreSections'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import FeaturedBadge from '../components/FeaturedBadge'
@@ -28,6 +29,8 @@ import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { REDESIGN } from '../constants/redesign'
+import HeroCreditSheet from '../components/home/HeroCreditSheet'
+import { EXPLORE_PHOTO_CREDIT } from '../constants/exploreCover'
 import {
   ScreenHeader as KitHeader, FilterBar, ListCard, EmptyState, ErrorState, CardSkeleton,
   CategoryIcon, IconButton, ModuleScreen,
@@ -296,11 +299,12 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace, savedRegion 
 
 // ─── Group-tile landing ────────────────────────────────────────────────────────
 
-function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
+function GroupTiles({ counts, visibleGroups, lang, onSelectGroup, embedded = false }) {
   const tilesMem = useScrollMemory('explore:tiles')
   if (REDESIGN) {
+    const Wrap = embedded ? View : ScrollView
     return (
-      <ScrollView {...tilesMem} contentContainerStyle={r.tilesWrap} showsVerticalScrollIndicator={false}>
+      <Wrap {...(embedded ? { style: [r.tilesWrap, { paddingTop: 0 }] } : { ...tilesMem, contentContainerStyle: r.tilesWrap, showsVerticalScrollIndicator: false })}>
         {visibleGroups.map(g => (
           <TouchableOpacity key={g} style={r.tile} onPress={() => onSelectGroup(g)} activeOpacity={press.card}
             accessibilityRole="button" accessibilityLabel={`${groupLabel(g, lang)}, ${counts[g] || 0}`}>
@@ -309,7 +313,7 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
             <Text style={r.tileCount}>{counts[g] || 0}</Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </Wrap>
     )
   }
   return (
@@ -361,7 +365,7 @@ export const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
   'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source, official_visit'
 
-export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate, placeOverlay = null, backRef = null }) {
+export default function ExploreScreen({ lang, onBack, onSelectPlace, onSelectEvent, onOpenMapEvents, onOpenRoutes, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate, placeOverlay = null, backRef = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
   // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
   const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
@@ -371,6 +375,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   // the group-tile landing — preserving the old Beaches-tile behavior (swap the engine, keep the nav).
   const rooted = initialCategory != null
   const [places,      setPlaces]      = useState([])
+  const [coverCreditOpen, setCoverCreditOpen] = useState(false)
   const [loading,     setLoading]     = useState(true)
   const [loadError,   setLoadError]   = useState(false)   // places fetch failed → ErrorState, never "no places"
   const [activeGroup, setActiveGroup] = useState(initialCategory ? categoryToGroup(initialCategory) : null)   // null = group-tile landing
@@ -627,6 +632,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             : [
                 hasSavedVisible && { icon: 'heart-outline', onPress: () => setShowSaved(true), accessibilityLabel: t('exploreSavedTitle', lang) },
                 hasSubs && { icon: 'document-text-outline', onPress: () => setShowMySubs(true), accessibilityLabel: t('exploreMySubmissions', lang) },
+                { icon: 'information-circle-outline', onPress: () => setCoverCreditOpen(true), accessibilityLabel: t('heroCreditTitle', lang) },
               ].filter(Boolean)}
         />
       ) : (<>
@@ -672,6 +678,22 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
           : <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
       ) : loadError ? (
         <ErrorState lang={lang} onRetry={load} />
+      ) : !activeGroup && REDESIGN && !rooted ? (
+        <ExploreSections
+          places={places}
+          userLocation={userLocation}
+          lang={lang}
+          placeName={placeName}
+          categoryLabel={categoryLabel}
+          onSelectPlace={onSelectPlace}
+          onSelectEvent={onSelectEvent}
+          onOpenMapEvents={onOpenMapEvents}
+          onOpenRoutes={onOpenRoutes}
+          onOpenOfficial={visibleGroups.includes('heritage') ? () => { openGroup('heritage'); setActiveCat(OFFICIAL_SITE_FILTER) } : undefined}
+          onOpenGroup={g => visibleGroups.includes(g) && openGroup(g)}
+        >
+          <GroupTiles counts={counts} visibleGroups={visibleGroups} lang={lang} onSelectGroup={openGroup} embedded />
+        </ExploreSections>
       ) : !activeGroup ? (
         <GroupTiles
           counts={counts}
@@ -804,6 +826,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     <View style={s.root}>
       {body}
       {placeOverlay && <View style={s.placeOverlay}>{placeOverlay}</View>}
+      <HeroCreditSheet visible={coverCreditOpen} credit={EXPLORE_PHOTO_CREDIT} lang={lang} onClose={() => setCoverCreditOpen(false)} />
     </View>
   )
 }

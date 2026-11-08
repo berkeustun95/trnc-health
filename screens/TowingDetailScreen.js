@@ -403,7 +403,7 @@ const s = StyleSheet.create({
   badgeClsText:{ color: colors.textSecondary },
 
   block:       { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
-  blockTitle:  { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
+  blockTitle:  { fontSize: 11, letterSpacing: 0.2,
                  color: colors.textSecondary, fontFamily: 'Inter_700Bold', marginBottom: 10 },
 
   tagWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

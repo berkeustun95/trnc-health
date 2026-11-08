@@ -526,7 +526,7 @@ const s = StyleSheet.create({
   livePillText:{ ...type.meta, color: '#FFFFFF' },
   liveDot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
 
-  dayDivider:  { ...type.caption, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6,
+  dayDivider:  { ...type.caption, color: colors.textSecondary, letterSpacing: 0.2,
                  paddingHorizontal: 16, paddingTop: 12, paddingBottom: 2 },
   dayDividerGap: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 4 },
   hairline:    { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginLeft: 72 },

@@ -27,7 +27,8 @@ export const MODULE_PHOTO = {
   medical:        require('../../assets/backgrounds/ada-bg-medical-facilities.jpg'),
   duty:           require('../../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
   events:         require('../../assets/backgrounds/ada-bg-events.jpg'),
-  explore:        require('../../assets/backgrounds/ada-bg-beaches-landmarks.jpg'),
+  // Kyrenia harbour, Katerina Bot (Unsplash), Berke 2026-11-08; credit: constants/exploreCover.js.
+  explore:        require('../../assets/backgrounds/ada-bg-explore.jpg'),
   accommodation:  require('../../assets/backgrounds/ada-bg-accommodation.jpg'),
   homeServices:   require('../../assets/backgrounds/ada-bg-home-services.jpg'),
   pets:           require('../../assets/backgrounds/ada-bg-pets.jpg'),
@@ -37,6 +38,8 @@ export const MODULE_PHOTO = {
   towing:         require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   garages:        require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   grooming:       require('../../assets/backgrounds/ada-bg-pets.jpg'),
+  // Araçlar has no photo of its own yet and takes the road photo, as garages and towing do.
+  cars:           require('../../assets/backgrounds/ada-bg-transportation.jpg'),
   // Kyrenia Gate, North Nicosia (Wikimedia Commons, ToprakM, 2024, CC BY 4.0), chosen by Berke
   // 2026-10-11 over the Atatürk monument after an on-device A/B. Credited through the Duyurular
   // header's ℹ︎ button (DUY_PHOTO_CREDIT, constants/duyurular.js). Left-anchored 1:2 crop

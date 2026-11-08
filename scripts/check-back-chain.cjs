@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases (+2 for Yeme-İçme) from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery basket page (rides eateryPartnerBackRef). +3 on 2026-10-21 for the Eatery "Ne yesem?" quiz page (rides eateryListBackRef). +2 for Sepetim opened from the quiz results bar. +2 on 2026-10-28 for a North Houses apartment over Konaklama (Günlük Kiralık). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery basket page (rides eateryPartnerBackRef). +3 on 2026-10-21 for the Eatery "Ne yesem?" quiz page (rides eateryListBackRef). +2 for Sepetim opened from the quiz results bar. +2 on 2026-10-28 for a North Houses apartment over Konaklama (Günlük Kiralık). +4 on 2026-11-07 for Araçlar (list, car, dealer over car, car over dealer). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -36,7 +36,8 @@ function run(state, home=null, prof=null, refs={}){
     return undefined }})
   const r=fn(ctx); return {r, calls:calls.join(' ')}
 }
-const base={updateTier:null, activeTab:'home', showWelcome:false}
+// carsStack is App state initialised to [] (an array is always there; the chain reads its length).
+const base={updateTier:null, activeTab:'home', showWelcome:false, carsStack:[]}
 const cases4=[
  ['Place open, check-in page up -> closes check-in only', {...base, showExplore:true, selectedExplorePlace:{id:1}}, {placeBackRef:()=>true}, r=>r.calls===''],
  ['Place open -> closes place, NOT the module', {...base, showExplore:true, selectedExplorePlace:{id:1}}, {placeBackRef:()=>false, exploreBackRef:()=>{throw new Error('module asked')}}, r=>r.calls==='setSelectedExplorePlace(null)'],
@@ -58,7 +59,7 @@ const cases4=[
  ['SCROLL SPOT Hub <- Welcome Guide (guide closes, hub stays)', {...base, showStudentHub:true, showNewcomerEssentials:true}, {studentHubBackRef:()=>{throw new Error('hub asked')}}, r=>r.calls==='setShowNewcomerEssentials(false)'],
  ['S8 Guide card open -> closes card, not guide', {...base, showNewcomerEssentials:true}, {guideBackRef:()=>true}, r=>r.calls===''],
  ['S8 Rates over guide -> closes rates, guide stays', {...base, showNewcomerEssentials:true, showExchangeRates:true}, {guideBackRef:()=>{throw new Error('guide asked')}}, r=>r.calls==='setShowExchangeRates(false)'],
- ['Hotels (Home tile) -> closes hotels', {...base, showHotels:true}, {}, r=>r.r===true && r.calls==='setShowHotels(false)'],
+ ['Hotels (Home tile) -> closes hotels', {...base, showHotels:true}, {}, r=>r.r===true && r.calls==='setShowHotels(false) setHotelsQuery("")'],
  ['Günlük Kiralık apartment open over Konaklama -> closes the apartment only, NOT the module', {...base, showAccommodation:true, openedRental:{slug:'yasemin-2plus1'}}, {}, r=>r.r===true && r.calls==='setOpenedRental(null)'],
  ['Konaklama, no overlay open -> closes the module (the apartment overlay is not left holding back)', {...base, showAccommodation:true, openedRental:null}, {}, r=>r.r===true && r.calls==='setShowAccommodation(false)'],
  ['S10 Duty over notifications -> closes duty, notifs stay', {...base, showNotifs:true, showDutyList:true}, {}, r=>r.calls==='closeDutyList()'],
@@ -86,6 +87,12 @@ const cases4=[
  ['Eatery partner opened from a quiz result -> closes the partner first, the quiz handler is not asked', {...base, showEatery:true, eateryPartner:{id:1}}, {eateryListBackRef:()=>{throw new Error("quiz asked")}}, r=>r.r===true && r.calls==='setEateryPartner(null)'],
  ['Eatery list -> closes the module', {...base, showEatery:true}, {}, r=>r.r===true && r.calls==='setShowEatery(false)'],
  ['Ehliyet -> closes the module', {...base, showEhliyet:true}, {}, r=>r.calls==='setShowEhliyet(false)'],
+ // Araçlar: carsStack holds the layers over the list (constants/cars.js pushCarsLayer; scripts/test-cars-ui.mjs
+ // proves which layer closeCarsLayer leaves on top). Every layer pops one step, never the module.
+ ['Araçlar list -> closes the module', {...base, showCars:true, carsStack:[]}, {}, r=>r.r===true && r.calls==='setShowCars(false)'],
+ ['Araçlar car detail over the list -> closes the detail only, list stays', {...base, showCars:true, carsStack:[{kind:'car',car:{id:'a'}}]}, {}, r=>r.r===true && r.calls==='closeCarsLayer()'],
+ ['Araçlar dealer page over a car -> back to the car, NOT the list', {...base, showCars:true, carsStack:[{kind:'car',car:{id:'a'}},{kind:'dealer',dealer:{id:'d'}}]}, {}, r=>r.r===true && r.calls==='closeCarsLayer()'],
+ ['Araçlar car opened from the dealer page -> back to the dealer, NOT the module', {...base, showCars:true, carsStack:[{kind:'car',car:{id:'a'}},{kind:'dealer',dealer:{id:'d'}},{kind:'car',car:{id:'b'}}]}, {}, r=>r.r===true && r.calls==='closeCarsLayer()'],
  ['S10 Insurance layer -> module step', {...base, showInsurance:true}, {insuranceBackRef:()=>true}, r=>r.calls===''],
  ['S10 Grooming onboarding -> module step', {...base, showGrooming:true}, {groomingBackRef:()=>true}, r=>r.calls===''],
  ['S10 Towing detail over Garages -> closes detail only', {...base, showGarages:true, showTowing:true}, {towingBackRef:()=>true, garagesBackRef:()=>{throw new Error('garages asked')}}, r=>r.calls===''],

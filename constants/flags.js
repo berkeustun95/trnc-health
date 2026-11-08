@@ -161,6 +161,10 @@ export const MODULE_FLAGS = {
   // Ehliyet — driving schools (first partner: Seyhun Bıkmaz Şoför Okulu). LIVE 2026-10-14
   // (20261108/20261109/20261110). No waitlist and no Coming Soon screen. Off = tile hidden again.
   ehliyet:      true,
+  // Araçlar — car listings for sale and rent (dealers, private sellers, later imported sites). DARK.
+  // DB: 20261165 (listings, private posting 18+, max 3, admin approval, 30-day expiry) + 20261166 (reports)
+  // + 20261167 (waitlist notify). Off = Coming Soon + waitlist. Plan: vault 10-ada/2026-11-07_araclar-PLAN.md.
+  cars:         false,
   // Dükkân — users sell their own items to each other (vault 2026-11-07_marketplace-plan.md).
   // DARK: no waitlist and no Coming Soon screen; dev and ADA Preview see it via MARKETPLACE
   // (constants/redesign.js). Sellers 18+, photos approved by hand, chat via conversations.listing_id.

@@ -7,6 +7,7 @@ import { LANG_CODES, dateLocale } from '../constants/i18n.js'
 import { assembleStripSlides } from './stripSlides.js'
 import { maybeListedFilter, isEventOver, isRunningFromEarlierDay, startsSoon } from './eventVisibility.js'
 import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
+import { readableTitle } from './readableTitle.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
 //
@@ -127,7 +128,7 @@ async function hydratePin(pin, lang) {
     if (!data) return null
     return {
       kind: 'event', id: data.id,
-      title: i18nText(pin.title_i18n, lang) || data.title,
+      title: i18nText(pin.title_i18n, lang) || readableTitle(data.title),
       subtitle: i18nText(pin.subtitle_i18n, lang) || eventWhen(data.start_date, lang),
       icon: 'calendar-outline',
       imageUrl: pin.image_url || firstImage(data.images) || data.source_image_url || null,
@@ -223,7 +224,7 @@ async function readEventsToday(now, lang) {
   if (!e) return null
   return {
     kind: 'event', id: e.id,
-    title: e.title || '',
+    title: readableTitle(e.title) || '',
     subtitle: eventWhen(e.start_date, lang),
     icon: 'calendar-outline',
     imageUrl: firstImage(e.images) || e.source_image_url || null,
@@ -254,7 +255,7 @@ async function readNextEvent(now, lang) {
   if (!e) return null
   return {
     kind: 'event', id: e.id,
-    title: e.title || '',
+    title: readableTitle(e.title) || '',
     subtitle: eventWhen(e.start_date, lang),
     icon: 'calendar-outline',
     imageUrl: firstImage(e.images) || e.source_image_url || null,

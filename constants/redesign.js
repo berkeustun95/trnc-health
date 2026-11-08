@@ -44,6 +44,13 @@ export const DUYURULAR = MODULE_FLAGS.duyurular || (typeof __DEV__ !== 'undefine
 const EHLIYET_PREVIEW = true
 export const EHLIYET = MODULE_FLAGS.ehliyet || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && EHLIYET_PREVIEW)
 
+// Araçlar (cars) before go-live: dev bundles and ADA Preview open the list, detail and dealer pages; MODULE_FLAGS.cars
+// stays off, so production shows no tile at all (not in homeGroups COMING_SOON) and no screen (preflight (c) keeps
+// a production publish off the Preview config). Preview reads the inactive test dealer's cars through is_previewer().
+// Set CARS_PREVIEW to false if ADA Preview must stop showing it.
+const CARS_PREVIEW = true
+export const CARS = MODULE_FLAGS.cars || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CARS_PREVIEW)
+
 // Dükkân (marketplace) before go-live: dev bundles and ADA Preview open the real screens; the flag
 // stays off, so production shows no tile and no screen (no Coming Soon, no waitlist). Hidden tile,
 // Preview unlock only (Berke, 2026-11-07). Set MARKETPLACE_PREVIEW to false if Preview must stop showing it.

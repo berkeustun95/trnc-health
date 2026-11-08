@@ -15,7 +15,7 @@ export const EXPLORE_GROUPS = {
   heritage:  ['castle_fortress', 'ancient_ruins', 'museum', 'religious_site', 'monument'],
   eat_drink: ['cafe', 'restaurant', 'bakery'],
   active:    ['gym', 'sports_facility', 'pool'],
-  services:  ['barber', 'print_shop', 'laundry'],
+  services:  ['barber', 'hair_salon', 'print_shop', 'laundry'],
 }
 
 // Landing-grid order.
@@ -37,9 +37,17 @@ export function categoryToGroup(category) {
 export const GROUP_META = {
   nature:    { icon: 'leaf-outline',      colorToken: placeColors.beach,    labelKey: 'exploreGroupNature' },
   heritage:  { icon: 'library-outline',   colorToken: placeColors.landmark, labelKey: 'exploreGroupHeritage' },
-  eat_drink: { icon: 'cafe-outline',      colorToken: placeColors.beach,    labelKey: 'exploreGroupEatDrink' },
+  eat_drink: { icon: 'cafe-outline',      colorToken: placeColors.eatery,    labelKey: 'exploreGroupEatDrink' },
   active:    { icon: 'barbell-outline',   colorToken: placeColors.beach,    labelKey: 'exploreGroupActive' },
-  services:  { icon: 'construct-outline', colorToken: placeColors.beach,    labelKey: 'exploreGroupServices' },
+  services:  { icon: 'construct-outline', colorToken: placeColors.petHotel, labelKey: 'exploreGroupServices' },
+}
+
+// Groups drawn as ICON pins (a disc with this icon, in the group colour) instead of a default pin
+// (Berke 2026-11-08). Android keeps only a default pin's hue and the wheel is full, so these groups
+// are told apart by shape — scripts/validate-map-sources.mjs leaves them out of the hue rivals.
+export const ICON_PIN = {
+  active:   { icon: 'barbell' },
+  services: { icon: 'construct' },
 }
 
 // category -> i18n key. Legacy heritage/beach categories keep their bl* keys; the Slice-5
@@ -59,6 +67,7 @@ export const CATEGORY_LABEL_KEY = {
   sports_facility: 'exploreCatSportsFacility',
   pool:            'exploreCatPool',
   barber:          'exploreCatBarber',
+  hair_salon:      'exploreCatHairSalon',
   print_shop:      'exploreCatPrintShop',
   laundry:         'exploreCatLaundry',
 }
@@ -117,7 +126,7 @@ export const NON_CLAIMABLE_CATEGORIES = [
 export const CLAIMABLE_CATEGORIES = [
   'cafe', 'restaurant', 'bakery',
   'gym', 'sports_facility', 'pool',
-  'barber', 'print_shop', 'laundry',
+  'barber', 'hair_salon', 'print_shop', 'laundry',
 ]
 
 // Allow-list semantics on purpose — an unknown category is NOT claimable.

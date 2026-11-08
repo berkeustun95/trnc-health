@@ -55,6 +55,7 @@ const EXPECTED_MODULES = {
   checkins:      true,   // live 2026-10-08 — check-ins + Google places (20261092/20261093)
   duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
   ehliyet:       true,   // live 2026-10-14 — driving schools (20261108/20261109/20261110); no waitlist
+  cars:          false,  // Araçlar, dark — 20261165/20261166/20261167; Coming Soon + waitlist until live
   marketplace:   false,  // Dükkân — dark, Preview unlock only; no waitlist
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
@@ -381,9 +382,9 @@ for (const [k, live] of Object.entries(actualModules)) {
 // one, so a migration that adds a module to the notify path MUST repoint this constant in
 // the same commit — otherwise the guard reads a superseded file and blocks every push
 // complaining about a module the database already knows about.
-// 20261104 carries BOTH current bodies (module_notif_text from 20261015, notify_module_waitlist
-// from 20261066 — 20261015's RPC was already superseded), rebuilt from pg_get_functiondef.
-const NOTIFY_SQL = 'supabase/migrations/20261104_duyurular_waitlist_notify.sql'
+// 20261167 carries BOTH current bodies (20261104's, plus 'cars'), and proves at apply that it
+// differs from the live bodies by exactly those additions.
+const NOTIFY_SQL = 'supabase/migrations/20261167_cars_waitlist_notify.sql'
 try {
   const sql = readFileSync(resolve(ROOT, NOTIFY_SQL), 'utf8')
 

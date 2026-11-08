@@ -1,0 +1,53 @@
+# ─── Araçlar: delete the photo files of removed / rejected / hidden private listings ─
+#
+# The go-live gate for private car listings (Berke, 2026-11-07). Which listings and when: constants/cars.js
+# photoCleanupReason() (removed 3 days, rejected 14, hidden 30; expired never), plus orphan files older than a day.
+# Engine and every rule: scripts/cleanup-vehicle-photos.mjs.
+#
+# The nightly schedule APPLIES: deleting a seller's photos after their listing is gone is the policy itself, and a
+# daily manual approval would leave it undone. A dispatch is dry unless apply=true. Logs: yes/no lines and error
+# codes only (public repo). 03:10 UTC, after the 02:40 expire-vehicles cron.
+#
+#   gh workflow run araclar-photo-cleanup                 # dry: prints the plan
+#   gh workflow run araclar-photo-cleanup -f apply=true   # delete now
+
+name: araclar-photo-cleanup
+
+on:
+  schedule:
+    - cron: '10 3 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Delete (otherwise --dry)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-araclar-photo-cleanup, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      # A scheduled run has no inputs, so writing is decided here, once: schedule = delete, dispatch = only with apply.
+      WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: Cleanup
+        run: |
+          if [ "$WRITE" = "true" ]; then node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cleanup-vehicle-photos.mjs --apply
+          else node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cleanup-vehicle-photos.mjs --dry; fi
