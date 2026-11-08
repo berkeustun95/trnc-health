@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking,
@@ -453,8 +453,20 @@ function renderCardContent(cardId, lang, onShowExchangeRates) {
 let guideReturn = null
 let guideLeavingVia = false
 
-export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeRates, backRef = null }) {
-  const [activeCard, setActiveCard] = useState(() => { const v = guideReturn; guideReturn = null; return v })
+// initialCard: open straight on one card (Ask Oli: "border crossing" → the Border Crossings card).
+export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeRates, backRef = null, initialCard = null }) {
+  const [activeCard, setActiveCard] = useState(() => {
+    const v = guideReturn ?? (CARDS.some(c => c.id === initialCard) ? initialCard : null)
+    guideReturn = null
+    return v
+  })
+  // Oli can route to a card while the guide is already open: follow it. Not on mount, where the state above
+  // already chose (and a return from Exchange Rates must keep its card).
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return }
+    if (CARDS.some(c => c.id === initialCard)) setActiveCard(initialCard)
+  }, [initialCard])
   const hubMem = useScrollMemory('guide:hub')
   useEffect(() => () => { if (!guideLeavingVia) forgetScroll('guide:'); guideLeavingVia = false }, [])
   const toRates = () => { guideReturn = activeCard; guideLeavingVia = true; onShowExchangeRates?.() }

@@ -709,6 +709,8 @@ export default function App() {
   // row screen 1 has already loaded. Cleared with the module, not with the sub-screen.
   const [connectivityOperator, setConnectivityOperator] = useState(null)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
+  const [newcomerCard, setNewcomerCard] = useState(null)   // a Welcome Guide card to open on entry (Ask Oli routes)
+  useEffect(() => { if (!showNewcomerEssentials) setNewcomerCard(null) }, [showNewcomerEssentials])
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [showLiveScores, setShowLiveScores] = useState(false)
   // A score editor (live_score_editors) sees the Live Scores tile while LIVE_SCORES_LIVE is false,
@@ -2330,7 +2332,8 @@ export default function App() {
     content = (
       <NewcomerEssentialsScreen
         lang={lang}
-        onBack={() => setShowNewcomerEssentials(false)}
+        initialCard={newcomerCard}
+        onBack={() => { setShowNewcomerEssentials(false); setNewcomerCard(null) }}
         onShowExchangeRates={() => setShowExchangeRates(true)}
         backRef={guideBackRef}
       />
@@ -2965,6 +2968,15 @@ export default function App() {
       // Reached only from the guided chat (OLI_CHAT): neither id is in OLI_INTENTS, which the search sheet uses.
       case 'nearby':        setShowExplore(true); break
       case 'eatery':        setShowEatery(true); break
+      // Guided chat routes to the exact page (constants/oliIntents.js CHAT_ROUTES).
+      case 'borders': case 'ports': case 'embassies': case 'holidays': case 'driving': case 'living':
+        setNewcomerCard(target); setShowNewcomerEssentials(true); break
+      case 'esim':          setShowEsim(true); break
+      case 'ehliyet':       setShowEhliyet(true); break
+      case 'hotels':        setShowHotels(true); break
+      case 'studentHub':    setShowStudentHub(true); break
+      case 'duyurular':     setShowDuyurular(true); break
+      case 'insurance':     setShowInsurance(true); break
     }
   }
 

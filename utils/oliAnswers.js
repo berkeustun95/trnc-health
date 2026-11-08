@@ -7,6 +7,7 @@ import { localDateKey } from './dutyStatus'
 import { dateLocale, t, LANG_CODES } from '../constants/i18n'
 import { EATERY_CATEGORY_KEY } from '../constants/eatery'
 import { REGION_LABEL_KEY } from '../constants/regions'
+import { MODULE_FLAGS } from '../constants/flags'
 
 // ─── Ask Oli answer providers ────────────────────────────────────────────────
 // The ONE seam between the chat sheet and whatever answers it. A provider is
@@ -14,7 +15,7 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 // and OliAnswer is what oli_messages.payload stores (20261163), so history renders the same whichever provider
 // wrote it:
 //   { v: 1, kind, intent, items: [{ t, s, a }], day, types? }
-//     kind    pharmacy | events | nearby | needLocation | eatery | route | search | noMatch | error
+//     kind    pharmacy | events | nearby | needLocation | eatery | route | soon | search | noMatch | error
 //     intent  the matched intent id (constants/oliIntents.js), or null
 //     items   rows shown under the answer: t title, s subtitle, a action
 //             ({ nav: <oliNavigate target> } | { result: <search_content row> } | { event: <id> })
@@ -29,6 +30,8 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 export const ANSWER_VERSION = 1
 const MAX_ITEMS = 6
 const NEARBY_KM = 25
+// Modules switched off in production open a Coming Soon page: Oli says so ('soon') instead of offering a button.
+const DARK = { jobs: !MODULE_FLAGS.jobs, transport: !MODULE_FLAGS.transport, insurance: !MODULE_FLAGS.insurance }
 
 const answerOf = (kind, intent = null, items = [], now = new Date(), types = []) =>
   ({ v: ANSWER_VERSION, kind, intent, items, day: localDateKey(now), ...(types.length ? { types } : {}) })
@@ -148,6 +151,9 @@ export const guidedProvider = {
   id: 'guided',
   async answer({ text = '', intentId = null, lang, userLocation = null, now = new Date() }) {
     const { intent, types } = intentId ? { intent: getIntent(intentId), types: [] } : resolveOliChat(text)
+    // A topic ADA has no content on: the honest "I don't know", without a search that would only match a word.
+    if (intent?.gap) return answerOf('noMatch', null, [], now)
+    if (DARK[intent?.id]) return answerOf('soon', intent.id, [], now)
     try {
       switch (intent?.id) {
         case 'pharmacy': return answerOf('pharmacy', 'pharmacy', await dutyToday(now), now)
