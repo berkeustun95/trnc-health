@@ -62,7 +62,8 @@ import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
 import { AD_SPONSORED_KEY } from '../constants/ads.js'
 import { PET_PARTNERS, PENDING_KEYS as PET_PENDING_KEYS, petPartnerSections } from '../constants/petPartners.js'
 import { REGULATORY_KEYS as PETS_REGULATORY_KEYS, REGULATORY_LOCALES } from '../constants/petsContent.js'
-import { FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY } from '../constants/cars.js'
+import { FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY,
+  MY_STATE_LABEL_KEY, CAR_ERROR_KEY, REJECT_REASON_KEY } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -74,6 +75,9 @@ const SURFACES = [
   'screens/CarDetailScreen.js',
   'screens/DealerScreen.js',
   'components/cars/VehicleCard.js',
+  // S3 (2026-11-08): posting, İlanlarım. Status labels, server-error keys and rejection reasons come from constants/cars.js maps.
+  'screens/CarPostScreen.js',
+  'screens/MyCarsScreen.js',
   // ⚠ ADDED 2026-09-20 WITH THE CAROUSEL REBUILD, IN THE SAME COMMIT — not after.
   //   Same argument as ProfileSetupScreen below: that is the only screen every user is
   //   FORCED through, and this is the other one. It is the FIRST screen of a fresh
@@ -379,6 +383,12 @@ const SAME_AS_ENGLISH = {
   'carsColourOrange': { French: 'Orange is French', German: 'Orange is German' },
   'carsColourBeige': { French: 'Beige is French', Spanish: 'Beige is Spanish', German: 'Beige is German' },
   'carsColourGold': { German: 'Gold is German' },
+  // S3 (2026-11-08): posting form.
+  'carsPostModel': { Turkish: 'Model is the Turkish word' },
+  'carsPostOptional': { German: 'Optional is German' },
+  'carsPostPhotos': { French: 'Photos is French' },
+  'carsPostRegion': { French: 'District is French (as carsFilterDistrict)' },
+  'carsPostWhatsapp': { Turkish: 'WhatsApp is a brand name', Russian: 'WhatsApp is a brand name', Greek: 'WhatsApp is a brand name', French: 'WhatsApp is a brand name', Spanish: 'WhatsApp is a brand name', German: 'WhatsApp is a brand name' },
   // Ehliyet action labels: product names, shown untranslated in every locale.
   'ehliyetInstagram': { Turkish: 'Instagram is a brand name', Arabic: 'Instagram is a brand name', Russian: 'Instagram is a brand name', Greek: 'Instagram is a brand name', French: 'Instagram is a brand name', Spanish: 'Instagram is a brand name', German: 'Instagram is a brand name', Persian: 'Instagram is a brand name' },
   'ehliyetWhatsApp': { Turkish: 'WhatsApp is a brand name', Arabic: 'WhatsApp is a brand name', Russian: 'WhatsApp is a brand name', Greek: 'WhatsApp is a brand name', French: 'WhatsApp is a brand name', Spanish: 'WhatsApp is a brand name', German: 'WhatsApp is a brand name', Persian: 'WhatsApp is a brand name' },
@@ -678,7 +688,14 @@ const viaVariable = [
   // field — so nothing else in this file can see them at all.
   ...PETS_REGULATORY_KEYS,
   // Araçlar enum labels (fuel, gearbox, body, colour, steering, sale/rent/all), each a t(MAP[code]) lookup.
-  ...[FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY].flatMap(m => Object.values(m)),
+  ...[FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY, INTENT_LABEL_KEY,
+    MY_STATE_LABEL_KEY, CAR_ERROR_KEY, REJECT_REASON_KEY].flatMap(m => Object.values(m)),
+  // carFormError() returns these; App.js opens the gates with the account / DOB ones; the admin tab notifies with these.
+  'carsPostErrIntent', 'carsPostErrMake', 'carsPostErrModel', 'carsPostErrYear', 'carsPostErrKm', 'carsPostErrSpecs', 'carsPostErrPrice',
+  'carsPostErrRegion', 'carsPostErrPhoneFormat', 'carsPostErrContact', 'carsPostErrDescription', 'carsPostErrPhotos',
+  'carsPostAccount', 'carsMineAccount', 'carsPostNeedsDob', 'carsPostSentTitle', 'carsPostSentBody', 'carsPostUpdatedTitle',
+  'carsPostUpdatedBody', 'carsPostPhotoFailed', 'carsNotifApprovedTitle', 'carsNotifApprovedBody', 'carsNotifRejectedTitle',
+  'carsNotifRejectedBody', 'carsReportTitle', 'carsReportSub',
   // The result count goes through tCount (no literal t('…') to scan). _one/_other exist in every locale; ru's _few/_many have no English twin.
   'carsResultCount_one', 'carsResultCount_other',
 ]
