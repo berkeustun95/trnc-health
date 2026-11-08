@@ -1467,7 +1467,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('places_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
     ('places_source_pair_check', '', 'source|source_id'),
     ('places_source_source_id_key', '', 'source|source_id'),
-    ('places_status_check', 'active|pending|rejected', 'status'),
+    ('places_status_check', 'active|pending|rejected|staged', 'status'),
     ('places_submitted_by_fkey', '', ''),
     ('profiles_age_ineligible_no_dob_check', '', 'age_ineligible|date_of_birth'),
     ('profiles_completion_requires_fields_check', 'student', 'date_of_birth|display_name|first_name|last_name|nationality_code|profile_completed_at|region|resident_status|student_level'),
