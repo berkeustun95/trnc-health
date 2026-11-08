@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
+    "@bacons/apple-targets": "5.0.0",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",
@@ -33,6 +34,7 @@
     "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-android-widget": "0.24.0",
     "react-native-maps": "1.20.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-url-polyfill": "^3.0.0",
@@ -58,6 +60,7 @@
     "ios:build": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 build --platform ios --profile production --non-interactive --no-wait",
     "ios:submit": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 submit --platform ios --profile production --latest --non-interactive",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "widgets:check": "node scripts/gen-widget-strings.mjs --check",
     "easignore:check": "node scripts/check-easignore.mjs && node scripts/check-easignore.mjs --self",
     "conn:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-connectivity-content.mjs",
     "native:safe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs",

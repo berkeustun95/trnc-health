@@ -66,6 +66,8 @@ const GUARDED = [
   // expo-video, expo-splash-screen, expo-system-ui (native splash, 1.4.2): added after the 1.4.1
   // binaries shipped, so a top-level import would crash those on an OTA. require() in a function.
   'expo-video', 'expo-splash-screen', 'expo-system-ui',
+  // Home-screen widgets (1.4.3): utils/widgets.js requires them only after a native-module check.
+  '@bacons/apple-targets', 'react-native-android-widget',
 ]
 
 const SKIP = new Set(['node_modules', '.git', 'assets', 'docs', 'web', 'supabase', 'scripts'])

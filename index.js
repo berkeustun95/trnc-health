@@ -1,5 +1,6 @@
 import { registerRootComponent } from 'expo';
 import App from './App';
+import { registerWidgets } from './utils/widgets';
 
 // In development the root is wrapped so the UI audits can install and the
 // EXPO_PUBLIC_DEV_LANG / EXPO_PUBLIC_DEV_ONBOARDED launch arguments can be seeded before
@@ -30,5 +31,8 @@ let Root = App;
 if (__DEV__) {
   Root = require('./utils/devRoot').default;
 }
+
+// Android home-screen widgets' headless task (no-op without the native module: Expo Go, < 1.4.3).
+registerWidgets();
 
 registerRootComponent(Root);

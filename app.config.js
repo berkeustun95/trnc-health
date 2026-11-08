@@ -35,11 +35,32 @@ const APP_ID = IS_PREVIEW ? 'com.berkeustun95.ada.preview' : 'com.berkeustun95.a
 // the two bundle ids and to "Maps SDK for iOS". A change needs a native build.
 const IOS_GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_IOS_API_KEY
 
+// ─── Home-screen widgets (1.4.3; vault 10-ada/2026-11-08_home-widgets-PLAN.md) ──────────
+// iOS: targets/widgets (WidgetKit via @bacons/apple-targets) reads the App Group the app writes
+// (utils/widgets.js); one group per variant, so ADA Preview never shares data with ADA.
+// Android: react-native-android-widget; gallery label/description per OS language come from
+// plugins/withWidgetStrings.js (widgets/strings.json).
+const IOS_APP_GROUP = `group.${APP_ID}`
+const WIDGET_STRINGS = JSON.parse(readFileSync(join(__dirname, 'widgets/strings.json'), 'utf8'))
+const ANDROID_WIDGETS = [
+  {
+    name: 'Shortcuts',
+    label: '@string/widget_shortcuts_label',
+    description: WIDGET_STRINGS.en.shortcutsDesc,
+    minWidth: '110dp',
+    minHeight: '110dp',
+    targetCellWidth: 2,
+    targetCellHeight: 2,
+    resizeMode: 'horizontal|vertical',
+    previewImage: './assets/widgets/shortcuts-preview.png',
+  },
+]
+
 export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
-    version: '1.4.2',
+    version: '1.4.3',
     orientation: 'portrait',
     icon: IS_PREVIEW ? './assets/brand/v2/preview-icon.png' : './assets/brand/v2/icon.png',
     splash: {
@@ -72,6 +93,8 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: APP_ID,
+      appleTeamId: 'MAQ8XPJ8Z6',
+      entitlements: { 'com.apple.security.application-groups': [IOS_APP_GROUP] },
       usesAppleSignIn: true,
       minimumOsVersion: '14.0',
       ...(IOS_GOOGLE_MAPS_KEY ? { config: { googleMapsApiKey: IOS_GOOGLE_MAPS_KEY } } : {}),
@@ -119,6 +142,18 @@ export default {
       favicon: './assets/favicon.png',
     },
     plugins: [
+      '@bacons/apple-targets',
+      [
+        'react-native-android-widget',
+        {
+          fonts: [
+            './node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf',
+            './node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf',
+          ],
+          widgets: ANDROID_WIDGETS,
+        },
+      ],
+      './plugins/withWidgetStrings',
       '@react-native-community/datetimepicker',
       // Native splash = the 1.4.1 look: the v2 logo on white. BootSplash.js draws an identical frame
       // (MorphFrame) and cross-fades it into the clip's first still. Every value is set: the props
@@ -216,6 +251,7 @@ export default {
       // Preview only — the key does not exist in the production config (diffed).
       // constants/redesign.js reads it to turn the redesign on in ADA Preview builds.
       ...(IS_PREVIEW ? { appVariant: 'preview' } : {}),
+      widgetAppGroup: IOS_APP_GROUP,
       eas: {
         projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c',
       },

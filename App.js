@@ -28,7 +28,7 @@ import { supabase, isGuest } from './lib/supabase'
 import { fetchNotifications } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
-import { t, LANGUAGES } from './constants/i18n'
+import { t, LANGUAGES, LANG_CODES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
@@ -126,6 +126,7 @@ import SudokuScreen from './screens/games/SudokuScreen'
 import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { dutyStatus, localDateKey, DUTY_FRESH } from './utils/dutyStatus'
 import { parseAdaRoute } from './utils/deepLinkRoutes'
+import { syncWidgets } from './utils/widgets'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
   loadCityWelcomeState, shouldAskHomeCity, markAskShown, setHomeCity,
@@ -1730,6 +1731,8 @@ export default function App() {
   }, [cityWelcomeVisible, cityWelcome?.region])
 
   const lang = profile?.preferred_language || pendingLang
+  // Home-screen widgets show ADA's language, not the phone's.
+  useEffect(() => { syncWidgets(LANG_CODES[lang] ?? 'en') }, [lang])
 
   if (showPasswordReset) {
     return (
