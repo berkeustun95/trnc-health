@@ -85,15 +85,24 @@ const VISIT: Record<string, string> = {
 // reads "Musıc" — so unknown words fall to English. Mixed-case titles are the organiser's: left as written.
 const TR_LETTERS = /[ÇĞİÖŞÜ]/
 const TR_I_STEMS = ['KIBRIS', 'KIZ', 'KADIN', 'BALIK', 'ALTIN', 'YIL', 'SALI']
+// English words that pass the back-vowel test below; in a Turkish title they stay English.
+const EN_BACK = new Set(['MUSIC', 'DISCO', 'RADIO', 'STUDIO', 'AUDIO', 'FINAL', 'INDOOR', 'OUTDOOR', 'TOUR', 'ROCK', 'JAZZ', 'COMIC', 'CLASSIC', 'TROPICAL', 'LATINO', 'ACOUSTIC'])
 const ACRONYMS = new Set(['ADA', 'KKTC', 'TRNC', 'EMU', 'DAÜ', 'YDÜ', 'NEU', 'GAÜ', 'LAÜ', 'UKÜ', 'ODTÜ', 'CIU', 'UKU', 'BAU', 'KSTU', 'ARUCAD', 'UEFA', 'FIFA', 'VIP', 'MMA', 'UK', 'USA', 'ABD', 'BBC', 'NYE', 'EDM', 'DJ', 'TV', 'AI'])
 const SMALL = new Set(['VE', 'İLE', 'ILE', 'DE', 'DA', 'YA', 'VEYA', 'AND', 'THE', 'OF', 'IN', 'AT', 'FOR', 'WITH', 'A', 'AN', 'TO', 'ON', 'BY', 'VS.', 'VS', '&'])
 
-function wordCase(w: string, first: boolean): string {
+// Turkish vowel harmony: a native word with a dotless ı has only back vowels (A I O U). Two or more of
+// them, in a title already Turkish, reads as Turkish (KIRMIZI → Kırmızı); one vowel stays English (PIG).
+function backHarmony(letters: string): boolean {
+  const v = letters.match(/[AEIİOÖUÜ]/g) || []
+  return letters.includes('I') && v.length >= 2 && v.every(c => 'AIOU'.includes(c)) && !EN_BACK.has(letters)
+}
+
+function wordCase(w: string, first: boolean, trTitle: boolean): string {
   const letters = w.replace(/[^\p{L}]/gu, '')
   if (!letters || /\d/.test(w)) return w
   if (!first && SMALL.has(w)) return w.toLocaleLowerCase(TR_LETTERS.test(w) ? 'tr' : 'en')
   if (ACRONYMS.has(letters) || (letters.length <= 4 && !/[AEIİOUÖÜ]/.test(letters))) return w
-  const tr = TR_LETTERS.test(w) || TR_I_STEMS.some(st => letters.startsWith(st))
+  const tr = TR_LETTERS.test(w) || TR_I_STEMS.some(st => letters.startsWith(st)) || (trTitle && backHarmony(letters))
   const loc = tr ? 'tr' : 'en'
   // Capitalise after a hyphen or slash (KIDS-FEST → Kids-Fest), never after an apostrophe (LEFKOŞA'DA → Lefkoşa'da).
   return w.toLocaleLowerCase(loc).replace(/(^|[-/])(\p{L})/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase(loc))
@@ -104,7 +113,8 @@ export function readableTitle(title: string): string {
   const letters = t.replace(/[^\p{L}]/gu, '')
   const upper = letters.replace(/[^\p{Lu}]/gu, '').length
   if (letters.length < 4 || upper / letters.length < 0.8) return t
-  return t.split(/(\s+)/).map((w, i) => /\s/.test(w) ? w : wordCase(w, i === 0)).join('')
+  const trTitle = TR_LETTERS.test(t) || /(^|\s)(VE|İLE|ILE)(\s|$)/.test(t)
+  return t.split(/(\s+)/).map((w, i) => /\s/.test(w) ? w : wordCase(w, i === 0, trTitle)).join('')
 }
 
 export function digestMessage(lang: string, events: DigestEvent[], place: DigestPlace | null): { title: string; body: string } {
