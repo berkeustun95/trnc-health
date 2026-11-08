@@ -868,6 +868,12 @@ export default function ExploreMapScreen({
     () => index.getClusters(regionToBBox(region), regionToZoom(region, width)),
     [index, region, width]
   )
+  // Partners on top: Google Maps (Android) draws equal-zIndex markers in the order they were ADDED, and a
+  // marker's zIndex never reaches the native view on the new architecture (measured on the Preview phone,
+  // prop and style both). Cluster and pin markers are re-added as the clusters change, so the partner
+  // markers re-mount with them — always added last. Three markers, cached logos.
+  const partnerGen = useRef(0)
+  const partnerKey = useMemo(() => ++partnerGen.current, [clusters])
 
   // Hotels: read on first entry (102 rows, only the pin + card columns), clustered on their own index
   // so a hotel never merges with a place bubble. A failed read leaves the layer empty, nothing else.
@@ -1044,7 +1050,7 @@ export default function ExploreMapScreen({
           )
         })}
         {!routesMode && !eventsMode && !hotelsMode && partnerPins.map(pin => (
-          <PartnerMarker key={pin.id} pin={pin} onPress={() => setSelected(pin)} />
+          <PartnerMarker key={`${pin.id}:${partnerKey}`} pin={pin} onPress={() => setSelected(pin)} />
         ))}
       </MapView>
       {/* Facility pins are partly OSM-sourced (geocoding policy): ODbL credit. */}

@@ -41,9 +41,9 @@ export function PartnerMarker({ pin, onPress }) {
   const tracks = useBriefTracking(loaded)
   return (
     <Marker coordinate={{ latitude: pin.lat, longitude: pin.lng }} tracksViewChanges={tracks} anchor={{ x: 0.5, y: 0.5 }}
-      // zIndex in STYLE too: on the new architecture (Expo 54) a bare zIndex prop is treated as a style
-      // attribute and never reaches the native marker — measured on the Preview phone, clusters drew over partners.
-      zIndex={1000} style={m.onTop} onPress={e => { e.stopPropagation(); onPress() }}>
+      // zIndex does not reach the native marker on the new architecture (prop or style, measured); the
+      // screen re-mounts this marker after the clusters instead (ExploreMapScreen partnerKey). Kept for iOS.
+      zIndex={1000} onPress={e => { e.stopPropagation(); onPress() }}>
       <View collapsable={false} style={m.partnerWrap}>
         <View collapsable={false} style={m.partner}>
           {uri
@@ -59,7 +59,6 @@ export function PartnerMarker({ pin, onPress }) {
 }
 
 const m = StyleSheet.create({
-  onTop:       { zIndex: 1000 },
   disc:        { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   // Row layout + negative margin keeps the badge inside the snapshot bounds (the stage 2 marker-badge fix).
   partnerWrap: { flexDirection: 'row', padding: 2 },
