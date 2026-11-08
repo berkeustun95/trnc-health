@@ -27,10 +27,35 @@ const admin = createClient(SB_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
+// The body, but never more than `max` bytes of it: a client that sends no Content-Length (or lies) cannot make the
+// function buffer an unbounded body. null = over the cap.
+async function readCapped(req: Request, max: number): Promise<Uint8Array | null> {
+  if (!req.body) return new Uint8Array(0)
+  const reader = req.body.getReader()
+  const parts: Uint8Array[] = []
+  let n = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    n += value.length
+    if (n > max) { await reader.cancel(); return null }
+    parts.push(value)
+  }
+  const out = new Uint8Array(n)
+  let p = 0
+  for (const v of parts) { out.set(v, p); p += v.length }
+  return out
+}
+
 Deno.serve(async req => {
   if (req.method !== 'POST') return json(405, { error: 'METHOD' })
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+  // A declared oversized body is refused before anything else; the body itself is read with a cap (readCapped).
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BYTES) return json(413, { error: 'TOO_LARGE' })
+
   const { data: { user } = { user: null }, error: authErr } = await admin.auth.getUser(jwt)
+  // An auth outage is not the caller's fault: 503, so the app says "try again", not "sign in again".
+  if (authErr && !(authErr.status && authErr.status < 500)) { console.error('vehicle-photo: auth', authErr.status ?? 'network'); return json(503, { error: 'AUTH_UNAVAILABLE' }) }
   if (authErr || !user || user.is_anonymous === true) return json(401, { error: 'NOT_SIGNED_IN' })
 
   const vehicleId = (req.headers.get('x-vehicle-id') ?? '').toLowerCase()
@@ -43,9 +68,9 @@ Deno.serve(async req => {
   if (!v || v.owner_id !== user.id || v.source !== 'private') return json(403, { error: 'NOT_YOURS' })
   if (v.status !== 'pending') return json(409, { error: 'VEHICLE_STATUS' })
 
-  const raw = new Uint8Array(await req.arrayBuffer())
+  const raw = await readCapped(req, MAX_BYTES)
+  if (raw === null) return json(413, { error: 'TOO_LARGE' })
   if (raw.length === 0) return json(400, { error: 'BAD_REQUEST' })
-  if (raw.length > MAX_BYTES) return json(413, { error: 'TOO_LARGE' })
 
   let clean: { format: string; bytes: Uint8Array }
   try { clean = stripImageMetadata(raw) } catch (e) {
@@ -68,9 +93,14 @@ Deno.serve(async req => {
   const { data: row, error: rowErr } = await asCaller.from('vehicle_images')
     .insert({ vehicle_id: vehicleId, storage_path: path, sort_order: sortOrder, is_primary: primary }).select('id').single()
   if (rowErr || !row) {
-    await admin.storage.from(BUCKET).remove([path])
-    const limit = String(rowErr?.message ?? '').includes('VEHICLE_PHOTO_LIMIT')
-    return json(limit ? 409 : 403, { error: limit ? 'VEHICLE_PHOTO_LIMIT' : 'VEHICLE_STATUS' })
+    // The file is already clean, so a failed removal leaves only an orphan (swept nightly), never a leak.
+    const { error: rmErr } = await admin.storage.from(BUCKET).remove([path])
+    if (rmErr) console.error('vehicle-photo: cleanup', rmErr.name)
+    if (String(rowErr?.message ?? '').includes('VEHICLE_PHOTO_LIMIT')) return json(409, { error: 'VEHICLE_PHOTO_LIMIT' })
+    // 42501 = the row policy refused it: the listing stopped being pending (or the caller's) since the check above.
+    if (rowErr?.code === '42501') return json(409, { error: 'VEHICLE_STATUS' })
+    console.error('vehicle-photo: row', rowErr?.code ?? 'none')
+    return json(500, { error: 'STORE_FAILED' })
   }
   return json(200, { id: row.id, path })
 })
