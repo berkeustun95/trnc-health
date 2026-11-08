@@ -47,7 +47,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 
 Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersiniz ya da kendi yüklediğiniz bir görsel kullanılır; yüklenen görsel dosya depolamamızda saklanır.
 
-Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğunuz sorulara gelen cevapları gönderebilmek için saklanır. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
+Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğunuz sorulara gelen cevapları gönderebilmek için saklanır. Ayrıca isteğe bağlı Cuma notu için kullanılır: hafta sonunun etkinlikleri ve gezilecek bir yer; Profil → «Bilgilendirmeler ve fırsatlar» bölümünden kapatabilirsiniz. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
 

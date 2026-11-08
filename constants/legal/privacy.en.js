@@ -47,7 +47,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
 
-Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. You can disable this in your device settings at any time.
+Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. Also used for an optional Friday note with the weekend's events and a place to visit; turn it off in Profile → Updates and offers. You can disable this in your device settings at any time.
 
 Reviews, questions and answers you submit.
 

@@ -1,5 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.177.0/testing/asserts.ts'
-import { weekendWindow, inWindow, weekPick, digestMessage } from './digest.ts'
+import { weekendWindow, inWindow, weekPick, digestMessage, readableTitle } from './digest.ts'
 
 const iso = (d: Date) => d.toISOString()
 
@@ -34,7 +34,7 @@ Deno.test('weekPick: same week same pick, next week moves on', () => {
   assertEquals(weekPick([], new Date()), null)
 })
 
-Deno.test('message: two names, the rest counted, a place in the reader language; titles as written', () => {
+Deno.test('message: two names, the rest counted, a place in the reader language; ALL-CAPS titles re-cased', () => {
   const ev = [
     { title: 'PEPPA PIG ÇOCUK TİYATROSU', start_date: '', end_date: null },
     { title: 'Murda Konseri', start_date: '', end_date: null },
@@ -43,7 +43,27 @@ Deno.test('message: two names, the rest counted, a place in the reader language;
   const place = { name: 'Bellapais Abbey', name_i18n: { en: 'Bellapais Abbey', tr: 'Bellapais Manastırı' } }
   assertEquals(digestMessage('Turkish', ev, place), {
     title: "🎉 Bu hafta sonu ADA'da",
-    body: 'PEPPA PIG ÇOCUK TİYATROSU · Murda Konseri +2 etkinlik daha\nGezmek için: Bellapais Manastırı',
+    body: 'Peppa Pig Çocuk Tiyatrosu · Murda Konseri +2 etkinlik daha\nGezmek için: Bellapais Manastırı',
   })
-  assertEquals(digestMessage('Klingon', ev.slice(0, 1), null).body, 'PEPPA PIG ÇOCUK TİYATROSU')
+  assertEquals(digestMessage('Klingon', ev.slice(0, 1), null).body, 'Peppa Pig Çocuk Tiyatrosu')
+})
+
+Deno.test('readableTitle: ALL CAPS → normal casing, Turkish and English per word, acronyms kept', () => {
+  assertEquals([
+    readableTitle('PEPPA PIG ÇOCUK TİYATROSU'),
+    readableTitle('TOM VE JERRY - KIBRIS KIDS FEST'),
+    readableTitle('BOEING BOEING'),
+    readableTitle("DJ ARDA İLE YILBAŞI PARTİSİ LEFKOŞA'DA"),
+    readableTitle('KKTC CUP 2026: EMU VS. NEU'),
+    readableTitle('Murda Konseri'),
+    readableTitle('ODTÜ'),
+  ], [
+    'Peppa Pig Çocuk Tiyatrosu',
+    'Tom ve Jerry - Kıbrıs Kids Fest',
+    'Boeing Boeing',
+    "DJ Arda ile Yılbaşı Partisi Lefkoşa'da",
+    'KKTC Cup 2026: EMU vs. NEU',
+    'Murda Konseri',
+    'ODTÜ',
+  ])
 })
