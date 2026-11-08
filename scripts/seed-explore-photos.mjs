@@ -73,7 +73,6 @@
 // service_role is required: these rows have provider_id NULL and no RLS role may write
 // them.
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -83,7 +82,7 @@ import sharp from 'sharp'
 import { legacyCreditString } from '../utils/photoAttribution.js'
 import { categoryToGroup, groupVisible, GROUP_ORDER, GROUP_TILE_THRESHOLD, LIVE_TILE_GROUPS }
   from '../constants/exploreCategories.js'
-import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -115,7 +114,7 @@ const UA = 'ADA-TRNC-Health/1.0 (berke.ustun95@gmail.com) explore-photo-mirror'
 
 const APPLY = process.argv.includes('--apply')
 // No workflow: its manifest (data/explore-photo-manifest.json) is not in the repo.
-prodWriteGuard({ wouldWrite: APPLY, workflow: null, dryHint: 'node scripts/seed-explore-photos.mjs' })
+prodWriteGuard({ wouldWrite: APPLY, workflow: 'explore-photos', dryHint: 'node scripts/seed-explore-photos.mjs' })
 
 // --only <uuid|name substring> narrows the run to one place. Everything downstream —
 // validation, the probe, the rollback block — then covers exactly what was written and
@@ -184,29 +183,15 @@ if (existsSync(resolve(ROOT, '.env'))) {
 }
 if (!process.env.EXPO_PUBLIC_SUPABASE_URL) fail('EXPO_PUBLIC_SUPABASE_URL missing — expected in .env')
 
-function serviceRoleKey() {
-  let out
-  try {
-    out = execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-  } catch {
-    fail('Keychain entry "ada-supabase-service-role" not found.', '',
-      'Create it with:', '  security add-generic-password -a "$USER" -s ada-supabase-service-role -w')
-  }
-  const key = out.trim()
-  if (!key) fail('Keychain entry "ada-supabase-service-role" is empty.')
-  if (key.startsWith('sb_publishable_')) {
-    fail('Keychain holds the PUBLISHABLE key, not the secret one.',
-      'It is bound by RLS and cannot update rows with provider_id NULL.')
-  }
-  return key
-}
+// The service key: SUPABASE_SERVICE_ROLE_KEY on the runner (workflow explore-photos), the Keychain only for a
+// local dry run where one still exists — scripts/lib/prod-write-guard.mjs, shared by every production writer.
 
 // The anon key is enough to READ the current state, and a dry run must never need a
 // secret. Only --apply reaches for the Keychain.
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL,
-  APPLY ? serviceRoleKey() : process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  // The runner has no anon key (production-storage holds the service key + URL only): its dry run reads with it.
+  APPLY || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? serviceRoleKey() : process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   { auth: { persistSession: false, autoRefreshToken: false } })
 
 // ─── 1. Manifest validation — refuse rather than write something wrong ───────

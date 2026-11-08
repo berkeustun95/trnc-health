@@ -544,6 +544,7 @@ WITH report AS (
   FROM (VALUES
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
     ('1103_duty_push_famagusta','duty_push_due'),
+    ('20261177_weekend_digest_schedule','weekend_digest_due'),
     ('1103_duty_push_famagusta','duty_thursday_closing_local'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','check_in_google'),
