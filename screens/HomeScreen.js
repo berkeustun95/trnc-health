@@ -1946,7 +1946,7 @@ const s = StyleSheet.create({
   cardBody:         { padding: 16 },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
   dutyCardBadge:    { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
-  dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, letterSpacing: 0.2 },
   cardMain:         { flexDirection: 'row', alignItems: 'center' },
   cardNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
   cardActions:      { flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginLeft: 6, alignSelf: 'stretch', paddingVertical: 2 },

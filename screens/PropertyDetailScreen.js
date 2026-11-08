@@ -670,9 +670,9 @@ const ds = StyleSheet.create({
   body:               { padding: 20 },
   badgeRow:           { flexDirection: 'row', gap: 6, marginBottom: 10 },
   typeBadge:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.surface },
-  typeBadgeText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase' },
+  typeBadgeText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   intentBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.primaryLight },
-  intentBadgeText:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.3 },
+  intentBadgeText:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.3 },
 
   title:              { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 27 },
   price:              { fontSize: 24, fontFamily: 'Inter_700Bold', color: colors.primary, marginTop: 8 },
@@ -683,7 +683,7 @@ const ds = StyleSheet.create({
   devName:            { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4 },
 
   divider:            { height: 1, backgroundColor: colors.border, marginVertical: 20 },
-  sectionLabel:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+  sectionLabel:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.2, marginBottom: 12 },
 
   factGrid:           { flexDirection: 'row', flexWrap: 'wrap' },
   fact:               { width: '50%', paddingVertical: 8, paddingRight: 12 },

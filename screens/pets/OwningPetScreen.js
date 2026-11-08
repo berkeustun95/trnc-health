@@ -117,7 +117,7 @@ const s = StyleSheet.create({
   safe:              { flex: 1 },
   scroll:            { flex: 1 },
   scrollContent:     { padding: 16, paddingBottom: 48 },
-  sectionHeader:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, marginBottom: 10, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionHeader:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondaryOnPage, marginBottom: 10, marginTop: 12, letterSpacing: 0.2 },
 
   infoCard:          { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 14, marginBottom: 4, ...shadow },
   infoCardBody:      { fontSize: 13, color: colors.textSecondary, fontFamily: 'Inter_400Regular', lineHeight: 19 },

@@ -887,10 +887,10 @@ const legacy = StyleSheet.create({
   detailTitle:        { fontSize: 24, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, marginBottom: 20, lineHeight: 30 },
   detailRow:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
   detailIconWrap:     { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  detailRowLabel:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  detailRowLabel:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 2 },
   detailRowValue:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20 },
   descBlock:          { marginTop: 8, padding: 16, backgroundColor: colors.bg, borderRadius: 14 },
-  descTitle:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
+  descTitle:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 8 },
   descText:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
 
   // Fullscreen viewer

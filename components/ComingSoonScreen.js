@@ -117,7 +117,7 @@ const s = StyleSheet.create({
   mascot:       { width: 116, height: 116, borderRadius: 58 },
 
   badge:        { backgroundColor: colors.tintServiceBg, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 14, marginBottom: 14 },
-  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, textTransform: 'uppercase', letterSpacing: 0.6 },
+  badgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.tintServiceFg, letterSpacing: 0.2 },
 
   title:        { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
   bodyText:     { fontSize: 15, color: colors.textSecondaryOnPage, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
