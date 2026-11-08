@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import {
   priceOrFilter, fxComplete, tryPerUnit, carPrice, carContact, waUrl, contactRegion, pushCarsLayer, sortedImages, VEHICLE_COLS, PRICE_BANDS,
   normalizePhone, parseAmount, carFormError, carPayload, carForm, myCarState, canRenew, canEdit, daysLeft, openListingCount,
-  carErrorKey, photoCleanupReason, rejectionText, MY_VEHICLE_COLS, layerKey,
+  carErrorKey, carErrorText, photoCleanupReason, rejectionText, MY_VEHICLE_COLS, layerKey,
 } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -115,6 +115,7 @@ check('the cap counts pending + live private only', openListingCount([
   { source: 'private', status: 'active', expires_at: iso(NOW - day) }, { source: 'private', status: 'rejected' }, { source: 'private', status: 'removed' }], NOW) === 2)
 check('server codes map to keys', carErrorKey({ message: 'VEHICLE_LIMIT' }) === 'carsErrLimit' && carErrorKey({ message: 'UNDER_18' }) === 'carsErrUnder18'
   && carErrorKey({ message: 'BLOCKED_TERM' }) === 'contentBlockedTerm' && carErrorKey({ message: 'boom' }) === 'carsErrGeneric' && carErrorKey(null) === 'carsErrGeneric')
+check('the limit message names the cap', carErrorText({ message: 'VEHICLE_LIMIT' }, () => 'up to {n}') === 'up to 3')
 check('a rejection code is translated, a note is shown as written', rejectionText('photos', k => `<${k}>`) === '<carsRejectPhotos>' && rejectionText('Plate visible in photo 3', k => k) === 'Plate visible in photo 3')
 
 const v = (o) => ({ source: 'private', status: 'active', updated_at: iso(NOW), hidden_at: null, ...o })

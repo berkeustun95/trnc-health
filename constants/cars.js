@@ -263,6 +263,8 @@ export function carErrorKey(error) {
   const code = Object.keys(CAR_ERROR_KEY).find(k => m.includes(k))
   return code ? CAR_ERROR_KEY[code] : 'carsErrGeneric'
 }
+// The message itself: carsErrLimit names the cap as {n}, so it can never drift from OPEN_LISTING_CAP.
+export const carErrorText = (error, tr) => tr(carErrorKey(error)).replace('{n}', String(OPEN_LISTING_CAP))
 
 // ─── PHOTO CLEANUP (scripts/cleanup-vehicle-photos.mjs) ─────────────────────
 // When a private listing's photo files are deleted. removed is final (the owner cannot undo it); rejected can be

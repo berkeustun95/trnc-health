@@ -10,7 +10,7 @@ import { colors, type, radii, elevation, press, listBottomPad } from '../constan
 import { t } from '../constants/i18n'
 import {
   MY_VEHICLE_COLS, MY_STATE_LABEL_KEY, OPEN_LISTING_CAP, myCarState, daysLeft, canRenew, canEdit, openListingCount,
-  sortedImages, carErrorKey, rejectionText,
+  sortedImages, carErrorText, rejectionText,
 } from '../constants/cars'
 
 // ─── İlanlarım: the seller's own listings in every state ────────────────────
@@ -108,7 +108,7 @@ export default function MyCarsScreen({ lang, onBack, onPost, onEdit, onOpenCar, 
     setBusy(`${car.id}:renew`)
     const { error } = await supabase.rpc('renew_vehicle', { p_id: car.id })
     setBusy(null)
-    if (error) { Alert.alert(t('carsMineRenew', lang), t(carErrorKey(error), lang)); return }
+    if (error) { Alert.alert(t('carsMineRenew', lang), carErrorText(error, k => t(k, lang))); return }
     load()
   }
 
@@ -120,7 +120,7 @@ export default function MyCarsScreen({ lang, onBack, onPost, onEdit, onOpenCar, 
           setBusy(`${car.id}:remove`)
           const { data, error } = await supabase.from('vehicles').update({ status: 'removed' }).eq('id', car.id).select('id')
           setBusy(null)
-          if (error || !data?.length) { Alert.alert(t('carsMineRemove', lang), t(carErrorKey(error), lang)); return }
+          if (error || !data?.length) { Alert.alert(t('carsMineRemove', lang), carErrorText(error, k => t(k, lang))); return }
           load()
         },
       },

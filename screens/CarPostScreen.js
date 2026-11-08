@@ -17,7 +17,7 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import {
   VEHICLE_BUCKET, MAX_PHOTOS, POST_INTENTS, FUELS, GEARBOXES, BODIES, COLOURS, STEERINGS, CURRENCIES, CURRENCY_SYMBOL,
   INTENT_LABEL_KEY, FUEL_LABEL_KEY, GEARBOX_LABEL_KEY, BODY_LABEL_KEY, COLOUR_LABEL_KEY, STEERING_LABEL_KEY,
-  carForm, carFormError, carPayload, carErrorKey, sortedImages,
+  carForm, carFormError, carPayload, carErrorText, sortedImages,
 } from '../constants/cars'
 
 // ─── İlan ver / edit a private listing ──────────────────────────────────────
@@ -222,7 +222,7 @@ export default function CarPostScreen({ session, lang, car = null, profilePhone 
       const failed = await uploadNew(car.id, photos)
       onSaved?.({ id: car.id, created: false, photoFailures: failed })
     } catch (e) {
-      setError(t(carErrorKey(e), lang))
+      setError(carErrorText(e, k => t(k, lang)))
     } finally {
       setSaving(false)
     }
