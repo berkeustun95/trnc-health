@@ -47,6 +47,9 @@ export const MODULE_PHOTO = {
   eatery:         require('../../assets/backgrounds/ada-bg-eatery.webp'),
   notifications:  require('../../assets/backgrounds/ada-bg-notifications.webp'),
   studentHub:     require('../../assets/backgrounds/ada-bg-student-hub.webp'),
+  // Dükkân (2026-11-08): 1536×2752 source, 1275-wide crop shifted right to x 220 so the guitar and
+  // the bike's front wheel stay whole, resized to 704×1520, WebP q72.
+  marketplace:    require('../../assets/backgrounds/ada-bg-marketplace.webp'),
 }
 
 // fullBleed: the photo from the very top, under the status bar — main's Sağlık facility list
