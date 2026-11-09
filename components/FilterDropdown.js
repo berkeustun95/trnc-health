@@ -32,6 +32,7 @@ export default function FilterDropdown({
   allowAll = true,               // false: a required choice — no "Tümü" row (Towing's region)
   variant = 'pill',              // 'field': full-width form field
   open: openProp, onOpenChange,  // optional controlled open state
+  searchPlaceholder = null,      // the search box hint (shown past 10 options); default: search by name or address
   style,
 }) {
   const insets = useSafeAreaInsets()
@@ -98,7 +99,7 @@ export default function FilterDropdown({
             <View style={st.searchWrap}>
               <Feather name="search" size={15} color={colors.textSecondary} />
               <TextInput style={st.search} value={query} onChangeText={setQuery}
-                placeholder={t('searchPlaceholder', lang)} placeholderTextColor={colors.textSecondary} />
+                placeholder={searchPlaceholder ?? t('searchPlaceholder', lang)} placeholderTextColor={colors.textSecondary} />
             </View>
           )}
           <ScrollView style={st.list} keyboardShouldPersistTaps="handled">
