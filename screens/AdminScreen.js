@@ -17,6 +17,8 @@ import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
 import GaragesScreen from './GaragesScreen'
 import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '../constants/cars'
+import { MARKETPLACE } from '../constants/redesign'
+import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoCount, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
 // expire. Requires an admin storage.objects SELECT policy on the bucket.
@@ -43,6 +45,17 @@ async function openSignedDoc(bucket, storedValue) {
 // becomes visible and can be raised. Every admin write whose success matters goes through
 // here — a write that silently does nothing is worse than one that fails loudly, because
 // the queue gets cleared either way and only one of them tells you.
+// Hide or restore reported content. A Bandabuliya listing goes through admin_set_listing_hidden; everything else is a
+// direct update, as before.
+async function setHiddenOrAlert(contentType, id, hidden, label) {
+  if (contentType === 'listing') {
+    try { await adminSetHidden(id, hidden); return true }
+    catch (e) { Alert.alert(`${label} failed`, e?.message ?? 'Unknown error. Nothing was changed and the report has been left open.'); return false }
+  }
+  return updateOrAlert(CONTENT_TABLE[contentType],
+    hidden ? { hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' } : { hidden_at: null, hidden_reason: null }, id, label)
+}
+
 async function updateOrAlert(table, patch, id, label) {
   const { data, error } = await supabase.from(table).update(patch).eq('id', id).select('id')
   if (error || !data?.length) {
@@ -87,7 +100,7 @@ const ROLES = ['customer', 'provider', 'admin']
 // Turning a partner OFF still needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
   'HomeServices',
-  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', 'Moderation']
+  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -404,10 +417,11 @@ function DailyBars({ daily }) {
   )
 }
 
-function UserCounts({ onOpenTools, onOpenReports, onOpenCars }) {
+function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace }) {
   const [counts, setCounts] = useState(null)
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingCars, setPendingCars] = useState(0)
+  const [pendingMkPhotos, setPendingMkPhotos] = useState(0)
   const [novestLastSeen, setNovestLastSeen] = useState(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -421,6 +435,7 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars }) {
       supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     ])
     setPendingCars(carsError ? null : carsCount)
+    if (MARKETPLACE) setPendingMkPhotos(await adminPendingPhotoCount())
     setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
@@ -470,12 +485,27 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars }) {
     </TouchableOpacity>
   )
 
+  // Bandabuliya photos waiting for review (only where the module is reachable). Same null rule.
+  const mkRow = MARKETPLACE && pendingMkPhotos !== 0 && (
+    <TouchableOpacity style={s.urgencyCard} onPress={onOpenMarketplace} activeOpacity={0.75}>
+      <View style={[s.urgencyDot, { backgroundColor: colors.danger }]} />
+      <Text style={s.urgencyLabel}>{pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review'}</Text>
+      {pendingMkPhotos !== null && (
+        <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
+          <Text style={s.urgencyCount}>{pendingMkPhotos}</Text>
+        </View>
+      )}
+      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+
   if (!counts) {
     if (!failed) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
     return (
       <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
         {reportsRow}
         {carsRow}
+        {mkRow}
         <FeedHealthBanner lastSeenAt={novestLastSeen} />
         <View style={s.allClearBox}>
           <Text style={s.allClearText}>User counts could not be loaded.</Text>
@@ -496,6 +526,7 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars }) {
     >
       {reportsRow}
       {carsRow}
+      {mkRow}
       <FeedHealthBanner lastSeenAt={novestLastSeen} />
       <View style={s.totalCard}>
         <Text style={s.totalValue}>{formatCount(counts.total - TEST_ACCOUNTS)}</Text>
@@ -593,7 +624,8 @@ function DashboardTab({ onNavigate }) {
           .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       ])
       const pendingPlaces = pendingPlacesCount ?? 0
-      setStats({ novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingCars, pendingReports, esimTotal, esimTourist, esimStudent })
+      const pendingMkPhotos = MARKETPLACE ? await adminPendingPhotoCount() : 0
+      setStats({ pendingMkPhotos, novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingCars, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -622,6 +654,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Places to review',                count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
     (stats.pendingCars ?? 0)         > 0 && { label: 'Car listings to approve',          count: stats.pendingCars,            tab: 'Cars',         color: colors.danger },
+    (stats.pendingMkPhotos ?? 0)     > 0 && { label: 'Bandabuliya photos to review',     count: stats.pendingMkPhotos,        tab: 'Bandabuliya',  color: colors.danger },
   ].filter(Boolean)
 
   return (
@@ -671,7 +704,7 @@ function DashboardTab({ onNavigate }) {
 // are one triage decision, not N. Oldest first: the queue is SLA-bound (we
 // publish a 24h removal commitment in the Terms).
 
-const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other' }
+const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other', prohibited_item: 'Prohibited item' }
 // 'profile' (20261026) is READ here but never WRITTEN: profiles has no hidden_at, and
 // what "hidden" should mean for a person is a decision that has not been made. Its row
 // is fetched so the report renders as itself; every write action is suppressed below.
@@ -687,11 +720,11 @@ const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam:
 //   thread around it and not the conversation metadata. Every action below runs off a
 //   pending report, so the policy is satisfied; if a report row were deleted mid-action,
 //   updateOrAlert's "0 rows changed — most likely an RLS policy" branch is what fires.
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles', message: 'messages', vehicle: 'vehicles' }
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles', message: 'messages', vehicle: 'vehicles', listing: 'marketplace_listings' }
 // messages.sender_id is ON DELETE SET NULL, so a reported message whose author deleted
 // their account has NO author to ban. confirmBan already refuses on a null authorId.
 // vehicles.owner_id is NULL for dealer and imported listings: there is no author to ban, and the button is not shown.
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id', vehicle: 'owner_id' }
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id', vehicle: 'owner_id', listing: 'owner_id' }
 // Types whose author column the client may NOT read, so it comes from admin_content_author()
 // instead. reviews.customer_id is revoked by 20261033: it is the only person-uuid on a
 // truly public table, and once the Student Hub is live get_student_list() turns it into a
@@ -700,12 +733,14 @@ const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer:
 // written back under, and confirmBan reads it there.
 // vehicles.owner_id is not client-readable at all (20261165); admin_content_author answers for it since 20261181.
 const AUTHOR_VIA_RPC = new Set(['review', 'vehicle'])
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body', vehicle: 'description' }
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body', vehicle: 'description', listing: 'description' }
 // Columns only SOME tables have. messages carries deleted_at — the sender withdrew it —
 // and an admin who could not see that would judge a message the participants can no longer
 // see, without knowing it. Selecting it unconditionally would 42703 every other type and
 // empty the whole queue, which is the trap the profile branch below already documents.
-const EXTRA_COLS     = { message: ['deleted_at'], vehicle: ['make', 'model', 'year', 'status'] }
+// A Bandabuliya listing (20261183): owner_id is client-readable (admins read every row), so its seller resolves by
+// column, not through admin_content_author; hiding goes through admin_set_listing_hidden (setHiddenOrAlert).
+const EXTRA_COLS     = { message: ['deleted_at'], vehicle: ['make', 'model', 'year', 'status'], listing: ['title', 'status', 'deleted_at'] }
 // Types whose remedy is not built. Read-only in triage: Dismiss is the only action.
 const READ_ONLY_REPORT_TYPES = ['profile']
 
@@ -758,7 +793,7 @@ function ReportsTab({ session }) {
     //   the maps but not here is silently never fetched: `g.content` stays null and the
     //   card renders "Content no longer exists — the author likely deleted their account",
     //   which is a lie an admin would act on by dismissing a real report.
-    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile', 'message', 'vehicle']) {
+    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile', 'message', 'vehicle', 'listing']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
       // profiles has no hidden_at/hidden_reason — selecting them would 42703 the whole
@@ -855,15 +890,12 @@ function ReportsTab({ session }) {
     // Bail BEFORE resolveReports. A failed hide that still cleared the queue is the
     // exact shape of the six-week bug: the report disappears and the content stays up.
     // Leaving the report open is recoverable; clearing it is not.
-    const wrote = await updateOrAlert(
-      CONTENT_TABLE[g.contentType],
-      { hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' },
-      g.contentId, 'Remove')
+    const wrote = await setHiddenOrAlert(g.contentType, g.contentId, true, 'Remove')
     if (!wrote) { setBusy(null); load(); return }
     await resolveReports(g, 'actioned')
     // Facilities are HIDDEN (recoverable), not deleted — say so, matching the owner
     // "listing hidden" banner. review/question/answer keep the "removed" wording.
-    if (g.contentType === 'facility' || g.contentType === 'place' || g.contentType === 'vehicle') {
+    if (g.contentType === 'facility' || g.contentType === 'place' || g.contentType === 'vehicle' || g.contentType === 'listing') {
       await notifyAuthor(g, 'notifListingHiddenTitle', 'notifListingHiddenBody')
     } else {
       await notifyAuthor(g, 'notifContentRemovedTitle', 'notifContentRemovedBody')
@@ -873,15 +905,12 @@ function ReportsTab({ session }) {
 
   async function restoreContent(g) {
     setBusy(g.key)
-    const wrote = await updateOrAlert(
-      CONTENT_TABLE[g.contentType],
-      { hidden_at: null, hidden_reason: null },
-      g.contentId, 'Restore')
+    const wrote = await setHiddenOrAlert(g.contentType, g.contentId, false, 'Restore')
     if (!wrote) { setBusy(null); load(); return }
     await resolveReports(g, 'dismissed')
     // Only facilities get a restore push — the owner saw the "hidden" banner and
     // should learn it's back. review/question/answer restores stay silent (unchanged).
-    if (g.contentType === 'facility' || g.contentType === 'place' || g.contentType === 'vehicle') {
+    if (g.contentType === 'facility' || g.contentType === 'place' || g.contentType === 'vehicle' || g.contentType === 'listing') {
       await notifyAuthor(g, 'notifListingVisibleTitle', 'notifListingVisibleBody')
     }
     setBusy(null); load()
@@ -902,10 +931,7 @@ function ReportsTab({ session }) {
     // that protects users and honours the 24h promise; an unbanned author who can no
     // longer see their post is a smaller failure than a banned author whose content is
     // still up. Both are checked, and neither clears the queue on its own.
-    const hid = await updateOrAlert(
-      CONTENT_TABLE[g.contentType],
-      { hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' },
-      g.contentId, 'Remove')
+    const hid = await setHiddenOrAlert(g.contentType, g.contentId, true, 'Remove')
     if (!hid) { setBusy(null); load(); return }
     const banned = await updateOrAlert(
       'profiles', { ugc_banned_until: until.toISOString() }, authorId, 'Ban')
@@ -961,6 +987,8 @@ function ReportsTab({ session }) {
         // A car listing reads as "Toyota Corolla 2018 — <description>": the description alone may be empty.
         const text        = g.contentType === 'vehicle' && g.content
           ? [`${g.content.make} ${g.content.model} ${g.content.year}`, g.content.description].filter(Boolean).join(' — ')
+          : g.contentType === 'listing' && g.content
+          ? [g.content.title, g.content.description].filter(Boolean).join(' — ')
           : g.content?.[TEXT_COL[g.contentType]]
         const readOnly    = READ_ONLY_REPORT_TYPES.includes(g.contentType)
         const reasonCount = g.reports.reduce((acc, r) => ({ ...acc, [r.reason]: (acc[r.reason] ?? 0) + 1 }), {})
@@ -4229,6 +4257,157 @@ function CarsTab() {
   )
 }
 
+// ─── Bandabuliya (slice 5) ──────────────────────────────────────────────────
+// Photos: the pending queue, oldest first. Approve sends the photo through marketplace-photo-review (resize, metadata
+// stripped and re-checked, then published); Reject asks for one of the six reasons the seller is shown.
+// Hidden: listings hidden by a report (ONE report hides one, 20261183 — red, decide within the 24 h SLA) or by an
+// admin; Restore / Hide go through admin_set_listing_hidden. Recent: the newest 100, to take one down by hand.
+// Report triage itself stays in the Reports tab (type 'listing'), where Ban is.
+const MK_ADMIN_VIEWS = ['Photos', 'Hidden', 'Recent']
+const MK_REASON_LABEL = { not_item: 'Not the item', inappropriate: 'Inappropriate', prohibited: 'Prohibited item',
+  contact_info: 'Contact info in photo', low_quality: 'Low quality', other: 'Other' }
+const MK_REVIEW_ERROR = {
+  ALREADY_REVIEWED: 'Someone already reviewed this photo, or the seller removed it.',
+  TRANSFORM_FAILED: 'Storage could not resize the photo. Try again; if it repeats, reject it as low quality.',
+  CORRUPT: 'The file is not a readable photo, or its metadata could not be removed. Reject it.',
+  NOT_ADMIN: 'This account is not an admin.',
+}
+
+function MarketplaceTab() {
+  const [view, setView]       = useState('Photos')
+  const [rows, setRows]       = useState(null)
+  const [urls, setUrls]       = useState({})
+  const [busy, setBusy]       = useState(null)
+  const [rejectFor, setRejectFor] = useState(null)
+
+  const load = useCallback(async () => {
+    setRows(null); setRejectFor(null)
+    try {
+      if (view === 'Photos') {
+        const q = await adminPhotoQueue()
+        setUrls(await signedUrls(q.map(p => p.storage_path)))
+        setRows(q)
+      } else {
+        setRows(await adminListings(view === 'Hidden' ? 'hidden' : 'recent'))
+      }
+    } catch (e) { Alert.alert('Could not load Bandabuliya', e?.message ?? 'Unknown error'); setRows([]) }
+  }, [view])
+  useEffect(() => { load() }, [load])
+
+  async function review(photo, action, reason) {
+    setBusy(photo.id)
+    try { await adminReviewPhoto(photo.id, action, reason) }
+    catch (e) { Alert.alert(action === 'approve' ? 'Approve failed' : 'Reject failed', MK_REVIEW_ERROR[e.message] ?? `${e.message}. Nothing was published.`) }
+    setBusy(null); load()
+  }
+  async function setHidden(listing, hidden) {
+    setBusy(listing.id)
+    try { await adminSetHidden(listing.id, hidden) } catch (e) { Alert.alert(hidden ? 'Hide failed' : 'Restore failed', e?.message ?? 'Unknown error') }
+    setBusy(null); load()
+  }
+
+  const renderPhoto = ({ item }) => {
+    const url = urls[item.storage_path]
+    const gone = !item.listing || item.listing.deleted_at
+    return (
+      <View style={s.card}>
+        <View style={[s.cardRow, { alignItems: 'flex-start', gap: 12 }]}>
+          <TouchableOpacity disabled={!url} onPress={() => url && Linking.openURL(url)}>
+            {url
+              ? <Image source={{ uri: url }} style={{ width: 120, height: 120, borderRadius: 8, backgroundColor: colors.border }} />
+              : <View style={{ width: 120, height: 120, borderRadius: 8, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="image-outline" size={28} color={colors.textSecondary} />
+                </View>}
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={s.cardTitle} numberOfLines={2}>{item.listing?.title ?? 'Listing not found'}</Text>
+            <Text style={s.cardSub}>Photo {item.position + 1} · submitted {timeAgo(item.created_at)}</Text>
+            {gone && <Text style={[s.cardSub, { color: colors.danger }]}>The listing was deleted — reject or leave it for the nightly sweep.</Text>}
+            {!!item.listing?.hidden_at && <Text style={[s.cardSub, { color: colors.danger }]}>The listing is hidden (see Hidden).</Text>}
+            <Text style={s.cardSub}>Approving publishes a resized copy with every bit of metadata removed (location included).</Text>
+          </View>
+        </View>
+        {busy === item.id
+          ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 10 }} />
+          : rejectFor === item.id ? (
+            <View style={[s.chipRow, { flexWrap: 'wrap', marginTop: 10 }]}>
+              {MK_REJECT_REASONS.map(r => (
+                <TouchableOpacity key={r} style={s.chip} onPress={() => review(item, 'reject', r)}>
+                  <Text style={s.chipText}>{MK_REASON_LABEL[r]}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={s.chip} onPress={() => setRejectFor(null)}><Text style={s.chipText}>Cancel</Text></TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.reportActions}>
+              <TouchableOpacity style={[s.ghostBtn, gone && { opacity: 0.4 }]} disabled={!!gone} onPress={() => review(item, 'approve')}>
+                <Text style={s.ghostBtnText}>Approve</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectFor(item.id)}>
+                <Text style={s.dangerGhostText}>Reject…</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+      </View>
+    )
+  }
+
+  const renderListing = ({ item }) => {
+    const reported = item.hidden_reason === 'auto_reports'
+    return (
+      <View style={[s.card, reported && { borderLeftWidth: 4, borderLeftColor: colors.danger }]}>
+        <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.cardTitle}>{item.title}</Text>
+            <Text style={s.cardSub}>{item.is_free ? 'Free' : `₺${item.price_tl}`} · {item.category} · posted {timeAgo(item.created_at)}</Text>
+            {reported && <Text style={[s.cardSub, { color: colors.danger }]}>Hidden by a report {timeAgo(item.hidden_at)} — decide in the Reports tab (24h SLA), or restore here.</Text>}
+            {item.hidden_reason === 'admin_removed' && <Text style={s.cardSub}>Hidden by an admin {timeAgo(item.hidden_at)}</Text>}
+          </View>
+          <View style={[s.pillGrey, { backgroundColor: colors.border }]}>
+            <Text style={[s.pillText, { color: colors.textPrimary }]}>{item.hidden_at ? 'hidden' : item.status}</Text>
+          </View>
+        </View>
+        {!!item.description && <Text style={[s.reportBody, { marginTop: 8 }]} numberOfLines={4}>{item.description}</Text>}
+        {busy === item.id
+          ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 10 }} />
+          : (
+            <View style={s.reportActions}>
+              {item.hidden_at
+                ? <TouchableOpacity style={s.ghostBtn} onPress={() => setHidden(item, false)}><Text style={s.ghostBtnText}>Restore</Text></TouchableOpacity>
+                : <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setHidden(item, true)}><Text style={s.dangerGhostText}>Hide</Text></TouchableOpacity>}
+            </View>
+          )}
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+        <View style={[s.chipRow, { marginBottom: 12 }]}>
+          {MK_ADMIN_VIEWS.map(v => (
+            <TouchableOpacity key={v} style={[s.chip, view === v && s.chipActive]} onPress={() => setView(v)}>
+              <Text style={[s.chipText, view === v && s.chipTextActive]}>{v}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+      {!rows
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={rows}
+            keyExtractor={r => r.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={view === 'Photos' ? 'No photos waiting.' : view === 'Hidden' ? 'No hidden listings.' : 'No listings yet.'} />}
+            renderItem={view === 'Photos' ? renderPhoto : renderListing}
+          />
+        )}
+    </View>
+  )
+}
+
 function JobPostingsTab() {
   const [jobs,           setJobs]           = useState([])
   const [loading,        setLoading]        = useState(true)
@@ -4826,6 +5005,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
             onOpenTools={() => { setTab('Dashboard'); setToolsOpen(true) }}
             onOpenReports={() => { setTab('Reports'); setToolsOpen(true) }}
             onOpenCars={() => { setTab('Cars'); setToolsOpen(true) }}
+            onOpenMarketplace={() => { setTab('Bandabuliya'); setToolsOpen(true) }}
           />
         </View>
       </SafeAreaView>
@@ -4921,6 +5101,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'PlaceClaims'   && <PlaceClaimsTab session={session} />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
           {tab === 'Cars'          && <CarsTab />}
+          {tab === 'Bandabuliya'   && <MarketplaceTab />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>

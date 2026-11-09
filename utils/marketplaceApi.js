@@ -267,6 +267,81 @@ function fxAct(rpc, args) {
   return ok(null)
 }
 
+// ─── Admin (slice 5): the photo queue and listing visibility ─────────────────────────────────────
+// Admins read every row (20261183's admin read policies). A photo decision goes through the
+// marketplace-photo-review function (approval re-encodes the file; there is no UPDATE policy); hide / restore
+// through admin_set_listing_hidden, the one admin writer of hidden_*. Sample-data branches, as above.
+export const MK_REJECT_REASONS = ['not_item', 'inappropriate', 'prohibited', 'contact_info', 'low_quality', 'other']
+const ADMIN_LISTING_COLS = 'id, owner_id, title, description, price_tl, is_free, category, status, created_at, expires_at, hidden_at, hidden_reason, deleted_at'
+
+export async function adminPhotoQueue() {
+  if (fixture) return fxPhotoQueue()
+  const { data, error } = await supabase.from('marketplace_photos')
+    .select('id, listing_id, owner_id, position, storage_path, created_at')
+    .eq('status', 'pending').order('created_at', { ascending: true }).limit(100)
+  if (error) { if (useFixtureOr(error)) return fxPhotoQueue(); throw error }
+  const ids = [...new Set(data.map(p => p.listing_id))]
+  const { data: ls, error: lErr } = ids.length
+    ? await supabase.from('marketplace_listings').select('id, title, hidden_at, deleted_at').in('id', ids)
+    : { data: [], error: null }
+  if (lErr) throw lErr
+  const byId = Object.fromEntries(ls.map(l => [l.id, l]))
+  return data.map(p => ({ ...p, listing: byId[p.listing_id] ?? null }))
+}
+
+// → resolves on success; throws Error(code), code being the function's own (ALREADY_REVIEWED, TRANSFORM_FAILED, …).
+export async function adminReviewPhoto(photoId, action, reason = null) {
+  if (fixture) {
+    const p = fixture.photos.find(x => x.id === photoId)
+    if (!p || p.status !== 'pending') throw new Error('ALREADY_REVIEWED')
+    Object.assign(p, action === 'approve' ? { status: 'approved' } : { status: 'rejected', reject_reason: reason })
+    return
+  }
+  const { error } = await supabase.functions.invoke('marketplace-photo-review', { body: { photo_id: photoId, action, reason } })
+  if (!error) return
+  let code = 'REVIEW_FAILED'
+  try { code = (await error.context.json())?.error || code } catch { /* not a JSON answer: not deployed, or offline */ }
+  throw new Error(code)
+}
+
+// view: 'hidden' (hidden, not deleted — reported first) | 'recent' (newest 100, any state)
+export async function adminListings(view) {
+  if (fixture) return fxAdminListings(view)
+  let q = supabase.from('marketplace_listings').select(ADMIN_LISTING_COLS).is('deleted_at', null)
+  q = view === 'hidden' ? q.not('hidden_at', 'is', null).order('hidden_at', { ascending: false }) : q.order('created_at', { ascending: false })
+  const { data, error } = await q.limit(100)
+  if (error) { if (useFixtureOr(error)) return fxAdminListings(view); throw error }
+  return data
+}
+
+export async function adminSetHidden(id, hidden) {
+  if (fixture) {
+    const l = fixture.listings.find(x => x.id === id)
+    Object.assign(l, hidden ? { hidden_at: l.hidden_at || new Date().toISOString(), hidden_reason: 'admin_removed' } : { hidden_at: null, hidden_reason: null })
+    return
+  }
+  const { error } = await supabase.rpc('admin_set_listing_hidden', { p_listing_id: id, p_hidden: hidden })
+  if (error) throw error
+}
+
+// null = could not be read (shown, not hidden as a zero — the AdminScreen rule).
+export async function adminPendingPhotoCount() {
+  if (fixture) return fxPhotoQueue().length
+  const { count, error } = await supabase.from('marketplace_photos').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+  if (error) { if (useFixtureOr(error)) return fxPhotoQueue().length; return null }
+  return count
+}
+
+function fxPhotoQueue() {
+  return fixture.photos.filter(p => p.status === 'pending')
+    .map(p => ({ ...p, owner_id: fixture.listings.find(l => l.id === p.listing_id)?.owner_id, created_at: p.created_at || new Date().toISOString(),
+      listing: fixture.listings.find(l => l.id === p.listing_id) ?? null }))
+}
+function fxAdminListings(view) {
+  const rows = fixture.listings.filter(l => !l.deleted_at)
+  return view === 'hidden' ? rows.filter(l => l.hidden_at) : [...rows].sort(byNewest)
+}
+
 // base64 → ArrayBuffer, the same helper the other upload screens carry (no base64-arraybuffer dependency).
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -336,7 +411,11 @@ function seedFixture() {
       mk('fx-2', 'Çalışma masası ve sandalye', 'Ahşap masa 120×60, döner sandalye. Taşınma nedeniyle satılık.', 2500, 'home', 'used', 'nicosia', 2),
       mk('fx-3', 'Üniversite hazırlık kitapları', 'Matematik ve fizik setleri. Ücretsiz, gelip alman yeterli.', null, 'books', 'used', 'famagusta', 4),
       mk('fx-4', 'Bebek arabası', 'Katlanır, yağmurluğu var. Temiz kullanıldı.', 3200, 'baby_kids', 'like_new', 'morphou', 6),
+      // For the admin tab: hidden by one report (20261183's auto-hide), waiting for a decision.
+      { ...mk('fx-6', 'Orijinal marka saat, faturasız', 'Kutusu yok, acil satılık.', 900, 'fashion', 'used', 'famagusta', 3),
+        hidden_at: ago(1), hidden_reason: 'auto_reports' },
     ],
-    photos: [],
+    // For the admin tab's photo queue (no file behind it: the tile shows a placeholder).
+    photos: [{ id: 'fx-p-0', listing_id: 'fx-1', position: 0, status: 'pending', storage_path: 'pending/fx-seller/fx-1/0.jpg', reject_reason: null, created_at: ago(0.1) }],
   }
 }
