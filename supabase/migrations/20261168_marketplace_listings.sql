@@ -744,7 +744,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261168_marketplace_listings.sql', '7f6d96d6b2d84aadbdf8f45f61613a5fd0c6329a15565f9ff8425a1140786bbb')
+VALUES ('20261168_marketplace_listings.sql', '38bbde3927af6941791a5a13b047362ad092352f28a93e4f81d944fa7ec5997f')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
