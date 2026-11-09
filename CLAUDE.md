@@ -117,6 +117,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
   `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
+- **Release holds** (`release-holds.json`, `scripts/check-release-holds.mjs`, Berke 2026-11-08): a merge on main
+  that is NOT cleared for production. `npm run ota` refuses while HEAD contains an uncleared hold; no env override.
+  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. Held now: #349 Explore combined.
 - **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
   refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`

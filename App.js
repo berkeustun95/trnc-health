@@ -34,7 +34,8 @@ import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, EXPLORE_ROUTES_LIVE, HOTELS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, CARS } from './constants/redesign'
-import { pushCarsLayer } from './constants/cars'
+import { pushCarsLayer, layerKey } from './constants/cars'
+import { isAdultForOrder } from './constants/eatery'
 import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
@@ -84,6 +85,8 @@ import TowingScreen from './screens/TowingScreen'
 import EhliyetScreen from './screens/EhliyetScreen'
 import CarsScreen from './screens/CarsScreen'
 import CarDetailScreen from './screens/CarDetailScreen'
+import CarPostScreen from './screens/CarPostScreen'
+import MyCarsScreen from './screens/MyCarsScreen'
 import DealerScreen from './screens/DealerScreen'
 import EateryScreen from './screens/EateryScreen'
 import EsimScreen from './screens/EsimScreen'
@@ -690,6 +693,27 @@ export default function App() {
   useEffect(() => { if (!showCars) setCarsStack([]) }, [showCars])
   const openCarsLayer = layer => setCarsStack(st => pushCarsLayer(st, layer))
   const closeCarsLayer = () => setCarsStack(st => st.slice(0, -1))
+  const [carsMineReload, setCarsMineReload] = useState(0)
+  // İlan ver / edit: signed-in adults only. The server refuses the rest too (vehicles_guard: NO_DOB / UNDER_18 /
+  // UGC_BANNED); checking here first spares somebody a long form that cannot be sent. ADULT_AGE via isAdultForOrder.
+  function openCarPost(car = null) {
+    if (requireAccount('carsPostAccount')) return
+    if (!profile?.date_of_birth) { requireProfileCompletion('carsPostNeedsDob'); return }
+    if (!isAdultForOrder(profile.date_of_birth)) { Alert.alert(t('carsPostTitle', lang), t('carsErrUnder18', lang)); return }
+    openCarsLayer({ kind: 'post', car })
+  }
+  function openMyCars() {
+    if (requireAccount('carsMineAccount')) return
+    openCarsLayer({ kind: 'mine' })
+  }
+  // After a save: the form closes and İlanlarım is where the listing's status lives, so it opens (or reloads) there.
+  function carSaved({ created, photoFailures }) {
+    setCarsStack(st => pushCarsLayer(st.filter(l => l.kind !== 'post'), { kind: 'mine' }))
+    setCarsMineReload(n => n + 1)
+    const body = t(created ? 'carsPostSentBody' : 'carsPostUpdatedBody', lang)
+    Alert.alert(t(created ? 'carsPostSentTitle' : 'carsPostUpdatedTitle', lang),
+      photoFailures ? `${body}\n\n${t('carsPostPhotoFailed', lang)}` : body)
+  }
   const [showEatery, setShowEatery] = useState(false)
   const [eateryPartner, setEateryPartner] = useState(null)   // the partner row open inside Yeme-İçme
   // Explore map pin -> partner page. The pin hands a slug (its row has no menu / contacts); EateryScreen
@@ -2579,12 +2603,19 @@ export default function App() {
     // Each layer is an overlay over the still-mounted list (filters, pages, scroll kept).
     content = (
       <View style={{ flex: 1 }}>
-        <CarsScreen lang={lang} onBack={() => setShowCars(false)} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
+        <CarsScreen lang={lang} onBack={() => setShowCars(false)} onOpenCar={car => openCarsLayer({ kind: 'car', car })}
+          onPost={() => openCarPost()} onMine={openMyCars} />
         {carsStack.map(layer => (
-          <View key={layer.kind + ':' + (layer.car?.id || layer.dealer?.id)} style={styles.moduleOverlay}>
+          <View key={layerKey(layer)} style={styles.moduleOverlay}>
             {layer.kind === 'car'
-              ? <CarDetailScreen car={layer.car} lang={lang} onBack={closeCarsLayer} onOpenDealer={dealer => openCarsLayer({ kind: 'dealer', dealer })} />
-              : <DealerScreen dealer={layer.dealer} lang={lang} onBack={closeCarsLayer} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />}
+              ? <CarDetailScreen car={layer.car} lang={lang} onBack={closeCarsLayer} onOpenDealer={dealer => openCarsLayer({ kind: 'dealer', dealer })} onRequireAccount={requireAccount} />
+              : layer.kind === 'dealer'
+                ? <DealerScreen dealer={layer.dealer} lang={lang} onBack={closeCarsLayer} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
+                : layer.kind === 'mine'
+                  ? <MyCarsScreen lang={lang} reloadKey={carsMineReload} onBack={closeCarsLayer} onPost={() => openCarPost()}
+                      onEdit={car => openCarPost(car)} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
+                  : <CarPostScreen session={session} lang={lang} car={layer.car} profilePhone={profile?.phone ?? null}
+                      onBack={closeCarsLayer} onSaved={carSaved} />}
           </View>
         ))}
       </View>

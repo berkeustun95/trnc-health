@@ -15,7 +15,7 @@ import { freshDb, applyFile as applyRaw } from './migration-harness.mjs'
 
 const mig = f => fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url))
 const RELEASE = ['20261164_shared_adult_age.sql', '20261165_vehicles.sql', '20261166_vehicles_moderation.sql', '20261167_cars_waitlist_notify.sql',
-  '20261181_vehicle_admin_author.sql'].map(mig)
+  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql'].map(mig)
 const read = f => readFileSync(mig(f), 'utf8')
 
 // Slice `CREATE … FUNCTION <name>(` up to its closing dollar-quote terminator, from an earlier migration.
@@ -310,7 +310,10 @@ async function behaviour(d) {
   // v4 is the owner's PENDING listing, v2 their APPROVED one.
   const obj = (who, name, opts) => as(d, who, `INSERT INTO storage.objects (bucket_id, name) VALUES ('vehicle-images', '${name}') RETURNING id`, opts)
   const f4 = `${v4}/${randomUUID()}.jpg`
-  t('upload into your own pending listing', (await obj('owner', f4)).ok, true)
+  // 20261182: no client uploads at all, not even the owner into their pending listing; the vehicle-photo function
+  // (service key, Exif stripped) writes the file. Simulated here as postgres.
+  t('the owner cannot upload directly, even into their own pending listing (20261182)', (await obj('owner', f4)).ok, false)
+  await as(d, 'postgres', `INSERT INTO storage.objects (bucket_id, name) VALUES ('vehicle-images', '${f4}')`)
   t('upload into your own APPROVED listing is refused (no photo swap after review)', (await obj('owner', `${v2}/${randomUUID()}.jpg`)).ok, false)
   t('upload into someone else\'s pending listing is refused', (await obj('owner2', `${v4}/${randomUUID()}.jpg`)).ok, false)
   t('upload into a folder with no listing is refused (not an image host)', (await obj('owner', `${randomUUID()}/${randomUUID()}.jpg`)).ok, false)
@@ -340,7 +343,7 @@ async function behaviour(d) {
 console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const { d, r } = await ready()
-  t('the five files apply, including their own assertions', r, { ok: true, msg: null })
+  t('the six files apply, including their own assertions', r, { ok: true, msg: null })
   if (r.ok) await behaviour(d)
 }
 // ── verify_schema tokens: the release's own H tokens must read TRUE on the migrated fixture and not on a fresh one.
@@ -348,7 +351,7 @@ console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const tokens = []
-  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|20261181_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
+  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[12]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
   let m
   while ((m = re.exec(vs))) {
     if (m[1].startsWith('10') && !/is_adult_on|vehicle/.test(m[2])) continue
@@ -399,6 +402,7 @@ await refused('dealers get a client write policy', mutantFile(1, 'dw', 'DROP POL
 await refused('live contact_events list differs (eatery missing in production)', RELEASE, FIXTURE({ contactMods: MODS16.filter(m => m !== 'eatery') }))
 await refused('auto-hide gains more than the vehicle branch', mutantFile(2, 'ah', "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  END IF;", "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  ELSIF NEW.content_type = 'profile' THEN\n    NULL;\n  END IF;"))
 await refused('admin_content_author gains more than the vehicle branch', mutantFile(4, 'aca', "    ELSE RAISE EXCEPTION 'UNSUPPORTED_CONTENT_TYPE: %', p_content_type;", "    WHEN 'dealer'   THEN v_author := NULL;\n    ELSE RAISE EXCEPTION 'UNSUPPORTED_CONTENT_TYPE: %', p_content_type;"))
+await refused('the client upload policy is kept (20261182 must drop it)', mutantFile(5, 'up', 'DROP POLICY "vehicle_images_upload" ON storage.objects;', ''))
 await refused('admin_content_author loses its admin gate', mutantFile(4, 'acg', "  IF NOT is_admin() THEN\n    RAISE EXCEPTION 'ADMIN_ONLY';\n  END IF;\n", ''))
 await refused('report hide policy made permissive', mutantFile(2, 'hr', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  AS RESTRICTIVE FOR SELECT', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  FOR SELECT'))
 await refused('notify allow-list loses duyurular while adding cars', mutantFile(3, 'nt', "'checkins','duyurular','cars') THEN", "'checkins','cars') THEN"))
