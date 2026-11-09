@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase'
 import { MODULE_FLAGS } from '../constants/flags'
 import { MARKETPLACE } from '../constants/redesign'
-import { MK_BUCKET, MK_LISTING_COLUMNS, MK_SIGNED_URL_TTL } from '../constants/marketplace'
+import { MK_BUCKET, MK_LISTING_COLUMNS, MK_SIGNED_URL_TTL, MK_NOTICE_VERSION } from '../constants/marketplace'
+import { notifyAdmins } from './notify'
 
 // Bandabuliya data access. Every read goes through RLS (20261183): browse sees only visible listings and
 // approved photos; the seller sees their own in every state.
@@ -40,7 +41,8 @@ export async function listListings({ category, district, query, from = 0 } = {})
 }
 
 export async function getListing(id) {
-  if (fixture) return fixture.listings.find(l => l.id === id && !l.deleted_at) || null
+  // As the read policy: a hidden listing is the seller's alone.
+  if (fixture) return fixture.listings.find(l => l.id === id && !l.deleted_at && (!l.hidden_at || l.owner_id === fixture.me)) || null
   const { data, error } = await supabase.from('marketplace_listings').select(MK_LISTING_COLUMNS).eq('id', id).maybeSingle()
   if (error) { if (useFixtureOr(error)) return getListing(id); throw error }
   return data
@@ -157,6 +159,114 @@ export async function removePhoto(photoId) {
   if (error) throw error
 }
 
+// ─── Chat (20261184), for ConversationScreen / ConversationsScreen (utils/chatApi.js shape) ─────────────
+// Only three calls differ from Student Hub: the inbox asks for kind 'listing', a buyer starts a thread from a
+// listing, and send_message routes listing threads to send_listing_message itself. On the Preview sample data the
+// seller accepts and answers a few seconds after the first message, so the whole flow can be walked on one phone.
+const ok = data => ({ data, error: null })
+const fail = code => ({ data: null, error: { message: code } })
+export const MARKETPLACE_CHAT = {
+  async list() {
+    if (fixture) return ok(fxThreads())
+    const r = await supabase.rpc('list_conversations', { p_kind: 'listing' })
+    if (r.error && useFixtureOr(r.error)) return ok(fxThreads())
+    return r
+  },
+  async messages(conversationId) {
+    if (fixture) return ok([...(fixture.messages[conversationId] || [])])
+    return supabase.from('messages').select('id, sender_id, sender_display_name, body, created_at')
+      .eq('conversation_id', conversationId).order('created_at', { ascending: true })
+  },
+  async start(other, body) {
+    if (fixture) return fxStart(other, body)
+    const r = await supabase.rpc('start_listing_conversation', { p_listing_id: other.listingId, p_body: body })
+    if (r.error && useFixtureOr(r.error)) return fxStart(other, body)
+    return r
+  },
+  async send(conversationId, body) {
+    if (fixture) return fxSend(conversationId, body)
+    return supabase.rpc('send_message', { p_conversation_id: conversationId, p_body: body })
+  },
+  async act(rpc, args) {
+    if (fixture) return fxAct(rpc, args)
+    return supabase.rpc(rpc, args)
+  },
+}
+
+// The notice is per user and versioned; the server refuses a listing message without it (NOTICE_REQUIRED).
+export async function noticeAccepted(uid) {
+  if (fixture) return fixture.noticeVersion === MK_NOTICE_VERSION
+  const { data, error } = await supabase.from('profiles').select('marketplace_notice_version').eq('id', uid).maybeSingle()
+  if (error) { if (useFixtureOr(error)) return noticeAccepted(uid); throw error }
+  return data?.marketplace_notice_version === MK_NOTICE_VERSION
+}
+export async function acceptNotice() {
+  if (fixture) { fixture.noticeVersion = MK_NOTICE_VERSION; return }
+  const { error } = await supabase.rpc('accept_marketplace_notice', { p_version: MK_NOTICE_VERSION })
+  if (error) { if (useFixtureOr(error)) { fixture.noticeVersion = MK_NOTICE_VERSION; return } throw error }
+}
+
+// ContentReportMenu's submitReport for a listing. One report hides it (20261183's auto-hide); the sample data does
+// the same so the "gone" state after a report can be walked.
+export async function reportListing(row) {
+  if (fixture) { const l = fixture.listings.find(x => x.id === row.content_id); if (l) l.hidden_at = new Date().toISOString(); return { error: null } }
+  const { error } = await supabase.from('content_reports').insert(row)
+  if (!error) notifyAdmins('content_report', row.content_id)
+  return { error }
+}
+
+function fxThreads() {
+  return fixture.threads.filter(c => !c.hidden).map(c => {
+    const l = fixture.listings.find(x => x.id === c.listing_id)
+    const msgs = fixture.messages[c.conversation_id] || []
+    const last = msgs[msgs.length - 1]
+    return { ...c, last_message_at: last?.created_at ?? c.created_at, last_body: last?.body ?? null,
+      listing_title: l?.title ?? null, listing_status: l?.status ?? null,
+      listing_available: !!l && l.status === 'active' && !l.deleted_at && !l.hidden_at }
+  }).sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1))
+}
+function fxMessage(cid, senderId, name, body) {
+  const m = { id: `fx-m-${fixture.seq++}`, sender_id: senderId, sender_display_name: name, body, created_at: new Date().toISOString() }
+  ;(fixture.messages[cid] ||= []).push(m)
+  return m
+}
+function fxStart(other, body) {
+  if (fixture.noticeVersion !== MK_NOTICE_VERSION) return fail('NOTICE_REQUIRED')
+  const l = fixture.listings.find(x => x.id === other.listingId)
+  if (!l || l.status !== 'active' || l.deleted_at || l.hidden_at) return fail('NO_SUCH_LISTING')
+  if (l.owner_id === fixture.me) return fail('OWN_LISTING')
+  if (fixture.threads.some(c => c.listing_id === l.id && c.other_user_id === l.owner_id && !c.is_closed)) return fail('CONVERSATION_EXISTS')
+  const cid = `fx-c-${fixture.seq++}`
+  fixture.threads.push({ conversation_id: cid, other_user_id: l.owner_id, display_name: fixture.names[l.owner_id], avatar_url: null,
+    is_accepted: false, awaiting_me: false, is_closed: false, created_at: new Date().toISOString(), listing_id: l.id })
+  fxMessage(cid, fixture.me, fixture.names[fixture.me], body)
+  setTimeout(() => {
+    const c = fixture?.threads.find(x => x.conversation_id === cid)
+    if (!c || c.is_closed) return
+    c.is_accepted = true
+    fxMessage(cid, l.owner_id, fixture.names[l.owner_id], 'Merhaba! Evet, hâlâ duruyor. Ne zaman bakmak istersin?')
+  }, 4000)
+  return ok('started')
+}
+function fxSend(cid, body) {
+  const c = fixture.threads.find(x => x.conversation_id === cid)
+  if (!c || c.is_closed) return fail('CONVERSATION_CLOSED')
+  if (fixture.noticeVersion !== MK_NOTICE_VERSION) return fail('NOTICE_REQUIRED')
+  if (!c.is_accepted) return fail('AWAITING_ACCEPTANCE')
+  fxMessage(cid, fixture.me, fixture.names[fixture.me], body)
+  return ok('sent')
+}
+function fxAct(rpc, args) {
+  const c = fixture.threads.find(x => x.conversation_id === args.p_conversation_id)
+  if (rpc === 'accept_conversation' && c) { c.is_accepted = true; c.awaiting_me = false }
+  else if (rpc === 'decline_conversation' && c) { c.is_closed = true; c.hidden = true }
+  else if (rpc === 'leave_conversation' && c) { c.is_closed = true; c.hidden = true }
+  else if (rpc === 'block_user') fixture.threads.filter(x => x.other_user_id === args.p_user_id).forEach(x => { x.is_closed = true })
+  else if (rpc === 'delete_message') Object.values(fixture.messages).forEach(ms => { const i = ms.findIndex(m => m.id === args.p_message_id); if (i >= 0) ms.splice(i, 1) })
+  else return fail('UNSUPPORTED')
+  return ok(null)
+}
+
 // base64 → ArrayBuffer, the same helper the other upload screens carry (no base64-arraybuffer dependency).
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -197,7 +307,21 @@ function fxCreate(fields) {
     expires_at: new Date(Date.now() + 30 * 86400e3).toISOString() })
   return id
 }
-export function setFixtureUser(uid, name) { if (fixture) { fixture.me = uid; fixture.names[uid] = name } }
+export function setFixtureUser(uid, name) {
+  if (!fixture) return
+  fixture.me = uid; fixture.names[uid] = name
+  if (!uid || fixture.sellerSeeded) return
+  fixture.sellerSeeded = true
+  const now = Date.now(), ago = m => new Date(now - m * 60e3).toISOString()
+  fixture.listings.push({ id: 'fx-5', owner_id: uid, title: 'Masa lambası, LED', description: 'Üç kademeli ışık, USB ile şarj oluyor.',
+    price_tl: 600, is_free: false, category: 'home', condition: 'like_new', district: 'nicosia', status: 'active', sold_at: null,
+    created_at: ago(600), bumped_at: ago(600), expires_at: new Date(now + 28 * 86400e3).toISOString(), hidden_at: null, deleted_at: null })
+  fixture.names['fx-buyer'] = 'Deniz'
+  fixture.threads.push({ conversation_id: 'fx-c-in', other_user_id: 'fx-buyer', display_name: 'Deniz', avatar_url: null,
+    is_accepted: false, awaiting_me: true, is_closed: false, created_at: ago(30), listing_id: 'fx-5' })
+  fixture.messages['fx-c-in'] = [{ id: 'fx-m-in', sender_id: 'fx-buyer', sender_display_name: 'Deniz',
+    body: 'Merhaba, lamba hâlâ satılık mı? Yarın Lefkoşa’da alabilirim.', created_at: ago(30) }]
+}
 function seedFixture() {
   const ago = d => new Date(Date.now() - d * 86400e3).toISOString()
   const left = d => new Date(Date.now() + d * 86400e3).toISOString()
@@ -206,7 +330,7 @@ function seedFixture() {
     id, owner_id: S, title, description, price_tl, is_free: price_tl === null, category, condition, district,
     status: 'active', sold_at: null, created_at: ago(days), bumped_at: ago(days), expires_at: left(30 - days), hidden_at: null, deleted_at: null })
   return {
-    seq: 1, me: null, names: { [S]: 'Önizleme Satıcı' }, localUri: {},
+    seq: 1, me: null, names: { [S]: 'Önizleme Satıcı' }, localUri: {}, threads: [], messages: {}, noticeVersion: null,
     listings: [
       mk('fx-1', 'Şehir bisikleti, 21 vites', 'Az kullanıldı, lastikleri yeni. Kask hediye.', 4500, 'sports', 'like_new', 'kyrenia', 1),
       mk('fx-2', 'Çalışma masası ve sandalye', 'Ahşap masa 120×60, döner sandalye. Taşınma nedeniyle satılık.', 2500, 'home', 'used', 'nicosia', 2),

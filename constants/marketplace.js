@@ -42,6 +42,9 @@ export const MK_RENEW_WINDOW_DAYS = 3
 
 export const MK_BUCKET = 'marketplace-photos'
 export const MK_SIGNED_URL_TTL = 3600
+// The safety notice's version, stamped by accept_marketplace_notice() (YYYY-MM-DD). Bump it when mkNoticeBody changes in
+// any language; a user who accepted an older version is asked again before their next chat.
+export const MK_NOTICE_VERSION = '2026-11-09'
 export const MK_LISTING_COLUMNS =
   'id, owner_id, title, description, price_tl, is_free, category, condition, district, status, sold_at, created_at, bumped_at, expires_at, hidden_at'
 
@@ -84,6 +87,14 @@ const ERROR_KEY = {
   ACTIVE_LISTING_LIMIT: 'mkErrActiveLimit', BLOCKED_TERM: 'mkErrBlockedTerm', UGC_BANNED: 'mkErrBanned',
   PHOTO_LIMIT: 'mkErrPhotoLimit', TOO_EARLY_TO_RENEW: 'mkErrTooEarly', NO_SUCH_LISTING: 'mkErrGone',
 }
+// Chat codes only a listing thread has (20261184). Everything else falls through to the Student Hub mapping.
+const CHAT_ERROR_KEY = { OWN_LISTING: 'mkChatOwnListing', NO_SUCH_LISTING: 'mkChatListingGone', NOTICE_REQUIRED: 'mkNoticeRequired' }
+export function mkChatErrorKey(err) {
+  const msg = String(err?.message || '')
+  const hit = Object.keys(CHAT_ERROR_KEY).find(k => msg.includes(k))
+  return hit ? CHAT_ERROR_KEY[hit] : null
+}
+
 export function mkErrorKey(err) {
   const msg = String(err?.message || err || '')
   const hit = Object.keys(ERROR_KEY).find(k => msg.includes(k))

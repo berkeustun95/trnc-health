@@ -14,6 +14,8 @@ const REASONS = [
   { key: 'false_info', label: 'reasonFalseInfo' },
   { key: 'other',      label: 'reasonOther' },
 ]
+// A Bandabuliya listing (20261183) also takes 'prohibited_item', first: it is the reason that listing reports exist for.
+const LISTING_REASONS = [{ key: 'prohibited_item', label: 'reasonProhibitedItem' }, ...REASONS]
 
 // A report is worthless if it sits unseen — the 24h commitment depends on the
 // admin being pushed, not on them opening the dashboard.
@@ -28,7 +30,9 @@ const REASONS = [
 // server-side. It authorizes against the caller's OWN content_reports row, so it also
 // cannot be used to spam admins about a report nobody filed.
 
-export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount, blockUserId = null }) {
+// submitReport(row) → { error }: replaces the insert (Bandabuliya's Preview sample data, before 20261183 is applied); it
+// then owns the admin alert too.
+export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount, blockUserId = null, submitReport = null, onReported = null }) {
   const [open, setOpen]       = useState(false)
   const [step, setStep]       = useState('menu')   // menu | form | done | blockConfirm | blockDone
   const [reason, setReason]   = useState(null)
@@ -68,6 +72,9 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
   const isProfile  = contentType === 'profile'
   // A car listing (Araçlar): "report this listing", not "this content".
   const isVehicle  = contentType === 'vehicle'
+  // A Bandabuliya listing: the same "report this listing" title; one report hides it (20261183), which the copy says.
+  const isListing  = contentType === 'listing'
+  const reasons    = isListing ? LISTING_REASONS : REASONS
 
   function close() {
     setOpen(false)
@@ -76,6 +83,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
     setDetails('')
     setError(null)
     if (didBlock) { setDidBlock(false); onBlocked?.() }
+    if (step === 'done') onReported?.()
   }
 
   async function blockAuthor() {
@@ -104,13 +112,14 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) { setError(t('reportError', lang)); setSaving(false); return }
 
-    const { error: err } = await supabase.from('content_reports').insert({
+    const row = {
       reporter_id:  session.user.id,
       content_type: contentType,
       content_id:   contentId,
       reason,
       details:      details.trim() || null,
-    })
+    }
+    const { error: err } = submitReport ? await submitReport(row) : await supabase.from('content_reports').insert(row)
 
     setSaving(false)
 
@@ -122,7 +131,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
     }
 
     setStep('done')
-    notifyAdmins('content_report', contentId)
+    if (!submitReport) notifyAdmins('content_report', contentId)
   }
 
   return (
@@ -190,10 +199,10 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
             {step === 'form' && (
               <>
-                <Text style={s.title}>{t(isMessage ? 'reportMessageTitle' : isProfile ? 'reportProfileTitle' : isFacility ? 'reportBusinessTitle' : isVehicle ? 'carsReportTitle' : 'reportTitle', lang)}</Text>
-                <Text style={s.sub}>{t(isMessage ? 'reportMessageSub' : isProfile ? 'reportProfileSub' : isFacility ? 'reportBusinessSub' : isVehicle ? 'carsReportSub' : 'reportSubtitle', lang)}</Text>
+                <Text style={s.title}>{t(isMessage ? 'reportMessageTitle' : isProfile ? 'reportProfileTitle' : isFacility ? 'reportBusinessTitle' : isVehicle || isListing ? 'carsReportTitle' : 'reportTitle', lang)}</Text>
+                <Text style={s.sub}>{t(isMessage ? 'reportMessageSub' : isProfile ? 'reportProfileSub' : isFacility ? 'reportBusinessSub' : isVehicle ? 'carsReportSub' : isListing ? 'mkReportSub' : 'reportSubtitle', lang)}</Text>
 
-                {REASONS.map(r => (
+                {reasons.map(r => (
                   <TouchableOpacity
                     key={r.key}
                     style={[s.reasonRow, reason === r.key && s.reasonRowActive]}

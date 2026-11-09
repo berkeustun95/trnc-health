@@ -6,10 +6,17 @@
 // 'duty' and 'weekend' (20261175, the Friday digest → Keşfet, weekend events) have a destination. 'message' rows carry no conversation id (the push does,
 // the row does not), so opening the hub from one would land on the wrong tab; it stays
 // inert until the hub can be opened on its Messages tab.
+// 'marketplace' (a photo decision, marketplace-photo-review) opens İlanlarım — the row carries no listing id, the push
+// does — and only where Bandabuliya is reachable (MARKETPLACE), so a dark bundle leaves the row inert.
+import { MARKETPLACE } from '../constants/redesign'
+
 export const DUTY_KEYWORDS = ['duty', 'nöbetçi', 'مناوبة', 'дежурн', 'εφημερεύ', 'garde', 'guardia', 'notdienst', 'نوبتی']
 
 export function notificationRoute(item) {
-  if (item?.type) return item.type === 'duty' || item.type === 'weekend' ? item.type : null
+  if (item?.type) {
+    if (item.type === 'marketplace') return MARKETPLACE ? 'marketplace' : null
+    return item.type === 'duty' || item.type === 'weekend' ? item.type : null
+  }
   const title = (item?.title ?? '').toLowerCase()
   return DUTY_KEYWORDS.some(kw => title.includes(kw)) ? 'duty' : null
 }

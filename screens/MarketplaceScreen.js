@@ -16,10 +16,12 @@ import { listListings, photosFor, signedUrls, setFixtureUser, usingFixture } fro
 import MarketplaceListingScreen from './MarketplaceListingScreen'
 import MarketplaceFormScreen from './MarketplaceFormScreen'
 import MarketplaceMineScreen from './MarketplaceMineScreen'
+import MarketplaceChatScreen from './MarketplaceChatScreen'
 
 // ─── Bandabuliya: browse ─────────────────────────────────────────────────────────
-// The module's main page (photo ground). Detail, form and İlanlarım open over it as layers; Android back
-// closes the top one (backRef), the same shape as Duyurular. Plan: vault 2026-11-07_marketplace-plan.md.
+// The module's main page (photo ground). Detail, form, İlanlarım and the chat open over it as layers; Android back
+// closes the top one (backRef), the same shape as Duyurular. target (a push tap, App.js): { view: 'inbox',
+// conversationId } opens that thread, { view: 'listing', listingId } that listing. Plan: vault 2026-11-07_marketplace-plan.md.
 
 function SearchField({ value, onChange, lang }) {
   return (
@@ -64,7 +66,7 @@ function ListingCard({ item, cover, lang, onPress }) {
 // Who may post decides the call to action: guests sign in, under-18s are told why (no dead button).
 function PostCta({ session, profile, lang, onPost, onSignIn }) {
   if (!session || isGuest(session)) {
-    return <Button title={t('mkSignInToPost', lang)} variant="secondary" icon="log-in-outline" onPress={onSignIn} fullWidth />
+    return <Button title={t('mkSignInToPost', lang)} variant="secondary" icon="log-in-outline" onPress={() => onSignIn()} fullWidth />
   }
   const adult = isAdultDob(profile?.date_of_birth)
   return (
@@ -84,7 +86,7 @@ function ListHeader({ lang, session, profile, onPost, onSignIn, showIntro }) {
   )
 }
 
-export default function MarketplaceScreen({ lang, session, profile, onBack, onSignIn, backRef = null, initialView = null }) {
+export default function MarketplaceScreen({ lang, session, profile, onBack, onSignIn, backRef = null, initialView = null, target = null }) {
   const [rows, setRows]         = useState([])
   const [covers, setCovers]     = useState({})
   const [more, setMore]         = useState(false)
@@ -93,7 +95,10 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   const [category, setCategory] = useState(null)
   const [district, setDistrict] = useState(null)
   const [query, setQuery]       = useState('')
-  const [opened, setOpened]     = useState(null)           // listing id
+  const [opened, setOpened]     = useState(target?.view === 'listing' ? target.listingId : null)   // listing id
+  // null | { compose } (from a listing) | { conversationId } (inbox, optionally straight into one thread)
+  const [chat, setChat]         = useState(target?.view === 'inbox' ? { conversationId: target.conversationId } : null)
+  const chatBackRef = useRef(null)
   const [form, setForm]         = useState(initialView === 'post' ? { mode: 'create' } : null)
   const [mine, setMine]         = useState(initialView === 'mine')
   const listMem = useScrollMemory('mk:list')
@@ -105,6 +110,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
+      if (chat) { if (chatBackRef.current?.()) return true; setChat(null); return true }
       if (form) { setForm(null); return true }
       if (opened) { setOpened(null); return true }
       if (mine && initialView !== 'mine') { setMine(false); return true }
@@ -149,6 +155,15 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   }, [more, loading, category, district, query, rows.length, loadCovers])
 
   const refreshAfterChange = () => { setForm(null); load() }
+  const signedIn = !!session && !isGuest(session)
+  // Guests are sent to sign in, with the reason (ContentReportMenu's onRequireAccount contract: true = gated).
+  const requireAccount = key => { if (signedIn) return false; onSignIn?.(key); return true }
+
+  if (chat) {
+    return <MarketplaceChatScreen lang={lang} session={session} backRef={chatBackRef}
+      compose={chat.compose ?? null} initialConversationId={chat.conversationId ?? null}
+      onBack={() => setChat(null)} onOpenListing={id => { setChat(null); setOpened(id) }} />
+  }
 
   if (form) {
     return <MarketplaceFormScreen lang={lang} session={session} listing={form.listing} onBack={() => setForm(null)}
@@ -156,7 +171,8 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   }
   if (opened) {
     return <MarketplaceListingScreen id={opened} lang={lang} session={session} onBack={() => { setOpened(null); load() }}
-      onEdit={l => setForm({ mode: 'edit', listing: l })} onChanged={load} />
+      onEdit={l => setForm({ mode: 'edit', listing: l })} onChanged={load} onRequireAccount={requireAccount}
+      onMessage={(l, sellerName) => setChat({ compose: { userId: l.owner_id, displayName: sellerName, listingId: l.id, listingTitle: l.title } })} />
   }
   if (mine) {
     return <MarketplaceMineScreen lang={lang} session={session} profile={profile}
@@ -165,12 +181,14 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   }
 
   const filtersOn = !!(category || district || query)
-  const signedIn = !!session && !isGuest(session)
   return (
     <ModuleScreen topic="marketplace">
       <SafeAreaView style={s.safe} edges={['top']}>
         <ScreenHeader onBack={onBack} title={t('menuMarketplace', lang)} subtitle={t('mkTagline', lang)} lang={lang}
-          actions={signedIn ? [{ icon: 'albums-outline', onPress: () => setMine(true), accessibilityLabel: t('mkMine', lang) }] : []} />
+          actions={signedIn ? [
+            { icon: 'chatbubbles-outline', onPress: () => setChat({}), accessibilityLabel: t('mkInboxTitle', lang) },
+            { icon: 'albums-outline', onPress: () => setMine(true), accessibilityLabel: t('mkMine', lang) },
+          ] : []} />
         <View style={s.searchRow}>
           <SearchField value={query} onChange={setQuery} lang={lang} />
         </View>

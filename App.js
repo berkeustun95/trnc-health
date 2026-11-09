@@ -1483,6 +1483,15 @@ export default function App() {
     registerPushToken()
   }, [session, pushRetry])
 
+  // Bandabuliya pushes: a listing chat (20261184) opens the thread; a photo decision (marketplace-photo-review) opens
+  // the listing. Gated like Student Hub: on a bundle where the module is dark the tap does nothing.
+  const openMarketplacePush = data => {
+    if (!MARKETPLACE) return false
+    if (data.screen === 'marketplace_conversation') { setShowMarketplace({ view: 'inbox', conversationId: data.conversation_id ?? null }); return true }
+    if (data.screen === 'marketplace') { setShowMarketplace({ view: 'listing', listingId: data.listing_id ?? null }); return true }
+    return false
+  }
+
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       if (!sessionRef.current) return
@@ -1504,7 +1513,7 @@ export default function App() {
         //   Doing nothing leaves the user where they were, which is honest.
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
-      }
+      } else openMarketplacePush(data)
     })
     return () => sub.remove()
   }, [])
@@ -1530,6 +1539,7 @@ export default function App() {
       }
       else if (screen === 'profile') setActiveTab('profile')
       else if (screen === 'notifications') setShowNotifs(true)
+      else openMarketplacePush(data)
     })
   }, [session])
 
@@ -2189,7 +2199,12 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
-      onNotifPress={item => (notificationRoute(item) === 'weekend' ? openWeekendOnMap() : setShowDutyList(true))}
+      onNotifPress={item => {
+        const route = notificationRoute(item)
+        if (route === 'weekend') openWeekendOnMap()
+        else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
+        else setShowDutyList(true)
+      }}
       onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
@@ -2625,7 +2640,8 @@ export default function App() {
   } else if (showMarketplace && MARKETPLACE) {
     // Bandabuliya. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
     content = <MarketplaceScreen lang={lang} session={session} profile={profile} backRef={marketplaceBackRef}
-      initialView={showMarketplace === 'mine' ? 'mine' : null} onSignIn={() => requireAccount('mkGatePost')}
+      initialView={showMarketplace === 'mine' ? 'mine' : null} target={typeof showMarketplace === 'object' ? showMarketplace : null}
+      onSignIn={key => requireAccount(key || 'mkGatePost')}
       onBack={() => setShowMarketplace(null)} />
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.

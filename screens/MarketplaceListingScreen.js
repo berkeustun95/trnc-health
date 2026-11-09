@@ -7,12 +7,15 @@ import { colors, category as CAT, type, radii } from '../constants/theme'
 import { DetailScaffold, InfoRow, InfoBanner, InlineAlert, Button, ConfirmDialog, ErrorState, EmptyState, RemoteImage, IconButton, PageCanvas } from '../components/ui'
 import { MK_CATEGORY, MK_CONDITION, formatPrice, listingState, canRenew, daysUntil, mkErrorKey } from '../constants/marketplace'
 import { HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
-import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, renewListing } from '../utils/marketplaceApi'
+import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, renewListing, reportListing } from '../utils/marketplaceApi'
+import ContentReportMenu from '../components/ContentReportMenu'
 
 // ─── Bandabuliya: one listing ────────────────────────────────────────────────────
 // Clean ground (DetailScaffold over PageCanvas). Others see approved photos only (RLS); while none is
 // approved the page shows the category placeholder and "Fotoğraflar inceleniyor". The seller sees every
-// photo of their own with its review state, and manages the listing here.
+// photo of their own with its review state, and manages the listing here. Others write to the seller (slice 4) and
+// report or block from the top-right menu; one report hides the listing for everyone (20261183), so after it this
+// page shows "gone".
 
 const PHOTO_BADGE = { pending: 'mkPhotoPending', rejected: 'mkPhotoRejected' }
 
@@ -50,7 +53,7 @@ function PhotoViewer({ urls, index, onClose, lang }) {
   )
 }
 
-export default function MarketplaceListingScreen({ id, lang, session, onBack, onEdit, onChanged }) {
+export default function MarketplaceListingScreen({ id, lang, session, onBack, onEdit, onChanged, onMessage, onRequireAccount }) {
   const [listing, setListing] = useState(null)
   const [photos, setPhotos]   = useState([])
   const [urls, setUrls]       = useState({})
@@ -112,6 +115,11 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
         title={listing.title}
         onBack={onBack}
         lang={lang}
+        headerRight={mine ? null : (
+          <ContentReportMenu contentType="listing" contentId={listing.id} blockUserId={listing.owner_id} lang={lang}
+            onRequireAccount={onRequireAccount} submitReport={reportListing} onReported={load}
+            onBlocked={() => { onChanged?.(); onBack() }} style={s.report} />
+        )}
       >
         <Text style={s.price}>{formatPrice(listing, lang, t)}</Text>
 
@@ -152,6 +160,14 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
           <View style={[s.safety, s.block]}>
             <Ionicons name="shield-checkmark-outline" size={18} color={CAT.homeLife.ink} />
             <Text style={s.safetyText}>{t('mkSafetyShort', lang)}</Text>
+          </View>
+        )}
+        {/* Only a buyer starts a thread, and only on a live listing (start_listing_conversation, 20261184). A sold one
+            stays readable but takes no new chats; existing threads continue from the inbox. */}
+        {!mine && state === 'live' && (
+          <View style={s.block}>
+            <Button title={t('mkMessageSeller', lang)} icon="chatbubbles-outline" fullWidth
+              onPress={() => { if (onRequireAccount?.('mkGatePost')) return; onMessage?.(listing, seller) }} />
           </View>
         )}
 
@@ -205,4 +221,5 @@ const s = StyleSheet.create({
   ownerActions: { marginTop: 24, gap: 10 },
   viewer:       { flex: 1, backgroundColor: '#000' },
   viewerClose:  { position: 'absolute', top: 48, right: 12 },
+  report:       { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.9)' },
 })
