@@ -215,6 +215,12 @@ export async function reportListing(row) {
   return { error }
 }
 
+// ContentReportMenu's blockPerson for a seller. block_user (20261029) also closes every live thread with them.
+export async function blockSeller(userId) {
+  if (fixture) { fxAct('block_user', { p_user_id: userId }); return { error: null } }
+  return supabase.rpc('block_user', { p_user_id: userId })
+}
+
 function fxThreads() {
   return fixture.threads.filter(c => !c.hidden).map(c => {
     const l = fixture.listings.find(x => x.id === c.listing_id)

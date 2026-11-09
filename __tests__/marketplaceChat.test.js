@@ -129,3 +129,14 @@ describe('listing chat on the Preview sample data', () => {
     expect(supabase.rpc.mock.calls.map(([n]) => n)).not.toContain('accept_marketplace_notice')
   })
 })
+
+describe('block from a listing', () => {
+  test('on the sample data: closes threads with that seller, never calls production', async () => {
+    const api = require('../utils/marketplaceApi')
+    const before = require('../lib/supabase').supabase.rpc.mock.calls.length
+    const r = await api.blockSeller('fx-seller')
+    expect(r.error).toBeNull()
+    expect((await api.MARKETPLACE_CHAT.list()).data.filter(t => t.other_user_id === 'fx-seller').every(t => t.is_closed)).toBe(true)
+    expect(require('../lib/supabase').supabase.rpc.mock.calls.length).toBe(before)
+  })
+})

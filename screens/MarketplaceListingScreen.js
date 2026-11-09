@@ -7,7 +7,7 @@ import { colors, category as CAT, type, radii } from '../constants/theme'
 import { DetailScaffold, InfoRow, InfoBanner, InlineAlert, Button, ConfirmDialog, ErrorState, EmptyState, RemoteImage, IconButton, PageCanvas } from '../components/ui'
 import { MK_CATEGORY, MK_CONDITION, formatPrice, listingState, canRenew, daysUntil, mkErrorKey } from '../constants/marketplace'
 import { HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
-import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, renewListing, reportListing } from '../utils/marketplaceApi'
+import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, renewListing, reportListing, blockSeller } from '../utils/marketplaceApi'
 import ContentReportMenu from '../components/ContentReportMenu'
 
 // ─── Bandabuliya: one listing ────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
         lang={lang}
         headerRight={mine ? null : (
           <ContentReportMenu contentType="listing" contentId={listing.id} blockUserId={listing.owner_id} lang={lang}
-            onRequireAccount={onRequireAccount} submitReport={reportListing} onReported={load}
+            onRequireAccount={onRequireAccount} submitReport={reportListing} blockPerson={blockSeller} onReported={load}
             onBlocked={() => { onChanged?.(); onBack() }} style={s.report} />
         )}
       >

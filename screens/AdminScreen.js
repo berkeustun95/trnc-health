@@ -654,7 +654,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Places to review',                count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
     (stats.pendingCars ?? 0)         > 0 && { label: 'Car listings to approve',          count: stats.pendingCars,            tab: 'Cars',         color: colors.danger },
-    (stats.pendingMkPhotos ?? 0)     > 0 && { label: 'Bandabuliya photos to review',     count: stats.pendingMkPhotos,        tab: 'Bandabuliya',  color: colors.danger },
+    stats.pendingMkPhotos !== 0 && stats.pendingMkPhotos !== undefined && { label: stats.pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review', count: stats.pendingMkPhotos ?? '?', tab: 'Bandabuliya', color: colors.danger },
   ].filter(Boolean)
 
   return (
@@ -1009,7 +1009,7 @@ function ReportsTab({ session }) {
               )}
               {withdrawn && (
                 <View style={s.reportBadge}>
-                  <Text style={s.reportBadgeText}>WITHDRAWN BY SENDER</Text>
+                  <Text style={s.reportBadgeText}>{g.contentType === 'listing' ? 'DELETED BY SELLER' : 'WITHDRAWN BY SENDER'}</Text>
                 </View>
               )}
               <View style={{ flex: 1 }} />

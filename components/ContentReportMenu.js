@@ -32,7 +32,8 @@ const LISTING_REASONS = [{ key: 'prohibited_item', label: 'reasonProhibitedItem'
 
 // submitReport(row) → { error }: replaces the insert (Bandabuliya's Preview sample data, before 20261183 is applied); it
 // then owns the admin alert too.
-export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount, blockUserId = null, submitReport = null, onReported = null }) {
+// blockPerson(userId) → { error }: replaces block_user for the same reason.
+export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount, blockUserId = null, submitReport = null, onReported = null, blockPerson = null }) {
   const [open, setOpen]       = useState(false)
   const [step, setStep]       = useState('menu')   // menu | form | done | blockConfirm | blockDone
   const [reason, setReason]   = useState(null)
@@ -93,7 +94,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
     // The author's id is resolved server-side and never returned — the blocker
     // never learns who wrote the (anonymous) review they blocked.
     const { error: err } = blocksPerson
-      ? await supabase.rpc('block_user', { p_user_id: blockUserId })
+      ? await (blockPerson ? blockPerson(blockUserId) : supabase.rpc('block_user', { p_user_id: blockUserId }))
       : await supabase.rpc('block_content_author', {
           p_content_type: contentType,
           p_content_id:   contentId,
