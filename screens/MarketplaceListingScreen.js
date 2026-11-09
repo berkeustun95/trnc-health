@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { t } from '../constants/i18n'
+import { t, tCount } from '../constants/i18n'
 import { colors, category as CAT, type, radii } from '../constants/theme'
 import { DetailScaffold, InfoRow, InfoBanner, InlineAlert, Button, ConfirmDialog, ErrorState, EmptyState, RemoteImage, IconButton, PageCanvas } from '../components/ui'
 import { MK_CATEGORY, MK_CONDITION, formatPrice, listingState, canRenew, daysUntil, mkErrorKey } from '../constants/marketplace'
@@ -149,7 +149,7 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
           <InfoRow category="homeLife" icon="location-outline" label={t('ddDistrict', lang)} value={t(HS_DISTRICT_LABEL_KEY[listing.district], lang)} />
           {!!seller && <InfoRow category="homeLife" icon="person-outline" label={t('mkSeller', lang)} value={seller} />}
           {mine && state !== 'expired' && (
-            <InfoRow category="homeLife" icon="time-outline" label={t('mkExpiresIn', lang)} value={t('mkDaysLeft', lang).replace('{n}', String(Math.max(0, daysUntil(listing.expires_at))))} />
+            <InfoRow category="homeLife" icon="time-outline" label={t('mkExpiresIn', lang)} value={tCount('mkDays', Math.max(0, daysUntil(listing.expires_at)), lang)} />
           )}
         </View>
 

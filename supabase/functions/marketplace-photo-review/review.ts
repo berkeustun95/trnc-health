@@ -100,18 +100,18 @@ async function reject(p: Photo, reason: Reason, reviewed: Record<string, unknown
   return out(200, { status: 'rejected' })
 }
 
-// profiles.preferred_language → text. English fallback, as module_notif_text (20261167). Pending the slice 6
-// translation review with the other mk* strings.
+// profiles.preferred_language → text. English fallback, as module_notif_text (20261167). Reviewed in slice 6
+// (2026-11-09): register matches the module's mk* strings (Greek and Persian formal).
 const BODY: Record<string, string> = {
   English: 'A photo on “{t}” wasn\'t published. Open your listing to see why.',
   Turkish: '“{t}” ilanındaki bir fotoğraf yayınlanmadı. Nedenini görmek için ilanını aç.',
   Arabic: 'لم تُنشر إحدى صور «{t}». افتح إعلانك لمعرفة السبب.',
   Russian: 'Одно из фото в «{t}» не опубликовано. Откройте объявление, чтобы узнать причину.',
-  Greek: 'Μια φωτογραφία στην αγγελία «{t}» δεν δημοσιεύτηκε. Άνοιξε την αγγελία σου για να δεις γιατί.',
+  Greek: 'Μια φωτογραφία στην αγγελία «{t}» δεν δημοσιεύτηκε. Ανοίξτε την αγγελία σας για να δείτε γιατί.',
   French: 'Une photo de « {t} » n\'a pas été publiée. Ouvrez votre annonce pour voir pourquoi.',
   Spanish: 'Una foto de «{t}» no se ha publicado. Abre tu anuncio para ver el motivo.',
   German: 'Ein Foto in „{t}“ wurde nicht veröffentlicht. Öffne deine Anzeige, um den Grund zu sehen.',
-  Persian: 'یکی از عکس‌های «{t}» منتشر نشد. آگهی‌ات را باز کن تا دلیلش را ببینی.',
+  Persian: 'یکی از عکس‌های «{t}» منتشر نشد. آگهی‌تان را باز کنید تا دلیلش را ببینید.',
 }
 export function rejectText(lang: string, listingTitle: string) {
   const t = listingTitle.length > 40 ? listingTitle.slice(0, 39).trimEnd() + '…' : listingTitle
