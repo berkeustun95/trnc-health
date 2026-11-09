@@ -1,5 +1,5 @@
 import { buildWidgetTree } from 'react-native-android-widget/lib/commonjs/api/build-widget-tree'
-import { ShortcutsWidget } from '../widgets/android/ShortcutsWidget'
+import { ShortcutsWidget, shortcutsLayout } from '../widgets/android/ShortcutsWidget'
 import { SHORTCUTS, widgetText } from '../widgets/shortcuts'
 import { parseAdaRoute } from '../utils/deepLinkRoutes'
 import strings from '../widgets/strings.json'
@@ -21,6 +21,32 @@ describe('Kısayollar (Android)', () => {
     expect(texts).toEqual(SHORTCUTS.map(s => strings[code][s.labelKey]))
     // Every glyph resolved: an unknown Ionicons name would render as an empty box.
     nodes.filter(n => n.type === 'IconWidget').forEach(n => expect(n.props.icon).toMatch(/^[-]$/))
+  })
+
+  // Sizes in dp as Samsung One UI reports them on the S20+ (2×2 measured 169×242), plus the
+  // 70n−30 grid the picker uses on stock launchers.
+  const rowsOf = tree => tree.children.length
+  test.each([
+    ['4×1 default', 250, 110, 1, true],
+    ['4×1 stock', 250, 40, 1, false],
+    ['2×2', 169, 242, 2, true],
+    ['2×1', 169, 110, 1, false],
+    ['3×2', 250, 242, 1, true],
+  ])('%s → %d row(s), labels %s', (_, width, height, rows, labels) => {
+    const tree = buildWidgetTree(<ShortcutsWidget code="tr" width={width} height={height} />)
+    expect(rowsOf(tree)).toBe(rows)
+    const nodes = collect(tree)
+    expect(nodes.filter(n => n.props?.clickAction === 'OPEN_URI')).toHaveLength(4)
+    expect(nodes.some(n => n.type === 'TextWidget')).toBe(labels)
+  })
+
+  test('wells never overflow their column', () => {
+    for (let width = 110; width <= 400; width += 10) {
+      for (let height = 40; height <= 300; height += 10) {
+        const { cols, well } = shortcutsLayout(width, height)
+        expect(cols * (well + 8)).toBeLessThanOrEqual(width - 16)
+      }
+    }
   })
 
   test('every shortcut is a route the app opens', () => {

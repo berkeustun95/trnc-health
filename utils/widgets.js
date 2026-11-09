@@ -31,7 +31,7 @@ export async function syncWidgets(langCode) {
       const { requestWidgetUpdate } = require('react-native-android-widget')
       const { renderNamed } = require('../widgets/android/taskHandler')
       for (const widgetName of ANDROID_WIDGETS) {
-        await requestWidgetUpdate({ widgetName, renderWidget: () => renderNamed(widgetName, langCode) })
+        await requestWidgetUpdate({ widgetName, renderWidget: info => renderNamed(widgetName, langCode, info) })
       }
     }
   } catch (e) {

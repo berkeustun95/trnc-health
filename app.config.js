@@ -47,10 +47,12 @@ const ANDROID_WIDGETS = [
     name: 'Shortcuts',
     label: '@string/widget_shortcuts_label',
     description: WIDGET_STRINGS.en.shortcutsDesc,
-    minWidth: '110dp',
-    minHeight: '110dp',
-    targetCellWidth: 2,
-    targetCellHeight: 2,
+    // 4×1 by default (one row, like iOS's medium); resizable down to 2×1 (minResize* is added by
+    // plugins/withWidgetStrings.js — this plugin has no option for it). Layout: ShortcutsWidget.
+    minWidth: '250dp',
+    minHeight: '40dp',
+    targetCellWidth: 4,
+    targetCellHeight: 1,
     resizeMode: 'horizontal|vertical',
     previewImage: './assets/widgets/shortcuts-preview.png',
   },

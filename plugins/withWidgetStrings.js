@@ -7,7 +7,7 @@ const fs = require('fs')
 const path = require('path')
 const strings = require('../widgets/strings.json')
 
-const WIDGETS = [{ name: 'shortcuts', label: 'shortcutsName', description: 'shortcutsDesc' }]
+const WIDGETS = [{ name: 'shortcuts', label: 'shortcutsName', description: 'shortcutsDesc', minResize: ['110dp', '40dp'] }]
 
 const escape = text => text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
 
@@ -42,6 +42,14 @@ module.exports = function withWidgetStrings(config) {
       if (/^widget_.+_description$/.test(item.$.name)) delete item.$.translatable
     }
     await XML.writeXMLAsync({ path: base, xml })
+    // The resize floor, which react-native-android-widget cannot express: without it minWidth (the
+    // 4×1 default) is also the smallest size, and the 2×2 shape would be unreachable.
+    for (const w of WIDGETS.filter(w => w.minResize)) {
+      const file = path.join(res, `xml/widgetprovider_${w.name}.xml`)
+      const [width, height] = w.minResize
+      fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<appwidget-provider ',
+        `<appwidget-provider android:minResizeWidth="${width}" android:minResizeHeight="${height}" `))
+    }
     for (const [code, items] of Object.entries(strings)) {
       if (code === 'en') continue
       // Android qualifiers: Persian is 'fa', Greek 'el' — the same codes as strings.json.
