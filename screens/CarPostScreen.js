@@ -6,7 +6,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
-import { addBackListener } from '../utils/backHandler'
 import FilterDropdown from '../components/FilterDropdown'
 import { ScreenHeader, PageCanvas, Button, InfoBanner } from '../components/ui'
 import { photoUrl } from '../components/cars/VehicleCard'
@@ -123,7 +122,7 @@ function Field({ value, onChangeText, placeholder, keyboardType, maxLength, mult
   )
 }
 
-export default function CarPostScreen({ session, lang, car = null, profilePhone = null, onBack, onSaved }) {
+export default function CarPostScreen({ session, lang, car = null, profilePhone = null, backRef, onBack, onSaved }) {
   const insets = useSafeAreaInsets()
   const isEdit = !!car
   const initial = useRef(carForm(car, profilePhone)).current
@@ -232,19 +231,20 @@ export default function CarPostScreen({ session, lang, car = null, profilePhone 
     const dirty = JSON.stringify(form) !== JSON.stringify(initial)
       || removed.length > 0 || photos.some(p => p.kind === 'new')
     if (!dirty) { onBack(); return }
-    Alert.alert(t('carsPostDiscardTitle', lang), t('carsPostDiscardBody', lang), [
-      { text: t('cancel', lang), style: 'cancel' },
+    Alert.alert(t('carsPostDiscardTitle', lang), undefined, [
+      { text: t('carsPostStay', lang), style: 'cancel' },
       { text: t('carsPostDiscard', lang), style: 'destructive', onPress: onBack },
     ])
   }
 
-  // Android back / iOS edge swipe ask before throwing a filled form away, like the header back does. Registered after
-  // App's own listener, so it runs first (newest first); returning true stops App popping the layer underneath.
+  // Android back / iOS edge swipe ask before throwing a filled form away, like the header back does. App's back chain
+  // calls this through backRef: a listener of our own would not stay first, because App re-registers its listener
+  // whenever one of its many deps changes, and the newest listener runs first.
   const leaveRef = useRef(confirmLeave)
   leaveRef.current = confirmLeave
   useEffect(() => {
-    const sub = addBackListener(() => { leaveRef.current(); return true })
-    return () => sub.remove()
+    backRef.current = () => leaveRef.current()
+    return () => { backRef.current = null }
   }, [])
 
   const reReview = isEdit && car.status !== 'pending'

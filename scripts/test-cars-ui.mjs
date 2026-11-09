@@ -144,5 +144,22 @@ for (const f of ['screens/CarPostScreen.js', 'screens/MyCarsScreen.js']) {
   check("admin: 'vehicle' is in the Reports fetch list and AUTHOR_VIA_RPC", /'message', 'vehicle'\]\) \{/.test(admin) && /AUTHOR_VIA_RPC = new Set\(\['review', 'vehicle'\]\)/.test(admin))
 }
 
+// Berke, 2026-11-09 (from the Preview video). A for-sale car never shows "Kiralama şirketi", and the system back on
+// İlan ver / İlanı düzenle asks before discarding. A listener of CarPostScreen's own lost to App's, which re-registers
+// (and so runs first) whenever one of its deps changes; App's chain must hand the post layer to the form.
+{
+  const detail = readFileSync(resolve(ROOT, 'screens/CarDetailScreen.js'), 'utf8')
+  check('detail: the rental-company label needs a rent listing', /car\.intent === 'rent' && dealer\.is_rental_company \? 'carsRentalCompany'/.test(detail))
+  const app = readFileSync(resolve(ROOT, 'App.js'), 'utf8')
+  const post = readFileSync(resolve(ROOT, 'screens/CarPostScreen.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '')
+  check("App back: the post layer goes to the form's guard, not closeCarsLayer",
+    /\.kind === 'post' && carPostBackRef\.current\) carPostBackRef\.current\(\)\s*else closeCarsLayer\(\)/.test(app)
+    && /backRef=\{carPostBackRef\}/.test(app))
+  check('CarPostScreen: guard registered on backRef, no listener of its own', /backRef\.current = \(\) => leaveRef\.current\(\)/.test(post) && !post.includes('addBackListener'))
+  check("CarPostScreen: the prompt is Berke's (message only, Kal / Çık)", post.includes("Alert.alert(t('carsPostDiscardTitle', lang), undefined")
+    && post.includes("t('carsPostStay', lang), style: 'cancel'") && post.includes("t('carsPostDiscard', lang), style: 'destructive'"))
+  check('the discard check counts added and removed photos', /photos\.some\(p => p\.kind === 'new'\)/.test(post) && /removed\.length > 0/.test(post))
+}
+
 console.log(bad ? `cars ui: ${bad} FAILED` : 'cars ui: OK')
 process.exit(bad ? 1 : 0)
