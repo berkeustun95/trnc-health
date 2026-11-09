@@ -73,7 +73,8 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
   const labelKey = labelOverride?.key ?? mod.labelKey
   const lines    = labelOverride?.lines ?? 2
   // A row's optional subKey takes the label's second line, so the box (and the row) keeps its height.
-  const subKey   = labelOverride ? null : mod.subKey
+  // The grid ALWAYS passes an override (tileLabel sizes every tile), so only a different label drops it.
+  const subKey   = labelKey === mod.labelKey ? mod.subKey : null
   // Same large-text rule as Home's tiles (labelCap: 1.0 below 360dp, 1.15 above). The box
   // grows with the CAPPED scale only, so at normal text size the row height is unchanged.
   const { width: screenW, fontScale } = useWindowDimensions()

@@ -37,9 +37,12 @@ export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
   const fit = tileLabel(mod, lang)
   const lines = fit.lines
   const label = t(fit.key, lang)
+  // A module's optional subKey takes the label's second line, so the box (and the row) keeps its height.
+  const sub = fit.key === mod.labelKey && mod.subKey ? t(mod.subKey, lang) : null
+  const spoken = sub ? `${label}, ${sub}` : label
   return (
     <TouchableOpacity style={[s.tile, { width }]} onPress={() => onPress(mod)} activeOpacity={press.small}
-      accessibilityRole="button" accessibilityLabel={mod.soon ? `${label}, ${t('hrSoonBadge', lang)}` : label}>
+      accessibilityRole="button" accessibilityLabel={mod.soon ? `${spoken}, ${t('hrSoonBadge', lang)}` : spoken}>
       <View>
         <CategoryIcon icon={mod.icon} category={cat} size={52} />
         {mod.soon && (
@@ -49,11 +52,12 @@ export function ServiceTile({ mod, cat, lang, onPress, width = TILE_WIDTH }) {
       <View style={s.labelBox}>
         <Text
           style={[s.label, { fontSize: fit.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
-          numberOfLines={lines}
+          numberOfLines={sub ? 1 : lines}
           maxFontSizeMultiplier={cap}
         >
           {label}
         </Text>
+        {!!sub && <Text style={s.sub} numberOfLines={1} maxFontSizeMultiplier={cap}>{sub}</Text>}
       </View>
     </TouchableOpacity>
   )
@@ -103,6 +107,7 @@ const s = StyleSheet.create({
   labelBox: { height: LABEL_BOX, alignSelf: 'stretch', marginTop: 8, overflow: 'hidden' },
   // Medium (500) — final (Berke, 2026-10-01). check-tile-labels reads this family to pick its font.
   label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_500Medium', color: colors.tileInk, textAlign: 'center' },
+  sub:      { fontSize: 10, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
   // "Yakında": white on primaryDark, 7.58:1. Sits over the icon's top edge so the label box —
   // the 68pt budget above — is untouched.
   soon:     { position: 'absolute', top: -7, alignSelf: 'center', paddingHorizontal: 6, height: 16,
