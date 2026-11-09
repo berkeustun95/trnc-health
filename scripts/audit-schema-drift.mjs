@@ -57,6 +57,11 @@
 //   • Types (section T) are compared loosely; precision and domain differences may not
 //     surface.
 //   • Policies, triggers, functions and views are out of scope for this pass.
+//   • A value list BUILT AT APPLY TIME is invisible to a text replay. A migration that
+//     reads the live CHECK and re-adds it with one more value (so it cannot drop a value
+//     another module added) has no literal list in its text to replay. Such a migration
+//     DECLARES what it adds — see extendCheckHints() below. Opt-in: a file without the
+//     directive is replayed exactly as before.
 
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
@@ -370,6 +375,49 @@ function constraintsInDoBlocks(sql) {
   return found
 }
 
+// ─── CHECK VALUE LISTS EXTENDED AT APPLY TIME ──────────────────────────────
+//
+// Some migrations must not write a CHECK's value list out: other modules add values
+// too, so a written-out list would remove whatever another migration added after it was
+// drafted. They read pg_get_constraintdef() and re-add the constraint with their own
+// values appended, inside a DO block whose ALTER is built by format() — which neither
+// replay pass can see, so the model keeps the PREVIOUS list and the audit reports the
+// new value as drift on a database that is exactly right.
+//
+// Such a migration declares the values it adds, on a line of its own:
+//     -- drift:extend-check notifications_type_check marketplace
+//     -- drift:extend-check some_check value_a, value_b
+// The constraint keeps every value the replay already has and gains these, at this
+// file's place in the replay (a later DROP still wins in settle()). Only CHECK value
+// lists, and only additions. A directive naming a constraint the replay does not have,
+// or one it has dropped, refuses generation: a hint that silently does nothing is the
+// false green this file exists to avoid.
+const hintProblems = []
+function extendCheckHints(raw, f) {
+  const out = []
+  for (const m of raw.matchAll(/^[ \t]*--[ \t]*drift:extend-check[ \t]+([\w"]+)[ \t]+(.+?)[ \t]*$/gm)) {
+    const name = colName(m[1])
+    const values = m[2].split(',').map(v => v.trim())
+    if (values.some(v => !/^[\w.-]+$/.test(v))) {
+      hintProblems.push(`${f}: drift:extend-check ${name} — values must be plain words, comma-separated: "${m[2]}"`)
+      continue
+    }
+    const prev = [...conEvents].reverse().find(e => e.name === name)
+    if (!prev || prev.op !== 'add') {
+      hintProblems.push(`${f}: drift:extend-check ${name} — no earlier migration ${prev ? 'leaves it in place (last event is a DROP)' : 'creates it'}`)
+      continue
+    }
+    if (!/^CHECK\b/i.test(prev.body.trim())) {
+      hintProblems.push(`${f}: drift:extend-check ${name} — not a CHECK constraint`)
+      continue
+    }
+    // Quoted literals are all litSig() reads, so appending them is the whole extension;
+    // the column set is unchanged because a value is not a column.
+    out.push({ ...prev, from: f, body: `${prev.body} ${values.map(v => `'${v}'`).join(' ')}` })
+  }
+  return out
+}
+
 
 // ── Phase 1: every CREATE TABLE, so a table always exists before it is altered.
 for (const { f, sql } of parsed) {
@@ -531,9 +579,13 @@ for (const { f, sql } of parsed) {
   //
   //   Emitting per file restores replay order across files, which is the ordering that
   //   actually decides these cases.
-  for (const c of constraintsInDoBlocks(readFileSync(resolve(ROOT, f), 'utf8'))) {
+  const raw = readFileSync(resolve(ROOT, f), 'utf8')
+  for (const c of constraintsInDoBlocks(raw)) {
     conEvents.push({ name: c.name, op: 'add', body: c.spec, from: f, tbl: c.tbl })
   }
+  // Same per-file rule, after this file's own events, so a hint extends the list as it
+  // stands once this file has run.
+  conEvents.push(...extendCheckHints(raw, f))
 }
 
 // ─── DROP TABLE ─────────────────────────────────────────────────────────────
@@ -893,7 +945,7 @@ SELECT * FROM (
 ORDER BY section, c1, c2;
 `
 
-const problems = validateEmitted(sql)
+const problems = [...hintProblems, ...validateEmitted(sql)]
 if (problems.length) {
   console.error(`\nREFUSING to write ${OUT.replace(ROOT + '/', '')} — ${problems.length} problem(s):\n`)
   for (const p of problems) console.error(`  ✗ ${p}`)
