@@ -650,6 +650,7 @@ $function$;
 -- ─── 7. Notifications: a 'marketplace' type (photo rejected, listing removed) ───────────────
 -- Idempotent: the live values are kept in their order and 'marketplace' is appended only when missing,
 -- so 'weekend' (20261175) and any later type survive, and a re-run changes nothing.
+-- drift:extend-check notifications_type_check marketplace
 DO $$
 DECLARE v_def text; v_vals text[];
 BEGIN
@@ -744,7 +745,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261183_marketplace_listings.sql', '9717d5064c122aef8bbc78f2f8a16d960ffe3f762bb85b667a814e46e0b9faa3')
+VALUES ('20261183_marketplace_listings.sql', '9c13fd9e59afced0a28ce3b5526b2f1f9128591fb2c93304f6ee776153eb3a80')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

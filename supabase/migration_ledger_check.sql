@@ -289,7 +289,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261180_weekend_digest_pause.sql', '0dd619d437cbf00ab5259c1455192a900e1e109d1a0e39d7cb63a4189a2c98d8'),
   ('20261181_vehicle_admin_author.sql', '8781667c15b1a48042d45070edf90f9a2db783a55737a11bc5160a9f49c4895f'),
   ('20261182_vehicle_photos_via_function.sql', 'cabddd29556116a29920a2a728289d407df5dc99a298ecf179ef04d641728848'),
-  ('20261183_marketplace_listings.sql', '9717d5064c122aef8bbc78f2f8a16d960ffe3f762bb85b667a814e46e0b9faa3'),
+  ('20261183_marketplace_listings.sql', '9c13fd9e59afced0a28ce3b5526b2f1f9128591fb2c93304f6ee776153eb3a80'),
   ('20261184_marketplace_messaging.sql', 'c13bd082da484842bb53aa600b5d4a11b7eeb4fbc92a398868fdf53d04c865e8')
 )
 SELECT * FROM (

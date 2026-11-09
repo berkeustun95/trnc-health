@@ -1497,7 +1497,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('module_waitlist_user_id_fkey', '', ''),
     ('notifications_conversation_id_fkey', '', 'conversation_id|id'),
     ('notifications_pkey', '', 'id'),
-    ('notifications_type_check', 'admin_alert|admin_message|duty|featured|general|message|question|waitlist|weekend', 'type'),
+    ('notifications_type_check', 'admin_alert|admin_message|duty|featured|general|marketplace|message|question|waitlist|weekend', 'type'),
     ('notifications_user_id_fkey', '', 'id|user_id'),
     ('oli_messages_payload_check', '8000|object', 'payload'),
     ('oli_messages_pkey', '', 'id'),
