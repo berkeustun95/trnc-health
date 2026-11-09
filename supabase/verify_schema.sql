@@ -737,6 +737,8 @@ WITH report AS (
     ('20261183_marketplace_listings','marketplace_photo_insert_guard'),
     ('20261184_marketplace_messaging','send_listing_message'),
     ('20261184_marketplace_messaging','start_listing_conversation'),
+    ('20261185_marketplace_maintenance','marketplace_maintenance'),
+    ('20261185_marketplace_maintenance','marketplace_orphan_objects'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -5861,6 +5863,16 @@ WITH report AS (
                 AND indexname = 'conversations_one_live_per_listing'
                 AND indexdef LIKE 'CREATE UNIQUE INDEX%(pair_lo, pair_hi, listing_id)%kind = ''listing''%')
     AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.send_listing_message(uuid,text)'), 'EXECUTE'), false)
+  -- 20261185: the retention RPCs are service_role-only (the nightly function), and a purge keeps chats: the
+  -- listing link must stay ON DELETE SET NULL. RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261185_marketplace_maintenance','retention RPCs service_role-only; purge keeps chats (listing_id ON DELETE SET NULL)',
+    COALESCE(has_function_privilege('service_role', to_regprocedure('public.marketplace_maintenance(boolean)'), 'EXECUTE')
+         AND has_function_privilege('service_role', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.marketplace_maintenance(boolean)'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.marketplace_maintenance(boolean)'), 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE'), false)
+    AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname = 'conversations_listing_id_fkey' AND confdeltype = 'n')
   -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
@@ -5985,7 +5997,9 @@ FROM (VALUES
   -- 12-month retention on partner_booking_requests (20261148), 03:53 UTC daily; exact schedule + command are the 20261148 row below.
   ('20261148_partner_booking_requests_retention','purge-partner-booking-requests'),
   -- 90-day retention on oli_messages (20261163), 03:57 UTC daily; exact schedule + command are the 20261163 row below.
-  ('20261163_oli_messages','purge-oli-messages')
+  ('20261163_oli_messages','purge-oli-messages'),
+  -- Bandabuliya retention (20261185), 01:23 UTC daily; exact schedule + command are the 20261185 row below.
+  ('20261185_marketplace_maintenance','marketplace-maintenance')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -6037,6 +6051,18 @@ SELECT '20261163_oli_messages', 'purge-oli-messages: schedule 57 3 * * * and the
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-oli-messages' AND active
                     AND schedule = '57 3 * * *'
                     AND btrim(command) = 'SELECT public.purge_oli_messages()') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261185: marketplace-maintenance runs daily at 01:23 UTC and POSTs {"apply": true} with the Vault key ───
+SELECT '20261185_marketplace_maintenance', 'marketplace-maintenance: schedule 23 1 * * *, Vault key, apply body',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'marketplace-maintenance') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'marketplace-maintenance' AND active
+                    AND schedule = '23 1 * * *'
+                    AND command LIKE '%/functions/v1/marketplace-maintenance%'
+                    AND command LIKE '%name = ''novest_sync_key''%'
+                    AND command LIKE '%{"apply": true}%') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
