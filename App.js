@@ -147,6 +147,10 @@ import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
 import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
 import { withReadableTitle } from './utils/readableTitle'
+import { otaApplyBlocker, OTA_APPLIED_KEY, LAUNCH_TAP_MS } from './utils/otaLaunchApply'
+import { BOOT_SPLASH_KEY, localDay, splashRecord } from './utils/bootSplashDay'
+
+const LAUNCHED_AT = Date.now()
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -618,6 +622,12 @@ export default function App() {
     claimSplash(build).then(setSplashPlay)
   }, [])
   const splashUp = splashPlay !== false && !bootSplashDone
+  // Read by the launch OTA apply below (utils/otaLaunchApply.js).
+  const touchedRef = useRef(false)
+  const splashPlayRef = useRef(splashPlay)
+  splashPlayRef.current = splashPlay
+  const splashUpRef = useRef(splashUp)
+  splashUpRef.current = splashUp
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)
@@ -1053,15 +1063,37 @@ export default function App() {
     })
   }
 
+  // utils/otaLaunchApply.js: reload into a just-downloaded OTA only while nothing can be lost.
+  // An unconditional reload here once threw away wherever the user already was (a duty push
+  // opened Nöbetçi Eczane, then the reload dropped it on Home), hence every guard.
   useEffect(() => {
-    if (!__DEV__) {
-      Updates.checkForUpdateAsync().then(({ isAvailable }) => {
-        // Download only; it applies on the next cold start. A reload here restarted the JS
-        // ~2 s after launch and threw away wherever the user already was — a duty push opened
-        // Nöbetçi Eczane, then the reload dropped it on Home.
-        if (isAvailable) Updates.fetchUpdateAsync()
+    if (__DEV__) return
+    Updates.checkForUpdateAsync()
+      .then(({ isAvailable }) => (isAvailable ? Updates.fetchUpdateAsync() : null))
+      .then(async res => {
+        const fetchedId = res?.isNew ? res.manifest?.id : null
+        if (!fetchedId) return
+        const [tap, url, lastAppliedId] = await Promise.all([
+          Notifications.getLastNotificationResponseAsync().catch(() => null),
+          Linking.getInitialURL().catch(() => null),
+          AsyncStorage.getItem(OTA_APPLIED_KEY).catch(() => null),
+        ])
+        const tapAt = tap?.notification?.date
+        const blocker = otaApplyBlocker({
+          fetchedId, runningId: Updates.updateId, emergency: Updates.isEmergencyLaunch,
+          elapsedMs: Date.now() - LAUNCHED_AT, touched: touchedRef.current, appState: AppState.currentState,
+          launchedByTap: !!tap && (!tapAt || Date.now() - tapAt < LAUNCH_TAP_MS), launchedByLink: !!url, lastAppliedId,
+        })
+        if (blocker) return
+        await AsyncStorage.setItem(OTA_APPLIED_KEY, fetchedId)
+        // The clip already played to the end on this launch: don't play it again for the new
+        // build right after. Mid-clip, it restarts with the reload, which reads as one splash.
+        if (splashPlayRef.current === true && !splashUpRef.current) {
+          await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(localDay(), fetchedId)).catch(() => {})
+        }
+        if (touchedRef.current || AppState.currentState !== 'active') return
+        await Updates.reloadAsync()
       }).catch(() => {})
-    }
   }, [])
 
   useEffect(() => {
@@ -3099,7 +3131,7 @@ export default function App() {
   const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider onTouchStart={() => { touchedRef.current = true }}>
      <SplashUpContext.Provider value={splashUp}>
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
