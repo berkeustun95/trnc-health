@@ -3,7 +3,7 @@
 --     private.is_adult_on (20261164), the 8-value content_reports_content_type_check and the auto-hide body
 --     with the vehicle branch (20261166) — copied VERBATIM; the md5 of the auto-hide body is what 20261168's
 --     pre-flight demands (760dc1de…).
---   • content_reports reason check and notifications_type_check as live (probe 42413063083).
+--   • content_reports reason check as live (probe 42413063083); notifications_type_check as 20261175 left it ('weekend').
 --   • Supabase Storage, minimally: storage.buckets, storage.objects (RLS on), storage.foldername() as Supabase
 --     defines it. NOT modelled: the Storage API, protect_delete, signed URLs.
 CREATE SCHEMA IF NOT EXISTS private;
@@ -58,7 +58,7 @@ $$;
 CREATE TRIGGER auto_hide_on_report AFTER INSERT ON public.content_reports FOR EACH ROW EXECUTE FUNCTION auto_hide_reported_content();
 
 ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check
-  CHECK ((type = ANY (ARRAY['duty'::text, 'message'::text, 'waitlist'::text, 'question'::text, 'admin_alert'::text, 'admin_message'::text, 'featured'::text, 'general'::text])));
+  CHECK ((type = ANY (ARRAY['duty'::text, 'message'::text, 'waitlist'::text, 'question'::text, 'admin_alert'::text, 'admin_message'::text, 'featured'::text, 'general'::text, 'weekend'::text])));
 
 CREATE SCHEMA IF NOT EXISTS storage;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;

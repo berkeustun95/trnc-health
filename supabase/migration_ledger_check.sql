@@ -281,7 +281,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261165_vehicles.sql', '506b0ba0508ed32f2232a1db064dad8457126a4b98b84cf8265e57c1b3894178'),
   ('20261166_vehicles_moderation.sql', '4765f02f6f17f797267635fa64b383ec91cf96627211037b2115c25ad0a78db4'),
   ('20261167_cars_waitlist_notify.sql', '7329e36b81122a7e440a467e6a9d264923468367b11ccde608b29d202c2112f6'),
-  ('20261168_marketplace_listings.sql', '7f6d96d6b2d84aadbdf8f45f61613a5fd0c6329a15565f9ff8425a1140786bbb'),
+  ('20261168_marketplace_listings.sql', '38bbde3927af6941791a5a13b047362ad092352f28a93e4f81d944fa7ec5997f'),
   ('20261169_marketplace_messaging.sql', 'aa708e0d021fe1691cfcf6c0e6a9184de8938a72b6447453ec6562ef2a76d1e0'),
   ('20261175_weekend_digest.sql', '49726a42249bb6618d80c6a5d96585731c8267fa7365b9e09f1f6fb44fd5c87b'),
   ('20261176_weekend_digest_test_send.sql', '92c36b9779dc8190e3e64aab046ce387092e1569d3f9fb1e1a419f1f00823c5a'),

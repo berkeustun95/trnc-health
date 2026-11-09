@@ -261,5 +261,37 @@ for (const [name, fn] of CASES) {
   void live
 }
 
+// notifications_type_check is extended from the live list, never rewritten from a hard-coded one.
+const NOTIF_DEF = db => db.query(`SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'notifications_type_check'`).then(r => r.rows[0]?.d)
+const LIVE9 = `'duty'::text, 'message'::text, 'waitlist'::text, 'question'::text, 'admin_alert'::text, 'admin_message'::text, 'featured'::text, 'general'::text, 'weekend'::text`
+{
+  const db = await build()
+  const d = await NOTIF_DEF(db)
+  check(`notifications: 'weekend' survives, 'marketplace' appended after the live values`,
+    d === `CHECK ((type = ANY (ARRAY[${LIVE9}, 'marketplace'::text])))`, d)
+  const again = await applyFile(db, FILE)
+  const d2 = await NOTIF_DEF(db)
+  check('notifications: a re-run changes nothing (definition byte-identical)', again.ok && d2 === d, again.msg || d2)
+}
+{
+  const db = await freshDb(BASE + SEED + `ALTER TABLE public.notifications DROP CONSTRAINT notifications_type_check;
+    ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('duty', 'message', 'waitlist', 'question', 'admin_alert', 'admin_message', 'featured', 'general', 'weekend', 'some_future_type'));`)
+  const r = await applyFile(db, FILE)
+  const d = await NOTIF_DEF(db)
+  check('notifications: a type added later by another module survives too',
+    r.ok && d === `CHECK ((type = ANY (ARRAY[${LIVE9}, 'some_future_type'::text, 'marketplace'::text])))`, r.msg || d)
+}
+{
+  const db = await freshDb(BASE + SEED + `ALTER TABLE public.notifications DROP CONSTRAINT notifications_type_check;`)
+  const r = await applyFile(db, FILE)
+  check('red: notifications_type_check missing → refused', !r.ok && /notifications_type_check is missing/.test(r.msg), r.msg)
+}
+{
+  const db = await freshDb(BASE + SEED + `ALTER TABLE public.notifications DROP CONSTRAINT notifications_type_check;
+    ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check CHECK (type <> '');`)
+  const r = await applyFile(db, FILE)
+  check('red: notifications_type_check not a value list → refused', !r.ok && /not a plain value list/.test(r.msg), r.msg)
+}
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed')
 process.exit(failed ? 1 : 0)

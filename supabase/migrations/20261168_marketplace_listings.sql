@@ -74,11 +74,15 @@ BEGIN
   PERFORM set_config('mig1168.storage_policies',
     (SELECT count(*) FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
       AND policyname NOT IN ('marketplace photos upload own pending', 'marketplace photos read via row'))::text, true);
+  -- notifications_type_check is read, not pinned: other modules add types (20261175 'weekend'). Refuse
+  -- only when it is missing or not a plain value list, which section 7 could not extend safely.
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint WHERE conname = 'notifications_type_check'
      AND conrelid = 'public.notifications'::regclass;
-  IF v_def IS DISTINCT FROM 'CHECK ((type = ANY (ARRAY[''duty''::text, ''message''::text, ''waitlist''::text, ''question''::text, ''admin_alert''::text, ''admin_message''::text, ''featured''::text, ''general''::text])))'
-     AND v_def IS DISTINCT FROM 'CHECK ((type = ANY (ARRAY[''duty''::text, ''message''::text, ''waitlist''::text, ''question''::text, ''admin_alert''::text, ''admin_message''::text, ''featured''::text, ''general''::text, ''marketplace''::text])))' THEN
-    RAISE EXCEPTION 'REFUSING: notifications_type_check is %, not the probed list. Nothing applied.', v_def;
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION 'REFUSING: notifications_type_check is missing. Nothing applied.';
+  END IF;
+  IF v_def !~ '^CHECK \(\(type = ANY \(ARRAY\[''[a-z_]+''::text(, ''[a-z_]+''::text)*\]\)\)\)$' THEN
+    RAISE EXCEPTION 'REFUSING: notifications_type_check is not a plain value list: %. Nothing applied.', v_def;
   END IF;
 END $pre$;
 
@@ -644,10 +648,23 @@ END;
 $function$;
 
 -- ─── 7. Notifications: a 'marketplace' type (photo rejected, listing removed) ───────────────
-ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check
-  CHECK (type = ANY (ARRAY['duty'::text, 'message'::text, 'waitlist'::text, 'question'::text, 'admin_alert'::text,
-                           'admin_message'::text, 'featured'::text, 'general'::text, 'marketplace'::text]));
+-- Idempotent: the live values are kept in their order and 'marketplace' is appended only when missing,
+-- so 'weekend' (20261175) and any later type survive, and a re-run changes nothing.
+DO $notif$
+DECLARE v_def text; v_vals text[];
+BEGIN
+  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint WHERE conname = 'notifications_type_check'
+     AND conrelid = 'public.notifications'::regclass;
+  SELECT array_agg(m[1] ORDER BY n) INTO v_vals FROM regexp_matches(v_def, '''([a-z_]+)''::text', 'g') WITH ORDINALITY AS r(m, n);
+  IF 'marketplace' = ANY (v_vals) THEN
+    RAISE NOTICE 'notifications_type_check already allows marketplace: unchanged';
+  ELSE
+    EXECUTE format('ALTER TABLE public.notifications DROP CONSTRAINT notifications_type_check, '
+                   'ADD CONSTRAINT notifications_type_check CHECK (type IN (%s))',
+                   (SELECT string_agg(quote_literal(v), ', ' ORDER BY n) FROM unnest(v_vals || 'marketplace'::text) WITH ORDINALITY AS u(v, n)));
+    RAISE NOTICE 'notifications_type_check: added marketplace to %', v_vals;
+  END IF;
+END $notif$;
 
 -- ─── 8. Assertions ──────────────────────────────────────────────────────────────────────────
 DO $assert$
@@ -741,8 +758,9 @@ NOTIFY pgrst, 'reload schema';
 --   verify_schema QUERY 1: the 20261168_marketplace_listings rows must read OK.
 --
 -- ─── Rollback ───────────────────────────────────────────────────────────────
---   Restore auto_hide_reported_content to Araçlar 20261166's body and the two content_reports and the
---   notifications_type_check constraints to their probed lists (only if no 'listing'/'prohibited_item'/
---   'marketplace' rows exist); DROP the two storage policies; empty and drop the bucket through the
+--   Restore auto_hide_reported_content to Araçlar 20261166's body and the two content_reports constraints
+--   to their probed lists (only if no 'listing'/'prohibited_item' rows exist). notifications_type_check:
+--   remove ONLY 'marketplace' (only if no 'marketplace' rows exist), rebuilding the list from the live
+--   values as section 7 does, so 'weekend' and any later type stay; DROP the two storage policies; empty and drop the bucket through the
 --   Storage API; DROP TABLE marketplace_photos, marketplace_listings; DROP the functions above; DROP the
 --   profiles trigger and the two notice columns; delete the schema_migrations_applied row.
