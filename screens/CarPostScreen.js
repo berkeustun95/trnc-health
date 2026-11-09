@@ -317,7 +317,7 @@ export default function CarPostScreen({ session, lang, car = null, profilePhone 
               </View>
               <View style={s.half}>
                 <Label text={t('carsColour', lang)} />
-                <FilterDropdown variant="field" allowAll={false} lang={lang} label={t('carsColour', lang)}
+                <FilterDropdown variant="field" allowAll={false} lang={lang} label={t('carsColour', lang)} searchPlaceholder={t('carsColourSearch', lang)}
                   options={COLOURS.map(c => ({ value: c, label: L(COLOUR_LABEL_KEY, c) }))} value={form.colour} onChange={v => set('colour', v)} />
               </View>
             </View>

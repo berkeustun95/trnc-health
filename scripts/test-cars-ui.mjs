@@ -158,6 +158,11 @@ for (const f of ['screens/CarPostScreen.js', 'screens/MyCarsScreen.js']) {
   check('CarPostScreen: guard registered on backRef, no listener of its own', /backRef\.current = \(\) => leaveRef\.current\(\)/.test(post) && !post.includes('addBackListener'))
   check("CarPostScreen: the prompt is Berke's (message only, Kal / Çık)", post.includes("Alert.alert(t('carsPostDiscardTitle', lang), undefined")
     && post.includes("t('carsPostStay', lang), style: 'cancel'") && post.includes("t('carsPostDiscard', lang), style: 'destructive'"))
+  // The picker search box said "İsim veya adrese göre ara…" (by name or address) for colours and makes.
+  const list = readFileSync(resolve(ROOT, 'screens/CarsScreen.js'), 'utf8')
+  check('Renk / Marka pickers have their own search hint', post.includes("searchPlaceholder={t('carsColourSearch', lang)}")
+    && list.includes("searchPlaceholder={t('carsMakeSearch', lang)}")
+    && /placeholder=\{searchPlaceholder \?\? t\('searchPlaceholder', lang\)\}/.test(readFileSync(resolve(ROOT, 'components/FilterDropdown.js'), 'utf8')))
   check('the discard check counts added and removed photos', /photos\.some\(p => p\.kind === 'new'\)/.test(post) && /removed\.length > 0/.test(post))
 }
 
