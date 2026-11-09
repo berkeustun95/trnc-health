@@ -823,6 +823,7 @@ export default function App() {
   const garagesBackRef = useRef(null)
   const facilityBackRef = useRef(null)
   const towingBackRef = useRef(null)
+  const carPostBackRef = useRef(null)
   const liveScoresBackRef = useRef(null)          // LiveScoresScreen: its editor layer
   const liveScoresEditorBackRef = useRef(null)    // admin's editor: fixture/new → list
   const profileGuardRef = useRef(null)
@@ -1212,7 +1213,11 @@ export default function App() {
       if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showEhliyet) { setShowEhliyet(false); return true }
       // Top layer first (car or dealer page), then the list: back walks the way the user came.
-      if (carsStack.length > 0) { closeCarsLayer(); return true }
+      if (carsStack.length > 0) {
+        if (carsStack[carsStack.length - 1].kind === 'post' && carPostBackRef.current) carPostBackRef.current()
+        else closeCarsLayer()
+        return true
+      }
       if (showCars) { setShowCars(false); return true }
       // Partner page before the list: back steps partner -> list -> Home.
       if (eateryPartner) { if (eateryPartnerBackRef.current?.()) return true; if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
@@ -2649,7 +2654,7 @@ export default function App() {
                   ? <MyCarsScreen lang={lang} reloadKey={carsMineReload} onBack={closeCarsLayer} onPost={() => openCarPost()}
                       onEdit={car => openCarPost(car)} onOpenCar={car => openCarsLayer({ kind: 'car', car })} />
                   : <CarPostScreen session={session} lang={lang} car={layer.car} profilePhone={profile?.phone ?? null}
-                      onBack={closeCarsLayer} onSaved={carSaved} />}
+                      backRef={carPostBackRef} onBack={closeCarsLayer} onSaved={carSaved} />}
           </View>
         ))}
       </View>
