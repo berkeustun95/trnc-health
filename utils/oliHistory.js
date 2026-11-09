@@ -6,11 +6,23 @@ import { supabase } from '../lib/supabase'
 export const HISTORY_LIMIT = 100
 
 // → { rows (oldest first), error }. The newest HISTORY_LIMIT messages; older ones stay until the purge.
+// A hung connection ends as an error after HISTORY_TIMEOUT_MS: the sheet blocks sending while history loads, so
+// a load that never returns would leave the chat dead (2026-11-08).
+export const HISTORY_TIMEOUT_MS = 10000
 export async function loadOliHistory() {
-  const { data, error } = await supabase.from('oli_messages')
+  let q = supabase.from('oli_messages')
     .select('id, role, body, payload, created_at')
     .order('created_at', { ascending: false })
     .limit(HISTORY_LIMIT)
+  let timer = null
+  if (typeof AbortController === 'function') {
+    const controller = new AbortController()
+    timer = setTimeout(() => controller.abort(), HISTORY_TIMEOUT_MS)
+    q = q.abortSignal(controller.signal)
+  }
+  let res
+  try { res = await q } catch (e) { res = { data: null, error: e } } finally { clearTimeout(timer) }
+  const { data, error } = res
   if (error) return { rows: [], error }
   return { rows: (data ?? []).reverse(), error: null }
 }

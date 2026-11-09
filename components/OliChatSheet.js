@@ -32,7 +32,7 @@ const CHIPS = [
   { id: 'newcomer',  labelKey: 'oliChipNewcomer' },
 ]
 
-const NAV_TARGETS = new Set(OLI_CHAT_INTENTS.map(i => i.id))
+const NAV_TARGETS = new Set(OLI_CHAT_INTENTS.filter(i => !i.gap).map(i => i.id))
 const RESULT_MODULES = new Set(['medical', 'events', 'beach', 'landmark', 'homeServices', 'transport', 'jobPostings', 'towing'])
 export const TEXT_KEY = {
   pharmacy: ['oliChatPharmacy', 'oliChatPharmacyNone'],
@@ -40,6 +40,7 @@ export const TEXT_KEY = {
   eatery:   ['oliChatEatery', 'oliChatEateryNone'],
   nearby:   ['oliChatNearby', 'oliChatNearbyNone'],
   needLocation: ['oliChatNeedLocation', 'oliChatNeedLocation'],
+  soon:     ['oliChatSoon', 'oliChatSoon'],
   search:   ['oliChatSearch', 'oliChatNoMatch'],
   noMatch:  ['oliChatNoMatch', 'oliChatNoMatch'],
   error:    ['oliChatError', 'oliChatError'],
@@ -133,6 +134,15 @@ export function OliAnswer({ payload, lang, onAction }) {
   )
 }
 
+// A hung network ends a send as the error reply after SEND_TIMEOUT_MS, so the lock is released and the chat stays
+// usable; the question then counts as not saved, and no reply is stored without it.
+export const SEND_TIMEOUT_MS = 15000
+function withTimeout(promise, fallback) {
+  let timer
+  const late = new Promise(resolve => { timer = setTimeout(() => resolve(fallback), SEND_TIMEOUT_MS) })
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer))
+}
+
 let localSeq = 0
 const localKey = () => `l${Date.now()}-${localSeq++}`
 
@@ -148,6 +158,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
   const [notSaved, setNotSaved] = useState(false)
   const [del, setDel] = useState(null)                // null | { busy, error } while the delete confirm is open
   const listRef = useRef(null)
+  const sendingRef = useRef(false)                    // `busy` is state: two taps in one frame both read false
   const inputRef = useRef('')
   inputRef.current = input
   const voice = useVoiceInput({ lang, getText: () => inputRef.current, onText: setInput })
@@ -194,22 +205,35 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
     return () => clearTimeout(id)
   }, [open, messages.length, busy, kbLift])
 
+  // History integrity (bug 1, 2026-11-08): one send at a time; nothing is sent while saved history is loading
+  // (the load would replace the list and drop the new question); the question is stored before the reply, and a
+  // reply is stored only if its question was; the reply is stored before it is drawn, so a fault while drawing
+  // cannot lose it.
   async function send(text, intentId = null, label = null) {
     const body = (label ?? text).trim()
-    if (!body || busy) return
+    if (!body || sendingRef.current || history === 'loading') return
+    sendingRef.current = true
     voice.abort()
     setInput('')
     setBusy(true)
     const now = new Date()
     setMessages(m => [...m, { key: localKey(), role: 'user', body, at: now.toISOString() }])
-    const savedUser = canSave ? saveOliMessage({ role: 'user', body: body.slice(0, 500) }) : Promise.resolve(null)
-    const answer = await oliProvider.answer({ text: intentId ? '' : body, intentId, lang, userLocation, now })
-    const userErr = await savedUser
-    setMessages(m => [...m, { key: localKey(), role: 'oli', payload: answer, at: new Date().toISOString() }])
-    setBusy(false)
-    // An 'error' answer is a moment, not something worth keeping.
-    const oliErr = canSave && answer.kind !== 'error' ? await saveOliMessage({ role: 'oli', payload: answer }) : null
-    if (canSave && (userErr || oliErr)) setNotSaved(true)
+    try {
+      const savedUser = canSave ? saveOliMessage({ role: 'user', body: body.slice(0, 500) }) : Promise.resolve(null)
+      const failed = { v: 1, kind: 'error', intent: null, items: [], day: localDateKey(now) }
+      let answer
+      try { answer = await withTimeout(oliProvider.answer({ text: intentId ? '' : body, intentId, lang, userLocation, now }), failed) }
+      catch { answer = failed }
+      const userErr = await withTimeout(savedUser, new Error('timeout'))
+      // An 'error' answer is a moment, not something worth keeping.
+      const savedOli = canSave && !userErr && answer.kind !== 'error' ? saveOliMessage({ role: 'oli', payload: answer }) : Promise.resolve(null)
+      setMessages(m => [...m, { key: localKey(), role: 'oli', payload: answer, at: new Date().toISOString() }])
+      const oliErr = await savedOli
+      if (canSave && (userErr || oliErr)) setNotSaved(true)
+    } finally {
+      sendingRef.current = false
+      setBusy(false)
+    }
   }
 
   // The app's own dialog, not Alert.alert: Android's system dialog upper-cases its buttons without the locale, so
@@ -254,7 +278,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
   }
 
   const empty = !messages.length && history !== 'loading'
-  const canSend = !!input.trim() && !busy
+  const canSend = !!input.trim() && !busy && history !== 'loading'
 
   return (
     <Modal visible={open === true} transparent animationType="slide" statusBarTranslucent onRequestClose={closeSheet}>
@@ -302,7 +326,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
           style={s.chipsBar} contentContainerStyle={s.chips}>
           {CHIPS.map(c => (
-            <TouchableOpacity key={c.id} style={s.chip} activeOpacity={press.small} accessibilityRole="button" disabled={busy}
+            <TouchableOpacity key={c.id} style={s.chip} activeOpacity={press.small} accessibilityRole="button" disabled={busy || history === 'loading'}
               onPress={() => send('', c.id, t(c.labelKey, lang))}>
               <Text style={s.chipText}>{t(c.labelKey, lang)}</Text>
             </TouchableOpacity>
