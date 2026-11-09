@@ -2226,12 +2226,13 @@ WITH report AS (
         AND pg_get_constraintdef(oid) NOT LIKE '%''emergency''%'
         AND pg_get_constraintdef(oid) NOT LIKE '%''health''%')
     -- ► BUMPED FROM 36 TO 39 BY 20261165 (the three vehicle_images_* policies), same commit; red until it applies.
-    -- ► BUMPED FROM 39 TO 41 BY 20261183 (the two marketplace photos policies), same commit; red until it applies.
-    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 41 policies, all named, none unknown, none missing',
+    -- ► 39 → 38 BY 20261182 (vehicle_images_upload dropped: car photos go through the vehicle-photo function). Red until it applies.
+    -- ► 38 → 40 BY 20261183 (the two marketplace photos policies), same commit; red until it applies.
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 40 policies, all named, none unknown, none missing',
       (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects') = 41
+        WHERE schemaname='storage' AND tablename='objects') = 40
       AND (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 41
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 40
       AND (SELECT count(*) FROM pg_policies
              WHERE schemaname='storage' AND tablename='objects'
                AND policyname NOT IN (
@@ -2246,7 +2247,7 @@ WITH report AS (
                  'provider_documents_owner_select','provider_documents_owner_update',
                  'towing_logos_admin_delete','towing_logos_admin_insert','towing_logos_admin_update',
                  'towing_logos_public_read',
-                 'vehicle_images_delete','vehicle_images_select','vehicle_images_upload',
+                 'vehicle_images_delete','vehicle_images_select',
                  'marketplace photos upload own pending','marketplace photos read via row',
                  'Providers manage own facility images','Public facility image read',
                  'estate_agent_documents_admin_read','organizer delete own event images',
@@ -5764,15 +5765,22 @@ WITH report AS (
     AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.expire_vehicles()'), 'EXECUTE'), false)
     AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicles') AND tgname = 'vehicles_guard' AND tgenabled <> 'D'), false)
     AND COALESCE((SELECT count(*) = 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicle_images') AND tgname = 'vehicle_images_guard' AND tgenabled <> 'D'), false)
-  UNION ALL SELECT '20261165_vehicles','bucket vehicle-images: public, 5 MB, jpeg/png/webp; exactly 3 vehicle_images_* storage policies (no UPDATE), each guest-guarded and tied to the caller''s listing; upload only into a PENDING one',
+  -- 20261182 dropped vehicle_images_upload (photos go through the vehicle-photo function), so 3 → 2 and the upload
+  -- clause moved to the 20261182 token. RED UNTIL 20261182 RUNS.
+  UNION ALL SELECT '20261165_vehicles','bucket vehicle-images: public, 5 MB, jpeg/png/webp; exactly 2 vehicle_images_* storage policies (select, delete; no UPDATE), each guest-guarded and tied to the caller''s listing',
     COALESCE((SELECT public AND file_size_limit = 5242880 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
                 FROM storage.buckets WHERE id = 'vehicle-images'), false)
-    AND COALESCE((SELECT count(*) = 3 AND NOT bool_or(cmd = 'UPDATE')
+    AND COALESCE((SELECT count(*) = 2 AND NOT bool_or(cmd = 'UPDATE')
                          AND bool_and(coalesce(qual,'') || coalesce(with_check,'') LIKE '%my_vehicle_status(%'
                                   AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_anonymous_session()%')
                     FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
                      AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%vehicle-images%'), false)
-    AND COALESCE((SELECT with_check LIKE '%''pending''%' FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'vehicle_images_upload'), false)
+  -- 20261182: no client can write the bucket at all; the vehicle-photo function (service key, strips Exif) is the only writer.
+  UNION ALL SELECT '20261182_vehicle_photos_via_function','vehicle-images: no client INSERT / UPDATE / ALL storage policy (photos only via the vehicle-photo function); the vehicle_images row policy is kept',
+    NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND cmd IN ('INSERT', 'UPDATE', 'ALL')
+                 AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%vehicle-images%')
+    AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicle_images' AND policyname = 'vehicle_images_insert_own'
+                 AND with_check LIKE '%''pending''%')
   UNION ALL SELECT '20261165_vehicles','vehicles.owner_id is readable by no client; my_vehicles() is the owner''s path (authenticated only)',
     COALESCE(NOT has_column_privilege('anon', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
          AND NOT has_column_privilege('authenticated', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
