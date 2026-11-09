@@ -170,7 +170,7 @@ export default function CarDetailScreen({ car, lang, onBack, onOpenDealer, onReq
               <View style={s.rows}>
                 <InfoRow icon="location-outline" category="city" label={t('carsLocation', lang)} value={place} divider={!!dealer} />
                 {!!dealer && (
-                  <InfoRow icon="storefront-outline" category="city" label={t(dealer.is_rental_company ? 'carsRentalCompany' : 'carsDealer', lang)}
+                  <InfoRow icon="storefront-outline" category="city" label={t(car.intent === 'rent' && dealer.is_rental_company ? 'carsRentalCompany' : 'carsDealer', lang)}
                     value={dealer.name} onPress={() => onOpenDealer(dealer)} divider={false} />
                 )}
               </View>
