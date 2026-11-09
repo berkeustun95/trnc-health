@@ -624,6 +624,7 @@ export default function App() {
   const splashUp = splashPlay !== false && !bootSplashDone
   // Read by the launch OTA apply below (utils/otaLaunchApply.js).
   const touchedRef = useRef(false)
+  const sheetUpRef = useRef(false)
   const splashPlayRef = useRef(splashPlay)
   splashPlayRef.current = splashPlay
   const splashUpRef = useRef(splashUp)
@@ -1069,9 +1070,9 @@ export default function App() {
   useEffect(() => {
     if (__DEV__) return
     Updates.checkForUpdateAsync()
-      .then(({ isAvailable }) => (isAvailable ? Updates.fetchUpdateAsync() : null))
-      .then(async res => {
-        const fetchedId = res?.isNew ? res.manifest?.id : null
+      // The check's id, not fetch's isNew: the native ON_LOAD check may have downloaded it first.
+      .then(check => (check.isAvailable ? Updates.fetchUpdateAsync().then(() => check.manifest?.id ?? null) : null))
+      .then(async fetchedId => {
         if (!fetchedId) return
         const [tap, url, lastAppliedId] = await Promise.all([
           Notifications.getLastNotificationResponseAsync().catch(() => null),
@@ -1081,9 +1082,10 @@ export default function App() {
         const tapAt = tap?.notification?.date
         const blocker = otaApplyBlocker({
           fetchedId, runningId: Updates.updateId, emergency: Updates.isEmergencyLaunch,
-          elapsedMs: Date.now() - LAUNCHED_AT, touched: touchedRef.current, appState: AppState.currentState,
+          elapsedMs: Date.now() - LAUNCHED_AT, touched: touchedRef.current || sheetUpRef.current, appState: AppState.currentState,
           launchedByTap: !!tap && (!tapAt || Date.now() - tapAt < LAUNCH_TAP_MS), launchedByLink: !!url, lastAppliedId,
         })
+        console.log(`[ota-apply] ${blocker ?? 'reloading'} ${fetchedId.slice(0, 8)} after ${Date.now() - LAUNCHED_AT} ms`)
         if (blocker) return
         await AsyncStorage.setItem(OTA_APPLIED_KEY, fetchedId)
         // The clip already played to the end on this launch: don't play it again for the new
@@ -1091,7 +1093,7 @@ export default function App() {
         if (splashPlayRef.current === true && !splashUpRef.current) {
           await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(localDay(), fetchedId)).catch(() => {})
         }
-        if (touchedRef.current || AppState.currentState !== 'active') return
+        if (touchedRef.current || sheetUpRef.current || AppState.currentState !== 'active') return
         await Updates.reloadAsync()
       }).catch(() => {})
   }, [])
@@ -3105,6 +3107,10 @@ export default function App() {
     !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
     shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
                              current: LEGAL_VERSION, returning: returningDevice })
+  const appUpdateVisible = !splashUp && session !== undefined && fontsLoaded && onboarded === true &&
+    (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))
+  // A launch sheet may be a Modal, whose touches the root never sees: one on screen counts as in use.
+  sheetUpRef.current = policyNoticeVisible || appUpdateVisible || homeCityAskVisible || cityWelcomeVisible || showCoachMarks || oliSheetOpen
   // Seen, NOT accepted: nothing is written to profiles.
   // The notice closes on the STATE change, before and regardless of the storage write — a
   // failed write can never keep it on screen. The write is retried so it also stays closed
@@ -3387,8 +3393,7 @@ export default function App() {
           above it), but this Modal lives out here and knows nothing about onboarding, so
           without the repeat it would cover the carousel a new user is still reading. */}
       <AppUpdateNotice
-        visible={!splashUp && session !== undefined && fontsLoaded && onboarded === true &&
-                 (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))}
+        visible={appUpdateVisible}
         tier={updateTier}
         lang={lang}
         onUpdate={openStore}
