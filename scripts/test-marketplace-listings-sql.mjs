@@ -1,4 +1,4 @@
-// 20261168 (Dükkân listings, photos, private bucket, reports, notice) against the live messaging fixture plus
+// 20261168 (Bandabuliya listings, photos, private bucket, reports, notice) against the live messaging fixture plus
 // Araçlar S1's prerequisites (scripts/fixtures/*.sql). PGlite = PostgreSQL 18; prod is 17.6.
 //   node scripts/test-marketplace-listings-sql.mjs
 // What a pass is evidence of: the RLS / grant / trigger outcomes seeded here. Not the Storage API, not signed

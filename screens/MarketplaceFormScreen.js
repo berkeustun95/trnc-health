@@ -15,7 +15,7 @@ import {
 } from '../constants/marketplace'
 import { createListing, updateListing, photosFor, signedUrls, uploadPhoto, removePhoto } from '../utils/marketplaceApi'
 
-// ─── Dükkân: post / edit a listing ──────────────────────────────────────────
+// ─── Bandabuliya: post / edit a listing ──────────────────────────────────────────
 // Clean ground. The form checks the table's own bounds (20261168) before sending; the server repeats every
 // one of them (18+, word filter, caps). Photos upload after the row exists (the path carries its id), one
 // at a time with progress; a failed photo leaves the listing saved and the form in edit mode, so a retry

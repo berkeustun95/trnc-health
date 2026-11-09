@@ -9,7 +9,7 @@ import { MK_CATEGORY, MK_CONDITION, formatPrice, listingState, canRenew, daysUnt
 import { HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, renewListing } from '../utils/marketplaceApi'
 
-// ─── Dükkân: one listing ────────────────────────────────────────────────────
+// ─── Bandabuliya: one listing ────────────────────────────────────────────────────
 // Clean ground (DetailScaffold over PageCanvas). Others see approved photos only (RLS); while none is
 // approved the page shows the category placeholder and "Fotoğraflar inceleniyor". The seller sees every
 // photo of their own with its review state, and manages the listing here.

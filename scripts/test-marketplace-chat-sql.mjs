@@ -1,4 +1,4 @@
-// 20261169 (Dükkân chat) on top of 20261168, against the live messaging fixture + Araçlar prerequisites.
+// 20261169 (Bandabuliya chat) on top of 20261168, against the live messaging fixture + Araçlar prerequisites.
 // Student Hub's own outcomes are scripts/test-marketplace-messaging-sql.mjs (MARKETPLACE_MIGRATIONS=…).
 //   node scripts/test-marketplace-chat-sql.mjs
 // PGlite = PostgreSQL 18; prod is 17.6. Evidence about the RPC outcomes seeded here, nothing else.
@@ -89,13 +89,13 @@ const CASES = [
     const n = (await as(db, 'B', `SELECT count(*)::int FROM list_conversations('listing')`)).value
     return errIs(r2, 'CONVERSATION_EXISTS') && r3.value === 'sent' && n === 2
   }],
-  ['a Dükkân thread does not block a Student Hub thread with the same person (and vice versa)', async db => {
+  ['a Bandabuliya thread does not block a Student Hub thread with the same person (and vice versa)', async db => {
     await db.exec(`INSERT INTO student_education (user_id, institution_id, level, listing_opt_in) VALUES ('${U.S}', '${INST}', 'university', true)`)
     await as(db, 'L', `SELECT start_conversation('${U.S}', 'selam')`)
     const r = await as(db, 'L', `SELECT start_listing_conversation('${db.listing}', 'Gitar için yazıyorum')`)
     return r.value === 'sent'
   }],
-  ['inboxes are split: Student Hub list shows no Dükkân thread; a non-student CAN list Dükkân', async db => {
+  ['inboxes are split: Student Hub list shows no Bandabuliya thread; a non-student CAN list Bandabuliya', async db => {
     await open(db, 'L')
     const sh = (await as(db, 'L', `SELECT count(*)::int FROM list_conversations()`)).value
     const mk = (await as(db, 'L', `SELECT count(*)::int FROM list_conversations('listing')`)).value
@@ -131,8 +131,8 @@ const CASES = [
     await db.exec(`INSERT INTO conversation_attempts (initiator_id, recipient_id, outcome) SELECT '${U.B}', '${U.S}', 'refused' FROM generate_series(1, 50)`)
     return errIs(await open(db, 'B'), 'RATE_LIMITED')
   }],
-  ['word filter applies to Dükkân messages', async db => errIs(await open(db, 'B', 'bu yasakkelime'), 'BLOCKED_TERM')],
-  ['push for a Dükkân thread: screen marketplace_conversation + listing_id; Student Hub push unchanged', async db => {
+  ['word filter applies to Bandabuliya messages', async db => errIs(await open(db, 'B', 'bu yasakkelime'), 'BLOCKED_TERM')],
+  ['push for a Bandabuliya thread: screen marketplace_conversation + listing_id; Student Hub push unchanged', async db => {
     await open(db, 'B')
     const mk = (await db.query(`SELECT body->'data' d FROM _posts`)).rows.pop()?.d
     await db.exec(`DELETE FROM _posts; UPDATE profiles SET push_token = 'ExponentPushToken[l]' WHERE id = '${U.S}';

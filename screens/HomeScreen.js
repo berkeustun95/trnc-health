@@ -167,7 +167,7 @@ const TESTER_UNLOCK = new Set(['liveScores'])
 // Ehliyet is dark (MODULE_FLAGS.ehliyet): dev and ADA Preview see its tile through the same Set (constants/redesign.js EHLIYET).
 const EHLIYET_UNLOCK = new Set(['ehliyet'])
 const TESTER_EHLIYET_UNLOCK = new Set(['liveScores', 'ehliyet'])
-// Dükkân is dark (MODULE_FLAGS.marketplace): dev and ADA Preview see its tile too (constants/redesign.js MARKETPLACE).
+// Bandabuliya is dark (MODULE_FLAGS.marketplace): dev and ADA Preview see its tile too (constants/redesign.js MARKETPLACE).
 const withMarketplace = set => (MARKETPLACE ? new Set([...(set || []), 'marketplace']) : set)
 const HOME_UNLOCK = withMarketplace(EHLIYET ? EHLIYET_UNLOCK : undefined)
 const HOME_TESTER_UNLOCK = withMarketplace(EHLIYET ? TESTER_EHLIYET_UNLOCK : TESTER_UNLOCK)

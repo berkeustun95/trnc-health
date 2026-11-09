@@ -2625,8 +2625,9 @@ const translations = {
     nhAptT1Desc: "Two bedrooms with double beds in each room.\nFully equipped kitchen\n24/7 Hot Water\nwifi \nsmart tv \nInverter air conditioning in every room\n400mt from Golden Tulip hotel\n200 meters to cafes, restaurants and shops.\nIt is right across from Onbeş Kasım Kıbrıs University. \nMarket under the building. \n2.7 km from Metehan border\nIn the center of Nicosia",
     nhAptM1Name: "2 bedroom fully equipped central mehmet akif cd apartment",
     nhAptM1Desc: "Our largest apartment: Premium 2+1 in the Mine building. High level comfort for families and long stays.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Marketplace",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Buy & sell",
     mkSearch: "Search listings",
     mkClearSearch: "Clear search",
     mkIntroTitle: "Buy and sell second-hand",
@@ -5296,8 +5297,9 @@ const translations = {
     nhAptT1Desc: "İki yatak oda her odada çift kişilik yatak.\nTam donanımlı mutfak\n24/7 Sıcak Su\nWifi \nAkıllı tv \nHer odada Inverter klima\nGolden Tulip otele 400mt\nKafe,restorant ve mağazalara 200 mt.\nOnbeş Kasım Kıbrıs Üniversitesi hemen karşısında. \nBina altında market. \nMetehan sınırına 2,7 km\nLefkoşanın merkezinde",
     nhAptM1Name: "2 yatak odalı tam donanımlı merkezi mehmet akif cd daire",
     nhAptM1Desc: "En geniş dairemiz: Mine binasında premium 2+1. Aileler ve uzun konaklamalar için üst düzey konfor.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Dükkân",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Al-sat ilanları",
     mkSearch: "İlanlarda ara",
     mkClearSearch: "Aramayı temizle",
     mkIntroTitle: "İkinci el al, sat",
@@ -7743,8 +7745,9 @@ const translations = {
     nhAptT1Desc: "غرفتا نوم بسرير مزدوج في كل غرفة.\nمطبخ مجهّز بالكامل\nماء ساخن على مدار الساعة\nواي فاي \nتلفزيون ذكي \nمكيّف هواء إنفرتر في كل غرفة\n400 م من فندق Golden Tulip\n200 متر إلى المقاهي والمطاعم والمتاجر.\nتقع قبالة جامعة Onbeş Kasım Kıbrıs مباشرةً. \nسوبرماركت أسفل المبنى. \n2.7 كم من حدود Metehan\nفي وسط نيقوسيا",
     nhAptM1Name: "شقة مركزية بغرفتي نوم ومجهّزة بالكامل في شارع Mehmet Akif",
     nhAptM1Desc: "أكبر شققنا: شقة 2+1 فاخرة في مبنى Mine. راحة عالية للعائلات والإقامات الطويلة.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "السوق",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "بيع وشراء",
     mkSearch: "ابحث في الإعلانات",
     mkClearSearch: "مسح البحث",
     mkIntroTitle: "اشترِ وبِع المستعمل",
@@ -10208,8 +10211,9 @@ const translations = {
     nhAptT1Desc: "Две спальни с двуспальной кроватью в каждой.\nПолностью оборудованная кухня\nГорячая вода 24/7\nWi-Fi \nSmart TV \nКондиционер-инвертор в каждой комнате\n400 м до отеля Golden Tulip\n200 метров до кафе, ресторанов и магазинов.\nНапротив университета Onbeş Kasım Kıbrıs. \nМагазин на первом этаже здания. \n2,7 км до границы Metehan\nВ центре Никосии",
     nhAptM1Name: "Центральная полностью оборудованная квартира с 2 спальнями на улице Mehmet Akif",
     nhAptM1Desc: "Наша самая просторная квартира: премиальная 2+1 в здании Mine. Высокий уровень комфорта для семей и длительного проживания.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Лавка",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Купля-продажа",
     mkSearch: "Поиск объявлений",
     mkClearSearch: "Очистить поиск",
     mkIntroTitle: "Покупайте и продавайте с рук",
@@ -12653,8 +12657,9 @@ const translations = {
     nhAptT1Desc: "Δύο υπνοδωμάτια με διπλό κρεβάτι σε κάθε δωμάτιο.\nΠλήρως εξοπλισμένη κουζίνα\nΖεστό νερό 24/7\nWi-Fi \nSmart TV \nΚλιματιστικό inverter σε κάθε δωμάτιο\n400 μ. από το ξενοδοχείο Golden Tulip\n200 μέτρα από καφέ, εστιατόρια και καταστήματα.\nΑκριβώς απέναντι από το Πανεπιστήμιο Onbeş Kasım Kıbrıs. \nΣούπερ μάρκετ κάτω από το κτίριο. \n2,7 χλμ. από τα σύνορα Metehan\nΣτο κέντρο της Λευκωσίας",
     nhAptM1Name: "Κεντρικό πλήρως εξοπλισμένο διαμέρισμα 2 υπνοδωματίων, οδός Mehmet Akif",
     nhAptM1Desc: "Το μεγαλύτερο διαμέρισμά μας: premium 2+1 στο κτίριο Mine. Υψηλού επιπέδου άνεση για οικογένειες και μακρές διαμονές.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Αγορά",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Αγοραπωλησίες",
     mkSearch: "Αναζήτηση αγγελιών",
     mkClearSearch: "Καθαρισμός αναζήτησης",
     mkIntroTitle: "Αγοράστε και πουλήστε μεταχειρισμένα",
@@ -15102,8 +15107,9 @@ const translations = {
     nhAptT1Desc: "Deux chambres avec lit double dans chacune.\nCuisine entièrement équipée\nEau chaude 24 h/24\nWi-Fi \nTV connectée \nClimatisation inverter dans chaque pièce\n400 m de l'hôtel Golden Tulip\n200 mètres des cafés, restaurants et commerces.\nJuste en face de l'université Onbeş Kasım Kıbrıs. \nSupérette au pied de l'immeuble. \n2,7 km du poste-frontière de Metehan\nAu centre de Nicosie",
     nhAptM1Name: "Appartement central de 2 chambres, entièrement équipé, rue Mehmet Akif",
     nhAptM1Desc: "Notre plus grand appartement : un 2+1 premium dans l'immeuble Mine. Un grand confort pour les familles et les longs séjours.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Marché",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Achat-vente",
     mkSearch: "Rechercher des annonces",
     mkClearSearch: "Effacer la recherche",
     mkIntroTitle: "Achetez et vendez d’occasion",
@@ -17548,8 +17554,9 @@ const translations = {
     nhAptT1Desc: "Dos dormitorios con cama doble en cada uno.\nCocina totalmente equipada\nAgua caliente 24/7\nWi-Fi \nSmart TV \nAire acondicionado inverter en cada habitación\nA 400 m del hotel Golden Tulip\nA 200 metros de cafés, restaurantes y tiendas.\nJusto enfrente de la Universidad Onbeş Kasım Kıbrıs. \nSupermercado en la planta baja del edificio. \nA 2,7 km de la frontera de Metehan\nEn el centro de Nicosia",
     nhAptM1Name: "Apartamento céntrico de 2 dormitorios, totalmente equipado, calle Mehmet Akif",
     nhAptM1Desc: "Nuestro apartamento más grande: un 2+1 premium en el edificio Mine. Gran comodidad para familias y estancias largas.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Mercadillo",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Compraventa",
     mkSearch: "Buscar anuncios",
     mkClearSearch: "Borrar búsqueda",
     mkIntroTitle: "Compra y vende de segunda mano",
@@ -19994,8 +20001,9 @@ const translations = {
     nhAptT1Desc: "Zwei Schlafzimmer mit Doppelbett in jedem Zimmer.\nVoll ausgestattete Küche\nWarmwasser rund um die Uhr\nWLAN \nSmart-TV \nInverter-Klimaanlage in jedem Zimmer\n400 m vom Hotel Golden Tulip\n200 Meter zu Cafés, Restaurants und Geschäften.\nGleich gegenüber der Onbeş-Kasım-Kıbrıs-Universität. \nLebensmittelmarkt unter dem Gebäude. \n2,7 km von der Grenze bei Metehan\nIm Zentrum von Nikosia",
     nhAptM1Name: "Zentrale, voll ausgestattete 2-Schlafzimmer-Wohnung, Mehmet-Akif-Straße",
     nhAptM1Desc: "Unsere größte Wohnung: Premium-2+1 im Mine-Gebäude. Hoher Komfort für Familien und lange Aufenthalte.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "Marktplatz",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "Kaufen & Verkaufen",
     mkSearch: "Anzeigen durchsuchen",
     mkClearSearch: "Suche löschen",
     mkIntroTitle: "Gebraucht kaufen und verkaufen",
@@ -22436,8 +22444,9 @@ const translations = {
     nhAptT1Desc: "دو اتاق خواب با تخت دونفره در هر اتاق.\nآشپزخانهٔ کاملاً مجهز\nآب گرم 24/7\nوای‌فای \nتلویزیون هوشمند \nکولر گازی اینورتر در هر اتاق\n400 متر تا هتل Golden Tulip\n200 متر تا کافه‌ها، رستوران‌ها و فروشگاه‌ها.\nدقیقاً روبه‌روی دانشگاه Onbeş Kasım Kıbrıs. \nفروشگاه مواد غذایی زیر ساختمان. \n2.7 کیلومتر تا مرز Metehan\nدر مرکز نیکوزیا",
     nhAptM1Name: "آپارتمان مرکزی دو‌خوابهٔ کاملاً مجهز در خیابان Mehmet Akif",
     nhAptM1Desc: "بزرگ‌ترین آپارتمان ما: 2+1 پریمیوم در ساختمان Mine. آسایش در سطح بالا برای خانواده‌ها و اقامت‌های طولانی.",
-    // Dükkân (marketplace), 2026-11-07
-    menuMarketplace: "بازارچه",
+    // Bandabuliya (marketplace), 2026-11-07; renamed from Dükkân 2026-11-09
+    menuMarketplace: "Bandabuliya",
+    mkTagline: "خرید و فروش",
     mkSearch: "جست\u200cوجو در آگهی\u200cها",
     mkClearSearch: "پاک کردن جست\u200cوجو",
     mkIntroTitle: "خرید و فروش دست دوم",

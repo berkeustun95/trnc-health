@@ -51,7 +51,7 @@ export const EHLIYET = MODULE_FLAGS.ehliyet || (typeof __DEV__ !== 'undefined' &
 const CARS_PREVIEW = true
 export const CARS = MODULE_FLAGS.cars || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CARS_PREVIEW)
 
-// Dükkân (marketplace) before go-live: dev bundles and ADA Preview open the real screens; the flag
+// Bandabuliya (marketplace) before go-live: dev bundles and ADA Preview open the real screens; the flag
 // stays off, so production shows no tile and no screen (no Coming Soon, no waitlist). Hidden tile,
 // Preview unlock only (Berke, 2026-11-07). Set MARKETPLACE_PREVIEW to false if Preview must stop showing it.
 const MARKETPLACE_PREVIEW = true

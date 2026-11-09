@@ -715,7 +715,7 @@ export default function App() {
     Alert.alert(t(created ? 'carsPostSentTitle' : 'carsPostUpdatedTitle', lang),
       photoFailures ? `${body}\n\n${t('carsPostPhotoFailed', lang)}` : body)
   }
-  // Dükkân: null | 'browse' | 'mine' (Profil's İlanlarım row opens straight into the seller's list).
+  // Bandabuliya: null | 'browse' | 'mine' (Profil's İlanlarım row opens straight into the seller's list).
   const [showMarketplace, setShowMarketplace] = useState(null)
   const [showEatery, setShowEatery] = useState(false)
   const [eateryPartner, setEateryPartner] = useState(null)   // the partner row open inside Yeme-İçme
@@ -2623,7 +2623,7 @@ export default function App() {
       </View>
     )
   } else if (showMarketplace && MARKETPLACE) {
-    // Dükkân. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
+    // Bandabuliya. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
     content = <MarketplaceScreen lang={lang} session={session} profile={profile} backRef={marketplaceBackRef}
       initialView={showMarketplace === 'mine' ? 'mine' : null} onSignIn={() => requireAccount('mkGatePost')}
       onBack={() => setShowMarketplace(null)} />

@@ -56,7 +56,7 @@ const EXPECTED_MODULES = {
   duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
   ehliyet:       true,   // live 2026-10-14 — driving schools (20261108/20261109/20261110); no waitlist
   cars:          false,  // Araçlar, dark — 20261165/20261166/20261167; Coming Soon + waitlist until live
-  marketplace:   false,  // Dükkân — dark, Preview unlock only; no waitlist
+  marketplace:   false,  // Bandabuliya — dark, Preview unlock only; no waitlist
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //

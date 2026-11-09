@@ -7,8 +7,8 @@ import SplashStatusBar from '../components/SplashStatusBar'
 import { MK_CATEGORY, formatPrice, listingState, canRenew, isAdultDob } from '../constants/marketplace'
 import { myListings, photosFor, signedUrls } from '../utils/marketplaceApi'
 
-// ─── Dükkân: İlanlarım ──────────────────────────────────────────────────────
-// The seller's own listings in every state (RLS "owner read"). Opened from Dükkân's header and from
+// ─── Bandabuliya: İlanlarım ──────────────────────────────────────────────────────
+// The seller's own listings in every state (RLS "owner read"). Opened from Bandabuliya's header and from
 // Profil's row. Clean ground.
 
 const STATE_BADGE = { live: 'mkStateLive', sold: 'mkStateSold', expired: 'mkStateExpired', hidden: 'mkStateHidden' }

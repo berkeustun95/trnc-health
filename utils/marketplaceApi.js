@@ -3,7 +3,7 @@ import { MODULE_FLAGS } from '../constants/flags'
 import { MARKETPLACE } from '../constants/redesign'
 import { MK_BUCKET, MK_LISTING_COLUMNS, MK_SIGNED_URL_TTL } from '../constants/marketplace'
 
-// Dükkân data access. Every read goes through RLS (20261168): browse sees only visible listings and
+// Bandabuliya data access. Every read goes through RLS (20261168): browse sees only visible listings and
 // approved photos; the seller sees their own in every state.
 //
 // ─── Preview fixture ────────────────────────────────────────────────────────

@@ -368,6 +368,9 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // ─── Bandabuliya (marketplace), 2026-11-09: a proper name, not translated ──────────
+  'menuMarketplace': Object.fromEntries(['Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+    .map(l => [l, 'Bandabuliya is the brand name in every language (Berke, 2026-11-09); mkTagline says what it is'])),
   // ─── Araçlar (cars), 2026-11-07: the same word in these languages ──────────────────
   'carsFilterDistrict': { French: 'District is French (as ddDistrict)' },
   'carsDescription': { French: 'Description is French' },

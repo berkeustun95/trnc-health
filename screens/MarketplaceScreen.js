@@ -17,7 +17,7 @@ import MarketplaceListingScreen from './MarketplaceListingScreen'
 import MarketplaceFormScreen from './MarketplaceFormScreen'
 import MarketplaceMineScreen from './MarketplaceMineScreen'
 
-// ─── Dükkân: browse ─────────────────────────────────────────────────────────
+// ─── Bandabuliya: browse ─────────────────────────────────────────────────────────
 // The module's main page (photo ground). Detail, form and İlanlarım open over it as layers; Android back
 // closes the top one (backRef), the same shape as Duyurular. Plan: vault 2026-11-07_marketplace-plan.md.
 
@@ -169,7 +169,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   return (
     <ModuleScreen topic="marketplace">
       <SafeAreaView style={s.safe} edges={['top']}>
-        <ScreenHeader onBack={onBack} title={t('menuMarketplace', lang)} lang={lang}
+        <ScreenHeader onBack={onBack} title={t('menuMarketplace', lang)} subtitle={t('mkTagline', lang)} lang={lang}
           actions={signedIn ? [{ icon: 'albums-outline', onPress: () => setMine(true), accessibilityLabel: t('mkMine', lang) }] : []} />
         <View style={s.searchRow}>
           <SearchField value={query} onChange={setQuery} lang={lang} />

@@ -1353,10 +1353,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               titleStyle={s.sectionTitle} hintStyle={s.fieldHint} />
           )}
 
-          {/* Dükkân: İlanlarım. App passes the handler only while MARKETPLACE is on (dev / Preview until go-live). */}
+          {/* Bandabuliya: İlanlarım. App passes the handler only while MARKETPLACE is on (dev / Preview until go-live). */}
           {!!onOpenMyListings && !isGuest(session) && (
             <View style={s.marketingSection}>
               <Text style={s.sectionTitle}>{t('menuMarketplace', lang)}</Text>
+              <Text style={s.fieldHint}>{t('mkTagline', lang)}</Text>
               <TouchableOpacity style={s.marketingRow} onPress={onOpenMyListings} accessibilityRole="button" activeOpacity={0.7}>
                 <Text style={s.marketingLabel}>{t('mkMine', lang)}</Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />

@@ -1,4 +1,4 @@
-// Dükkân (marketplace): users sell their own items to each other. Plan: vault
+// Bandabuliya (marketplace): users sell their own items to each other. Plan: vault
 // 10-ada/2026-11-07_marketplace-plan.md. The database is 20261168 (listings, photos) and 20261169 (chat).
 import { HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from './homeServices'
 import { ADULT_AGE } from './profileGate'
