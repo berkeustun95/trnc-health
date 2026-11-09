@@ -1,9 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261169 — Dükkân chat: a conversation can be about a listing (conversations.kind / listing_id)
+-- 20261184 — Dükkân chat: a conversation can be about a listing (conversations.kind / listing_id)
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Plan: vault 10-ada/2026-11-07_marketplace-plan.md ("reuse existing messaging"; Berke approved the
--- listing_id extension with Student Hub regression tests first). Needs 20261168 (marketplace_listings).
+-- listing_id extension with Student Hub regression tests first). Needs 20261183 (marketplace_listings).
 --
 -- ─── WHAT CHANGES FOR STUDENT HUB: NOTHING OBSERVABLE ───────────────────────
 --   Every existing row becomes kind = 'student' (column DEFAULT). The bodies below are the live ones
@@ -24,12 +24,12 @@
 --   signed-in, not a guest, has read the safety notice (marketplace_notice_at), not the seller, at most
 --   one live thread per (buyer, seller, listing), the shared 50-new-threads-per-24h cap, no block either
 --   way, not previously declined for that listing, and may_initiate_by_age(buyer, seller) — UNCHANGED.
---   Sellers are 18+ (20261168), so in practice: a teen buyer may open a thread with an adult seller and
+--   Sellers are 18+ (20261183), so in practice: a teen buyer may open a thread with an adult seller and
 --   the seller may reply; an adult never opens one with a teen. No student listing is required on
 --   either side. Accept-first, decline, leave, block, delete and report work as in Student Hub (those
 --   functions are untouched). The sender must ALSO have read the notice to reply (seller included).
 --
--- Apply: one supabase-migrate run with 20261168 and 20261170 (Berke approves production-db).
+-- Apply: one supabase-migrate run with 20261183 and 20261185 (Berke approves production-db).
 -- ═══════════════════════════════════════════════════════════════════════════
 
 SET ROLE postgres;
@@ -42,14 +42,14 @@ DO $pre$
 DECLARE v_bad text;
 BEGIN
   IF to_regclass('public.marketplace_listings') IS NULL THEN
-    RAISE EXCEPTION 'REFUSING: marketplace_listings is missing — apply 20261168 first. Nothing applied.';
+    RAISE EXCEPTION 'REFUSING: marketplace_listings is missing — apply 20261183 first. Nothing applied.';
   END IF;
   -- Live md5s (probe 42413063083) or this file's own (re-run).
   SELECT string_agg(f.sig || ' md5 ' || coalesce(md5(p.prosrc), 'MISSING'), '; ') INTO v_bad
     FROM (VALUES
-      ('public.start_conversation(uuid,text)', 'ebc64230658bf71451bd47d3abf236d7', '81f20569216b1e46adba4e0bf8955a76'),
-      ('public.send_message(uuid,text)',       '384abcad73aaa28c00d15a2dbf84a63d', '6b8a5876ceb95a7df9deee010664911d'),
-      ('public.notify_new_message(uuid)',      '3cd1e046ff8149cfb09214421c469f2b', '79978bdd738750ad27195f63700f6b85')
+      ('public.start_conversation(uuid,text)', 'ebc64230658bf71451bd47d3abf236d7', 'c053fc5fcd770d95965316810acfc79a'),
+      ('public.send_message(uuid,text)',       '384abcad73aaa28c00d15a2dbf84a63d', 'e74e414e1dc2902510c09a6bc76e142f'),
+      ('public.notify_new_message(uuid)',      '3cd1e046ff8149cfb09214421c469f2b', 'a6d656b979628ca52be155b6b8dc5bbc')
     ) AS f(sig, live, mine)
     LEFT JOIN pg_proc p ON p.oid = to_regprocedure(f.sig)
    WHERE p.prosrc IS NULL OR md5(p.prosrc) NOT IN (f.live, f.mine);
@@ -85,7 +85,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS conversations_one_live_per_listing ON public.c
 CREATE INDEX IF NOT EXISTS conversations_listing_idx ON public.conversations (listing_id) WHERE listing_id IS NOT NULL;
 
 COMMENT ON COLUMN public.conversations.kind IS
-  'student = Student Hub (both listed students); listing = Dükkân, about listing_id (20261169).';
+  'student = Student Hub (both listed students); listing = Dükkân, about listing_id (20261184).';
 
 -- ─── 2. Student Hub bodies, live + the edits named in the header ────────────
 CREATE OR REPLACE FUNCTION public.start_conversation(p_recipient_id uuid, p_body text)
@@ -121,7 +121,7 @@ BEGIN
     SELECT 1 FROM conversations
      WHERE pair_lo = least(v_me, p_recipient_id) AND pair_hi = greatest(v_me, p_recipient_id)
        AND declined_at IS NULL AND closed_at IS NULL
-       AND kind = 'student'  -- 20261169: a Dükkân thread with the same person is not this thread
+       AND kind = 'student'  -- 20261184: a Dükkân thread with the same person is not this thread
   ) THEN
     RAISE EXCEPTION 'CONVERSATION_EXISTS';
   END IF;
@@ -161,7 +161,7 @@ BEGIN
                   AND pair_hi = greatest(v_me, p_recipient_id)
                   AND declined_at IS NOT NULL
                   AND initiator_id = v_me
-                  AND kind = 'student')  -- 20261169: declining a Dükkân thread is about that item only
+                  AND kind = 'student')  -- 20261184: declining a Dükkân thread is about that item only
     OR NOT may_initiate_by_age(v_me, p_recipient_id);
 
   INSERT INTO conversation_attempts (initiator_id, recipient_id, outcome)
@@ -205,7 +205,7 @@ DECLARE
   v_them uuid;
   v_msg  uuid;
 BEGIN
-  -- 20261169: a Dükkân thread has its own eligibility (no student listing); everything below this
+  -- 20261184: a Dükkân thread has its own eligibility (no student listing); everything below this
   -- line is the Student Hub path, unchanged.
   IF (SELECT kind FROM conversations WHERE id = p_conversation_id) = 'listing' THEN
     RETURN send_listing_message(p_conversation_id, p_body);
@@ -292,7 +292,7 @@ DECLARE
   v_token    text;
   v_title    text;
   v_text     text;
-  -- 20261169: a Dükkân thread opens in Dükkân, not Student Hub.
+  -- 20261184: a Dükkân thread opens in Dükkân, not Student Hub.
   v_kind     text;
   v_listing  uuid;
 BEGIN
@@ -381,7 +381,7 @@ BEGIN
       body    := jsonb_build_object(
                    'to', v_token, 'title', v_title, 'body', v_text, 'sound', 'default',
                    --   20261087 adds 'type' = 'message', the same value as notifications.type.
-                   --   20261169: a Dükkân thread says 'marketplace_conversation' (+ listing_id). An older
+                   --   20261184: a Dükkân thread says 'marketplace_conversation' (+ listing_id). An older
                    --   bundle does not know that screen and ignores the tap, instead of opening Student Hub
                    --   on a thread its inbox will never list.
                    'data', CASE WHEN v_kind = 'listing'
@@ -640,7 +640,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261169_marketplace_messaging.sql', 'aa708e0d021fe1691cfcf6c0e6a9184de8938a72b6447453ec6562ef2a76d1e0')
+VALUES ('20261184_marketplace_messaging.sql', 'c13bd082da484842bb53aa600b5d4a11b7eeb4fbc92a398868fdf53d04c865e8')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -651,7 +651,7 @@ RESET ROLE;
 NOTIFY pgrst, 'reload schema';
 
 -- ─── Verification after applying (read-only, run alone) ─────────────────────
---   verify_schema QUERY 1: the 20261169_marketplace_messaging rows must read OK.
+--   verify_schema QUERY 1: the 20261184_marketplace_messaging rows must read OK.
 --
 -- ─── Rollback ───────────────────────────────────────────────────────────────
 --   Only while no kind = 'listing' row exists: restore the four bodies from probe 42413063083 (DROP

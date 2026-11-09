@@ -3,11 +3,11 @@ import { MODULE_FLAGS } from '../constants/flags'
 import { MARKETPLACE } from '../constants/redesign'
 import { MK_BUCKET, MK_LISTING_COLUMNS, MK_SIGNED_URL_TTL } from '../constants/marketplace'
 
-// Bandabuliya data access. Every read goes through RLS (20261168): browse sees only visible listings and
+// Bandabuliya data access. Every read goes through RLS (20261183): browse sees only visible listings and
 // approved photos; the seller sees their own in every state.
 //
 // ─── Preview fixture ────────────────────────────────────────────────────────
-// Before 20261168 is applied the tables do not exist. In dev / ADA Preview (MARKETPLACE on, flag off)
+// Before 20261183 is applied the tables do not exist. In dev / ADA Preview (MARKETPLACE on, flag off)
 // a "relation does not exist" answer switches this module to an in-memory store so the screens can be
 // walked on a phone; the first successful query after the apply switches it back for good. Production
 // never gets here: with MODULE_FLAGS.marketplace false the screens are unreachable, and with it true
@@ -54,7 +54,7 @@ export async function myListings(uid) {
   return data
 }
 
-// Profiles are owner-read only; the username comes through marketplace_seller_names (20261168), which
+// Profiles are owner-read only; the username comes through marketplace_seller_names (20261183), which
 // answers only for listings the caller can see.
 export async function sellerName(listing) {
   if (fixture) return fixture.names[listing.owner_id] || null
@@ -134,7 +134,7 @@ export async function renewListing(id) {
 
 // Upload one picked photo to pending/<uid>/<listing>/<file>, then its row. File name: a timestamp and the
 // slot, not crypto.randomUUID (unreliable on Hermes, ExploreSubmitScreen). Row insert failing after the
-// upload leaves an orphan object; marketplace-maintenance sweeps objects with no row (20261170).
+// upload leaves an orphan object; marketplace-maintenance sweeps objects with no row (20261185).
 export async function uploadPhoto({ uid, listingId, asset, position }) {
   const type = (asset.mimeType || '').toLowerCase()
   const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg'

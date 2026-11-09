@@ -1,9 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261168 — Dükkân (marketplace): listings, photos (private bucket), reports, safety notice
+-- 20261183 — Dükkân (marketplace): listings, photos (private bucket), reports, safety notice
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Plan: vault 10-ada/2026-11-07_marketplace-plan.md (approved by Berke 2026-11-07). The app is behind
--- MODULE_FLAGS.marketplace (dark; dev + ADA Preview only). Chat is 20261169, maintenance cron 20261170.
+-- MODULE_FLAGS.marketplace (dark; dev + ADA Preview only). Chat is 20261184, maintenance cron 20261185.
 --
 -- ⚠ BUILDS ON ARAÇLAR S1 (20261164-20261167, a parallel session): private.is_adult_on() (Berke 2026-11-07: one
 --   SQL home for the adult age), the 8-value content_reports_content_type_check ('vehicle') and the auto-hide
@@ -23,7 +23,7 @@
 --           Column grants keep hidden_*, expires_at, bumped_at, deleted_at and boosted_until out of
 --           every client's reach; those change only inside the SECURITY DEFINER functions below.
 --   DELETE  Nobody. The seller soft-deletes with delete_marketplace_listing(); rows are purged 30 days
---           later unless a report on them is still pending (marketplace-maintenance, 20261170).
+--           later unless a report on them is still pending (marketplace-maintenance, 20261185).
 -- marketplace_photos
 --   SELECT  The seller sees their own photos in any status. Admins see all. Everyone else sees an
 --           APPROVED photo of a listing they can see (the subquery runs under the listing policies).
@@ -44,7 +44,7 @@
 --
 -- boosted_until exists for a later paid "öne çıkar"; nothing reads or writes it yet.
 --
--- Apply: one supabase-migrate run with 20261169 and 20261170, after Araçlar S1 (Berke approves production-db).
+-- Apply: one supabase-migrate run with 20261184 and 20261185, after Araçlar S1 (Berke approves production-db).
 -- ═══════════════════════════════════════════════════════════════════════════
 
 SET ROLE postgres;
@@ -62,7 +62,7 @@ BEGIN
   END IF;
   SELECT md5(prosrc) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure('public.auto_hide_reported_content()');
   -- 760d… = Araçlar 20261166's body (vehicle branch); the second value is this file's own body (re-run).
-  IF v_md5 IS NULL OR v_md5 NOT IN ('760dc1dec2fd8ce4de8467584f6bf6fc', '2915343fc069c2aa745ff418ddc853ad') THEN
+  IF v_md5 IS NULL OR v_md5 NOT IN ('760dc1dec2fd8ce4de8467584f6bf6fc', '3c9cf19cbf51d97048202bd90bcbe3fe') THEN
     RAISE EXCEPTION 'REFUSING: live auto_hide_reported_content body (md5 %) is not Araçlar 20261166''s — apply that first or re-derive. Nothing applied.', v_md5;
   END IF;
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint WHERE conname = 'content_reports_content_type_check'
@@ -216,9 +216,9 @@ CREATE INDEX IF NOT EXISTS marketplace_listings_owner_idx ON public.marketplace_
 COMMENT ON TABLE public.marketplace_listings IS
   'Dükkân: items users sell to each other (no payments in ADA; buyer and seller agree in chat). Sellers 18+. '
   'Item columns are client-writable by the owner; moderation, expiry, deletion and boost only via SECURITY '
-  'DEFINER functions. One report auto-hides. Soft delete, purged 30 days later unless a report is pending. 20261168.';
+  'DEFINER functions. One report auto-hides. Soft delete, purged 30 days later unless a report is pending. 20261183.';
 COMMENT ON COLUMN public.marketplace_listings.boosted_until IS
-  'Reserved for a paid "öne çıkar" boost. Unused: no grant, no reader, no writer (20261168).';
+  'Reserved for a paid "öne çıkar" boost. Unused: no grant, no reader, no writer (20261183).';
 
 ALTER TABLE public.marketplace_listings ENABLE ROW LEVEL SECURITY;
 
@@ -511,7 +511,7 @@ CREATE INDEX IF NOT EXISTS marketplace_photos_queue_idx
 COMMENT ON TABLE public.marketplace_photos IS
   'Dükkân listing photos. Private bucket marketplace-photos; visible to others only once approved (by an admin '
   'today: marketplace-photo-review re-encodes the image, stripping EXIF/GPS). review_source/scan leave room for '
-  'an automatic scan. 20261168.';
+  'an automatic scan. 20261183.';
 
 ALTER TABLE public.marketplace_photos ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.marketplace_photos FROM PUBLIC, anon, authenticated;
@@ -618,7 +618,7 @@ CREATE OR REPLACE FUNCTION public.auto_hide_reported_content()
 AS $function$
 DECLARE v_count int;
 BEGIN
-  -- Dükkân (20261168): ONE report hides a listing (Berke 2026-11-07). Before the 3-reporter count.
+  -- Dükkân (20261183): ONE report hides a listing (Berke 2026-11-07). Before the 3-reporter count.
   IF NEW.content_type = 'listing' THEN
     PERFORM set_config('app.trusted_marketplace', 'on', true);
     UPDATE marketplace_listings SET hidden_at = now(), hidden_reason = 'auto_reports'
@@ -650,7 +650,7 @@ $function$;
 -- ─── 7. Notifications: a 'marketplace' type (photo rejected, listing removed) ───────────────
 -- Idempotent: the live values are kept in their order and 'marketplace' is appended only when missing,
 -- so 'weekend' (20261175) and any later type survive, and a re-run changes nothing.
-DO $notif$
+DO $$
 DECLARE v_def text; v_vals text[];
 BEGIN
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint WHERE conname = 'notifications_type_check'
@@ -664,7 +664,7 @@ BEGIN
                    (SELECT string_agg(quote_literal(v), ', ' ORDER BY n) FROM unnest(v_vals || 'marketplace'::text) WITH ORDINALITY AS u(v, n)));
     RAISE NOTICE 'notifications_type_check: added marketplace to %', v_vals;
   END IF;
-END $notif$;
+END $$;
 
 -- ─── 8. Assertions ──────────────────────────────────────────────────────────────────────────
 DO $assert$
@@ -744,7 +744,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261168_marketplace_listings.sql', '38bbde3927af6941791a5a13b047362ad092352f28a93e4f81d944fa7ec5997f')
+VALUES ('20261183_marketplace_listings.sql', '9717d5064c122aef8bbc78f2f8a16d960ffe3f762bb85b667a814e46e0b9faa3')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -755,7 +755,7 @@ RESET ROLE;
 NOTIFY pgrst, 'reload schema';
 
 -- ─── Verification after applying (read-only, run alone) ─────────────────────
---   verify_schema QUERY 1: the 20261168_marketplace_listings rows must read OK.
+--   verify_schema QUERY 1: the 20261183_marketplace_listings rows must read OK.
 --
 -- ─── Rollback ───────────────────────────────────────────────────────────────
 --   Restore auto_hide_reported_content to Araçlar 20261166's body and the two content_reports constraints

@@ -1,4 +1,4 @@
-// 20261169 (Bandabuliya chat) on top of 20261168, against the live messaging fixture + Araçlar prerequisites.
+// 20261184 (Bandabuliya chat) on top of 20261183, against the live messaging fixture + Araçlar prerequisites.
 // Student Hub's own outcomes are scripts/test-marketplace-messaging-sql.mjs (MARKETPLACE_MIGRATIONS=…).
 //   node scripts/test-marketplace-chat-sql.mjs
 // PGlite = PostgreSQL 18; prod is 17.6. Evidence about the RPC outcomes seeded here, nothing else.
@@ -8,7 +8,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const rel = p => fileURLToPath(new URL(p, import.meta.url))
 const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8')
-const FILES = ['20261168_marketplace_listings.sql', '20261169_marketplace_messaging.sql'].map(f => rel('../supabase/migrations/' + f))
+const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql'].map(f => rel('../supabase/migrations/' + f))
 
 const U = {
   S: 'a0000000-0000-4000-8000-00000000000a',  // adult seller, not a student
@@ -152,7 +152,7 @@ for (const [name, fn] of CASES) {
 {
   const db = await build()
   const again = await applyFile(db, FILES[1])
-  check('20261169 second apply is a clean re-run', again.ok, again.msg)
+  check('20261184 second apply is a clean re-run', again.ok, again.msg)
 }
 {
   const db = await freshDb(BASE + SEED + `CREATE OR REPLACE FUNCTION public.send_message(p_conversation_id uuid, p_body text) RETURNS text LANGUAGE sql AS 'SELECT ''x''';`)

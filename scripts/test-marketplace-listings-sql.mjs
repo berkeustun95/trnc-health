@@ -1,4 +1,4 @@
-// 20261168 (Bandabuliya listings, photos, private bucket, reports, notice) against the live messaging fixture plus
+// 20261183 (Bandabuliya listings, photos, private bucket, reports, notice) against the live messaging fixture plus
 // Araçlar S1's prerequisites (scripts/fixtures/*.sql). PGlite = PostgreSQL 18; prod is 17.6.
 //   node scripts/test-marketplace-listings-sql.mjs
 // What a pass is evidence of: the RLS / grant / trigger outcomes seeded here. Not the Storage API, not signed
@@ -9,7 +9,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const rel = p => fileURLToPath(new URL(p, import.meta.url))
 const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8')
-const FILE = rel('../supabase/migrations/20261168_marketplace_listings.sql')
+const FILE = rel('../supabase/migrations/20261183_marketplace_listings.sql')
 
 const U = {
   A: 'a0000000-0000-4000-8000-00000000000a', B: 'b0000000-0000-4000-8000-00000000000b',

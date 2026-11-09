@@ -1,9 +1,9 @@
 // Bandabuliya (marketplace): users sell their own items to each other. Plan: vault
-// 10-ada/2026-11-07_marketplace-plan.md. The database is 20261168 (listings, photos) and 20261169 (chat).
+// 10-ada/2026-11-07_marketplace-plan.md. The database is 20261183 (listings, photos) and 20261184 (chat).
 import { HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from './homeServices'
 import { ADULT_AGE } from './profileGate'
 
-// Mirrors marketplace_listings_category_check (20261168). No vehicles (Araçlar) and no real estate (Emlak).
+// Mirrors marketplace_listings_category_check (20261183). No vehicles (Araçlar) and no real estate (Emlak).
 export const MK_CATEGORIES = [
   { key: 'electronics',   labelKey: 'mkCatElectronics',  icon: 'phone-portrait-outline' },
   { key: 'home',          labelKey: 'mkCatHome',         icon: 'bed-outline' },
@@ -45,7 +45,7 @@ export const MK_SIGNED_URL_TTL = 3600
 export const MK_LISTING_COLUMNS =
   'id, owner_id, title, description, price_tl, is_free, category, condition, district, status, sold_at, created_at, bumped_at, expires_at, hidden_at'
 
-// UI only: whether to offer "İlan ver". The boundary is the server (i_am_adult(), 20261168); an unknown
+// UI only: whether to offer "İlan ver". The boundary is the server (i_am_adult(), 20261183); an unknown
 // date of birth is "not adult" there too.
 export function isAdultDob(dob, today = new Date()) {
   if (!dob) return false

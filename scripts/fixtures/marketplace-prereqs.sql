@@ -1,7 +1,7 @@
--- Prerequisites the marketplace migrations (20261168-20261170) build on, beyond messaging-live.sql:
+-- Prerequisites the marketplace migrations (20261183-20261185) build on, beyond messaging-live.sql:
 --   • Araçlar S1 as its files read on 2026-11-07 (~/trnc-health-araclar, db/araclar-schema 69e446c):
 --     private.is_adult_on (20261164), the 8-value content_reports_content_type_check and the auto-hide body
---     with the vehicle branch (20261166) — copied VERBATIM; the md5 of the auto-hide body is what 20261168's
+--     with the vehicle branch (20261166) — copied VERBATIM; the md5 of the auto-hide body is what 20261183's
 --     pre-flight demands (760dc1de…).
 --   • content_reports reason check as live (probe 42413063083); notifications_type_check as 20261175 left it ('weekend').
 --   • Supabase Storage, minimally: storage.buckets, storage.objects (RLS on), storage.foldername() as Supabase

@@ -281,15 +281,15 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261165_vehicles.sql', '506b0ba0508ed32f2232a1db064dad8457126a4b98b84cf8265e57c1b3894178'),
   ('20261166_vehicles_moderation.sql', '4765f02f6f17f797267635fa64b383ec91cf96627211037b2115c25ad0a78db4'),
   ('20261167_cars_waitlist_notify.sql', '7329e36b81122a7e440a467e6a9d264923468367b11ccde608b29d202c2112f6'),
-  ('20261168_marketplace_listings.sql', '38bbde3927af6941791a5a13b047362ad092352f28a93e4f81d944fa7ec5997f'),
-  ('20261169_marketplace_messaging.sql', 'aa708e0d021fe1691cfcf6c0e6a9184de8938a72b6447453ec6562ef2a76d1e0'),
   ('20261175_weekend_digest.sql', '49726a42249bb6618d80c6a5d96585731c8267fa7365b9e09f1f6fb44fd5c87b'),
   ('20261176_weekend_digest_test_send.sql', '92c36b9779dc8190e3e64aab046ce387092e1569d3f9fb1e1a419f1f00823c5a'),
   ('20261177_weekend_digest_schedule.sql', 'd95c2c652810daa339d59d52c4e7f936d344a155153e3e5fe927260cfd40abcd'),
   ('20261178_places_staged_preview.sql', 'fafb937c3f99cd5cf1d00e3e8f42839e28e60dd16a880625abf22acc0665dfa7'),
   ('20261179_osm_free_listings.sql', '7f45f9d8d18c559a043350d286996f9e0e869d9c4a2b10a10d35c45247e6f790'),
   ('20261180_weekend_digest_pause.sql', '0dd619d437cbf00ab5259c1455192a900e1e109d1a0e39d7cb63a4189a2c98d8'),
-  ('20261181_vehicle_admin_author.sql', '8781667c15b1a48042d45070edf90f9a2db783a55737a11bc5160a9f49c4895f')
+  ('20261181_vehicle_admin_author.sql', '8781667c15b1a48042d45070edf90f9a2db783a55737a11bc5160a9f49c4895f'),
+  ('20261183_marketplace_listings.sql', '9717d5064c122aef8bbc78f2f8a16d960ffe3f762bb85b667a814e46e0b9faa3'),
+  ('20261184_marketplace_messaging.sql', 'c13bd082da484842bb53aa600b5d4a11b7eeb4fbc92a398868fdf53d04c865e8')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
