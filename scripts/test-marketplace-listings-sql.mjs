@@ -293,5 +293,32 @@ const LIVE9 = `'duty'::text, 'message'::text, 'waitlist'::text, 'question'::text
   check('red: notifications_type_check not a value list → refused', !r.ok && /not a plain value list/.test(r.msg), r.msg)
 }
 
+// verify_schema's content_reports type token (label 1026_student_education). 20261183 widens the list, so this file owns
+// the token; Araçlar's test no longer evaluates it. It must still name 'vehicle': losing Araçlar's type goes red here.
+{
+  const vs = readFileSync(rel('../supabase/verify_schema.sql'), 'utf8')
+  const head = vs.indexOf(`UNION ALL SELECT '1026_student_education','content_reports admits`)
+  const from = vs.indexOf('\n', head) + 1
+  const expr = vs.slice(from, from + vs.slice(from).search(/\n\s*(?:--[^\n]*\n\s*)*UNION ALL SELECT/))
+  const token = db => db.query(`SELECT (${expr}) AS ok`).then(r => r.rows[0].ok, e => e.message)
+  check(`content_reports token: found, and names both 'vehicle' and 'listing'`, head > 0 && expr.includes(`'vehicle'`) && expr.includes(`'listing'`), expr)
+  check('content_reports token: green after 20261183', await token(await build()) === true)
+  const before = await token(await freshDb(BASE + SEED))
+  check('content_reports token: not green before 20261183', before === false, before)
+  const noVehicle = `ALTER TABLE public.content_reports DROP CONSTRAINT content_reports_content_type_check;
+    ALTER TABLE public.content_reports ADD CONSTRAINT content_reports_content_type_check
+      CHECK (content_type IN ('answer','facility','message','place','profile','question','review'));`
+  const db = await freshDb(BASE + SEED + noVehicle)
+  const r = await applyFile(db, FILE)
+  const t2 = await token(db)
+  check(`red: 'vehicle' gone from content_reports → 20261183 refuses and the token stays red`, !r.ok && /REFUSING: content_reports_content_type_check/.test(r.msg) && t2 !== true, r.ok ? t2 : r.msg)
+  const after = await build()
+  await after.exec(`ALTER TABLE public.content_reports DROP CONSTRAINT content_reports_content_type_check;
+    ALTER TABLE public.content_reports ADD CONSTRAINT content_reports_content_type_check
+      CHECK (content_type IN ('answer','facility','listing','message','place','profile','question','review'));`)
+  const t3 = await token(after)
+  check(`red: 'vehicle' dropped after the release → the token goes red`, t3 === false, t3)
+}
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed')
 process.exit(failed ? 1 : 0)
