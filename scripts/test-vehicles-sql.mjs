@@ -381,7 +381,8 @@ console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const tokens = []
-  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[1268]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
+  // 1026_student_education (the content_reports type list) is owned by 20261183 from now on: test-marketplace-listings-sql.mjs asserts it.
+  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[1268]_[a-z_]+|1029_student_messaging)','([^']*(?:''[^']*)*)',\n/g
   let m
   while ((m = re.exec(vs))) {
     if (m[1].startsWith('10') && !/is_adult_on|vehicle/.test(m[2])) continue
