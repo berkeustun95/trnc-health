@@ -9,13 +9,15 @@
 // website. data/dealers/<slug>/ holds:
 //   dealer.json          the dealer row (name, region, phone / WhatsApp for the buttons, consent date and note)
 //   cars.csv             one row per car, matched by ilan_no (scripts/lib/dealer-csv.mjs maps and validates it)
-//   photos/<ilan_no>/    1.jpg (the cover), 2.jpg, … — optional per car
+//   photos/<ilan_no>/    1.jpg (the cover), 2.jpg, … — optional per car. The repo is public: only files already
+//                        stripped of metadata may be committed (scripts/test-dealer-import.mjs fails otherwise).
 //
 // What a run does:
 //   • a new ilan_no is added; a changed row is updated (content_hash); a car missing from the CSV is set to 'removed'
 //     and its photos are deleted. More than a couple of removals at once needs confirm_remove=<count> (a truncated
 //     file must not empty the stock). A row that cannot be mapped is skipped and reported; what is live under its
-//     reference is left alone.
+//     reference is left alone. A car in the CSV that is not active in ADA (rejected or removed) is HELD and left
+//     alone: --reactivate <ref,ref> brings it back.
 //   • photos go through the same stripper as sellers' uploads (supabase/functions/_shared/image-metadata.mjs: all
 //     Exif / XMP / GPS removed at byte level, proved clean, refused otherwise), are stored under the listing's folder
 //     and read back before their rows are written. A car with no photo folder keeps the photos it has; with none it
@@ -41,8 +43,9 @@ prodWriteGuard({ wouldWrite: apply, workflow: 'araclar-dealer-import', dryHint: 
 
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 const slug = arg('dealer')
-if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(slug ?? '')) fail('usage: --dealer <slug> [--offline | --apply] [--confirm-remove <n>]')
+if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(slug ?? '')) fail('usage: --dealer <slug> [--offline | --apply] [--confirm-remove <n>] [--reactivate <ref,ref>]')
 const confirmed = arg('confirm-remove') ? Number(arg('confirm-remove')) : null
+const reactivate = (arg('reactivate') ?? '').split(',').map(s => s.trim()).filter(Boolean)
 const DIR = resolve(ROOT, 'data/dealers', slug)
 if (!existsSync(resolve(DIR, 'dealer.json')) || !existsSync(resolve(DIR, 'cars.csv'))) fail(`data/dealers/${slug}/ needs dealer.json and cars.csv`)
 
@@ -51,6 +54,7 @@ const MAX_BYTES = 5 * 1024 * 1024
 const MAX_PHOTOS = 30
 const DEALER = JSON.parse(readFileSync(resolve(DIR, 'dealer.json'), 'utf8'))
 if (DEALER.slug !== slug) fail('dealer.json: slug does not match its folder')
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(DEALER.id ?? '')) fail('dealer.json: id is not a uuid')
 if ('is_active' in DEALER) fail('dealer.json must not carry is_active: this script never activates a dealer')
 if (!/^\d{4}-\d{2}-\d{2}$/.test(DEALER.consent_date ?? '') || !DEALER.consent_note) fail('dealer.json: consent_date and consent_note are required (no consent, no import)')
 
@@ -83,9 +87,10 @@ for (const c of cars) {
 
 function report(plan, existing) {
   const line = (tag, c, extra = '') => console.log(`  ${tag.padEnd(7)} ${label(c)}${extra}`)
-  console.log(`\n${DEALER.name}: ${cars.length} CSV row(s) → add ${plan.add.length} · change ${plan.change.length} · unchanged ${plan.same.length} · remove ${plan.remove.length} · skipped ${plan.skipped.length}`)
+  console.log(`\n${DEALER.name}: ${cars.length} CSV row(s) → add ${plan.add.length} · change ${plan.change.length} · unchanged ${plan.same.length} · remove ${plan.remove.length} · held ${plan.held.length} · skipped ${plan.skipped.length}`)
   for (const c of plan.add) line('ADD', c)
-  for (const c of plan.change) line('CHANGE', c, `  [${c.fields.map(f => f === 'description' || f === 'status' ? f : `${f}: ${c.was[f]} → ${c.row[f]}`).join(', ')}]`)
+  for (const c of plan.change) line(c.fields[0] === 'status' ? 'REACTIVATE' : 'CHANGE', c, `  [${c.fields.map(f => f === 'description' || f === 'content_hash' ? f : f === 'status' ? `status: ${c.was.status} → active` : `${f}: ${c.was[f]} → ${c.row[f]}`).join(', ')}]`)
+  for (const c of plan.held) line('HELD', c, `  status ${c.was.status} in ADA: left alone (--reactivate ${c.ref} to bring it back)`)
   for (const e of plan.remove) console.log(`  REMOVE  ${e.external_id}  ${e.make} ${e.model} ${e.year}`)
   for (const c of plan.skipped) line('SKIPPED', c, `  ${c.problems.join('; ')}`)
   const flagged = cars.filter(c => c.flags.length)
@@ -124,7 +129,7 @@ if (vErr) fail(`read vehicles: ${vErr.message}`)
 const existing = rows.map(r => ({ ...r, photos: r.vehicle_images.length }))
 
 let plan
-try { plan = planSync(cars, existing) } catch (e) { fail(`REFUSED: ${e.message}`) }
+try { plan = planSync(cars, existing, reactivate) } catch (e) { fail(`REFUSED: ${e.message}`) }
 console.log(`dealer row: ${dealerRow[0] ? (dealerLive ? 'exists, ACTIVE (cars are public)' : 'exists, inactive (ADA Preview only)') : 'new, will be created inactive'}`)
 report(plan, existing)
 const refusal = removalRefusal(plan, existing, confirmed)
@@ -164,11 +169,17 @@ async function dropPhotos(images) {
 for (const e of plan.remove) {
   const { error } = await db.from('vehicles').update({ status: 'removed' }).eq('id', e.id)
   must(`remove ${e.external_id}`, error)
-  await dropPhotos(e.vehicle_images)
+}
+// Every car that is not live and not in the CSV loses its photos, not only the ones removed in THIS run: a run that
+// died between the status change and the photo delete is finished by the next one.
+const inCsv = new Set(cars.map(c => c.ref))
+for (const e of existing) {
+  if (!inCsv.has(e.external_id) && e.vehicle_images.length) await dropPhotos(e.vehicle_images)
 }
 
+const heldRefs = new Set(plan.held.map(c => c.ref))
 for (const [ref, wanted] of photosOf) {
-  if (!wanted.length) continue
+  if (!wanted.length || heldRefs.has(ref)) continue
   const id = idOf.get(ref)
   const have = existing.find(e => e.external_id === ref)?.vehicle_images ?? []
   const paths = wanted.map(w => `${id}/${w.file}`)
@@ -188,7 +199,7 @@ for (const [ref, wanted] of photosOf) {
 // ─── Read back ───────────────────────────────────────────────────────────────
 const { data: after, error: aErr } = await db.from('vehicles').select('id, external_id, status, content_hash, vehicle_images(id)').eq('dealer_id', DEALER.id).not('external_id', 'is', null)
 must('read back', aErr)
-const want = new Map(cars.filter(c => c.row).map(c => [c.ref, contentHash(c.row)]))
+const want = new Map(cars.filter(c => c.row && !heldRefs.has(c.ref)).map(c => [c.ref, contentHash(c.row)]))
 const wrong = [...want].filter(([ref, h]) => { const r = after.find(a => a.external_id === ref); return !r || r.status !== 'active' || r.content_hash !== h })
 const stillLive = plan.remove.filter(e => after.find(a => a.id === e.id)?.status !== 'removed')
 if (wrong.length || stillLive.length) fail(`read back: ${wrong.length} car(s) not as written, ${stillLive.length} not removed`)

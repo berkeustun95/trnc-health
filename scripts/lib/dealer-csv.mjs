@@ -68,25 +68,43 @@ export function wholeNumber(s) {
   return Number(s.replace(/[.,]/g, ''))
 }
 
-// A description may not carry a way to reach anyone but the dealer's own buttons: phone numbers, e-mail addresses and
-// links are cut out. Six digits and fewer are left alone (km, cc, prices).
+// A description may not carry a way to reach anyone but the dealer's own buttons: phone numbers, e-mail addresses,
+// links and handles are cut out. Only PHONE-SHAPED numbers are cut (a +/00/0 prefix, a 5xx mobile, a 3-2-2 landline):
+// "12.500-11.950 GBP", "150.000-160.000 km" and "2015-2016 120.000" are prices, km and years and must survive
+// (review 2026-11-10). Separators never include a newline, so two paragraphs cannot join into a "number".
+const SEP = '[ ()./-]{0,3}'
+const NOT_IN_NUMBER = '(?<!\\d)(?<!\\d[.,])'
 const CONTACT = [
   /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g,
   /\b(?:https?:\/\/|www\.)\S+/gi,
-  /\b(?:wa\.me|t\.me|instagram\.com|facebook\.com)\/\S+/gi,
-  /(?<![\d.,])(?:\+|00)?\d(?:[\s().-]{0,2}\d){9,13}(?![\d.,]\d)/g,
-  /(?<![\d.,])0?5\d{2}[\s().-]{0,2}\d{3}[\s().-]{0,2}\d{2}[\s().-]{0,2}\d{2}(?!\d)/g,
+  /\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|info|biz|me|co|tr|uk|cy)\b(?:\/\S*)?/gi,
+  /(?<![\w.])@[\w.]{2,}/g,
+  new RegExp(`\\(?${NOT_IN_NUMBER}(?:\\+|00)\\d(?:${SEP}\\d){9,13}(?!\\d)`, 'g'),
+  new RegExp(`\\(?${NOT_IN_NUMBER}0\\d{3}${SEP}\\d{3}${SEP}\\d{2}${SEP}\\d{2}(?!\\d)`, 'g'),
+  new RegExp(`${NOT_IN_NUMBER}5\\d{2}[ -]?\\d{3}[ -]?\\d{2}[ -]?\\d{2}(?!\\d)`, 'g'),
+  new RegExp(`${NOT_IN_NUMBER}5\\d{2}\\.\\d{3}\\.\\d{2}\\.\\d{2}(?!\\d)`, 'g'),
+  new RegExp(`${NOT_IN_NUMBER}\\d{3}[ -]\\d{2}[ -]\\d{2}(?![\\d.,]\\d)(?!\\d)`, 'g'),
 ]
 export function stripContacts(text) {
-  let out = text, cut = 0
-  for (const re of CONTACT) out = out.replace(re, () => { cut++; return '' })
-  return { text: out.replace(/[ \t]{2,}/g, ' ').replace(/ +([,.;:])/g, '$1').trim(), cut }
+  let out = text
+  const cut = []
+  for (const re of CONTACT) out = out.replace(re, m => { cut.push(m.trim()); return '' })
+  out = out.replace(/\(\s*\)/g, '').replace(/[ \t]{2,}/g, ' ').replace(/ +([,.;:])/g, '$1').trim()
+  return { text: out, cut }
+}
+
+// What may still be a contact after the cut: the row is then SKIPPED and shown, never imported on a guess. Prices and
+// km (1-3 digits then groups of three) and years are taken out first, so they cannot look like a long digit run.
+export function contactResidue(text) {
+  const bare = text.replace(/\d{1,3}(?:[.,]\d{3})+/g, ' ').replace(/\b(?:19|20)\d{2}\b/g, ' ')
+  const m = bare.match(/@|\d{7,}|(?:\d[ ()./-]{0,2}){9,}\d|\b(?:whatsapp|instagram|facebook|telegram)\s*:/i)
+  return m ? m[0].trim() : null
 }
 
 export function buildDescription(r) {
   const head = [r.versiyon, r.motor_cc && `${r.motor_cc} cc`, r.durum].filter(Boolean).join(' · ')
   const { text, cut } = stripContacts([head, r.ozellikler, r.aciklama].filter(Boolean).join('\n\n'))
-  return { description: text || null, cut }
+  return { description: text || null, cut, residue: contactResidue(text) }
 }
 
 // One CSV row → { ref, row } or { ref, problems }. `flags` are notes for the run log (a price that differs from the
@@ -108,14 +126,16 @@ export function mapCar(r) {
   else if (km > 2000000) problems.push(`km ${km} is out of range`)
   const price = wholeNumber(r.fiyat_liste ?? '')
   if (!price) problems.push(`fiyat_liste "${r.fiyat_liste ?? ''}" is not a price`)
+  else if (price > (intent === 'rent' ? 1000000 : 100000000)) problems.push(`fiyat_liste ${price} is out of range`)
   if (!CURRENCIES.includes(r.para_birimi)) problems.push(`para_birimi "${r.para_birimi ?? ''}" has no match`)
   if (!r.marka || r.marka.length > 40) problems.push('marka is missing or over 40 characters')
   if (!r.model || r.model.length > 60) problems.push('model is missing or over 60 characters')
   const fuel = pick(FUEL, 'yakit', 'yakit'), gearbox = pick(GEARBOX, 'vites', 'vites'), body_type = pick(BODY, 'kasa', 'kasa')
   const colour = pick(COLOUR, 'renk', 'renk'), steering = pick(STEERING, 'direksiyon', 'direksiyon'), region = pick(REGION, 'sehir', 'sehir')
-  const { description, cut } = buildDescription(r)
+  const { description, cut, residue } = buildDescription(r)
   if (description && description.length > 3000) problems.push('the description is over 3000 characters')
-  if (cut) flags.push(`${cut} contact detail(s) cut from the description`)
+  if (residue) problems.push(`the description may still hold a contact ("${residue}"): edit the CSV text`)
+  for (const c of cut) flags.push(`contact detail cut from the description: "${c}"`)
   const other = r.fiyat_aciklamada ? wholeNumber(r.fiyat_aciklamada) : null
   if (other !== null && price && other !== price) flags.push(`FİYAT FARKLI: list ${price}, in the dealer's text ${other} (list price used)`)
   if (problems.length) return { ref, problems, flags }
@@ -136,19 +156,26 @@ export const changedFields = (was, now) => HASH_FIELDS.filter(f => norm(was[f]) 
 
 // What a run would do. `existing`: the dealer's rows that carry a reference. A CSV row that could not be mapped keeps
 // whatever is live under its reference (a typo in the file must not delete a car); a duplicated reference stops the run.
-export function planSync(cars, existing) {
+// A car that is in the CSV but NOT active in ADA (an admin rejected or removed it, or it was sold and came back) is
+// HELD: left exactly as it is unless its reference is named in `reactivate`. The importer never undoes moderation.
+export function planSync(cars, existing, reactivate = []) {
   const seen = new Set(), dup = new Set()
   for (const c of cars) { if (seen.has(c.ref)) dup.add(c.ref); seen.add(c.ref) }
   if (dup.size) throw new Error(`the CSV lists a reference twice: ${[...dup].join(', ')}`)
   const byRef = new Map(existing.map(e => [e.external_id, e]))
-  const plan = { add: [], change: [], same: [], remove: [], skipped: cars.filter(c => !c.row) }
+  const plan = { add: [], change: [], same: [], remove: [], held: [], skipped: cars.filter(c => !c.row) }
+  const unknown = reactivate.filter(ref => byRef.get(ref)?.status === 'active' || !byRef.has(ref) || !cars.some(c => c.ref === ref && c.row))
+  if (unknown.length) throw new Error(`reactivate names a reference that is not a held car in the CSV: ${unknown.join(', ')}`)
   for (const c of cars) {
     if (!c.row) continue
     const was = byRef.get(c.ref)
     if (!was) plan.add.push(c)
+    else if (was.status !== 'active' && !reactivate.includes(c.ref)) plan.held.push({ ...c, id: was.id, was })
     else {
       const fields = changedFields(was, c.row)
       if (was.status !== 'active') fields.unshift('status')
+      // A stored hash that no longer matches (the hash recipe changed) is rewritten, or the read-back could never pass.
+      if (!fields.length && was.content_hash !== contentHash(c.row)) fields.push('content_hash')
       if (fields.length) plan.change.push({ ...c, id: was.id, fields, was })
       else plan.same.push({ ...c, id: was.id })
     }
@@ -163,7 +190,7 @@ export function removalRefusal(plan, existing, confirmed) {
   const n = plan.remove.length
   if (!plan.add.length && !plan.change.length && !plan.same.length && live) return 'the CSV has no usable car; refusing to remove the whole stock'
   const free = Math.max(2, Math.floor(live / 10))
-  if (n > free && confirmed !== n) return `this run would remove ${n} of ${live} cars (more than ${free}); re-run with confirm_remove=${n} if that is right`
+  if ((n > free || n * 2 > live) && confirmed !== n) return `this run would remove ${n} of ${live} cars; re-run with confirm_remove=${n} if that is right`
   return null
 }
 

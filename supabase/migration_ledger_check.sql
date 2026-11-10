@@ -289,7 +289,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261180_weekend_digest_pause.sql', '0dd619d437cbf00ab5259c1455192a900e1e109d1a0e39d7cb63a4189a2c98d8'),
   ('20261181_vehicle_admin_author.sql', '8781667c15b1a48042d45070edf90f9a2db783a55737a11bc5160a9f49c4895f'),
   ('20261182_vehicle_photos_via_function.sql', 'cabddd29556116a29920a2a728289d407df5dc99a298ecf179ef04d641728848'),
-  ('20261186_vehicles_dealer_import.sql', 'fcbf2f45f694c22e117cf4053083b760862070c1478f1098dfa0303223dc4ba9')
+  ('20261186_vehicles_dealer_import.sql', 'a7ecf2da90e99cb92718341eec3c27e635a0a0b9325947501cf8b2b31eab86af')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

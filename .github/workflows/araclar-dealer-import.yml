@@ -27,6 +27,10 @@ on:
         description: 'Exact number of cars this run removes (only asked for when it is more than a couple)'
         type: string
         default: ''
+      reactivate:
+        description: 'References (comma-separated) of held cars to bring back: in the CSV but rejected / removed in ADA'
+        type: string
+        default: ''
 
 concurrency: { group: prod-araclar-dealer-import, cancel-in-progress: false }
 
@@ -44,6 +48,7 @@ jobs:
       IN_DEALER: ${{ inputs.dealer }}
       IN_APPLY: ${{ inputs.apply }}
       IN_CONFIRM: ${{ inputs.confirm_remove }}
+      IN_REACTIVATE: ${{ inputs.reactivate }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -60,6 +65,8 @@ jobs:
         run: |
           [[ "$IN_CONFIRM" =~ ^[0-9]*$ ]] || { echo "::error::confirm_remove must be a number"; exit 1; }
           set -- --dealer "$IN_DEALER"
-          [ -n "$IN_CONFIRM" ] && set -- "$@" --confirm-remove "$IN_CONFIRM"
-          [ "$IN_APPLY" = "true" ] && set -- "$@" --apply
+          [[ "$IN_REACTIVATE" =~ ^[A-Za-z0-9,\ -]*$ ]] || { echo "::error::reactivate must be a list of references"; exit 1; }
+          if [ -n "$IN_CONFIRM" ]; then set -- "$@" --confirm-remove "$IN_CONFIRM"; fi
+          if [ -n "$IN_REACTIVATE" ]; then set -- "$@" --reactivate "$IN_REACTIVATE"; fi
+          if [ "$IN_APPLY" = "true" ]; then set -- "$@" --apply; fi
           node scripts/import-dealer-cars.mjs "$@"

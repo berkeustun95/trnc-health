@@ -17,6 +17,8 @@
 --      constants/cars.js BODY_LABEL_KEY and the nine languages ship in the same PR.
 --
 -- Nothing here shows a car to anyone: a dealer row is created inactive by the importer, later.
+-- ORDER: apply this BEFORE an app build with 'Minibüs' in the İlan ver body list reaches users, or a private seller
+-- who picks it gets a check violation.
 --
 -- Apply: supabase-migrate, one file. dealers gains columns ⇒ ends with NOTIFY pgrst.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -26,6 +28,10 @@ SET ROLE postgres;
 BEGIN;
 
 SET LOCAL lock_timeout = '5s';
+
+-- Both tables up front, vehicles first: a client query holds vehicles and reaches dealers through the RLS subquery,
+-- so taking dealers first could deadlock with it (review 2026-11-10).
+LOCK TABLE public.vehicles, public.dealers IN ACCESS EXCLUSIVE MODE;
 
 DO $$
 DECLARE v_def text;
@@ -109,7 +115,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261186_vehicles_dealer_import.sql', 'fcbf2f45f694c22e117cf4053083b760862070c1478f1098dfa0303223dc4ba9')
+VALUES ('20261186_vehicles_dealer_import.sql', 'a7ecf2da90e99cb92718341eec3c27e635a0a0b9325947501cf8b2b31eab86af')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
