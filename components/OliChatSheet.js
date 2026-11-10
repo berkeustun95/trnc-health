@@ -317,6 +317,9 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
             renderItem={renderItem}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            // All rows at once: with the default 10, scrollToEnd measured a half-built list and a long
+            // saved history opened in the middle (device test 2026-11-10). History is capped, so this is bounded.
+            initialNumToRender={items.length}
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           />
