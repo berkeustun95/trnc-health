@@ -24,6 +24,9 @@
 //     and read back before their rows are written; then the staged copies are deleted. A staged set REPLACES the
 //     car's photos. A car with nothing staged keeps the photos it has; with none it stays hidden
 //     (vehicles_hide_photoless).
+//   • a logo staged as <slug>/logo/1.<ext> (upload-dealer-photos --logo) is stripped the same way, stored in
+//     vehicle-images under partner/dealer/<slug>/ (a folder the nightly photo sweep never touches) and set as
+//     dealers.logo_path; the previous logo file is deleted. dealer.json does not carry logo_path.
 //   • the dealer row is created INACTIVE and this script never activates it: production does not show the cars, ADA
 //     Preview does. After a write it reads back as anon and fails if anon sees a car of an inactive dealer.
 //
@@ -59,6 +62,7 @@ const DEALER = JSON.parse(readFileSync(resolve(DIR, 'dealer.json'), 'utf8'))
 if (DEALER.slug !== slug) fail('dealer.json: slug does not match its folder')
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(DEALER.id ?? '')) fail('dealer.json: id is not a uuid')
 if ('is_active' in DEALER) fail('dealer.json must not carry is_active: this script never activates a dealer')
+if ('logo_path' in DEALER) fail('dealer.json must not carry logo_path: the logo is staged with upload-dealer-photos --logo and set by this script')
 if (!/^\d{4}-\d{2}-\d{2}$/.test(DEALER.consent_date ?? '') || !DEALER.consent_note) fail('dealer.json: consent_date and consent_note are required (no consent, no import)')
 
 // ─── The CSV ─────────────────────────────────────────────────────────────────
@@ -70,6 +74,7 @@ const photosOf = new Map()    // ref → [{ file, bytes, mime }]; absent = nothi
 const stagedOf = new Map()    // ref → the staged files as read ({ path, stamp }), deleted once the car's photos are written
 const strayStaged = []        // staged for a car that is in the CSV but not importable now (skipped / held): left to wait
 const goneStaged = []         // staged for a reference that is not in the CSV at all (sold): deleted on apply
+let logo = null               // { file, bytes, mime, staged: [{ path, stamp }] } when a logo is staged
 
 function report(plan, existing) {
   const line = (tag, c, extra = '') => console.log(`  ${tag.padEnd(7)} ${label(c)}${extra}`)
@@ -87,6 +92,7 @@ function report(plan, existing) {
   console.log(offline ? '\nphotos: not read offline (they are staged in the private bucket)'
     : `\nphotos: ${[...photosOf.values()].filter(p => p.length).length} car(s) with staged photos · ${noPhoto.length} car(s) with no photo (hidden until one arrives)`)
   for (const [ref, p] of photosOf) if (p.length) console.log(`  PHOTOS  ${ref}  ${p.length} staged`)
+  if (logo) console.log('  LOGO    a dealer logo is staged')
   for (const x of strayStaged) console.log(`  STAGED, WAITING  ${x}`)
   for (const x of goneStaged) console.log(`  STAGED, NOT IN THE CSV  ${x}  (deleted from staging on apply)`)
   if (photoProblems.length) { console.log('\nphoto problems:'); for (const p of photoProblems) console.log(`  ${p}`) }
@@ -132,6 +138,22 @@ try { plan = planSync(cars, existing, reactivate) } catch (e) { fail(`REFUSED: $
   for (const f of folders ?? []) {
     const ref = f.name
     if (f.id) { photoProblems.push(`${ref}: a file outside a car folder in staging`); continue }
+    if (ref === 'logo') {
+      const { data: entries, error: lErr } = await intake.list(`${slug}/logo`, { limit: 10 })
+      if (lErr) fail(`list the staged logo: ${lErr.message}`)
+      const files = entries.filter(e => e.id)
+      if (files.length !== 1 || !/^1\.(jpg|png|webp)$/.test(files[0].name)) { photoProblems.push('logo: staging must hold exactly one file, 1.jpg / 1.png / 1.webp'); continue }
+      try {
+        const { data, error: dlErr } = await intake.download(`${slug}/logo/${files[0].name}`)
+        if (dlErr) throw new Error(`download failed (${dlErr.message})`)
+        const clean = stripImageMetadata(new Uint8Array(await data.arrayBuffer()))
+        const left = metadataFound(clean.bytes)
+        if (left.found.length || left.gps) throw new Error('metadata left after stripping')
+        logo = { file: `logo-${createHash('sha256').update(clean.bytes).digest('hex').slice(0, 16)}.${FORMAT_EXT[clean.format]}`, bytes: Buffer.from(clean.bytes), mime: FORMAT_MIME[clean.format],
+          staged: files.map(e => ({ path: `${slug}/logo/${e.name}`, stamp: `${e.name}|${e.id}|${e.updated_at}` })) }
+      } catch (e) { photoProblems.push(`logo: ${e.message}`) }
+      continue
+    }
     if (!cars.some(c => c.ref === ref)) { goneStaged.push(ref); continue }
     if (!usable.has(ref)) { strayStaged.push(`${ref} (its car is skipped or held: the photos wait)`); continue }
     const { data: entries, error: lErr } = await intake.list(`${slug}/${ref}`, { limit: 200 })
@@ -234,6 +256,28 @@ for (const [ref, wanted] of photosOf) {
   if (!same) { errors.push(`${ref}: its staged set changed during the run; left in staging, run the import again`); continue }
   const { error: sErr } = await intake.remove(read.map(r => r.path))
   if (sErr) errors.push(`empty staging ${ref}: ${sErr.message}`)
+}
+
+// ─── The logo: store, read back, point the dealer row at it, drop the old file, unstage ─
+if (logo) {
+  const path = `partner/dealer/${slug}/${logo.file}`
+  const { data: cur, error: cErr } = await db.from('dealers').select('logo_path').eq('id', DEALER.id).single()
+  must('read the current logo', cErr)
+  const { error: upErr } = await bucket.upload(path, logo.bytes, { contentType: logo.mime, upsert: true, cacheControl: '31536000' })
+  must('upload the logo', upErr)
+  const { data: back, error: rErr } = await bucket.download(path)
+  if (rErr || !Buffer.from(await back.arrayBuffer()).equals(logo.bytes)) fail('verify the logo: the stored file differs')
+  const { error: setErr } = await db.from('dealers').update({ logo_path: path }).eq('id', DEALER.id)
+  must('set the logo', setErr)
+  if (cur.logo_path && cur.logo_path !== path && cur.logo_path.startsWith(`partner/dealer/${slug}/`)) {
+    const { error } = await bucket.remove([cur.logo_path])
+    if (error) errors.push(`delete the old logo: ${error.message}`)
+  }
+  const { data: nowStaged, error: nErr } = await intake.list(`${slug}/logo`, { limit: 10 })
+  const same = !nErr && nowStaged.filter(e => e.id).map(e => `${e.name}|${e.id}|${e.updated_at}`).sort().join() === logo.staged.map(r => r.stamp).sort().join()
+  if (!same) errors.push('the staged logo changed during the run; left in staging, run the import again')
+  else { const { error } = await intake.remove(logo.staged.map(r => r.path)); if (error) errors.push(`empty the logo staging: ${error.message}`) }
+  console.log('logo: set')
 }
 
 // Photos staged for a reference that is not in the CSV (the car was sold before they were used) must not linger.

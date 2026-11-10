@@ -117,7 +117,7 @@ export function mapCar(r) {
     return v
   }
   const ref = r.ilan_no
-  if (!/^[A-Za-z0-9-]{1,40}$/.test(ref ?? '')) problems.push(`ilan_no "${ref ?? ''}" is not a plain reference`)
+  if (!/^[A-Za-z0-9-]{1,40}$/.test(ref ?? '') || ref === 'logo') problems.push(`ilan_no "${ref ?? ''}" is not a plain reference`)
   const intent = r.tur ? pick(INTENT, 'tur', 'tur') : 'sale'
   const year = wholeNumber(r.yil ?? '')
   if (year === null || year < 1950 || year > 2100) problems.push(`yil "${r.yil ?? ''}" is not a year`)
