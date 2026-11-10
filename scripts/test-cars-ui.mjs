@@ -141,7 +141,7 @@ for (const f of ['screens/CarPostScreen.js', 'screens/MyCarsScreen.js']) {
 {
   const admin = readFileSync(resolve(ROOT, 'screens/AdminScreen.js'), 'utf8')
   check("admin: every vehicles read names its columns (select('*') on vehicles 42501s)", !/from\('vehicles'\)\.select\('\*'/.test(admin))
-  check("admin: 'vehicle' is in the Reports fetch list and AUTHOR_VIA_RPC", /'message', 'vehicle'\]\) \{/.test(admin) && /AUTHOR_VIA_RPC = new Set\(\['review', 'vehicle'\]\)/.test(admin))
+  check("admin: 'vehicle' is in the Reports fetch list and AUTHOR_VIA_RPC", /'message', 'vehicle'(, '[a-z_]+')*\]\) \{/.test(admin) && /AUTHOR_VIA_RPC = new Set\(\['review', 'vehicle'\]\)/.test(admin))
 }
 
 // Berke, 2026-11-09 (from the Preview video). A for-sale car never shows "Kiralama şirketi", and the system back on

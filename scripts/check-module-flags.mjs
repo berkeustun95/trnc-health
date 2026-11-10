@@ -56,6 +56,7 @@ const EXPECTED_MODULES = {
   duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
   ehliyet:       true,   // live 2026-10-14 — driving schools (20261108/20261109/20261110); no waitlist
   cars:          false,  // Araçlar, dark — 20261165/20261166/20261167; Coming Soon + waitlist until live
+  marketplace:   false,  // Bandabuliya — dark, Preview unlock only; no waitlist
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //
@@ -399,7 +400,8 @@ try {
   // Modules with no Coming Soon screen and no waitlist: nobody can sign up, so nothing is ever
   // notified and the notify path needs no entry. ehliyet (2026-10-13): dark until a flag flip.
   // Remove the entry if it ever gets a waitlist.
-  const NO_WAITLIST = new Set(['ehliyet'])
+  // marketplace (2026-11-07): hidden tile, Preview unlock only (Berke).
+  const NO_WAITLIST = new Set(['ehliyet', 'marketplace'])
   // The exemption must not mask a real gap: an exempt key has to be a known module, must never
   // reach ComingSoonScreen (that screen takes waitlist signups), and must not be COMING_SOON.
   const csFiles = ['App.js', ...readdirSync(resolve(ROOT, 'screens')).filter(f => f.endsWith('.js')).map(f => `screens/${f}`)]

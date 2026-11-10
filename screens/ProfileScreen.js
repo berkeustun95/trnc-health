@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { supabase } from '../lib/supabase'
+import { supabase, isGuest } from '../lib/supabase'
 import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
 import { colors, shadow, radius, elevation, type, font, TAP } from '../constants/theme'
 import { Button, ConfirmDialog, useTabBarFootprint, PageCanvas } from '../components/ui'
@@ -150,7 +150,7 @@ function draftFromRow(row) {
   }
 }
 
-export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null, settingsSlot = null, underTabBar = false }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null, settingsSlot = null, underTabBar = false, onOpenMyListings = null }) {
   const tabFoot = useTabBarFootprint()
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({
@@ -1351,6 +1351,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           {CHECKINS && (
             <MuseumPassport session={session} lang={lang} sectionStyle={s.marketingSection}
               titleStyle={s.sectionTitle} hintStyle={s.fieldHint} />
+          )}
+
+          {/* Bandabuliya: İlanlarım. App passes the handler only while MARKETPLACE is on (dev / Preview until go-live). */}
+          {!!onOpenMyListings && !isGuest(session) && (
+            <View style={s.marketingSection}>
+              <Text style={s.sectionTitle}>{t('menuMarketplace', lang)}</Text>
+              <Text style={s.fieldHint}>{t('mkTagline', lang)}</Text>
+              <TouchableOpacity style={s.marketingRow} onPress={onOpenMyListings} accessibilityRole="button" activeOpacity={0.7}>
+                <Text style={s.marketingLabel}>{t('mkMine', lang)}</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           )}
 
           {MODULE_FLAGS.studentHub && (

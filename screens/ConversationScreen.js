@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../lib/supabase'
+import { STUDENT_CHAT } from '../utils/chatApi'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
@@ -123,6 +123,10 @@ export default function ConversationScreen({
   lang,
   onBack,
   onChanged,               // the inbox refetches; also how a compose becomes a thread
+  api = STUDENT_CHAT,      // utils/chatApi.js; Bandabuliya passes its listing adapter
+  header = null,           // rendered under the title bar (Bandabuliya: the listing card)
+  beforeSend = null,       // async () => boolean; false stops the send (Bandabuliya: the safety notice)
+  errorKey = null,         // error → i18n key for codes only this kind of thread has, checked first
 }) {
   // ─── THE THREAD OWNS ITS OWN STATE ─────────────────────────────────────────
   //
@@ -188,14 +192,14 @@ export default function ConversationScreen({
   // beside it).
   const refreshConversation = useCallback(async () => {
     if (!conversation) return
-    const { data, error } = await supabase.rpc('list_conversations')
+    const { data, error } = await api.list()
     if (error) return
     const row = (data ?? []).find(r => r.conversation_id === conversation.conversation_id)
     // A row that has GONE is not an error: declining hides it from the initiator by RLS,
     // and the other person deleting their account takes it with them. Keep the last known
     // state rather than blanking the screen somebody is still reading.
     if (row) setConv(row)
-  }, [conversation])
+  }, [conversation, api])
 
   const load = useCallback(() => {
     if (!conversation) return undefined
@@ -205,18 +209,14 @@ export default function ConversationScreen({
     // policy, not by this query — a client-side `.is('deleted_at', null)` would be a
     // second copy of a rule the database already owns, and the copy that drifts is the
     // one that shows something it should not.
-    supabase
-      .from('messages')
-      .select('id, sender_id, sender_display_name, body, created_at')
-      .eq('conversation_id', conversation.conversation_id)
-      .order('created_at', { ascending: true })
+    api.messages(conversation.conversation_id)
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) { setFailed(true); return }
         setRows(data ?? [])
       })
     return () => { cancelled = true }
-  }, [conversation])
+  }, [conversation, api])
 
   useEffect(() => load(), [load])
   useEffect(() => { refreshConversation() }, [refreshConversation])
@@ -224,12 +224,13 @@ export default function ConversationScreen({
   async function send() {
     const text = body.trim()
     if (!text || sending) return
+    if (beforeSend && !(await beforeSend())) return
     setSending(true)
     setErrKey(null)
 
     const call = composing
-      ? supabase.rpc('start_conversation', { p_recipient_id: other.userId, p_body: text })
-      : supabase.rpc('send_message', { p_conversation_id: conversation.conversation_id, p_body: text })
+      ? api.start(other, text)
+      : api.send(conversation.conversation_id, text)
 
     const { data, error } = await call
     setSending(false)
@@ -248,7 +249,8 @@ export default function ConversationScreen({
       // rolled the first one back. constants/messaging.js cannot make this call itself —
       // see the note there about staying import-free for the i18n guard.
       setErrKey(
-        moderationErrorKey(error, { contentType: 'message', text })
+        errorKey?.(error)
+        ?? moderationErrorKey(error, { contentType: 'message', text })
         ?? sendErrorKey(error)
         ?? 'msgSendFailed',
       )
@@ -269,7 +271,7 @@ export default function ConversationScreen({
   async function act(rpc, args, confirmed) {
     if (busy) return
     setBusy(true)
-    const { error } = await supabase.rpc(rpc, args)
+    const { error } = await api.act(rpc, args)
     setBusy(false)
     setMenuOpen(false)
     if (error) { Alert.alert(t('msgActionFailedTitle', lang), t('msgActionFailedBody', lang)); return }
@@ -373,6 +375,7 @@ export default function ConversationScreen({
           ) : null
         }
       />
+      {header}
 
       <KeyboardAwareForm>
         <ScrollView

@@ -191,6 +191,9 @@ export const HOME_MODULES = [
   // Araçlar (MODULE_FLAGS.cars). Dark: shown only where CARS is true (constants/homeGroups.js GATES: dev / ADA Preview).
   // speedometer-outline because car-outline (transport, towing) and car-sport-outline (garages) are taken.
   { id: 'cars',               icon: 'speedometer-outline',      tint: 'standard', labelKey: 'menuCars' },
+  // Bandabuliya (MODULE_FLAGS.marketplace). Dark: the tile shows only through HomeScreen's `unlocked` Set on dev / ADA Preview.
+  // subKey: a second line under the name; the name is not self-explanatory (Berke, 2026-11-09).
+  { id: 'marketplace',        icon: 'storefront-outline',       tint: 'standard', labelKey: 'menuMarketplace', subKey: 'mkTagline' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
   { id: 'grooming',           icon: 'cut-outline',              tint: 'standard', labelKey: 'menuGrooming' },

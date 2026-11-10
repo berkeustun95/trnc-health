@@ -72,6 +72,9 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
   const tint     = TINTS[mod.tint] || TINTS.standard
   const labelKey = labelOverride?.key ?? mod.labelKey
   const lines    = labelOverride?.lines ?? 2
+  // A row's optional subKey takes the label's second line, so the box (and the row) keeps its height.
+  // The grid ALWAYS passes an override (tileLabel sizes every tile), so only a different label drops it.
+  const subKey   = labelKey === mod.labelKey ? mod.subKey : null
   // Same large-text rule as Home's tiles (labelCap: 1.0 below 360dp, 1.15 above). The box
   // grows with the CAPPED scale only, so at normal text size the row height is unchanged.
   const { width: screenW, fontScale } = useWindowDimensions()
@@ -84,7 +87,7 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
       accessibilityRole="button"
       // The RESOLVED label, not mod.labelKey: a screen reader must announce the tile a
       // sighted user is looking at, and on the grid that is the partner's full phrase.
-      accessibilityLabel={t(labelKey, lang)}
+      accessibilityLabel={subKey ? `${t(labelKey, lang)}, ${t(subKey, lang)}` : t(labelKey, lang)}
     >
       <View style={[s.icon, { backgroundColor: tint.bg }]}>
         <Ionicons name={mod.icon} size={24} color={tint.fg} />
@@ -98,11 +101,14 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
             fontSize: labelOverride.size,
             lineHeight: GRID_LABEL_HEIGHT / lines,
           }]}
-          numberOfLines={lines}
+          numberOfLines={subKey ? 1 : lines}
           maxFontSizeMultiplier={cap}
         >
           {t(labelKey, lang)}
         </Text>
+        {!!subKey && (
+          <Text style={s.sub} numberOfLines={1} maxFontSizeMultiplier={cap}>{t(subKey, lang)}</Text>
+        )}
       </View>
     </TouchableOpacity>
   )
@@ -131,4 +137,5 @@ const s = StyleSheet.create({
   //
   // Colour is #3F4E57, softer than textPrimary's near-black at 8.24:1 on the canvas.
   label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: LABEL_FAMILY, color: '#3F4E57', textAlign: 'center' },
+  sub:      { fontSize: 10, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: LABEL_FAMILY, color: colors.textSecondary, textAlign: 'center' },
 })
