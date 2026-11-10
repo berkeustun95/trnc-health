@@ -15,7 +15,7 @@ import { freshDb, applyFile as applyRaw } from './migration-harness.mjs'
 
 const mig = f => fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url))
 const RELEASE = ['20261164_shared_adult_age.sql', '20261165_vehicles.sql', '20261166_vehicles_moderation.sql', '20261167_cars_waitlist_notify.sql',
-  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql'].map(mig)
+  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql', '20261186_vehicles_dealer_import.sql'].map(mig)
 const read = f => readFileSync(mig(f), 'utf8')
 
 // Slice `CREATE … FUNCTION <name>(` up to its closing dollar-quote terminator, from an earlier migration.
@@ -288,6 +288,20 @@ async function behaviour(d) {
                            UPDATE public.dealers SET is_active = true`, { multi: true })
   t('with dealer and source live, anon sees all three', await countVisible(d, 'anon'), 3)
   t('a signed-in user cannot write dealers', (await as(d, 'owner', `INSERT INTO public.dealers (slug, name) VALUES ('x-y', 'X')`)).ok, false)
+  // 20261186: consent is service-only; a dealer reference imports once; 'minibus' is a body type.
+  await as(d, 'postgres', `UPDATE public.dealers SET consent_date = '2026-11-10', consent_note = 'owner agreed' WHERE slug = 'test-oto'`)
+  t('anon cannot read dealer consent', (await as(d, 'anon', 'SELECT consent_date FROM public.dealers')).ok, false)
+  t('a signed-in user cannot read dealer consent', (await as(d, 'owner', 'SELECT consent_note FROM public.dealers')).ok, false)
+  t('an admin cannot read dealer consent either', (await as(d, 'admin', 'SELECT consent_note FROM public.dealers')).ok, false)
+  t('clients still read the named dealer columns', n(await as(d, 'anon', 'SELECT count(id) n FROM (SELECT id, slug, name, logo_path, phone, whatsapp, region, area, website, is_rental_company FROM public.dealers) x')), 1)
+  t('…and select * on dealers is refused (clients name their columns)', (await as(d, 'anon', 'SELECT * FROM public.dealers')).ok, false)
+  const dealerCar = (id, ext, body = 'sedan') => as(d, 'postgres', `INSERT INTO public.vehicles (id, intent, source, dealer_id, external_id, owner_id, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, region, status, published_at)
+    VALUES ('${id}', 'sale', 'dealer', '11111111-1111-4111-8111-111111111111', ${ext === null ? 'NULL' : `'${ext}'`}, NULL, 'Mercedes-Benz', 'Minibüs', 1998, 0, 'diesel', 'manual', '${body}', 'white', 'right', 3990, 'GBP', 'nicosia', 'active', now())`)
+  t("a dealer car with body_type 'minibus' is accepted", (await dealerCar('44444444-4444-4444-8444-444444444441', '190595', 'minibus')).ok, true)
+  t('the same dealer reference cannot be imported twice', (await dealerCar('44444444-4444-4444-8444-444444444442', '190595')).ok, false)
+  t('dealer cars without a reference are not limited (the Preview seed)', (await dealerCar('44444444-4444-4444-8444-444444444443', null)).ok, true)
+  t('an unknown body type is still refused', (await dealerCar('44444444-4444-4444-8444-444444444444', 'x-1', 'bus')).ok, false)
+  await as(d, 'postgres', `DELETE FROM public.vehicles WHERE id::text LIKE '44444444-%'`)
   t('a signed-in user cannot write sources', (await as(d, 'owner', `UPDATE public.vehicle_sources SET is_active = false`)).ok, false)
   t('an import row needs a source and external id', (await as(d, 'postgres', `INSERT INTO public.vehicles (intent, source, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, region)
     VALUES ('sale', 'import', 'A', 'B', 2020, 1, 'petrol', 'manual', 'sedan', 'red', 'left', 1, 'GBP', 'Girne')`)).ok, false)
@@ -351,7 +365,7 @@ console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const tokens = []
-  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[12]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
+  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[126]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
   let m
   while ((m = re.exec(vs))) {
     if (m[1].startsWith('10') && !/is_adult_on|vehicle/.test(m[2])) continue
@@ -403,6 +417,9 @@ await refused('live contact_events list differs (eatery missing in production)',
 await refused('auto-hide gains more than the vehicle branch', mutantFile(2, 'ah', "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  END IF;", "    UPDATE vehicles   SET hidden_at = now(), hidden_reason = 'auto_reports' WHERE id = NEW.content_id AND hidden_at IS NULL;\n  ELSIF NEW.content_type = 'profile' THEN\n    NULL;\n  END IF;"))
 await refused('admin_content_author gains more than the vehicle branch', mutantFile(4, 'aca', "    ELSE RAISE EXCEPTION 'UNSUPPORTED_CONTENT_TYPE: %', p_content_type;", "    WHEN 'dealer'   THEN v_author := NULL;\n    ELSE RAISE EXCEPTION 'UNSUPPORTED_CONTENT_TYPE: %', p_content_type;"))
 await refused('the client upload policy is kept (20261182 must drop it)', mutantFile(5, 'up', 'DROP POLICY "vehicle_images_upload" ON storage.objects;', ''))
+await refused('20261186: consent readable by clients (table grant kept)', mutantFile(6, 'cg', 'REVOKE SELECT ON public.dealers FROM anon, authenticated;', ''))
+await refused('20261186: the dealer reference index is not unique', mutantFile(6, 'ux', 'CREATE UNIQUE INDEX vehicles_dealer_external_key', 'CREATE INDEX vehicles_dealer_external_key'))
+await refused('20261186: a consent column added to the client grant', mutantFile(6, 'cc', 'is_rental_company, is_active, created_at, updated_at)\n  ON public.dealers', 'is_rental_company, is_active, created_at, updated_at, consent_note)\n  ON public.dealers'))
 await refused('admin_content_author loses its admin gate', mutantFile(4, 'acg', "  IF NOT is_admin() THEN\n    RAISE EXCEPTION 'ADMIN_ONLY';\n  END IF;\n", ''))
 await refused('report hide policy made permissive', mutantFile(2, 'hr', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  AS RESTRICTIVE FOR SELECT', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  FOR SELECT'))
 await refused('notify allow-list loses duyurular while adding cars', mutantFile(3, 'nt', "'checkins','duyurular','cars') THEN", "'checkins','cars') THEN"))

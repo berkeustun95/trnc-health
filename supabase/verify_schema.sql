@@ -301,6 +301,9 @@ WITH report AS (
     ('20261165_vehicles','dealers','is_active'),
     ('20261165_vehicles','vehicle_sources','is_active'),
     ('20261165_vehicles','vehicle_images','storage_path'),
+    -- 20261186: dealer consent (service_role only); red until it runs.
+    ('20261186_vehicles_dealer_import','dealers','consent_date'),
+    ('20261186_vehicles_dealer_import','dealers','consent_note'),
     -- 20261143: partner_booking_requests (no identifier column; asserted as an absence in H).
     ('20261143_partner_booking_requests','partner_booking_requests','id'),
     ('20261143_partner_booking_requests','partner_booking_requests','partner'),
@@ -1260,6 +1263,7 @@ WITH report AS (
     ('20261165_vehicles','vehicles_owner_idx'),
     ('20261165_vehicles','vehicles_dealer_idx'),
     ('20261165_vehicles','vehicles_expiry_idx'),
+    ('20261186_vehicles_dealer_import','vehicles_dealer_external_key'),
     ('20261165_vehicles','vehicle_images_vehicle_idx'),
     ('1095_institutions_country','institutions_country_idx'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
@@ -5699,6 +5703,18 @@ WITH report AS (
                  AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%vehicle-images%')
     AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicle_images' AND policyname = 'vehicle_images_insert_own'
                  AND with_check LIKE '%''pending''%')
+  -- 20261186: dealer stock imports. RED UNTIL 20261186 RUNS.
+  UNION ALL SELECT '20261186_vehicles_dealer_import','dealers: clients read every column but consent_date / consent_note; one car per (dealer, reference); body_type allows minibus',
+    COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+               WHERE a.attrelid = to_regclass('public.dealers') AND a.attnum > 0 AND NOT a.attisdropped
+                 AND NOT has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT')) = 'consent_date,consent_note', false)
+    AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+                   WHERE a.attrelid = to_regclass('public.dealers') AND a.attnum > 0 AND NOT a.attisdropped
+                     AND NOT has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT')) = 'consent_date,consent_note', false)
+    AND COALESCE((SELECT indexdef LIKE 'CREATE UNIQUE INDEX%(dealer_id, external_id)%source = ''dealer''%external_id IS NOT NULL%'
+                    FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'vehicles_dealer_external_key'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%''minibus''%' AND pg_get_constraintdef(oid) LIKE '%''minivan''%'
+                    FROM pg_constraint WHERE conrelid = to_regclass('public.vehicles') AND conname = 'vehicles_body_type_check'), false)
   UNION ALL SELECT '20261165_vehicles','vehicles.owner_id is readable by no client; my_vehicles() is the owner''s path (authenticated only)',
     COALESCE(NOT has_column_privilege('anon', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
          AND NOT has_column_privilege('authenticated', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
