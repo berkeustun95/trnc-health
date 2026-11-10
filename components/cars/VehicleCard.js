@@ -26,11 +26,13 @@ export function placeLabel(region, area, lang) {
     .filter(Boolean).join(' · ')
 }
 
-export const kmLabel = km => (km != null ? `${groupDigits(km)} km` : null)
+// A partner may leave km or the price empty on purpose (buyers ask): with a language, an empty value reads
+// "Km için sor" / "Fiyat için ara" instead of a blank. Private listings always have both (20261189).
+export const kmLabel = (km, lang) => (km != null ? `${groupDigits(km)} km` : lang ? t('carsAskKm', lang) : null)
 
 export function priceLabel(car, lang) {
   const p = carPrice(car)
-  if (!p) return null
+  if (!p) return t('carsAskPrice', lang)
   return car.intent === 'rent' ? `${p}${t('carsPerDay', lang)}` : p
 }
 
@@ -40,13 +42,13 @@ export default function VehicleCard({ car, lang, onPress, showDealer = true }) {
   const images = sortedImages(car.vehicle_images)
   const uri = photoUrl(images[0]?.storage_path)
   const title = `${car.make} ${car.model}`
-  const specs = [kmLabel(car.km), fuelLabel(car.fuel, lang), gearboxLabel(car.gearbox, lang)].filter(Boolean).join(' · ')
+  const specs = [kmLabel(car.km, lang), fuelLabel(car.fuel, lang), gearboxLabel(car.gearbox, lang)].filter(Boolean).join(' · ')
   const place = placeLabel(car.region, car.area, lang)
   const price = priceLabel(car, lang)
   const dealer = showDealer ? car.dealers?.name : null
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={press.card} accessibilityRole="button"
-      accessibilityLabel={[title, String(car.year), price, specs, place].filter(Boolean).join(', ')}>
+      accessibilityLabel={[title, car.year != null ? String(car.year) : null, price, specs, place].filter(Boolean).join(', ')}>
       <View style={{ height: photoH }}>
         {uri
           ? <RemoteImage source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
@@ -69,7 +71,7 @@ export default function VehicleCard({ car, lang, onPress, showDealer = true }) {
       <View style={s.body}>
         <View style={s.titleRow}>
           <Text style={s.title} numberOfLines={1}>{title}</Text>
-          <Text style={s.year}>{car.year}</Text>
+          {car.year != null && <Text style={s.year}>{car.year}</Text>}
         </View>
         {!!specs && <Text style={s.specs} numberOfLines={1}>{specs}</Text>}
         {(!!place || !!dealer) && (

@@ -15,7 +15,7 @@ import { freshDb, applyFile as applyRaw } from './migration-harness.mjs'
 
 const mig = f => fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url))
 const RELEASE = ['20261164_shared_adult_age.sql', '20261165_vehicles.sql', '20261166_vehicles_moderation.sql', '20261167_cars_waitlist_notify.sql',
-  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql', '20261186_vehicles_dealer_import.sql', '20261188_dealer_intake_bucket.sql'].map(mig)
+  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql', '20261186_vehicles_dealer_import.sql', '20261188_dealer_intake_bucket.sql', '20261189_vehicles_partner_empty_fields.sql'].map(mig)
 const read = f => readFileSync(mig(f), 'utf8')
 
 // Slice `CREATE … FUNCTION <name>(` up to its closing dollar-quote terminator, from an earlier migration.
@@ -302,6 +302,25 @@ async function behaviour(d) {
   t('dealer cars without a reference are not limited (the Preview seed)', (await dealerCar('44444444-4444-4444-8444-444444444443', null)).ok, true)
   t('an unknown body type is still refused', (await dealerCar('44444444-4444-4444-8444-444444444444', 'x-1', 'bus')).ok, false)
   await as(d, 'postgres', `DELETE FROM public.vehicles WHERE id::text LIKE '44444444-%'`)
+  // 20261189 (Berke's standing rule): a partner's empty field is imported EMPTY; a private seller's listing stays complete.
+  const partnerCar = (id, cols, vals) => as(d, 'postgres', `INSERT INTO public.vehicles (id, intent, source, dealer_id, external_id, owner_id, make, model, status, published_at${cols})
+    VALUES ('${id}', 'sale', 'dealer', '11111111-1111-4111-8111-111111111111', '${id.slice(-4)}', NULL, 'Mercedes-Benz', 'Minibüs', 'active', now()${vals})`)
+  t('a dealer car with nothing but make and model is accepted', (await partnerCar('55555555-5555-4555-8555-555555550001', '', '')).ok, true)
+  t('…with a price and no km', (await partnerCar('55555555-5555-4555-8555-555555550002', ', price, currency, body_type', ", 3990, 'GBP', 'minibus'")).ok, true)
+  t('…but a wrong value is still refused (NULL passes a CHECK, nonsense does not)', (await partnerCar('55555555-5555-4555-8555-555555550003', ', fuel', ", 'steam'")).ok || (await partnerCar('55555555-5555-4555-8555-555555550004', ', km', ', -5')).ok, false)
+  t('a dealer SALE still cannot carry a daily price', (await partnerCar('55555555-5555-4555-8555-555555550005', ', price_per_day, currency', ", 40, 'GBP'")).ok, false)
+  {
+    const r = await as(d, 'anon', `SELECT id FROM public.vehicles WHERE km IS NULL AND price IS NULL`, { preview: true })
+    t('ADA Preview reads the empty-field car (photoless ones stay hidden as before)', r.ok, true)
+  }
+  const privateRow = over => { const v = { intent: `'sale'`, make: `'Kia'`, model: `'Rio'`, year: '2015', km: '90000', fuel: `'petrol'`, gearbox: `'manual'`, body_type: `'hatchback'`, colour: `'red'`, steering: `'right'`, price: '5000', currency: `'GBP'`, region: `'nicosia'`, contact_phone: `'+905330000000'`, ...over }
+    return as(d, 'owner2', `INSERT INTO public.vehicles (${Object.keys(v).join(', ')}) VALUES (${Object.values(v).join(', ')}) RETURNING id`) }
+  for (const col of ['km', 'year', 'fuel', 'gearbox', 'body_type', 'colour', 'steering', 'currency', 'region', 'price']) {
+    t(`a private seller cannot leave ${col} empty`, (await privateRow({ [col]: 'NULL' })).ok, false)
+  }
+  t('a private rental still needs its daily price', (await privateRow({ intent: `'rent'`, price: 'NULL', price_per_day: 'NULL' })).ok, false)
+  t('…and a complete private listing is accepted (control)', (await privateRow({})).ok, true)
+  await as(d, 'postgres', `DELETE FROM public.vehicles WHERE id::text LIKE '55555555-%' OR (make = 'Kia' AND model = 'Rio')`)
   t('a signed-in user cannot write sources', (await as(d, 'owner', `UPDATE public.vehicle_sources SET is_active = false`)).ok, false)
   t('an import row needs a source and external id', (await as(d, 'postgres', `INSERT INTO public.vehicles (intent, source, make, model, year, km, fuel, gearbox, body_type, colour, steering, price, currency, region)
     VALUES ('sale', 'import', 'A', 'B', 2020, 1, 'petrol', 'manual', 'sedan', 'red', 'left', 1, 'GBP', 'Girne')`)).ok, false)
@@ -381,7 +400,7 @@ console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const tokens = []
-  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[1268]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
+  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[12689]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
   let m
   while ((m = re.exec(vs))) {
     if (m[1].startsWith('10') && !/is_adult_on|vehicle/.test(m[2])) continue
@@ -440,6 +459,9 @@ await refused('20261188: the staging bucket made public', mutantFile(7, 'pub', "
 await refused('20261188: staging insert open to every signed-in user', mutantFile(7, 'adm', "    AND (select public.is_admin())\n    AND name ~", "    AND name ~"))
 await refused('20261188: a staging policy loses the guest guard', mutantFile(7, 'gg', "    bucket_id = 'dealer-intake'\n    AND NOT (select public.is_anonymous_session())\n    AND (select public.is_admin())\n  );\n\nCREATE POLICY \"dealer_intake_delete\"", "    bucket_id = 'dealer-intake'\n    AND (select public.is_admin())\n  );\n\nCREATE POLICY \"dealer_intake_delete\""))
 await refused('20261188: an overwrite (UPDATE) policy on staging', mutantFile(7, 'upd', 'CREATE POLICY "dealer_intake_delete" ON storage.objects', `CREATE POLICY "dealer_intake_update" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'dealer-intake' AND NOT (select public.is_anonymous_session()) AND (select public.is_admin()));\nCREATE POLICY "dealer_intake_delete" ON storage.objects`))
+await refused('20261189: private sellers no longer need km', mutantFile(8, 'km', 'OR (km IS NOT NULL AND year IS NOT NULL', 'OR (year IS NOT NULL'))
+await refused('20261189: the price check forgets private sellers', mutantFile(8, 'pr', "(intent = 'sale' AND price_per_day IS NULL AND (price IS NOT NULL OR source <> 'private'))", "(intent = 'sale' AND price_per_day IS NULL)"))
+await refused('20261189: make becomes optional too', mutantFile(8, 'mk', '  ALTER COLUMN km        DROP NOT NULL,', '  ALTER COLUMN km        DROP NOT NULL,\n  ALTER COLUMN make      DROP NOT NULL,'))
 await refused('admin_content_author loses its admin gate', mutantFile(4, 'acg', "  IF NOT is_admin() THEN\n    RAISE EXCEPTION 'ADMIN_ONLY';\n  END IF;\n", ''))
 await refused('report hide policy made permissive', mutantFile(2, 'hr', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  AS RESTRICTIVE FOR SELECT', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  FOR SELECT'))
 await refused('notify allow-list loses duyurular while adding cars', mutantFile(3, 'nt', "'checkins','duyurular','cars') THEN", "'checkins','cars') THEN"))

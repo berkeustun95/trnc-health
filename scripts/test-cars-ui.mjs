@@ -166,5 +166,21 @@ for (const f of ['screens/CarPostScreen.js', 'screens/MyCarsScreen.js']) {
   check('the discard check counts added and removed photos', /photos\.some\(p => p\.kind === 'new'\)/.test(post) && /removed\.length > 0/.test(post))
 }
 
+// Berke's standing rule, 2026-11-10: a partner's empty price / km reads "Fiyat için ara" / "Km için sor", never a blank
+// and never "null". The price filter leaves such a car out by construction (every clause compares the price column).
+{
+  const card = readFileSync(resolve(ROOT, 'components/cars/VehicleCard.js'), 'utf8')
+  const detail = readFileSync(resolve(ROOT, 'screens/CarDetailScreen.js'), 'utf8')
+  check('an empty price shows the ask label on the card and the detail page', card.includes("if (!p) return t('carsAskPrice', lang)") && detail.includes('<Text style={s.price}>{priceLabel(car, lang)}</Text>'))
+  check('an empty km shows the ask label wherever km is shown to buyers', card.includes("lang ? t('carsAskKm', lang) : null") && card.includes('kmLabel(car.km, lang)') && (detail.match(/kmLabel\(car\.km, lang\)/g) ?? []).length === 2)
+  check('an empty year or steering is left out, not printed as "null"', !/String\(car\.year\)(?! : null)/.test(card + detail) && detail.includes('{!!car.steering && (') && card.includes('{car.year != null && <Text style={s.year}>'))
+  check('carPrice: no price → null; a price with no currency → the bare amount', carPrice({ intent: 'sale', price: null, currency: null }) === null
+    && carPrice({ intent: 'rent', price_per_day: null, currency: 'GBP' }) === null && carPrice({ intent: 'sale', price: 3990, currency: null }) === '3,990')
+  const f = priceOrFilter('sale', [0, 5000], fx)
+  check('the price filter can only match rows that have a price (an empty one is left out, not guessed)', f.split('),and(').every(c => /price\.lt\./.test(c)), f)
+  check('private sellers: the form still requires km and price', carFormError({ ...carForm(null, '+905330000000'), make: 'Kia', model: 'Rio', year: '2015', km: '', fuel: 'petrol', gearbox: 'manual', body_type: 'hatchback', colour: 'red', price: '5000', region: 'nicosia' }) !== null
+    && carFormError({ ...carForm(null, '+905330000000'), make: 'Kia', model: 'Rio', year: '2015', km: '90000', fuel: 'petrol', gearbox: 'manual', body_type: 'hatchback', colour: 'red', price: '', region: 'nicosia' }) !== null)
+}
+
 console.log(bad ? `cars ui: ${bad} FAILED` : 'cars ui: OK')
 process.exit(bad ? 1 : 0)

@@ -889,6 +889,7 @@ WITH report AS (
     -- 20261165: Araçlar. Who owns a listing follows its source; prices follow intent; a source goes live only checked.
     ('20261165_vehicles','vehicles_ownership_check'),
     ('20261165_vehicles','vehicles_price_check'),
+    ('20261189_vehicles_partner_empty_fields','vehicles_private_required_check'),
     ('20261165_vehicles','vehicles_status_check'),
     ('20261165_vehicles','vehicles_private_contact_check'),
     ('20261165_vehicles','vehicles_phone_check'),
@@ -5728,6 +5729,17 @@ WITH report AS (
                     FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
                      AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%dealer-intake%'), false)
     AND COALESCE((SELECT with_check LIKE '%name ~ %' FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'dealer_intake_insert'), false)
+  -- 20261189: a partner may leave a field empty; a private seller may not. RED UNTIL 20261189 RUNS.
+  UNION ALL SELECT '20261189_vehicles_partner_empty_fields','vehicles: only id, intent, source, make, model, status and the two timestamps are NOT NULL; private rows require the nine spec columns and their own price; a sale never carries a daily price',
+    COALESCE((SELECT string_agg(attname, ',' ORDER BY attname) FROM pg_attribute
+               WHERE attrelid = to_regclass('public.vehicles') AND attnum > 0 AND NOT attisdropped AND attnotnull)
+             = 'created_at,id,intent,make,model,source,status,updated_at', false)
+    AND COALESCE((SELECT bool_and(pg_get_constraintdef(c.oid) LIKE '%' || x || ' IS NOT NULL%') AND bool_and(pg_get_constraintdef(c.oid) LIKE '%private%')
+                    FROM pg_constraint c, unnest(ARRAY['km','year','fuel','gearbox','body_type','colour','steering','currency','region']) x
+                   WHERE c.conrelid = to_regclass('public.vehicles') AND c.conname = 'vehicles_private_required_check'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%price_per_day IS NULL%' AND pg_get_constraintdef(oid) LIKE '%price IS NULL%'
+                         AND (length(pg_get_constraintdef(oid)) - length(replace(pg_get_constraintdef(oid), 'private', ''))) / 7 = 2
+                    FROM pg_constraint WHERE conrelid = to_regclass('public.vehicles') AND conname = 'vehicles_price_check'), false)
   UNION ALL SELECT '20261165_vehicles','vehicles.owner_id is readable by no client; my_vehicles() is the owner''s path (authenticated only)',
     COALESCE(NOT has_column_privilege('anon', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
          AND NOT has_column_privilege('authenticated', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
