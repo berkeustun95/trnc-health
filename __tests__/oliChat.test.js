@@ -333,5 +333,5 @@ describe('abuse', () => {
     await fireEvent.changeText(input(), 'one more')
     await fireEvent.press(sendBtn())
     expect(roles()).toEqual(['user', 'oli'])
-  })
+  }, 20000)   // renders all 150 rows (initialNumToRender); passes in under 1 s at rest, over jest's 5 s on a busy Mac
 })
