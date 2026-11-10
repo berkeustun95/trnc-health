@@ -5,7 +5,9 @@
       "commit": "c0dadd9bd0cdafcb3a02536b3e41803694f92854",
       "what": "Explore combined (stage 4 + round 2), merged to main 2026-11-08",
       "since": "2026-11-08",
-      "cleared": false,
+      "cleared": true,
+      "clearedOn": "2026-11-10",
+      "clearedBy": "Berke, in chat: GO PRODUCTION on commit 18d66c7b, after Preview 57fcd332 (01a1c565) and the fix video",
       "clear": "Only when Berke has seen Explore combined on Preview (video or his own tap-through) and says go in chat. Then set cleared to true in a PR."
     }
   ]
