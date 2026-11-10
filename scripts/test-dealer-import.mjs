@@ -121,7 +121,7 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
   check(`${slug}: no link and no source-site name anywhere in the data`, !/https?:|www\.|kktcarabam/i.test(text + JSON.stringify(dealer)))
   // The repo is public and git never forgets: no dealer photo is committed at all (they are staged in dealer-intake).
   check(`${slug}: no photos folder in the repo`, !existsSync(resolve(dir, 'photos')))
-  check(`${slug}: dealer.json has consent and never is_active`, /^\d{4}-\d{2}-\d{2}$/.test(dealer.consent_date) && !!dealer.consent_note && !('is_active' in dealer) && dealer.slug === slug)
+  check(`${slug}: dealer.json has consent and never is_active or logo_path`, /^\d{4}-\d{2}-\d{2}$/.test(dealer.consent_date) && !!dealer.consent_note && !('is_active' in dealer) && !('logo_path' in dealer) && dealer.slug === slug)
   const cars = parseCsv(text).map(mapCar)
   check(`${slug}: every row has a unique reference and no contact detail`, new Set(cars.map(c => c.ref)).size === cars.length && cars.every(c => !c.flags.some(f => f.includes('contact'))))
   if (slug === 'mustafa-ustuner-otomotiv') {
@@ -138,6 +138,9 @@ check('importer: writes no is_active and no source_url', !/is_active\s*:\s*(true
 
 check('importer: refuses a partial staged set, drops old rows before linking new ones, and unstages only what it read', imp.includes('incompleteSet(files)')
   && imp.indexOf('dropPhotos(have.filter(') < imp.indexOf("must(`photo rows ${ref}`") && imp.includes("read.map(r => r.stamp).sort().join()") && imp.includes('for (const ref of goneStaged)'))
+// The logo: staged like a photo, stored where the nightly photo sweep never looks, never taken from dealer.json.
+check("importer: the logo goes to partner/dealer/<slug>/ and 'logo' can never be a car reference", imp.includes('const path = `partner/dealer/${slug}/${logo.file}`')
+  && imp.includes("if ('logo_path' in DEALER) fail(") && !mapCar({ ...R, ilan_no: 'logo' }).row)
 // (Strings are split so check-prod-write-guard does not read this test as a writer.)
 // The Mac upload command: no service key, private staging only, and nothing leaves the Mac before it is proved clean.
 const up = readFileSync(resolve(ROOT, 'scripts/upload-dealer-photos.mjs'), 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
