@@ -2,7 +2,12 @@
 // mapping, and scripts/import-dealer-cars.mjs only reads, compares and writes.
 //
 // The CSV is the dealer's own stock list (Berke collects it; the owner consented). One row per car, matched by
-// ilan_no. A row that cannot be mapped exactly is SKIPPED and reported, never guessed: a missing km stays missing.
+// ilan_no.
+//
+// STANDING RULE for every partner (Berke, 2026-11-10): a field the partner left EMPTY is empty on purpose — buyers
+// are meant to call and ask. The car is imported with that field NULL: never skipped, never given an invented value
+// (20261189 lets dealer / import rows hold NULL; the app shows "Fiyat için ara" / "Km için sor"). Only a row with no
+// marka / model / ilan_no, or with a value that is there but unreadable ("Zeplin" as a fuel), is skipped and reported.
 // Columns: ilan_no, marka, model, versiyon, yil, durum, kasa, yakit, vites, direksiyon, motor_cc, renk, km, sehir,
 // fiyat_liste, fiyat_aciklamada, para_birimi, ozellikler, aciklama, not, and optionally tur (Satılık / Kiralık).
 import { createHash } from 'node:crypto'
@@ -110,40 +115,51 @@ export function buildDescription(r) {
 // One CSV row → { ref, row } or { ref, problems }. `flags` are notes for the run log (a price that differs from the
 // one in the dealer's own text is imported at the list price and flagged).
 export function mapCar(r) {
-  const problems = [], flags = []
-  const pick = (map, col, label) => {
-    const v = map.get(key(r[col] ?? ''))
-    if (!v) problems.push(`${label} "${r[col] ?? ''}" has no match`)
-    return v
+  const problems = [], flags = [], empty = []
+  const blank = col => (r[col] ?? '') === ''
+  // An EMPTY field is the partner's choice (buyers call and ask): it is imported empty, never skipped and never
+  // filled in (Berke's standing rule, 2026-11-10). A value that is there but cannot be read is still a problem.
+  const pick = (map, col) => {
+    if (blank(col)) { empty.push(col); return null }
+    const v = map.get(key(r[col]))
+    if (!v) problems.push(`${col} "${r[col]}" has no match`)
+    return v ?? null
   }
   const ref = r.ilan_no
   if (!/^[A-Za-z0-9-]{1,40}$/.test(ref ?? '') || ref === 'logo') problems.push(`ilan_no "${ref ?? ''}" is not a plain reference`)
-  const intent = r.tur ? pick(INTENT, 'tur', 'tur') : 'sale'
-  const year = wholeNumber(r.yil ?? '')
-  if (year === null || year < 1950 || year > 2100) problems.push(`yil "${r.yil ?? ''}" is not a year`)
-  const km = r.km === '' || r.km == null ? null : wholeNumber(r.km)
-  if (km === null) problems.push(r.km ? `km "${r.km}" is not a number` : 'km is missing')
-  else if (km > 2000000) problems.push(`km ${km} is out of range`)
-  const price = wholeNumber(r.fiyat_liste ?? '')
-  if (!price) problems.push(`fiyat_liste "${r.fiyat_liste ?? ''}" is not a price`)
-  else if (price > (intent === 'rent' ? 1000000 : 100000000)) problems.push(`fiyat_liste ${price} is out of range`)
-  if (!CURRENCIES.includes(r.para_birimi)) problems.push(`para_birimi "${r.para_birimi ?? ''}" has no match`)
+  const intent = r.tur ? (INTENT.get(key(r.tur)) ?? (problems.push(`tur "${r.tur}" has no match`), null)) : 'sale'
+  let year = null, km = null, price = null, currency = null
+  if (blank('yil')) empty.push('yil')
+  else { year = wholeNumber(r.yil); if (year === null || year < 1950 || year > 2100) problems.push(`yil "${r.yil}" is not a year`) }
+  if (blank('km')) empty.push('km')
+  else { km = wholeNumber(r.km); if (km === null) problems.push(`km "${r.km}" is not a number`); else if (km > 2000000) problems.push(`km ${km} is out of range`) }
+  if (blank('fiyat_liste')) empty.push('fiyat_liste')
+  else {
+    price = wholeNumber(r.fiyat_liste)
+    if (!price) problems.push(`fiyat_liste "${r.fiyat_liste}" is not a price`)
+    else if (price > (intent === 'rent' ? 1000000 : 100000000)) problems.push(`fiyat_liste ${price} is out of range`)
+  }
+  if (blank('para_birimi')) { if (price) empty.push('para_birimi') }
+  else if (!CURRENCIES.includes(r.para_birimi)) problems.push(`para_birimi "${r.para_birimi}" has no match`)
+  else if (price) currency = r.para_birimi
+  // The two things a listing cannot exist without.
   if (!r.marka || r.marka.length > 40) problems.push('marka is missing or over 40 characters')
   if (!r.model || r.model.length > 60) problems.push('model is missing or over 60 characters')
-  const fuel = pick(FUEL, 'yakit', 'yakit'), gearbox = pick(GEARBOX, 'vites', 'vites'), body_type = pick(BODY, 'kasa', 'kasa')
-  const colour = pick(COLOUR, 'renk', 'renk'), steering = pick(STEERING, 'direksiyon', 'direksiyon'), region = pick(REGION, 'sehir', 'sehir')
+  const fuel = pick(FUEL, 'yakit'), gearbox = pick(GEARBOX, 'vites'), body_type = pick(BODY, 'kasa')
+  const colour = pick(COLOUR, 'renk'), steering = pick(STEERING, 'direksiyon'), region = pick(REGION, 'sehir')
   const { description, cut, residue } = buildDescription(r)
   if (description && description.length > 3000) problems.push('the description is over 3000 characters')
   if (residue) problems.push(`the description may still hold a contact ("${residue}"): edit the CSV text`)
   for (const c of cut) flags.push(`contact detail cut from the description: "${c}"`)
   const other = r.fiyat_aciklamada ? wholeNumber(r.fiyat_aciklamada) : null
   if (other !== null && price && other !== price) flags.push(`FİYAT FARKLI: list ${price}, in the dealer's text ${other} (list price used)`)
+  if (empty.length) flags.push(`left empty by the partner, imported empty: ${empty.join(', ')}`)
   if (problems.length) return { ref, problems, flags }
   return {
     ref, flags,
     row: {
       external_id: ref, intent, make: r.marka, model: r.model, year, km, fuel, gearbox, body_type, colour, steering,
-      price: intent === 'sale' ? price : null, price_per_day: intent === 'rent' ? price : null, currency: r.para_birimi,
+      price: intent === 'sale' ? price : null, price_per_day: intent === 'rent' ? price : null, currency,
       region, area: null, description,
     },
   }

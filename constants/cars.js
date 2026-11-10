@@ -47,7 +47,7 @@ export const groupDigits = n => String(Math.round(Number(n))).replace(/\B(?=(\d{
 export function carPrice(car) {
   const amount = car.intent === 'rent' ? car.price_per_day : car.price
   if (amount == null) return null
-  return `${CURRENCY_SYMBOL[car.currency] || `${car.currency} `}${groupDigits(amount)}`
+  return `${CURRENCY_SYMBOL[car.currency] || (car.currency ? `${car.currency} ` : '')}${groupDigits(amount)}`
 }
 
 // GBP bands per intent. [lo, hi): hi null = open-ended.
