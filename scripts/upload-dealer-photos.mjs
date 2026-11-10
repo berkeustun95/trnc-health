@@ -3,6 +3,7 @@
 //
 //   node scripts/upload-dealer-photos.mjs --dealer mustafa-ustuner-otomotiv ~/ADA-partner-files/mustafa-photos
 //   node scripts/upload-dealer-photos.mjs --dealer <slug> <folder> --check     # read and report only, no sign-in
+//   node scripts/upload-dealer-photos.mjs --dealer <slug> --logo ~/ADA-partner-files/logo.png   # the dealer's logo (alone or with a folder)
 //
 // <folder> holds one folder per car, named by ilan_no, with 1.jpg (the cover), 2.jpg, … (jpg / jpeg / png / webp /
 // heic). Each photo is stripped of ALL metadata here, on the Mac, with the same code the server uses
@@ -33,10 +34,14 @@ const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 const di = args.indexOf('--dealer')
 const slug = di >= 0 ? args[di + 1] : null
 const checkOnly = args.includes('--check')
-const folderArg = args.find((a, i) => !a.startsWith('--') && i !== di + 1)
-if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(slug ?? '') || !folderArg) fail('usage: node scripts/upload-dealer-photos.mjs --dealer <slug> <folder with one folder per ilan_no> [--check]')
-const SRC = resolve(folderArg.replace(/^~(?=\/|$)/, homedir()))
-if (!existsSync(SRC) || !statSync(SRC).isDirectory()) fail(`not a folder: ${SRC}`)
+const li = args.indexOf('--logo')
+const home = p => resolve(p.replace(/^~(?=\/|$)/, homedir()))
+const LOGO = li >= 0 && args[li + 1] ? home(args[li + 1]) : null
+const folderArg = args.find((a, i) => !a.startsWith('--') && i !== di + 1 && i !== li + 1)
+if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(slug ?? '') || (!folderArg && !LOGO)) fail('usage: node scripts/upload-dealer-photos.mjs --dealer <slug> [<folder with one folder per ilan_no>] [--logo <image>] [--check]')
+const SRC = folderArg ? home(folderArg) : null
+if (SRC && (!existsSync(SRC) || !statSync(SRC).isDirectory())) fail(`not a folder: ${SRC}`)
+if (LOGO && (!existsSync(LOGO) || !statSync(LOGO).isFile())) fail(`not a file: ${LOGO}`)
 const csvPath = resolve(ROOT, 'data/dealers', slug, 'cars.csv')
 if (!existsSync(csvPath)) fail(`unknown dealer: data/dealers/${slug}/cars.csv is missing`)
 
@@ -52,7 +57,7 @@ process.on('exit', () => rmSync(tmp, { recursive: true, force: true }))
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(130))
 const sips = (...a) => execFileSync('/usr/bin/sips', a, { stdio: ['ignore', 'ignore', 'pipe'] })
 const problems = [], notes = [], plan = []
-for (const ref of readdirSync(SRC).filter(n => !n.startsWith('.')).sort()) {
+for (const ref of SRC ? readdirSync(SRC).filter(n => !n.startsWith('.')).sort() : []) {
   const dir = join(SRC, ref)
   if (!statSync(dir).isDirectory()) { problems.push(`${ref}: a file next to the car folders (expected only folders named by ilan_no)`); continue }
   const car = cars.get(ref)
@@ -90,12 +95,22 @@ for (const ref of readdirSync(SRC).filter(n => !n.startsWith('.')).sort()) {
   }
   plan.push({ ref, car, out })
 }
+// The dealer's logo travels the same way: stripped here, staged as <slug>/logo/1.<ext>, set by the import job.
+if (LOGO) {
+  try {
+    const clean = stripImageMetadata(new Uint8Array(readFileSync(LOGO)))
+    const left = metadataFound(clean.bytes)
+    if (left.found.length || left.gps) throw new Error('metadata left after stripping')
+    if (clean.bytes.length > MAX_BYTES) throw new Error('over 5 MB')
+    plan.push({ ref: 'logo', car: null, out: [{ path: `${slug}/logo/1.${FORMAT_EXT[clean.format]}`, bytes: Buffer.from(clean.bytes), mime: FORMAT_MIME[clean.format] }] })
+  } catch (e) { problems.push(`logo: ${e.message === 'UNSUPPORTED_FORMAT' ? 'not a JPEG / PNG / WebP image' : e.message === 'CORRUPT' ? 'the image file is damaged' : e.message}`) }
+}
 
 const mb = n => `${(n / 1048576).toFixed(1)} MB`
-console.log(`\n${plan.length} car folder(s), ${plan.reduce((n, p) => n + p.out.length, 0)} photo(s), ${mb(plan.reduce((n, p) => n + p.out.reduce((m, o) => m + o.bytes.length, 0), 0))} after stripping (all metadata removed and checked)`)
-for (const p of plan) console.log(`  ${p.ref}  ${p.car.row ? `${p.car.row.make} ${p.car.row.model} ${p.car.row.year}` : '(row not importable yet)'}  ${p.out.length} photo(s)`)
+console.log(`\n${plan.filter(p => p.car).length} car folder(s)${LOGO ? ' + the dealer logo' : ''}, ${plan.reduce((n, p) => n + p.out.length, 0)} file(s), ${mb(plan.reduce((n, p) => n + p.out.reduce((m, o) => m + o.bytes.length, 0), 0))} after stripping (all metadata removed and checked)`)
+for (const p of plan) console.log(p.car ? `  ${p.ref}  ${p.car.row ? `${p.car.row.make} ${p.car.row.model} ${p.car.row.year}` : '(row not importable yet)'}  ${p.out.length} photo(s)` : '  dealer logo')
 const without = [...cars.values()].filter(c => c.row && !plan.some(p => p.ref === c.ref))
-if (without.length) console.log(`\nno folder for ${without.length} car(s): ${without.map(c => c.ref).join(', ')}`)
+if (SRC && without.length) console.log(`\nno folder for ${without.length} car(s): ${without.map(c => c.ref).join(', ')}`)
 if (notes.length) { console.log('\nnotes:'); for (const n of notes) console.log(`  ${n}`) }
 if (problems.length) { console.error('\nproblems (nothing uploaded):'); for (const p of problems) console.error(`  ${p}`); process.exit(1) }
 if (!plan.length) fail('\nnothing to upload')
@@ -133,7 +148,7 @@ let code = 1
 try {
   const { data: admin, error: aErr } = await db.rpc('is_admin')
   if (aErr || admin !== true) throw new Error('this account is not an admin: only admins can stage dealer photos')
-  const go = (await ask(`Upload ${plan.reduce((n, p) => n + p.out.length, 0)} photo(s) for ${plan.length} car(s) to private staging? (y/N) `)).toLowerCase()
+  const go = (await ask(`Upload ${plan.reduce((n, p) => n + p.out.length, 0)} file(s) (${plan.filter(p => p.car).length} car(s)${LOGO ? ' + the logo' : ''}) to private staging? (y/N) `)).toLowerCase()
   if (go !== 'y') throw new Error('stopped: nothing uploaded')
 
   // Each car's staged set is replaced as a whole.
@@ -158,9 +173,9 @@ try {
     const { data: now, error: cErr } = await bucket.list(`${slug}/${p.ref}`, { limit: 200 })
     if (cErr || now.length !== p.out.length) throw new Error(`${p.ref}: staged ${now?.length ?? '?'} of ${p.out.length} photo(s)`)
     done++
-    console.log(`  staged ${p.ref}  ${p.out.length} photo(s)`)
+    console.log(p.car ? `  staged ${p.ref}  ${p.out.length} photo(s)` : '  staged the dealer logo')
   }
-  console.log(`\nDone: ${done} car(s) staged. Tell Claude, or run:\n  gh workflow run araclar-dealer-import -R berkeustun95/trnc-health -f dealer=${slug} -f apply=true`)
+  console.log(`\nDone: ${done} set(s) staged. Tell Claude, or run:\n  gh workflow run araclar-dealer-import -R berkeustun95/trnc-health -f dealer=${slug} -f apply=true`)
   code = 0
 } catch (e) {
   console.error(`\n${e.message}`)
