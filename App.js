@@ -147,6 +147,10 @@ import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
 import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
 import { withReadableTitle } from './utils/readableTitle'
+import { otaApplyBlocker, OTA_APPLIED_KEY, LAUNCH_TAP_MS } from './utils/otaLaunchApply'
+import { BOOT_SPLASH_KEY, localDay, splashRecord } from './utils/bootSplashDay'
+
+const LAUNCHED_AT = Date.now()
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -618,6 +622,13 @@ export default function App() {
     claimSplash(build).then(setSplashPlay)
   }, [])
   const splashUp = splashPlay !== false && !bootSplashDone
+  // Read by the launch OTA apply below (utils/otaLaunchApply.js).
+  const touchedRef = useRef(false)
+  const sheetUpRef = useRef(false)
+  const splashPlayRef = useRef(splashPlay)
+  splashPlayRef.current = splashPlay
+  const splashUpRef = useRef(splashUp)
+  splashUpRef.current = splashUp
   // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
   const [policySeen, setPolicySeen] = useState(undefined)
   const [returningDevice, setReturningDevice] = useState(false)
@@ -735,6 +746,8 @@ export default function App() {
   // row screen 1 has already loaded. Cleared with the module, not with the sub-screen.
   const [connectivityOperator, setConnectivityOperator] = useState(null)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
+  const [newcomerCard, setNewcomerCard] = useState(null)   // a Welcome Guide card to open on entry (Ask Oli routes)
+  useEffect(() => { if (!showNewcomerEssentials) setNewcomerCard(null) }, [showNewcomerEssentials])
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [showLiveScores, setShowLiveScores] = useState(false)
   // A score editor (live_score_editors) sees the Live Scores tile while LIVE_SCORES_LIVE is false,
@@ -1052,15 +1065,38 @@ export default function App() {
     })
   }
 
+  // utils/otaLaunchApply.js: reload into a just-downloaded OTA only while nothing can be lost.
+  // An unconditional reload here once threw away wherever the user already was (a duty push
+  // opened Nöbetçi Eczane, then the reload dropped it on Home), hence every guard.
   useEffect(() => {
-    if (!__DEV__) {
-      Updates.checkForUpdateAsync().then(({ isAvailable }) => {
-        // Download only; it applies on the next cold start. A reload here restarted the JS
-        // ~2 s after launch and threw away wherever the user already was — a duty push opened
-        // Nöbetçi Eczane, then the reload dropped it on Home.
-        if (isAvailable) Updates.fetchUpdateAsync()
+    if (__DEV__) return
+    Updates.checkForUpdateAsync()
+      // The check's id, not fetch's isNew: the native ON_LOAD check may have downloaded it first.
+      .then(check => (check.isAvailable ? Updates.fetchUpdateAsync().then(() => check.manifest?.id ?? null) : null))
+      .then(async fetchedId => {
+        if (!fetchedId) return
+        const [tap, url, lastAppliedId] = await Promise.all([
+          Notifications.getLastNotificationResponseAsync().catch(() => null),
+          Linking.getInitialURL().catch(() => null),
+          AsyncStorage.getItem(OTA_APPLIED_KEY).catch(() => null),
+        ])
+        const tapAt = tap?.notification?.date
+        const blocker = otaApplyBlocker({
+          fetchedId, runningId: Updates.updateId, emergency: Updates.isEmergencyLaunch,
+          elapsedMs: Date.now() - LAUNCHED_AT, touched: touchedRef.current || sheetUpRef.current, appState: AppState.currentState,
+          launchedByTap: !!tap && (!tapAt || Date.now() - tapAt < LAUNCH_TAP_MS), launchedByLink: !!url, lastAppliedId,
+        })
+        console.log(`[ota-apply] ${blocker ?? 'reloading'} ${fetchedId.slice(0, 8)} after ${Date.now() - LAUNCHED_AT} ms`)
+        if (blocker) return
+        await AsyncStorage.setItem(OTA_APPLIED_KEY, fetchedId)
+        // The clip already played to the end on this launch: don't play it again for the new
+        // build right after. Mid-clip, it restarts with the reload, which reads as one splash.
+        if (splashPlayRef.current === true && !splashUpRef.current) {
+          await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(localDay(), fetchedId)).catch(() => {})
+        }
+        if (touchedRef.current || sheetUpRef.current || AppState.currentState !== 'active') return
+        await Updates.reloadAsync()
       }).catch(() => {})
-    }
   }, [])
 
   useEffect(() => {
@@ -2370,7 +2406,8 @@ export default function App() {
     content = (
       <NewcomerEssentialsScreen
         lang={lang}
-        onBack={() => setShowNewcomerEssentials(false)}
+        initialCard={newcomerCard}
+        onBack={() => { setShowNewcomerEssentials(false); setNewcomerCard(null) }}
         onShowExchangeRates={() => setShowExchangeRates(true)}
         backRef={guideBackRef}
       />
@@ -3016,6 +3053,15 @@ export default function App() {
       // Reached only from the guided chat (OLI_CHAT): neither id is in OLI_INTENTS, which the search sheet uses.
       case 'nearby':        setShowExplore(true); break
       case 'eatery':        setShowEatery(true); break
+      // Guided chat routes to the exact page (constants/oliIntents.js CHAT_ROUTES).
+      case 'borders': case 'ports': case 'embassies': case 'holidays': case 'driving': case 'living':
+        setNewcomerCard(target); setShowNewcomerEssentials(true); break
+      case 'esim':          setShowEsim(true); break
+      case 'ehliyet':       setShowEhliyet(true); break
+      case 'hotels':        setShowHotels(true); break
+      case 'studentHub':    setShowStudentHub(true); break
+      case 'duyurular':     setShowDuyurular(true); break
+      case 'insurance':     setShowInsurance(true); break
     }
   }
 
@@ -3066,6 +3112,10 @@ export default function App() {
     !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
     shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
                              current: LEGAL_VERSION, returning: returningDevice })
+  const appUpdateVisible = !splashUp && session !== undefined && fontsLoaded && onboarded === true &&
+    (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))
+  // A launch sheet may be a Modal, whose touches the root never sees: one on screen counts as in use.
+  sheetUpRef.current = policyNoticeVisible || appUpdateVisible || homeCityAskVisible || cityWelcomeVisible || showCoachMarks || oliSheetOpen
   // Seen, NOT accepted: nothing is written to profiles.
   // The notice closes on the STATE change, before and regardless of the storage write — a
   // failed write can never keep it on screen. The write is retried so it also stays closed
@@ -3092,7 +3142,7 @@ export default function App() {
   const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider onTouchStart={() => { touchedRef.current = true }}>
      <SplashUpContext.Provider value={splashUp}>
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
@@ -3348,8 +3398,7 @@ export default function App() {
           above it), but this Modal lives out here and knows nothing about onboarding, so
           without the repeat it would cover the carousel a new user is still reading. */}
       <AppUpdateNotice
-        visible={!splashUp && session !== undefined && fontsLoaded && onboarded === true &&
-                 (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))}
+        visible={appUpdateVisible}
         tier={updateTier}
         lang={lang}
         onUpdate={openStore}

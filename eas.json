@@ -63,6 +63,13 @@
         "ascAppId": "6783996527",
         "appleTeamId": "MAQ8XPJ8Z6"
       }
+    },
+    "preview-testflight": {
+      "ios": {
+        "appleId": "getadaapp@gmail.com",
+        "ascAppId": "6832486958",
+        "appleTeamId": "MAQ8XPJ8Z6"
+      }
     }
   }
 }
