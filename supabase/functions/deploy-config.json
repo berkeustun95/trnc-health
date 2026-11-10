@@ -6,6 +6,8 @@
     "live-scores-basketball": { "verify_jwt": true },
     "live-scores-f1":         { "verify_jwt": true },
     "live-scores-football":   { "verify_jwt": true },
+    "marketplace-maintenance": { "verify_jwt": true },
+    "marketplace-photo-review": { "verify_jwt": true },
     "send-duty-notification": { "verify_jwt": true },
     "send-weekend-digest":    { "verify_jwt": true },
     "sync-novest":            { "verify_jwt": true },

@@ -18,7 +18,7 @@ import { t } from '../constants/i18n'
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
-import { REDESIGN, DUYURULAR, EHLIYET, EATERY } from '../constants/redesign'
+import { REDESIGN, DUYURULAR, EHLIYET, EATERY, MARKETPLACE } from '../constants/redesign'
 import { loadEateryPartners, EATERY_GATES } from '../utils/loadEateryPartners'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
@@ -167,6 +167,10 @@ const TESTER_UNLOCK = new Set(['liveScores'])
 // Ehliyet is dark (MODULE_FLAGS.ehliyet): dev and ADA Preview see its tile through the same Set (constants/redesign.js EHLIYET).
 const EHLIYET_UNLOCK = new Set(['ehliyet'])
 const TESTER_EHLIYET_UNLOCK = new Set(['liveScores', 'ehliyet'])
+// Bandabuliya is dark (MODULE_FLAGS.marketplace): dev and ADA Preview see its tile too (constants/redesign.js MARKETPLACE).
+const withMarketplace = set => (MARKETPLACE ? new Set([...(set || []), 'marketplace']) : set)
+const HOME_UNLOCK = withMarketplace(EHLIYET ? EHLIYET_UNLOCK : undefined)
+const HOME_TESTER_UNLOCK = withMarketplace(EHLIYET ? TESTER_EHLIYET_UNLOCK : TESTER_UNLOCK)
 
 // Fair rotation of the eatery slides: one stored integer (AsyncStorage), read once per app session so the order
 // does not reshuffle on a dismissal or a Home remount, and advanced once so the NEXT launch leads with the next
@@ -249,6 +253,7 @@ export default function HomeScreen({
   onShowTowing,
   onShowEhliyet,
   onShowCars,
+  onShowMarketplace,
   onShowEatery,
   overlayOpen = false,   // App-level sheets over Home (Oli, language, about, tutorial, city ask): the strip slider holds still
   onOpenEateryPartner,
@@ -615,6 +620,7 @@ export default function HomeScreen({
     towing:             onShowTowing,
     ehliyet:            onShowEhliyet,
     cars:               onShowCars,
+    marketplace:        onShowMarketplace,
     eatery:             onShowEatery,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
@@ -1038,7 +1044,7 @@ export default function HomeScreen({
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
 
             <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={EHLIYET ? (liveScoresTester ? TESTER_EHLIYET_UNLOCK : EHLIYET_UNLOCK) : (liveScoresTester ? TESTER_UNLOCK : undefined)} />
+            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? HOME_TESTER_UNLOCK : HOME_UNLOCK} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}

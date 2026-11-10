@@ -33,7 +33,7 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, EXPLORE_ROUTES_LIVE, HOTELS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
-import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, CARS } from './constants/redesign'
+import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, CARS, MARKETPLACE } from './constants/redesign'
 import { pushCarsLayer, layerKey } from './constants/cars'
 import { isAdultForOrder } from './constants/eatery'
 import { FloatingTabBar, PageCanvas } from './components/ui'
@@ -88,6 +88,7 @@ import CarDetailScreen from './screens/CarDetailScreen'
 import CarPostScreen from './screens/CarPostScreen'
 import MyCarsScreen from './screens/MyCarsScreen'
 import DealerScreen from './screens/DealerScreen'
+import MarketplaceScreen from './screens/MarketplaceScreen'
 import EateryScreen from './screens/EateryScreen'
 import EsimScreen from './screens/EsimScreen'
 import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
@@ -725,6 +726,8 @@ export default function App() {
     Alert.alert(t(created ? 'carsPostSentTitle' : 'carsPostUpdatedTitle', lang),
       photoFailures ? `${body}\n\n${t('carsPostPhotoFailed', lang)}` : body)
   }
+  // Bandabuliya: null | 'browse' | 'mine' (Profil's İlanlarım row opens straight into the seller's list).
+  const [showMarketplace, setShowMarketplace] = useState(null)
   const [showEatery, setShowEatery] = useState(false)
   const [eateryPartner, setEateryPartner] = useState(null)   // the partner row open inside Yeme-İçme
   // Explore map pin -> partner page. The pin hands a slug (its row has no menu / contacts); EateryScreen
@@ -816,6 +819,7 @@ export default function App() {
   const jobsBackRef = useRef(null)
   const transportBackRef = useRef(null)
   const duyurularBackRef = useRef(null)
+  const marketplaceBackRef = useRef(null)
   const eateryPartnerBackRef = useRef(null)
   const eateryListBackRef = useRef(null)     // the "Ne yesem?" quiz page (a layer above the Yeme-İçme list)
   const insuranceBackRef = useRef(null)
@@ -1219,6 +1223,7 @@ export default function App() {
         return true
       }
       if (showCars) { setShowCars(false); return true }
+      if (showMarketplace) { if (marketplaceBackRef.current?.()) return true; setShowMarketplace(null); return true }
       // Partner page before the list: back steps partner -> list -> Home.
       if (eateryPartner) { if (eateryPartnerBackRef.current?.()) return true; if (eateryFromMap) setShowEatery(false); setEateryPartner(null); return true }
       if (showEatery) { if (eateryListBackRef.current?.()) return true; setShowEatery(false); return true }
@@ -1258,7 +1263,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1519,6 +1524,15 @@ export default function App() {
     registerPushToken()
   }, [session, pushRetry])
 
+  // Bandabuliya pushes: a listing chat (20261184) opens the thread; a photo decision (marketplace-photo-review) opens
+  // the listing. Gated like Student Hub: on a bundle where the module is dark the tap does nothing.
+  const openMarketplacePush = data => {
+    if (!MARKETPLACE) return false
+    if (data.screen === 'marketplace_conversation') { setShowMarketplace({ view: 'inbox', conversationId: data.conversation_id ?? null }); return true }
+    if (data.screen === 'marketplace') { setShowMarketplace({ view: 'listing', listingId: data.listing_id ?? null }); return true }
+    return false
+  }
+
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       if (!sessionRef.current) return
@@ -1540,7 +1554,7 @@ export default function App() {
         //   Doing nothing leaves the user where they were, which is honest.
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
-      }
+      } else openMarketplacePush(data)
     })
     return () => sub.remove()
   }, [])
@@ -1566,6 +1580,7 @@ export default function App() {
       }
       else if (screen === 'profile') setActiveTab('profile')
       else if (screen === 'notifications') setShowNotifs(true)
+      else openMarketplacePush(data)
     })
   }, [session])
 
@@ -2225,7 +2240,12 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
-      onNotifPress={item => (notificationRoute(item) === 'weekend' ? openWeekendOnMap() : setShowDutyList(true))}
+      onNotifPress={item => {
+        const route = notificationRoute(item)
+        if (route === 'weekend') openWeekendOnMap()
+        else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
+        else setShowDutyList(true)
+      }}
       onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
@@ -2659,6 +2679,12 @@ export default function App() {
         ))}
       </View>
     )
+  } else if (showMarketplace && MARKETPLACE) {
+    // Bandabuliya. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
+    content = <MarketplaceScreen lang={lang} session={session} profile={profile} backRef={marketplaceBackRef}
+      initialView={showMarketplace === 'mine' ? 'mine' : null} target={typeof showMarketplace === 'object' ? showMarketplace : null}
+      onSignIn={key => requireAccount(key || 'mkGatePost')}
+      onBack={() => setShowMarketplace(null)} />
   } else if (showEatery && EATERY) {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} session={session} dateOfBirth={profile?.date_of_birth ?? null} onRequireAccount={requireAccount} partner={eateryPartner} onOpenPartner={setEateryPartner}
@@ -2774,6 +2800,7 @@ export default function App() {
             onShowTowing={() => setShowTowing(true)}
             onShowEhliyet={() => setShowEhliyet(true)}
             onShowCars={() => setShowCars(true)}
+            onShowMarketplace={() => setShowMarketplace('browse')}
             onShowEatery={() => setShowEatery(true)}
             overlayOpen={oliSheetOpen || showLangModal || showAboutSheet || showCoachMarks || showHomeCityAsk}
             onOpenEateryPartner={slug => { setShowEatery(true); setEateryOpenSlug(slug); setEateryFromMap(true) }}
@@ -2912,6 +2939,7 @@ export default function App() {
             guardRef={profileGuardRef}
             onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
             onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
+            onOpenMyListings={MARKETPLACE ? () => setShowMarketplace('mine') : null}
           />
         )}
 
@@ -3031,7 +3059,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowEatery(false); setEateryPartner(null)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -3072,7 +3100,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowEatery(false); setEateryPartner(null)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)

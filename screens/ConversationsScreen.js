@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../lib/supabase'
+import { STUDENT_CHAT } from '../utils/chatApi'
 import ContentCard from '../components/ContentCard'
 import Avatar, { prefetchAvatars } from '../components/Avatar'
 import { colors, radius } from '../constants/theme'
@@ -39,7 +39,7 @@ function stamp(iso, lang) {
   return `${d.getDate()} ${months[d.getMonth()]}`
 }
 
-function Row({ row, lang, onOpen }) {
+function Row({ row, lang, onOpen, renderExtra }) {
   return (
     <TouchableOpacity
       style={s.row}
@@ -65,6 +65,7 @@ function Row({ row, lang, onOpen }) {
           </Text>
           <Text style={s.time}>{stamp(row.last_message_at, lang)}</Text>
         </View>
+        {renderExtra?.(row)}
 
         <Text style={[s.preview, row.is_closed && s.previewMuted]} numberOfLines={1}>
           {row.last_body ?? ''}
@@ -85,7 +86,8 @@ function Row({ row, lang, onOpen }) {
   )
 }
 
-export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfile, refreshKey = 0 }) {
+// api: utils/chatApi.js (Bandabuliya passes its listing adapter); renderExtra(row): a line under the name.
+export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfile, refreshKey = 0, api = STUDENT_CHAT, renderExtra = null }) {
   const [rows, setRows]         = useState(null)
   const [failed, setFailed]     = useState(false)
   const [refreshing, setRefresh] = useState(false)
@@ -99,7 +101,7 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
     if (canSee !== true) return undefined
     let cancelled = false
     setFailed(false)
-    supabase.rpc('list_conversations').then(({ data, error }) => {
+    api.list().then(({ data, error }) => {
       if (cancelled) return
       // AUTH_REQUIRED and NOT_LISTED are the server restating what this screen already
       // checked through canSee, so they are a load failure here rather than a state with
@@ -109,7 +111,7 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
       prefetchAvatars((data ?? []).map(r => r.avatar_url)).finally(() => setRows(data ?? []))
     })
     return () => { cancelled = true }
-  }, [canSee, refreshKey])
+  }, [canSee, refreshKey, api])
 
   useEffect(() => load(), [load])
 
@@ -167,7 +169,7 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
         <ContentCard>
           {rows.map((row, i) => (
             <View key={row.conversation_id} style={i ? s.divider : null}>
-              <Row row={row} lang={lang} onOpen={onOpen} />
+              <Row row={row} lang={lang} onOpen={onOpen} renderExtra={renderExtra} />
             </View>
           ))}
         </ContentCard>
