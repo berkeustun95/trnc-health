@@ -7,7 +7,7 @@ import { colors, type, radii, elevation, press } from '../constants/theme'
 import { t, dateLocale } from '../constants/i18n'
 import { getIntent, getPlaceType, OLI_CHAT_INTENTS } from '../constants/oliIntents'
 import { oliProvider } from '../utils/oliAnswers'
-import { loadOliHistory, saveOliMessage, deleteOliHistory } from '../utils/oliHistory'
+import { loadOliHistory, saveOliMessage, saveRefused, deleteOliHistory } from '../utils/oliHistory'
 import { localDateKey } from '../utils/dutyStatus'
 import { IconButton, ErrorState, RowSkeleton, ConfirmDialog } from './ui'
 import { useVoiceInput, MicButton } from './OliMic'
@@ -137,6 +137,9 @@ export function OliAnswer({ payload, lang, onAction }) {
 // A hung network ends a send as the error reply after SEND_TIMEOUT_MS, so the lock is released and the chat stays
 // usable; the question then counts as not saved, and no reply is stored without it.
 export const SEND_TIMEOUT_MS = 15000
+// How often a message that could not be saved is sent again while the sheet is open.
+export const SAVE_RETRY_MS = 4000
+const TIMED_OUT = new Error('timeout')
 function withTimeout(promise, fallback) {
   let timer
   const late = new Promise(resolve => { timer = setTimeout(() => resolve(fallback), SEND_TIMEOUT_MS) })
@@ -158,13 +161,15 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
   const [notSaved, setNotSaved] = useState(false)
   const [del, setDel] = useState(null)                // null | { busy, error } while the delete confirm is open
   const listRef = useRef(null)
+  const pendingRef = useRef([])                       // not saved yet, oldest first: { row, inflight? }
+  const retryingRef = useRef(false)
   const sendingRef = useRef(false)                    // `busy` is state: two taps in one frame both read false
   const inputRef = useRef('')
   inputRef.current = input
   const voice = useVoiceInput({ lang, getText: () => inputRef.current, onText: setInput })
 
   // A different account (sign-in, sign-out, guest → account) never sees the previous one's chat.
-  useEffect(() => { setMessages([]); setHistory('idle'); setNotSaved(false) }, [userId, isGuest])
+  useEffect(() => { setMessages([]); setHistory('idle'); setNotSaved(false); pendingRef.current = [] }, [userId, isGuest])
 
   async function loadHistory() {
     setHistory('loading')
@@ -219,22 +224,57 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
     const now = new Date()
     setMessages(m => [...m, { key: localKey(), role: 'user', body, at: now.toISOString() }])
     try {
-      const savedUser = canSave ? saveOliMessage({ role: 'user', body: body.slice(0, 500) }) : Promise.resolve(null)
+      const userRow = { role: 'user', body: body.slice(0, 500) }
+      // Behind messages still waiting to be saved, so the saved order stays the order asked.
+      const queued = pendingRef.current.length > 0
+      const savedUser = canSave && !queued ? saveOliMessage(userRow) : Promise.resolve(null)
       const failed = { v: 1, kind: 'error', intent: null, items: [], day: localDateKey(now) }
       let answer
       try { answer = await withTimeout(oliProvider.answer({ text: intentId ? '' : body, intentId, lang, userLocation, now }), failed) }
       catch { answer = failed }
-      const userErr = await withTimeout(savedUser, new Error('timeout'))
+      const userErr = await withTimeout(savedUser, TIMED_OUT)
       // An 'error' answer is a moment, not something worth keeping.
-      const savedOli = canSave && !userErr && answer.kind !== 'error' ? saveOliMessage({ role: 'oli', payload: answer }) : Promise.resolve(null)
+      const oliRow = answer.kind !== 'error' ? { role: 'oli', payload: answer } : null
+      const savedOli = canSave && !queued && !userErr && oliRow ? saveOliMessage(oliRow) : Promise.resolve(null)
       setMessages(m => [...m, { key: localKey(), role: 'oli', payload: answer, at: new Date().toISOString() }])
       const oliErr = await savedOli
-      if (canSave && (userErr || oliErr)) setNotSaved(true)
+      if (canSave) {
+        const pending = pendingRef.current
+        // A timed-out save may still land: the retry waits for its real result before sending it again.
+        if (queued || userErr) pending.push({ row: userRow, inflight: userErr === TIMED_OUT ? savedUser : null }, ...(oliRow ? [{ row: oliRow }] : []))
+        else if (oliErr) pending.push({ row: oliRow })
+        if (!pending.length) setNotSaved(false)
+        else if (!queued) setNotSaved(true)
+      }
     } finally {
       sendingRef.current = false
       setBusy(false)
     }
   }
+
+  // What could not be saved is sent again, in order, until it is: the "not saved" line goes as soon as the
+  // connection is back (Berke 2026-11-10). A refused row is dropped and the line stays: it was not saved.
+  async function retrySaves() {
+    const pending = pendingRef.current
+    if (!pending.length || retryingRef.current || sendingRef.current) return
+    retryingRef.current = true
+    try {
+      while (pending.length && pendingRef.current === pending) {
+        const { row, inflight } = pending[0]
+        const err = inflight ? await inflight : await saveOliMessage(row)
+        if (pendingRef.current !== pending) return
+        if (err && inflight) { pending[0] = { row }; continue }
+        if (err) { if (saveRefused(err)) pending.length = 0; setNotSaved(true); return }
+        pending.shift()
+      }
+      if (pendingRef.current === pending) setNotSaved(false)
+    } finally { retryingRef.current = false }
+  }
+  useEffect(() => {
+    if (!open || !notSaved) return
+    const id = setInterval(retrySaves, SAVE_RETRY_MS)
+    return () => clearInterval(id)
+  }, [open, notSaved])
 
   // The app's own dialog, not Alert.alert: Android's system dialog upper-cases its buttons without the locale, so
   // Turkish "Sil" read "SIL" (device test 2026-11-07).
@@ -242,7 +282,7 @@ export default function OliChatSheet({ lang, userLocation, userId, isGuest, onNa
     setDel({ busy: true, error: null })
     const err = await deleteOliHistory(userId)
     if (err) { setDel({ busy: false, error: t('oliChatDeleteFailed', lang) }); return }
-    setDel(null); setMessages([]); setNotSaved(false)
+    setDel(null); setMessages([]); setNotSaved(false); pendingRef.current = []
   }
 
   function runAction(a) {
