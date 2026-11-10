@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ─── Araçlar: a dealer's stock, from the CSV and photo folders in data/dealers/<slug>/ ───
+// ─── Araçlar: a dealer's stock, from the CSV in data/dealers/<slug>/ and the photos staged in dealer-intake ───
 //
 //   node scripts/import-dealer-cars.mjs --dealer <slug> --offline   # no network: what the CSV maps to, what is skipped
 //   gh workflow run araclar-dealer-import -f dealer=<slug>                 # dry, in CI: the add / change / remove list
@@ -9,8 +9,9 @@
 // website. data/dealers/<slug>/ holds:
 //   dealer.json          the dealer row (name, region, phone / WhatsApp for the buttons, consent date and note)
 //   cars.csv             one row per car, matched by ilan_no (scripts/lib/dealer-csv.mjs maps and validates it)
-//   photos/<ilan_no>/    1.jpg (the cover), 2.jpg, … — optional per car. The repo is public: only files already
-//                        stripped of metadata may be committed (scripts/test-dealer-import.mjs fails otherwise).
+// Photos are NEVER in the repo (it is public, and a sold car's photos would stay in its history). Berke stages them
+// from his Mac with scripts/upload-dealer-photos.mjs into the private bucket dealer-intake (20261188) as
+// <slug>/<ilan_no>/<n>.<jpg|png|webp>, 1 = the cover.
 //
 // What a run does:
 //   • a new ilan_no is added; a changed row is updated (content_hash); a car missing from the CSV is set to 'removed'
@@ -20,13 +21,14 @@
 //     alone: --reactivate <ref,ref> brings it back.
 //   • photos go through the same stripper as sellers' uploads (supabase/functions/_shared/image-metadata.mjs: all
 //     Exif / XMP / GPS removed at byte level, proved clean, refused otherwise), are stored under the listing's folder
-//     and read back before their rows are written. A car with no photo folder keeps the photos it has; with none it
-//     stays hidden (vehicles_hide_photoless).
+//     and read back before their rows are written; then the staged copies are deleted. A staged set REPLACES the
+//     car's photos. A car with nothing staged keeps the photos it has; with none it stays hidden
+//     (vehicles_hide_photoless).
 //   • the dealer row is created INACTIVE and this script never activates it: production does not show the cars, ADA
 //     Preview does. After a write it reads back as anon and fails if anon sees a car of an inactive dealer.
 //
 // CI only for writes (prod-write-guard). The log names cars by reference, make and model: stock data, no user data.
-import { readFileSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
@@ -50,6 +52,7 @@ const DIR = resolve(ROOT, 'data/dealers', slug)
 if (!existsSync(resolve(DIR, 'dealer.json')) || !existsSync(resolve(DIR, 'cars.csv'))) fail(`data/dealers/${slug}/ needs dealer.json and cars.csv`)
 
 const BUCKET = 'vehicle-images'
+const INTAKE = 'dealer-intake'
 const MAX_BYTES = 5 * 1024 * 1024
 const MAX_PHOTOS = 30
 const DEALER = JSON.parse(readFileSync(resolve(DIR, 'dealer.json'), 'utf8'))
@@ -62,28 +65,10 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(DEALER.consent_date ?? '') || !DEALER.consent_no
 const cars = parseCsv(readFileSync(resolve(DIR, 'cars.csv'), 'utf8')).map(mapCar)
 const label = c => `${c.ref}  ${c.row ? `${c.row.make} ${c.row.model} ${c.row.year}` : ''}`.trim()
 
-// ─── Photos: read, strip, prove clean (offline too, so a bad file is found before any write) ─
 const photoProblems = []
-const photosOf = new Map()   // ref → [{ path suffix, bytes, mime }]; absent = no folder (keep what is stored)
-for (const c of cars) {
-  const dir = resolve(DIR, 'photos', c.ref ?? '')
-  if (!c.row || !existsSync(dir)) continue
-  const { files, problems } = orderPhotos(readdirSync(dir).filter(n => !n.startsWith('.')))
-  for (const p of problems) photoProblems.push(`${c.ref}: ${p}`)
-  if (files.length > MAX_PHOTOS) photoProblems.push(`${c.ref}: ${files.length} photos (at most ${MAX_PHOTOS})`)
-  const out = []
-  for (const name of files) {
-    try {
-      const clean = stripImageMetadata(new Uint8Array(readFileSync(resolve(dir, name))))
-      const left = metadataFound(clean.bytes)
-      if (left.found.length || left.gps) throw new Error('metadata left after stripping')
-      if (clean.bytes.length > MAX_BYTES) throw new Error('over 5 MB')
-      out.push({ file: `${createHash('sha256').update(clean.bytes).digest('hex').slice(0, 32)}.${FORMAT_EXT[clean.format]}`, bytes: Buffer.from(clean.bytes), mime: FORMAT_MIME[clean.format] })
-    } catch (e) { photoProblems.push(`${c.ref}/${name}: ${e.message}`) }
-  }
-  if (new Set(out.map(o => o.file)).size !== out.length) photoProblems.push(`${c.ref}: the same photo is there twice`)
-  photosOf.set(c.ref, out)
-}
+const photosOf = new Map()    // ref → [{ file, bytes, mime }]; absent = nothing staged (keep what is stored)
+const stagedOf = new Map()    // ref → the staged paths, deleted once the car's photos are written
+const strayStaged = []        // staged folders that match no importable car: reported, left alone
 
 function report(plan, existing) {
   const line = (tag, c, extra = '') => console.log(`  ${tag.padEnd(7)} ${label(c)}${extra}`)
@@ -98,7 +83,10 @@ function report(plan, existing) {
   for (const c of flagged) for (const f of c.flags) console.log(`  ${c.ref}  ${f}`)
   const live = new Set(existing.filter(e => e.photos > 0).map(e => e.external_id))
   const noPhoto = cars.filter(c => c.row && !(photosOf.get(c.ref)?.length) && !live.has(c.ref))
-  console.log(`\nphotos: ${[...photosOf.values()].filter(p => p.length).length} car(s) with a photo folder · ${noPhoto.length} car(s) with no photo (hidden until one arrives)`)
+  console.log(offline ? '\nphotos: not read offline (they are staged in the private bucket)'
+    : `\nphotos: ${[...photosOf.values()].filter(p => p.length).length} car(s) with staged photos · ${noPhoto.length} car(s) with no photo (hidden until one arrives)`)
+  for (const [ref, p] of photosOf) if (p.length) console.log(`  PHOTOS  ${ref}  ${p.length} staged`)
+  for (const x of strayStaged) console.log(`  STAGED, NOT USED  ${x}`)
   if (photoProblems.length) { console.log('\nphoto problems:'); for (const p of photoProblems) console.log(`  ${p}`) }
 }
 
@@ -106,7 +94,7 @@ if (offline) {
   const plan = planSync(cars, [])
   console.log('OFFLINE: the database was not read; every mapped car is shown as ADD.')
   report(plan, [])
-  process.exit(photoProblems.length ? 1 : 0)
+  process.exit(0)
 }
 
 // ─── The database ────────────────────────────────────────────────────────────
@@ -117,6 +105,7 @@ if (!URL_ || !ANON) fail('EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_K
 const db = createClient(URL_, serviceRoleKey(), { auth: { persistSession: false, autoRefreshToken: false } })
 const anon = createClient(URL_, ANON, { auth: { persistSession: false, autoRefreshToken: false } })
 const bucket = db.storage.from(BUCKET)
+const intake = db.storage.from(INTAKE)
 
 const { data: dealerRow, error: dErr } = await db.from('dealers').select('id, slug, is_active').or(`id.eq.${DEALER.id},slug.eq.${slug}`)
 if (dErr) fail(`read dealer: ${dErr.message}`)
@@ -130,6 +119,40 @@ const existing = rows.map(r => ({ ...r, photos: r.vehicle_images.length }))
 
 let plan
 try { plan = planSync(cars, existing, reactivate) } catch (e) { fail(`REFUSED: ${e.message}`) }
+
+// ─── Staged photos: read, strip, prove clean — before any write, so a bad file stops the run ─
+{
+  const usable = new Set([...plan.add, ...plan.change, ...plan.same].map(c => c.ref))
+  const { data: folders, error } = await intake.list(slug, { limit: 1000, sortBy: { column: 'name', order: 'asc' } })
+  // Before 20261188 is applied there is no staging bucket: cars still sync, with no photos to move.
+  if (error && !/not found/i.test(error.message)) fail(`list staged photos: ${error.message}`)
+  if (error) console.log('staging bucket dealer-intake does not exist yet (20261188): no photos read')
+  for (const f of folders ?? []) {
+    const ref = f.name
+    if (f.id) { strayStaged.push(`${ref} (a file outside a car folder)`); continue }
+    if (!usable.has(ref)) { strayStaged.push(`${ref} (no importable car with this reference: skipped, held or not in the CSV)`); continue }
+    const { data: entries, error: lErr } = await intake.list(`${slug}/${ref}`, { limit: 200 })
+    if (lErr) fail(`list staged photos of ${ref}: ${lErr.message}`)
+    const { files, problems } = orderPhotos(entries.filter(e => e.id).map(e => e.name))
+    for (const p of problems) photoProblems.push(`${ref}: ${p}`)
+    if (files.length > MAX_PHOTOS) photoProblems.push(`${ref}: ${files.length} photos (at most ${MAX_PHOTOS})`)
+    const out = []
+    for (const name of files) {
+      try {
+        const { data, error: dlErr } = await intake.download(`${slug}/${ref}/${name}`)
+        if (dlErr) throw new Error(`download failed (${dlErr.message})`)
+        const clean = stripImageMetadata(new Uint8Array(await data.arrayBuffer()))
+        const left = metadataFound(clean.bytes)
+        if (left.found.length || left.gps) throw new Error('metadata left after stripping')
+        if (clean.bytes.length > MAX_BYTES) throw new Error('over 5 MB')
+        out.push({ file: `${createHash('sha256').update(clean.bytes).digest('hex').slice(0, 32)}.${FORMAT_EXT[clean.format]}`, bytes: Buffer.from(clean.bytes), mime: FORMAT_MIME[clean.format] })
+      } catch (e) { photoProblems.push(`${ref}/${name}: ${e.message}`) }
+    }
+    if (new Set(out.map(o => o.file)).size !== out.length) photoProblems.push(`${ref}: the same photo is there twice`)
+    photosOf.set(ref, out)
+    stagedOf.set(ref, entries.filter(e => e.id).map(e => `${slug}/${ref}/${e.name}`))
+  }
+}
 console.log(`dealer row: ${dealerRow[0] ? (dealerLive ? 'exists, ACTIVE (cars are public)' : 'exists, inactive (ADA Preview only)') : 'new, will be created inactive'}`)
 report(plan, existing)
 const refusal = removalRefusal(plan, existing, confirmed)
@@ -179,7 +202,7 @@ for (const e of existing) {
 
 const heldRefs = new Set(plan.held.map(c => c.ref))
 for (const [ref, wanted] of photosOf) {
-  if (!wanted.length || heldRefs.has(ref)) continue
+  if (!wanted.length) continue
   const id = idOf.get(ref)
   const have = existing.find(e => e.external_id === ref)?.vehicle_images ?? []
   const paths = wanted.map(w => `${id}/${w.file}`)
@@ -194,6 +217,9 @@ for (const [ref, wanted] of photosOf) {
     .upsert(paths.map((p, i) => ({ vehicle_id: id, storage_path: p, sort_order: i, is_primary: i === 0 })), { onConflict: 'vehicle_id,storage_path' })
   must(`photo rows ${ref}`, error)
   await dropPhotos(have.filter(h => !paths.includes(h.storage_path)))
+  // Stored, read back and linked: the staged copies have done their job.
+  const { error: sErr } = await intake.remove(stagedOf.get(ref))
+  if (sErr) errors.push(`empty staging ${ref}: ${sErr.message}`)
 }
 
 // ─── Read back ───────────────────────────────────────────────────────────────

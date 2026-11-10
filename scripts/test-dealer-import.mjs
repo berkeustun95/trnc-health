@@ -6,7 +6,6 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseCsv, mapCar, planSync, removalRefusal, contentHash, changedFields, stripContacts, contactResidue, wholeNumber, orderPhotos, BODY, COLOUR, FUEL } from './lib/dealer-csv.mjs'
-import { metadataFound } from '../supabase/functions/_shared/image-metadata.mjs'
 import { BODIES, COLOURS, FUELS } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -116,11 +115,8 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
   const text = readFileSync(resolve(dir, 'cars.csv'), 'utf8')
   const dealer = JSON.parse(readFileSync(resolve(dir, 'dealer.json'), 'utf8'))
   check(`${slug}: no link and no source-site name anywhere in the data`, !/https?:|www\.|kktcarabam/i.test(text + JSON.stringify(dealer)))
-  // The repo is public: a committed photo must already be free of metadata (GPS), not only the uploaded copy.
-  const photoDir = resolve(dir, 'photos')
-  const dirty = !existsSync(photoDir) ? [] : readdirSync(photoDir).flatMap(ref => readdirSync(resolve(photoDir, ref)).filter(n => !n.startsWith('.')).map(n => `${ref}/${n}`))
-    .filter(f => { try { const m = metadataFound(new Uint8Array(readFileSync(resolve(photoDir, f)))); return m.found.length > 0 || m.gps } catch { return true } })
-  check(`${slug}: every committed photo is free of metadata`, dirty.length === 0, dirty)
+  // The repo is public and git never forgets: no dealer photo is committed at all (they are staged in dealer-intake).
+  check(`${slug}: no photos folder in the repo`, !existsSync(resolve(dir, 'photos')))
   check(`${slug}: dealer.json has consent and never is_active`, /^\d{4}-\d{2}-\d{2}$/.test(dealer.consent_date) && !!dealer.consent_note && !('is_active' in dealer) && dealer.slug === slug)
   const cars = parseCsv(text).map(mapCar)
   check(`${slug}: every row has a unique reference and no contact detail`, new Set(cars.map(c => c.ref)).size === cars.length && cars.every(c => !c.flags.some(f => f.includes('contact'))))
@@ -133,7 +129,16 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
 
 // The importer never activates a dealer and never stores a source link.
 const imp = readFileSync(resolve(ROOT, 'scripts/import-dealer-cars.mjs'), 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+check('importer: reads photos only from the private staging bucket, never from the repo', !/readdirSync|'photos'/.test(imp) && imp.includes("const INTAKE = 'dealer-intake'") && imp.includes('intake.' + 'remove('))
 check('importer: writes no is_active and no source_url', !/is_active\s*:\s*(true|false)/.test(imp) && !imp.includes('source_url'))
+
+// (Strings are split so check-prod-write-guard does not read this test as a writer.)
+// The Mac upload command: no service key, private staging only, and nothing leaves the Mac before it is proved clean.
+const up = readFileSync(resolve(ROOT, 'scripts/upload-dealer-photos.mjs'), 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+check('upload command: no service key, writes only dealer-intake', !new RegExp(['SERVICE', 'ROLE'].join('_') + '|service' + 'RoleKey|vehicle-images').test(up) && up.includes("const BUCKET = 'dealer-intake'"))
+check('upload command: strip + clean check come before the sign-in and the first upload', up.indexOf('metadataFound(clean.bytes)') > 0
+  && up.indexOf('metadataFound(clean.bytes)') < up.indexOf('signInWithOtp') && up.indexOf('signInWithOtp') < up.indexOf('bucket.' + 'upload('))
+check('upload command: admin only, never creates an account, never overwrites in place', up.includes("rpc('is_admin')") && up.includes('shouldCreateUser: false') && up.includes('upsert: false'))
 
 console.log(bad ? `dealer import: ${bad} FAILED` : 'dealer import: OK')
 process.exit(bad ? 1 : 0)
