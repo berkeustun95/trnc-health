@@ -383,6 +383,7 @@ const SAME_AS_ENGLISH = {
   'carsBodySuv': { Turkish: 'SUV is the body-type name used untranslated in this market', Greek: 'SUV is the body-type name used untranslated in this market', French: 'SUV is the body-type name used untranslated in this market', Spanish: 'SUV is the body-type name used untranslated in this market', German: 'SUV is the body-type name used untranslated in this market' },
   'carsBodyCoupe': { Turkish: 'Coupe is the Turkish body-type name' },
   'carsBodyMinivan': { Turkish: 'Minivan is the Turkish body-type name' },
+  'carsBodyMinibus': { French: 'Minibus is the French word' },
   'carsColourOrange': { French: 'Orange is French', German: 'Orange is German' },
   'carsColourBeige': { French: 'Beige is French', Spanish: 'Beige is Spanish', German: 'Beige is German' },
   'carsColourGold': { German: 'Gold is German' },

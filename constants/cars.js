@@ -24,7 +24,7 @@ export const FUEL_LABEL_KEY = {
 export const GEARBOX_LABEL_KEY = { manual: 'carsGearManual', automatic: 'carsGearAutomatic' }
 export const BODY_LABEL_KEY = {
   sedan: 'carsBodySedan', hatchback: 'carsBodyHatchback', suv: 'carsBodySuv', estate: 'carsBodyEstate', coupe: 'carsBodyCoupe',
-  convertible: 'carsBodyConvertible', pickup: 'carsBodyPickup', van: 'carsBodyVan', minivan: 'carsBodyMinivan',
+  convertible: 'carsBodyConvertible', pickup: 'carsBodyPickup', van: 'carsBodyVan', minivan: 'carsBodyMinivan', minibus: 'carsBodyMinibus',
 }
 export const COLOUR_LABEL_KEY = {
   white: 'carsColourWhite', black: 'carsColourBlack', grey: 'carsColourGrey', silver: 'carsColourSilver', blue: 'carsColourBlue',
