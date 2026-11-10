@@ -1,8 +1,9 @@
-# ─── Araçlar dealer import: a dealer's stock from data/dealers/<slug>/ (CSV + photo folders) ──
+# ─── Araçlar dealer import: a dealer's stock from data/dealers/<slug>/cars.csv + photos staged in dealer-intake ──
 #
 # Berke, 2026-11-10: real dealer cars come from a CSV he collects by hand (the owner consented), never from a website.
 # scripts/import-dealer-cars.mjs adds new cars, updates changed ones, removes cars missing from the CSV (with a safety
-# stop), and mirrors the photos through the metadata stripper. The dealer row is created INACTIVE and never activated
+# stop), and moves the photos staged in the private dealer-intake bucket (scripts/upload-dealer-photos.mjs, never git)
+# into vehicle-images through the metadata stripper, emptying staging. The dealer row is created INACTIVE and never activated
 # here, so production shows nothing; the run fails if anon can see a car of an inactive dealer. CI-only
 # (scripts/lib/prod-write-guard.mjs). Dry by default. The log names cars by reference, make and model (stock data).
 #

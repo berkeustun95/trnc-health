@@ -5,8 +5,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseCsv, mapCar, planSync, removalRefusal, contentHash, changedFields, stripContacts, contactResidue, wholeNumber, orderPhotos, BODY, COLOUR, FUEL } from './lib/dealer-csv.mjs'
-import { metadataFound } from '../supabase/functions/_shared/image-metadata.mjs'
+import { parseCsv, mapCar, planSync, removalRefusal, contentHash, changedFields, stripContacts, contactResidue, wholeNumber, orderPhotos, incompleteSet, BODY, COLOUR, FUEL } from './lib/dealer-csv.mjs'
 import { BODIES, COLOURS, FUELS } from '../constants/cars.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -109,6 +108,10 @@ const o = orderPhotos(['10.jpg', '2.JPG', '1.jpeg', '3.webp'])
 check('photos: numeric order, 1 is the cover', o.files.join() === '1.jpeg,2.JPG,3.webp,10.jpg' && !o.problems.length, o)
 check('photos: HEIC, names and duplicates are problems', orderPhotos(['1.heic', 'cover.jpg', '1.jpg', '01.png']).problems.length === 3, orderPhotos(['1.heic', 'cover.jpg', '1.jpg', '01.png']))
 
+// Review 2026-11-10: a set cut off half-way must never replace a car's photos. The upload sends 1 last.
+check('a whole staged set (1..n) is accepted', incompleteSet(['1.jpg', '2.png', '3.webp']) === null && incompleteSet(['1.jpg']) === null)
+check('a set without its 1, with a gap, or empty is refused', [['2.jpg', '3.jpg'], ['1.jpg', '3.jpg'], []].every(x => typeof incompleteSet(x) === 'string'))
+
 // ── The committed dealer data ──
 for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
   const dir = resolve(ROOT, 'data/dealers', slug)
@@ -116,11 +119,8 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
   const text = readFileSync(resolve(dir, 'cars.csv'), 'utf8')
   const dealer = JSON.parse(readFileSync(resolve(dir, 'dealer.json'), 'utf8'))
   check(`${slug}: no link and no source-site name anywhere in the data`, !/https?:|www\.|kktcarabam/i.test(text + JSON.stringify(dealer)))
-  // The repo is public: a committed photo must already be free of metadata (GPS), not only the uploaded copy.
-  const photoDir = resolve(dir, 'photos')
-  const dirty = !existsSync(photoDir) ? [] : readdirSync(photoDir).flatMap(ref => readdirSync(resolve(photoDir, ref)).filter(n => !n.startsWith('.')).map(n => `${ref}/${n}`))
-    .filter(f => { try { const m = metadataFound(new Uint8Array(readFileSync(resolve(photoDir, f)))); return m.found.length > 0 || m.gps } catch { return true } })
-  check(`${slug}: every committed photo is free of metadata`, dirty.length === 0, dirty)
+  // The repo is public and git never forgets: no dealer photo is committed at all (they are staged in dealer-intake).
+  check(`${slug}: no photos folder in the repo`, !existsSync(resolve(dir, 'photos')))
   check(`${slug}: dealer.json has consent and never is_active`, /^\d{4}-\d{2}-\d{2}$/.test(dealer.consent_date) && !!dealer.consent_note && !('is_active' in dealer) && dealer.slug === slug)
   const cars = parseCsv(text).map(mapCar)
   check(`${slug}: every row has a unique reference and no contact detail`, new Set(cars.map(c => c.ref)).size === cars.length && cars.every(c => !c.flags.some(f => f.includes('contact'))))
@@ -133,7 +133,26 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
 
 // The importer never activates a dealer and never stores a source link.
 const imp = readFileSync(resolve(ROOT, 'scripts/import-dealer-cars.mjs'), 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+check('importer: reads photos only from the private staging bucket, never from the repo', !/readdirSync|'photos'/.test(imp) && imp.includes("const INTAKE = 'dealer-intake'") && imp.includes('intake.' + 'remove('))
 check('importer: writes no is_active and no source_url', !/is_active\s*:\s*(true|false)/.test(imp) && !imp.includes('source_url'))
+
+check('importer: refuses a partial staged set, drops old rows before linking new ones, and unstages only what it read', imp.includes('incompleteSet(files)')
+  && imp.indexOf('dropPhotos(have.filter(') < imp.indexOf("must(`photo rows ${ref}`") && imp.includes("read.map(r => r.stamp).sort().join()") && imp.includes('for (const ref of goneStaged)'))
+// (Strings are split so check-prod-write-guard does not read this test as a writer.)
+// The Mac upload command: no service key, private staging only, and nothing leaves the Mac before it is proved clean.
+const up = readFileSync(resolve(ROOT, 'scripts/upload-dealer-photos.mjs'), 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+check('upload command: no service key, writes only dealer-intake', !new RegExp(['SERVICE', 'ROLE'].join('_') + '|service' + 'RoleKey|vehicle-images').test(up) && up.includes("const BUCKET = 'dealer-intake'"))
+check('upload command: strip + clean check come before the sign-in and the first upload', up.indexOf('metadataFound(clean.bytes)') > 0
+  && up.indexOf('metadataFound(clean.bytes)') < up.indexOf('signInWithPassword') && up.indexOf('signInWithPassword') < up.indexOf('bucket.' + 'upload('))
+check('upload command: the cover (1) is uploaded last and a failed car is cleared from staging', up.includes('for (const o of [...p.out].reverse())') && up.includes('await bucket.' + 'remove(p.out.map(x => x.path))'))
+check('upload command: temp copies are removed on Ctrl-C too', up.includes("for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'])"))
+check('upload command: admin only, never overwrites in place', up.includes("rpc('is_admin')") && up.includes('upsert: false'))
+// Berke, 2026-11-10: the password is typed hidden each run; never stored, logged, cached, taken from argv / env / a file.
+check('upload command: the password is read hidden and goes only into signInWithPassword', up.includes("password: await askHidden(") && up.includes("const email = await ask('\\nAdmin e-mail: ', true)") && up.includes('if (!muted) process.stdout.write(chunk, enc)') && up.includes('output: screen, terminal: true')
+  && (up.match(/askHidden\(/g) ?? []).length === 1 && !/password\s*=|PASSWORD|argv[^\n]*[Pp]ass/.test(up) && up.includes('persistSession: false'))
+check('upload command: signs out on every path after the sign-in', /finally \{\s*rl\.close\(\)\s*const \{ error \} = await db\.auth\.signOut\(\)/.test(up)
+  && !up.slice(up.indexOf('signInWithPassword')).replace(/[^\n]*sign-in failed[^\n]*/, '').includes('fail('))
+
 
 console.log(bad ? `dealer import: ${bad} FAILED` : 'dealer import: OK')
 process.exit(bad ? 1 : 0)

@@ -202,3 +202,10 @@ export function orderPhotos(names) {
   const dup = nums.filter((n, i) => nums.indexOf(n) !== i)
   return { files: good, problems: [...bad.map(n => `"${n}" is not <number>.jpg/png/webp`), ...dup.map(n => `two files are numbered ${n}`)] }
 }
+
+// A STAGED set must be whole: exactly 1..n. The upload sends the highest number first and 1 last, so a set that was
+// cut off half-way (or is still being uploaded) has no 1 or has a gap, and is refused instead of replacing a car's photos.
+export function incompleteSet(names) {
+  const nums = names.map(n => parseInt(n)).sort((a, b) => a - b)
+  return nums.length > 0 && nums.every((n, i) => n === i + 1) ? null : `the staged set is not whole (found ${nums.join(', ') || 'nothing'}; expected 1..n): upload the car's folder again`
+}

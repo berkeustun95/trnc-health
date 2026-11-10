@@ -15,7 +15,7 @@ import { freshDb, applyFile as applyRaw } from './migration-harness.mjs'
 
 const mig = f => fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url))
 const RELEASE = ['20261164_shared_adult_age.sql', '20261165_vehicles.sql', '20261166_vehicles_moderation.sql', '20261167_cars_waitlist_notify.sql',
-  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql', '20261186_vehicles_dealer_import.sql'].map(mig)
+  '20261181_vehicle_admin_author.sql', '20261182_vehicle_photos_via_function.sql', '20261186_vehicles_dealer_import.sql', '20261188_dealer_intake_bucket.sql'].map(mig)
 const read = f => readFileSync(mig(f), 'utf8')
 
 // Slice `CREATE … FUNCTION <name>(` up to its closing dollar-quote terminator, from an earlier migration.
@@ -63,7 +63,7 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $f$
   SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $f$;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated;
-GRANT ALL ON storage.objects TO authenticated;
+GRANT ALL ON storage.objects TO anon, authenticated;
 CREATE POLICY "property_images_upload" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'property-images');
 
 CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE SET search_path TO '' AS $f$
@@ -341,6 +341,22 @@ async function behaviour(d) {
   const live = `${v2}/${randomUUID()}.jpg`
   await as(d, 'postgres', `INSERT INTO storage.objects (bucket_id, name) VALUES ('vehicle-images', '${live}')`)
   t('the owner cannot delete an approved listing\'s file', (await as(d, 'owner', `DELETE FROM storage.objects WHERE name = '${live}' RETURNING id`)).rows.length, 0)
+  // 20261188: the private staging bucket for dealer photos. Admins only; a fixed path shape; never an overwrite.
+  const intake = (who, name, opts) => as(d, who, `INSERT INTO storage.objects (bucket_id, name) VALUES ('dealer-intake', '${name}') RETURNING id`, opts)
+  t('an admin stages a dealer photo', (await intake('admin', 'test-oto/270925/1.jpg')).ok, true)
+  t('a signed-in user cannot stage one', (await intake('owner', 'test-oto/270925/2.jpg')).ok, false)
+  t('anon cannot stage one', (await intake('anon', 'test-oto/270925/3.jpg')).ok, false)
+  t('png, webp and a two-digit number are accepted', (await intake('admin', 'test-oto/270925/2.png')).ok && (await intake('admin', 'test-oto/270925/30.webp')).ok, true)
+  await as(d, 'postgres', `DELETE FROM storage.objects WHERE bucket_id = 'dealer-intake' AND name <> 'test-oto/270925/1.jpg'`)
+  t('the path shape is enforced (no nesting, no other extension)', (await intake('admin', 'test-oto/270925/x/1.jpg')).ok || (await intake('admin', 'test-oto/270925/1.heic')).ok || (await intake('admin', '1.jpg')).ok, false)
+  t('an admin lists the staged file', n(await as(d, 'admin', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'dealer-intake'`)), 1)
+  t('a signed-in user does not see it', n(await as(d, 'owner', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'dealer-intake'`)), 0)
+  { const r = await as(d, 'anon', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'dealer-intake'`)
+    t('anon does not see it', !r.ok || n(r) === 0, true) }
+  t('a staged file is never overwritten (no UPDATE policy)', (await as(d, 'admin', `UPDATE storage.objects SET name = name WHERE bucket_id = 'dealer-intake' RETURNING id`)).rows.length, 0)
+  t('a signed-in user cannot delete it', (await as(d, 'owner', `DELETE FROM storage.objects WHERE bucket_id = 'dealer-intake' RETURNING id`)).rows.length, 0)
+  t('an admin deletes it', (await as(d, 'admin', `DELETE FROM storage.objects WHERE bucket_id = 'dealer-intake' RETURNING id`)).rows.length, 1)
+  t('the bucket is private', (await as(d, 'postgres', `SELECT public FROM storage.buckets WHERE id = 'dealer-intake'`)).rows[0]?.public, false)
   t('an admin can delete any listing file', (await as(d, 'admin', `DELETE FROM storage.objects WHERE name = '${live}' RETURNING id`)).rows.length, 1)
   t('contact_events accepts module cars', (await as(d, 'postgres', `INSERT INTO public.contact_events (module, entity_id, action) VALUES ('cars', 'x', 'call')`)).ok, true)
   t('contact_events still accepts eatery (control)', (await as(d, 'postgres', `INSERT INTO public.contact_events (module, entity_id, action) VALUES ('eatery', 'x', 'call')`)).ok, true)
@@ -365,7 +381,7 @@ console.log('Araçlar S1 + S3 — real files, in release order')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const tokens = []
-  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[126]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
+  const re = /UNION ALL SELECT '(2026116[4-7]_[a-z_]+|2026118[1268]_[a-z_]+|1029_student_messaging|1026_student_education)','([^']*(?:''[^']*)*)',\n/g
   let m
   while ((m = re.exec(vs))) {
     if (m[1].startsWith('10') && !/is_adult_on|vehicle/.test(m[2])) continue
@@ -420,6 +436,10 @@ await refused('the client upload policy is kept (20261182 must drop it)', mutant
 await refused('20261186: consent readable by clients (table grant kept)', mutantFile(6, 'cg', 'REVOKE SELECT ON public.dealers FROM anon, authenticated;', ''))
 await refused('20261186: the dealer reference index is not unique', mutantFile(6, 'ux', 'CREATE UNIQUE INDEX vehicles_dealer_external_key', 'CREATE INDEX vehicles_dealer_external_key'))
 await refused('20261186: a consent column added to the client grant', mutantFile(6, 'cc', 'is_rental_company, is_active, created_at, updated_at)\n  ON public.dealers', 'is_rental_company, is_active, created_at, updated_at, consent_note)\n  ON public.dealers'))
+await refused('20261188: the staging bucket made public', mutantFile(7, 'pub', "VALUES ('dealer-intake', 'dealer-intake', false,", "VALUES ('dealer-intake', 'dealer-intake', true,"))
+await refused('20261188: staging insert open to every signed-in user', mutantFile(7, 'adm', "    AND (select public.is_admin())\n    AND name ~", "    AND name ~"))
+await refused('20261188: a staging policy loses the guest guard', mutantFile(7, 'gg', "    bucket_id = 'dealer-intake'\n    AND NOT (select public.is_anonymous_session())\n    AND (select public.is_admin())\n  );\n\nCREATE POLICY \"dealer_intake_delete\"", "    bucket_id = 'dealer-intake'\n    AND (select public.is_admin())\n  );\n\nCREATE POLICY \"dealer_intake_delete\""))
+await refused('20261188: an overwrite (UPDATE) policy on staging', mutantFile(7, 'upd', 'CREATE POLICY "dealer_intake_delete" ON storage.objects', `CREATE POLICY "dealer_intake_update" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'dealer-intake' AND NOT (select public.is_anonymous_session()) AND (select public.is_admin()));\nCREATE POLICY "dealer_intake_delete" ON storage.objects`))
 await refused('admin_content_author loses its admin gate', mutantFile(4, 'acg', "  IF NOT is_admin() THEN\n    RAISE EXCEPTION 'ADMIN_ONLY';\n  END IF;\n", ''))
 await refused('report hide policy made permissive', mutantFile(2, 'hr', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  AS RESTRICTIVE FOR SELECT', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  FOR SELECT'))
 await refused('notify allow-list loses duyurular while adding cars', mutantFile(3, 'nt', "'checkins','duyurular','cars') THEN", "'checkins','cars') THEN"))
