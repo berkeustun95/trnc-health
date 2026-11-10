@@ -16,7 +16,8 @@
 // What a run does:
 //   • a new ilan_no is added; a changed row is updated (content_hash); a car missing from the CSV is set to 'removed'
 //     and its photos are deleted. More than a couple of removals at once needs confirm_remove=<count> (a truncated
-//     file must not empty the stock). A row that cannot be mapped is skipped and reported; what is live under its
+//     file must not empty the stock). A field the partner left EMPTY (price, km, …) is imported empty: never
+//     skipped, never invented (Berke's standing rule; 20261189). A row that cannot be mapped is skipped and reported; what is live under its
 //     reference is left alone. A car in the CSV that is not active in ADA (rejected or removed) is HELD and left
 //     alone: --reactivate <ref,ref> brings it back.
 //   • photos go through the same stripper as sellers' uploads (supabase/functions/_shared/image-metadata.mjs: all
@@ -67,7 +68,7 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(DEALER.consent_date ?? '') || !DEALER.consent_no
 
 // ─── The CSV ─────────────────────────────────────────────────────────────────
 const cars = parseCsv(readFileSync(resolve(DIR, 'cars.csv'), 'utf8')).map(mapCar)
-const label = c => `${c.ref}  ${c.row ? `${c.row.make} ${c.row.model} ${c.row.year}` : ''}`.trim()
+const label = c => `${c.ref}  ${c.row ? [c.row.make, c.row.model, c.row.year].filter(v => v != null).join(' ') : ''}`.trim()
 
 const photoProblems = []
 const photosOf = new Map()    // ref → [{ file, bytes, mime }]; absent = nothing staged (keep what is stored)
@@ -82,7 +83,7 @@ function report(plan, existing) {
   for (const c of plan.add) line('ADD', c)
   for (const c of plan.change) line(c.fields[0] === 'status' ? 'REACTIVATE' : 'CHANGE', c, `  [${c.fields.map(f => f === 'description' || f === 'content_hash' ? f : f === 'status' ? `status: ${c.was.status} → active` : `${f}: ${c.was[f]} → ${c.row[f]}`).join(', ')}]`)
   for (const c of plan.held) line('HELD', c, `  status ${c.was.status} in ADA: left alone (--reactivate ${c.ref} to bring it back)`)
-  for (const e of plan.remove) console.log(`  REMOVE  ${e.external_id}  ${e.make} ${e.model} ${e.year}`)
+  for (const e of plan.remove) console.log(`  REMOVE  ${e.external_id}  ${[e.make, e.model, e.year].filter(v => v != null).join(' ')}`)
   for (const c of plan.skipped) line('SKIPPED', c, `  ${c.problems.join('; ')}`)
   const flagged = cars.filter(c => c.flags.length)
   if (flagged.length) console.log('\nflags:')

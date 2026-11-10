@@ -37,7 +37,14 @@ check('colours: Bordo → red, Lacivert → blue, Krem → beige, Buz Yeşili �
 check('Turkish case: GÜMÜŞ and İSKELE match', map({ renk: 'GÜMÜŞ' }).row?.colour === 'silver' && map({ sehir: 'İSKELE' }).row?.region === 'iskele')
 check('every mapped value is one the app and the table know', [...BODY.values()].every(v => BODIES.includes(v)) && [...COLOUR.values()].every(v => COLOURS.includes(v)) && [...FUEL.values()].every(v => FUELS.includes(v)))
 check('km 0 is a new car, not a missing value', map({ km: '0', durum: '0 Km' }).row.km === 0)
-check('a missing km skips the row (never guessed)', !map({ km: '' }).row && map({ km: '' }).problems.join().includes('km is missing'), map({ km: '' }))
+// Berke's standing rule, 2026-11-10: an empty field is the partner's choice. Imported EMPTY, never skipped, never invented.
+check('an empty km is imported empty (not skipped, not 0)', map({ km: '' }).row?.km === null && map({ km: '' }).flags.some(f => f === 'left empty by the partner, imported empty: km'), map({ km: '' }))
+check('an empty price: no price, no currency, still a sale', (x => x.row && x.row.price === null && x.row.price_per_day === null && x.row.currency === null && x.row.intent === 'sale')(map({ fiyat_liste: '', fiyat_aciklamada: '', para_birimi: 'GBP' })))
+check('every other field may be empty too', (x => x.row && [x.row.year, x.row.fuel, x.row.gearbox, x.row.body_type, x.row.colour, x.row.steering, x.row.region].every(v => v === null))(
+  map({ yil: '', yakit: '', vites: '', kasa: '', renk: '', direksiyon: '', sehir: '', versiyon: '', durum: '', motor_cc: '', ozellikler: '' })))
+check('a car with only marka + model + ilan_no is importable', (x => !!x.row && x.row.description === null)(mapCar({ ilan_no: '1', marka: 'Mercedes-Benz', model: 'Minibüs' })))
+check('without marka, model or ilan_no there is no listing: skipped', !map({ marka: '' }).row && !map({ model: '' }).row && !map({ ilan_no: '' }).row)
+check('a value that is there but unreadable is still a problem, never emptied', !map({ km: 'çok' }).row && !map({ fiyat_liste: 'uygun' }).row && !map({ yil: '20x1' }).row)
 check('an unknown body / colour / fuel skips the row and names it', ['kasa', 'renk', 'yakit'].every(c => { const x = map({ [c]: 'Zeplin' }); return !x.row && x.problems.some(p => p.includes('Zeplin')) }))
 check('price: thousands separators, never a decimal', wholeNumber('29.950') === 29950 && wholeNumber('29,950') === 29950 && wholeNumber('29950.50') === null && wholeNumber('') === null)
 check('a price that differs from the dealer text: list price used, flagged', map({ fiyat_liste: '12500', fiyat_aciklamada: '11950' }).row.price === 12500
@@ -75,7 +82,7 @@ check('a new price is a change, named', p.change.length === 1 && p.change[0].fie
 check('…and the hash moves with it', contentHash(cars3[0].row) !== contentHash(mapCar({ ...R, ilan_no: '1', fiyat_liste: '27950' }).row) && changedFields(live('1'), cars3[0].row).length === 0)
 p = planSync(cars3.slice(0, 2), ['1', '2', '3'].map(r => live(r)))
 check('a car missing from the CSV is removed', p.remove.length === 1 && p.remove[0].external_id === '3')
-p = planSync([cars3[0], cars3[1], mapCar({ ...R, ilan_no: '3', km: '' })], ['1', '2', '3'].map(r => live(r)))
+p = planSync([cars3[0], cars3[1], mapCar({ ...R, ilan_no: '3', km: 'çok' })], ['1', '2', '3'].map(r => live(r)))
 check('an unmappable row keeps what is live under its reference', p.remove.length === 0 && p.skipped.length === 1)
 p = planSync(cars3, [live('1'), live('2'), live('3', { status: 'removed' })])
 check('a car in the CSV that is removed in ADA is HELD, not brought back', p.held.length === 1 && p.held[0].ref === '3' && !p.change.length && !p.remove.length)
@@ -126,7 +133,7 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
   check(`${slug}: every row has a unique reference and no contact detail`, new Set(cars.map(c => c.ref)).size === cars.length && cars.every(c => !c.flags.some(f => f.includes('contact'))))
   if (slug === 'mustafa-ustuner-otomotiv') {
     const skipped = cars.filter(c => !c.row)
-    check('Mustafa Üstüner: 30 rows; only 190595 (no km) waits', cars.length === 30 && skipped.length === 1 && skipped[0].ref === '190595' && skipped[0].problems.join() === 'km is missing', skipped)
+    check('Mustafa Üstüner: all 30 rows import; 190595 with its km empty', cars.length === 30 && skipped.length === 0 && cars.find(c => c.ref === '190595').row.km === null && cars.find(c => c.ref === '190595').row.body_type === 'minibus', skipped)
     // Berke, 2026-11-10: Mustafa confirmed the list prices of the five rows that differed from his text.
     check('Mustafa Üstüner: no price flag is left (the five were confirmed at list price)', cars.every(c => !c.flags.some(f => f.startsWith('FİYAT FARKLI')))
       && ['269886:12500', '269358:16900', '261802:6950', '202349:10500'].every(x => cars.find(c => c.ref === x.split(':')[0]).row.price === Number(x.split(':')[1])))

@@ -122,8 +122,8 @@ export default function CarDetailScreen({ car, lang, onBack, onOpenDealer, onReq
   ].filter(Boolean)
 
   const facts = [
-    [t('carsYear', lang), String(car.year)],
-    [t('carsKm', lang), kmLabel(car.km)],
+    [t('carsYear', lang), car.year != null ? String(car.year) : null],
+    [t('carsKm', lang), kmLabel(car.km, lang)],
     [t('carsFuel', lang), fuelLabel(car.fuel, lang)],
     [t('carsGearbox', lang), gearboxLabel(car.gearbox, lang)],
     [t('carsBody', lang), label(BODY_LABEL_KEY, car.body_type)],
@@ -146,14 +146,16 @@ export default function CarDetailScreen({ car, lang, onBack, onOpenDealer, onReq
                   <Text style={[s.tagText, { color: car.intent === 'rent' ? CAT.explore.ink : colors.primaryDark }]}>{label(INTENT_LABEL_KEY, car.intent)}</Text>
                 </View>
                 {/* Steering up front: TRNC drives on the left, so a left-hand-drive import is a deciding fact, not a footnote. */}
-                <View style={[s.tag, { backgroundColor: c.bg }]}>
-                  <Ionicons name="car-sport-outline" size={13} color={c.ink} />
-                  <Text style={[s.tagText, { color: c.ink }]}>{label(STEERING_LABEL_KEY, car.steering)}</Text>
-                </View>
+                {!!car.steering && (
+                  <View style={[s.tag, { backgroundColor: c.bg }]}>
+                    <Ionicons name="car-sport-outline" size={13} color={c.ink} />
+                    <Text style={[s.tagText, { color: c.ink }]}>{label(STEERING_LABEL_KEY, car.steering)}</Text>
+                  </View>
+                )}
               </View>
               <Text style={s.title} accessibilityRole="header">{car.make} {car.model}</Text>
-              <Text style={s.subtitle}>{[String(car.year), kmLabel(car.km)].filter(Boolean).join(' · ')}</Text>
-              {!!priceLabel(car, lang) && <Text style={s.price}>{priceLabel(car, lang)}</Text>}
+              <Text style={s.subtitle}>{[car.year != null ? String(car.year) : null, kmLabel(car.km, lang)].filter(Boolean).join(' · ')}</Text>
+              <Text style={s.price}>{priceLabel(car, lang)}</Text>
 
               <Text style={s.section}>{t('carsSpecs', lang)}</Text>
               <View style={s.factGrid}>

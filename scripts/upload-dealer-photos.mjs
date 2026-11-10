@@ -108,7 +108,7 @@ if (LOGO) {
 
 const mb = n => `${(n / 1048576).toFixed(1)} MB`
 console.log(`\n${plan.filter(p => p.car).length} car folder(s)${LOGO ? ' + the dealer logo' : ''}, ${plan.reduce((n, p) => n + p.out.length, 0)} file(s), ${mb(plan.reduce((n, p) => n + p.out.reduce((m, o) => m + o.bytes.length, 0), 0))} after stripping (all metadata removed and checked)`)
-for (const p of plan) console.log(p.car ? `  ${p.ref}  ${p.car.row ? `${p.car.row.make} ${p.car.row.model} ${p.car.row.year}` : '(row not importable yet)'}  ${p.out.length} photo(s)` : '  dealer logo')
+for (const p of plan) console.log(p.car ? `  ${p.ref}  ${p.car.row ? [p.car.row.make, p.car.row.model, p.car.row.year].filter(v => v != null).join(' ') : '(row not importable yet)'}  ${p.out.length} photo(s)` : '  dealer logo')
 const without = [...cars.values()].filter(c => c.row && !plan.some(p => p.ref === c.ref))
 if (SRC && without.length) console.log(`\nno folder for ${without.length} car(s): ${without.map(c => c.ref).join(', ')}`)
 if (notes.length) { console.log('\nnotes:'); for (const n of notes) console.log(`  ${n}`) }
