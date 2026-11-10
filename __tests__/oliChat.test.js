@@ -3,7 +3,7 @@
 // The production crash of 2026-11-07 (d82ac6e8: a route answer read a.types.map of undefined) fails here.
 //   npm run test:oli   (runs before every `npm run ota` and `npm run ota:preview`)
 import { render, screen, act, fireEvent } from '@testing-library/react-native'
-import OliChatSheet, { OliAnswer, OliErrorBoundary, TEXT_KEY, SEND_TIMEOUT_MS } from '../components/OliChatSheet'
+import OliChatSheet, { OliAnswer, OliErrorBoundary, TEXT_KEY, SEND_TIMEOUT_MS, SAVE_RETRY_MS } from '../components/OliChatSheet'
 import { t, LANGUAGES } from '../constants/i18n'
 import { getIntent } from '../constants/oliIntents'
 import { loadOliHistory, saveOliMessage } from '../utils/oliHistory'
@@ -15,6 +15,7 @@ jest.mock('../lib/supabase', () => ({ supabase: {} }))
 jest.mock('../utils/oliAnswers', () => ({ oliProvider: { answer: jest.fn() } }))
 jest.mock('../utils/oliHistory', () => ({
   loadOliHistory: jest.fn(), saveOliMessage: jest.fn(async () => null), deleteOliHistory: jest.fn(async () => null),
+  saveRefused: err => err?.code === 'P0001',
 }))
 jest.mock('../components/OliMic', () => ({
   useVoiceInput: () => ({ available: false, listening: false, toggle: () => {}, abort: () => {} }),
@@ -267,6 +268,51 @@ describe('abuse', () => {
     } finally { jest.useRealTimers() }
   })
 
+  const notSaved = () => screen.queryByText(t('oliChatNotSaved', 'English'))
+  const tick = () => act(async () => { jest.advanceTimersByTime(SAVE_RETRY_MS + 10) })
+
+  test('what could not be saved is saved once the connection is back, and the note goes', async () => {
+    jest.useFakeTimers()
+    try {
+      let online = false
+      saveOliMessage.mockImplementation(async () => (online ? null : new Error('Network request failed')))
+      await openSheet()
+      await fireEvent.changeText(input(), 'first')
+      await fireEvent.press(sendBtn())
+      await fireEvent.changeText(input(), 'second')
+      await fireEvent.press(sendBtn())
+      expect(notSaved()).toBeTruthy()
+      await tick()
+      expect(notSaved()).toBeTruthy()
+      online = true
+      saveOliMessage.mockClear()
+      await tick()
+      expect(notSaved()).toBeNull()
+      expect(saveOliMessage.mock.calls.map(c => c[0].body ?? c[0].role)).toEqual(['first', 'oli', 'second', 'oli'])
+      await tick()
+      expect(saveOliMessage).toHaveBeenCalledTimes(4)
+    } finally { jest.useRealTimers() }
+  })
+
+  test('a refused save is not sent again, and the note goes with the next saved question', async () => {
+    jest.useFakeTimers()
+    try {
+      saveOliMessage.mockResolvedValueOnce(Object.assign(new Error('OLI_RATE_LIMIT'), { code: 'P0001' }))
+        .mockResolvedValueOnce(Object.assign(new Error('OLI_RATE_LIMIT'), { code: 'P0001' }))
+      await openSheet()
+      await fireEvent.changeText(input(), 'first')
+      await fireEvent.press(sendBtn())
+      await tick()
+      await tick()
+      expect(saveOliMessage).toHaveBeenCalledTimes(2)
+      expect(notSaved()).toBeTruthy()
+      await fireEvent.changeText(input(), 'second')
+      await fireEvent.press(sendBtn())
+      expect(notSaved()).toBeNull()
+      expect(saveOliMessage.mock.calls.slice(2).map(c => c[0].body ?? c[0].role)).toEqual(['second', 'oli'])
+    } finally { jest.useRealTimers() }
+  })
+
   test('a hung history load ends as an error and the chat stays usable', async () => {
     loadOliHistory.mockResolvedValueOnce({ rows: [], error: new Error('aborted') })
     const openRef = { current: null }
@@ -287,5 +333,5 @@ describe('abuse', () => {
     await fireEvent.changeText(input(), 'one more')
     await fireEvent.press(sendBtn())
     expect(roles()).toEqual(['user', 'oli'])
-  })
+  }, 20000)   // renders all 150 rows (initialNumToRender); passes in under 1 s at rest, over jest's 5 s on a busy Mac
 })
