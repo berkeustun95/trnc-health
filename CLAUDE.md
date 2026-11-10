@@ -119,7 +119,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
 - **Release holds** (`release-holds.json`, `scripts/check-release-holds.mjs`, Berke 2026-11-08): a merge on main
   that is NOT cleared for production. `npm run ota` refuses while HEAD contains an uncleared hold; no env override.
-  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. Held now: #349 Explore combined.
+  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. Held now: none (#349 Explore combined cleared 2026-11-10).
 - **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
   refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
