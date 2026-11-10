@@ -63,7 +63,7 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $f$
   SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $f$;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated;
-GRANT ALL ON storage.objects TO authenticated;
+GRANT ALL ON storage.objects TO anon, authenticated;
 CREATE POLICY "property_images_upload" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'property-images');
 
 CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE SET search_path TO '' AS $f$
@@ -346,6 +346,8 @@ async function behaviour(d) {
   t('an admin stages a dealer photo', (await intake('admin', 'test-oto/270925/1.jpg')).ok, true)
   t('a signed-in user cannot stage one', (await intake('owner', 'test-oto/270925/2.jpg')).ok, false)
   t('anon cannot stage one', (await intake('anon', 'test-oto/270925/3.jpg')).ok, false)
+  t('png, webp and a two-digit number are accepted', (await intake('admin', 'test-oto/270925/2.png')).ok && (await intake('admin', 'test-oto/270925/30.webp')).ok, true)
+  await as(d, 'postgres', `DELETE FROM storage.objects WHERE bucket_id = 'dealer-intake' AND name <> 'test-oto/270925/1.jpg'`)
   t('the path shape is enforced (no nesting, no other extension)', (await intake('admin', 'test-oto/270925/x/1.jpg')).ok || (await intake('admin', 'test-oto/270925/1.heic')).ok || (await intake('admin', '1.jpg')).ok, false)
   t('an admin lists the staged file', n(await as(d, 'admin', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'dealer-intake'`)), 1)
   t('a signed-in user does not see it', n(await as(d, 'owner', `SELECT count(*) n FROM storage.objects WHERE bucket_id = 'dealer-intake'`)), 0)
@@ -436,6 +438,7 @@ await refused('20261186: the dealer reference index is not unique', mutantFile(6
 await refused('20261186: a consent column added to the client grant', mutantFile(6, 'cc', 'is_rental_company, is_active, created_at, updated_at)\n  ON public.dealers', 'is_rental_company, is_active, created_at, updated_at, consent_note)\n  ON public.dealers'))
 await refused('20261188: the staging bucket made public', mutantFile(7, 'pub', "VALUES ('dealer-intake', 'dealer-intake', false,", "VALUES ('dealer-intake', 'dealer-intake', true,"))
 await refused('20261188: staging insert open to every signed-in user', mutantFile(7, 'adm', "    AND (select public.is_admin())\n    AND name ~", "    AND name ~"))
+await refused('20261188: a staging policy loses the guest guard', mutantFile(7, 'gg', "    bucket_id = 'dealer-intake'\n    AND NOT (select public.is_anonymous_session())\n    AND (select public.is_admin())\n  );\n\nCREATE POLICY \"dealer_intake_delete\"", "    bucket_id = 'dealer-intake'\n    AND (select public.is_admin())\n  );\n\nCREATE POLICY \"dealer_intake_delete\""))
 await refused('20261188: an overwrite (UPDATE) policy on staging', mutantFile(7, 'upd', 'CREATE POLICY "dealer_intake_delete" ON storage.objects', `CREATE POLICY "dealer_intake_update" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'dealer-intake' AND NOT (select public.is_anonymous_session()) AND (select public.is_admin()));\nCREATE POLICY "dealer_intake_delete" ON storage.objects`))
 await refused('admin_content_author loses its admin gate', mutantFile(4, 'acg', "  IF NOT is_admin() THEN\n    RAISE EXCEPTION 'ADMIN_ONLY';\n  END IF;\n", ''))
 await refused('report hide policy made permissive', mutantFile(2, 'hr', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  AS RESTRICTIVE FOR SELECT', 'CREATE POLICY vehicles_hide_reported ON public.vehicles\n  FOR SELECT'))

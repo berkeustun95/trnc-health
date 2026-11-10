@@ -12,15 +12,17 @@
 //
 //   gh workflow run araclar-dealer-import -f dealer=<slug> -f apply=true
 //
-// moves them into vehicle-images and empties staging. Sign-in: an ADMIN account, by a one-time code e-mailed to it
-// (nothing is stored on this Mac; there is no service key here and none is needed). Only admins can write the
-// bucket (storage policy dealer_intake_insert).
+// moves them into vehicle-images and empties staging. Sign-in: an ADMIN account, e-mail + password. The password is
+// typed into the terminal with hidden input on every run; it is never stored, logged or cached (no session is
+// persisted either), and the run signs out at the end, whatever happens. There is no service key on this Mac and none
+// is needed. Only admins can write the bucket (storage policy dealer_intake_insert).
 import { readFileSync, readdirSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tmpdir, homedir } from 'node:os'
 import { execFileSync } from 'node:child_process'
-import { createInterface } from 'node:readline/promises'
+import { createInterface } from 'node:readline'
+import { Writable } from 'node:stream'
 import { createClient } from '@supabase/supabase-js'
 import { parseCsv, mapCar } from './lib/dealer-csv.mjs'
 import { stripImageMetadata, metadataFound, FORMAT_EXT, FORMAT_MIME } from '../supabase/functions/_shared/image-metadata.mjs'
@@ -45,7 +47,9 @@ const cars = new Map(parseCsv(readFileSync(csvPath, 'utf8')).map(mapCar).map(c =
 
 // ─── Read, convert, strip, prove clean: everything is checked before the first upload ─
 const tmp = mkdtempSync(join(tmpdir(), 'ada-dealer-photos-'))
+// Converted copies can still carry Exif: they are removed however the run ends, a Ctrl-C included.
 process.on('exit', () => rmSync(tmp, { recursive: true, force: true }))
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(130))
 const sips = (...a) => execFileSync('/usr/bin/sips', a, { stdio: ['ignore', 'ignore', 'pipe'] })
 const problems = [], notes = [], plan = []
 for (const ref of readdirSync(SRC).filter(n => !n.startsWith('.')).sort()) {
@@ -97,53 +101,72 @@ if (problems.length) { console.error('\nproblems (nothing uploaded):'); for (con
 if (!plan.length) fail('\nnothing to upload')
 if (checkOnly) { console.log('\nCHECK ONLY: nothing uploaded.'); process.exit(0) }
 
-// ─── Sign in as an admin with a one-time e-mail code ────────────────────────
+// ─── Sign in as an admin: e-mail + password, typed hidden, kept only in this process's memory ─
 const env = Object.fromEntries((existsSync(resolve(ROOT, '.env')) ? readFileSync(resolve(ROOT, '.env'), 'utf8') : '').split('\n')
   .map(l => l.match(/^\s*(EXPO_PUBLIC_SUPABASE_(?:URL|ANON_KEY))\s*=\s*(.*?)\s*$/)).filter(Boolean).map(m => [m[1], m[2].replace(/^["']|["']$/g, '')]))
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || env.EXPO_PUBLIC_SUPABASE_URL
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 if (!URL_ || !ANON) fail('EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY not found (.env in the repo root, or the environment)')
+if (!process.stdin.isTTY) fail('run this in a terminal: the password is typed there, never piped or passed as an argument')
 const db = createClient(URL_, ANON, { auth: { persistSession: false, autoRefreshToken: true } })
-const rl = createInterface({ input: process.stdin, output: process.stdout })
-const email = (await rl.question('\nAdmin e-mail: ')).trim()
-{
-  const { error } = await db.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
-  if (error) fail(`could not send the code: ${error.message}`)
-}
-const typed = (await rl.question('Code from the e-mail (or paste the whole sign-in link): ')).trim()
-{
-  const link = typed.match(/token_hash=([A-Za-z0-9_-]+)/)
-  const { error } = link
-    ? await db.auth.verifyOtp({ token_hash: link[1], type: (typed.match(/[?&]type=([a-z_]+)/) ?? [])[1] ?? 'magiclink' })
-    : await db.auth.verifyOtp({ email, token: typed.replace(/\s/g, ''), type: 'email' })
-  if (error) fail(`sign-in failed: ${error.message}`)
-}
-{
-  const { data, error } = await db.rpc('is_admin')
-  if (error || data !== true) { await db.auth.signOut(); fail('this account is not an admin: only admins can stage dealer photos') }
-}
-const go = (await rl.question(`Upload ${plan.reduce((n, p) => n + p.out.length, 0)} photo(s) for ${plan.length} car(s) to private staging? (y/N) `)).trim().toLowerCase()
-rl.close()
-if (go !== 'y') { await db.auth.signOut(); fail('stopped: nothing uploaded') }
 
-// ─── Upload: each car's staged set is replaced as a whole ───────────────────
-const bucket = db.storage.from(BUCKET)
-let done = 0
-for (const p of plan) {
-  const { data: old, error: lErr } = await bucket.list(`${slug}/${p.ref}`, { limit: 200 })
-  if (lErr) fail(`${p.ref}: list staging: ${lErr.message}`)
-  if (old.length) {
-    const { error } = await bucket.remove(old.map(o => `${slug}/${p.ref}/${o.name}`))
-    if (error) fail(`${p.ref}: clear staging: ${error.message}`)
-  }
-  for (const o of p.out) {
-    const { error } = await bucket.upload(o.path, o.bytes, { contentType: o.mime, upsert: false })
-    if (error) fail(`${o.path}: ${error.message}`, `(${done} car(s) fully staged before this; re-run to finish: a car's set is replaced as a whole)`)
-  }
-  const { data: now, error: cErr } = await bucket.list(`${slug}/${p.ref}`, { limit: 200 })
-  if (cErr || now.length !== p.out.length) fail(`${p.ref}: staged ${now?.length ?? '?'} of ${p.out.length} photo(s)`)
-  done++
-  console.log(`  staged ${p.ref}  ${p.out.length} photo(s)`)
+// ONE readline for the whole run, in terminal mode: the TTY stays raw, so the terminal itself never echoes, and
+// readline's own echo goes through `screen`, which is switched off from the instant the e-mail line is entered until
+// the password line is read (in the same callback, so not even typed-ahead or pasted input can appear).
+let muted = false
+const screen = new Writable({ write(chunk, enc, cb) { if (!muted) process.stdout.write(chunk, enc); cb() } })
+const rl = createInterface({ input: process.stdin, output: screen, terminal: true })
+const ask = (q, muteAfter = false) => new Promise(done => rl.question(q, a => { muted = muteAfter; done(a.trim()) }))
+const askHidden = q => new Promise(done => {
+  process.stdout.write(q)
+  rl.question('', a => { muted = false; process.stdout.write('\n'); done(a) })
+})
+
+const email = await ask('\nAdmin e-mail: ', true)
+{
+  const { error } = await db.auth.signInWithPassword({ email, password: await askHidden('Password (hidden): ') })
+  if (error) { rl.close(); fail(`sign-in failed: ${error.message}`) }
 }
-await db.auth.signOut()
-console.log(`\nDone: ${done} car(s) staged. Tell Claude, or run:\n  gh workflow run araclar-dealer-import -R berkeustun95/trnc-health -f dealer=${slug} -f apply=true`)
+
+// Signed in from here on: every way out of the run signs out first.
+let code = 1
+try {
+  const { data: admin, error: aErr } = await db.rpc('is_admin')
+  if (aErr || admin !== true) throw new Error('this account is not an admin: only admins can stage dealer photos')
+  const go = (await ask(`Upload ${plan.reduce((n, p) => n + p.out.length, 0)} photo(s) for ${plan.length} car(s) to private staging? (y/N) `)).toLowerCase()
+  if (go !== 'y') throw new Error('stopped: nothing uploaded')
+
+  // Each car's staged set is replaced as a whole.
+  const bucket = db.storage.from(BUCKET)
+  let done = 0
+  for (const p of plan) {
+    const { data: old, error: lErr } = await bucket.list(`${slug}/${p.ref}`, { limit: 200 })
+    if (lErr) throw new Error(`${p.ref}: list staging: ${lErr.message}`)
+    if (old.length) {
+      const { error } = await bucket.remove(old.map(o => `${slug}/${p.ref}/${o.name}`))
+      if (error) throw new Error(`${p.ref}: clear staging: ${error.message}`)
+    }
+    // Highest number first, 1 (the cover) last: the import job refuses a set without a 1 or with a gap, so a set that
+    // is cut off, or still on its way, can never replace a car's photos.
+    for (const o of [...p.out].reverse()) {
+      const { error } = await bucket.upload(o.path, o.bytes, { contentType: o.mime, upsert: false })
+      if (error) {
+        await bucket.remove(p.out.map(x => x.path))
+        throw new Error(`${o.path}: ${error.message}\n(${done} car(s) fully staged before this; this car's partial set was cleared. Run the command again to finish.)`)
+      }
+    }
+    const { data: now, error: cErr } = await bucket.list(`${slug}/${p.ref}`, { limit: 200 })
+    if (cErr || now.length !== p.out.length) throw new Error(`${p.ref}: staged ${now?.length ?? '?'} of ${p.out.length} photo(s)`)
+    done++
+    console.log(`  staged ${p.ref}  ${p.out.length} photo(s)`)
+  }
+  console.log(`\nDone: ${done} car(s) staged. Tell Claude, or run:\n  gh workflow run araclar-dealer-import -R berkeustun95/trnc-health -f dealer=${slug} -f apply=true`)
+  code = 0
+} catch (e) {
+  console.error(`\n${e.message}`)
+} finally {
+  rl.close()
+  const { error } = await db.auth.signOut()
+  console.log(error ? `sign-out failed: ${error.message}` : 'signed out')
+}
+process.exit(code)

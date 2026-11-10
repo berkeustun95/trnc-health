@@ -33,7 +33,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-import { parseCsv, mapCar, planSync, removalRefusal, contentHash, orderPhotos, HASH_FIELDS } from './lib/dealer-csv.mjs'
+import { parseCsv, mapCar, planSync, removalRefusal, contentHash, orderPhotos, incompleteSet, HASH_FIELDS } from './lib/dealer-csv.mjs'
 import { stripImageMetadata, metadataFound, FORMAT_EXT, FORMAT_MIME } from '../supabase/functions/_shared/image-metadata.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -67,8 +67,9 @@ const label = c => `${c.ref}  ${c.row ? `${c.row.make} ${c.row.model} ${c.row.ye
 
 const photoProblems = []
 const photosOf = new Map()    // ref → [{ file, bytes, mime }]; absent = nothing staged (keep what is stored)
-const stagedOf = new Map()    // ref → the staged paths, deleted once the car's photos are written
-const strayStaged = []        // staged folders that match no importable car: reported, left alone
+const stagedOf = new Map()    // ref → the staged files as read ({ path, stamp }), deleted once the car's photos are written
+const strayStaged = []        // staged for a car that is in the CSV but not importable now (skipped / held): left to wait
+const goneStaged = []         // staged for a reference that is not in the CSV at all (sold): deleted on apply
 
 function report(plan, existing) {
   const line = (tag, c, extra = '') => console.log(`  ${tag.padEnd(7)} ${label(c)}${extra}`)
@@ -86,7 +87,8 @@ function report(plan, existing) {
   console.log(offline ? '\nphotos: not read offline (they are staged in the private bucket)'
     : `\nphotos: ${[...photosOf.values()].filter(p => p.length).length} car(s) with staged photos · ${noPhoto.length} car(s) with no photo (hidden until one arrives)`)
   for (const [ref, p] of photosOf) if (p.length) console.log(`  PHOTOS  ${ref}  ${p.length} staged`)
-  for (const x of strayStaged) console.log(`  STAGED, NOT USED  ${x}`)
+  for (const x of strayStaged) console.log(`  STAGED, WAITING  ${x}`)
+  for (const x of goneStaged) console.log(`  STAGED, NOT IN THE CSV  ${x}  (deleted from staging on apply)`)
   if (photoProblems.length) { console.log('\nphoto problems:'); for (const p of photoProblems) console.log(`  ${p}`) }
 }
 
@@ -125,16 +127,19 @@ try { plan = planSync(cars, existing, reactivate) } catch (e) { fail(`REFUSED: $
   const usable = new Set([...plan.add, ...plan.change, ...plan.same].map(c => c.ref))
   const { data: folders, error } = await intake.list(slug, { limit: 1000, sortBy: { column: 'name', order: 'asc' } })
   // Before 20261188 is applied there is no staging bucket: cars still sync, with no photos to move.
-  if (error && !/not found/i.test(error.message)) fail(`list staged photos: ${error.message}`)
+  if (error && !/^Bucket not found$/i.test(error.message)) fail(`list staged photos: ${error.message}`)
   if (error) console.log('staging bucket dealer-intake does not exist yet (20261188): no photos read')
   for (const f of folders ?? []) {
     const ref = f.name
-    if (f.id) { strayStaged.push(`${ref} (a file outside a car folder)`); continue }
-    if (!usable.has(ref)) { strayStaged.push(`${ref} (no importable car with this reference: skipped, held or not in the CSV)`); continue }
+    if (f.id) { photoProblems.push(`${ref}: a file outside a car folder in staging`); continue }
+    if (!cars.some(c => c.ref === ref)) { goneStaged.push(ref); continue }
+    if (!usable.has(ref)) { strayStaged.push(`${ref} (its car is skipped or held: the photos wait)`); continue }
     const { data: entries, error: lErr } = await intake.list(`${slug}/${ref}`, { limit: 200 })
     if (lErr) fail(`list staged photos of ${ref}: ${lErr.message}`)
     const { files, problems } = orderPhotos(entries.filter(e => e.id).map(e => e.name))
     for (const p of problems) photoProblems.push(`${ref}: ${p}`)
+    const partial = incompleteSet(files)
+    if (partial) { photoProblems.push(`${ref}: ${partial}`); continue }
     if (files.length > MAX_PHOTOS) photoProblems.push(`${ref}: ${files.length} photos (at most ${MAX_PHOTOS})`)
     const out = []
     for (const name of files) {
@@ -150,7 +155,7 @@ try { plan = planSync(cars, existing, reactivate) } catch (e) { fail(`REFUSED: $
     }
     if (new Set(out.map(o => o.file)).size !== out.length) photoProblems.push(`${ref}: the same photo is there twice`)
     photosOf.set(ref, out)
-    stagedOf.set(ref, entries.filter(e => e.id).map(e => `${slug}/${ref}/${e.name}`))
+    stagedOf.set(ref, entries.filter(e => e.id).map(e => ({ path: `${slug}/${ref}/${e.name}`, stamp: `${e.name}|${e.id}|${e.updated_at}` })))
   }
 }
 console.log(`dealer row: ${dealerRow[0] ? (dealerLive ? 'exists, ACTIVE (cars are public)' : 'exists, inactive (ADA Preview only)') : 'new, will be created inactive'}`)
@@ -182,12 +187,14 @@ for (const c of plan.change) {
 }
 
 // Rows first, then files: a file with no row is invisible; a row with no file is a broken photo.
+// true = the rows are gone (a file that could not be removed is an orphan the nightly sweep takes).
 async function dropPhotos(images) {
-  if (!images.length) return
+  if (!images.length) return true
   const { error } = await db.from('vehicle_images').delete().in('id', images.map(i => i.id))
-  if (error) { errors.push(`delete photo rows: ${error.code}`); return }
+  if (error) { errors.push(`delete photo rows: ${error.code}`); return false }
   const { error: rmErr } = await bucket.remove(images.map(i => i.storage_path))
   if (rmErr) errors.push(`delete photo files: ${rmErr.message}`)
+  return true
 }
 for (const e of plan.remove) {
   const { error } = await db.from('vehicles').update({ status: 'removed' }).eq('id', e.id)
@@ -213,13 +220,29 @@ for (const [ref, wanted] of photosOf) {
     const { data: back, error: rErr } = await bucket.download(paths[i])
     if (rErr || !Buffer.from(await back.arrayBuffer()).equals(w.bytes)) fail(`verify ${ref} photo ${i + 1}: the stored file differs`)
   }
+  // Old rows go BEFORE the new ones are linked: a run that dies in between leaves the car with no photo (hidden) and
+  // its set still staged, which the next run repairs; the other order could leave a mixed set nobody repairs.
+  if (!(await dropPhotos(have.filter(h => !paths.includes(h.storage_path))))) { errors.push(`${ref}: old photos not removed; its staged set is kept for the next run`); continue }
   const { error } = await db.from('vehicle_images')
     .upsert(paths.map((p, i) => ({ vehicle_id: id, storage_path: p, sort_order: i, is_primary: i === 0 })), { onConflict: 'vehicle_id,storage_path' })
   must(`photo rows ${ref}`, error)
-  await dropPhotos(have.filter(h => !paths.includes(h.storage_path)))
-  // Stored, read back and linked: the staged copies have done their job.
-  const { error: sErr } = await intake.remove(stagedOf.get(ref))
+  // Stored, read back and linked: the staged copies have done their job — unless the set was replaced while this run
+  // was working (same names, new files): then it is left for the next run.
+  const read = stagedOf.get(ref)
+  const { data: nowStaged, error: nErr } = await intake.list(`${slug}/${ref}`, { limit: 200 })
+  const same = !nErr && nowStaged.filter(e => e.id).map(e => `${e.name}|${e.id}|${e.updated_at}`).sort().join() === read.map(r => r.stamp).sort().join()
+  if (!same) { errors.push(`${ref}: its staged set changed during the run; left in staging, run the import again`); continue }
+  const { error: sErr } = await intake.remove(read.map(r => r.path))
   if (sErr) errors.push(`empty staging ${ref}: ${sErr.message}`)
+}
+
+// Photos staged for a reference that is not in the CSV (the car was sold before they were used) must not linger.
+for (const ref of goneStaged) {
+  const { data: entries, error: lErr } = await intake.list(`${slug}/${ref}`, { limit: 200 })
+  if (lErr) { errors.push(`list staging ${ref}: ${lErr.message}`); continue }
+  const paths = entries.filter(e => e.id).map(e => `${slug}/${ref}/${e.name}`)
+  const { error } = paths.length ? await intake.remove(paths) : { error: null }
+  if (error) errors.push(`empty staging ${ref}: ${error.message}`)
 }
 
 // ─── Read back ───────────────────────────────────────────────────────────────
