@@ -143,7 +143,7 @@ export default function CarsScreen({ lang, onBack, onOpenCar, onPost, onMine }) 
           actions={[{ icon: 'person-circle-outline', onPress: onMine, accessibilityLabel: t('carsMineTitle', lang) }]} />
         <ModeBar mode={mode} onChange={changeMode} lang={lang} />
         <FilterBar>
-          <Dropdown label={t('carsFilterMake', lang)} lang={lang} options={makeOptions} value={make} onChange={setMake} />
+          <Dropdown label={t('carsFilterMake', lang)} searchPlaceholder={t('carsMakeSearch', lang)} lang={lang} options={makeOptions} value={make} onChange={setMake} />
           {mode !== 'all' && (
             fx.state === 'ok'
               ? <Dropdown label={t('carsFilterPrice', lang)} title={t('carsPriceTitle', lang)} lang={lang}

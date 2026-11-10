@@ -6,19 +6,22 @@
 //   node scripts/check-oli-intents.mjs
 import { resolveOliChat, OLI_CHAT_INTENTS } from '../constants/oliIntents.js'
 import { t, LANGUAGES } from '../constants/i18n.js'
+import { readFileSync } from 'node:fs'
+import { REALISTIC_QUESTIONS } from './oli-realistic-questions.mjs'
 
 let bad = 0, n = 0
 const check = (label, text, want) => {
   n++
   const got = resolveOliChat(text).intent?.id ?? null
-  if (got !== want) { bad++; console.log(`  ✗ ${label}: "${text}" → ${got}, want ${want}`) }
+  // want may list several right answers: 'nearby|beaches'.
+  if (!String(want).split('|').includes(String(got))) { bad++; console.log(`  ✗ ${label}: "${text}" → ${got}, want ${want}`) }
 }
 
 const CHIPS = { oliChatChipPharmacy: 'pharmacy', oliChatChipEvents: 'events', oliChatChipNearby: 'nearby',
   oliChatChipEatery: 'eatery', oliChipEmergency: 'emergency', oliChipNewcomer: 'newcomer' }
 for (const { key: lang } of LANGUAGES) {
   for (const [k, id] of Object.entries(CHIPS)) check(`chip ${lang}`, t(k, lang), id)
-  for (const i of OLI_CHAT_INTENTS) check(`title ${lang}`, t(i.titleKey, lang), i.id)
+  for (const i of OLI_CHAT_INTENTS) if (!i.gap) check(`title ${lang}`, t(i.titleKey, lang), i.id)
 }
 
 // Written as people type them (accents optional: normalize() folds them).
@@ -96,7 +99,7 @@ for (const [lang, rows] of Object.entries(PHRASES)) for (const [text, want] of r
 // Routes that worked before and must keep working.
 for (const [text, want] of [
   ['eczane yakınımda', 'pharmacy'], ['yakınımda ne var', 'nearby'], ['what is near me', 'nearby'],
-  ['residence permit', 'newcomer'], ['visa', 'newcomer'], ['oturum izni', 'newcomer'], ['border crossing', 'newcomer'],
+  ['residence permit', 'gap'], ['visa', 'embassies'], ['oturum izni', 'gap'], ['border crossing', 'borders'],
   ['iş ilanları', 'jobs'], ['etkinlik', 'events'], ['plaj', 'beaches'], ['doktor', 'clinic'], ['acil', 'emergency'],
   ['Oli, nöbetçi eczane', 'pharmacy'], ['hey oli where can i eat', 'eatery'], ['uzaya bilet var mı', null],
 ]) check('regression', text, want)
@@ -107,6 +110,21 @@ for (const [text, want] of [
   n++
   const got = resolveOliChat(text).types
   if (JSON.stringify(got) !== JSON.stringify(want)) { bad++; console.log(`  ✗ types: "${text}" → ${JSON.stringify(got)}, want ${JSON.stringify(want)}`) }
+}
+
+// Realistic questions (scripts/oli-realistic-questions.mjs), 60 per language.
+for (const [lang, rows] of Object.entries(REALISTIC_QUESTIONS)) for (const [text, want] of rows) check(`real ${lang}`, text, want)
+
+// Every chat route must open something: an id without an oliNavigate case in App.js is a button that does nothing.
+{
+  const app = readFileSync(new URL('../App.js', import.meta.url), 'utf8')
+  const from = app.indexOf('const oliNavigate = (target) => {')
+  const block = app.slice(from, app.indexOf('\n  }\n', from))
+  for (const i of OLI_CHAT_INTENTS) {
+    if (i.gap) continue
+    n++
+    if (!block.includes(`case '${i.id}'`)) { bad++; console.log(`  ✗ no oliNavigate case in App.js for chat intent '${i.id}'`) }
+  }
 }
 
 console.log(bad ? `oli intents: ${bad} of ${n} FAILED` : `oli intents: OK (${n} checks, 9 languages)`)

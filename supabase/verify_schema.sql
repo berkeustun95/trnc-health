@@ -320,6 +320,9 @@ WITH report AS (
     ('20261183_marketplace_listings','profiles','marketplace_notice_version'),
     ('20261184_marketplace_messaging','conversations','kind'),
     ('20261184_marketplace_messaging','conversations','listing_id'),
+    -- 20261186: dealer consent (service_role only); red until it runs.
+    ('20261186_vehicles_dealer_import','dealers','consent_date'),
+    ('20261186_vehicles_dealer_import','dealers','consent_note'),
     -- 20261143: partner_booking_requests (no identifier column; asserted as an absence in H).
     ('20261143_partner_booking_requests','partner_booking_requests','id'),
     ('20261143_partner_booking_requests','partner_booking_requests','partner'),
@@ -1324,6 +1327,7 @@ WITH report AS (
     ('20261165_vehicles','vehicles_owner_idx'),
     ('20261165_vehicles','vehicles_dealer_idx'),
     ('20261165_vehicles','vehicles_expiry_idx'),
+    ('20261186_vehicles_dealer_import','vehicles_dealer_external_key'),
     ('20261165_vehicles','vehicle_images_vehicle_idx'),
     -- Bandabuliya (20261183/84): browse, an owner's listings, photo order + the review queue, one live thread per listing.
     ('20261183_marketplace_listings','marketplace_listings_browse_idx'),
@@ -2229,12 +2233,13 @@ WITH report AS (
         AND pg_get_constraintdef(oid) NOT LIKE '%''health''%')
     -- ► BUMPED FROM 36 TO 39 BY 20261165 (the three vehicle_images_* policies), same commit; red until it applies.
     -- ► 39 → 38 BY 20261182 (vehicle_images_upload dropped: car photos go through the vehicle-photo function). Red until it applies.
-    -- ► 38 → 40 BY 20261183 (the two marketplace photos policies), same commit; red until it applies.
-    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 40 policies, all named, none unknown, none missing',
+    -- ► 38 → 41 BY 20261188 (the three admin-only dealer_intake_* policies on the private staging bucket). Red until it applies.
+    -- ► 41 → 43 BY 20261183 (the two marketplace photos policies), same commit; red until it applies.
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 43 policies, all named, none unknown, none missing',
       (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects') = 40
+        WHERE schemaname='storage' AND tablename='objects') = 43
       AND (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 40
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 43
       AND (SELECT count(*) FROM pg_policies
              WHERE schemaname='storage' AND tablename='objects'
                AND policyname NOT IN (
@@ -2251,6 +2256,7 @@ WITH report AS (
                  'towing_logos_public_read',
                  'vehicle_images_delete','vehicle_images_select',
                  'marketplace photos upload own pending','marketplace photos read via row',
+                 'dealer_intake_delete','dealer_intake_insert','dealer_intake_select',
                  'Providers manage own facility images','Public facility image read',
                  'estate_agent_documents_admin_read','organizer delete own event images',
                  'property_images_delete','property_images_public','provider_credentials_admin_read',
@@ -5783,6 +5789,29 @@ WITH report AS (
                  AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%vehicle-images%')
     AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicle_images' AND policyname = 'vehicle_images_insert_own'
                  AND with_check LIKE '%''pending''%')
+  -- 20261186: dealer stock imports. RED UNTIL 20261186 RUNS.
+  UNION ALL SELECT '20261186_vehicles_dealer_import','dealers: clients read every column but consent_date / consent_note; one car per (dealer, reference); body_type allows minibus',
+    COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+               WHERE a.attrelid = to_regclass('public.dealers') AND a.attnum > 0 AND NOT a.attisdropped
+                 AND NOT has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT')) = 'consent_date,consent_note', false)
+    AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+                   WHERE a.attrelid = to_regclass('public.dealers') AND a.attnum > 0 AND NOT a.attisdropped
+                     AND NOT has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT')) = 'consent_date,consent_note', false)
+    AND COALESCE((SELECT indexdef LIKE 'CREATE UNIQUE INDEX%(dealer_id, external_id)%source = ''dealer''%external_id IS NOT NULL%'
+                    FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'vehicles_dealer_external_key'), false)
+    AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE '%''minibus''%' AND pg_get_constraintdef(oid) LIKE '%''minivan''%'
+                    FROM pg_constraint WHERE conrelid = to_regclass('public.vehicles') AND conname = 'vehicles_body_type_check'), false)
+  -- 20261188: dealer photos are staged in a private bucket only admins can write. RED UNTIL 20261188 RUNS.
+  UNION ALL SELECT '20261188_dealer_intake_bucket','bucket dealer-intake: private, 5 MB, jpeg/png/webp; exactly insert + select + delete policies, each authenticated-only, admin-only and guest-guarded; insert enforces the path shape; no UPDATE',
+    COALESCE((SELECT NOT public AND file_size_limit = 5242880 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
+                FROM storage.buckets WHERE id = 'dealer-intake'), false)
+    AND COALESCE((SELECT string_agg(policyname || ':' || cmd, ',' ORDER BY policyname) = 'dealer_intake_delete:DELETE,dealer_intake_insert:INSERT,dealer_intake_select:SELECT'
+                         AND bool_and(roles = ARRAY['authenticated']::name[]
+                                  AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_admin()%'
+                                  AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%is_anonymous_session()%')
+                    FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+                     AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%dealer-intake%'), false)
+    AND COALESCE((SELECT with_check LIKE '%name ~ %' FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'dealer_intake_insert'), false)
   UNION ALL SELECT '20261165_vehicles','vehicles.owner_id is readable by no client; my_vehicles() is the owner''s path (authenticated only)',
     COALESCE(NOT has_column_privilege('anon', to_regclass('public.vehicles'), 'owner_id', 'SELECT')
          AND NOT has_column_privilege('authenticated', to_regclass('public.vehicles'), 'owner_id', 'SELECT')

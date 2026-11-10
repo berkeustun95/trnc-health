@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Linking, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import Constants from 'expo-constants'
@@ -129,17 +129,36 @@ export function LanguageSheet({ visible, onClose, lang, onSelect }) {
   )
 }
 
+// ADA Preview only: why an OTA did not apply (no device logs from TestFlight testers otherwise).
+const IS_PREVIEW = Constants.expoConfig?.extra?.appVariant === 'preview'
+function useUpdatesDiagnostics(visible) {
+  const [text, setText] = useState(null)
+  useEffect(() => {
+    if (!IS_PREVIEW || !visible) return
+    const head = `${Updates.channel ?? '?'} · ${Updates.runtimeVersion ?? '?'}${Updates.isEmergencyLaunch ? ` · EMERGENCY: ${Updates.emergencyLaunchReason ?? ''}` : ''}`
+    Updates.readLogEntriesAsync(24 * 3600 * 1000)
+      .then(entries => {
+        const bad = entries.filter(e => e.level === 'error' || e.level === 'fatal' || e.level === 'warn').slice(-3)
+        setText([head, ...bad.map(e => `${e.code}: ${e.message}`.slice(0, 160))].join('\n'))
+      })
+      .catch(e => setText(`${head}\nlog: ${e.message}`))
+  }, [visible])
+  return text
+}
+
 // ─── About ───────────────────────────────────────────────────────────────────
 // The real version and the PLATFORM update id (first 8 chars — the one the About screen has
 // always quoted, never the EAS group id), or "Built-in" when running the embedded bundle.
 export function AboutSheet({ visible, onClose, lang }) {
   const version = Constants.expoConfig?.version ?? '—'
   const update = !Updates.isEmbeddedLaunch && Updates.updateId ? Updates.updateId.slice(0, 8) : t('hrAboutEmbedded', lang)
+  const diag = useUpdatesDiagnostics(visible)
   return (
     <BottomSheet visible={visible} onClose={onClose} title={t('menuAbout', lang)} lang={lang}>
       <Text style={s.aboutBody}>{t('aboutDescription', lang)}</Text>
       <View style={s.kv}><Text style={s.k}>{t('hrAboutVersion', lang)}</Text><Text style={s.v} selectable>{version}</Text></View>
       <View style={s.kv}><Text style={s.k}>{t('hrAboutUpdate', lang)}</Text><Text style={s.v} selectable>{update}</Text></View>
+      {diag ? <Text style={s.sub} selectable>{diag}</Text> : null}
     </BottomSheet>
   )
 }

@@ -17,6 +17,8 @@ export function normalize(str = '') {
     .replace(/Ü/g, 'u').replace(/ü/g, 'u')
     .toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    // Arabic and Persian marks (shadda, madda, harakat) go like Latin accents: "صرّف" is "صرف", "آمبولانس" is "امبولانس".
+    .replace(/[\u064b-\u065f\u0670]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -27,7 +29,8 @@ export const OLI_INTENTS = [
     keywords: ['pharmacy', 'pharmacies', 'chemist', 'drugstore', 'duty pharmacy', 'on duty', 'medicine', 'prescription',
       'eczane', 'nobetci eczane', 'nobetci', 'ilac', 'recete',
       'аптека', 'дежурная аптека', 'лекарство', 'apotheke', 'pharmacie', 'farmacia', 'صيدلية', 'دواء', 'داروخانه',
-      'pharmacie de garde', 'bereitschaftsapotheke', 'аптеки', 'дежурные аптеки', 'φαρμακειο', 'φαρμακεια', 'εφημερευον', 'εφημερευοντα', 'مناوبة', 'نوبت دار', 'صيدليات'],
+      'pharmacie de garde', 'bereitschaftsapotheke', 'аптеки', 'дежурные аптеки', 'φαρμακειο', 'φαρμακεια', 'εφημερευον', 'εφημερευοντα', 'مناوبة', 'نوبت دار', 'صيدليات',
+      'داروخونه', 'صيدلية مناوبة'],
   },
   {
     id: 'clinic', msgKey: 'oliMsgClinic', titleKey: 'hubMedicalTitle',
@@ -36,7 +39,8 @@ export const OLI_INTENTS = [
       'врач', 'больница', 'клиника', 'стоматолог', 'arzt', 'klinik', 'krankenhaus', 'zahnarzt',
       'medecin', 'clinique', 'hopital', 'dentiste', 'medico', 'clinica', 'hospital', 'dentista',
       'طبيب', 'عيادة', 'مستشفى', 'اسنان', 'پزشک', 'دکتر', 'بیمارستان', 'دندانپزشک',
-      'sante', 'медицина', 'γιατρο', 'γιατρος', 'ιατρικ', 'νοσοκομειο', 'οδοντιατρ', 'κλινικη', 'پزشکی', 'طبي', 'طبية', 'مرافق طبية'],
+      'sante', 'медицина', 'γιατρο', 'γιατρος', 'ιατρικ', 'νοσοκομειο', 'οδοντιατρ', 'κλινικη', 'پزشکی', 'طبي', 'طبية', 'مرافق طبية',
+      'دكتور', 'دندونپزشک', 'دندون', 'دندان'],
   },
   {
     id: 'emergency', msgKey: 'oliMsgEmergency', titleKey: 'menuEmergency',
@@ -45,7 +49,8 @@ export const OLI_INTENTS = [
       'скорая', 'полиция', 'помощь', 'пожар', 'notruf', 'krankenwagen', 'polizei', 'feuerwehr',
       'urgence', 'ambulance', 'police', 'emergencia', 'ambulancia', 'policia',
       'طوارئ', 'اسعاف', 'شرطة', 'اورژانس', 'امبولانس', 'پلیس',
-      'urgences', 'экстренн', 'службы спасения', 'εκτακτη αναγκη', 'εκτακτης αναγκης', 'ασθενοφορο', 'αστυνομια', 'πυροσβεστικη', 'اضطراری', 'آتش نشانی'],
+      'urgences', 'экстренн', 'службы спасения', 'εκτακτη αναγκη', 'εκτακτης αναγκης', 'ασθενοφορο', 'αστυνομια', 'πυροσβεστικη', 'اضطراری', 'آتش نشانی',
+      'скорой', 'скорую', 'полици', 'رقم الطوارئ'],
   },
   {
     id: 'newcomer', msgKey: 'oliMsgNewcomer', titleKey: 'menuNewcomerEssentials',
@@ -53,7 +58,8 @@ export const OLI_INTENTS = [
       'yeni', 'rehber', 'hos geldin', 'sinir', 'gecis', 'kapi', 'tasinma', 'oturum', 'vize', 'ikamet',
       'новичок', 'граница', 'гид', 'виза', 'neu', 'grenze', 'leitfaden', 'nouveau', 'frontiere', 'guide',
       'nuevo', 'frontera', 'guia', 'جديد', 'حدود', 'دليل', 'تازه وارد', 'مرز', 'راهنما',
-      'new here', 'just moved', 'moved here', 'yeni geldim', 'tasindim', 'erste schritte', 'willkommen', 'nouvel arrivant', 'recien llegado', 'переехал', 'οδηγος', 'καλωσορισμα', 'νεος στην κυπρο'],
+      'new here', 'just moved', 'moved here', 'yeni geldim', 'tasindim', 'erste schritte', 'willkommen', 'nouvel arrivant', 'recien llegado', 'переехал', 'οδηγος', 'καλωσορισμα', 'νεος στην κυπρο',
+      'emmenager', 'mudarme', 'me mude', 'hergezogen', 'umgezogen', 'neu hier', 'μετακομισ', 'تازه اومدم', 'تازه رسیدم'],
   },
   {
     id: 'events', msgKey: 'oliMsgEvents', titleKey: 'menuEvents',
@@ -61,7 +67,8 @@ export const OLI_INTENTS = [
       'etkinlik', 'konser', 'festival', 'gece hayati', 'parti', 'neler var', 'ne var',
       'концерт', 'событие', 'вечеринка', 'veranstaltung', 'konzert', 'evenement', 'concert',
       'evento', 'concierto', 'حفلة', 'فعالية', 'كونسير', 'کنسرت', 'رویداد', 'برنامه',
-      'concerts', 'событи', 'фестиваль', 'εκδηλωσ', 'συναυλ', 'φεστιβαλ', 'حفلات', 'فعاليات'],
+      'concerts', 'событи', 'фестиваль', 'εκδηλωσ', 'συναυλ', 'φεστιβαλ', 'حفلات', 'فعاليات',
+      'this weekend', 'weekend', 'hafta sonu', 'week end', 'fin de semana', 'was ist los', 'wochenende', 'мероприят', 'на выходных', 'выходных', 'σαββατοκυριακο'],
   },
   {
     id: 'homeServices', msgKey: 'oliMsgHomeServices', titleKey: 'menuHomeServices',
@@ -70,7 +77,8 @@ export const OLI_INTENTS = [
       'сантехник', 'электрик', 'уборка', 'ремонт', 'klempner', 'elektriker', 'reinigung',
       'plombier', 'electricien', 'menage', 'fontanero', 'electricista', 'limpieza',
       'سباك', 'كهربائي', 'تنظيف', 'لوله', 'برق کار', 'نظافت',
-      'renovation', 'reforma', 'umbau', 'handwerker', 'artisan', 'отделка', 'ανακαινιση', 'υδραυλικ', 'ηλεκτρολογ', 'بازسازی', 'تجديد'],
+      'renovation', 'reforma', 'umbau', 'handwerker', 'artisan', 'отделка', 'ανακαινιση', 'υδραυλικ', 'ηλεκτρολογ', 'بازسازی', 'تجديد',
+      'electricien', 'electricista', 'كهربجي', 'برقکار', 'لوله کش'],
   },
   {
     id: 'jobs', msgKey: 'oliMsgJobs', titleKey: 'menuJobPostings',
@@ -125,7 +133,8 @@ export const OLI_INTENTS = [
       'studyo', 'dubleks', 'mustakil', 'konut', 'apartman', 'zemin kat',
       'вилла', 'студия', 'haus', 'maison', 'casa',
       'فيلا', 'استوديو', 'ویلا', 'διαμερισμα', 'κατοικια', 'ακινητα',
-      'residences', 'immobilier', 'inmuebles', 'residencias', 'wohnheim', 'immobilien', 'общежити', 'недвижимост', 'ενοικιαση', 'ενοικιο', 'φοιτητικες εστιες', 'خوابگاه', 'املاک', 'للإيجار', 'إيجار'],
+      'residences', 'immobilier', 'inmuebles', 'residencias', 'wohnheim', 'immobilien', 'общежити', 'недвижимост', 'ενοικιαση', 'ενοικιο', 'φοιτητικες εστιες', 'خوابگاه', 'املاک', 'للإيجار', 'إيجار',
+      'dorm', 'dorms', 'dormitory', 'dormitories', 'yurt', 'yurdu', 'yurtlar', 'studentenwohnheim', 'residence etudiante', 'residencia de estudiantes', 'appart', 'квартир', 'аренд', 'φοιτητικη εστια', 'εστια', 'سكن طلاب', 'خوابگاه'],
   },
   {
     id: 'pets', msgKey: 'oliMsgPets', titleKey: 'menuPets',
@@ -143,7 +152,8 @@ export const OLI_INTENTS = [
       'автобус', 'такси', 'машина', 'транспорт', 'bus', 'taxi', 'auto', 'transport',
       'voiture', 'autobus', 'coche', 'transporte', 'حافلة', 'تاكسي', 'سيارة', 'مواصلات',
       'اتوبوس', 'تاکسی', 'ماشین', 'حمل و نقل',
-      'ταξι', 'λεωφορειο', 'μεταφορες', 'حمل ونقل'],
+      'ταξι', 'λεωφορειο', 'μεταφορες', 'حمل ونقل',
+      'taxis', 'taksiler', 'تكسي', 'باص', 'الباص'],
   },
   {
     id: 'beaches', msgKey: 'oliMsgBeaches', titleKey: 'menuBeachesLandmarks',
@@ -151,7 +161,8 @@ export const OLI_INTENTS = [
       'plaj', 'sahil', 'gezilecek', 'gezi', 'deniz', 'tarihi yer', 'gorulecek',
       'пляж', 'достопримечательности', 'море', 'strand', 'sehenswurdigkeiten',
       'plage', 'sites', 'playa', 'lugares', 'شاطئ', 'معالم', 'بحر', 'ساحل', 'دیدنی', 'جاهای دیدنی',
-      'castle', 'castles', 'kale', 'kalesi', 'museum', 'muze', 'sehenswurdigkeit', 'достопримечательност', 'παραλια', 'παραλιες', 'αξιοθεατα', 'الشواطئ', 'سواحل', 'جاذبه'],
+      'castle', 'castles', 'kale', 'kalesi', 'museum', 'muze', 'sehenswurdigkeit', 'достопримечательност', 'παραλια', 'παραλιες', 'αξιοθεατα', 'الشواطئ', 'سواحل', 'جاذبه',
+      'plajlar', 'plaja', 'plajda', 'plaji', 'plajlari', 'пляжи', 'пляжей', 'пляжа'],
   },
   {
     id: 'exchange', msgKey: 'oliMsgExchange', titleKey: 'menuExchangeRates',
@@ -159,7 +170,8 @@ export const OLI_INTENTS = [
       'kur', 'doviz', 'para', 'cevir', 'lira', 'kur cevir',
       'курс', 'валюта', 'деньги', 'обмен', 'wechselkurs', 'wahrung', 'geld',
       'change', 'devise', 'taux', 'cambio', 'moneda', 'divisa', 'صرف', 'عملة', 'نقود', 'نرخ ارز', 'ارز', 'پول',
-      'ισοτιμια', 'ισοτιμιες', 'συναλλαγμα', 'الصرف', 'أسعار الصرف', 'курсы', 'валют'],
+      'ισοτιμια', 'ισοτιμιες', 'συναλλαγμα', 'الصرف', 'أسعار الصرف', 'курсы', 'валют',
+      'para bozdur', 'para cevir', 'para degis', 'cambiar dinero', 'casa de cambio', 'dinero', 'يورو', 'ليرة', 'مصاري', 'یورو', 'لیر', 'نرخ یورو'],
   },
   {
     id: 'municipal', msgKey: 'oliMsgMunicipal', titleKey: 'menuMunicipalities',
@@ -187,7 +199,8 @@ const CHAT_NEARBY = {
     'explorar', 'que hacer', 'muestrame lugares', 'lugares para visitar',
     'обзор', 'исследовать', 'что посмотреть', 'чем заняться', 'покажи места',
     'εξερευν', 'δειξε μου μερη', 'τι να κανω', 'τι να δω',
-    'استكشاف', 'استكشف', 'أرني أماكن', 'ماذا أفعل', 'کاوش', 'نشانم بده', 'چه کار کنم'],
+    'استكشاف', 'استكشف', 'أرني أماكن', 'ماذا أفعل', 'کاوش', 'نشانم بده', 'چه کار کنم',
+      'what can i do', 'ne yapabilirim', 'peut faire', 'puede hacer', 'cerca', 'dans le coin', 'pres d ici', 'a cote', 'куда сходить', 'исторические места', 'ιστορικα μερη', 'επισκεφ', 'اماكن تاريخية', 'بتستاهل زيارة', 'شو فيني اعمل', 'جاهای تاریخی', 'چیکار میشه کرد', 'چیکار کنم'],
 }
 const CHAT_EATERY = {
   id: 'eatery', msgKey: 'oliChatEatery', titleKey: 'menuEatery',
@@ -197,11 +210,135 @@ const CHAT_EATERY = {
     'مطعم', 'طعام', 'مقهى', 'رستوران', 'غذا', 'کافه', 'εστιατοριο', 'φαγητο', 'καφε',
     'φαω', 'να φαω', 'آكل', 'مأكولات', 'مشروبات', 'خوردن', 'نوشیدن'],
 }
-// Chat priority differs from OLI_INTENTS in two places: pets before clinic (Arabic "طبيب بيطري", a vet, contains
-// "doctor") and accommodation before newcomer (French "Résidences" prefix-matches newcomer's 'residence').
-const CHAT_ORDER = ['pharmacy', 'pets', 'clinic', 'emergency', 'accommodation', 'newcomer', 'events', 'homeServices', 'jobs',
-  'transport', 'nearby', 'beaches', 'exchange', 'municipal', 'eatery']
-const ALL_CHAT = [...OLI_INTENTS, CHAT_NEARBY, CHAT_EATERY]
+// Chat-only routes to the exact page that answers the question. The Welcome Guide sections open that card
+// (NewcomerEssentialsScreen initialCard); the others open their module. They share one lead-in (oliChatRouteSection)
+// and the button reads the page's own title. Every id here needs an oliNavigate case in App.js
+// (scripts/check-oli-intents.mjs asserts it).
+const SECTION = { msgKey: 'oliChatRouteSection' }
+const CHAT_ROUTES = [
+  { ...SECTION, id: 'borders', titleKey: 'essCardBorders',
+    keywords: ['border', 'borders', 'border crossing', 'crossing', 'checkpoint', 'green line', 'go to the south', 'south cyprus',
+      'sinir kapisi', 'sinir kapilari', 'sinir', 'gecis noktasi', 'guneye', 'guney kibris', 'guney tarafina', 'yesil hat',
+      'граница', 'границу', 'кпп', 'пропускной пункт', 'на юг', 'южный кипр',
+      'grenzubergang', 'grenze', 'in den suden', 'frontiere', 'point de passage', 'points de passage', 'passer au sud',
+      'frontera', 'paso fronterizo', 'cruce', 'al sur', 'معبر', 'المعابر', 'الحدود', 'مرز', 'گذرگاه',
+      'συνορα', 'οδοφραγμα', 'σημειο διελευσης', 'στο νοτο',
+      'to the south', 'cross to the south', 'go south', 'south side', 'kapilar', 'au sud', 'fronteriz', 'νοτο', 'جنوب', 'معابر', 'حدودية', 'جنوبی'] },
+  { ...SECTION, id: 'ports', titleKey: 'essCardPorts',
+    keywords: ['airport', 'airports', 'flight', 'flights', 'ferry', 'ferries', 'seaport', 'ercan', 'larnaca', 'paphos',
+      'havalimani', 'havaalani', 'ucak', 'ucus', 'feribot', 'liman', 'аэропорт', 'паром', 'рейс', 'flughafen', 'flug',
+      'aeroport', 'ferry', 'aeropuerto', 'vuelo', 'ferri', 'مطار', 'رحلة', 'عبارة', 'فرودگاه', 'پرواز', 'καραβι',
+      'αεροδρομιο', 'πτηση', 'πτησεις', 'φεριμποτ', 'λιμανι',
+      'مطارات', 'موانئ', 'faehre', 'fahre nach', 'die fahre',
+      'eine fahre', 'φερι', 'ارجان', 'أرجان', 'إركان', 'کشتی'] },
+  { ...SECTION, id: 'embassies', titleKey: 'essCardEmbassies',
+    keywords: ['embassy', 'embassies', 'consulate', 'visa', 'passport', 'elcilik', 'buyukelcilik', 'konsolosluk', 'vize',
+      'pasaport', 'посольство', 'консульство', 'виза', 'визу', 'паспорт', 'botschaft', 'konsulat', 'visum', 'reisepass',
+      'ambassade', 'consulat', 'passeport', 'embajada', 'consulado', 'visado', 'pasaporte', 'سفارة', 'قنصلية', 'تأشيرة',
+      'جواز سفر', 'سفارت', 'کنسولگری', 'ویزا', 'گذرنامه', 'πρεσβεια', 'προξενειο', 'βιζα', 'διαβατηριο',
+      'سفارات', 'посольства', 'πρεσβειες',
+      'buyukelcili', 'elcili', 'فيزا'] },
+  { ...SECTION, id: 'holidays', titleKey: 'essCardHolidays',
+    keywords: ['public holiday', 'public holidays', 'bank holiday', 'national holiday', 'bayram', 'bayrami', 'resmi tatil',
+      'tatil gunu', 'праздник', 'праздники', 'выходные дни', 'feiertag', 'feiertage', 'jour ferie', 'jours feries',
+      'dia festivo', 'festivos', 'عطلة رسمية', 'عطلات', 'تعطیلات رسمی', 'تعطیل رسمی', 'αργια', 'αργιες',
+      'العطل الرسمية', 'العطل', 'عطل'] },
+  { ...SECTION, id: 'driving', titleKey: 'essCardDriving',
+    keywords: ['speed limit', 'speed limits', 'traffic rules', 'road rules', 'drive on the left', 'driving rules', 'drink driving',
+      'alcohol limit', 'seatbelt', 'number plate', 'hiz limiti', 'hiz siniri', 'trafik kurallari', 'soldan', 'alkol siniri',
+      'emniyet kemeri', 'ограничение скорости', 'правила дорожного движения', 'левостороннее', 'tempolimit',
+      'verkehrsregeln', 'linksverkehr', 'limitation de vitesse', 'code de la route', 'limite de velocidad', 'normas de trafico',
+      'حد السرعة', 'قواعد المرور', 'محدودیت سرعت', 'قوانین رانندگی', 'οριο ταχυτητας', 'κωδικας οδικης κυκλοφοριας',
+      'traffic', 'traffic and driving', 'trafik', 'surus', 'القيادة', 'السير والقيادة', 'пдд', 'вождение', 'οδηγηση', 'conduite', 'conduccion', 'fahren', 'رانندگی',
+      'hiz sinir', 'hiz limit', 'vitesse', 'limitation', 'roule a gauche', 'velocidad', 'por la izquierda', 'geschwindigkeit', 'hier links', 'links fahren', 'скорост', 'ταχυτητ', 'αριστερα', 'السرعة', 'عاليسار', 'اليسار', 'سرعت مجاز', 'سرعت'] },
+  { ...SECTION, id: 'living', titleKey: 'essCardLiving',
+    keywords: ['tap water', 'drinking water', 'jellyfish', 'snake', 'snakes', 'viper', 'summer hours', 'musluk suyu', 'icme suyu',
+      'damacana', 'denizanasi', 'yilan', 'engerek', 'yaz mesaisi', 'вода из под крана', 'питьевая вода', 'медуз', 'змея', 'змеи',
+      'leitungswasser', 'trinkwasser', 'qualle', 'quallen', 'schlange', 'eau du robinet', 'eau potable', 'meduse', 'serpent',
+      'agua del grifo', 'agua potable', 'medusa', 'medusas', 'serpiente', 'ماء الحنفية', 'مياه الشرب', 'قنديل البحر', 'ثعبان',
+      'آب لوله کشی', 'آب آشامیدنی', 'عروس دریایی', 'مار', 'νερο βρυσης', 'ποσιμο νερο', 'μεδουσα', 'μεδουσες', 'φιδι',
+      'living here', 'life here', 'burada yasam', 'yasam', 'الحياة هنا', 'жизнь здесь', 'η ζωη εδω', 'vivre ici', 'vivir aqui', 'leben vor ort', 'زندگی در اینجا',
+      'из под крана', 'βρυσης', 'φιδια', 'الحنفية', 'حنفية', 'افاعي', 'أفاعي'] },
+  { ...SECTION, id: 'towing', titleKey: 'menuTowing',
+    keywords: ['tow truck', 'towing', 'roadside', 'breakdown', 'broke down', 'flat tyre', 'flat tire', 'cekici', 'yol yardim',
+      'bozuldu', 'lastik patladi', 'эвакуатор', 'сломалась машина', 'abschleppdienst', 'abschleppwagen', 'pannenhilfe',
+      'depanneuse', 'depannage', 'grua', 'asistencia en carretera', 'سحب السيارات', 'ونش', 'یدک کش', 'امداد خودرو',
+      'γερανος', 'οδικη βοηθεια',
+      'سحب', 'سحب ومساعدة',
+      'γεραν', 'χαλασε', 'سطحة', 'تعطلت'] },
+  { ...SECTION, id: 'ehliyet', titleKey: 'menuEhliyet',
+    keywords: ['driving school', 'driving licence', 'driving license', 'drivers license', 'driver s license', 'driving test',
+      'learn to drive', 'ehliyet', 'surucu kursu', 'sofor okulu', 'surucu belgesi', 'direksiyon', 'водительские права',
+      'водительское удостоверение', 'автошкола', 'fuhrerschein', 'fahrschule', 'permis de conduire', 'auto ecole',
+      'carnet de conducir', 'autoescuela', 'رخصة قيادة', 'رخصة القيادة', 'مدرسة تعليم القيادة', 'گواهینامه',
+      'آموزشگاه رانندگی', 'διπλωμα οδηγησης', 'σχολη οδηγων',
+      'carne de conducir',
+      'driving schools', 'автошкол', 'σχολες οδηγων', 'رخصة سواقة', 'سواقة', 'تعليم سواقة'] },
+  { ...SECTION, id: 'esim', titleKey: 'menuEsim',
+    keywords: ['sim', 'sim card', 'esim', 'e sim', 'mobile line', 'phone line', 'mobile data', 'data plan', 'internet package',
+      'kktcell', 'telsim', 'turkcell', 'vodafone', 'hat', 'telefon hatti', 'sim kart', 'mobil hat', 'internet paketi', 'faturali',
+      'faturasiz', 'симка', 'сим карта', 'сим карту', 'мобильный интернет', 'sim karte', 'simkarte', 'handyvertrag',
+      'carte sim', 'forfait', 'tarjeta sim', 'linea movil', 'شريحة', 'خط موبايل', 'سیم کارت', 'سیمکارت', 'خط موبایل',
+      'καρτα sim', 'κινητη τηλεφωνια',
+      'الجوال', 'خط الجوال', 'мобильная связь', 'ligne mobile',
+      'симку', 'симки', 'сим карт', 'оператор', 'operadora', 'operateur', 'operator', 'mobilfunk', 'κινητης', 'πακετο ιντερνετ', 'شركة اتصالات', 'باقة نت', 'باقة', 'اپراتور', 'بسته اینترنت'] },
+  { ...SECTION, id: 'hotels', titleKey: 'accomTabHotels',
+    keywords: ['hotel', 'hotels', 'otel', 'oteller', 'гостиница', 'гостиницу', 'отель', 'отели',
+      'فندق', 'فنادق', 'هتل', 'ξενοδοχειο', 'ξενοδοχεια'] },
+  { ...SECTION, id: 'studentHub', titleKey: 'menuStudentHub',
+    keywords: ['student', 'students', 'university', 'campus', 'ogrenci', 'universite', 'kampus', 'студент', 'студенты',
+      'университет', 'universitat', 'etudiant', 'universite', 'estudiante', 'universidad', 'طالب', 'طلاب', 'جامعة',
+      'دانشجو', 'دانشگاه', 'φοιτητης', 'φοιτητες', 'πανεπιστημιο',
+      'φοιτητικα', 'estudiantil',
+      'universitari'] },
+  { ...SECTION, id: 'duyurular', titleKey: 'menuDuyurular',
+    keywords: ['announcement', 'announcements', 'scholarship', 'tender', 'outage', 'outages', 'power cut', 'water cut',
+      'electricity cut', 'duyuru', 'duyurular', 'munhal', 'burs', 'ihale', 'kesinti', 'elektrik kesintisi', 'su kesintisi',
+      'elektrikler', 'объявлени', 'стипенди', 'отключени', 'ankundigung', 'stipendium', 'stromausfall', 'annonce', 'bourse',
+      'coupure', 'anuncio', 'beca', 'corte de luz', 'corte de agua', 'إعلان', 'إعلانات', 'منحة', 'انقطاع', 'اطلاعیه',
+      'بورسیه', 'قطعی', 'ανακοινωση', 'ανακοινωσεις', 'υποτροφια', 'διακοπη',
+      'mitteilungen',
+      'отключ', 'منح', 'منح دراسية', 'برق قطع', 'قطع برق'] },
+]
+// Modules that are switched off in production: the question is understood, the answer says "not open yet"
+// (utils/oliAnswers.js) instead of a button to a Coming Soon page.
+const CHAT_DARK = [
+  { ...SECTION, id: 'insurance', titleKey: 'menuInsurance',
+    keywords: ['insurance', 'sigorta', 'страховка', 'страхование', 'versicherung', 'assurance', 'seguro', 'تأمين', 'بیمه', 'ασφαλεια',
+      'ασφαλιση', 'versichern',
+      'autoversicherung', 'kfz versicherung'] },
+]
+// Topics ADA has NO content on yet: answered with the honest "I don't know", never with a nearby card or a
+// search hit that only shares a word. The list of gaps lives in the vault (Oli build log).
+const CHAT_GAP = {
+  id: 'gap', gap: true, msgKey: 'oliChatNoMatch', titleKey: 'essHubTitle',
+  keywords: ['residence permit', 'work permit', 'oturum izni', 'oturma izni', 'ikamet izni', 'ikamet', 'calisma izni',
+    'вид на жительство', 'внж', 'разрешение на работу', 'aufenthaltserlaubnis', 'aufenthaltstitel', 'arbeitserlaubnis',
+    'titre de sejour', 'permis de sejour', 'permis de travail', 'permiso de residencia', 'permiso de trabajo',
+    'إقامة', 'الإقامة', 'تصريح عمل', 'اجازه اقامت', 'اقامت', 'مجوز کار', 'αδεια διαμονης', 'αδεια εργασιας',
+    'bank account', 'open an account', 'banka hesabi', 'hesap acmak', 'банковский счет', 'счет в банке', 'bankkonto', 'konto eroffnen',
+    'compte bancaire', 'cuenta bancaria', 'حساب بنكي', 'حساب بانکی', 'τραπεζικος λογαριασμος',
+    'school', 'schools', 'kindergarten', 'okul', 'okullar', 'kres', 'anaokulu', 'школа', 'школы', 'детский сад', 'schule', 'kindergarten',
+    'ecole', 'creche', 'escuela', 'colegio', 'guarderia', 'مدرسة', 'مدارس', 'روضة', 'مدرسه', 'مهدکودک', 'σχολειο', 'νηπιαγωγειο',
+      'supermarket', 'supermarkets', 'grocery', 'groceries', 'market', 'supermarche', 'supermercado', 'el super', 'supermarkt', 'супермаркет', 'σουπερ μαρκετ', 'سوبرماركت', 'سوپرمارکت', 'weather', 'hava durumu', 'hava nasil', 'meteo', 'temps fera', 'que tiempo', 'clima', 'wetter', 'погода', 'погоду', 'καιρο', 'الطقس', 'طقس', 'هوا فردا', 'آب و هوا', 'هوا چطور', 'home internet', 'ev interneti', 'eve internet', 'evde internet', 'fiber internet', 'wifi', 'internet a la maison', 'internet en casa', 'internet fur zu hause', 'internet zu hause', 'домашний интернет', 'ιντερνετ στο σπιτι', 'انترنت للبيت', 'انترنت منزلي', 'اینترنت خونه', 'اینترنت خانگی', 'electricity bill', 'elektrik faturasi', 'fatura', 'facture', 'factura', 'stromrechnung', 'rechnung', 'счет за', 'λογαριασμο του ρευματος', 'فاتورة', 'قبض برق', 'قبض', 'maternelle', 'τραπεζικ', 'حساب بنك'],
+}
+// Chat priority. Differs from OLI_INTENTS: pets before clinic (Arabic "طبيب بيطري", a vet, contains "doctor");
+// accommodation before newcomer (French "Résidences" prefix-matches newcomer's 'residence'); the specific routes
+// before the broad ones (towing before emergency: "yol yardım" is not "yardım"; driving schools before the driving
+// rules card); content gaps before newcomer, so "oturum izni" is not answered with the Welcome Guide.
+const CHAT_ORDER = ['pharmacy', 'pets', 'clinic', 'living', 'homeServices', 'towing', 'emergency', 'ehliyet', 'gap', 'driving', 'borders',
+  'ports', 'embassies', 'holidays', 'esim', 'hotels', 'accommodation', 'studentHub', 'newcomer', 'events', 'duyurular', 'jobs',
+  'insurance', 'transport', 'nearby', 'beaches', 'exchange', 'municipal', 'eatery']
+// Generic words that misroute in the chat now that specific routes exist: newcomer's permit / border words go to
+// the gap and borders routes above, and 'kapi' ("door") matched "Girne Kapısı". Turkish 'para' (money) is Spanish
+// "for"; Arabic 'حدود' is also "limits" (حدود السرعة); Persian 'لوله' (pipe) is also tap water (آب لوله کشی).
+const CHAT_DROP = {
+  newcomer: new Set(['residence', 'permit', 'oturum', 'ikamet', 'kapi', 'visa', 'vize', 'حدود']),
+  exchange: new Set(['para']),
+  homeServices: new Set(['لوله']),
+}
+const ALL_CHAT = [...OLI_INTENTS, CHAT_NEARBY, CHAT_EATERY, ...CHAT_ROUTES, ...CHAT_DARK, CHAT_GAP]
+  .map(i => (CHAT_DROP[i.id] ? { ...i, keywords: i.keywords.filter(k => !CHAT_DROP[i.id].has(k)) } : i))
 export const OLI_CHAT_INTENTS = CHAT_ORDER.map(id => ALL_CHAT.find(i => i.id === id))
 
 const BY_ID = OLI_CHAT_INTENTS.reduce((m, i) => { m[i.id] = i; return m }, {})
@@ -349,9 +486,17 @@ const NEARBY = OLI_CHAT_INTENTS.find(i => i.id === 'nearby')
 // The chat matches whole questions: punctuation and the Persian zero-width joiner split words ("kıbrıs'ı",
 // "d’urgence", "montre-moi", "حمل‌ونقل"), and a word must not match as the start of a longer keyword (partial false).
 const chatQuery = text => {
-  const q = stripWakeWord(normalize(String(text).replace(/[\u200c'’`´\-–—,.!?;:()·&/"«»¿¡؟،]+/g, ' ')))
-  // Arabic writes the article on the word ("الطوارئ"): each such word also counts without it.
-  const words = q.split(' ').filter(Boolean).flatMap(w => (w.length > 4 && w.startsWith('ال') ? [w, w.slice(2)] : [w]))
+  const q = stripWakeWord(normalize(String(text)
+    .replace(/[\u200c'’`´\-–—,.!?;:()·&/"«»¿¡؟،]+/g, ' ')))
+  // Arabic writes the article and short prepositions on the word ("الطوارئ", "عالجنوب", "بكيرينيا", "للبيت"): each such
+  // word also counts without them.
+  const words = q.split(' ').filter(Boolean).flatMap(w => {
+    const out = [w]
+    const pre = ['بال', 'وال', 'عال', 'فال', 'كال', 'لل', 'ال'].find(p => w.length > p.length + 2 && w.startsWith(p))
+    if (pre) out.push(w.slice(pre.length))
+    else if (w.length > 4 && /^[بلو]/.test(w)) out.push(w.slice(1))
+    return out
+  })
   return { q, words }
 }
 const hits = (kw, { q, words }) => keywordHits(kw, q, words, false)
