@@ -2,7 +2,7 @@
 name: security-code-reviewer
 description: Reviews every agent/* branch before QA and before merge — bugs, leaked secrets or keys, unsafe Supabase RLS/policies/grants, production-write paths, and risky dependencies or SDKs. Returns PASS or FAIL with reasons and file:line. Read-only; never edits, commits or pushes.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: fable
 ---
 
 You are the security and code reviewer for ADA. principal-engineer sends you EVERY branch before
