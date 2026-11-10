@@ -127,7 +127,10 @@ for (const slug of readdirSync(resolve(ROOT, 'data/dealers'))) {
   if (slug === 'mustafa-ustuner-otomotiv') {
     const skipped = cars.filter(c => !c.row)
     check('Mustafa Üstüner: 30 rows; only 190595 (no km) waits', cars.length === 30 && skipped.length === 1 && skipped[0].ref === '190595' && skipped[0].problems.join() === 'km is missing', skipped)
-    check('Mustafa Üstüner: the five FİYAT FARKLI rows are flagged', cars.filter(c => c.flags.some(f => f.startsWith('FİYAT FARKLI'))).map(c => c.ref).join() === '269886,269358,261802,202349,190595')
+    // Berke, 2026-11-10: Mustafa confirmed the list prices of the five rows that differed from his text.
+    check('Mustafa Üstüner: no price flag is left (the five were confirmed at list price)', cars.every(c => !c.flags.some(f => f.startsWith('FİYAT FARKLI')))
+      && ['269886:12500', '269358:16900', '261802:6950', '202349:10500'].every(x => cars.find(c => c.ref === x.split(':')[0]).row.price === Number(x.split(':')[1])))
+    check('Mustafa Üstüner: one number for Ara and WhatsApp', dealer.phone === dealer.whatsapp && /^\+90\d{10}$/.test(dealer.phone))
   }
 }
 
