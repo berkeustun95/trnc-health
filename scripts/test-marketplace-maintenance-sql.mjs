@@ -10,7 +10,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const rel = p => fileURLToPath(new URL(p, import.meta.url))
 const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8')
-const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql', '20261185_marketplace_maintenance.sql']
+const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql', '20261185_marketplace_maintenance.sql', '20261190_marketplace_terms.sql']
   .map(f => rel(`../supabase/migrations/${f}`))
 
 const CRON_STUB = `
@@ -25,8 +25,8 @@ CREATE FUNCTION cron.unschedule(p_name text) RETURNS boolean LANGUAGE sql AS $f$
 const U = { A: 'a0000000-0000-4000-8000-00000000000a', B: 'b0000000-0000-4000-8000-00000000000b' }
 const SEED = `
 INSERT INTO auth.users VALUES ('${U.A}'), ('${U.B}');
-INSERT INTO profiles (id, display_name, date_of_birth, role) VALUES
-  ('${U.A}', 'Ayla', '1990-01-01', 'customer'), ('${U.B}', 'Burak', '1991-02-02', 'customer');
+INSERT INTO profiles (id, display_name, date_of_birth, role, terms_version) VALUES
+  ('${U.A}', 'Ayla', '1990-01-01', 'customer', '2026-11-11'), ('${U.B}', 'Burak', '1991-02-02', 'customer', '2026-11-11');
 INSERT INTO storage.buckets (id, name) VALUES ('marketplace-photos', 'marketplace-photos') ON CONFLICT DO NOTHING;
 `
 
