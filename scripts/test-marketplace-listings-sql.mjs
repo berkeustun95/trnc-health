@@ -74,7 +74,7 @@ const CASES = [
   }],
   ['16-year-old cannot post', async db => !(await as(db, 'M', ITEM())).ok],
   ['unknown date of birth cannot post', async db => !(await as(db, 'N', ITEM())).ok],
-  ['guest cannot post', async db => !(await as(db, 'G', ITEM())).ok],
+  ['guest cannot post', async db => errIs(await as(db, 'G', ITEM()), 'AUTH_REQUIRED')],
   ['no session (anon role) cannot post or read', async db => !(await as(db, null, ITEM())).ok && !(await as(db, null, 'SELECT 1 FROM marketplace_listings')).ok],
   ['adult without a display name → NO_DISPLAY_NAME', async db => errIs(await as(db, 'Q', ITEM()), 'NO_DISPLAY_NAME')],
   ['blocked term in the title → BLOCKED_TERM', async db => errIs(await as(db, 'A', ITEM('Satılık yasakkelime')), 'BLOCKED_TERM')],
