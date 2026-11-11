@@ -56,7 +56,7 @@ Yazdığınız değerlendirmeler, sorular ve cevaplar.
 
 Bandabuliya. Bir ilan verdiğinizde ilanın başlığını, açıklamasını, fiyatını, kategorisini, durumunu, ilçesini, yayın durumunu ve tarihlerini hesabınıza bağlı olarak saklarız. Diğer kullanıcılar kullanıcı adınızı görür; adınızı, telefon numaranızı ve e-posta adresinizi asla görmez.
 
-Fotoğraflar: eklediğiniz fotoğraflar özel olarak saklanır. Biz onaylayana kadar yalnızca siz ve inceleme ekibimiz görebilir. Onayladığımızda, yeniden boyutlandırılmış ve konum dahil gömülü tüm meta verileri silinmiş bir kopyayı yayımlar, aslını sileriz. Reddedilen fotoğraf silinir. Fotoğraflar, bir saat sonra geçerliliğini yitiren bağlantılarla gösterilir.
+Fotoğraflar: eklediğiniz fotoğraflar özel olarak saklanır. Biz onaylayana kadar yalnızca siz ve inceleme ekibimiz görebilir. Onayladığımızda, yeniden boyutlandırılmış ve konum dahil gömülü tüm meta verileri silinmiş bir kopyasını yayımlarız ve aslını sileriz. Reddedilen fotoğraf silinir. Fotoğraflar, bir saat sonra geçerliliğini yitiren bağlantılarla gösterilir.
 
 Mesajlar: bir ilanla ilgili mesajlar, ADA'daki diğer mesajlar gibi ele alınır (mesajlaşma bölümüne bakın). Bandabuliya güvenlik notunu ne zaman ve hangi sürümünü kabul ettiğinizi kaydederiz.
 
@@ -181,7 +181,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
 • Sipariş kayıtları — 30 gün: siparişin oluşturulmasından 30 gün sonra otomatik olarak silinir. Doğrulama sayfası, siparişi oluşturulmasından 2 saat sonra artık doğrulamaz.
 • Rezervasyon talepleri — 12 ay: bir talebin kaydı (daire, tarihler, misafir sayısı, gönderilme zamanı) 12 ay sonra otomatik olarak silinir.
-• Bandabuliya ilanları ve fotoğrafları: sildiğiniz bir ilan hemen gizlenir ve, hakkında hâlâ açık bir bildirim yoksa, fotoğraflarıyla birlikte 30 gün sonra kalıcı olarak silinir. Süresi 90 günden uzun zaman önce dolmuş bir ilan da aynı şekilde silinir. Hiçbir ilanın kullanmadığı fotoğraf dosyaları iki gün içinde kaldırılır (bir gece işi, 24 saatten uzun süredir kullanılmayan dosyaları kaldırır).
+• Bandabuliya ilanları ve fotoğrafları: sildiğiniz bir ilan hemen gizlenir ve, hakkında hâlâ açık bir bildirim yoksa, fotoğraflarıyla birlikte 30 gün sonra kalıcı olarak silinir. Süresi 90 günden uzun zaman önce dolmuş bir ilan da aynı şekilde silinir. Hiçbir ilanın kullanmadığı fotoğraf dosyaları iki gün içinde kaldırılır (her gece çalışan bir işlem, 24 saatten uzun süredir kullanılmayan dosyaları kaldırır).
 • Oli'ye sor sohbet geçmişi — 90 gün: sorularınız ve Oli'nin yanıtları gönderildikten 90 gün sonra otomatik olarak, “Sohbet geçmişimi sil”i kullanırsanız hemen ve hesabınızla birlikte silinir.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
