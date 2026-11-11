@@ -24,6 +24,9 @@ const REAL = [
   { code: 'P0001', message: 'TERMS_REQUIRED' }, { code: 'P0001', message: 'NOTICE_REQUIRED' }, { code: 'P0001', message: 'NOT_ADULT' },
   { code: 'P0001', message: 'AUTH_REQUIRED' }, { code: '42501', message: 'new row violates row-level security policy for table "marketplace_listings"' },
   { code: '42703', message: 'column marketplace_listings.bumped_at does not exist' },
+  { code: 'PGRST204', message: "Could not find the 'bumped_at' column of 'marketplace_listings' in the schema cache" },
+  { code: '22P02', message: 'invalid input syntax for type uuid: "x"' },
+  { message: 'relation "public.marketplace_listings" does not exist' },   // no code: matched on codes only, never on prose
 ]
 
 test.each(REAL)('a real refusal %j is thrown by create / read / start / notice read and never switches to sample data', async err => {

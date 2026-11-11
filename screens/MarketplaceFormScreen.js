@@ -103,9 +103,11 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
     const fields = { title: title.trim(), description: desc.trim(), is_free: isFree, price_tl: isFree ? null : Number(price),
                      category, condition, district }
     let id = editingId
+    let wrote = false   // the row write succeeded: a later refusal leaves a partly saved listing
     try {
       if (id) await updateListing(id, fields)
       else { id = await createListing(fields); setEditingId(id) }
+      wrote = true
       for (const pid of removed) await removePhoto(pid)
       setRemoved([])
       const slots = freePositions(new Set(keptExisting.map(p => p.position)), picked.length)
@@ -122,7 +124,8 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
       setProgress(null); setSaving(false)
       // The listing may already exist: stay here in edit mode so a retry sends only what is missing.
       // TERMS_REQUIRED opens the terms gate over this form instead (nothing typed or picked is lost; the user taps Save again).
-      if (onTermsRequired && isTermsRequired(e)) onTermsRequired()
+      // If the row (and removals) already committed, the line stays visible after the gate closes: the save is incomplete.
+      if (onTermsRequired && isTermsRequired(e)) { onTermsRequired(); if (wrote) setError(t('mkErrPhotosPartial', lang)) }
       else setError(t(id && !editingId ? 'mkErrPhotosPartial' : mkErrorKey(e), lang))
       if (id) {
         const ph = (await photosFor([id]).catch(() => ({ [id]: [] })))[id].filter(p => p.status !== 'rejected')

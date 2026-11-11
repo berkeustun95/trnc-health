@@ -9,13 +9,16 @@ import { notifyAdmins } from './notify'
 //
 // ─── Preview fixture ────────────────────────────────────────────────────────
 // Before 20261183 is applied the tables do not exist. In dev / ADA Preview (MARKETPLACE on, flag off)
-// a "relation does not exist" answer switches this module to an in-memory store so the screens can be
-// walked on a phone; the first successful query after the apply switches it back for good. Production
+// a "table / function missing" answer switches this module to an in-memory store so the screens can be
+// walked on a phone; once on, it stays on until the app is reloaded (never switched back). Production
 // never gets here: with MODULE_FLAGS.marketplace false the screens are unreachable, and with it true
 // FIXTURE_ALLOWED is false.
 const FIXTURE_ALLOWED = MARKETPLACE && !MODULE_FLAGS.marketplace
 let fixture = null
-const MISSING = e => e && (e.code === 'PGRST205' || e.code === '42P01' || e.code === 'PGRST202' || /(relation|function) .* does not exist|schema cache/i.test(e.message || ''))
+// Codes only (PostgREST always sends one): a message match also caught PGRST204 "Could not find the 'x' column ... in the
+// schema cache", a real schema fault on a write, and would have faked a success.
+const MISSING_CODES = ['42P01', '42883', 'PGRST202', 'PGRST205']
+const MISSING = e => !!e && MISSING_CODES.includes(e.code)
 export const usingFixture = () => fixture !== null
 
 function useFixtureOr(error) {

@@ -87,6 +87,13 @@ describe('the gate layer', () => {
     const title = screen.getAllByText(t('mkTermsTitle', L)).find(n => n.props.accessibilityRole === 'header')
     expect(StyleSheet.flatten(title.props.style).color).not.toBe('#FFFFFF')
   })
+  test('announces its title on mount (a screen-reader user hears a gate that appears after an async refusal)', async () => {
+    const { AccessibilityInfo } = require('react-native')
+    const spy = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {})
+    await render(<MarketplaceTermsLayer lang="Turkish" userId={ME} onAccepted={() => {}} onCancel={() => {}} />)
+    expect(spy).toHaveBeenCalledWith(t('mkTermsTitle', 'Turkish'))
+    spy.mockRestore()
+  })
   test('is a VoiceOver focus trap', async () => {
     await render(<MarketplaceTermsLayer lang={L} userId={ME} onAccepted={() => {}} onCancel={() => {}} />)
     const trap = n => !!n && typeof n === 'object' && (Array.isArray(n) ? n.some(trap) : n.props?.accessibilityViewIsModal === true || trap(n.children))

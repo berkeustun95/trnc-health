@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Keyboard } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Keyboard, AccessibilityInfo } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -56,7 +56,7 @@ export function MarketplaceNoticeSheet({ visible, lang, onClose, onAccepted }) {
 // OnPhotoContext false: the gate is an opaque light canvas, so over a ModuleScreen (list) its header must not go white,
 // and ScreenHeader's status bar then reads dark. accessibilityViewIsModal keeps VoiceOver on the gate (iOS).
 export function MarketplaceTermsLayer({ lang, userId, onAccepted, onCancel }) {
-  useEffect(() => { Keyboard.dismiss() }, [])
+  useEffect(() => { Keyboard.dismiss(); AccessibilityInfo.announceForAccessibility(t('mkTermsTitle', lang)) }, [])
   return (
     <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
       <OnPhotoContext.Provider value={false}>
