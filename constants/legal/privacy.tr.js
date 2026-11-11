@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `ADA – Kuzey Kıbrıs Asistanı (Android paket adı com.berkeustun95.ada), Google Play'de P&D Digital tarafından yayımlanır ve Astarte Digital Trading Ltd. (KKTC, şirket no. MŞ29454) tarafından işletilir.
 
-Sürüm: 2026-11-09
-Son güncelleme: 9 Kasım 2026
+Sürüm: 2026-11-11
+Son güncelleme: 11 Kasım 2026
 
 KİM OLDUĞUMUZ
 

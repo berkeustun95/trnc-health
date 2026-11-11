@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `ADA – North Cyprus Assistant (Android package com.berkeustun95.ada), published on Google Play by P&D Digital, operated by Astarte Digital Trading Ltd. (TRNC, company no. MŞ29454).
 
-Version: 2026-11-09
-Last updated: November 9, 2026
+Version: 2026-11-11
+Last updated: November 11, 2026
 
 WHO WE ARE
 

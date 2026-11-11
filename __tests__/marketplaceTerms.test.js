@@ -72,9 +72,7 @@ describe('the floor', () => {
     expect(needs(MIN)).toBe(false)
     expect(needs('2026-11-12')).toBe(false)
   })
-  // Enabled by the LEGAL_VERSION bump commit (next task): LEGAL_VERSION is still 2026-11-09 here, so this is red as a normal test.
-  // `.failing` passes while it fails and turns red the day LEGAL_VERSION catches up, which is the prompt to make it a normal test.
-  test.failing('the floor never exceeds LEGAL_VERSION (accept writes LEGAL_VERSION; a higher floor re-asks forever)', () => {
+  test('the floor never exceeds LEGAL_VERSION (accept writes LEGAL_VERSION; a higher floor re-asks forever)', () => {
     expect(MIN <= LEGAL_VERSION).toBe(true)
   })
 })

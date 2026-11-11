@@ -77,7 +77,11 @@ import TERMS_TR   from './terms.tr.js'
 // Bumped 2026-10-30 -> 2026-11-09 for Explore stage 4: the push token also carries an optional Friday note
 // (weekend events + a place to visit), switchable in Profil → Bilgilendirmeler ve fırsatlar. New policy-updated
 // notice text. Terms unchanged (version line follows).
-export const LEGAL_VERSION = '2026-11-09'
+// Bumped 2026-11-09 -> 2026-11-11 for Bandabuliya: listings, photos, listing chat, the safety-notice record, retention.
+// TERMS CHANGE this time — 9.2/9.3/9.4 and the new 9.7. New policy-updated notice text. Re-asks only at a user's first
+// post / first message in Bandabuliya via MARKETPLACE_TERMS_MIN (not this value); if the real ship date is later, move
+// both together at go-live.
+export const LEGAL_VERSION = '2026-11-11'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue
