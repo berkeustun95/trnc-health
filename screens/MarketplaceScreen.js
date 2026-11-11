@@ -116,7 +116,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
-      if (termsGate) { setTermsGate(null); return true }
+      if (termsGate) { cancelTerms(); return true }
       if (chat) { if (chatBackRef.current?.()) return true; setChat(null); return true }
       if (form) { setForm(null); return true }
       if (opened) { setOpened(null); return true }

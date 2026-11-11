@@ -157,6 +157,22 @@ describe('posting', () => {
     expect(gateTitle()).toBeNull(); expect(profileWrites).toHaveLength(1)
     profileReply = v => ({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
   })
+  test('Android back during an in-flight Accept: same cancel path, nothing continues, the next post does not ask again', async () => {
+    let release
+    profileReply = v => new Promise(r => { release = () => r({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null }) })
+    const backRef = { current: null }
+    await open(old, { backRef, target: { view: 'listing', listingId: 'L1' } })
+    await press('stub-renew'); await press(t('shTermsAccept', L))
+    await waitFor(() => expect(release).toBeDefined())
+    let handled; await act(async () => { handled = backRef.current() })
+    expect(handled).toBe(true); expect(gateTitle()).toBeNull()
+    await act(async () => { release() })
+    expect(global.__renewed).toEqual([]); expect(screen.queryByText('stub:form')).toBeNull()
+    await press('stub-renew')
+    await waitFor(() => expect(global.__renewed).toEqual(['L1']))
+    expect(gateTitle()).toBeNull(); expect(profileWrites).toHaveLength(1)
+    profileReply = v => ({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
+  })
   test('initialView post asks before the form opens', async () => {
     await open(old, { initialView: 'post' })
     expect(await screen.findByText(t('mkTermsTitle', L))).toBeTruthy()
