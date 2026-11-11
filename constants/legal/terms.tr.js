@@ -132,7 +132,7 @@ Başka bir kullanıcıyı, paylaştığı herhangi bir değerlendirme üzerinden
 
 9.5 KURALLARI İHLAL ETMENİN SONUÇLARI
 
-Bu kuralları ihlal etmeniz hâlinde, ihlalin ağırlığına göre ve takdirimize bağlı olarak: içeriği kaldırabilir; değerlendirme, soru ve cevap paylaşma yetkinizi geçici olarak askıya alabilir; Bandabuliya'da ilan vermenizi engelleyebilir veya Bandabuliya kullanımınızı başka şekilde sınırlayabilir; ya da hesabınızı ve ADA'ya erişiminizi kalıcı olarak sonlandırabiliriz. İhlalin ağır olduğu durumlarda önceden bildirimde bulunmaksızın işlem yapabiliriz.
+Bu kuralları ihlal etmeniz hâlinde, ihlalin ağırlığına göre ve takdirimize bağlı olarak: içeriği kaldırabilir; değerlendirme, soru ve cevap paylaşma yetkinizi geçici olarak askıya alabilir; Bandabuliya'da ilan vermenizi engelleyebilir veya Bandabuliya kullanımınızı başka bir şekilde sınırlayabilir; ya da hesabınızı ve ADA'ya erişiminizi kalıcı olarak sonlandırabiliriz. İhlalin ağır olduğu durumlarda önceden bildirimde bulunmaksızın işlem yapabiliriz.
 
 9.6 İÇERİK HAKKINDA BİZE ULAŞMA
 
