@@ -177,7 +177,7 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
             {state !== 'hidden' && <Button title={t('mkEdit', lang)} icon="create-outline" variant="secondary" fullWidth disabled={busy} onPress={() => onEdit(listing)} />}
             {(state === 'live' || state === 'sold') && (
               <Button title={t(state === 'sold' ? 'mkMarkAvailable' : 'mkMarkSold', lang)} icon={state === 'sold' ? 'refresh-outline' : 'checkmark-done-outline'}
-                variant="secondary" fullWidth loading={busy} onPress={() => act(() => setSold(listing.id, state !== 'sold'))} />
+                variant="secondary" fullWidth loading={busy} onPress={() => { const run = () => act(() => setSold(listing.id, state !== 'sold')); if (state === 'sold') onPostAction(run); else run() }} />
             )}
             {state !== 'hidden' && canRenew(listing) && (
               <Button title={t('mkRenew', lang)} icon="reload-outline" fullWidth loading={busy} onPress={() => onPostAction(() => act(() => renewListing(listing.id)))} />

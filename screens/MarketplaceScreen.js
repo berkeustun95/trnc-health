@@ -17,7 +17,7 @@ import MarketplaceListingScreen from './MarketplaceListingScreen'
 import MarketplaceFormScreen from './MarketplaceFormScreen'
 import MarketplaceMineScreen from './MarketplaceMineScreen'
 import MarketplaceChatScreen, { MarketplaceTermsLayer } from './MarketplaceChatScreen'
-import { needsMarketplaceTerms } from '../constants/legal'
+import { needsMarketplaceTerms, LEGAL_VERSION } from '../constants/legal'
 
 // ─── Bandabuliya: browse ─────────────────────────────────────────────────────────
 // The module's main page (photo ground). Detail, form, İlanlarım and the chat open over it as layers; Android back
@@ -164,23 +164,27 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   const refreshAfterChange = () => { setForm(null); load() }
   const signedIn = !!session && !isGuest(session)
   // Guests are sent to sign in, with the reason (ContentReportMenu's onRequireAccount contract: true = gated).
-  // Every way into a post action (create, edit, renew) goes through here; mark sold and delete take content down and stay open.
+  // Every way into a post action (create, edit, renew, mark available again) goes through here; mark sold and delete take content down and stay open.
   const startPost = next => {
     if (termsDue()) { setTermsGate({ next }); return }
     if (typeof next === 'function') next(); else setForm(next)
   }
+  // The acceptance is recorded even if the user backed out while it saved (the row was written), but a cancelled gate
+  // (dead) never continues the action it was asking for.
+  const cancelTerms = () => { if (termsGate) termsGate.dead = true; setTermsGate(null) }
   const acceptTerms = d => {
     termsOk.current = true; onTermsAccepted?.(d)
-    const next = termsGate?.next
+    const g = termsGate
+    if (!g || g.dead) return
     setTermsGate(null)
-    if (typeof next === 'function') next(); else if (next) setForm(next)
+    if (typeof g.next === 'function') g.next(); else if (g.next) setForm(g.next)
   }
-  const gate = termsGate ? <MarketplaceTermsLayer lang={lang} userId={uid} onCancel={() => setTermsGate(null)} onAccepted={acceptTerms} /> : null
+  const gate = termsGate ? <MarketplaceTermsLayer lang={lang} userId={uid} onCancel={cancelTerms} onAccepted={acceptTerms} /> : null
   const requireAccount = key => { if (signedIn) return false; onSignIn?.(key); return true }
 
   if (chat) {
     return <MarketplaceChatScreen lang={lang} session={session} backRef={chatBackRef}
-      termsVersion={profile?.terms_version} onTermsAccepted={d => { termsOk.current = true; onTermsAccepted?.(d) }}
+      termsVersion={termsOk.current ? LEGAL_VERSION : profile?.terms_version} onTermsAccepted={d => { termsOk.current = true; onTermsAccepted?.(d) }}
       compose={chat.compose ?? null} initialConversationId={chat.conversationId ?? null}
       onBack={() => setChat(null)} onOpenListing={id => { setChat(null); setOpened(id) }} />
   }

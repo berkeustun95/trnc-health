@@ -46,6 +46,8 @@ jest.mock('../screens/MarketplaceFormScreen', () => ({ __esModule: true, default
 jest.mock('../screens/MarketplaceListingScreen', () => ({ __esModule: true, default: (...a) => mockStub('listing')(...a) }))
 jest.mock('../screens/MarketplaceMineScreen', () => ({ __esModule: true, default: (...a) => mockStub('mine')(...a) }))
 
+const { OnPhotoContext } = require('../components/ui/onPhoto')
+const { MarketplaceTermsLayer } = require('../screens/MarketplaceChatScreen')
 const legal = require('../constants/legal')
 const api = require('../utils/marketplaceApi')
 const MarketplaceChatScreen = require('../screens/MarketplaceChatScreen').default
@@ -60,7 +62,8 @@ const gateTitle = () => screen.queryByText(t('mkTermsTitle', L))
 const press = async label => fireEvent.press(await screen.findByText(label))
 
 beforeAll(async () => { await api.listListings(); api.setFixtureUser(ME, 'Ben') })
-beforeEach(() => { profileWrites.length = 0; global.__renewed = [] })
+const okReply = v => ({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
+beforeEach(() => { profileWrites.length = 0; global.__renewed = []; profileReply = okReply })
 
 describe('the floor', () => {
   const { needsMarketplaceTerms: needs, MARKETPLACE_TERMS_MIN: MIN, LEGAL_VERSION } = legal
@@ -74,6 +77,20 @@ describe('the floor', () => {
   })
   test('the floor never exceeds LEGAL_VERSION (accept writes LEGAL_VERSION; a higher floor re-asks forever)', () => {
     expect(MIN <= LEGAL_VERSION).toBe(true)
+  })
+})
+
+describe('the gate layer', () => {
+  test('is not in the on-photo variant even under a ModuleScreen (title stays dark, back button plain)', async () => {
+    const { StyleSheet } = require('react-native')
+    await render(<OnPhotoContext.Provider value={true}><MarketplaceTermsLayer lang={L} userId={ME} onAccepted={() => {}} onCancel={() => {}} /></OnPhotoContext.Provider>)
+    const title = screen.getAllByText(t('mkTermsTitle', L)).find(n => n.props.accessibilityRole === 'header')
+    expect(StyleSheet.flatten(title.props.style).color).not.toBe('#FFFFFF')
+  })
+  test('is a VoiceOver focus trap', async () => {
+    await render(<MarketplaceTermsLayer lang={L} userId={ME} onAccepted={() => {}} onCancel={() => {}} />)
+    const trap = n => !!n && typeof n === 'object' && (Array.isArray(n) ? n.some(trap) : n.props?.accessibilityViewIsModal === true || trap(n.children))
+    expect(trap(screen.toJSON())).toBe(true)
   })
 })
 
@@ -122,6 +139,23 @@ describe('posting', () => {
     expect(await screen.findByText('stub:form')).toBeTruthy()
     expect(gateTitle()).toBeNull()
     expect(profileWrites).toHaveLength(1)
+  })
+  test('back during an in-flight Accept: the form never opens, the renew never fires, and the next post does not ask again', async () => {
+    let release
+    profileReply = v => new Promise(r => { release = () => r({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null }) })
+    const accepted = jest.fn()
+    await open(old, { onTermsAccepted: accepted, target: { view: 'listing', listingId: 'L1' } })
+    await press('stub-renew'); await press(t('shTermsAccept', L))
+    await waitFor(() => expect(release).toBeDefined())
+    await fireEvent.press(screen.getAllByLabelText(t('back', L))[0])
+    expect(gateTitle()).toBeNull()
+    await act(async () => { release() })
+    expect(global.__renewed).toEqual([]); expect(screen.queryByText('stub:form')).toBeNull()
+    expect(accepted).toHaveBeenCalledWith(expect.objectContaining({ terms_version: legal.LEGAL_VERSION }))
+    await press('stub-renew')
+    await waitFor(() => expect(global.__renewed).toEqual(['L1']))
+    expect(gateTitle()).toBeNull(); expect(profileWrites).toHaveLength(1)
+    profileReply = v => ({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
   })
   test('initialView post asks before the form opens', async () => {
     await open(old, { initialView: 'post' })
@@ -211,7 +245,7 @@ describe('first message', () => {
     await type('Hâlâ var mı?')
     const first = send()
     expect(await screen.findByText(t('mkTermsTitle', L))).toBeTruthy()
-    await send()
+    fireEvent.press(screen.getByLabelText(t('msgSend', L), { includeHiddenElements: true }))   // the modal trap hides it from the a11y tree, not from a finger
     await press(t('shTermsCancel', L)); await first
     expect(gateTitle()).toBeNull()
     expect(await threadFor('fx-2')).toBeUndefined()

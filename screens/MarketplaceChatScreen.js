@@ -11,6 +11,8 @@ import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
 import StudentHubTermsGate from './StudentHubTermsGate'
 import { needsMarketplaceTerms } from '../constants/legal'
+import { isGuest } from '../lib/supabase'
+import { OnPhotoContext } from '../components/ui/onPhoto'
 
 // ─── Bandabuliya chat: inbox, one thread, or a first message from a listing ─────
 // Student Hub's two screens with the listing adapter (utils/marketplaceApi.js MARKETPLACE_CHAT), so block, leave,
@@ -51,12 +53,16 @@ export function MarketplaceNoticeSheet({ visible, lang, onClose, onAccepted }) {
 
 // The terms re-ask (decision 6): an absolute-fill layer, NOT a Modal, so Android back reaches it through the backRef chain
 // and the screen under it stays mounted (a typed draft survives). Reuses Student Hub's gate with Bandabuliya's own copy.
+// OnPhotoContext false: the gate is an opaque light canvas, so over a ModuleScreen (list) its header must not go white,
+// and ScreenHeader's status bar then reads dark. accessibilityViewIsModal keeps VoiceOver on the gate (iOS).
 export function MarketplaceTermsLayer({ lang, userId, onAccepted, onCancel }) {
   useEffect(() => { Keyboard.dismiss() }, [])
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <StudentHubTermsGate lang={lang} userId={userId} onAccepted={onAccepted} onCancel={onCancel}
-        titleKey="mkTermsTitle" bodyKey="mkTermsBody" />
+    <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+      <OnPhotoContext.Provider value={false}>
+        <StudentHubTermsGate lang={lang} userId={userId} onAccepted={onAccepted} onCancel={onCancel}
+          titleKey="mkTermsTitle" bodyKey="mkTermsBody" />
+      </OnPhotoContext.Provider>
     </View>
   )
 }
@@ -129,10 +135,11 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   })
 
   // Terms gate first (decision 6), then the notice, then the send. Like the notice, a second Send tap while it is open is not a second send.
-  // termsVersion null (profile not loaded) asks: never let an unchecked account through.
+  // termsVersion null (profile not loaded) asks: never let an unchecked account through. A guest is never asked
+  // (it must not write profiles): the send's AUTH_REQUIRED refusal handles it as before.
   const beforeSend = useCallback(async () => {
     if (resolveTerms.current) return false
-    if (!termsOk.current && needsMarketplaceTerms(termsVersion)) {
+    if (!isGuest(session) && !termsOk.current && needsMarketplaceTerms(termsVersion)) {
       setTermsOpen(true)
       if (!(await new Promise(resolve => { resolveTerms.current = resolve }))) return false
     }
@@ -142,7 +149,7 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
     if (resolveNotice.current) return false
     setNoticeOpen(true)
     return new Promise(resolve => { resolveNotice.current = resolve })
-  }, [myId, termsVersion])
+  }, [myId, termsVersion, session])
   const answerTerms = ok => {
     setTermsOpen(false)
     resolveTerms.current?.(ok); resolveTerms.current = null
