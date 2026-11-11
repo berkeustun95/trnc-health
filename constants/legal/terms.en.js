@@ -112,7 +112,7 @@ Text you submit in reviews, questions, answers, facility and place listings, lis
 
 Automated screening is a first line of defence only. It does not cover every type of content or every language, and no automated filter catches everything. The reporting and blocking tools described below apply to all user content, whether or not it was automatically screened.
 
-If a submission is rejected by this screening, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are linked to your account, are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
+If a submission is rejected by this screening, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are linked to your account, are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose. The one exception is Bandabuliya listings: if a listing title or description is rejected, we do not keep the rejected text. A rejected message about a listing is kept under the rule above.
 
 9.3 REPORTING OBJECTIONABLE CONTENT
 
@@ -144,7 +144,7 @@ Bandabuliya lets users list second-hand items and talk to each other about them.
 
 • We are not a party to any sale. ADA does not sell, buy, hold, deliver, inspect or guarantee any item, and no payment passes through ADA. Price, condition, payment, handover and any dispute are between the buyer and the seller.
 • Who can do what. Anyone can browse. To message a seller you need an account (not a guest session). To post a listing you must be at least 18 years old by the date of birth in your profile. Sellers cannot start a conversation; only a buyer can, from a listing.
-• What you may not list: alcohol, tobacco and vapes, weapons, medicines and drugs, live animals, adult content, counterfeit goods, services and jobs, and anything else that is unlawful in the TRNC. Property has its own section in ADA and is not listed here. Car parts and accessories may be listed.
+• What you may not list: alcohol, tobacco and vapes, weapons, medicines and drugs, live animals, adult content, counterfeit goods, services and jobs, and anything else that is unlawful in the TRNC. Vehicles and real estate cannot be listed in Bandabuliya; car parts and accessories can.
 • Your listing must be true. It must describe a real item you are entitled to sell, at the price and in the condition shown, with your own photos of that item.
 • Photos are reviewed before anyone else sees them. We may reject a photo that does not show the item, shows contact details, or breaches section 9.1. When we approve a photo, the published copy is resized, and all embedded metadata, including location, is removed from it.
 • Location. A listing shows only its district. Never put your address in a listing; agree a public meeting place in the chat.

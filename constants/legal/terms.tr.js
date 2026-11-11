@@ -112,7 +112,7 @@ Değerlendirmelerde, sorularda, cevaplarda, kurum ve mekân listelemelerinde, li
 
 Otomatik tarama yalnızca bir ilk savunma hattıdır. Her içerik türünü veya her dili kapsamaz ve hiçbir otomatik filtre her şeyi yakalayamaz. Aşağıda açıklanan bildirme ve engelleme araçları, otomatik olarak taranmış olsun ya da olmasın tüm kullanıcı içeriği için geçerlidir.
 
-Bir gönderim bu tarama sonucunda reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz.
+Bir gönderim bu tarama sonucunda reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz. Tek istisna Bandabuliya ilanlarıdır: bir ilanın başlığı veya açıklaması reddedilirse reddedilen metni saklamayız. Bir ilan hakkındaki reddedilen mesaj ise yukarıdaki kural uyarınca saklanır.
 
 9.3 UYGUNSUZ İÇERİĞİ BİLDİRME
 
@@ -144,7 +144,7 @@ Bandabuliya, kullanıcıların ikinci el eşyalarını ilan etmesine ve bunlar h
 
 • Hiçbir satışın tarafı değiliz. ADA hiçbir ürünü satmaz, satın almaz, saklamaz, teslim etmez, incelemez ya da garanti etmez; ADA üzerinden hiçbir ödeme yapılmaz. Fiyat, durum, ödeme, teslim ve her türlü anlaşmazlık alıcı ile satıcı arasındadır.
 • Kim ne yapabilir. Herkes ilanlara göz atabilir. Satıcıya mesaj göndermek için bir hesap gerekir (misafir oturumu yetmez). İlan vermek için profilinizdeki doğum tarihine göre en az 18 yaşında olmanız gerekir. Satıcılar sohbet başlatamaz; sohbeti yalnızca alıcı, bir ilandan başlatabilir.
-• İlan veremeyeceğiniz şeyler: alkol, tütün ve elektronik sigara, silah, ilaç ve uyuşturucu, canlı hayvan, yetişkin içerik, sahte ürün, hizmet ve iş ilanları ile KKTC'de yasa dışı olan her şey. Emlak ADA'nın kendi bölümündedir, burada ilan edilmez. Araç parçası ve aksesuarı ilan edilebilir.
+• İlan veremeyeceğiniz şeyler: alkol, tütün ve elektronik sigara, silah, ilaç ve uyuşturucu, canlı hayvan, yetişkin içerik, sahte ürün, hizmet ve iş ilanları ile KKTC'de yasa dışı olan her şey. Bandabuliya'da araç ve emlak ilanı verilemez; araç parçası ve aksesuarı ilanı verilebilir.
 • İlanınız doğru olmalıdır. Satmaya hakkınız olan gerçek bir ürünü, gösterilen fiyat ve durumda, o ürünün kendi fotoğraflarınızla anlatmalıdır.
 • Fotoğraflar, başkaları görmeden önce incelenir. Ürünü göstermeyen, iletişim bilgisi içeren ya da 9.1'e aykırı bir fotoğrafı reddedebiliriz. Onayladığımız fotoğrafın yayımlanan kopyası yeniden boyutlandırılır ve konum dahil gömülü tüm meta veriler silinir.
 • Konum. İlanda yalnızca ilçe görünür. İlana asla adresinizi yazmayın; herkese açık bir buluşma yerini sohbette kararlaştırın.
