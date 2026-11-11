@@ -128,6 +128,17 @@ test('renew refused: gate opens; accept leaves the user on the listing (repeats 
   expect(await screen.findByText(gateTitle())).toBeTruthy()
   expect(mockCalls.filter(c => c === 'renew_marketplace_listing')).toHaveLength(2)
 })
+test('forced gate: after a server refusal and a cancelled gate, the next post action asks WITHOUT calling the server (termsForced; profile still looks current)', async () => {
+  await open({ view: 'listing', listingId: 'L1' })
+  await press(t('mkRenew', L))
+  expect(await screen.findByText(gateTitle())).toBeTruthy()
+  expect(mockCalls.filter(c => c === 'renew_marketplace_listing')).toHaveLength(1)
+  await press(t('shTermsCancel', L))
+  await waitFor(() => expect(screen.queryByText(gateTitle())).toBeNull())
+  await press(t('mkRenew', L))
+  expect(await screen.findByText(gateTitle())).toBeTruthy()
+  expect(mockCalls.filter(c => c === 'renew_marketplace_listing')).toHaveLength(1)   // 2 here = termsDue() ignored termsForced
+})
 test('relist (mark available again) refused: gate opens, no error line', async () => {
   mockRow = mockListing({ status: 'sold' })
   await open({ view: 'listing', listingId: 'L1' })
