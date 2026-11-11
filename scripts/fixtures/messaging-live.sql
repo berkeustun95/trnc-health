@@ -18,7 +18,8 @@ GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated;
 CREATE TABLE public.profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role text, display_name text, avatar_url text, date_of_birth date,
-  ugc_banned_until timestamptz, preferred_language text, push_token text);
+  ugc_banned_until timestamptz, preferred_language text, push_token text,
+  terms_version text);  -- profiles.terms_version (20261016); the live column, added for the Bandabuliya terms tests (20261190)
 CREATE TABLE public.institutions (id uuid PRIMARY KEY, is_active boolean NOT NULL DEFAULT true);
 CREATE TABLE public.student_education (user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
   institution_id uuid REFERENCES public.institutions(id), level text, listing_opt_in boolean NOT NULL DEFAULT false);

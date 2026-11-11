@@ -742,6 +742,8 @@ WITH report AS (
     ('20261184_marketplace_messaging','start_listing_conversation'),
     ('20261185_marketplace_maintenance','marketplace_maintenance'),
     ('20261185_marketplace_maintenance','marketplace_orphan_objects'),
+    -- Bandabuliya terms gate (20261190): registered ahead of the apply; red until it runs.
+    ('20261190_marketplace_terms','i_have_marketplace_terms'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -1480,6 +1482,7 @@ WITH report AS (
     ('20261183_marketplace_listings','admin_set_listing_hidden'),
     ('20261183_marketplace_listings','marketplace_seller_names'),
     ('20261184_marketplace_messaging','start_listing_conversation'),
+    ('20261190_marketplace_terms','i_have_marketplace_terms'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','check_in'),
     ('1092_checkins','get_checkin_feed'),
@@ -5914,6 +5917,38 @@ WITH report AS (
          AND NOT has_function_privilege('authenticated', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE')
          AND NOT has_function_privilege('anon', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE'), false)
     AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname = 'conversations_listing_id_fkey' AND confdeltype = 'n')
+  -- 20261190: the Bandabuliya terms gate. The floor is ONE line in ONE helper (the caller's own terms_version, a plain text
+  -- comparison); the six replaced bodies only ASK it. Anchored to code shapes (the RAISE and the call), never to a bare word
+  -- that a comment could carry. RED UNTIL IT RUNS, and red again if 20261183/84 are re-applied on top (their bodies are ungated).
+  UNION ALL SELECT '20261190_marketplace_terms','i_have_marketplace_terms(): caller-only (no uuid overload), STABLE SECURITY DEFINER, text comparison on the caller''s own row, authenticated + service_role yes / anon no',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.i_have_marketplace_terms()')) LIKE '%STABLE SECURITY DEFINER%'
+         AND pg_get_functiondef(to_regprocedure('public.i_have_marketplace_terms()')) LIKE '%p.terms_version COLLATE "C" >= ''%'' FROM profiles p WHERE p.id = auth.uid()%'
+         AND to_regprocedure('public.i_have_marketplace_terms(uuid)') IS NULL
+         AND has_function_privilege('authenticated', to_regprocedure('public.i_have_marketplace_terms()'), 'EXECUTE')
+         AND has_function_privilege('service_role', to_regprocedure('public.i_have_marketplace_terms()'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.i_have_marketplace_terms()'), 'EXECUTE'), false)
+  UNION ALL SELECT '20261190_marketplace_terms','marketplace_listing_insert_guard: terms check after the sign-in check, before the age gate',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_listing_insert_guard()')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';.*RAISE EXCEPTION ''NOT_ADULT''', false)
+  UNION ALL SELECT '20261190_marketplace_terms','marketplace_listing_update_guard: terms check on an item-column change or a status change other than to sold, from the OLD/NEW difference (not the trusted switch); still SECURITY INVOKER',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_listing_update_guard()')) LIKE '%v_content_edit := ROW(NEW.title,%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_listing_update_guard()')) LIKE '%NEW.status IS DISTINCT FROM OLD.status AND NEW.status IS DISTINCT FROM ''sold''%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_listing_update_guard()')) LIKE '%IF v_content_edit AND auth.uid() IS NOT NULL AND NOT i_have_marketplace_terms() THEN%RAISE EXCEPTION ''TERMS_REQUIRED'';%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_listing_update_guard()')) NOT LIKE '%SECURITY DEFINER%', false)
+  UNION ALL SELECT '20261190_marketplace_terms','renew_marketplace_listing: terms check right after the sign-in check',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.renew_marketplace_listing(uuid)')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';', false)
+  UNION ALL SELECT '20261190_marketplace_terms','marketplace_photo_insert_guard: terms check before the listing lookup',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_insert_guard()')) ~ 'IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';\s*END IF;\s*IF NOT EXISTS \(SELECT 1 FROM marketplace_listings', false)
+  UNION ALL SELECT '20261190_marketplace_terms','send_listing_message: terms word after the thread-membership check and BEFORE the safety-notice word',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.send_listing_message(uuid,text)')) ~ 'RAISE EXCEPTION ''NO_SUCH_CONVERSATION'';.*RAISE EXCEPTION ''TERMS_REQUIRED'';.*RAISE EXCEPTION ''NOTICE_REQUIRED''', false)
+  UNION ALL SELECT '20261190_marketplace_terms','start_listing_conversation: terms word right after the sign-in check and BEFORE the safety-notice word',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.start_listing_conversation(uuid,text)')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';.*RAISE EXCEPTION ''NOTICE_REQUIRED''', false)
+  -- 20261190 negative, paired with its positives: Student Hub's two bodies ask nothing of the Bandabuliya terms, and the
+  -- listing thread still reaches the guarded path through send_message.
+  UNION ALL SELECT '20261190_marketplace_terms','Student Hub send_message / start_conversation do not raise the terms word; send_message still hands a listing thread to send_listing_message',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.send_message(uuid,text)')) NOT LIKE '%RAISE EXCEPTION ''TERMS_REQUIRED''%'
+         AND pg_get_functiondef(to_regprocedure('public.start_conversation(uuid,text)')) NOT LIKE '%RAISE EXCEPTION ''TERMS_REQUIRED''%'
+         AND pg_get_functiondef(to_regprocedure('public.send_message(uuid,text)')) LIKE '%RETURN send_listing_message(p_conversation_id, p_body);%'
+         AND pg_get_functiondef(to_regprocedure('public.start_conversation(uuid,text)')) LIKE '%IF NOT can_see_student_lists() THEN%', false)
   -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
