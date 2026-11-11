@@ -16,7 +16,8 @@ import { listListings, photosFor, signedUrls, setFixtureUser, usingFixture } fro
 import MarketplaceListingScreen from './MarketplaceListingScreen'
 import MarketplaceFormScreen from './MarketplaceFormScreen'
 import MarketplaceMineScreen from './MarketplaceMineScreen'
-import MarketplaceChatScreen from './MarketplaceChatScreen'
+import MarketplaceChatScreen, { MarketplaceTermsLayer } from './MarketplaceChatScreen'
+import { needsMarketplaceTerms } from '../constants/legal'
 
 // ─── Bandabuliya: browse ─────────────────────────────────────────────────────────
 // The module's main page (photo ground). Detail, form, İlanlarım and the chat open over it as layers; Android back
@@ -86,7 +87,7 @@ function ListHeader({ lang, session, profile, onPost, onSignIn, showIntro }) {
   )
 }
 
-export default function MarketplaceScreen({ lang, session, profile, onBack, onSignIn, backRef = null, initialView = null, target = null }) {
+export default function MarketplaceScreen({ lang, session, profile, onBack, onSignIn, onTermsAccepted, backRef = null, initialView = null, target = null }) {
   const [rows, setRows]         = useState([])
   const [covers, setCovers]     = useState({})
   const [more, setMore]         = useState(false)
@@ -99,7 +100,12 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   // null | { compose } (from a listing) | { conversationId } (inbox, optionally straight into one thread)
   const [chat, setChat]         = useState(target?.view === 'inbox' ? { conversationId: target.conversationId } : null)
   const chatBackRef = useRef(null)
-  const [form, setForm]         = useState(initialView === 'post' ? { mode: 'create' } : null)
+  // Terms re-ask (decision 6): the first POST asks before the form opens, so nobody fills a form and loses it. A profile that has not
+  // loaded (terms_version undefined) asks too. termsOk remembers an accept until App's profile catches up.
+  const termsOk = useRef(false)
+  const termsDue = () => !termsOk.current && !!session && !isGuest(session) && needsMarketplaceTerms(profile?.terms_version)
+  const [termsGate, setTermsGate] = useState(() => (initialView === 'post' && termsDue() ? { next: { mode: 'create' } } : null))   // { next: form | () => void }
+  const [form, setForm]         = useState(initialView === 'post' && !termsDue() ? { mode: 'create' } : null)
   const [mine, setMine]         = useState(initialView === 'mine')
   const listMem = useScrollMemory('mk:list')
   const seq = useRef(0)
@@ -110,6 +116,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
+      if (termsGate) { setTermsGate(null); return true }
       if (chat) { if (chatBackRef.current?.()) return true; setChat(null); return true }
       if (form) { setForm(null); return true }
       if (opened) { setOpened(null); return true }
@@ -157,27 +164,40 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   const refreshAfterChange = () => { setForm(null); load() }
   const signedIn = !!session && !isGuest(session)
   // Guests are sent to sign in, with the reason (ContentReportMenu's onRequireAccount contract: true = gated).
+  // Every way into a post action (create, edit, renew) goes through here; mark sold and delete take content down and stay open.
+  const startPost = next => {
+    if (termsDue()) { setTermsGate({ next }); return }
+    if (typeof next === 'function') next(); else setForm(next)
+  }
+  const acceptTerms = d => {
+    termsOk.current = true; onTermsAccepted?.(d)
+    const next = termsGate?.next
+    setTermsGate(null)
+    if (typeof next === 'function') next(); else if (next) setForm(next)
+  }
+  const gate = termsGate ? <MarketplaceTermsLayer lang={lang} userId={uid} onCancel={() => setTermsGate(null)} onAccepted={acceptTerms} /> : null
   const requireAccount = key => { if (signedIn) return false; onSignIn?.(key); return true }
 
   if (chat) {
     return <MarketplaceChatScreen lang={lang} session={session} backRef={chatBackRef}
+      termsVersion={profile?.terms_version} onTermsAccepted={d => { termsOk.current = true; onTermsAccepted?.(d) }}
       compose={chat.compose ?? null} initialConversationId={chat.conversationId ?? null}
       onBack={() => setChat(null)} onOpenListing={id => { setChat(null); setOpened(id) }} />
   }
 
   if (form) {
-    return <MarketplaceFormScreen lang={lang} session={session} listing={form.listing} onBack={() => setForm(null)}
-      onSaved={id => { refreshAfterChange(); setOpened(id) }} />
+    return <><MarketplaceFormScreen lang={lang} session={session} listing={form.listing} onBack={() => setForm(null)}
+      onSaved={id => { refreshAfterChange(); setOpened(id) }} />{gate}</>
   }
   if (opened) {
-    return <MarketplaceListingScreen id={opened} lang={lang} session={session} onBack={() => { setOpened(null); load() }}
-      onEdit={l => setForm({ mode: 'edit', listing: l })} onChanged={load} onRequireAccount={requireAccount}
-      onMessage={(l, sellerName) => setChat({ compose: { userId: l.owner_id, displayName: sellerName, listingId: l.id, listingTitle: l.title } })} />
+    return <><MarketplaceListingScreen id={opened} lang={lang} session={session} onBack={() => { setOpened(null); load() }}
+      onEdit={l => startPost({ mode: 'edit', listing: l })} onPostAction={startPost} onChanged={load} onRequireAccount={requireAccount}
+      onMessage={(l, sellerName) => setChat({ compose: { userId: l.owner_id, displayName: sellerName, listingId: l.id, listingTitle: l.title } })} />{gate}</>
   }
   if (mine) {
-    return <MarketplaceMineScreen lang={lang} session={session} profile={profile}
+    return <><MarketplaceMineScreen lang={lang} session={session} profile={profile}
       onBack={() => (initialView === 'mine' ? onBack() : setMine(false))}
-      onOpen={setOpened} onPost={() => setForm({ mode: 'create' })} />
+      onOpen={setOpened} onPost={() => startPost({ mode: 'create' })} />{gate}</>
   }
 
   const filtersOn = !!(category || district || query)
@@ -224,7 +244,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
             ListHeaderComponent={<ListHeader lang={lang} session={session} profile={profile} showIntro={!filtersOn}
-              onPost={() => setForm({ mode: 'create' })} onSignIn={onSignIn} />}
+              onPost={() => startPost({ mode: 'create' })} onSignIn={onSignIn} />}
             // A young marketplace can be genuinely empty, so this is an EmptyState, not an error.
             ListEmptyComponent={filtersOn ? (
               <EmptyState icon="search-outline" category="homeLife" title={t('mkEmptyFilteredTitle', lang)} message={t('mkEmptyFilteredSub', lang)}
@@ -236,6 +256,7 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
           />
         )}
       </SafeAreaView>
+      {gate}
     </ModuleScreen>
   )
 }

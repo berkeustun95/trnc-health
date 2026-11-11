@@ -12,7 +12,9 @@ import { colors, type, radii } from '../constants/theme'
 // ediyorum" records acceptance exactly like sign-up (ProfileSetupScreen): terms_version + terms_locale,
 // read back, and only a returned version equal to the one sent counts — RLS can filter an update to
 // zero rows without an error. terms_accepted_at is stamped by the server. "Vazgeç" / back = close.
-export default function StudentHubTermsGate({ lang, userId, onAccepted, onCancel }) {
+// Bandabuliya reuses it as an overlay (MarketplaceChatScreen's MarketplaceTermsLayer) by passing its own title/body keys;
+// the defaults are Student Hub's, so its call is unchanged.
+export default function StudentHubTermsGate({ lang, userId, onAccepted, onCancel, titleKey = 'shTermsTitle', bodyKey = 'shTermsBody' }) {
   const [tab, setTab] = useState('terms')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -33,8 +35,8 @@ export default function StudentHubTermsGate({ lang, userId, onAccepted, onCancel
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <ScreenHeader title={t('shTermsTitle', lang)} onBack={onCancel} lang={lang} />
-      <Text style={s.intro}>{t('shTermsBody', lang)}</Text>
+      <ScreenHeader title={t(titleKey, lang)} onBack={onCancel} lang={lang} />
+      <Text style={s.intro}>{t(bodyKey, lang)}</Text>
       <View style={s.tabs}>
         {['terms', 'privacy'].map(k => (
           <TouchableOpacity key={k} style={[s.tab, tab === k && s.tabOn]} onPress={() => setTab(k)}

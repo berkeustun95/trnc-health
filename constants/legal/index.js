@@ -86,6 +86,13 @@ export const LEGAL_VERSION = '2026-11-09'
 export const STUDENT_HUB_TERMS_MIN = '2026-09-20'
 export const needsStudentHubTerms = terms => terms == null || terms < STUDENT_HUB_TERMS_MIN
 
+// Bandabuliya's re-acceptance floor (decision 6, 2026-11-07): asked at a user's first post or first message there, never
+// on opening it. Fixed, not LEGAL_VERSION: Bandabuliya's terms 9.7 arrive with 2026-11-11. If the lawyer later changes the
+// wording, publish the new terms and raise this floor to re-ask everyone. It must never exceed LEGAL_VERSION (accept writes
+// LEGAL_VERSION, so a floor above it would re-ask forever) and must sit above any LEGAL_VERSION that lacks 9.7.
+export const MARKETPLACE_TERMS_MIN = '2026-11-11'
+export const needsMarketplaceTerms = terms => terms == null || terms < MARKETPLACE_TERMS_MIN
+
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
 // imported, so adding a body is one import and one map entry and this follows.
 const DOCS = {

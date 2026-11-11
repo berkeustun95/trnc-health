@@ -53,7 +53,7 @@ function PhotoViewer({ urls, index, onClose, lang }) {
   )
 }
 
-export default function MarketplaceListingScreen({ id, lang, session, onBack, onEdit, onChanged, onMessage, onRequireAccount }) {
+export default function MarketplaceListingScreen({ id, lang, session, onBack, onEdit, onChanged, onMessage, onRequireAccount, onPostAction = fn => fn() }) {
   const [listing, setListing] = useState(null)
   const [photos, setPhotos]   = useState([])
   const [urls, setUrls]       = useState({})
@@ -180,7 +180,7 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
                 variant="secondary" fullWidth loading={busy} onPress={() => act(() => setSold(listing.id, state !== 'sold'))} />
             )}
             {state !== 'hidden' && canRenew(listing) && (
-              <Button title={t('mkRenew', lang)} icon="reload-outline" fullWidth loading={busy} onPress={() => act(() => renewListing(listing.id))} />
+              <Button title={t('mkRenew', lang)} icon="reload-outline" fullWidth loading={busy} onPress={() => onPostAction(() => act(() => renewListing(listing.id)))} />
             )}
             <Button title={t('mkDelete', lang)} icon="trash-outline" variant="text" fullWidth disabled={busy} onPress={() => setConfirmDelete(true)} />
           </View>

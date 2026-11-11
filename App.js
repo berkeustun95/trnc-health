@@ -2682,6 +2682,7 @@ export default function App() {
   } else if (showMarketplace && MARKETPLACE) {
     // Bandabuliya. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
     content = <MarketplaceScreen lang={lang} session={session} profile={profile} backRef={marketplaceBackRef}
+      onTermsAccepted={d => setProfile(p => (p ? { ...p, ...d } : p))}
       initialView={showMarketplace === 'mine' ? 'mine' : null} target={typeof showMarketplace === 'object' ? showMarketplace : null}
       onSignIn={key => requireAccount(key || 'mkGatePost')}
       onBack={() => setShowMarketplace(null)} />

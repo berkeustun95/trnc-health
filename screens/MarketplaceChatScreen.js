@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Keyboard } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
@@ -9,6 +9,8 @@ import { mkChatErrorKey } from '../constants/marketplace'
 import { MARKETPLACE_CHAT, noticeAccepted, acceptNotice } from '../utils/marketplaceApi'
 import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
+import StudentHubTermsGate from './StudentHubTermsGate'
+import { needsMarketplaceTerms } from '../constants/legal'
 
 // ─── Bandabuliya chat: inbox, one thread, or a first message from a listing ─────
 // Student Hub's two screens with the listing adapter (utils/marketplaceApi.js MARKETPLACE_CHAT), so block, leave,
@@ -47,6 +49,18 @@ export function MarketplaceNoticeSheet({ visible, lang, onClose, onAccepted }) {
   )
 }
 
+// The terms re-ask (decision 6): an absolute-fill layer, NOT a Modal, so Android back reaches it through the backRef chain
+// and the screen under it stays mounted (a typed draft survives). Reuses Student Hub's gate with Bandabuliya's own copy.
+export function MarketplaceTermsLayer({ lang, userId, onAccepted, onCancel }) {
+  useEffect(() => { Keyboard.dismiss() }, [])
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <StudentHubTermsGate lang={lang} userId={userId} onAccepted={onAccepted} onCancel={onCancel}
+        titleKey="mkTermsTitle" bodyKey="mkTermsBody" />
+    </View>
+  )
+}
+
 // The listing a thread is about. listing_id is NULL once the listing is purged (20261185 keeps the chat).
 function listingState(row) {
   if (!row?.listing_id) return 'removed'
@@ -81,7 +95,7 @@ function InboxExtra({ row, lang }) {
 }
 
 // compose: { userId, displayName, listingId, listingTitle } — a buyer's first message from a listing page.
-export default function MarketplaceChatScreen({ lang, session, onBack, onOpenListing, compose = null, initialConversationId = null, backRef = null }) {
+export default function MarketplaceChatScreen({ lang, session, onBack, onOpenListing, compose = null, initialConversationId = null, backRef = null, termsVersion = null, onTermsAccepted }) {
   const myId = session?.user?.id
   const [thread, setThread]   = useState(null)          // a list_conversations row
   const [composing, setComposing] = useState(compose)
@@ -89,6 +103,9 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   const [noticeOpen, setNoticeOpen] = useState(false)
   const noticeOk = useRef(false)
   const resolveNotice = useRef(null)
+  const [termsOpen, setTermsOpen] = useState(false)
+  const termsOk = useRef(false)          // set on accept: the resumed send runs before App's profile re-renders
+  const resolveTerms = useRef(null)
 
   const findThread = useCallback(async match => {
     const { data } = await MARKETPLACE_CHAT.list()
@@ -107,19 +124,29 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   }, [compose, composing, thread, onBack])
   useEffect(() => {
     if (!backRef) return
-    backRef.current = () => { if (thread || composing) { leaveThread(); return true } return false }
+    backRef.current = () => { if (termsOpen) { answerTerms(false); return true } if (thread || composing) { leaveThread(); return true } return false }
     return () => { backRef.current = null }
   })
 
-  // The notice gate: known-accepted → go; otherwise ask once, and the send waits for the answer.
+  // Terms gate first (decision 6), then the notice, then the send. Like the notice, a second Send tap while it is open is not a second send.
+  // termsVersion null (profile not loaded) asks: never let an unchecked account through.
   const beforeSend = useCallback(async () => {
+    if (resolveTerms.current) return false
+    if (!termsOk.current && needsMarketplaceTerms(termsVersion)) {
+      setTermsOpen(true)
+      if (!(await new Promise(resolve => { resolveTerms.current = resolve }))) return false
+    }
     if (noticeOk.current) return true
     try { if (await noticeAccepted(myId)) { noticeOk.current = true; return true } } catch { /* ask */ }
     // A second tap on Send while the sheet is open is not a second send.
     if (resolveNotice.current) return false
     setNoticeOpen(true)
     return new Promise(resolve => { resolveNotice.current = resolve })
-  }, [myId])
+  }, [myId, termsVersion])
+  const answerTerms = ok => {
+    setTermsOpen(false)
+    resolveTerms.current?.(ok); resolveTerms.current = null
+  }
   const answerNotice = ok => {
     setNoticeOpen(false)
     if (ok) noticeOk.current = true
@@ -140,6 +167,10 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
     if (row) { setComposing(null); setThread(row) }
   }, [composing, thread, findThread])
 
+  const termsLayer = termsOpen ? (
+    <MarketplaceTermsLayer lang={lang} userId={myId} onCancel={() => answerTerms(false)}
+      onAccepted={d => { termsOk.current = true; onTermsAccepted?.(d); answerTerms(true) }} />
+  ) : null
   const notice = <MarketplaceNoticeSheet visible={noticeOpen} lang={lang} onClose={() => answerNotice(false)} onAccepted={() => answerNotice(true)} />
 
   if (thread || composing) {
@@ -157,6 +188,7 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
           api={MARKETPLACE_CHAT} header={strip} beforeSend={beforeSend} errorKey={errorKey}
         />
         {notice}
+        {termsLayer}
       </>
     )
   }

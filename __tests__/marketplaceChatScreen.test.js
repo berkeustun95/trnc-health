@@ -17,6 +17,7 @@ jest.mock('../components/PageBackground', () => () => null)
 jest.mock('../components/Avatar', () => ({ __esModule: true, default: () => null, prefetchAvatars: async () => {} }))
 
 const api = require('../utils/marketplaceApi')
+const { MARKETPLACE_TERMS_MIN } = require('../constants/legal')   // these tests are about the notice; the terms gate has its own file
 const MarketplaceChatScreen = require('../screens/MarketplaceChatScreen').default
 const L = 'English'
 const ME = 'me-uid'
@@ -29,7 +30,7 @@ beforeAll(async () => {
 })
 
 test('buyer: the first send waits for the safety notice, then the thread opens and the seller answers', async () => {
-  await render(<MarketplaceChatScreen lang={L} session={session} onBack={() => {}} onOpenListing={() => {}}
+  await render(<MarketplaceChatScreen lang={L} termsVersion={MARKETPLACE_TERMS_MIN} session={session} onBack={() => {}} onOpenListing={() => {}}
     compose={{ userId: 'fx-seller', displayName: 'Önizleme Satıcı', listingId: 'fx-3', listingTitle: 'Üniversite hazırlık kitapları' }} />)
 
   expect(screen.getByText('Üniversite hazırlık kitapları')).toBeTruthy()          // the listing strip
@@ -52,7 +53,7 @@ test('buyer: the first send waits for the safety notice, then the thread opens a
 }, 15000)
 
 test('the notice is asked once: a second thread sends straight away', async () => {
-  await render(<MarketplaceChatScreen lang={L} session={session} onBack={() => {}} onOpenListing={() => {}}
+  await render(<MarketplaceChatScreen lang={L} termsVersion={MARKETPLACE_TERMS_MIN} session={session} onBack={() => {}} onOpenListing={() => {}}
     compose={{ userId: 'fx-seller', displayName: 'Önizleme Satıcı', listingId: 'fx-1', listingTitle: 'Şehir bisikleti, 21 vites' }} />)
   await fireEvent.changeText(screen.getByPlaceholderText(t('msgPlaceholder', L)), 'Bisiklet duruyor mu?')
   await fireEvent.press(screen.getByLabelText(t('msgSend', L)))
@@ -61,7 +62,7 @@ test('the notice is asked once: a second thread sends straight away', async () =
 })
 
 test('seller: the inbox shows the request with its listing, and Accept opens the composer', async () => {
-  await render(<MarketplaceChatScreen lang={L} session={session} onBack={() => {}} onOpenListing={() => {}} />)
+  await render(<MarketplaceChatScreen lang={L} termsVersion={MARKETPLACE_TERMS_MIN} session={session} onBack={() => {}} onOpenListing={() => {}} />)
   expect(await screen.findByText(t('mkInboxTitle', L))).toBeTruthy()
   expect(await screen.findByText('Masa lambası, LED')).toBeTruthy()             // the listing line under the name
   await fireEvent.press(screen.getByLabelText('Deniz'))
