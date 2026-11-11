@@ -108,7 +108,7 @@ This list is illustrative, not exhaustive. Content that is not listed here may s
 
 9.2 CONTENT FILTERING
 
-Text you submit in reviews, questions, answers, facility and place listings, and listing change requests is automatically screened at the moment you submit it against a list of prohibited terms, currently maintained in English and Turkish.
+Text you submit in reviews, questions, answers, facility and place listings, listing change requests, Bandabuliya listing titles and descriptions, and messages is automatically screened at the moment you submit it against a list of prohibited terms, currently maintained in English and Turkish.
 
 Automated screening is a first line of defence only. It does not cover every type of content or every language, and no automated filter catches everything. The reporting and blocking tools described below apply to all user content, whether or not it was automatically screened.
 
@@ -118,6 +118,8 @@ If a submission is rejected by this screening, we keep the rejected text, the te
 
 Every review, question, and answer in ADA carries a Report action. Open the menu on the item you want to report, choose a reason, and submit it — you do not need to contact us separately, and the author is not told who reported them.
 
+Bandabuliya listings carry the same Report action. Because a listing can offer something unlawful or unsafe, a single report hides it from everyone except the seller until we have reviewed it.
+
 We review reported content and remove content that breaches these standards within 24 hours of the report.
 
 Content reported by several independent users may be hidden automatically, pending our review, before a person has looked at it. Automatic hiding is a safeguard and not a finding against the author; content hidden this way can be restored if our review finds no breach.
@@ -126,7 +128,7 @@ Content we remove is retained internally so that we can identify repeat breaches
 
 9.4 BLOCKING ANOTHER USER
 
-You can block another user from any review they have posted. Blocking hides that user's reviews and comments from you wherever community content appears. Blocking is private: the blocked user is not notified and cannot tell that you have blocked them. You can see and reverse your blocks at any time in your profile settings.
+You can block another user from any review they have posted. Blocking hides that user's reviews and comments from you wherever community content appears. Blocking is private: the blocked user is not notified and cannot tell that you have blocked them. You can see and reverse your blocks at any time in your profile settings. You can also block a seller from their Bandabuliya listing or from a conversation. Blocking closes any conversation with them.
 
 9.5 CONSEQUENCES OF BREACHING THESE STANDARDS
 
@@ -135,6 +137,20 @@ If you breach these standards we may, at our discretion and depending on severit
 9.6 CONTACTING US ABOUT CONTENT
 
 To report objectionable content, an abusive user, or a decision we have taken, contact us at getadaapp@gmail.com. We aim to respond within 24 hours.
+
+9.7 BANDABULIYA: BUYING AND SELLING BETWEEN USERS
+
+Bandabuliya lets users list second-hand items and talk to each other about them. It is a noticeboard, not a shop.
+
+• We are not a party to any sale. ADA does not sell, buy, hold, deliver, inspect or guarantee any item, and no payment passes through ADA. Price, condition, payment, handover and any dispute are between the buyer and the seller.
+• Who can do what. Anyone can browse. To message a seller you need an account (not a guest session). To post a listing you must be at least 18 years old by the date of birth in your profile. Sellers cannot start a conversation; only a buyer can, from a listing.
+• What you may not list: alcohol, tobacco and vapes, weapons, medicines and drugs, live animals, adult content, counterfeit goods, services and jobs, and anything else that is unlawful in the TRNC. Vehicles and property have their own sections in ADA and are not listed here. Car parts and accessories may be listed.
+• Your listing must be true. It must describe a real item you are entitled to sell, at the price and in the condition shown, with your own photos of that item.
+• Photos are reviewed before anyone else sees them. We may reject a photo that does not show the item, shows contact details, or breaches section 9.1. When we approve a photo, the published copy is resized, and all embedded metadata, including location, is removed from it.
+• Location. A listing shows only its district. Never put your address in a listing; agree a public meeting place in the chat.
+• Safety. Before your first message we show you a safety notice. Meet in a busy public place, check the item before you pay, and never pay in advance, send a deposit or share card details. Report anything suspicious.
+• Limits. A listing runs for 30 days and can be renewed in its last 3 days or after it expires. You can post up to 10 new listings in 24 hours and have up to 50 live at once, with up to 8 photos each.
+• Removal. We may hide or remove a listing, or limit your use of Bandabuliya, under section 9.5. A listing you delete disappears immediately and is permanently deleted 30 days later, unless a report about it is still open. A listing that expired more than 90 days ago is deleted automatically. Conversations about a deleted listing remain for both people, without the listing.
 
 10. INTELLECTUAL PROPERTY
 

@@ -108,7 +108,7 @@ Bu liste örnekleyicidir, sınırlayıcı değildir. Burada sayılmayan içerikl
 
 9.2 İÇERİK FİLTRELEME
 
-Değerlendirmelerde, sorularda, cevaplarda, kurum ve mekân listelemelerinde ve listeleme değişiklik taleplerinde gönderdiğiniz metin, gönderdiğiniz anda, hâlihazırda İngilizce ve Türkçe olarak tutulan yasaklı terimler listesine karşı otomatik olarak taranır.
+Değerlendirmelerde, sorularda, cevaplarda, kurum ve mekân listelemelerinde, listeleme değişiklik taleplerinde, Bandabuliya ilan başlıklarında ve açıklamalarında, ayrıca mesajlarda gönderdiğiniz metin, gönderdiğiniz anda, hâlihazırda İngilizce ve Türkçe olarak tutulan yasaklı terimler listesine karşı otomatik olarak taranır.
 
 Otomatik tarama yalnızca bir ilk savunma hattıdır. Her içerik türünü veya her dili kapsamaz ve hiçbir otomatik filtre her şeyi yakalayamaz. Aşağıda açıklanan bildirme ve engelleme araçları, otomatik olarak taranmış olsun ya da olmasın tüm kullanıcı içeriği için geçerlidir.
 
@@ -118,6 +118,8 @@ Bir gönderim bu tarama sonucunda reddedilirse, hatalı reddetmeleri bulup düze
 
 ADA'daki her değerlendirme, soru ve cevapta bir Bildir seçeneği bulunur. Bildirmek istediğiniz öğenin menüsünü açın, bir gerekçe seçin ve gönderin — ayrıca bizimle iletişime geçmenize gerek yoktur ve içeriğin sahibine kimin bildirdiği söylenmez.
 
+Bandabuliya ilanlarında da aynı Bildir işlemi bulunur. Bir ilan yasa dışı ya da tehlikeli bir şey sunabileceği için, tek bir bildirim ilanı biz inceleyene kadar satıcı dışındaki herkesten gizler.
+
 Bildirilen içerikleri inceler ve bu kuralları ihlal eden içerikleri bildirimden itibaren 24 saat içinde kaldırırız.
 
 Birbirinden bağımsız birden fazla kullanıcı tarafından bildirilen içerikler, bir kişi tarafından incelenmeden önce, inceleme beklenirken otomatik olarak gizlenebilir. Otomatik gizleme bir güvenlik önlemidir, içeriğin sahibi hakkında verilmiş bir karar değildir; bu şekilde gizlenen içerik, incelememiz sonucunda ihlal bulunmazsa geri getirilebilir.
@@ -126,7 +128,7 @@ Kaldırdığımız içerikler, aynı hesabın tekrarlayan ihlallerini tespit ede
 
 9.4 BAŞKA BİR KULLANICIYI ENGELLEME
 
-Başka bir kullanıcıyı, paylaştığı herhangi bir değerlendirme üzerinden engelleyebilirsiniz. Engelleme, o kullanıcının değerlendirmelerini ve yorumlarını topluluk içeriğinin göründüğü her yerde sizden gizler. Engelleme özeldir: engellenen kullanıcıya bildirim gitmez ve engellendiğini anlayamaz. Engellemelerinizi istediğiniz zaman profil ayarlarınızdan görebilir ve geri alabilirsiniz.
+Başka bir kullanıcıyı, paylaştığı herhangi bir değerlendirme üzerinden engelleyebilirsiniz. Engelleme, o kullanıcının değerlendirmelerini ve yorumlarını topluluk içeriğinin göründüğü her yerde sizden gizler. Engelleme özeldir: engellenen kullanıcıya bildirim gitmez ve engellendiğini anlayamaz. Engellemelerinizi istediğiniz zaman profil ayarlarınızdan görebilir ve geri alabilirsiniz. Bir satıcıyı Bandabuliya ilanından ya da bir sohbetten de engelleyebilirsiniz. Engelleme, onunla olan sohbetleri kapatır.
 
 9.5 KURALLARI İHLAL ETMENİN SONUÇLARI
 
@@ -135,6 +137,20 @@ Bu kuralları ihlal etmeniz hâlinde, ihlalin ağırlığına göre ve takdirimi
 9.6 İÇERİK HAKKINDA BİZE ULAŞMA
 
 Uygunsuz içeriği, saldırgan bir kullanıcıyı veya aldığımız bir kararı bildirmek için getadaapp@gmail.com adresinden bize ulaşın. 24 saat içinde yanıt vermeyi hedefliyoruz.
+
+9.7 BANDABULİYA: KULLANICILAR ARASINDA ALIM SATIM
+
+Bandabuliya, kullanıcıların ikinci el eşyalarını ilan etmesine ve bunlar hakkında birbirleriyle yazışmasına olanak tanır. Bir mağaza değil, bir ilan panosudur.
+
+• Hiçbir satışın tarafı değiliz. ADA hiçbir ürünü satmaz, satın almaz, saklamaz, teslim etmez, incelemez ya da garanti etmez; ADA üzerinden hiçbir ödeme yapılmaz. Fiyat, durum, ödeme, teslim ve her türlü anlaşmazlık alıcı ile satıcı arasındadır.
+• Kim ne yapabilir. Herkes ilanlara göz atabilir. Satıcıya mesaj göndermek için bir hesap gerekir (misafir oturumu yetmez). İlan vermek için profilinizdeki doğum tarihine göre en az 18 yaşında olmanız gerekir. Satıcılar sohbet başlatamaz; sohbeti yalnızca alıcı, bir ilandan başlatabilir.
+• İlan veremeyeceğiniz şeyler: alkol, tütün ve elektronik sigara, silah, ilaç ve uyuşturucu, canlı hayvan, yetişkin içerik, sahte ürün, hizmet ve iş ilanları ile KKTC'de yasa dışı olan her şey. Araç ve emlak ADA'nın kendi bölümlerindedir, burada ilan edilmez. Araç parçası ve aksesuarı ilan edilebilir.
+• İlanınız doğru olmalıdır. Satmaya hakkınız olan gerçek bir ürünü, gösterilen fiyat ve durumda, o ürünün kendi fotoğraflarınızla anlatmalıdır.
+• Fotoğraflar, başkaları görmeden önce incelenir. Ürünü göstermeyen, iletişim bilgisi içeren ya da 9.1'e aykırı bir fotoğrafı reddedebiliriz. Onayladığımız fotoğrafın yayımlanan kopyası yeniden boyutlandırılır ve konum dahil gömülü tüm meta veriler silinir.
+• Konum. İlanda yalnızca ilçe görünür. İlana asla adresinizi yazmayın; herkese açık bir buluşma yerini sohbette kararlaştırın.
+• Güvenlik. İlk mesajınızdan önce size bir güvenlik notu gösteririz. Kalabalık ve herkese açık bir yerde buluşun, ödemeden önce ürünü kontrol edin; asla önceden ödeme yapmayın, kapora göndermeyin ve kart bilgilerinizi paylaşmayın. Şüpheli her şeyi bildirin.
+• Sınırlar. Bir ilan 30 gün yayında kalır; son 3 gününde ya da süresi dolduktan sonra yenilenebilir. 24 saatte en fazla 10 yeni ilan verebilir, aynı anda en fazla 50 ilanınız yayında olabilir; her ilanda en fazla 8 fotoğraf bulunabilir.
+• Kaldırma. Bir ilanı 9.5 uyarınca gizleyebilir ya da kaldırabilir veya Bandabuliya kullanımınızı sınırlayabiliriz. Sildiğiniz ilan hemen kaybolur ve 30 gün sonra, hakkında açık bir bildirim yoksa, kalıcı olarak silinir. Süresi 90 günden uzun zaman önce dolmuş ilanlar otomatik olarak silinir. Silinen bir ilanla ilgili sohbetler, ilan olmadan, iki taraf için de kalır.
 
 10. FİKRİ MÜLKİYET
 
