@@ -47,7 +47,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 
 Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersiniz ya da kendi yüklediğiniz bir görsel kullanılır; yüklenen görsel dosya depolamamızda saklanır.
 
-Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını, sorduğunuz sorulara gelen cevapları, sohbetlerinizdeki yeni mesajları (Bandabuliya ilanlarıyla ilgili sohbetler dahil) göndermek ve bir ilana eklediğiniz fotoğraf yayınlanmadığında sizi bilgilendirmek için saklanır. Ayrıca isteğe bağlı Cuma notu için kullanılır: hafta sonunun etkinlikleri ve gezilecek bir yer; Profil → «Bilgilendirmeler ve fırsatlar» bölümünden kapatabilirsiniz. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
+Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını, sorduğunuz sorulara gelen cevapları, sohbetlerinizdeki yeni mesajları (Bandabuliya ilanlarıyla ilgili sohbetler dahil) göndermek ve bir ilana eklediğiniz fotoğraf yayınlanmadığında ya da ilanınızı gizlediğimizde sizi bilgilendirmek için saklanır. Ayrıca isteğe bağlı Cuma notu için kullanılır: hafta sonunun etkinlikleri ve gezilecek bir yer; Profil → «Bilgilendirmeler ve fırsatlar» bölümünden kapatabilirsiniz. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
 
@@ -56,7 +56,7 @@ Yazdığınız değerlendirmeler, sorular ve cevaplar.
 
 Bandabuliya. Bir ilan verdiğinizde ilanın başlığını, açıklamasını, fiyatını, kategorisini, durumunu, ilçesini, yayın durumunu ve tarihlerini hesabınıza bağlı olarak saklarız. Diğer kullanıcılar kullanıcı adınızı görür, sohbet ettiğiniz kişiler ayrıca profil fotoğrafınızı görür; adınızı, telefon numaranızı ve e-posta adresinizi ise asla görmez.
 
-Fotoğraflar: eklediğiniz fotoğraflar özel olarak saklanır. Biz onaylayana kadar yalnızca siz ve inceleme ekibimiz görebilir. Onayladığımızda, yeniden boyutlandırılmış ve konum dahil gömülü tüm meta verileri silinmiş bir kopyasını yayımlarız ve aslını sileriz. Reddedilen fotoğrafın dosyası silinir; reddedilme gerekçesiyle birlikte kaydı, ilan kalıcı olarak silinene kadar ilanla birlikte kalır. Fotoğraflar, bir saat sonra geçerliliğini yitiren bağlantılarla gösterilir.
+Fotoğraflar: eklediğiniz fotoğraflar özel olarak saklanır. Biz onaylayana kadar yalnızca siz ve inceleme ekibimiz görebilir. Onayladığımızda, yeniden boyutlandırılmış ve konum dahil gömülü tüm meta verileri silinmiş bir kopyasını yayımlarız ve aslını sileriz. Reddedilen fotoğrafın dosyası silinir; reddedilme gerekçesiyle birlikte kaydı, ilan kalıcı olarak silinene ya da fotoğrafı siz kaldırana kadar ilanla birlikte kalır. Fotoğraflar, bir saat sonra geçerliliğini yitiren bağlantılarla gösterilir.
 
 Mesajlar: bir ilanla ilgili mesajlar, yukarıda anlatılan mesajlarla aynı şekilde ele alınır: silme, saklama ve bildirme kuralları aynıdır. Bandabuliya güvenlik notunu ne zaman ve hangi sürümünü kabul ettiğinizi kaydederiz.
 

@@ -47,7 +47,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
 
-Push notification token: stored to send you duty pharmacy alerts, replies to questions you have asked, new messages in your chats (including chats about Bandabuliya listings), and a notice when a photo you added to a listing is not published. Also used for an optional Friday note with the weekend's events and a place to visit; turn it off in Profile → Updates and offers. You can disable this in your device settings at any time.
+Push notification token: stored to send you duty pharmacy alerts, replies to questions you have asked, new messages in your chats (including chats about Bandabuliya listings), and a notice when a photo you added to a listing is not published or when we hide your listing. Also used for an optional Friday note with the weekend's events and a place to visit; turn it off in Profile → Updates and offers. You can disable this in your device settings at any time.
 
 Reviews, questions and answers you submit.
 
@@ -56,7 +56,7 @@ Reviews, questions and answers you submit.
 
 Bandabuliya. When you post a listing we store its title, description, price, category, condition, district, status and dates, linked to your account. Other users see your username, and the people you chat with also see your profile picture; they never see your name, phone number or email.
 
-Photos you add are stored privately. Until we approve them, only you and our reviewers can see them. On approval we publish a resized copy with all embedded metadata, including location, removed, and we delete the original. The file of a rejected photo is deleted; the record of it, with the reason we gave, stays with the listing until the listing is permanently deleted. Photos are shown through links that expire after one hour.
+Photos you add are stored privately. Until we approve them, only you and our reviewers can see them. On approval we publish a resized copy with all embedded metadata, including location, removed, and we delete the original. The file of a rejected photo is deleted; the record of it, with the reason we gave, stays with the listing until the listing is permanently deleted or you remove the photo. Photos are shown through links that expire after one hour.
 
 Messages about a listing are handled like the messages described above: the same rules apply to deleting, keeping and reporting them. We record when you accepted the Bandabuliya safety notice and which version you accepted.
 
