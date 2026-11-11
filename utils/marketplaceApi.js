@@ -15,7 +15,7 @@ import { notifyAdmins } from './notify'
 // FIXTURE_ALLOWED is false.
 const FIXTURE_ALLOWED = MARKETPLACE && !MODULE_FLAGS.marketplace
 let fixture = null
-const MISSING = e => e && (e.code === 'PGRST205' || e.code === '42P01' || e.code === 'PGRST202' || /does not exist|schema cache/i.test(e.message || ''))
+const MISSING = e => e && (e.code === 'PGRST205' || e.code === '42P01' || e.code === 'PGRST202' || /(relation|function) .* does not exist|schema cache/i.test(e.message || ''))
 export const usingFixture = () => fixture !== null
 
 function useFixtureOr(error) {
