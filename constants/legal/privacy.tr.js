@@ -54,6 +54,12 @@ Yazdığınız değerlendirmeler, sorular ve cevaplar.
 • Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için 30 gün saklanır, sonra kalıcı olarak silinir. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
 • Konuşma başlatma denemeleri — birine mesaj göndermeye çalıştığınızda, iletilip iletilmediğinden bağımsız olarak bu denemenin gerçekleştiğini kaydederiz. Bunu yalnızca yöneticiler görebilir ve 30 gün sonra silinir.
 
+Bandabuliya. Bir ilan verdiğinizde ilanın başlığını, açıklamasını, fiyatını, kategorisini, durumunu, ilçesini, yayın durumunu ve tarihlerini hesabınıza bağlı olarak saklarız. Diğer kullanıcılar kullanıcı adınızı görür; adınızı, telefon numaranızı ve e-posta adresinizi asla görmez.
+
+Fotoğraflar: eklediğiniz fotoğraflar özel olarak saklanır. Biz onaylayana kadar yalnızca siz ve inceleme ekibimiz görebilir. Onayladığımızda, yeniden boyutlandırılmış ve konum dahil gömülü tüm meta verileri silinmiş bir kopyayı yayımlar, aslını sileriz. Reddedilen fotoğraf silinir. Fotoğraflar, bir saat sonra geçerliliğini yitiren bağlantılarla gösterilir.
+
+Mesajlar: bir ilanla ilgili mesajlar, ADA'daki diğer mesajlar gibi ele alınır (mesajlaşma bölümüne bakın). Bandabuliya güvenlik notunu ne zaman ve hangi sürümünü kabul ettiğinizi kaydederiz.
+
 Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar. Engelleme listeniz özeldir ve engellediğiniz kullanıcıya asla gösterilmez.
 
 Reddedilen gönderimler: gönderdiğiniz bir metin içerik filtremiz tarafından reddedilirse, bu kaydı hesabınıza bağlı olarak 30 gün süreyle saklarız. 7. bölümde ayrıntılı olarak açıklanmıştır.
@@ -105,6 +111,8 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • 18 yaşından küçüklerin check-in'lerini, göstermeyi seçmedikleri sürece gizli tutmak — Küçükleri korumak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 • Check-in yaparken yakınınızdaki mekanları Google aracılığıyla bulmak — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • Restorana sipariş gönderdiğinizde sipariş kaydı oluşturmak ve oluşturulabilecek sipariş sayısını sınırlamak — Restoranın siparişi doğrulayabilmesi ve spam ile sahte siparişlerin önlenmesi için. Hukuki dayanak: Güvenilir ve kötüye kullanıma kapalı bir hizmetteki meşru menfaatimiz; sizinle yapılan sözleşmenin ifası
+• Bandabuliya ilanlarınızı ve fotoğraflarınızı diğer kullanıcılara göstermek, alıcıların ve satıcıların birbirine mesaj göndermesini sağlamak — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• Bandabuliya fotoğraflarını başkaları görmeden önce incelemek, bildirilen ilanları gizlemek ve güvenlik notunu ne zaman kabul ettiğinizi kaydetmek — Yasa dışı ya da tehlikeli ürünleri ve kötüye kullanımı diğer kullanıcılardan uzak tutmak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
@@ -173,6 +181,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
 • Sipariş kayıtları — 30 gün: siparişin oluşturulmasından 30 gün sonra otomatik olarak silinir. Doğrulama sayfası, siparişi oluşturulmasından 2 saat sonra artık doğrulamaz.
 • Rezervasyon talepleri — 12 ay: bir talebin kaydı (daire, tarihler, misafir sayısı, gönderilme zamanı) 12 ay sonra otomatik olarak silinir.
+• Bandabuliya ilanları ve fotoğrafları: sildiğiniz bir ilan hemen gizlenir ve, hakkında hâlâ açık bir bildirim yoksa, fotoğraflarıyla birlikte 30 gün sonra kalıcı olarak silinir. Süresi 90 günden uzun zaman önce dolmuş bir ilan da aynı şekilde silinir. Hiçbir ilanın kullanmadığı fotoğraf dosyaları iki gün içinde kaldırılır (bir gece işi, 24 saatten uzun süredir kullanılmayan dosyaları kaldırır).
 • Oli'ye sor sohbet geçmişi — 90 gün: sorularınız ve Oli'nin yanıtları gönderildikten 90 gün sonra otomatik olarak, “Sohbet geçmişimi sil”i kullanırsanız hemen ve hesabınızla birlikte silinir.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 

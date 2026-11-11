@@ -54,6 +54,12 @@ Reviews, questions and answers you submit.
 • Messages you send — the text of your messages to other students and who you sent them to. A message you delete is hidden from both of you but kept for 30 days so a report can be reviewed, then removed permanently. If someone reports a message, an administrator can read that message and nothing else from the conversation.
 • Attempts to start a conversation — when you try to message someone, we record that the attempt happened, whether or not it went through. Only administrators can see this, and it is deleted after 30 days.
 
+Bandabuliya. When you post a listing we store its title, description, price, category, condition, district, status and dates, linked to your account. Other users see your username, never your name, phone number or email.
+
+Photos you add are stored privately. Until we approve them, only you and our reviewers can see them. On approval we publish a resized copy with all embedded metadata, including location, removed, and we delete the original. A rejected photo is deleted. Photos are shown through links that expire after one hour.
+
+Messages about a listing are handled like other messages in ADA (see the messaging section). We record when you accepted the Bandabuliya safety notice and which version you accepted.
+
 Moderation data: content you report, and users you block. Your block list is private and is never shown to the user you blocked.
 
 Rejected submissions: if text you submit is rejected by our content filter, we keep a record of it, linked to your account, for 30 days. Section 7 describes it in full.
@@ -105,6 +111,8 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Keep the check-ins of under-18s hidden unless they choose to show them — To protect minors. Legal basis: Our legitimate interest in a safe service
 • Find the places near you through Google when you check in — To give you the feature you use. Legal basis: Performance of a contract with you
 • Create an order record when you send an order to a restaurant, and limit how many orders can be created — To let the restaurant verify the order and to prevent spam and fake orders. Legal basis: Our legitimate interest in a reliable, abuse-free service; performance of a contract with you
+• Show your Bandabuliya listings and photos to other users, and let buyers and sellers message each other — To give you the feature you use. Legal basis: Performance of a contract with you
+• Review Bandabuliya photos before others see them, hide reported listings, and keep a record of when you accepted the safety notice — To keep unlawful or unsafe items and abuse away from other users. Legal basis: Our legitimate interest in a safe service
 
 We do not sell or rent your personal data, and we do not share it with third parties for their own marketing.
 
@@ -173,6 +181,7 @@ Different data is kept for different lengths of time.
 • Check-ins: retained for as long as your account is active, and deleted with it. A check-in you delete is removed at once.
 • Order records — 30 days: deleted automatically 30 days after the order was created. The verification page stops confirming an order 2 hours after it was created.
 • Booking requests — 12 months: the record of a request (apartment, dates, number of guests, time sent) is deleted automatically after 12 months.
+• Bandabuliya listings and photos: a listing you delete is hidden at once and permanently deleted, with its photos, 30 days later, unless a report about it is still open. A listing that expired more than 90 days ago is deleted the same way. Photo files that no listing uses any more are removed within two days (a nightly job removes files unused for over 24 hours).
 • Ask Oli chat history — 90 days: your questions and Oli's answers are deleted automatically 90 days after they were sent, at once if you use “Delete my chat history”, and with your account.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 
