@@ -103,7 +103,10 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   // Terms re-ask (decision 6): the first POST asks before the form opens, so nobody fills a form and loses it. A profile that has not
   // loaded (terms_version undefined) asks too. termsOk remembers an accept until App's profile catches up.
   const termsOk = useRef(false)
-  const termsDue = () => !termsOk.current && !!session && !isGuest(session) && needsMarketplaceTerms(profile?.terms_version)
+  // termsForced: the server refused with TERMS_REQUIRED, so the gate is due whatever the profile says (the client and server floors can
+  // disagree, or the row changed elsewhere) until an accept in this session. It is a backstop, like NOTICE_REQUIRED for the notice.
+  const termsForced = useRef(false)
+  const termsDue = () => !!session && !isGuest(session) && (termsForced.current || (!termsOk.current && needsMarketplaceTerms(profile?.terms_version)))
   const [termsGate, setTermsGate] = useState(() => (initialView === 'post' && termsDue() ? { next: { mode: 'create' } } : null))   // { next: form | () => void }
   const [form, setForm]         = useState(initialView === 'post' && !termsDue() ? { mode: 'create' } : null)
   const [mine, setMine]         = useState(initialView === 'mine')
@@ -172,8 +175,10 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
   // The acceptance is recorded even if the user backed out while it saved (the row was written), but a cancelled gate
   // (dead) never continues the action it was asking for.
   const cancelTerms = () => { if (termsGate) termsGate.dead = true; setTermsGate(null) }
+  // No resubmit after the accept: the user is back on the form / listing and repeats the action.
+  const termsRefused = () => { termsOk.current = false; termsForced.current = true; setTermsGate({ next: null }) }
   const acceptTerms = d => {
-    termsOk.current = true; onTermsAccepted?.(d)
+    termsOk.current = true; termsForced.current = false; onTermsAccepted?.(d)
     const g = termsGate
     if (!g || g.dead) return
     setTermsGate(null)
@@ -184,18 +189,19 @@ export default function MarketplaceScreen({ lang, session, profile, onBack, onSi
 
   if (chat) {
     return <MarketplaceChatScreen lang={lang} session={session} backRef={chatBackRef}
-      termsVersion={termsOk.current ? LEGAL_VERSION : profile?.terms_version} onTermsAccepted={d => { termsOk.current = true; onTermsAccepted?.(d) }}
+      termsVersion={termsOk.current ? LEGAL_VERSION : profile?.terms_version} onTermsAccepted={d => { termsOk.current = true; termsForced.current = false; onTermsAccepted?.(d) }}
+      onTermsRefused={() => { termsOk.current = false; termsForced.current = true }}
       compose={chat.compose ?? null} initialConversationId={chat.conversationId ?? null}
       onBack={() => setChat(null)} onOpenListing={id => { setChat(null); setOpened(id) }} />
   }
 
   if (form) {
-    return <><MarketplaceFormScreen lang={lang} session={session} listing={form.listing} onBack={() => setForm(null)}
+    return <><MarketplaceFormScreen lang={lang} session={session} listing={form.listing} onBack={() => setForm(null)} onTermsRequired={termsRefused}
       onSaved={id => { refreshAfterChange(); setOpened(id) }} />{gate}</>
   }
   if (opened) {
     return <><MarketplaceListingScreen id={opened} lang={lang} session={session} onBack={() => { setOpened(null); load() }}
-      onEdit={l => startPost({ mode: 'edit', listing: l })} onPostAction={startPost} onChanged={load} onRequireAccount={requireAccount}
+      onEdit={l => startPost({ mode: 'edit', listing: l })} onPostAction={startPost} onTermsRequired={termsRefused} onChanged={load} onRequireAccount={requireAccount}
       onMessage={(l, sellerName) => setChat({ compose: { userId: l.owner_id, displayName: sellerName, listingId: l.id, listingTitle: l.title } })} />{gate}</>
   }
   if (mine) {

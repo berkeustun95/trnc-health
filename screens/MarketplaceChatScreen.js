@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import { colors, category as CAT, type, radii } from '../constants/theme'
 import { ScreenHeader, BottomSheet, Button, InlineAlert, ModuleScreen } from '../components/ui'
-import { mkChatErrorKey } from '../constants/marketplace'
+import { mkChatErrorKey, isTermsRequired } from '../constants/marketplace'
 import { MARKETPLACE_CHAT, noticeAccepted, acceptNotice } from '../utils/marketplaceApi'
 import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
@@ -101,7 +101,7 @@ function InboxExtra({ row, lang }) {
 }
 
 // compose: { userId, displayName, listingId, listingTitle } — a buyer's first message from a listing page.
-export default function MarketplaceChatScreen({ lang, session, onBack, onOpenListing, compose = null, initialConversationId = null, backRef = null, termsVersion = null, onTermsAccepted }) {
+export default function MarketplaceChatScreen({ lang, session, onBack, onOpenListing, compose = null, initialConversationId = null, backRef = null, termsVersion = null, onTermsAccepted, onTermsRefused }) {
   const myId = session?.user?.id
   const [thread, setThread]   = useState(null)          // a list_conversations row
   const [composing, setComposing] = useState(compose)
@@ -111,6 +111,7 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   const resolveNotice = useRef(null)
   const [termsOpen, setTermsOpen] = useState(false)
   const termsOk = useRef(false)          // set on accept: the resumed send runs before App's profile re-renders
+  const termsForced = useRef(false)      // the server refused with TERMS_REQUIRED: due whatever the profile says, until an accept
   const resolveTerms = useRef(null)
 
   const findThread = useCallback(async match => {
@@ -139,7 +140,7 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   // (it must not write profiles): the send's AUTH_REQUIRED refusal handles it as before.
   const beforeSend = useCallback(async () => {
     if (resolveTerms.current) return false
-    if (!isGuest(session) && !termsOk.current && needsMarketplaceTerms(termsVersion)) {
+    if (!isGuest(session) && (termsForced.current || (!termsOk.current && needsMarketplaceTerms(termsVersion)))) {
       setTermsOpen(true)
       if (!(await new Promise(resolve => { resolveTerms.current = resolve }))) return false
     }
@@ -160,11 +161,14 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
     resolveNotice.current?.(ok); resolveNotice.current = null
   }
   // The server is the backstop: a NOTICE_REQUIRED (an older accepted version) clears the cache so the next send asks.
+  // TERMS_REQUIRED does the same for the terms gate, but opens it at once (the draft stays in the composer; the user taps Send again).
+  // false = no error line (ConversationScreen shows only a truthy key).
   const errorKey = useCallback(e => {
+    if (isTermsRequired(e)) { termsOk.current = false; termsForced.current = true; onTermsRefused?.(); setTermsOpen(true); return false }
     const k = mkChatErrorKey(e)
     if (k === 'mkNoticeRequired') noticeOk.current = false
     return k
-  }, [])
+  }, [onTermsRefused])
 
   const onChanged = useCallback(async change => {
     setRefreshKey(k => k + 1)
@@ -176,7 +180,7 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
 
   const termsLayer = termsOpen ? (
     <MarketplaceTermsLayer lang={lang} userId={myId} onCancel={() => answerTerms(false)}
-      onAccepted={d => { termsOk.current = true; onTermsAccepted?.(d); answerTerms(true) }} />
+      onAccepted={d => { termsOk.current = true; termsForced.current = false; onTermsAccepted?.(d); answerTerms(true) }} />
   ) : null
   const notice = <MarketplaceNoticeSheet visible={noticeOpen} lang={lang} onClose={() => answerNotice(false)} onAccepted={() => answerNotice(true)} />
 

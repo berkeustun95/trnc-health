@@ -11,7 +11,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import SplashStatusBar from '../components/SplashStatusBar'
 import {
   MK_CATEGORIES, MK_CONDITIONS, MK_DISTRICTS, MK_TITLE_MIN, MK_TITLE_MAX, MK_DESC_MIN, MK_DESC_MAX, MK_PRICE_MAX,
-  MK_PHOTOS_MAX, mkErrorKey,
+  MK_PHOTOS_MAX, mkErrorKey, isTermsRequired,
 } from '../constants/marketplace'
 import { createListing, updateListing, photosFor, signedUrls, uploadPhoto, removePhoto } from '../utils/marketplaceApi'
 
@@ -36,7 +36,7 @@ const freePositions = (taken, n) => {
   return out
 }
 
-export default function MarketplaceFormScreen({ lang, session, listing = null, onBack, onSaved }) {
+export default function MarketplaceFormScreen({ lang, session, listing = null, onBack, onSaved, onTermsRequired }) {
   const [editingId, setEditingId] = useState(listing?.id || null)
   const [title, setTitle]         = useState(listing?.title || '')
   const [category, setCategory]   = useState(listing?.category || null)
@@ -121,7 +121,9 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
     } catch (e) {
       setProgress(null); setSaving(false)
       // The listing may already exist: stay here in edit mode so a retry sends only what is missing.
-      setError(t(id && !editingId ? 'mkErrPhotosPartial' : mkErrorKey(e), lang))
+      // TERMS_REQUIRED opens the terms gate over this form instead (nothing typed or picked is lost; the user taps Save again).
+      if (onTermsRequired && isTermsRequired(e)) onTermsRequired()
+      else setError(t(id && !editingId ? 'mkErrPhotosPartial' : mkErrorKey(e), lang))
       if (id) {
         const ph = (await photosFor([id]).catch(() => ({ [id]: [] })))[id].filter(p => p.status !== 'rejected')
         const urls = await signedUrls(ph.map(p => p.storage_path)).catch(() => ({}))
