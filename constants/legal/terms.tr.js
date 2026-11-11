@@ -132,7 +132,7 @@ Başka bir kullanıcıyı, paylaştığı herhangi bir değerlendirme üzerinden
 
 9.5 KURALLARI İHLAL ETMENİN SONUÇLARI
 
-Bu kuralları ihlal etmeniz hâlinde, ihlalin ağırlığına göre ve takdirimize bağlı olarak: içeriği kaldırabilir; değerlendirme, soru ve cevap paylaşma yetkinizi geçici olarak askıya alabilir; ya da hesabınızı ve ADA'ya erişiminizi kalıcı olarak sonlandırabiliriz. İhlalin ağır olduğu durumlarda önceden bildirimde bulunmaksızın işlem yapabiliriz.
+Bu kuralları ihlal etmeniz hâlinde, ihlalin ağırlığına göre ve takdirimize bağlı olarak: içeriği kaldırabilir; değerlendirme, soru ve cevap paylaşma yetkinizi geçici olarak askıya alabilir; Bandabuliya'da ilan vermenizi engelleyebilir veya Bandabuliya kullanımınızı başka şekilde sınırlayabilir; ya da hesabınızı ve ADA'ya erişiminizi kalıcı olarak sonlandırabiliriz. İhlalin ağır olduğu durumlarda önceden bildirimde bulunmaksızın işlem yapabiliriz.
 
 9.6 İÇERİK HAKKINDA BİZE ULAŞMA
 
@@ -144,13 +144,13 @@ Bandabuliya, kullanıcıların ikinci el eşyalarını ilan etmesine ve bunlar h
 
 • Hiçbir satışın tarafı değiliz. ADA hiçbir ürünü satmaz, satın almaz, saklamaz, teslim etmez, incelemez ya da garanti etmez; ADA üzerinden hiçbir ödeme yapılmaz. Fiyat, durum, ödeme, teslim ve her türlü anlaşmazlık alıcı ile satıcı arasındadır.
 • Kim ne yapabilir. Herkes ilanlara göz atabilir. Satıcıya mesaj göndermek için bir hesap gerekir (misafir oturumu yetmez). İlan vermek için profilinizdeki doğum tarihine göre en az 18 yaşında olmanız gerekir. Satıcılar sohbet başlatamaz; sohbeti yalnızca alıcı, bir ilandan başlatabilir.
-• İlan veremeyeceğiniz şeyler: alkol, tütün ve elektronik sigara, silah, ilaç ve uyuşturucu, canlı hayvan, yetişkin içerik, sahte ürün, hizmet ve iş ilanları ile KKTC'de yasa dışı olan her şey. Araç ve emlak ADA'nın kendi bölümlerindedir, burada ilan edilmez. Araç parçası ve aksesuarı ilan edilebilir.
+• İlan veremeyeceğiniz şeyler: alkol, tütün ve elektronik sigara, silah, ilaç ve uyuşturucu, canlı hayvan, yetişkin içerik, sahte ürün, hizmet ve iş ilanları ile KKTC'de yasa dışı olan her şey. Emlak ADA'nın kendi bölümündedir, burada ilan edilmez. Araç parçası ve aksesuarı ilan edilebilir.
 • İlanınız doğru olmalıdır. Satmaya hakkınız olan gerçek bir ürünü, gösterilen fiyat ve durumda, o ürünün kendi fotoğraflarınızla anlatmalıdır.
 • Fotoğraflar, başkaları görmeden önce incelenir. Ürünü göstermeyen, iletişim bilgisi içeren ya da 9.1'e aykırı bir fotoğrafı reddedebiliriz. Onayladığımız fotoğrafın yayımlanan kopyası yeniden boyutlandırılır ve konum dahil gömülü tüm meta veriler silinir.
 • Konum. İlanda yalnızca ilçe görünür. İlana asla adresinizi yazmayın; herkese açık bir buluşma yerini sohbette kararlaştırın.
 • Güvenlik. İlk mesajınızdan önce size bir güvenlik notu gösteririz. Kalabalık ve herkese açık bir yerde buluşun, ödemeden önce ürünü kontrol edin; asla önceden ödeme yapmayın, kapora göndermeyin ve kart bilgilerinizi paylaşmayın. Şüpheli her şeyi bildirin.
 • Sınırlar. Bir ilan 30 gün yayında kalır; son 3 gününde ya da süresi dolduktan sonra yenilenebilir. 24 saatte en fazla 10 yeni ilan verebilir, aynı anda en fazla 50 ilanınız yayında olabilir; her ilanda en fazla 8 fotoğraf bulunabilir.
-• Kaldırma. Bir ilanı 9.5 uyarınca gizleyebilir ya da kaldırabilir veya Bandabuliya kullanımınızı sınırlayabiliriz. Sildiğiniz ilan hemen kaybolur ve 30 gün sonra, hakkında açık bir bildirim yoksa, kalıcı olarak silinir. Süresi 90 günden uzun zaman önce dolmuş ilanlar otomatik olarak silinir. Silinen bir ilanla ilgili sohbetler, ilan olmadan, iki taraf için de kalır.
+• Kaldırma. Bir ilanı 9.5 uyarınca gizleyebilir ya da kaldırabilir veya Bandabuliya kullanımınızı sınırlayabiliriz. Sildiğiniz ilan hemen kaybolur ve 30 gün sonra, hakkında açık bir bildirim yoksa, kalıcı olarak silinir. Süresi 90 günden uzun süredir dolmuş olan bir ilan otomatik olarak gizlenir ve, hakkında açık bir bildirim yoksa, yaklaşık 30 gün sonra kalıcı olarak silinir. Silinen bir ilanla ilgili sohbetler, ilan olmadan, iki taraf için de kalır.
 
 10. FİKRİ MÜLKİYET
 

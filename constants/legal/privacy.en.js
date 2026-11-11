@@ -37,7 +37,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 • First and last name — your real name. Held on your account; see section 3 for who can see it.
 • Display name (labelled “Username” in the app) — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
-• Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5) and whether your check-ins start hidden from other users (see section 3).
+• Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5) and whether your check-ins start hidden from other users (see section 3). It is also used to check that you are 18 or over before you post in Bandabuliya.
 • Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
 • Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Today it chooses the district name and photo at the top of the Home screen; nothing else in the app reads it yet.
@@ -47,18 +47,18 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
 
-Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. Also used for an optional Friday note with the weekend's events and a place to visit; turn it off in Profile → Updates and offers. You can disable this in your device settings at any time.
+Push notification token: stored to send you duty pharmacy alerts, replies to questions you have asked, new messages in your chats (including chats about Bandabuliya listings), and a notice when a photo you added to a listing is not published. Also used for an optional Friday note with the weekend's events and a place to visit; turn it off in Profile → Updates and offers. You can disable this in your device settings at any time.
 
 Reviews, questions and answers you submit.
 
-• Messages you send — the text of your messages to other students and who you sent them to. A message you delete is hidden from both of you but kept for 30 days so a report can be reviewed, then removed permanently. If someone reports a message, an administrator can read that message and nothing else from the conversation.
+• Messages you send — the text of your messages to other students and to other users about Bandabuliya listings, and who you sent them to. A message you delete is hidden from both of you but kept for 30 days so a report can be reviewed, then removed permanently. If someone reports a message, an administrator can read that message and nothing else from the conversation.
 • Attempts to start a conversation — when you try to message someone, we record that the attempt happened, whether or not it went through. Only administrators can see this, and it is deleted after 30 days.
 
-Bandabuliya. When you post a listing we store its title, description, price, category, condition, district, status and dates, linked to your account. Other users see your username, never your name, phone number or email.
+Bandabuliya. When you post a listing we store its title, description, price, category, condition, district, status and dates, linked to your account. Other users see your username, and the people you chat with also see your profile picture; they never see your name, phone number or email.
 
-Photos you add are stored privately. Until we approve them, only you and our reviewers can see them. On approval we publish a resized copy with all embedded metadata, including location, removed, and we delete the original. A rejected photo is deleted. Photos are shown through links that expire after one hour.
+Photos you add are stored privately. Until we approve them, only you and our reviewers can see them. On approval we publish a resized copy with all embedded metadata, including location, removed, and we delete the original. The file of a rejected photo is deleted; the record of it, with the reason we gave, stays with the listing until the listing is permanently deleted. Photos are shown through links that expire after one hour.
 
-Messages about a listing are handled like other messages in ADA (see the messaging section). We record when you accepted the Bandabuliya safety notice and which version you accepted.
+Messages about a listing are handled like the messages described above: the same rules apply to deleting, keeping and reporting them. We record when you accepted the Bandabuliya safety notice and which version you accepted.
 
 Moderation data: content you report, and users you block. Your block list is private and is never shown to the user you blocked.
 
@@ -125,6 +125,7 @@ Other users can see:
 • Your display name, next to reviews, questions and answers you post.
 • The content of the reviews, questions and answers you post, and the ratings you give.
 • Your check-ins, while they are visible: your display name, your profile picture, the place, and how long ago you checked in. They appear in the place's list of recent check-ins and in Explore → Check-ins, and only to signed-in users — never to guests. There is no page that lists one person's check-ins. If you are 18 or over, your check-ins are visible unless you turn on “Hide my check-ins” in your profile; if you are under 18, or we do not know your date of birth, they are hidden unless you turn that setting off. This is decided once, when you first check in, and does not change by itself when you turn 18. Turning it on removes your check-ins from both lists at once. Users you have blocked, and users who have blocked you, do not see your check-ins. You can delete any of your check-ins in your profile at any time.
+• Bandabuliya, while a listing is live: its title, description, price (or that it is free), category, condition, district, whether it is still available or marked sold, and when it was posted and when it expires; its approved photos; and your username. Photos still waiting for review, or rejected, are not shown to others. The people you chat with about a listing also see your profile picture in their list of chats. Anyone who opens Bandabuliya, signed in or as a guest, can see listings.
 
 Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, or your email address.
 
@@ -181,7 +182,7 @@ Different data is kept for different lengths of time.
 • Check-ins: retained for as long as your account is active, and deleted with it. A check-in you delete is removed at once.
 • Order records — 30 days: deleted automatically 30 days after the order was created. The verification page stops confirming an order 2 hours after it was created.
 • Booking requests — 12 months: the record of a request (apartment, dates, number of guests, time sent) is deleted automatically after 12 months.
-• Bandabuliya listings and photos: a listing you delete is hidden at once and permanently deleted, with its photos, 30 days later, unless a report about it is still open. A listing that expired more than 90 days ago is deleted the same way. Photo files that no listing uses any more are removed within two days (a nightly job removes files unused for over 24 hours).
+• Bandabuliya listings and photos: a listing you delete is hidden at once and permanently deleted, with its photos, 30 days later, unless a report about it is still open. A listing that has been expired for more than 90 days is hidden in the same way and, unless a report about it is still open, permanently deleted about 30 days later. Photo files that no listing uses any more are removed within two days (a nightly job removes every such file once it is more than 24 hours old).
 • Ask Oli chat history — 90 days: your questions and Oli's answers are deleted automatically 90 days after they were sent, at once if you use “Delete my chat history”, and with your account.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 

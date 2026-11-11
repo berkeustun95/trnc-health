@@ -132,7 +132,7 @@ You can block another user from any review they have posted. Blocking hides that
 
 9.5 CONSEQUENCES OF BREACHING THESE STANDARDS
 
-If you breach these standards we may, at our discretion and depending on severity: remove the content; temporarily suspend your ability to post reviews, questions, and answers; or permanently terminate your account and your access to ADA. Where a breach is serious, we may act without prior notice.
+If you breach these standards we may, at our discretion and depending on severity: remove the content; temporarily suspend your ability to post reviews, questions, and answers; stop you posting listings or otherwise limit your use of Bandabuliya; or permanently terminate your account and your access to ADA. Where a breach is serious, we may act without prior notice.
 
 9.6 CONTACTING US ABOUT CONTENT
 
@@ -144,13 +144,13 @@ Bandabuliya lets users list second-hand items and talk to each other about them.
 
 • We are not a party to any sale. ADA does not sell, buy, hold, deliver, inspect or guarantee any item, and no payment passes through ADA. Price, condition, payment, handover and any dispute are between the buyer and the seller.
 • Who can do what. Anyone can browse. To message a seller you need an account (not a guest session). To post a listing you must be at least 18 years old by the date of birth in your profile. Sellers cannot start a conversation; only a buyer can, from a listing.
-• What you may not list: alcohol, tobacco and vapes, weapons, medicines and drugs, live animals, adult content, counterfeit goods, services and jobs, and anything else that is unlawful in the TRNC. Vehicles and property have their own sections in ADA and are not listed here. Car parts and accessories may be listed.
+• What you may not list: alcohol, tobacco and vapes, weapons, medicines and drugs, live animals, adult content, counterfeit goods, services and jobs, and anything else that is unlawful in the TRNC. Property has its own section in ADA and is not listed here. Car parts and accessories may be listed.
 • Your listing must be true. It must describe a real item you are entitled to sell, at the price and in the condition shown, with your own photos of that item.
 • Photos are reviewed before anyone else sees them. We may reject a photo that does not show the item, shows contact details, or breaches section 9.1. When we approve a photo, the published copy is resized, and all embedded metadata, including location, is removed from it.
 • Location. A listing shows only its district. Never put your address in a listing; agree a public meeting place in the chat.
 • Safety. Before your first message we show you a safety notice. Meet in a busy public place, check the item before you pay, and never pay in advance, send a deposit or share card details. Report anything suspicious.
 • Limits. A listing runs for 30 days and can be renewed in its last 3 days or after it expires. You can post up to 10 new listings in 24 hours and have up to 50 live at once, with up to 8 photos each.
-• Removal. We may hide or remove a listing, or limit your use of Bandabuliya, under section 9.5. A listing you delete disappears immediately and is permanently deleted 30 days later, unless a report about it is still open. A listing that expired more than 90 days ago is deleted automatically. Conversations about a deleted listing remain for both people, without the listing.
+• Removal. We may hide or remove a listing, or limit your use of Bandabuliya, under section 9.5. A listing you delete disappears immediately and is permanently deleted 30 days later, unless a report about it is still open. A listing that has been expired for more than 90 days is hidden automatically and, unless a report about it is still open, permanently deleted about 30 days later. Conversations about a deleted listing remain for both people, without the listing.
 
 10. INTELLECTUAL PROPERTY
 
