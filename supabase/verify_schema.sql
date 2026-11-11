@@ -47,6 +47,9 @@ WITH report AS (
     ('20261165_vehicles','dealers'),
     ('20261165_vehicles','vehicles'),
     ('20261165_vehicles','vehicle_images'),
+    -- Bandabuliya (20261183): registered ahead of the apply; red until it runs.
+    ('20261183_marketplace_listings','marketplace_listings'),
+    ('20261183_marketplace_listings','marketplace_photos'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_schools'),
     ('1108_driving_schools','driving_school_branches'),
@@ -301,6 +304,22 @@ WITH report AS (
     ('20261165_vehicles','dealers','is_active'),
     ('20261165_vehicles','vehicle_sources','is_active'),
     ('20261165_vehicles','vehicle_images','storage_path'),
+    -- 20261183/84: Bandabuliya. The columns the read policies, the guards, the notice gate and the listing chat depend on.
+    ('20261183_marketplace_listings','marketplace_listings','status'),
+    ('20261183_marketplace_listings','marketplace_listings','owner_id'),
+    ('20261183_marketplace_listings','marketplace_listings','expires_at'),
+    ('20261183_marketplace_listings','marketplace_listings','bumped_at'),
+    ('20261183_marketplace_listings','marketplace_listings','deleted_at'),
+    ('20261183_marketplace_listings','marketplace_listings','hidden_at'),
+    ('20261183_marketplace_listings','marketplace_listings','hidden_reason'),
+    ('20261183_marketplace_listings','marketplace_photos','listing_id'),
+    ('20261183_marketplace_listings','marketplace_photos','status'),
+    ('20261183_marketplace_listings','marketplace_photos','storage_path'),
+    ('20261183_marketplace_listings','marketplace_photos','position'),
+    ('20261183_marketplace_listings','profiles','marketplace_notice_at'),
+    ('20261183_marketplace_listings','profiles','marketplace_notice_version'),
+    ('20261184_marketplace_messaging','conversations','kind'),
+    ('20261184_marketplace_messaging','conversations','listing_id'),
     -- 20261186: dealer consent (service_role only); red until it runs.
     ('20261186_vehicles_dealer_import','dealers','consent_date'),
     ('20261186_vehicles_dealer_import','dealers','consent_note'),
@@ -707,6 +726,22 @@ WITH report AS (
     ('20261165_vehicles','renew_vehicle'),
     ('20261165_vehicles','expire_vehicles'),
     ('20261165_vehicles','my_vehicles'),
+    -- Bandabuliya (20261183/84): registered ahead of the apply; red until it runs.
+    ('20261183_marketplace_listings','i_am_adult'),
+    ('20261183_marketplace_listings','marketplace_blocked_with'),
+    ('20261183_marketplace_listings','guard_marketplace_notice_columns'),
+    ('20261183_marketplace_listings','accept_marketplace_notice'),
+    ('20261183_marketplace_listings','marketplace_listing_insert_guard'),
+    ('20261183_marketplace_listings','marketplace_listing_update_guard'),
+    ('20261183_marketplace_listings','delete_marketplace_listing'),
+    ('20261183_marketplace_listings','renew_marketplace_listing'),
+    ('20261183_marketplace_listings','admin_set_listing_hidden'),
+    ('20261183_marketplace_listings','marketplace_seller_names'),
+    ('20261183_marketplace_listings','marketplace_photo_insert_guard'),
+    ('20261184_marketplace_messaging','send_listing_message'),
+    ('20261184_marketplace_messaging','start_listing_conversation'),
+    ('20261185_marketplace_maintenance','marketplace_maintenance'),
+    ('20261185_marketplace_maintenance','marketplace_orphan_objects'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -739,6 +774,13 @@ WITH report AS (
     ('20261165_vehicles','vehicles_guard'),
     ('20261165_vehicles','vehicle_images_guard'),
     ('20261166_vehicles_moderation','guard_vehicle_moderation'),
+    -- Bandabuliya (20261183): registered ahead of the apply; red until it runs.
+    ('20261183_marketplace_listings','guard_marketplace_notice_columns'),
+    ('20261183_marketplace_listings','mkt_10_insert_guard'),
+    ('20261183_marketplace_listings','mkt_20_ugc_title'),
+    ('20261183_marketplace_listings','mkt_21_ugc_description'),
+    ('20261183_marketplace_listings','mkt_30_update_guard'),
+    ('20261183_marketplace_listings','mkp_10_insert_guard'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
@@ -903,6 +945,28 @@ WITH report AS (
     ('20261165_vehicles','vehicle_images_path_check'),
     ('20261165_vehicles','vehicle_images_vehicle_id_fkey'),
     ('20261165_vehicles','dealers_slug_key'),
+    -- 20261183/84: Bandabuliya. Bounds, vocabularies, the photo path shape, and a listing thread only on a listing.
+    ('20261183_marketplace_listings','marketplace_listings_owner_id_fkey'),
+    ('20261183_marketplace_listings','marketplace_listings_title_check'),
+    ('20261183_marketplace_listings','marketplace_listings_description_check'),
+    ('20261183_marketplace_listings','marketplace_listings_price_check'),
+    ('20261183_marketplace_listings','marketplace_listings_category_check'),
+    ('20261183_marketplace_listings','marketplace_listings_condition_check'),
+    ('20261183_marketplace_listings','marketplace_listings_district_check'),
+    ('20261183_marketplace_listings','marketplace_listings_status_check'),
+    ('20261183_marketplace_listings','marketplace_listings_hidden_reason_check'),
+    ('20261183_marketplace_listings','marketplace_photos_listing_id_fkey'),
+    ('20261183_marketplace_listings','marketplace_photos_owner_id_fkey'),
+    ('20261183_marketplace_listings','marketplace_photos_reviewed_by_fkey'),
+    ('20261183_marketplace_listings','marketplace_photos_position_check'),
+    ('20261183_marketplace_listings','marketplace_photos_status_check'),
+    ('20261183_marketplace_listings','marketplace_photos_path_check'),
+    ('20261183_marketplace_listings','marketplace_photos_reject_reason_check'),
+    ('20261183_marketplace_listings','marketplace_photos_review_source_check'),
+    ('20261183_marketplace_listings','marketplace_photos_storage_path_key'),
+    ('20261184_marketplace_messaging','conversations_kind_check'),
+    ('20261184_marketplace_messaging','conversations_listing_kind_check'),
+    ('20261184_marketplace_messaging','conversations_listing_id_fkey'),
     ('20261143_partner_booking_requests','partner_booking_requests_pkey'),
     ('20261143_partner_booking_requests','partner_booking_requests_partner_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_apartment_check'),
@@ -1266,6 +1330,13 @@ WITH report AS (
     ('20261165_vehicles','vehicles_expiry_idx'),
     ('20261186_vehicles_dealer_import','vehicles_dealer_external_key'),
     ('20261165_vehicles','vehicle_images_vehicle_idx'),
+    -- Bandabuliya (20261183/84): browse, an owner's listings, photo order + the review queue, one live thread per listing.
+    ('20261183_marketplace_listings','marketplace_listings_browse_idx'),
+    ('20261183_marketplace_listings','marketplace_listings_owner_idx'),
+    ('20261183_marketplace_listings','marketplace_photos_live_position'),
+    ('20261183_marketplace_listings','marketplace_photos_queue_idx'),
+    ('20261184_marketplace_messaging','conversations_one_live_per_listing'),
+    ('20261184_marketplace_messaging','conversations_listing_idx'),
     ('1095_institutions_country','institutions_country_idx'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_school_branches_school_idx'),
@@ -1399,6 +1470,16 @@ WITH report AS (
     -- Araçlar renew + my listings (20261165): registered ahead of the apply; red until it runs.
     ('20261165_vehicles','renew_vehicle'),
     ('20261165_vehicles','my_vehicles'),
+    -- Bandabuliya (20261183/84): registered ahead of the apply; red until it runs. send_listing_message is
+    -- DELIBERATELY ABSENT: send_message routes to it, and it is revoked from every client role.
+    ('20261183_marketplace_listings','i_am_adult'),
+    ('20261183_marketplace_listings','marketplace_blocked_with'),
+    ('20261183_marketplace_listings','accept_marketplace_notice'),
+    ('20261183_marketplace_listings','delete_marketplace_listing'),
+    ('20261183_marketplace_listings','renew_marketplace_listing'),
+    ('20261183_marketplace_listings','admin_set_listing_hidden'),
+    ('20261183_marketplace_listings','marketplace_seller_names'),
+    ('20261184_marketplace_messaging','start_listing_conversation'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','check_in'),
     ('1092_checkins','get_checkin_feed'),
@@ -2154,11 +2235,12 @@ WITH report AS (
     -- ► BUMPED FROM 36 TO 39 BY 20261165 (the three vehicle_images_* policies), same commit; red until it applies.
     -- ► 39 → 38 BY 20261182 (vehicle_images_upload dropped: car photos go through the vehicle-photo function). Red until it applies.
     -- ► 38 → 41 BY 20261188 (the three admin-only dealer_intake_* policies on the private staging bucket). Red until it applies.
-    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 41 policies, all named, none unknown, none missing',
+    -- ► 41 → 43 BY 20261183 (the two marketplace photos policies), same commit; red until it applies.
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 43 policies, all named, none unknown, none missing',
       (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects') = 41
+        WHERE schemaname='storage' AND tablename='objects') = 43
       AND (SELECT count(*) FROM pg_policies
-        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 41
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 43
       AND (SELECT count(*) FROM pg_policies
              WHERE schemaname='storage' AND tablename='objects'
                AND policyname NOT IN (
@@ -2174,6 +2256,7 @@ WITH report AS (
                  'towing_logos_admin_delete','towing_logos_admin_insert','towing_logos_admin_update',
                  'towing_logos_public_read',
                  'vehicle_images_delete','vehicle_images_select',
+                 'marketplace photos upload own pending','marketplace photos read via row',
                  'dealer_intake_delete','dealer_intake_insert','dealer_intake_select',
                  'Providers manage own facility images','Public facility image read',
                  'estate_agent_documents_admin_read','organizer delete own event images',
@@ -3262,13 +3345,14 @@ WITH report AS (
     -- the app that shows a stranger's name. Derived from the constraint text rather than
     -- compared to a remembered spelling: `IN (...)` and `= ANY (ARRAY[...])` are the same
     -- constraint printed two ways, and pinning either would fail on a correct database.
-    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile, message and vehicle',
+    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile, message, vehicle and listing',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c,
               LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
         WHERE c.conrelid = to_regclass('public.content_reports')
           AND c.conname = 'content_reports_content_type_check')
-      = ARRAY['answer','facility','message','place','profile','question','review','vehicle']
+      = ARRAY['answer','facility','listing','message','place','profile','question','review','vehicle']
+    -- ► BUMPED FROM 8 TO 9 BY 20261183 ('listing', Bandabuliya), same commit as the widened CHECK; red until it applies.
     -- ► BUMPED FROM 7 TO 8 BY 20261166 ('vehicle'), same commit as the widened CHECK; red until it applies.
     -- ► BUMPED FROM 6 TO 7 BY 20261029, in the same commit that widened the CHECK. The
     --   edit is the review moment, and it is the whole argument for pinning the derived
@@ -5776,6 +5860,60 @@ WITH report AS (
                     FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles' AND policyname = 'vehicles_hide_reported'), false)
     AND COALESCE((SELECT pg_get_triggerdef(oid) LIKE '%BEFORE UPDATE ON public.vehicles%guard_moderation_columns(''vehicle'')%'
                     FROM pg_trigger WHERE tgrelid = to_regclass('public.vehicles') AND tgname = 'guard_vehicle_moderation'), false)
+  -- 20261183: Bandabuliya photos. The bucket is PRIVATE (signed URLs; an approved photo is read through its row) and
+  -- exactly two policies name it: an adult's guest-guarded upload into pending/<uid>/, and a read gated on a row.
+  -- No UPDATE/DELETE: moving pending → approved and deleting are the edge functions' (service_role). RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261183_marketplace_listings','bucket marketplace-photos: PRIVATE, 10 MB, jpeg/png/webp; exactly 2 storage policies (upload into pending/<uid>/ by a non-guest adult, read via row), no UPDATE/DELETE',
+    COALESCE((SELECT NOT public AND file_size_limit = 10485760 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
+                FROM storage.buckets WHERE id = 'marketplace-photos'), false)
+    AND COALESCE((SELECT count(*) = 2 AND NOT bool_or(cmd IN ('UPDATE', 'DELETE', 'ALL'))
+                    FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+                     AND coalesce(qual,'') || coalesce(with_check,'') LIKE '%marketplace-photos%'), false)
+    AND COALESCE((SELECT with_check LIKE '%is_anonymous_session()%' AND with_check LIKE '%''pending''%' AND with_check LIKE '%i_am_adult()%'
+                    FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+                     AND policyname = 'marketplace photos upload own pending'), false)
+  -- 20261183: ONE report hides a listing (Berke 2026-11-07), and the vehicle and place branches survive the rewrite.
+  UNION ALL SELECT '20261183_marketplace_listings','auto_hide_reported_content: one report hides a listing; the vehicle and place branches stay',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.auto_hide_reported_content()')) LIKE '%NEW.content_type = ''listing''%UPDATE marketplace_listings%'
+         AND pg_get_functiondef(to_regprocedure('public.auto_hide_reported_content()')) LIKE '%UPDATE vehicles%'
+         AND pg_get_functiondef(to_regprocedure('public.auto_hide_reported_content()')) LIKE '%UPDATE places%', false)
+  -- 20261183: the report reasons gain prohibited_item. Derived from the constraint text, as the 1026 type token is.
+  UNION ALL SELECT '20261183_marketplace_listings','content_reports reason vocabulary is exactly the 5 old reasons plus prohibited_item',
+    (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+       FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+      WHERE c.conrelid = to_regclass('public.content_reports') AND c.conname = 'content_reports_reason_check')
+    IS NOT DISTINCT FROM ARRAY['false_info','harassment','offensive','other','prohibited_item','spam']
+  -- 20261183 ADDS 'marketplace' to the live list rather than restating it, so other modules' types survive.
+  -- Asserted as containment, not equality: the full list belongs to no single migration. RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261183_marketplace_listings','notifications_type_check admits marketplace and still admits message and weekend',
+    COALESCE((SELECT array_agg(m[1])
+                FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+               WHERE c.conrelid = to_regclass('public.notifications') AND c.conname = 'notifications_type_check')
+             @> ARRAY['marketplace','message','weekend'], false)
+  -- 20261183: the 18+ gate asks about the CALLER only (no uuid argument), through the one SQL home of the age rule.
+  UNION ALL SELECT '20261183_marketplace_listings','i_am_adult(): caller-only, via private.is_adult_on, no anon EXECUTE',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.i_am_adult()')) LIKE '%private.is_adult_on(%'
+         AND NOT has_function_privilege('anon', to_regprocedure('public.i_am_adult()'), 'EXECUTE'), false)
+  -- 20261184: one inbox per kind. The () overload is gone (it would list Bandabuliya threads in Student Hub), the
+  -- (text) one is authenticated-only, and a listing thread is unique per pair AND listing. RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261184_marketplace_messaging','list_conversations(text) replaces list_conversations(); one live thread per pair per listing',
+    to_regprocedure('public.list_conversations()') IS NULL
+    AND COALESCE(has_function_privilege('authenticated', to_regprocedure('public.list_conversations(text)'), 'EXECUTE')
+             AND NOT has_function_privilege('anon', to_regprocedure('public.list_conversations(text)'), 'EXECUTE'), false)
+    AND EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'conversations'
+                AND indexname = 'conversations_one_live_per_listing'
+                AND indexdef LIKE 'CREATE UNIQUE INDEX%(pair_lo, pair_hi, listing_id)%kind = ''listing''%')
+    AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.send_listing_message(uuid,text)'), 'EXECUTE'), false)
+  -- 20261185: the retention RPCs are service_role-only (the nightly function), and a purge keeps chats: the
+  -- listing link must stay ON DELETE SET NULL. RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261185_marketplace_maintenance','retention RPCs service_role-only; purge keeps chats (listing_id ON DELETE SET NULL)',
+    COALESCE(has_function_privilege('service_role', to_regprocedure('public.marketplace_maintenance(boolean)'), 'EXECUTE')
+         AND has_function_privilege('service_role', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.marketplace_maintenance(boolean)'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.marketplace_maintenance(boolean)'), 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.marketplace_orphan_objects(integer)'), 'EXECUTE'), false)
+    AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname = 'conversations_listing_id_fkey' AND confdeltype = 'n')
   -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
@@ -5900,7 +6038,9 @@ FROM (VALUES
   -- 12-month retention on partner_booking_requests (20261148), 03:53 UTC daily; exact schedule + command are the 20261148 row below.
   ('20261148_partner_booking_requests_retention','purge-partner-booking-requests'),
   -- 90-day retention on oli_messages (20261163), 03:57 UTC daily; exact schedule + command are the 20261163 row below.
-  ('20261163_oli_messages','purge-oli-messages')
+  ('20261163_oli_messages','purge-oli-messages'),
+  -- Bandabuliya retention (20261185), 01:23 UTC daily; exact schedule + command are the 20261185 row below.
+  ('20261185_marketplace_maintenance','marketplace-maintenance')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -5952,6 +6092,18 @@ SELECT '20261163_oli_messages', 'purge-oli-messages: schedule 57 3 * * * and the
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-oli-messages' AND active
                     AND schedule = '57 3 * * *'
                     AND btrim(command) = 'SELECT public.purge_oli_messages()') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261185: marketplace-maintenance runs daily at 01:23 UTC and POSTs {"apply": true} with the Vault key ───
+SELECT '20261185_marketplace_maintenance', 'marketplace-maintenance: schedule 23 1 * * *, Vault key, apply body',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'marketplace-maintenance') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'marketplace-maintenance' AND active
+                    AND schedule = '23 1 * * *'
+                    AND command LIKE '%/functions/v1/marketplace-maintenance%'
+                    AND command LIKE '%name = ''novest_sync_key''%'
+                    AND command LIKE '%{"apply": true}%') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
