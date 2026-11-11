@@ -5920,14 +5920,15 @@ WITH report AS (
   -- 20261190: the Bandabuliya terms gate. The floor is ONE line in ONE helper (the caller's own terms_version, a plain text
   -- comparison); the six replaced bodies only ASK it. Anchored to code shapes (the RAISE and the call), never to a bare word
   -- that a comment could carry. RED UNTIL IT RUNS, and red again if 20261183/84 are re-applied on top (their bodies are ungated).
-  UNION ALL SELECT '20261190_marketplace_terms','i_have_marketplace_terms(): caller-only (no uuid overload), STABLE SECURITY DEFINER, text comparison on the caller''s own row, authenticated yes / anon no',
+  UNION ALL SELECT '20261190_marketplace_terms','i_have_marketplace_terms(): caller-only (no uuid overload), STABLE SECURITY DEFINER, text comparison on the caller''s own row, authenticated + service_role yes / anon no',
     COALESCE(pg_get_functiondef(to_regprocedure('public.i_have_marketplace_terms()')) LIKE '%STABLE SECURITY DEFINER%'
          AND pg_get_functiondef(to_regprocedure('public.i_have_marketplace_terms()')) LIKE '%p.terms_version COLLATE "C" >= ''%'' FROM profiles p WHERE p.id = auth.uid()%'
          AND to_regprocedure('public.i_have_marketplace_terms(uuid)') IS NULL
          AND has_function_privilege('authenticated', to_regprocedure('public.i_have_marketplace_terms()'), 'EXECUTE')
+         AND has_function_privilege('service_role', to_regprocedure('public.i_have_marketplace_terms()'), 'EXECUTE')
          AND NOT has_function_privilege('anon', to_regprocedure('public.i_have_marketplace_terms()'), 'EXECUTE'), false)
   UNION ALL SELECT '20261190_marketplace_terms','marketplace_listing_insert_guard: terms check after the sign-in check, before the age gate',
-    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_listing_insert_guard()')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';[\s\S]*RAISE EXCEPTION ''NOT_ADULT''', false)
+    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_listing_insert_guard()')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';.*RAISE EXCEPTION ''NOT_ADULT''', false)
   UNION ALL SELECT '20261190_marketplace_terms','marketplace_listing_update_guard: terms check on an item-column change or a status change other than to sold, from the OLD/NEW difference (not the trusted switch); still SECURITY INVOKER',
     COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_listing_update_guard()')) LIKE '%v_content_edit := ROW(NEW.title,%'
          AND pg_get_functiondef(to_regprocedure('public.marketplace_listing_update_guard()')) LIKE '%NEW.status IS DISTINCT FROM OLD.status AND NEW.status IS DISTINCT FROM ''sold''%'
@@ -5938,9 +5939,9 @@ WITH report AS (
   UNION ALL SELECT '20261190_marketplace_terms','marketplace_photo_insert_guard: terms check before the listing lookup',
     COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_insert_guard()')) ~ 'IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';\s*END IF;\s*IF NOT EXISTS \(SELECT 1 FROM marketplace_listings', false)
   UNION ALL SELECT '20261190_marketplace_terms','send_listing_message: terms word after the thread-membership check and BEFORE the safety-notice word',
-    COALESCE(pg_get_functiondef(to_regprocedure('public.send_listing_message(uuid,text)')) ~ 'RAISE EXCEPTION ''NO_SUCH_CONVERSATION'';[\s\S]*RAISE EXCEPTION ''TERMS_REQUIRED'';[\s\S]*RAISE EXCEPTION ''NOTICE_REQUIRED''', false)
+    COALESCE(pg_get_functiondef(to_regprocedure('public.send_listing_message(uuid,text)')) ~ 'RAISE EXCEPTION ''NO_SUCH_CONVERSATION'';.*RAISE EXCEPTION ''TERMS_REQUIRED'';.*RAISE EXCEPTION ''NOTICE_REQUIRED''', false)
   UNION ALL SELECT '20261190_marketplace_terms','start_listing_conversation: terms word right after the sign-in check and BEFORE the safety-notice word',
-    COALESCE(pg_get_functiondef(to_regprocedure('public.start_listing_conversation(uuid,text)')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';[\s\S]*RAISE EXCEPTION ''NOTICE_REQUIRED''', false)
+    COALESCE(pg_get_functiondef(to_regprocedure('public.start_listing_conversation(uuid,text)')) ~ 'AUTH_REQUIRED[^;]*;\s*END IF;\s*IF NOT i_have_marketplace_terms\(\) THEN\s*RAISE EXCEPTION ''TERMS_REQUIRED'';.*RAISE EXCEPTION ''NOTICE_REQUIRED''', false)
   -- 20261190 negative, paired with its positives: Student Hub's two bodies ask nothing of the Bandabuliya terms, and the
   -- listing thread still reaches the guarded path through send_message.
   UNION ALL SELECT '20261190_marketplace_terms','Student Hub send_message / start_conversation do not raise the terms word; send_message still hands a listing thread to send_listing_message',

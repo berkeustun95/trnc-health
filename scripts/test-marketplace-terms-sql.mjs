@@ -212,10 +212,14 @@ const CONTROLS = [
   ['photo approve and reject (service role, as marketplace-photo-review), terms missing', async db => {
     const p1 = (await photo(db, 'S', db.listing, 0)).value, p2 = (await photo(db, 'S', db.listing, 1)).value
     await noTerms(db, 'S')
-    const a = await as(db, 'svc', `UPDATE marketplace_photos SET status = 'approved', width = 800, height = 600, reviewed_at = now(), review_source = 'admin' WHERE id = '${p1}' AND status = 'pending' RETURNING id`)
-    const b = await as(db, 'svc', `UPDATE marketplace_photos SET status = 'rejected', reject_reason = 'other', reviewed_at = now(), review_source = 'admin' WHERE id = '${p2}' AND status = 'pending' RETURNING id`)
+    // the exact field sets marketplace-photo-review/review.ts writes (approve: status, storage_path, width, height + reviewed;
+    // reject: status, reject_reason + reviewed; reviewed = reviewed_by, reviewed_at, review_source), as the service role
+    const a = await as(db, 'svc', `UPDATE marketplace_photos SET status = 'approved', storage_path = 'approved/${U.S}/${db.listing}/${p1}.jpg', width = 800, height = 600,
+      reviewed_by = '${U.X}', reviewed_at = now(), review_source = 'admin' WHERE id = '${p1}' AND status = 'pending' RETURNING id`)
+    const b = await as(db, 'svc', `UPDATE marketplace_photos SET status = 'rejected', reject_reason = 'other',
+      reviewed_by = '${U.X}', reviewed_at = now(), review_source = 'admin' WHERE id = '${p2}' AND status = 'pending' RETURNING id`)
     const st = (await db.query(`SELECT string_agg(status, ',' ORDER BY position) s FROM marketplace_photos`)).rows[0].s
-    return a.ok && b.ok && st === 'approved,rejected'
+    return a.ok && b.ok && a.rows.length === 1 && b.rows.length === 1 && st === 'approved,rejected'
   }],
   ['the seller deletes a photo of their own, terms missing (photo DELETE is untouched)', async db => {
     await photo(db, 'S', db.listing, 0); await noTerms(db, 'S')
@@ -371,6 +375,37 @@ async function sendOracle(db) {
   check('consequence (header): re-applying 20261183 + 20261184 AFTER 20261190 removes the gate again (the post is allowed)', (await as(d7, 'S', ITEM('Üçüncü eşya'))).ok === true)
 }
 
+// ── 5b. service_role must hold EXECUTE on the helper explicitly (the update guard is SECURITY INVOKER) ──────────────
+{
+  // A project without Supabase's default EXECUTE grants: the helper is created, then service_role's EXECUTE is revoked
+  // right before the file's own GRANT line. Real file: that line puts it back. Mutant: the line names authenticated only.
+  const GRANT = 'GRANT EXECUTE ON FUNCTION public.i_have_marketplace_terms() TO authenticated, service_role;'
+  const NOGRANT = 'GRANT EXECUTE ON FUNCTION public.i_have_marketplace_terms() TO authenticated;'
+  const REVOKE = 'REVOKE EXECUTE ON FUNCTION public.i_have_marketplace_terms() FROM service_role;\n'
+  const ASSERT_SVC = /  IF NOT has_function_privilege\('service_role'[\s\S]*?END IF;\n/
+  check('the file grants EXECUTE on the helper to authenticated and service_role, and asserts service_role holds it', T190.includes(GRANT) && ASSERT_SVC.test(T190))
+  const dir = mkdtempSync(join(tmpdir(), 'terms-svc-'))
+  const real = join(dir, '20261190_real_noprivs.sql'), mutA = join(dir, '20261190_nogrant_noassert.sql'), mutB = join(dir, '20261190_nogrant_assert.sql')
+  writeFileSync(real, T190.replace(GRANT, REVOKE + GRANT))
+  writeFileSync(mutA, T190.replace(GRANT, REVOKE + NOGRANT).replace(ASSERT_SVC, ''))
+  writeFileSync(mutB, T190.replace(GRANT, REVOKE + NOGRANT))
+  const upd = db => as(db, 'svc', `UPDATE marketplace_listings SET status = 'sold' WHERE id = '${db.listing}' RETURNING id`)
+  const dA = await build(false); const rA = await applyFile(dA, mutA)
+  const uA = rA.ok ? await upd(dA) : null
+  console.log('RED (no explicit service_role grant, EXECUTE revoked): applied=' + rA.ok + '  service-role status-only update: ' + (uA ? (uA.ok ? 'ok' : uA.err) : 'n/a'))
+  check('red: without the explicit grant a service-role status-only UPDATE fails ("permission denied for function")', rA.ok && uA && !uA.ok && /permission denied for function/.test(uA.err), uA ?? rA.msg)
+  const dB = await build(false); const rB = await applyFile(dB, real)
+  const uB = rB.ok ? await upd(dB) : null
+  console.log('GREEN (the file, same EXECUTE revoke before its GRANT): applied=' + rB.ok + '  service-role status-only update: ' + (uB ? (uB.ok ? 'ok' : uB.err) : 'n/a'))
+  check('green: with the explicit grant the same service-role status-only UPDATE passes', rB.ok && uB && uB.ok && uB.rows.length === 1 && (await listingRow(dB)).status === 'sold', uB ?? rB.msg)
+  const dC = await build(false); const rC = await applyFile(dC, mutB)
+  check('red: grant dropped but the in-migration assertion kept → the migration refuses ("service_role must be able to call")', !rC.ok && /service_role must be able to call/.test(rC.msg), rC.msg)
+  const dD = await build(true)
+  const priv = async r => (await dD.query(`SELECT has_function_privilege('${r}', 'public.i_have_marketplace_terms()', 'EXECUTE') AS p`)).rows[0].p
+  check('privileges on the helper after the file: authenticated yes, service_role yes (positive controls), anon no, PUBLIC (as a role) no',
+    (await priv('authenticated')) === true && (await priv('service_role')) === true && (await priv('anon')) === false, [await priv('authenticated'), await priv('service_role'), await priv('anon')])
+}
+
 // ── 6. verify_schema tokens, before and after ────────────────────────────────────────────────────
 {
   const vs = readFileSync(rel('../supabase/verify_schema.sql'), 'utf8')
@@ -416,6 +451,11 @@ async function sendOracle(db) {
   check('H tokens: the 8 20261190 tokens are TRUE after; the 7 that pin new behaviour are not true before, the Student Hub negative is true both ways (unchanged bodies)',
     mine.length === 8 && mine.every(r => r.after === 'true') && mine.filter(r => !SH.test(r.label)).every(r => r.before !== 'true')
     && mine.filter(r => SH.test(r.label)).every(r => r.before === 'true'), mine)
+  // the three regexes use `.*` across lines: in PostgreSQL's default ARE mode `.` matches a newline, which is checked here
+  // with a positive and a negative control on this engine (a newline-sensitive `(?n)` would flip the first one)
+  const nl = async sql => (await after.query(`SELECT (${sql}) AS r`)).rows[0].r
+  check('regex control: `.` crosses a newline in the default mode (true), does not with (?n) (false); `[\\s\\S]` is not used in verify_schema',
+    (await nl(`E'a\\nb' ~ 'a.*b'`)) === true && (await nl(`E'a\\nb' ~ '(?n)a.*b'`)) === false && (await nl(`E'a\\nb' ~ 'a.b'`)) === true && !/\[\\s\\S\]/.test(vs))
   // red: re-applying 20261183 + 20261184 after 20261190 (ungated bodies back) turns them red
   const re2 = await build(true); await applyFile(re2, F183); await applyFile(re2, F184)
   const redRows = []; for (const tk of tokens.filter(t => t.label.startsWith('20261190'))) redRows.push({ label: tk.label, v: await run(re2, tk) })

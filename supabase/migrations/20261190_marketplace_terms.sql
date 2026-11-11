@@ -32,6 +32,11 @@
 --     send_message / start_conversation are NOT replaced: their bodies are asserted byte-identical below.
 --   Untouched, and asserted by tests with terms missing: report auto-hide, admin hide / restore, the nightly
 --   maintenance (soft delete, purge), photo approve / reject (service role), the seller's own delete.
+--   Also still allowed without terms (none of them is a post, an edit or a message): accept / decline / leave a
+--   conversation, block, delete one's own message, and the file upload into one's own pending/ folder (an upload
+--   with no photo row stays invisible and the nightly sweep removes it).
+--   One side effect: a guest's photo-row insert now answers TERMS_REQUIRED (guests have no terms). It is still
+--   refused; that guard never had a sign-in check, so there is no AUTH_REQUIRED word to lose.
 --   A photo row refused after its upload leaves one object in pending/<uid>/…; marketplace_orphan_objects
 --   (20261185) lists it after 24 h and the nightly function removes it.
 --
@@ -82,7 +87,9 @@ END $pre$;
 
 -- ─── 1. The helper: did the CALLER accept the terms? ────────────────────────────────────────
 -- STABLE SECURITY DEFINER (profiles is owner-read; the update guard below is a SECURITY INVOKER trigger, so this
--- must be executable by authenticated, as i_am_adult() is). No session, no profile row, NULL → false.
+-- must be executable by authenticated, as i_am_adult() is, and by service_role: a service-role UPDATE of a listing
+-- (photo review, maintenance, SQL fixes) runs that trigger as service_role, so the grant is explicit and does not
+-- lean on Supabase's default privileges). No session, no profile row, NULL → false.
 CREATE OR REPLACE FUNCTION public.i_have_marketplace_terms()
  RETURNS boolean
  LANGUAGE sql
@@ -92,7 +99,7 @@ AS $function$
   SELECT coalesce((SELECT p.terms_version IS NOT NULL AND p.terms_version COLLATE "C" >= '2026-11-11' FROM profiles p WHERE p.id = auth.uid()), false);
 $function$;
 REVOKE ALL ON FUNCTION public.i_have_marketplace_terms() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.i_have_marketplace_terms() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.i_have_marketplace_terms() TO authenticated, service_role;
 
 -- ─── 2. Listings: post, edit / relist, renew, photo ─────────────────────────────────────────
 -- Each body below is 20261183's with only the TERMS_REQUIRED check added (CREATE OR REPLACE keeps owner, ACL and
@@ -428,6 +435,9 @@ BEGIN
   IF NOT has_function_privilege('authenticated', 'public.i_have_marketplace_terms()', 'EXECUTE') THEN
     RAISE EXCEPTION 'positive control: authenticated must be able to call i_have_marketplace_terms()';
   END IF;
+  IF NOT has_function_privilege('service_role', 'public.i_have_marketplace_terms()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'positive control: service_role must be able to call i_have_marketplace_terms() (the update guard runs as the caller)';
+  END IF;
   IF has_function_privilege('anon', 'public.i_have_marketplace_terms()', 'EXECUTE') THEN
     RAISE EXCEPTION 'anon must not call i_have_marketplace_terms()';
   END IF;
@@ -502,7 +512,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261190_marketplace_terms.sql', '92b63d5bda607ec26d0c316c3e0205b50a5d896176ec6dbf2e7c1e78f4708e83')
+VALUES ('20261190_marketplace_terms.sql', 'b436cffa085b47c49d70b752becbdb3fee51682bd3c8b718367449acf62fa3fd')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
