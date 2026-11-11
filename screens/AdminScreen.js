@@ -376,7 +376,8 @@ function FeedHealthBanner({ lastSeenAt }) {
 
 // Berke's own test accounts, all signed-up. A conservative estimate, taken off the totals only.
 // Which platform each is on is unknown, so they come off Unknown for the three to add up to accounts.
-const TEST_ACCOUNTS = 10
+// 11 since 2026-11-11: the second QA account (two-account tests) joined the 10.
+const TEST_ACCOUNTS = 11
 
 const formatCount = n => n.toLocaleString('en-US')
 
