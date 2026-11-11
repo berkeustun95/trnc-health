@@ -1,4 +1,5 @@
-// 20261183 (Bandabuliya listings, photos, private bucket, reports, notice) against the live messaging fixture plus
+// 20261183 (Bandabuliya listings, photos, private bucket, reports, notice) with 20261184 and 20261190 on top (the cases run
+// as a seller with accepted terms; the terms refusals are scripts/test-marketplace-terms-sql.mjs), against the live messaging fixture plus
 // Araçlar S1's prerequisites (scripts/fixtures/*.sql). PGlite = PostgreSQL 18; prod is 17.6.
 //   node scripts/test-marketplace-listings-sql.mjs
 // What a pass is evidence of: the RLS / grant / trigger outcomes seeded here. Not the Storage API, not signed
@@ -10,6 +11,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 const rel = p => fileURLToPath(new URL(p, import.meta.url))
 const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8')
 const FILE = rel('../supabase/migrations/20261183_marketplace_listings.sql')
+const ON_TOP = ['20261184_marketplace_messaging.sql', '20261190_marketplace_terms.sql'].map(f => rel('../supabase/migrations/' + f))
 
 const U = {
   A: 'a0000000-0000-4000-8000-00000000000a', B: 'b0000000-0000-4000-8000-00000000000b',
@@ -19,11 +21,11 @@ const U = {
 }
 const SEED = `
 INSERT INTO auth.users VALUES ${Object.values(U).map(u => `('${u}')`).join(',')};
-INSERT INTO profiles (id, display_name, date_of_birth, role) VALUES
-  ('${U.A}', 'Ayla', '1990-01-01', 'customer'), ('${U.B}', 'Burak', '1991-02-02', 'customer'),
-  ('${U.C}', 'Cem', '1992-03-03', 'customer'), ('${U.M}', 'Mert', (current_date - interval '16 years')::date, 'customer'),
-  ('${U.N}', 'Nur', NULL, 'customer'), ('${U.X}', 'Admin', '1985-01-01', 'admin'),
-  ('${U.Q}', NULL, '1990-05-05', 'customer'), ('${U.G}', NULL, NULL, NULL);
+INSERT INTO profiles (id, display_name, date_of_birth, role, terms_version) VALUES
+  ('${U.A}', 'Ayla', '1990-01-01', 'customer', '2026-11-11'), ('${U.B}', 'Burak', '1991-02-02', 'customer', '2026-11-11'),
+  ('${U.C}', 'Cem', '1992-03-03', 'customer', '2026-11-11'), ('${U.M}', 'Mert', (current_date - interval '16 years')::date, 'customer', '2026-11-11'),
+  ('${U.N}', 'Nur', NULL, 'customer', '2026-11-11'), ('${U.X}', 'Admin', '1985-01-01', 'admin', '2026-11-11'),
+  ('${U.Q}', NULL, '1990-05-05', 'customer', '2026-11-11'), ('${U.G}', NULL, NULL, NULL, NULL);
 `
 async function as(db, who, sql) {
   const claims = who === 'G' ? { sub: U.G, is_anonymous: true } : who === null ? null : { sub: U[who] }
@@ -48,10 +50,16 @@ const photoPath = (owner, lid, n = 1) => `pending/${U[owner]}/${lid}/${n}.jpg`
 const addPhoto = (db, who, lid, pos, owner = who) =>
   as(db, who, `INSERT INTO marketplace_photos (listing_id, position, storage_path) VALUES ('${lid}', ${pos}, '${photoPath(owner, lid, pos)}') RETURNING id`)
 
+// build(): 20261183 alone (the migration-level checks below). buildFull(): 183 + 184 + 190, what the cases run on.
 async function build(extra = '') {
   const db = await freshDb(BASE + SEED + extra)
   const r = await applyFile(db, FILE)
   if (!r.ok) throw new Error('apply failed: ' + r.msg)
+  return db
+}
+async function buildFull() {
+  const db = await build()
+  for (const f of ON_TOP) { const r = await applyFile(db, f); if (!r.ok) throw new Error(f.split('/').pop() + ' failed: ' + r.msg) }
   return db
 }
 
@@ -238,11 +246,11 @@ const CASES = [
 
 for (const [name, fn] of CASES) {
   let ok, got
-  try { ok = await fn(await build()) } catch (e) { ok = false; got = e.message }
+  try { ok = await fn(await buildFull()) } catch (e) { ok = false; got = e.message }
   check(name, ok === true, got)
 }
 
-// Migration-level: re-run is clean; the pre-flight refuses without Araçlar S1.
+// Migration-level (20261183 on its own: a re-run of it after 20261190 would strip the terms gate, see 20261190's header): re-run is clean; the pre-flight refuses without Araçlar S1.
 {
   const db = await build()
   const again = await applyFile(db, FILE)

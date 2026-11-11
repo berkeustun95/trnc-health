@@ -103,25 +103,40 @@ const CASES = [
     await db.exec(`UPDATE student_education SET listing_opt_in = false WHERE user_id = '${U.B}'`)
     return errIs(await send(db, 'A', id), 'CONVERSATION_CLOSED')
   }],
+  // 20261190: Student Hub asks nothing of the Bandabuliya terms. profiles.terms_version is NULL for A (never accepted any) and
+  // '2026-09' for B (an old version): start, reply, accept and the inbox all work exactly as with current terms.
+  ['terms NULL / older (2026-09) on both sides: start, reply, continue and inbox are unchanged', async db => {
+    await db.exec(`UPDATE profiles SET terms_version = NULL WHERE id = '${U.A}'; UPDATE profiles SET terms_version = '2026-09' WHERE id = '${U.B}'`)
+    const r = await start(db, 'A', 'B'); const id = await conv(db, 'A', 'B')
+    const r1 = await send(db, 'B', id); const r2 = await send(db, 'A', id)
+    const inbox = await as(db, 'B', `SELECT count(*)::int FROM list_conversations()`)
+    return r.value === 'sent' && r1.value === 'sent' && r2.value === 'sent' && inbox.value === 1
+  }],
+  ['terms NULL on the SENDER of a reply (listed student, never accepted anything): reply still accepted', async db => {
+    await start(db, 'A', 'B'); const id = await conv(db, 'A', 'B')
+    await db.exec(`UPDATE profiles SET terms_version = NULL WHERE id IN ('${U.A}', '${U.B}')`)
+    return (await send(db, 'B', id)).value === 'sent' && (await send(db, 'A', id)).value === 'sent'
+  }],
   ['clients cannot write conversations or messages directly', async db => {
     const r1 = await as(db, 'A', `INSERT INTO conversations (initiator_id, recipient_id) VALUES ('${U.A}', '${U.B}')`)
     return !r1.ok
   }],
 ]
 
-async function build(extra = '') {
+async function build(extra = '', post = '') {
   const db = await freshDb(FIXTURE + SEED + extra)
   for (const f of MIGRATIONS) {
     const r = await applyFile(db, f)
     if (!r.ok) throw new Error(`migration ${f} failed: ${r.msg}`)
   }
+  if (post) await db.exec(post)
   return db
 }
-async function runSuite(extra = '') {
+async function runSuite(extra = '', post = '') {
   const out = []
   for (const [name, fn] of CASES) {
     let ok
-    try { ok = await fn(await build(extra)) } catch (e) { ok = false; name.err = e.message }
+    try { ok = await fn(await build(extra, post)) } catch { ok = false }  // a case that throws (e.g. no thread was created) is a failed case; assigning to the string `name` threw a TypeError here
     out.push([name, ok === true])
   }
   return out
@@ -160,6 +175,20 @@ const BREAKS = [
   ['word filter trigger dropped', 'blocked term in the opening message → BLOCKED_TERM',
    `DROP TRIGGER msg_30_ugc_screen ON public.messages;`],
 ]
+// Red-first for the 20261190 cases (with the migrations applied): put the Bandabuliya terms gate INTO the two Student Hub
+// functions after the fact; the cases that say "Student Hub asks nothing of terms" must fail.
+if (MIGRATIONS.length) {
+  const gate = fn => `DO $m$ DECLARE d text; BEGIN
+    d := pg_get_functiondef('public.${fn}'::regprocedure);
+    IF position('IF NOT can_see_student_lists() THEN' IN d) = 0 THEN RAISE EXCEPTION 'mutation anchor missing in ${fn}'; END IF;
+    EXECUTE replace(d, 'IF NOT can_see_student_lists() THEN', 'IF NOT i_have_marketplace_terms() THEN RAISE EXCEPTION ''TERMS_REQUIRED''; END IF; IF NOT can_see_student_lists() THEN');
+  END $m$;`
+  for (const [what, post] of [['start_conversation', gate('start_conversation(uuid,text)')], ['send_message', gate('send_message(uuid,text)')]]) {
+    const res = await runSuite('', post)
+    const hit = res.filter(([n]) => n.startsWith('terms NULL'))
+    check(`red: a terms gate inside Student Hub's ${what} → both terms cases fail`, hit.length === 2 && hit.every(([, ok]) => ok === false), hit)
+  }
+}
 if (!MIGRATIONS.length) {
   for (const [what, target, sql] of BREAKS) {
     const res = await runSuite(sql)

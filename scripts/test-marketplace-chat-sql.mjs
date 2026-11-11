@@ -8,7 +8,7 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 
 const rel = p => fileURLToPath(new URL(p, import.meta.url))
 const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8')
-const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql'].map(f => rel('../supabase/migrations/' + f))
+const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql', '20261190_marketplace_terms.sql'].map(f => rel('../supabase/migrations/' + f))
 
 const U = {
   S: 'a0000000-0000-4000-8000-00000000000a',  // adult seller, not a student
@@ -21,10 +21,10 @@ const U = {
 const INST = '30000000-0000-4000-8000-000000000003'
 const SEED = `
 INSERT INTO auth.users VALUES ${Object.values(U).map(u => `('${u}')`).join(',')};
-INSERT INTO profiles (id, display_name, date_of_birth, push_token) VALUES
-  ('${U.S}', 'Satıcı', '1988-01-01', 'ExponentPushToken[s]'), ('${U.B}', 'Alıcı', '1990-01-01', NULL),
-  ('${U.T}', 'Genç', (current_date - interval '15 years')::date, NULL), ('${U.L}', 'Öğrenci', '1999-01-01', NULL),
-  ('${U.N}', 'Okumadı', '1990-01-01', NULL), ('${U.G}', NULL, NULL, NULL);
+INSERT INTO profiles (id, display_name, date_of_birth, push_token, terms_version) VALUES
+  ('${U.S}', 'Satıcı', '1988-01-01', 'ExponentPushToken[s]', '2026-11-11'), ('${U.B}', 'Alıcı', '1990-01-01', NULL, '2026-11-11'),
+  ('${U.T}', 'Genç', (current_date - interval '15 years')::date, NULL, '2026-11-11'), ('${U.L}', 'Öğrenci', '1999-01-01', NULL, '2026-11-11'),
+  ('${U.N}', 'Okumadı', '1990-01-01', NULL, '2026-11-11'), ('${U.G}', NULL, NULL, NULL, NULL);
 INSERT INTO institutions VALUES ('${INST}', true);
 INSERT INTO student_education (user_id, institution_id, level, listing_opt_in) VALUES ('${U.L}', '${INST}', 'university', true);
 `
@@ -39,9 +39,9 @@ async function as(db, who, sql) {
 }
 const errIs = (r, code) => !r.ok && r.err.includes(code)
 const notice = (db, who) => as(db, who, `SELECT accept_marketplace_notice('2026-11-07')`)
-async function build() {
+async function build(files = FILES) {
   const db = await freshDb(BASE + SEED)
-  for (const f of FILES) { const r = await applyFile(db, f); if (!r.ok) throw new Error(f + ': ' + r.msg) }
+  for (const f of files) { const r = await applyFile(db, f); if (!r.ok) throw new Error(f + ': ' + r.msg) }
   for (const w of ['S', 'B', 'T', 'L']) await notice(db, w)
   const r = await as(db, 'S', `INSERT INTO marketplace_listings (title, description, price_tl, is_free, category, condition, district)
     VALUES ('Gitar satılık', 'Akustik gitar, çok iyi durumda.', 3000, false, 'hobby_music', 'like_new', 'nicosia') RETURNING id`)
@@ -150,7 +150,7 @@ for (const [name, fn] of CASES) {
   check(name, ok === true, got)
 }
 {
-  const db = await build()
+  const db = await build(FILES.slice(0, 2))
   const again = await applyFile(db, FILES[1])
   check('20261184 second apply is a clean re-run', again.ok, again.msg)
 }
