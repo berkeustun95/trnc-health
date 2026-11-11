@@ -260,16 +260,35 @@ for (const [name, fn] of CONTROLS) {
   await setTerms(db, 'S', '2026-11-11')
   check('  …positive control: terms valid, notice missing → NOTICE_REQUIRED', errIs(await send(db, 'S', id), 'NOTICE_REQUIRED'))
 }
-{
-  const db = await build(true)
+async function sendOracle(db) {
   await open(db, 'B'); const id = await thread(db, 'B')
   const random = 'f0000000-0000-4000-8000-0000000000ff'
   await setTerms(db, 'P', null)
   const real = await send(db, 'P', id), fake = await send(db, 'P', random)
-  check('send_message: a listed student with NO terms who is not in the thread gets the SAME word for a real listing thread and a random id',
-    !real.ok && !fake.ok && /NO_SUCH_CONVERSATION/.test(real.err) && /NO_SUCH_CONVERSATION/.test(fake.err), [real.err, fake.err])
+  return { same: !real.ok && !fake.ok && /NO_SUCH_CONVERSATION/.test(real.err) && /NO_SUCH_CONVERSATION/.test(fake.err), words: [real.err, fake.err], id }
+}
+{
+  const db = await build(true)
+  const o = await sendOracle(db)
+  check('send_message: a listed student with NO terms who is not in the thread gets the SAME word for a real listing thread and a random id', o.same, o.words)
   await setTerms(db, 'B', null)
-  check('  …positive control: the participant without terms DOES get TERMS_REQUIRED', errIs(await send(db, 'B', id), 'TERMS_REQUIRED'))
+  check('  …positive control: the participant without terms DOES get TERMS_REQUIRED', errIs(await send(db, 'B', o.id), 'TERMS_REQUIRED'))
+}
+{
+  // red-first: the terms check moved straight after the sign-in check in send_listing_message (the order this file rejects) makes the words differ
+  const dir0 = mkdtempSync(join(tmpdir(), 'terms-oracle-'))
+  const mutO = join(dir0, '20261190_oracle_mutant.sql')
+  const TERMS_BLOCK = "  IF NOT i_have_marketplace_terms() THEN\n    RAISE EXCEPTION 'TERMS_REQUIRED';\n  END IF;\n"
+  const AUTH_BLOCK = "  IF v_me IS NULL OR is_anonymous_session() THEN\n    RAISE EXCEPTION 'AUTH_REQUIRED';\n  END IF;\n"
+  const s0 = T190.indexOf('CREATE OR REPLACE FUNCTION public.send_listing_message('), s1 = T190.indexOf('$function$;', s0)
+  let fnText = T190.slice(s0, s1)
+  fnText = fnText.replace(TERMS_BLOCK, '').replace(AUTH_BLOCK, AUTH_BLOCK + TERMS_BLOCK)
+  writeFileSync(mutO, T190.slice(0, s0) + fnText + T190.slice(s1))
+  const dbm = await build(false)
+  const r = await applyFile(dbm, mutO)
+  const o = r.ok ? await sendOracle(dbm) : null
+  check('red-first: terms checked straight after AUTH in send_listing_message → the oracle check FAILS (real thread: TERMS_REQUIRED, random id: NO_SUCH_CONVERSATION)',
+    r.ok && o.same === false && /TERMS_REQUIRED/.test(o.words[0]) && /NO_SUCH_CONVERSATION/.test(o.words[1]), r.msg ?? o?.words)
 }
 {
   const db = await build(true)
@@ -399,8 +418,26 @@ for (const [name, fn] of CONTROLS) {
     && mine.filter(r => SH.test(r.label)).every(r => r.before === 'true'), mine)
   // red: re-applying 20261183 + 20261184 after 20261190 (ungated bodies back) turns them red
   const re2 = await build(true); await applyFile(re2, F183); await applyFile(re2, F184)
-  const redRows = []; for (const tk of tokens.filter(t => t.label.startsWith('20261190'))) redRows.push(await run(re2, tk))
-  check('H tokens red-first: after re-applying 20261183/84 on top, every body token of 20261190 that pins a replaced body is red', redRows.filter(v => v !== 'true').length >= 3, redRows)
+  const redRows = []; for (const tk of tokens.filter(t => t.label.startsWith('20261190'))) redRows.push({ label: tk.label, v: await run(re2, tk) })
+  const isHelper = r => /i_have_marketplace_terms\(\):/.test(r.label), isSH = r => SH.test(r.label)
+  check('H tokens red-first: after re-applying 20261183/84 on top, exactly the 6 replaced-body tokens are red; the helper token and the Student Hub negative stay true',
+    redRows.length === 8 && redRows.filter(r => !isHelper(r) && !isSH(r)).length === 6 && redRows.filter(r => !isHelper(r) && !isSH(r)).every(r => r.v === 'false')
+    && redRows.filter(r => isHelper(r) || isSH(r)).every(r => r.v === 'true'), redRows)
+}
+
+// ── 7. verify_schema.sql still parses whole (the C / G tuple lists were edited by script) ───────────────────────────
+{
+  const vs = readFileSync(rel('../supabase/verify_schema.sql'), 'utf8')
+  const q1 = vs.slice(vs.indexOf('WITH report AS ('), vs.indexOf('═══ QUERY 2 / 5'))
+  const db = await build(true)
+  const code = async sql => { try { await db.query(sql); return 'ok' } catch (e) { await db.exec('ROLLBACK').catch(() => {}); return String(e.code ?? e.message) } }
+  const got = await code(q1)
+  console.log('QUERY 1 on the fixture database: ' + got + ' (42P01 = a table this fixture lacks, i.e. already past the parser)')
+  check('verify_schema QUERY 1 parses (any error but 42601 syntax)', q1.length > 100000 && got !== '42601', got)
+  // positive control: the same text with one comma removed from the registered tuples must be a syntax error
+  const marker = "('20261190_marketplace_terms','i_have_marketplace_terms'),"
+  const broken = q1.replace(marker, "('20261190_marketplace_terms','i_have_marketplace_terms')")
+  check('  …control: one comma removed from a registered tuple list is a syntax error (42601)', broken !== q1 && await code(broken) === '42601')
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed')

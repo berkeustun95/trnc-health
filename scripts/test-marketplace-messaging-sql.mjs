@@ -177,7 +177,7 @@ const BREAKS = [
 ]
 // Red-first for the 20261190 cases (with the migrations applied): put the Bandabuliya terms gate INTO the two Student Hub
 // functions after the fact; the cases that say "Student Hub asks nothing of terms" must fail.
-if (MIGRATIONS.length) {
+if (MIGRATIONS.some(f => f.includes('20261190_marketplace_terms'))) {
   const gate = fn => `DO $m$ DECLARE d text; BEGIN
     d := pg_get_functiondef('public.${fn}'::regprocedure);
     IF position('IF NOT can_see_student_lists() THEN' IN d) = 0 THEN RAISE EXCEPTION 'mutation anchor missing in ${fn}'; END IF;
