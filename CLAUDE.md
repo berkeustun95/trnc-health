@@ -404,6 +404,9 @@ a new feature or module; a bug still unfixed after one attempt; schema, RLS or m
 refactors or architecture choices; auth, payments or security-sensitive code (also **security-code-reviewer**);
 deciding whether something is ready for production. Everyday work stays in the main chat: running tests,
 on-device screenshots, small fixes, i18n edits, commits, OTAs.
+Main-chat work still gets a check before it ships: before any commit that goes to Preview or production, run
+**qa-tester**; if i18n files changed, also **translation-reviewer**; if auth, RLS, payments or secrets are
+touched, also **security-code-reviewer**. Fix every FAIL before committing.
 Flow for the work principal-engineer owns: Principal → senior-app-engineer /
 senior-backend-engineer / data-content-engineer → security-code-reviewer + translation-reviewer (every branch)
 + ui-ux-designer (any UI change) → qa-tester → (FAIL: back to the senior, repeat until PASS) → release-engineer.
