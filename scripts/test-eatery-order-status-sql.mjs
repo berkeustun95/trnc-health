@@ -467,4 +467,90 @@ const run = async (d) => { const r = await checks(d); return r }
   t('re-running 20261193 AFTER 20261194 keeps the real can_manage (no stub put back)', [again.ok, before, after], [true, true, true])
   t('re-running 20261194 keeps a key row added after the first apply', await (async () => { await d.exec(`INSERT INTO private.eatery_worker_key_hashes (key_sha256, note) VALUES ('${'ab'.repeat(32)}', 'x') ON CONFLICT DO NOTHING`); const r = await applyFile(d, FB); if (!r.ok) { console.log('      B re-run:', r.msg); await d.exec('ROLLBACK;').catch(() => {}) } return [r.ok, (await q(d, `SELECT count(*)::int n FROM private.eatery_worker_key_hashes WHERE key_sha256 = '${'ab'.repeat(32)}'`))[0].n] })(), [true, 1])
 }
-console.log(bad ? `\n${bad} FAILED` : '\nall passed (so far)')
+
+// ── RED-FIRST mutants: break the thing, see the suite go red (the anchor is asserted present, so the break landed) ──
+const table = []
+const MUTANTS = [
+  // 20261193
+  { n: 'A1 p_mode check dropped (any mode accepted)', f: 'A', pairs: [[`  IF p_mode IS NOT NULL AND p_mode NOT IN ('pickup','delivery') THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'invalid_mode';\n  END IF;\n`, '']], fail: 'create_eatery_order body: a carried-forward or new shape is missing' },
+  { n: 'A2 delivery ends on ready instead of on_the_way', f: 'A', pairs: [[`WHEN 'delivery' THEN ARRAY['on_the_way']`, `WHEN 'delivery' THEN ARRAY['ready']`]], fail: 'STEP "next: sent / delivery"' },
+  { n: 'A3 skipping forward removed (sent -> received only)', f: 'A', pairs: [[`WHEN 'sent'      THEN ARRAY['received','preparing'] || f.fin || ARRAY['cancelled']`, `WHEN 'sent'      THEN ARRAY['received'] || ARRAY['cancelled']`]], fail: 'STEP "next: sent / delivery"' },
+  { n: 'A4 cancel no longer allowed from preparing', f: 'A', pairs: [[`WHEN 'preparing' THEN f.fin || ARRAY['cancelled']`, `WHEN 'preparing' THEN f.fin`]], fail: 'STEP "next: preparing / delivery"' },
+  { n: 'A5 my_eatery_orders owner filter removed', f: 'A', pairs: [[`WHERE o.created_by = v_uid AND o.created_at > now() - interval '24 hours'`, `WHERE o.created_at > now() - interval '24 hours'`]], fail: 'my_eatery_orders body: owner filter missing' },
+  { n: 'A6 subscribe ownership removed', f: 'A', pairs: [[`WHERE code = v_c AND created_by = v_uid FOR UPDATE`, `WHERE code = v_c FOR UPDATE`]], fail: 'eatery_order_subscribe body: owner filter missing' },
+  { n: 'A7 my_eatery_orders granted to anon', f: 'A', pairs: [[`GRANT  EXECUTE ON FUNCTION public.my_eatery_orders() TO authenticated;`, `GRANT  EXECUTE ON FUNCTION public.my_eatery_orders() TO anon, authenticated;`]], fail: 'my_eatery_orders has the wrong owner' },
+  { n: 'A8 notify_lang CHECK also accepts the ISO code tr', f: 'A', pairs: [[`CHECK (notify_lang IN ('English',`, `CHECK (notify_lang IN ('tr','English',`]], fail: 'accepts an ISO code' },
+  { n: 'A9 order events readable by authenticated', f: 'A', pairs: [[`REVOKE ALL ON TABLE public.eatery_order_events FROM PUBLIC, anon, authenticated;`, `REVOKE ALL ON TABLE public.eatery_order_events FROM PUBLIC, anon, authenticated;\nGRANT SELECT ON public.eatery_order_events TO authenticated;`]], fail: 'anon/authenticated must hold nothing' },
+  { n: 'A10 the 3-argument create_eatery_order is NOT dropped (overload left)', f: 'A', pairs: [[`DROP FUNCTION IF EXISTS public.create_eatery_order(uuid, jsonb, text);\n`, '']], fail: 'an old create/verify signature survived' },
+  { n: 'A11 verify ignores the 12-hour window for status_open', f: 'A', pairs: [[`v_open := now() < v_o.created_at + interval '12 hours' AND `, `v_open := `]], fail: 'STEP "verify: 13 h old order status_open false"' },
+  { n: 'A12 verify returns the push token', f: 'A', pairs: [[`    'fulfilment',             v_o.fulfilment,`, `    'notify_token', v_o.notify_token,\n    'fulfilment',             v_o.fulfilment,`]], fail: 'verify_eatery_order body: new keys missing, or a forbidden key present' },
+  { n: 'A13 re-running 20261193 puts the can_manage stub back', f: 'A', pairs: [[`  IF to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)') IS NULL\n     OR NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261194_eatery_order_status_partner.sql') THEN`, `  IF true THEN`]], rerun: true },
+  { n: 'A14 create stores no fulfilment', f: 'A', pairs: [[`VALUES (v_code, p_partner, v_lines, v_total, v_cur, v_uid, p_client_id, v_guest, v_test, p_mode)`, `VALUES (v_code, p_partner, v_lines, v_total, v_cur, v_uid, p_client_id, v_guest, v_test, NULL)`]], fail: 'create_eatery_order body: a carried-forward or new shape is missing' },
+  // 20261194
+  { n: 'B1 enrol does not need the Worker key', f: 'B', pairs: [[`never an exception: a RAISE would roll back the attempt row just written.\n  IF NOT public.eatery_worker_key_ok() THEN`, `never an exception: a RAISE would roll back the attempt row just written.\n  IF false THEN`]], fail: 'eatery_partner_enrol body' },
+  { n: 'B2 the device gate ignores the Worker key', f: 'B', pairs: [[`   WHERE public.eatery_worker_key_ok()\n     AND p_device IS NOT NULL`, `   WHERE p_device IS NOT NULL`]], fail: 'eatery_order_device_id body' },
+  { n: 'B3 per-code cap 5 -> 50', f: 'B', pairs: [[`a.at > now() - interval '1 hour') >= 5`, `a.at > now() - interval '1 hour') >= 50`]], fail: 'STEP "6th attempt WITH THE CORRECT PIN: locked"' },
+  { n: 'B4 per-bucket 15-minute cap 10 -> 100', f: 'B', pairs: [[`interval '15 minutes') >= 10`, `interval '15 minutes') >= 100`]], red: 'cap: 10 failures in 15 minutes lock' },
+  { n: 'B5 per-bucket 24-hour cap 30 -> 300', f: 'B', pairs: [[`interval '24 hours') >= 30`, `interval '24 hours') >= 300`]], red: 'cap: 30 failures in 24 hours lock' },
+  { n: 'B6 the lock never fires', f: 'B', pairs: [[`  IF (SELECT count(*) FROM private.eatery_pin_attempts a WHERE a.order_code = v_c`, `  IF false AND (SELECT count(*) FROM private.eatery_pin_attempts a WHERE a.order_code = v_c`]], fail: 'STEP "6th attempt WITH THE CORRECT PIN: locked"' },
+  { n: 'B7 a test order is judged against the real partner PIN and bucket', f: 'B', pairs: [[`  v_scope   := CASE WHEN v_o.is_test THEN 'test' ELSE 'partner' END;\n  v_partner := CASE WHEN v_o.is_test THEN NULL ELSE v_o.partner_id END;`, `  v_scope   := 'partner';\n  v_partner := v_o.partner_id;`]], fail: 'STEP "test order with the REAL wa PIN: wrong_pin"' },
+  { n: 'B8 a test-scope device may manage a REAL order', f: 'B', pairs: [[`(d.scope = 'test' AND p_is_test IS TRUE)`, `(d.scope = 'test')`]], fail: 'eatery_order_device_id body' },
+  { n: 'B9 a revoked device still works', f: 'B', pairs: [[`     AND d.revoked_at IS NULL\n     AND ((d.scope`, `     AND ((d.scope`]], fail: 'eatery_order_device_id body' },
+  { n: 'B10 the freeze follows expires_at (2 h) instead of 12 h', f: 'B', pairs: [[`  IF now() >= v_o.created_at + interval '12 hours' THEN\n    RETURN jsonb_build_object('status', 'frozen');`, `  IF now() >= v_o.expires_at THEN\n    RETURN jsonb_build_object('status', 'frozen');`]], fail: 'eatery_order_set_status body' },
+  { n: 'B11 the same status is not a no-op', f: 'B', pairs: [[`  IF p_status IS NOT DISTINCT FROM v_o.status THEN\n    RETURN jsonb_build_object('status', 'ok', 'changed', false);\n  END IF;\n`, '']], fail: 'STEP "same status again: ok, changed false"' },
+  { n: 'B12 a push failure is NOT swallowed', f: 'B', pairs: [[`    EXCEPTION WHEN OTHERS THEN\n      v_req := NULL;\n    END;\n  END IF;\n  BEGIN\n    INSERT INTO public.push_log`, `    END;\n  END IF;\n  BEGIN\n    INSERT INTO public.push_log`]], red: 'a push that FAILS (pg_net down)' },
+  { n: 'B13 push tokens are not cleared on a final status', f: 'B', pairs: [[`  IF p_status IN ('on_the_way','ready','cancelled') THEN\n    UPDATE public.eatery_orders SET notify_token`, `  IF false THEN\n    UPDATE public.eatery_orders SET notify_token`]], red: 'push token + language kept on a non-final status, cleared on a final one' },
+  { n: 'B14 a guest order falls back to the profile push token', f: 'B', pairs: [[`IF v_tok IS NULL AND NOT v_o.created_as_guest THEN`, `IF v_tok IS NULL THEN`]], red: 'no order token on a guest order: NO http call' },
+  { n: 'B15 the admin gate is removed', f: 'B', pairs: [[`IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN`, `IF false THEN`]], fail: 'admin pin function: the admin / guest gate is missing' },
+  { n: 'B16 a guest session passes the admin gate', f: 'B', pairs: [[`IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN`, `IF auth.uid() IS NULL OR NOT public.is_admin() THEN`]], fail: 'admin pin function: the admin / guest gate is missing' },
+  { n: 'B17 retention no longer clears push tokens', f: 'B', pairs: [[String.raw`E';\nUPDATE public.eatery_orders SET notify_token = NULL, notify_lang = NULL WHERE created_at < now() - interval ''12 hours'' AND (notify_token IS NOT NULL OR notify_lang IS NOT NULL);\nDELETE`, String.raw`E';\nDELETE`]], fail: 'the retention command is not' },
+  { n: 'B18 the PIN is stored in plaintext', f: 'B', pairs: [[`VALUES ('partner', p_partner, v_salt, encode(sha256(convert_to(v_salt || ':' || v_pin, 'UTF8')), 'hex'))`, `VALUES ('partner', p_partner, v_salt, v_pin)`]], fail: 'STEP "issue a partner PIN for wa' },
+  { n: 'B19 the PIN is raised in a notice', f: 'B', pairs: [[`  RETURN jsonb_build_object('pin', v_pin,`, `  RAISE NOTICE 'pin %', v_pin;\n  RETURN jsonb_build_object('pin', v_pin,`]], fail: 'eatery_pin_issue body' },
+  { n: 'B20 device limit 5 -> 50', f: 'B', pairs: [[`d.revoked_at IS NULL) >= 5 THEN`, `d.revoked_at IS NULL) >= 50 THEN`]], red: 'device limit: the sixth is refused' },
+  { n: 'B21 enrol RAISES on a wrong PIN (the attempt row would roll back)', f: 'B', pairs: [[`VALUES (v_scope, v_partner, v_c, false);\n    RETURN jsonb_build_object('status', 'wrong_pin');`, `VALUES (v_scope, v_partner, v_c, false);\n    RAISE EXCEPTION 'wrong_pin';`]], fail: 'eatery_partner_enrol body' },
+  { n: 'B22 a test order push has no TEST prefix', f: 'B', pairs: [[`'TEST ' || U&'\\00B7' || ' ' || v_pname`, `v_pname`]], red: 'push title is prefixed TEST' },
+  { n: 'B23 enrol ignores the 12-hour closing', f: 'B', pairs: [[`  IF now() >= v_o.created_at + interval '12 hours' THEN\n    RETURN jsonb_build_object('status', 'closed');`, `  IF false THEN\n    RETURN jsonb_build_object('status', 'closed');`]], fail: 'STEP "13 h old order: closed even with the right PIN"' },
+  { n: 'B24 the private tables are not revoked from anon / authenticated', f: 'B', pairs: [[`REVOKE ALL ON TABLE private.%I FROM PUBLIC, anon, authenticated`, `REVOKE ALL ON TABLE private.%I FROM PUBLIC`]], fail: 'is reachable by anon / authenticated' },
+  { n: 'B25 the Worker key hash store is seeded with a value', f: 'B', pairs: [[`-- ─── (2) PINs, devices, attempts`, `INSERT INTO private.eatery_worker_key_hashes (key_sha256, note) VALUES ('${'ab'.repeat(32)}', 'x');\n-- ─── (2) PINs, devices, attempts`]], fail: 'the worker key store changed during this file' },
+  { n: 'B26 can_manage always true', f: 'B', pairs: [[`AS $fn$ SELECT public.eatery_order_device_id(p_partner, p_is_test, p_device) IS NOT NULL $fn$;`, `AS $fn$ SELECT true $fn$;`]], fail: 'eatery_order_can_manage still is not the real body' },
+]
+if (process.argv.includes('--no-mutants')) console.log('\n(mutants skipped)')
+else {
+  console.log('\nRED-FIRST mutants')
+  for (const m of MUTANTS) {
+    const src = m.f === 'A' ? SA : SB
+    const p = mutant(m.n, src, m.pairs)
+    if (!p) { table.push([m.n, 'ANCHOR MISSING', '']); continue }
+    const fa = m.f === 'A' ? p : FA, fb = m.f === 'B' ? p : FB
+    const d = await after1144()
+    const rA = await applyFile(d, fa)
+    if (m.f === 'A' && m.fail) {
+      const hit = !rA.ok && rA.msg.includes(m.fail)
+      t(`${m.n}: apply FAILS with "${m.fail}"`, [rA.ok, hit], [false, true]); if (!hit) console.log(`      ${rA.ok ? '(applied!)' : rA.msg}`)
+      table.push([m.n, rA.ok ? 'GREEN (BAD)' : hit ? 'RED' : 'RED, wrong message', rA.ok ? '' : rA.msg.slice(0, 120)]); continue
+    }
+    if (!rA.ok) { bad++; console.log(`  ✗ ${m.n}: 20261193 did not apply: ${rA.msg}`); table.push([m.n, 'A FAILED', rA.msg.slice(0, 100)]); continue }
+    const rB = await applyFile(d, fb)
+    if (m.fail) {
+      const hit = !rB.ok && rB.msg.includes(m.fail)
+      t(`${m.n}: apply FAILS with "${m.fail}"`, [rB.ok, hit], [false, true]); if (!hit) console.log(`      ${rB.ok ? '(applied!)' : rB.msg}`)
+      table.push([m.n, rB.ok ? 'GREEN (BAD)' : hit ? 'RED' : 'RED, wrong message', rB.ok ? '' : rB.msg.slice(0, 120)]); continue
+    }
+    if (!rB.ok) { bad++; console.log(`  ✗ ${m.n}: 20261194 did not apply: ${rB.msg}`); table.push([m.n, 'B FAILED', rB.msg.slice(0, 100)]); continue }
+    if (m.rerun) {
+      await seed(d)
+      const dv = await device(d, PA), co = await order(d, { partner: PA })
+      const again = await applyFile(d, fa)
+      const can = val(await as(d, 'anon', `SELECT public.verify_eatery_order('${co}', '${dv.token}') -> 'can_manage' AS c`))
+      t(`${m.n}: after the re-run the enrolled device can no longer manage (the suite goes red)`, [again.ok, can], [true, false])
+      table.push([m.n, can === false ? 'RED' : 'GREEN (BAD)', 'verify can_manage after the re-run: ' + can]); continue
+    }
+    const res = await checks(d)
+    const hit = res.find(([n]) => n.includes(m.red))
+    t(`${m.n}: the check "${m.red}" goes red`, [hit !== undefined, hit?.[1]], [true, false])
+    table.push([m.n, hit && hit[1] === false ? 'RED' : 'GREEN (BAD)', m.red])
+  }
+  console.log('\nMUTANT TABLE'); for (const r of table) console.log(`  ${r[1].padEnd(18)} ${r[0]}  ${r[2] ? '→ ' + r[2] : ''}`)
+}
+console.log(bad ? `\n${bad} FAILED` : '\nall passed')
+process.exit(bad ? 1 : 0)
