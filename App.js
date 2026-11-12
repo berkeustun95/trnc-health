@@ -2247,6 +2247,7 @@ export default function App() {
       onMarkRead={markNotifRead}
       onNotifPress={item => {
         const route = notificationRoute(item)
+        if (route !== 'marketplace_listing') listingTapRef.current.cancel()
         if (route === 'weekend') openWeekendOnMap()
         else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
         else if (route === 'marketplace_listing') listingTapRef.current.run(() => marketplaceListingTarget(item.listing_id, getMarketplaceListing), target => { closeNotifs(); setShowMarketplace(target) })
