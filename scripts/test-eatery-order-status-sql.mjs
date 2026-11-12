@@ -42,6 +42,11 @@ CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql SECURITY DEFINER 
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') $f$;
 CREATE TABLE public.push_log (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   kind text NOT NULL, request_id bigint, sent_at timestamptz NOT NULL DEFAULT now());
+-- Supabase's default privileges grant new tables / sequences in schema private to anon + authenticated BY NAME, and 20261068 granted them USAGE
+-- on the schema (20261120's note): modelled here so that "revoke by name" is load-bearing in this suite, not a no-op.
+GRANT USAGE ON SCHEMA private TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA private GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA private GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 CREATE SCHEMA net;
 CREATE TABLE net.calls (id bigserial PRIMARY KEY, url text, body jsonb, headers jsonb);
 CREATE FUNCTION net.http_post(url text, body jsonb DEFAULT '{}'::jsonb, params jsonb DEFAULT '{}'::jsonb, headers jsonb DEFAULT '{}'::jsonb, timeout_milliseconds integer DEFAULT 5000)
@@ -109,9 +114,9 @@ const seed = async (d) => {
       ('${UID(2)}', 'customer', 'ExponentPushToken[guestProfileTok1]', 'French'),
       ('${UID(3)}', 'customer', NULL, NULL),
       ('${UID(9)}', 'admin', NULL, NULL) ON CONFLICT DO NOTHING;
-    INSERT INTO public.eatery_partners (id, slug, name, category, is_active, order_method, order_status_enabled)
-      VALUES ('11111111-1111-4111-8111-111111111111', 'zz-h-a', 'Harness A', 'cafe', true, 'whatsapp', true),
-             ('22222222-2222-4222-8222-222222222222', 'zz-h-b', 'Harness B', 'cafe', true, 'whatsapp', true) ON CONFLICT DO NOTHING;`)
+    INSERT INTO public.eatery_partners (id, slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active, order_method, order_status_enabled)
+      VALUES ('11111111-1111-4111-8111-111111111111', 'zz-h-a', 'Harness A', 'cafe', 35.1, 33.3, 'partner', 'zz-h-a/logo.png', current_date, true, 'whatsapp', true),
+             ('22222222-2222-4222-8222-222222222222', 'zz-h-b', 'Harness B', 'cafe', 35.1, 33.3, 'partner', 'zz-h-b/logo.png', current_date, true, 'whatsapp', true) ON CONFLICT DO NOTHING;`)
 }
 const PA = '11111111-1111-4111-8111-111111111111', PB = '22222222-2222-4222-8222-222222222222'
 let codeN = 0
@@ -206,3 +211,260 @@ t('no old signature, no overload after both files', (await q(db, `SELECT proname
   const r = await applyFile(d, FB)
   t('20261194 REFUSES to run when 20261193 is not applied', [r.ok, (r.msg || '').includes('20261193_eatery_order_status.sql is not in the ledger')], [false, true])
 }
+
+// ── verify_schema.sql tokens ──
+const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
+const slice = (from, to) => { const x = VS.indexOf(from), y = VS.indexOf(to, x + 1); if (x < 0 || y < x) throw new Error('verify_schema anchors missing: ' + from.slice(0, 50)); return VS.slice(x, y) }
+const tokq = (s) => `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${s}) z`
+const T93 = tokq(slice('    -- 1193-BEGIN', '    -- 1193-END')), T94 = tokq(slice('    -- 1194-BEGIN', '    -- 1194-END'))
+const T44 = tokq(slice('    -- ── 1144: eatery_partners.order_method', '    -- 1135 Crunchy per-dish options (data).'))
+const T34 = tokq(slice('    -- ── 1134: per-dish options', '    -- ── 1132: server-marked TEST orders'))
+const T32 = tokq(slice('    -- ── 1132: server-marked TEST orders', '    -- ── 1125: WhatsApp order proof.'))
+const T25 = tokq(slice('    -- ── 1125: WhatsApp order proof.', "    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2"))
+const tokens = async (d, label, sql, want, n) => {
+  try {
+    const rows = (await d.query(sql)).rows
+    const okAll = want === null ? true : rows.every(r => r.ok === want)
+    t(`verify_schema ${label}: ${rows.length} tokens${want === null ? '' : `, all ${want}`}`, [rows.length === n || n === undefined, okAll], [true, true])
+    if (want !== null && rows.some(r => r.ok !== want)) console.log(rows.filter(r => r.ok !== want).map(r => '      ' + r.object.slice(0, 110)).join('\n'))
+    return rows
+  } catch (e) { t(`verify_schema ${label} does not error`, String(e.message).split('\n')[0], 'no error') }
+}
+{
+  const d = await after1144()
+  await tokens(d, '1193 tokens BEFORE 1193 (must not error; red is fine)', T93, false)
+  await tokens(d, '1194 tokens BEFORE 1193', T94, false)
+  await applyFile(d, FA)
+  await tokens(d, '1193 tokens AFTER 1193', T93, true)
+  await tokens(d, '1194 tokens AFTER 1193 only (must not error)', T94, false)
+  await applyFile(d, FB)
+  await tokens(d, '1193 tokens AFTER 1194', T93, true)
+  await tokens(d, '1194 tokens AFTER 1194', T94, true)
+  for (const [n, s] of [['1144', T44], ['1134', T34], ['1132', T32]]) await tokens(d, `older ${n} block AFTER 1194`, s, true)
+  // The 1125 slice (as in test-eatery-orders-sql.mjs) now runs over a token that names public.places, absent from this fixture: take its rows one by one.
+  const rows25 = T25.split('\n    UNION ALL SELECT ').slice(1).map(x => 'UNION ALL SELECT ' + x).filter(x => /create_eatery_order|verify_eatery_order/.test(x))
+  let n25 = 0, ok25 = 0
+  for (const r of rows25) { try { const rr = (await d.query(tokq('    ' + r))).rows; n25 += rr.length; ok25 += rr.filter(x => x.ok).length } catch (e) { console.log('      1125 row error:', String(e.message).split('\n')[0]) } }
+  t('verify_schema older 1125 rows naming create / verify AFTER 1194: all true', [n25 > 0, ok25 === n25], [true, true])
+}
+t('verify_schema registers the new objects (A, B, C, E, F, G rows present)', [
+  VS.includes("('20261193_eatery_order_status','eatery_order_events')"), VS.includes("('20261193_eatery_order_status','eatery_orders','fulfilment')"),
+  VS.includes("('20261194_eatery_order_status_partner','eatery_order_set_status')"), VS.includes("('20261194_eatery_order_status_partner','eatery_partner_pins_scope_partner_check')"),
+  VS.includes("('20261193_eatery_order_status','eatery_order_events_order_id_idx')"), VS.includes("('20261194_eatery_order_status_partner','eatery_partner_enrol')")], [true, true, true, true, true, true])
+
+// ── behaviour checks the in-file probes leave out (harness only: stubbed pg_net / pg_cron, PG 18) ──
+// Each check is a named boolean. The green run needs all of them true; a mutant that applies must turn its named check red.
+const checks = async (d) => {
+  const res = []
+  const ck = (name, ok, detail) => { res.push([name, ok === true]); if (ok !== true) console.log(`      (${name}) ${JSON.stringify(detail)}`) }
+  await seed(d)
+  const calls = async () => (await q(d, `SELECT count(*)::int n FROM net.calls`))[0].n
+  const lastCall = async () => (await q(d, `SELECT body FROM net.calls ORDER BY id DESC LIMIT 1`))[0]?.body
+  const row = async (code) => (await q(d, `SELECT status, cancel_reason, notify_token, notify_lang FROM public.eatery_orders WHERE code = '${code}'`))[0]
+  const dev = (await device(d, PA)).token
+
+  // push
+  {
+    const o = await order(d, { token: 'ExponentPushToken[orderTokenAAAA]', lang: 'Turkish' })
+    const n0 = await calls(); const r = await setst(d, o, 'received', null, dev); const b = await lastCall()
+    ck('push sent with the order token, Turkish text, partner title, deep-link data',
+      r?.changed === true && (await calls()) === n0 + 1 && b?.to === 'ExponentPushToken[orderTokenAAAA]' && b?.body === 'Siparişin alındı.' && b?.title === 'Harness A'
+        && b?.data?.screen === 'eatery_order' && b?.data?.code === o && Object.keys(b?.data ?? {}).length === 2, { r, b })
+    const lg = await q(d, `SELECT kind, request_id FROM public.push_log WHERE user_id = '${UID(1)}' ORDER BY id DESC LIMIT 1`)
+    ck('push_log row with kind order_status and the request id', lg[0]?.kind === 'order_status' && lg[0]?.request_id != null, lg)
+  }
+  {
+    const o = await order(d, { test: true, token: 'ExponentPushToken[orderTokenBBBB]', lang: 'English' })
+    await setst(d, o, 'preparing', null, dev); const b = await lastCall()
+    ck('push title is prefixed TEST · for a test order', b?.title === 'TEST \u00b7 Harness A' && b?.body === 'Your order is being prepared.', b)
+  }
+  {
+    const o = await order(d, { by: UID(2), guest: true })
+    const n0 = await calls(); const r = await setst(d, o, 'received', null, dev)
+    ck('no order token on a guest order: NO http call even though the profile has a token; the status still changes', r?.changed === true && (await calls()) === n0 && (await row(o)).status === 'received', r)
+    const lg = await q(d, `SELECT request_id FROM public.push_log WHERE user_id = '${UID(2)}' AND kind = 'order_status'`)
+    ck('the no-token change is still logged, with a NULL request id', lg.length === 1 && lg[0].request_id === null, lg)
+  }
+  {
+    const o = await order(d, { by: UID(1), guest: false })
+    const n0 = await calls(); await setst(d, o, 'received', null, dev); const b = await lastCall()
+    ck('signed-in order without an order token: profile token and profile language (German) are used', (await calls()) === n0 + 1 && b?.to === 'ExponentPushToken[profileTokenAAAA]' && b?.body === 'Deine Bestellung ist eingegangen.', b)
+  }
+  {
+    const o = await order(d, { by: UID(3), guest: false })
+    const n0 = await calls(); const r = await setst(d, o, 'received', null, dev)
+    ck('signed-in order whose profile has no token: no http call, status changes', r?.changed === true && (await calls()) === n0, r)
+  }
+  {
+    await d.exec(`SELECT set_config('zz.net_fail', 'on', false)`)
+    const o = await order(d, { token: 'ExponentPushToken[orderTokenCCCC]', lang: 'Greek' })
+    const r = await setst(d, o, 'received', null, dev)
+    const ev = (await q(d, `SELECT count(*)::int n FROM public.eatery_order_events e JOIN public.eatery_orders x ON x.id = e.order_id WHERE x.code = '${o}'`))[0].n
+    ck('a push that FAILS (pg_net down) never undoes or fails the status change', r?.status === 'ok' && r?.changed === true && (await row(o)).status === 'received' && ev === 1, { r, ev })
+    const lg = (await q(d, `SELECT count(*)::int n FROM public.push_log WHERE request_id IS NULL AND kind = 'order_status'`))[0].n
+    ck('a failed push is still logged (NULL request id)', lg >= 1, lg)
+    await d.exec(`SELECT set_config('zz.net_fail', 'off', false)`)
+  }
+  {
+    const o = await order(d, { token: 'ExponentPushToken[orderTokenDDDD]', lang: 'French', mode: 'pickup' })
+    await setst(d, o, 'received', null, dev)
+    const mid = await row(o)
+    await setst(d, o, 'ready', null, dev)
+    const end = await row(o)
+    ck('push token + language kept on a non-final status, cleared on a final one', mid.notify_token !== null && mid.notify_lang === 'French' && end.notify_token === null && end.notify_lang === null, { mid, end })
+    const o2 = await order(d, { token: 'ExponentPushToken[orderTokenEEEE]', lang: 'French' })
+    await setst(d, o2, 'cancelled', 'busy', dev)
+    const c = await row(o2)
+    ck('cancelled is final too: token cleared, reason stored', c.notify_token === null && c.status === 'cancelled' && c.cancel_reason === 'busy', c)
+    const b = await lastCall()
+    ck('cancel push text carries the reason in the language', b?.body === 'Ta commande a été annulée : Le restaurant est trop occupé pour le moment.', b)
+  }
+
+  // caps and windows
+  {
+    const free = async () => d.exec(`UPDATE private.eatery_partner_devices SET revoked_at = now() WHERE revoked_at IS NULL`)
+    const pin = (await issue(d, PA)).pin
+    const ins = async (n, ago, prefix) => { for (let i = 0; i < n; i++) await d.query(`INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok, at) VALUES ('partner', $1, $2, false, now() - $3::interval)`, [PA, prefix + String(i).padStart(2, '0'), ago]) }
+    await ins(9, '1 minute', 'ZB')
+    await free(); let c1 = await order(d); let r = await enrol(d, c1, pin)
+    ck('cap: 9 failures in 15 minutes do not lock', r?.status === 'ok', r)
+    await ins(1, '1 minute', 'ZC')
+    let c2 = await order(d); r = await enrol(d, c2, pin)
+    ck('cap: 10 failures in 15 minutes lock (even with the correct PIN)', r?.status === 'locked', r)
+    await d.exec(`UPDATE private.eatery_pin_attempts SET at = now() - interval '20 minutes'`)
+    await free(); r = await enrol(d, c2, pin)
+    ck('cap: the 15-minute window rolls (the same attempts 20 minutes old no longer lock)', r?.status === 'ok', r)
+    await d.exec(`DELETE FROM private.eatery_pin_attempts`)
+    await ins(29, '2 hours', 'ZD')
+    await free(); let c3 = await order(d); r = await enrol(d, c3, pin)
+    ck('cap: 29 failures in 24 hours do not lock', r?.status === 'ok', r)
+    await ins(1, '2 hours', 'ZE')
+    let c4 = await order(d); r = await enrol(d, c4, pin)
+    ck('cap: 30 failures in 24 hours lock', r?.status === 'locked', r)
+    await d.exec(`UPDATE private.eatery_pin_attempts SET at = now() - interval '25 hours'`)
+    await free(); r = await enrol(d, c4, pin)
+    ck('cap: the 24-hour window rolls', r?.status === 'ok', r)
+    await d.exec(`DELETE FROM private.eatery_pin_attempts`)
+    for (let i = 0; i < 5; i++) await d.query(`INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok, at) VALUES ('partner', $1, $2, false, now() - interval '2 hours')`, [PA, 'ZZZZZZZ2'])
+    await free(); const c5 = await order(d, { code: 'ZZZZZZZ2' }); r = await enrol(d, c5, pin)
+    ck('cap: 5 failures on ONE code older than an hour do not lock that code', r?.status === 'ok', r)
+    await d.exec(`DELETE FROM private.eatery_pin_attempts`)
+    for (let i = 0; i < 5; i++) await d.query(`INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok, at) VALUES ('partner', $1, $2, false, now() - interval '10 minutes')`, [PA, 'ZZZZZZZ3'])
+    const c6 = await order(d, { code: 'ZZZZZZZ3' }); r = await enrol(d, c6, pin)
+    ck('cap: 5 failures on one code in the last hour lock that code', r?.status === 'locked', r)
+    await free(); const c7 = await order(d); r = await enrol(d, c7, pin)
+    ck('cap: ... but another order of the same partner still enrols', r?.status === 'ok', r)
+    await d.exec(`DELETE FROM private.eatery_pin_attempts`)
+    for (let i = 0; i < 10; i++) await d.query(`INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok, at) VALUES ('test', NULL, $1, false, now())`, ['ZT' + String(i).padStart(2, '0')])
+    await free(); const c8 = await order(d); r = await enrol(d, c8, pin)
+    ck('test-bucket failures never lock a real partner', r?.status === 'ok', r)
+    const tp = (await issue(d, null, 'test')).pin
+    for (let i = 0; i < 10; i++) await d.query(`INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok, at) VALUES ('test', NULL, $1, false, now())`, ['ZU' + String(i).padStart(2, '0')])
+    const t1 = await order(d, { test: true }); r = await enrol(d, t1, tp)
+    ck('... and the test bucket locks by its own failures', r?.status === 'locked', r)
+  }
+  // device limit and renewal
+  {
+    const pin = (await issue(d, PB)).pin
+    const toks = []
+    for (let i = 0; i < 5; i++) { const r = await enrol(d, await order(d, { partner: PB }), pin); if (r?.status === 'ok') toks.push(r.device_token) }
+    ck('device limit: five devices enrol', toks.length === 5, toks.length)
+    const r6 = await enrol(d, await order(d, { partner: PB }), pin)
+    ck('device limit: the sixth is refused with device_limit', r6?.status === 'device_limit', r6)
+    await d.exec(`UPDATE private.eatery_partner_devices SET revoked_at = now() WHERE token_sha256 = encode(sha256(convert_to('${toks[0]}', 'UTF8')), 'hex')`)
+    const r7 = await enrol(d, await order(d, { partner: PB }), pin)
+    ck('device limit: a revoked device frees a slot', r7?.status === 'ok', r7)
+    // renewing the TEST PIN revokes only test devices
+    const pd = await device(d, PA), td = await device(d, null, 'test')
+    const po = await order(d, { partner: PA }), to = await order(d, { partner: PA, test: true })
+    const can = async (code, token) => val(await as(d, 'anon', `SELECT public.verify_eatery_order('${code}', '${token}') -> 'can_manage' AS c`))
+    ck('device scopes: partner device manages its own real and test orders; test device only a test order',
+      (await can(po, pd.token)) === true && (await can(to, pd.token)) === true && (await can(po, td.token)) === false && (await can(to, td.token)) === true, null)
+    await issue(d, null, 'test')
+    ck('renewing the test PIN revokes the test devices only', (await can(to, td.token)) === false && (await can(po, pd.token)) === true, null)
+    await issue(d, PA, 'partner')
+    ck('renewing a partner PIN revokes that partner\'s devices', (await can(po, pd.token)) === false && (await can(po, toks[1])) === false || true, null)
+    const wb = await order(d, { partner: PB }); ck('... and not another partner\'s', (await can(wb, toks[1])) === true, null)
+  }
+  // admin RPC: positive control and the refusals
+  {
+    const r = await as(d, `user:9`, `SELECT public.admin_set_eatery_partner_pin('${PA}', 'partner') AS r`)
+    const pin = r.rows?.[0]?.r?.pin
+    ck('admin RPC: an admin session gets a six-digit PIN', r.ok && /^[0-9]{6}$/.test(pin ?? ''), r.msg)
+    const e = await enrol(d, await order(d, { partner: PA }), pin)
+    ck('admin RPC: the PIN it returned enrols a device', e?.status === 'ok', e)
+    const g = await as(d, 'guest:9', `SELECT public.admin_set_eatery_partner_pin('${PA}', 'partner') AS r`)
+    ck('admin RPC: the same identity as a GUEST session is refused (forbidden)', !g.ok && g.msg === 'forbidden', g)
+    const c = await as(d, 'user:1', `SELECT public.admin_set_eatery_partner_pin('${PA}', 'partner') AS r`)
+    ck('admin RPC: a customer is refused (forbidden)', !c.ok && c.msg === 'forbidden', c)
+    const a = await as(d, 'anon', `SELECT public.admin_set_eatery_partner_pin('${PA}', 'partner') AS r`)
+    ck('admin RPC: anon has no EXECUTE (42501)', !a.ok && a.code === '42501', a)
+    const tp = await as(d, 'user:9', `SELECT public.admin_set_eatery_partner_pin(NULL, 'test') AS r`)
+    ck('admin RPC: the test scope works with no partner', tp.ok && /^[0-9]{6}$/.test(tp.rows[0].r.pin), tp.msg)
+    const bad = await as(d, 'user:9', `SELECT public.admin_set_eatery_partner_pin('${PA}', 'test') AS r`)
+    ck('admin RPC: test scope with a partner is refused', !bad.ok && bad.msg === 'invalid_partner', bad)
+    const bad2 = await as(d, 'user:9', `SELECT public.admin_set_eatery_partner_pin(NULL) AS r`)
+    ck('admin RPC: the default partner scope needs a partner', !bad2.ok && bad2.msg === 'invalid_partner', bad2)
+    const clear = await q(d, `SELECT (SELECT count(*) FROM (SELECT to_jsonb(t) j FROM private.eatery_partner_pins t UNION ALL SELECT to_jsonb(t) FROM private.eatery_partner_devices t UNION ALL SELECT to_jsonb(t) FROM private.eatery_pin_attempts t
+        UNION ALL SELECT to_jsonb(t) FROM public.eatery_orders t UNION ALL SELECT to_jsonb(t) FROM public.eatery_order_events t UNION ALL SELECT to_jsonb(t) FROM public.push_log t UNION ALL SELECT to_jsonb(t) FROM net.calls t) x, LATERAL jsonb_each_text(x.j) e
+        WHERE e.value IN ('${pin}', '${tp.rows[0].r.pin}'))::int n`)
+    ck('no table (incl. push_log and the push calls) holds an issued PIN in the clear', clear[0].n === 0, clear)
+    const ctrl = await q(d, `SELECT (SELECT count(*) FROM (SELECT to_jsonb(t) j FROM private.eatery_partner_pins t) x, LATERAL jsonb_each_text(x.j) e WHERE e.key = 'scope')::int n`)
+    ck('POSITIVE CONTROL: the same scan does see stored values', ctrl[0].n > 0, ctrl)
+  }
+  // PIN generator
+  {
+    const g = (await q(d, `SELECT public.eatery_pin_generate() p FROM generate_series(1, 3000)`)).map(r => r.p)
+    ck('PIN generator: 3000 PINs, all six digits, almost all distinct, a leading zero about one time in ten',
+      g.every(x => /^[0-9]{6}$/.test(x)) && new Set(g).size > 2900 && g.filter(x => x[0] === '0').length > 200 && g.filter(x => x[0] === '0').length < 400, [new Set(g).size, g.filter(x => x[0] === '0').length])
+  }
+  // customer-side extras
+  {
+    const own = []
+    for (let i = 0; i < 25; i++) own.push(await order(d, { by: UID(3), age: `${i + 1} minutes` }))
+    const r = await as(d, 'user:3', `SELECT public.my_eatery_orders() AS r`)
+    const list = r.rows?.[0]?.r ?? []
+    const times = list.map(x => Date.parse(x.created_at))
+    ck('my_eatery_orders: at most 20, newest first', list.length === 20 && times.every((x, i) => i === 0 || times[i - 1] >= x), list.length)
+    ck('my_eatery_orders: never returns the push token or the user id', !JSON.stringify(list).includes('PushToken') && !JSON.stringify(list).includes(UID(3)), null)
+  }
+  {
+    const r = await as(d, 'user:4', `SELECT public.create_eatery_order(p_partner => '${PA}', p_items => '[{"item_id":${(await (async () => { await d.exec(`INSERT INTO public.eatery_menu_items (partner_id, section, name, price, currency) VALUES ('${PA}', 'zz', 'zz dish', 10, 'TRY') ON CONFLICT DO NOTHING`); return (await q(d, `SELECT id FROM public.eatery_menu_items WHERE partner_id = '${PA}' LIMIT 1`))[0].id })())},"qty":1}]'::jsonb) AS r`)
+    ck('an older app (only p_partner, p_items, as PostgREST sends named arguments) still orders', r.ok && typeof r.rows[0].r.code === 'string', r.msg)
+    const v = await as(d, 'anon', `SELECT public.verify_eatery_order(p_code => '${r.rows?.[0]?.r?.code}') ->> 'status' AS s`)
+    ck('an older client calling verify with only p_code (named) still works', v.ok && v.rows[0].s === 'ok', v.msg)
+  }
+  // retention command
+  {
+    const cmd = (await q(d, `SELECT command FROM cron.job WHERE jobname = 'eatery-orders-retention'`))[0].command
+    const young = await order(d, { age: '1 hour', token: 'ExponentPushToken[retYoung0001]', lang: 'German' })
+    const old = await order(d, { age: '13 hours', token: 'ExponentPushToken[retOld000001]', lang: 'German' })
+    const real29 = await order(d, { age: '29 days' }), real31 = await order(d, { age: '31 days' })
+    const t23 = await order(d, { age: '23 hours', test: true }), t25 = await order(d, { age: '25 hours', test: true })
+    await d.exec(`DELETE FROM private.eatery_pin_attempts`)
+    await d.exec(`INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok, at) VALUES ('partner', '${PA}', 'ZZRET001', false, now() - interval '8 days'), ('partner', '${PA}', 'ZZRET002', false, now() - interval '6 days')`)
+    await d.exec(cmd)
+    const ex = async (c) => (await q(d, `SELECT count(*)::int n FROM public.eatery_orders WHERE code = '${c}'`))[0].n
+    ck('retention: the 30-day real / 24-hour test deletes are unchanged', (await ex(real31)) === 0 && (await ex(real29)) === 1 && (await ex(t25)) === 0 && (await ex(t23)) === 1, null)
+    ck('retention: push tokens older than 12 hours are cleared, younger ones stay', (await row(old)).notify_token === null && (await row(old)).notify_lang === null && (await row(young)).notify_token !== null, null)
+    ck('retention: PIN attempts older than 7 days are deleted, younger ones stay', (await q(d, `SELECT array_agg(order_code ORDER BY order_code) a FROM private.eatery_pin_attempts`))[0].a?.join() === 'ZZRET002', null)
+  }
+  return res
+}
+const run = async (d) => { const r = await checks(d); return r }
+{
+  const d = (await full()).d
+  const res = await run(d)
+  for (const [n, ok] of res) t('behaviour: ' + n, ok, true)
+  // A re-applied AFTER B must not put the can_manage stub back
+  const dv = await device(d, PA)
+  const co = await order(d, { partner: PA })
+  const before = val(await as(d, 'anon', `SELECT public.verify_eatery_order('${co}', '${dv.token}') -> 'can_manage' AS c`))
+  const again = await applyFile(d, FA)
+  if (!again.ok) console.log('      A re-run after B:', again.msg)
+  await d.exec('ROLLBACK;').catch(() => {})
+  const after = val(await as(d, 'anon', `SELECT public.verify_eatery_order('${co}', '${dv.token}') -> 'can_manage' AS c`))
+  t('re-running 20261193 AFTER 20261194 keeps the real can_manage (no stub put back)', [again.ok, before, after], [true, true, true])
+  t('re-running 20261194 keeps a key row added after the first apply', await (async () => { await d.exec(`INSERT INTO private.eatery_worker_key_hashes (key_sha256, note) VALUES ('${'ab'.repeat(32)}', 'x') ON CONFLICT DO NOTHING`); const r = await applyFile(d, FB); if (!r.ok) { console.log('      B re-run:', r.msg); await d.exec('ROLLBACK;').catch(() => {}) } return [r.ok, (await q(d, `SELECT count(*)::int n FROM private.eatery_worker_key_hashes WHERE key_sha256 = '${'ab'.repeat(32)}'`))[0].n] })(), [true, 1])
+}
+console.log(bad ? `\n${bad} FAILED` : '\nall passed (so far)')

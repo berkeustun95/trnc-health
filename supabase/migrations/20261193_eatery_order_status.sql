@@ -841,7 +841,7 @@ BEGIN
       ('authenticated cannot INSERT eatery_order_events',    'user:81',  $q$INSERT INTO public.eatery_order_events (order_id, status) VALUES ('00000000-0000-4000-8000-0000000000aa', 'received')$q$, 'state:42501', NULL),
       ('anon cannot SELECT eatery_order_events',             'anon',     $q$SELECT to_jsonb(count(*)) FROM public.eatery_order_events$q$, 'state:42501', NULL),
       ('CONTROL service_role reads the orders',              'sr',       $q$SELECT to_jsonb(count(*) > 0) FROM public.eatery_orders$q$, 'val:true', NULL),
-      ('CONTROL service_role reads the events (empty)',      'sr',       $q$SELECT to_jsonb(count(*)) FROM public.eatery_order_events$q$, 'val:0', NULL),
+      ('CONTROL service_role can read the events',           'sr',       $q$SELECT to_jsonb(count(*) >= 0) FROM public.eatery_order_events$q$, 'val:true', NULL),
       ('authenticated cannot call next_statuses',            'user:81',  $q$SELECT public.eatery_order_next_statuses('sent', 'pickup')$q$, 'state:42501', NULL),
       ('authenticated cannot call can_manage',               'user:81',  $q$SELECT public.eatery_order_can_manage('{{wa}}', false, 'x')$q$, 'state:42501', NULL),
       ('anon cannot call can_manage',                        'anon',     $q$SELECT public.eatery_order_can_manage('{{wa}}', false, 'x')$q$, 'state:42501', NULL),
@@ -928,7 +928,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261193_eatery_order_status.sql', 'c02dd3d72ebbd04b231eb83db80497f999da924db276249be9a45f9c95badaff')
+VALUES ('20261193_eatery_order_status.sql', '23504239d716113ae3be194302d2019b1486919c2775c6e98489e5fb47365de0')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

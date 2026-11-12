@@ -4617,7 +4617,7 @@ WITH report AS (
                            AND pg_get_constraintdef(c.oid) LIKE '%Greek%' AND pg_get_constraintdef(c.oid) LIKE '%French%' AND pg_get_constraintdef(c.oid) LIKE '%Spanish%' AND pg_get_constraintdef(c.oid) LIKE '%German%'
                            AND pg_get_constraintdef(c.oid) LIKE '%Persian%' AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%' AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%' AND c.convalidated
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_lang_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%ExpoPushToken%' AND pg_get_constraintdef(c.oid) LIKE '%ExponentPushToken%' AND c.convalidated
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%Expo(nent)?PushToken%' AND c.convalidated
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_token_check'), false)
       AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%notify_token IS NULL%' AND pg_get_constraintdef(c.oid) LIKE '%notify_lang IS NULL%' AND c.convalidated
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_pair_check'), false)
@@ -4734,9 +4734,9 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)')) LIKE '%eatery_order_device_id(p_partner, p_is_test, p_device) IS NOT NULL%', false)
     UNION ALL SELECT '20261194_eatery_order_status_partner','enrol: Worker key first, caps 5 / 10 / 30 on FAILED attempts checked before the PIN is compared, a salted hash compare, device limit 5; PIN issue: CSPRNG rejection sampling, salted hash, devices revoked, attempts cleared, PIN never raised',
       COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%eatery_worker_key_ok()%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%NOT a.ok AND a.at > now() - interval ''1 hour'')) >= 5%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''15 minutes'')) >= 10%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''24 hours'')) >= 30%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%NOT a.ok AND a.at > now() - interval ''1 hour'') >= 5%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''15 minutes'') >= 10%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''24 hours'') >= 30%'
            AND position('''locked''' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)'))) < position('encode(sha256' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')))
            AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%revoked_at IS NULL%) >= 5%'
            AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%16000000%'
@@ -4929,8 +4929,8 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%created_as_guest AND NOT is_test AND created_at > now()%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%WHERE created_by = v_uid AND created_at > now() - interval ''1 hour'';%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) NOT LIKE '%created_by = v_uid AND NOT is_test%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%client_id, created_as_guest, is_test)%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%p_client_id, v_guest, v_test)%', false)
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%client_id, created_as_guest, is_test, fulfilment)%' -- 20261193:supersede (the INSERT also stores fulfilment now)
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%p_client_id, v_guest, v_test, p_mode)%', false)
       AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id','p_mode']::text[] FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')), false)
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
     UNION ALL SELECT '20261132_eatery_orders_is_test','verify_eatery_order body returns the is_test key (and still no created_by / client_id)',

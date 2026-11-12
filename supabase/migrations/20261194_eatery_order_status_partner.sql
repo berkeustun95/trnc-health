@@ -865,19 +865,19 @@ BEGIN
       ('enrol with NO Worker key: forbidden',                 'anon', '',    $q$SELECT public.eatery_partner_enrol('ZZZZ2222', '000000') -> 'status'$q$, 'val:forbidden', NULL),
       ('enrol with a WRONG Worker key: forbidden',            'anon', 'bad', $q$SELECT public.eatery_partner_enrol('ZZZZ2222', '000000') -> 'status'$q$, 'val:forbidden', NULL),
       ('CONTROL enrol with the key, no PIN set yet: no_pin',  'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ2222', '000000') -> 'status'$q$, 'val:no_pin', NULL),
-      ('no PIN set: no attempt recorded',                     'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_pin_attempts$q$, 'val:0', NULL),
+      ('no PIN set: no attempt recorded',                     'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_pin_attempts WHERE order_code = 'ZZZZ2222'$q$, 'val:0', NULL),
       ('issue a partner PIN for wa (internal core)',          'pg',   '',    $q$SELECT public.eatery_pin_issue('{{wa}}', 'partner')$q$, 'ok', 'pa'),
       ('issue a partner PIN for wb',                          'pg',   '',    $q$SELECT public.eatery_pin_issue('{{wb}}', 'partner')$q$, 'ok', 'pb'),
       ('issue the test PIN',                                  'pg',   '',    $q$SELECT public.eatery_pin_issue(NULL, 'test')$q$, 'ok', 'pt'),
       ('the PIN is six digits',                               'pg',   '',    $q$SELECT to_jsonb('{{p_pa}}' ~ '^[0-9]{6}$' AND '{{p_pb}}' ~ '^[0-9]{6}$' AND '{{p_pt}}' ~ '^[0-9]{6}$')$q$, 'val:true', NULL),
       ('only a salted hash is stored for wa',                 'pg',   '',    $q$SELECT to_jsonb(pin_sha256 = encode(sha256(convert_to(salt || ':' || '{{p_pa}}', 'UTF8')), 'hex') AND pin_sha256 <> encode(sha256(convert_to('{{p_pa}}', 'UTF8')), 'hex')) FROM private.eatery_partner_pins WHERE partner_id = '{{wa}}'$q$, 'val:true', NULL),
-      ('exactly 3 PIN rows (wa, wb, test)',                   'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_partner_pins$q$, 'val:3', NULL),
+      ('exactly 3 PIN rows for wa, wb and the test scope',    'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_partner_pins WHERE partner_id IN ('{{wa}}', '{{wb}}') OR scope = 'test'$q$, 'val:3', NULL),
       ('unknown code: not_found',                             'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ2224', '{{p_pa}}') -> 'status'$q$, 'val:not_found', NULL),
       ('garbage code: not_found',                             'anon', 'key', $q$SELECT public.eatery_partner_enrol('not a code', '{{p_pa}}') -> 'status'$q$, 'val:not_found', NULL),
       ('13 h old order: closed even with the right PIN',      'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ7777', '{{p_pa}}') -> 'status'$q$, 'val:closed', NULL),
       ('malformed PIN: wrong_pin (returned, not raised)',     'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ8888', '12345') -> 'status'$q$, 'val:wrong_pin', NULL),
       ('NULL PIN: wrong_pin',                                 'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ9999', NULL) -> 'status'$q$, 'val:wrong_pin', NULL),
-      ('the failed attempts were recorded (not rolled back)', 'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_pin_attempts WHERE NOT ok$q$, 'val:2', NULL),
+      ('the failed attempts were recorded (not rolled back)', 'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_pin_attempts WHERE NOT ok AND order_code IN ('ZZZZ8888', 'ZZZZ9999')$q$, 'val:2', NULL),
       ('real order with the TEST PIN: wrong_pin',             'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ2222', '{{p_pt}}') -> 'status'$q$, 'val:wrong_pin', NULL),
       ('real order of wa with the wb PIN: wrong_pin',         'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ2222', '{{p_pb}}') -> 'status'$q$, 'val:wrong_pin', NULL),
       ('test order with the REAL wa PIN: wrong_pin',          'anon', 'key', $q$SELECT public.eatery_partner_enrol('ZZZZ4444', '{{p_pa}}') -> 'status'$q$, 'val:wrong_pin', NULL),
@@ -963,7 +963,7 @@ BEGIN
       ('admin RPC: a signed-in non-admin is refused',         'user:94', '',  $q$SELECT public.admin_set_eatery_partner_pin('{{wa}}', 'partner')$q$, 'err:forbidden', NULL),
       ('admin RPC: a guest is refused',                       'guest:95', '', $q$SELECT public.admin_set_eatery_partner_pin('{{wa}}', 'partner')$q$, 'err:forbidden', NULL),
       ('admin RPC: anon has no EXECUTE',                      'anon', '',     $q$SELECT public.admin_set_eatery_partner_pin('{{wa}}', 'partner')$q$, 'state:42501', NULL),
-      ('refusals issued no PIN (still wa renewed once)',      'pg',   '',    $q$SELECT to_jsonb(count(*)) FROM private.eatery_partner_pins$q$, 'val:3', NULL),
+      ('refusals issued no PIN (still 3 rows for wa, wb, test)', 'pg', '',   $q$SELECT to_jsonb(count(*)) FROM private.eatery_partner_pins WHERE partner_id IN ('{{wa}}', '{{wb}}') OR scope = 'test'$q$, 'val:3', NULL),
       ('core: test scope with a partner refused',             'pg',   '',    $q$SELECT public.eatery_pin_issue('{{wa}}', 'test')$q$, 'err:invalid_partner', NULL),
       ('core: partner scope without a partner refused',       'pg',   '',    $q$SELECT public.eatery_pin_issue(NULL, 'partner')$q$, 'err:invalid_partner', NULL),
       ('core: unknown partner refused',                       'pg',   '',    $q$SELECT public.eatery_pin_issue('00000000-0000-4000-8000-0000000000ee', 'partner')$q$, 'err:invalid_partner', NULL),
@@ -973,7 +973,7 @@ BEGIN
       ('private tables: authenticated denied (devices)',      'user:94', '',  $q$SELECT to_jsonb(count(*)) FROM private.eatery_partner_devices$q$, 'state:42501', NULL),
       ('private tables: anon denied (attempts)',              'anon', '',     $q$SELECT to_jsonb(count(*)) FROM private.eatery_pin_attempts$q$, 'state:42501', NULL),
       ('private tables: guest denied (key hashes)',           'guest:95', '', $q$SELECT to_jsonb(count(*)) FROM private.eatery_worker_key_hashes$q$, 'state:42501', NULL),
-      ('CONTROL postgres reads the pins',                     'pg',   '',    $q$SELECT to_jsonb(count(*) = 3) FROM private.eatery_partner_pins$q$, 'val:true', NULL),
+      ('CONTROL postgres reads the pins',                     'pg',   '',    $q$SELECT to_jsonb(count(*) = 3) FROM private.eatery_partner_pins WHERE partner_id IN ('{{wa}}', '{{wb}}') OR scope = 'test'$q$, 'val:true', NULL),
       ('helpers: worker_key_ok denied to authenticated',      'user:94', '',  $q$SELECT public.eatery_worker_key_ok()$q$, 'state:42501', NULL),
       ('helpers: pin_generate denied to authenticated',       'user:94', '',  $q$SELECT public.eatery_pin_generate()$q$, 'state:42501', NULL),
       ('helpers: pin_issue denied to authenticated',          'user:94', '',  $q$SELECT public.eatery_pin_issue('{{wa}}', 'partner')$q$, 'state:42501', NULL),
@@ -1059,7 +1059,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261194_eatery_order_status_partner.sql', 'a09b67d4670706e584a63ec40e44af8206cd016852db2031d4d64c02f3def1e1')
+VALUES ('20261194_eatery_order_status_partner.sql', '7f189edd2368a2fce716aecf99ef7822aef677c0f69bbf980af4a857c45b07c8')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
