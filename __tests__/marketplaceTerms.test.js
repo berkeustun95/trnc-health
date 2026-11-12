@@ -7,22 +7,27 @@ import { t } from '../constants/i18n'
 
 const MISSING = { data: null, error: { code: 'PGRST202', message: 'Could not find the function in the schema cache' } }
 const thenable = () => { const c = new Proxy({}, { get: (_, k) => (k === 'then' ? res => res(MISSING) : () => c) }); return c }
-const profileWrites = []
+const profileWrites = []   // accept_terms calls, as sent
+const directTermsWrites = []   // any profiles.update naming terms_version / terms_locale: must stay empty
 let profileReply = v => ({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
-// profiles: update(...).eq(...).select(...).single() records what was sent and answers like the server.
+// profiles: a direct update is recorded only so the test can prove none carries terms; acceptance goes through the rpc.
 const profilesChain = () => {
-  let sent
   const c = new Proxy({}, { get: (_, k) => {
-    if (k === 'update') return v => { sent = v; profileWrites.push(v); return c }
-    if (k === 'single') return async () => profileReply(sent.terms_version)
+    if (k === 'update') return v => { if ('terms_version' in v || 'terms_locale' in v) directTermsWrites.push(v); return c }
+    if (k === 'then') return res => res(MISSING)
     return () => c
   } })
   return c
 }
+const mockAcceptRpc = async (name, args) => {
+  if (name !== 'accept_terms') return MISSING
+  profileWrites.push(args)
+  return profileReply(args.p_version)
+}
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default)
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null, Feather: () => null }))
 jest.mock('../lib/supabase', () => ({
-  supabase: { rpc: jest.fn(async () => MISSING), from: jest.fn(tbl => (tbl === 'profiles' ? profilesChain() : thenable())) },
+  supabase: { rpc: jest.fn((name, args) => mockAcceptRpc(name, args)), from: jest.fn(tbl => (tbl === 'profiles' ? profilesChain() : thenable())) },
   isGuest: s => !!s?.guest,
 }))
 jest.mock('../constants/redesign', () => ({ MARKETPLACE: true, REDESIGN: true }))
@@ -63,7 +68,7 @@ const press = async label => fireEvent.press(await screen.findByText(label))
 
 beforeAll(async () => { await api.listListings(); api.setFixtureUser(ME, 'Ben') })
 const okReply = v => ({ data: { terms_version: v, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
-beforeEach(() => { profileWrites.length = 0; global.__renewed = []; profileReply = okReply })
+beforeEach(() => { profileWrites.length = 0; directTermsWrites.length = 0; global.__renewed = []; profileReply = okReply })
 
 describe('the floor', () => {
   const { needsMarketplaceTerms: needs, MARKETPLACE_TERMS_MIN: MIN, LEGAL_VERSION } = legal
@@ -127,7 +132,8 @@ describe('posting', () => {
     await press(t('mkPost', L))
     await press(t('shTermsAccept', L))
     expect(await screen.findByText('stub:form')).toBeTruthy()
-    expect(profileWrites).toEqual([{ terms_version: legal.LEGAL_VERSION, terms_locale: 'English' }])
+    expect(profileWrites).toEqual([{ p_version: legal.LEGAL_VERSION, p_locale: 'English' }])
+    expect(directTermsWrites).toEqual([])
     expect(accepted).toHaveBeenCalledWith(expect.objectContaining({ terms_version: legal.LEGAL_VERSION }))
   })
   test('a failed save keeps the gate (RLS filtered to zero rows) and opens nothing', async () => {

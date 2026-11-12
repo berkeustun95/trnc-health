@@ -219,14 +219,12 @@ const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_
 //   the flush would strand a real acceptance on the device the moment the flag went back
 //   to false, which is precisely when the record would matter most.
 //
-// ⚠ error === null IS NOT PROOF THE WRITE LANDED. An update that RLS filters to zero rows
-//   comes back without an error, so clearing the entry on `!error` would throw away a tick
-//   that was never recorded — this repo has shipped that family of bug before. The write
-//   asks for the row back and the entry is cleared only when the returned version is the
-//   one we sent. The `owner read` policy is what makes that read-back legitimate.
-//
-// terms_accepted_at is never sent. Branch (g) of check_profile_name_content would
-// overwrite it anyway; not sending it is what makes that impossible to get wrong here.
+// The write is the accept_terms RPC (20261191): the server validates version and locale and
+// stamps terms_accepted_at itself. It never lowers a recorded version, so a stale tick
+// older than what the account already holds comes back as that HIGHER row. The entry is
+// then cleared (it can never be written) but the row is not returned: it is not an
+// acceptance of what was ticked. The entry is cleared only when the returned version is
+// the one we sent, never on `!error` alone.
 async function flushPendingConsent(session, profile) {
   const decision = decidePendingConsent({
     pending:         await readPendingConsent(),
@@ -238,12 +236,10 @@ async function flushPendingConsent(session, profile) {
   if (decision.clear) await clearPendingConsent()
   if (!decision.write) return null
 
-  const { data, error } = await supabase.from('profiles')
-    .update({ terms_version: decision.version, terms_locale: decision.locale })
-    .eq('id', session.user.id)
-    .select('terms_version, terms_locale, terms_accepted_at')
-    .single()
-  if (error || data?.terms_version !== decision.version) return null
+  const { data, error } = await supabase.rpc('accept_terms', { p_version: decision.version, p_locale: decision.locale })
+  if (error) return null
+  if (data?.terms_version > decision.version) { await clearPendingConsent(); return null }
+  if (data?.terms_version !== decision.version) return null
   await clearPendingConsent()
   return data
 }

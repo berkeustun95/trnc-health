@@ -18,7 +18,7 @@ const mockChain = tbl => {
   let op = 'select'
   const settle = single => {
     if (tbl === 'profiles') {
-      if (op === 'update') return { data: { terms_version: require('../constants/legal').LEGAL_VERSION, terms_locale: 'English', terms_accepted_at: 'now' }, error: null }
+      if (op === 'update') { mockCalls.push('profiles.update'); return mockRefuse() }
       return { data: { marketplace_notice_version: '2026-11-09' }, error: null }
     }
     if (op === 'insert' || op === 'update') { mockCalls.push(`${tbl}.${op}`); return mockRefuse() }
@@ -50,6 +50,7 @@ jest.mock('../lib/supabase', () => ({
       if (name === 'list_conversations') return { data: [{ conversation_id: 'c1', other_user_id: 's1', other_display_name: 'Satici', is_accepted: true, is_closed: false,
         listing_id: 'L1', listing_title: 'Bisiklet', listing_status: 'active', listing_available: true, created_at: new Date().toISOString(), last_message_at: new Date().toISOString() }], error: null }
       if (name === 'marketplace_seller_names') return { data: [], error: null }
+      if (name === 'accept_terms') { mockCalls.push('accept_terms'); return { data: { terms_version: args.p_version, terms_locale: args.p_locale, terms_accepted_at: 'now' }, error: null } }
       mockCalls.push(name)
       return mockRefuse()
     }),
@@ -95,6 +96,8 @@ test('edit-save refused: gate opens over the form, fields kept, no error line, n
   expect(mockCalls.filter(c => c === 'marketplace_listings.update')).toHaveLength(1)
   await press(t('shTermsAccept', L))
   await waitFor(() => expect(screen.queryByText(gateTitle())).toBeNull())
+  expect(mockCalls.filter(c => c === 'accept_terms')).toHaveLength(1)
+  expect(mockCalls).not.toContain('profiles.update')   // acceptance is the rpc, never a direct terms write
   expect(screen.getByDisplayValue('Bisiklet kirmizi')).toBeTruthy()
   expect(mockCalls.filter(c => c === 'marketplace_listings.update')).toHaveLength(1)   // no automatic resubmit
   await press(t('mkSave', L))

@@ -3,21 +3,19 @@
 import { render, screen, fireEvent } from '@testing-library/react-native'
 import { t } from '../constants/i18n'
 
+const MISSING = { data: null, error: { code: 'PGRST202', message: 'x' } }
 const profilesChain = () => {
-  let sent
-  const c = new Proxy({}, { get: (_, k) => {
-    if (k === 'update') return v => { sent = v; return c }
-    if (k === 'single') return async () => ({ data: { terms_version: sent.terms_version, terms_locale: 'English', terms_accepted_at: 'now' }, error: null })
-    return () => c
-  } })
+  const c = new Proxy({}, { get: (_, k) => (k === 'then' ? res => res(MISSING) : () => c) })
   return c
 }
-const MISSING = { data: null, error: { code: 'PGRST202', message: 'x' } }
+const mockAcceptRpc = async (name, args) => (name === 'accept_terms'
+  ? { data: { terms_version: args.p_version, terms_locale: args.p_locale, terms_accepted_at: 'now' }, error: null }
+  : MISSING)
 const thenable = () => { const c = new Proxy({}, { get: (_, k) => (k === 'then' ? res => res(MISSING) : () => c) }); return c }
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default)
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null, Feather: () => null }))
 jest.mock('../lib/supabase', () => ({
-  supabase: { rpc: jest.fn(async () => MISSING), from: jest.fn(tbl => (tbl === 'profiles' ? profilesChain() : thenable())) },
+  supabase: { rpc: jest.fn((name, args) => mockAcceptRpc(name, args)), from: jest.fn(tbl => (tbl === 'profiles' ? profilesChain() : thenable())) },
   isGuest: s => !!s?.guest,
 }))
 jest.mock('../constants/redesign', () => ({ MARKETPLACE: true, REDESIGN: true }))
