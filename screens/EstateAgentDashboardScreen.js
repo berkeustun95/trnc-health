@@ -172,7 +172,7 @@ export default function EstateAgentDashboardScreen({ session, lang }) {
           <Text style={{ fontSize: 48, marginBottom: 16 }}>⏳</Text>
           <Text style={ds.centerTitle}>{t('accomPendingAgent', lang)}</Text>
           <Text style={ds.centerSub}>{t('accomPendingAgentSub', lang)}</Text>
-          <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={{ marginTop: 32 }}>
+          <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
             <Text style={ds.signOutLink}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </View>
@@ -192,7 +192,7 @@ export default function EstateAgentDashboardScreen({ session, lang }) {
               <Text style={ds.rejectionText}>{agentRecord.rejection_reason}</Text>
             </View>
           )}
-          <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={{ marginTop: 32 }}>
+          <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
             <Text style={ds.signOutLink}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </View>

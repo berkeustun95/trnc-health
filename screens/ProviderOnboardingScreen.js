@@ -236,7 +236,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
           <TouchableOpacity style={s.primaryBtn} onPress={() => setStep(2)}>
             <Text style={s.primaryBtnText}>Get started</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })}>
+          <TouchableOpacity onPress={() => supabase.auth.signOut()}>
             <Text style={s.signOutText}>Sign out</Text>
           </TouchableOpacity>
         </View>

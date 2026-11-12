@@ -3,7 +3,11 @@
 // `scope: 'global'`. auth-js's default is 'global', so a bare call silently logs the user out
 // everywhere. This parses app source with @babel/parser (not a regex: comments mention a bare
 // `supabase.auth.signOut()`, and calls can span lines) and fails with file:line of every offender.
-// A count bump below must land in the same commit as the new site, with the reason.
+// Berke (2026-11-12): provider-role screens (provider, home_service_provider, insurance_provider,
+// estate_agent, organizer) keep their ORIGINAL bare `signOut()` (global by auth-js default); admin,
+// customer and guest sites are local. A bare call counts as global, and is allowed ONLY at those legacy
+// provider sites (pinned below by exact per-file count; in App.js structurally, inside the
+// `profile.role === 'provider'` branch). A count bump must land in the same commit as the new site, with the reason.
 const fs = require('fs')
 const path = require('path')
 const { parse } = require('@babel/parser')
@@ -11,8 +15,19 @@ const { parse } = require('@babel/parser')
 const ROOT = path.join(__dirname, '..')
 const EXPECTED_DELETION_FNS = 5 // ProfileScreen, ProviderScreen, InsuranceDashboard, HomeServiceDashboard, ProfileSetup
 const EXPECTED_UNDER13 = 2 // AgeIneligibleScreen + App.js ageDeletedNotice
-const EXPECTED_GLOBAL = 7
-const EXPECTED_LOCAL = 19
+// 8 local + 4 explicit global + 14 allow-listed bare (3 of them deletion sign-outs) = 26 sites (was 19 + 7 before provider screens reverted)
+const EXPECTED_GLOBAL = 4
+const EXPECTED_LOCAL = 8
+const EXPECTED_BARE = 14
+const BARE_ALLOW = {
+  [path.join('screens', 'ProviderScreen.js')]: 2,
+  [path.join('screens', 'ProviderOnboardingScreen.js')]: 1,
+  [path.join('screens', 'HomeServiceDashboardScreen.js')]: 2,
+  [path.join('screens', 'InsuranceDashboardScreen.js')]: 2,
+  [path.join('screens', 'EstateAgentDashboardScreen.js')]: 2,
+  [path.join('screens', 'OrganizerScreen.js')]: 1,
+  'App.js': { providerBranch: 4 },
+}
 const EXCLUDED = new Set(['node_modules', 'scripts', '__tests__', 'supabase', 'web', 'docs', '.git'])
 const FN_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod'])
 
@@ -34,8 +49,14 @@ function scopeOf(call) {
   return p && p.value.type === 'StringLiteral' && ['local', 'global'].includes(p.value.value) ? p.value.value : null
 }
 
-// -> { calls: [{ file, line, scope, enclosingFn, inAgeNotice }], offenders: [string], deletionFns: [{ file, line, signOuts }] }
-function scan(source, file) {
+// `else if (profile.role === 'provider') { ... }`: is path[i+1] (the child) the consequent of such an IfStatement?
+const isProviderIf = n => n.type === 'IfStatement' && n.test.type === 'BinaryExpression' && n.test.operator === '===' &&
+  isMember(n.test.left) && propName(n.test.left) === 'role' && n.test.left.object.name === 'profile' &&
+  n.test.right.type === 'StringLiteral' && n.test.right.value === 'provider'
+const inProviderBranch = (ancestors, node) => ancestors.some((a, i) => isProviderIf(a) && (ancestors[i + 1] || node) === a.consequent)
+
+// -> { calls: [{ file, line, scope, bare, allowedBare, inAgeNotice }], offenders: [string], deletionFns: [{ file, line, signOuts }] }
+function scan(source, file, allow = BARE_ALLOW) {
   const ast = parse(source, { sourceType: 'module', plugins: ['jsx'] })
   const calls = [], offenders = [], fns = new Map()
   const at = n => `${file}:${n.loc.start.line}`
@@ -47,10 +68,14 @@ function scan(source, file) {
       const scope = scopeOf(node)
       const inAgeNotice = ancestors.some(a => a.type === 'JSXOpeningElement' && a.name.name === 'AgeIneligibleScreen') ||
         ancestors.some(a => a.type === 'JSXElement' && a.openingElement.name.name === 'AgeIneligibleScreen')
-      const c = { file, line: node.loc.start.line, scope, inAgeNotice }
+      const bare = node.arguments.length === 0
+      const rule = allow[file]
+      const allowedBare = bare && (typeof rule === 'number' || (!!rule && inProviderBranch(ancestors, node)))
+      const c = { file, line: node.loc.start.line, scope, bare, allowedBare, inAgeNotice }
       calls.push(c)
       if (curFn) fns.get(curFn).signOuts.push(c)
-      if (!scope) offenders.push(`${at(node)} auth.signOut needs exactly one argument { scope: 'local' | 'global' } (a bare or variable scope defaults to every device)`)
+      if (bare && !allowedBare) offenders.push(`${at(node)} bare auth.signOut() outside the legacy provider-role allow-list (global by default; name { scope: 'local' | 'global' })`)
+      else if (!scope && !bare) offenders.push(`${at(node)} auth.signOut needs exactly one argument { scope: 'local' | 'global' } (a bare or variable scope defaults to every device)`)
     } else if (isAuthSignOut(node) && !(isCall(ancestors[ancestors.length - 1]) && ancestors[ancestors.length - 1].callee === node)) {
       offenders.push(`${at(node)} auth.signOut used by reference; call it inline with an explicit scope`)
     }
@@ -70,14 +95,20 @@ function scan(source, file) {
     }
   }
   walk(ast.program, [], null)
+  const rule = allow[file]
+  if (rule) {
+    const want = typeof rule === 'number' ? rule : rule.providerBranch
+    const got = calls.filter(c => c.allowedBare)
+    if (got.length !== want) offenders.push(`${file} expected exactly ${want} allow-listed bare auth.signOut() calls, found ${got.length} (${got.map(c => c.line).join(', ')})`)
+  }
   const deletionFns = []
   for (const [fn, info] of fns) {
     if (!info.deletes.length) continue
     const line = fn.loc.start.line
     deletionFns.push({ file, line, signOuts: info.signOuts })
     if (!info.signOuts.length) offenders.push(`${file}:${line} function calls rpc('delete_own_account') but never signs out`)
-    info.signOuts.filter(c => c.scope !== 'global').forEach(c =>
-      offenders.push(`${file}:${c.line} sign-out after delete_own_account (function at ${file}:${line}) must be scope 'global'`))
+    info.signOuts.filter(c => c.scope !== 'global' && !c.allowedBare).forEach(c =>
+      offenders.push(`${file}:${c.line} sign-out after delete_own_account (function at ${file}:${line}) must be global: scope 'global' or an allow-listed bare call`))
   }
   return { calls, offenders, deletionFns }
 }
@@ -107,7 +138,9 @@ describe('auth.signOut scope guard (real source)', () => {
   const deletionFns = results.flatMap(r => r.deletionFns)
   const global = calls.filter(c => c.scope === 'global')
   const local = calls.filter(c => c.scope === 'local')
+  const bare = calls.filter(c => c.allowedBare)
   const fmt = c => `${c.file}:${c.line}`
+  const bareList = 'Allowed bare (legacy provider-role, global) sign-outs:\n' + bare.map(c => `  ${fmt(c)}`).join('\n')
 
   test('scanner read real files (not vacuous)', () => {
     expect(files.length).toBeGreaterThan(50)
@@ -116,12 +149,15 @@ describe('auth.signOut scope guard (real source)', () => {
   })
 
   test('every call names scope local or global; no by-reference or destructured use', () => {
-    expect(results.flatMap(r => r.offenders)).toEqual([])
+    console.log(bareList)
+    const offenders = results.flatMap(r => r.offenders)
+    if (offenders.length) throw new Error(offenders.join('\n') + '\n' + bareList)
   })
 
   test('deletion functions sign out globally', () => {
-    console.log('delete_own_account functions:\n' + deletionFns.map(d => `  ${d.file}:${d.line} -> ${d.signOuts.map(s => `${s.line}:${s.scope}`).join(', ')}`).join('\n'))
+    console.log('delete_own_account functions:\n' + deletionFns.map(d => `  ${d.file}:${d.line} -> ${d.signOuts.map(s => `${s.line}:${s.scope || 'bare'}`).join(', ')}`).join('\n'))
     expect(deletionFns.map(fmt)).toHaveLength(EXPECTED_DELETION_FNS)
+    expect(deletionFns.flatMap(d => d.signOuts).filter(c => c.allowedBare)).toHaveLength(3) // Provider, InsuranceDashboard, HomeServiceDashboard
   })
 
   test('global allow-list: deletion sites + exactly two under-13 sites', () => {
@@ -135,13 +171,22 @@ describe('auth.signOut scope guard (real source)', () => {
     expect(under13.filter(c => c.file.endsWith('AgeIneligibleScreen.js'))).toHaveLength(1)
     expect(global).toHaveLength(EXPECTED_GLOBAL)
     expect(local).toHaveLength(EXPECTED_LOCAL)
+    expect(bare).toHaveLength(EXPECTED_BARE)
   })
 })
 
 describe('auth.signOut scope guard (self-check on fixtures)', () => {
-  const run = src => scan(src, 'fixture.js')
-  const red = src => expect(run(src).offenders.length).toBeGreaterThan(0)
-  const green = src => expect(run(src).offenders).toEqual([])
+  const run = (src, file = 'fixture.js', allow = BARE_ALLOW) => scan(src, file, allow)
+  const red = (src, file, allow, re) => {
+    const o = run(src, file, allow).offenders
+    expect(o.length).toBeGreaterThan(0)
+    if (re) expect(o.join('\n')).toMatch(re)
+  }
+  const green = (src, file, allow) => expect(run(src, file, allow).offenders).toEqual([])
+  const app1 = { 'App.js': { providerBranch: 1 } } // fixtures carry one provider-branch call, not the real 4
+  const organizer = path.join('screens', 'OrganizerScreen.js')
+  const providerScreen = path.join('screens', 'ProviderScreen.js')
+  const appProvider = "if (a) {} else if (profile.role === 'provider') { x = () => supabase.auth.signOut() } else if (profile.role === 'organizer') { y = 1 }"
 
   test('red: bare call', () => red('async function f(){ await supabase.auth.signOut() }'))
   test('red: multi-line bare call', () => red('async function f(){\n await supabase\n  .auth\n  .signOut(\n  )\n}'))
@@ -153,6 +198,27 @@ describe('auth.signOut scope guard (self-check on fixtures)', () => {
     red("async function d(){ await supabase.rpc('delete_own_account'); await supabase.auth.signOut({ scope: 'local' }) }"))
   test('red: delete_own_account function with no sign-out', () =>
     red("const d = async () => { await supabase.rpc('delete_own_account') }"))
+  test('red: bare call outside the allow-list (another screen)', () =>
+    red('const a = () => supabase.auth.signOut()', path.join('screens', 'ProfileScreen.js'), undefined, /outside the legacy provider-role allow-list/))
+  test('red: extra bare call in an allow-listed file', () =>
+    red('const a = () => supabase.auth.signOut(); const b = () => supabase.auth.signOut()', organizer, undefined, /expected exactly 1 allow-listed bare/))
+  test('red: allow-listed file with a missing bare call', () => red('const a = 1', organizer, undefined, /expected exactly 1/))
+  test('red: allow-listed file, bare call turned local', () =>
+    red("const a = () => supabase.auth.signOut({ scope: 'local' })", organizer, undefined, /expected exactly 1/))
+  test('red: App.js bare call outside the provider branch', () =>
+    red(appProvider + "; z = () => supabase.auth.signOut()", 'App.js', app1, /outside the legacy provider-role allow-list/))
+  test('red: App.js bare call in another role branch', () =>
+    red("if (a) {} else if (profile.role === 'provider') { } else if (profile.role === 'organizer') { y = () => supabase.auth.signOut() }", 'App.js', app1, /outside the legacy/))
+  test('red: deletion function in a non-allow-listed file with bare sign-out', () =>
+    red("async function d(){ await supabase.rpc('delete_own_account'); await supabase.auth.signOut() }", undefined, undefined, /outside the legacy/))
+  test('red: deletion function in an allow-listed file, sign-out turned local', () =>
+    red("async function d(){ await supabase.rpc('delete_own_account'); await supabase.auth.signOut({ scope: 'local' }) }", providerScreen, { [providerScreen]: 0 }, /must be global/))
+  test('green: allowed bare call (one in an allow-listed file)', () =>
+    green('const a = () => supabase.auth.signOut()', organizer))
+  test('green: allowed bare deletion sign-out counts as global', () =>
+    green("async function d(){ await supabase.rpc('delete_own_account'); await supabase.auth.signOut() }", providerScreen, { [providerScreen]: 1 }))
+  test('green: App.js bare call inside the provider branch, nested', () =>
+    green("if (a) {} else if (profile.role === 'provider') { if (b) { x = () => supabase.auth.signOut() } } else if (profile.role === 'organizer') { y = 1 }", 'App.js', app1))
   test('green: commented-out bare call', () => green('// supabase.auth.signOut()\n/* supabase.auth.signOut() */\nconst a = 1'))
   test('green: GoogleSignin.signOut()', () => green('async function f(){ await GoogleSignin.signOut() }'))
   test('green: explicit scopes, deletion global', () => {

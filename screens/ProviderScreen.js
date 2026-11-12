@@ -266,8 +266,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       return
     }
     await clearBook()   // delivery addresses live on this phone only; gone with the account (not on sign-out)
-    // Safety sign-out: the account was just deleted, so end it on every device.
-    await supabase.auth.signOut({ scope: 'global' })
+    await supabase.auth.signOut()
   }
 
   if (loading) {
@@ -293,7 +292,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.signOutBtn} onPress={() => supabase.auth.signOut({ scope: 'local' })}>
+          <TouchableOpacity style={styles.signOutBtn} onPress={() => supabase.auth.signOut()}>
             <Text style={styles.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </View>

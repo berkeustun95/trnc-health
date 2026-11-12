@@ -147,7 +147,7 @@ export default function InsuranceDashboardScreen({ session, lang = 'English' }) 
       {/* ── Header ─────────────────────────────────────────────── */}
       <View style={s.header}>
         <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.headerLogo} resizeMode="contain" />
-        <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut({ scope: 'local' })}>
+        <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
           <Text style={s.signOutText}>{t('signOut', lang)}</Text>
         </TouchableOpacity>
       </View>
@@ -303,8 +303,7 @@ export default function InsuranceDashboardScreen({ session, lang = 'English' }) 
             style={[s.saveBtn, { backgroundColor: colors.dangerLight, marginTop: 12 }]}
             onPress={async () => {
               const { error: err } = await supabase.rpc('delete_own_account')
-              // Safety sign-out: the account was just deleted, so end it on every device.
-              if (!err) { await clearBook(); await supabase.auth.signOut({ scope: 'global' }) }
+              if (!err) { await clearBook(); await supabase.auth.signOut() }
             }}
           >
             <Text style={[s.saveBtnText, { color: colors.danger }]}>Delete Account</Text>

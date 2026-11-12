@@ -2150,7 +2150,7 @@ export default function App() {
             </Text>
             <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
             <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={{ marginTop: 32 }}>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -2169,7 +2169,7 @@ export default function App() {
             </Text>
             <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
             <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={{ marginTop: 32 }}>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -2186,7 +2186,7 @@ export default function App() {
             </Text>
             <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
             <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={{ marginTop: 32 }}>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -2203,7 +2203,7 @@ export default function App() {
             </Text>
             <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
             <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={{ marginTop: 32 }}>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
