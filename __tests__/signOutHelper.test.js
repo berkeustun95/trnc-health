@@ -50,7 +50,6 @@ beforeEach(async () => {
   mockState.last = null
   supabase.auth.signOut.mockClear()
   Object.keys(mockStore).forEach(k => delete mockStore[k])
-  H.resetSigningOut()
   await H.savePushToken('ExponentPushToken[this-phone]', 'u1')
   mockOrder.length = 0
 })
@@ -119,31 +118,49 @@ test('(f) global after deletion: no update', async () => {
   expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: 'global' })
 })
 
-test('(g) registration write is suppressed while signing out; re-armed on failure and on a new sign-in', async () => {
-  expect(H.isSigningOut()).toBe(false)
-  H.resetSigningOut()
+test('(g) registration write is suppressed during a sign-out; allowed again once it ends, success or failure, no SIGNED_IN needed', async () => {
   mockState.signOutResult = { error: new Error('offline') }
-  let during
   mockState.updateImpl = async () => {
     mockState.updateImpl = null
-    during = H.isSigningOut()
     mockOrder.length = 0
     await H.savePushToken('ExponentPushToken[racing]', 'u1') // the effect re-running mid sign-out
     return { error: null }
   }
   await H.signOutThisDevice()
-  expect(during).toBe(true)
   expect(mockOrder).toEqual(['signOut']) // the racing registration wrote nothing
-  expect(H.isSigningOut()).toBe(false) // sign-out failed: session kept, registration allowed again
 
-  mockState.signOutResult = null
-  await H.signOutThisDevice()
-  expect(H.isSigningOut()).toBe(true) // succeeded: stays suppressed until SIGNED_IN
-  H.resetSigningOut()
-  expect(H.isSigningOut()).toBe(false)
   mockOrder.length = 0
-  await H.savePushToken('ExponentPushToken[new]', 'u1')
-  expect(mockOrder).toEqual(['update']) // a registration after a new sign-in writes again
+  await H.savePushToken('ExponentPushToken[after-failure]', 'u1')
+  expect(mockOrder).toEqual(['update']) // failed sign-out: session kept, registration allowed
+
+  for (const call of [() => H.signOutThisDevice(), () => H.signOutEverywhere({ clearToken: true })]) {
+    mockState.signOutResult = null
+    await call()
+    mockOrder.length = 0
+    // password-recovery link: a session appears with no SIGNED_IN event
+    await H.savePushToken('ExponentPushToken[recovery]', 'u1')
+    expect(mockOrder).toEqual(['update'])
+    expect(mockState.last.patch).toEqual({ push_token: 'ExponentPushToken[recovery]' })
+  }
+})
+
+test('(g2) sign-out call throws: flag released, error propagates', async () => {
+  supabase.auth.signOut.mockImplementationOnce(async () => { throw new Error('boom') })
+  await expect(H.signOutThisDevice()).rejects.toThrow('boom')
+  mockOrder.length = 0
+  await H.savePushToken('ExponentPushToken[x]', 'u1')
+  expect(mockOrder).toEqual(['update'])
+})
+
+test('(g3) session user differs from the captured id (or none, or a guest): no write, nothing remembered', async () => {
+  for (const session of [{ user: { id: 'admin1', is_anonymous: false } }, null, { user: { id: 'u1', is_anonymous: true } }]) {
+    mockState.session = session
+    mockOrder.length = 0
+    AsyncStorage.setItem.mockClear()
+    await H.savePushToken('ExponentPushToken[wrong]', 'u1')
+    expect(mockOrder).toEqual([])
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled()
+  }
 })
 
 test('(h) remembered token is forgotten after success, kept after failure', async () => {
@@ -156,11 +173,11 @@ test('(h) remembered token is forgotten after success, kept after failure', asyn
   expect(AsyncStorage.removeItem).toHaveBeenCalled()
 })
 
-// App.js wiring the unit tests above cannot see: the effect must register through the helper (which remembers the
-// token and honours the sign-out flag) and a new sign-in must re-arm it.
-test('App.js registers via savePushToken and re-arms on SIGNED_IN', () => {
+// App.js wiring the unit tests above cannot see: the effect must register through the helper (which checks the
+// session, remembers the token and honours the sign-out flag). The flag is released by the helper itself.
+test('App.js registers via savePushToken; no SIGNED_IN re-arm wiring remains', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'App.js'), 'utf8')
   expect(src).toMatch(/await savePushToken\(token, session\.user\.id\)/)
   expect(src).not.toMatch(/push_token:\s*token/)
-  expect(src).toMatch(/if \(event === 'SIGNED_IN'\) resetSigningOut\(\)/)
+  expect(src).not.toMatch(/resetSigningOut|isSigningOut/)
 })

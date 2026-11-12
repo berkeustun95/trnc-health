@@ -15,20 +15,20 @@ let signingOut = false
 // The token THIS device registered, kept in AsyncStorage too so a launch where registration could
 // not run (offline, permission prompt pending) can still clear it. Local sign-out only clears a row
 // that still holds this exact token, so another phone's newer token on the same account survives.
-// The ONLY writer of profiles.push_token: remember, check the flag, write, in that order (nothing but the
-// flag check sits right before the write). Returns without writing while a sign-out is under way.
+// The ONLY writer of profiles.push_token. Returns without writing while a sign-out is under way, and unless
+// the live session is still the non-guest user the effect captured (an admin signing in on this phone while
+// A's registration waited on the permission primer must not write onto A's row). Order: flag, session check,
+// remember (only for the right user), flag again, write; nothing but the flag check sits right before the write.
 export async function savePushToken(token, userId) {
+  if (signingOut) return
+  const { data: { session } } = await supabase.auth.getSession()
+  if (isGuest(session) || session?.user?.id !== userId) return
   if (signingOut) return
   rememberedToken = token
   try { await AsyncStorage.setItem(TOKEN_KEY, token) } catch {}
   if (signingOut) return
   await supabase.from('profiles').update({ push_token: token }).eq('id', userId)
 }
-
-// The registration effect re-runs on session churn and must not re-write the token between the
-// clear and the sign-out; a new sign-in re-arms it.
-export const isSigningOut = () => signingOut
-export const resetSigningOut = () => { signingOut = false }
 
 async function forgetPushToken() {
   rememberedToken = null
@@ -59,10 +59,16 @@ async function clearPushToken({ onlyThisDevice }) {
 
 async function finish(signOutCall) {
   let result
-  try { result = await signOutCall } catch (e) { signingOut = false; throw e }
-  if (result?.error) signingOut = false
-  else await forgetPushToken()
-  return result
+  try {
+    result = await signOutCall
+    if (!result?.error) await forgetPushToken()
+    return result
+  } finally {
+    // The flag only covers clear -> end of the sign-out call. After it there is no session (the effect returns
+    // on !session, savePushToken's session check and RLS refuse), and a recovery-link session that emits no
+    // SIGNED_IN must still be able to register.
+    signingOut = false
+  }
 }
 
 // "Çıkış yap": this device only.

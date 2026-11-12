@@ -115,7 +115,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
-import { signOutThisDevice, signOutEverywhere, savePushToken, resetSigningOut } from './utils/signOut'
+import { signOutThisDevice, signOutEverywhere, savePushToken } from './utils/signOut'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
@@ -1108,7 +1108,6 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
-      if (event === 'SIGNED_IN') resetSigningOut()
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { menuAnim.setValue(260); setShowMenu(false) }
       // A normal sign-out returns to the entry screen; a gate-driven one is on its way
       // to the sign-up form, so don't bounce it back to the entry screen.
