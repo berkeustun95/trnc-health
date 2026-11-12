@@ -60,6 +60,20 @@ CREATE TRIGGER auto_hide_on_report AFTER INSERT ON public.content_reports FOR EA
 ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check
   CHECK ((type = ANY (ARRAY['duty'::text, 'message'::text, 'waitlist'::text, 'question'::text, 'admin_alert'::text, 'admin_message'::text, 'featured'::text, 'general'::text, 'weekend'::text])));
 
+-- notifications as 20261088 / 20261089 leave it (read from the repo migrations: policies from 20260718_capture_5_rls_policies.sql
+-- + 20261089, grants from 20261088; NOT a live probe). 20261192 refuses without 20261088's ledger row and asserts these grants.
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "no_anon_delete_notifications" ON public.notifications AS RESTRICTIVE FOR DELETE TO authenticated USING ((NOT is_anonymous_session()));
+CREATE POLICY "no_anon_insert_notifications" ON public.notifications AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK ((NOT is_anonymous_session()));
+CREATE POLICY "service insert notifications" ON public.notifications FOR INSERT TO public WITH CHECK (false);
+CREATE POLICY "users read own notifications" ON public.notifications FOR SELECT TO public USING ((user_id = auth.uid()));
+CREATE POLICY "no_anon_update_notifications" ON public.notifications AS RESTRICTIVE FOR UPDATE TO authenticated USING ((NOT is_anonymous_session())) WITH CHECK ((NOT is_anonymous_session()));
+CREATE POLICY "users update own notifications" ON public.notifications FOR UPDATE TO public USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "users delete own notifications" ON public.notifications FOR DELETE TO authenticated USING ((user_id = auth.uid()));
+REVOKE INSERT, UPDATE ON public.notifications FROM anon, authenticated;
+GRANT UPDATE (read) ON public.notifications TO authenticated;
+INSERT INTO public.schema_migrations_applied (filename, checksum) VALUES ('20261088_notifications_lock_client_writes.sql', 'fixture');
+
 CREATE SCHEMA IF NOT EXISTS storage;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
 CREATE TABLE storage.buckets (id text PRIMARY KEY, name text NOT NULL, public boolean DEFAULT false,

@@ -320,6 +320,8 @@ WITH report AS (
     ('20261183_marketplace_listings','profiles','marketplace_notice_version'),
     ('20261184_marketplace_messaging','conversations','kind'),
     ('20261184_marketplace_messaging','conversations','listing_id'),
+    -- 20261192: the listing a Bandabuliya photo-decision notice opens. marketplace-photo-review writes it (and retries without it on a DB lacking it).
+    ('20261192_notifications_listing_id','notifications','listing_id'),
     -- 20261186: dealer consent (service_role only); red until it runs.
     ('20261186_vehicles_dealer_import','dealers','consent_date'),
     ('20261186_vehicles_dealer_import','dealers','consent_note'),
@@ -969,6 +971,8 @@ WITH report AS (
     ('20261184_marketplace_messaging','conversations_kind_check'),
     ('20261184_marketplace_messaging','conversations_listing_kind_check'),
     ('20261184_marketplace_messaging','conversations_listing_id_fkey'),
+    -- 20261192: existence here; its ON DELETE SET NULL action is an H token.
+    ('20261192_notifications_listing_id','notifications_listing_id_fkey'),
     ('20261143_partner_booking_requests','partner_booking_requests_pkey'),
     ('20261143_partner_booking_requests','partner_booking_requests_partner_check'),
     ('20261143_partner_booking_requests','partner_booking_requests_apartment_check'),
@@ -1339,6 +1343,8 @@ WITH report AS (
     ('20261183_marketplace_listings','marketplace_photos_queue_idx'),
     ('20261184_marketplace_messaging','conversations_one_live_per_listing'),
     ('20261184_marketplace_messaging','conversations_listing_idx'),
+    -- 20261192: partial (listing_id IS NOT NULL); serves the FK's lookup when the nightly purge deletes listings.
+    ('20261192_notifications_listing_id','notifications_listing_id_idx'),
     ('1095_institutions_country','institutions_country_idx'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_school_branches_school_idx'),
@@ -5949,6 +5955,25 @@ WITH report AS (
          AND pg_get_functiondef(to_regprocedure('public.start_conversation(uuid,text)')) NOT LIKE '%RAISE EXCEPTION ''TERMS_REQUIRED''%'
          AND pg_get_functiondef(to_regprocedure('public.send_message(uuid,text)')) LIKE '%RETURN send_listing_message(p_conversation_id, p_body);%'
          AND pg_get_functiondef(to_regprocedure('public.start_conversation(uuid,text)')) LIKE '%IF NOT can_see_student_lists() THEN%', false)
+  -- 20261192: notifications.listing_id. (a) SET NULL, never CASCADE: a purged listing or a deleted seller must not delete a
+  -- notice through this FK (it runs as an UPDATE; notifications has no triggers, owned by the 1087 token). confdeltype and
+  -- confrelid, not a rendered string. A missing FK makes the subselect NULL, so the token is false, not an error.
+  UNION ALL SELECT '20261192_notifications_listing_id','notifications_listing_id_fkey is ON DELETE SET NULL to marketplace_listings',
+    COALESCE((SELECT c.contype = 'f' AND c.confdeltype = 'n' AND c.confrelid = to_regclass('public.marketplace_listings')
+                FROM pg_constraint c WHERE c.conrelid = to_regclass('public.notifications') AND c.conname = 'notifications_listing_id_fkey'), false)
+  -- 20261192: (b) listing_id is not client-writable: anon and authenticated hold no INSERT or UPDATE on it; authenticated reads it
+  -- (own rows only, by RLS); service_role inserts it. Derived through pg_attribute: has_column_privilege RAISES for an absent column,
+  -- which would kill the whole report. No row (column absent) -> bool_and NULL -> false. The 1088 token owns "read is the only writable column".
+  UNION ALL SELECT '20261192_notifications_listing_id','notifications.listing_id: no INSERT/UPDATE for anon or authenticated; authenticated SELECT; service_role INSERT',
+    COALESCE((SELECT bool_and(
+                  NOT has_column_privilege('anon', a.attrelid, a.attname, 'INSERT')
+              AND NOT has_column_privilege('anon', a.attrelid, a.attname, 'UPDATE')
+              AND NOT has_column_privilege('authenticated', a.attrelid, a.attname, 'INSERT')
+              AND NOT has_column_privilege('authenticated', a.attrelid, a.attname, 'UPDATE')
+              AND has_column_privilege('authenticated', a.attrelid, a.attname, 'SELECT')
+              AND has_column_privilege('service_role', a.attrelid, a.attname, 'INSERT'))
+                FROM pg_attribute a
+               WHERE a.attrelid = to_regclass('public.notifications') AND a.attname = 'listing_id' AND NOT a.attisdropped), false)
   -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
