@@ -33,3 +33,11 @@ test('photo decision without a listing id: keeps the İlanlarım hint', async ()
   expect(screen.getByText(t('mkTapViewMine', L))).toBeTruthy()
   expect(screen.queryByText(t('mkTapOpenListing', L))).toBeNull()
 })
+test('Bandabuliya chat row: "Sohbeti aç"; a Student Hub message row shows no hint', async () => {
+  await show([
+    row({ id: 'a', title: 'İlan sohbeti', type: 'message', conversation_id: 'c1', listing_conversation: true }),
+    row({ id: 'b', title: 'Öğrenci mesajı', type: 'message', conversation_id: 'c2' }),
+  ])
+  expect(screen.getAllByText(t('mkTapOpenChat', L))).toHaveLength(1)
+  expect(t('mkTapOpenChat', L)).toBe('Sohbeti aç')
+})
