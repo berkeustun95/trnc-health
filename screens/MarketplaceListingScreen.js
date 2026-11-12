@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { t, tCount } from '../constants/i18n'
 import { colors, category as CAT, type, radii } from '../constants/theme'
 import { DetailScaffold, InfoRow, InfoBanner, InlineAlert, Button, ConfirmDialog, ErrorState, EmptyState, RemoteImage, IconButton, PageCanvas } from '../components/ui'
-import { MK_CATEGORY, MK_CONDITION, formatPrice, listingState, canRenew, daysUntil, mkErrorKey } from '../constants/marketplace'
+import { MK_CATEGORY, MK_CONDITION, formatPrice, listingState, canRenew, daysUntil, mkErrorKey, isTermsRequired } from '../constants/marketplace'
 import { HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, renewListing, reportListing, blockSeller } from '../utils/marketplaceApi'
 import ContentReportMenu from '../components/ContentReportMenu'
@@ -53,7 +53,7 @@ function PhotoViewer({ urls, index, onClose, lang }) {
   )
 }
 
-export default function MarketplaceListingScreen({ id, lang, session, onBack, onEdit, onChanged, onMessage, onRequireAccount }) {
+export default function MarketplaceListingScreen({ id, lang, session, onBack, onEdit, onChanged, onMessage, onRequireAccount, onPostAction = fn => fn(), onTermsRequired }) {
   const [listing, setListing] = useState(null)
   const [photos, setPhotos]   = useState([])
   const [urls, setUrls]       = useState({})
@@ -82,7 +82,7 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
 
   async function act(fn) {
     setBusy(true); setActionError(null)
-    try { await fn(); await load(); onChanged?.() } catch (e) { setActionError(t(mkErrorKey(e), lang)) }
+    try { await fn(); await load(); onChanged?.() } catch (e) { if (onTermsRequired && isTermsRequired(e)) onTermsRequired(); else setActionError(t(mkErrorKey(e), lang)) }
     setBusy(false)
   }
 
@@ -177,10 +177,10 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
             {state !== 'hidden' && <Button title={t('mkEdit', lang)} icon="create-outline" variant="secondary" fullWidth disabled={busy} onPress={() => onEdit(listing)} />}
             {(state === 'live' || state === 'sold') && (
               <Button title={t(state === 'sold' ? 'mkMarkAvailable' : 'mkMarkSold', lang)} icon={state === 'sold' ? 'refresh-outline' : 'checkmark-done-outline'}
-                variant="secondary" fullWidth loading={busy} onPress={() => act(() => setSold(listing.id, state !== 'sold'))} />
+                variant="secondary" fullWidth loading={busy} onPress={() => { const run = () => act(() => setSold(listing.id, state !== 'sold')); if (state === 'sold') onPostAction(run); else run() }} />
             )}
             {state !== 'hidden' && canRenew(listing) && (
-              <Button title={t('mkRenew', lang)} icon="reload-outline" fullWidth loading={busy} onPress={() => act(() => renewListing(listing.id))} />
+              <Button title={t('mkRenew', lang)} icon="reload-outline" fullWidth loading={busy} onPress={() => onPostAction(() => act(() => renewListing(listing.id)))} />
             )}
             <Button title={t('mkDelete', lang)} icon="trash-outline" variant="text" fullWidth disabled={busy} onPress={() => setConfirmDelete(true)} />
           </View>

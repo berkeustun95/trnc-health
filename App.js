@@ -1421,7 +1421,7 @@ export default function App() {
         }
       })
     setNotifsLoading(true)
-    fetchNotifications(supabase, session.user.id)
+    fetchNotifications(supabase, session.user.id, { guest: isGuest(session) })
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
 
     // Owns a garage? Drives the dark-launched garages tile for owners onboarded
@@ -2244,6 +2244,7 @@ export default function App() {
         const route = notificationRoute(item)
         if (route === 'weekend') openWeekendOnMap()
         else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
+        else if (route === 'marketplace_conversation') { closeNotifs(); setShowMarketplace({ view: 'inbox', conversationId: item.conversation_id }) }
         else setShowDutyList(true)
       }}
       onEnablePush={() => setPushRetry(n => n + 1)}
@@ -2682,6 +2683,7 @@ export default function App() {
   } else if (showMarketplace && MARKETPLACE) {
     // Bandabuliya. Dark module: no ComingSoon fallback (NO_WAITLIST). MARKETPLACE is true only when live or on dev / ADA Preview.
     content = <MarketplaceScreen lang={lang} session={session} profile={profile} backRef={marketplaceBackRef}
+      onTermsAccepted={d => setProfile(p => (p ? { ...p, ...d } : p))}
       initialView={showMarketplace === 'mine' ? 'mine' : null} target={typeof showMarketplace === 'object' ? showMarketplace : null}
       onSignIn={key => requireAccount(key || 'mkGatePost')}
       onBack={() => setShowMarketplace(null)} />

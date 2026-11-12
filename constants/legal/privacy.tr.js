@@ -14,8 +14,8 @@
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `ADA – Kuzey Kıbrıs Asistanı (Android paket adı com.berkeustun95.ada), Google Play'de P&D Digital tarafından yayımlanır ve Astarte Digital Trading Ltd. (KKTC, şirket no. MŞ29454) tarafından işletilir.
 
-Sürüm: 2026-11-09
-Son güncelleme: 9 Kasım 2026
+Sürüm: 2026-11-11
+Son güncelleme: 11 Kasım 2026
 
 KİM OLDUĞUMUZ
 
@@ -37,7 +37,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 
 • Ad ve soyad — gerçek adınız. Hesabınızda saklanır; kimlerin görebileceği için 3. bölüme bakınız.
 • Görünen ad (uygulamada “Kullanıcı adı” olarak geçer) — 3 ile 20 karakter arasında, kendi seçtiğiniz bir ad. Gerçek adınız olmak zorunda değildir. Yazdığınız değerlendirmelerin, soruların ve cevapların yanında gösterilen ad budur ve diğer kullanıcıların gördüğü tek addır.
-• Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları (5. bölüme bakınız) ve check-in'lerinizin diğer kullanıcılardan başlangıçta gizli olup olmayacağını (3. bölüme bakınız) etkiler.
+• Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları (5. bölüme bakınız) ve check-in'lerinizin diğer kullanıcılardan başlangıçta gizli olup olmayacağını (3. bölüme bakınız) etkiler. Bandabuliya'da ilan vermeden önce 18 yaşında veya daha büyük olduğunuzu kontrol etmek için de kullanılır.
 • Uyruk — hangi ikamet, izin ve evrak bilgilerinin sizin için geçerli olduğunu ve öncelikle hangi dilleri sunmamız gerektiğini belirleyebilmek için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.
 • KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Bugün Ana Sayfa'nın üstündeki bölge adını ve fotoğrafını seçer; uygulamada bu veriyi okuyan başka bir bölüm henüz yok.
@@ -47,12 +47,18 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 
 Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersiniz ya da kendi yüklediğiniz bir görsel kullanılır; yüklenen görsel dosya depolamamızda saklanır.
 
-Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğunuz sorulara gelen cevapları gönderebilmek için saklanır. Ayrıca isteğe bağlı Cuma notu için kullanılır: hafta sonunun etkinlikleri ve gezilecek bir yer; Profil → «Bilgilendirmeler ve fırsatlar» bölümünden kapatabilirsiniz. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
+Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını, sorduğunuz sorulara gelen cevapları, sohbetlerinizdeki yeni mesajları (Bandabuliya ilanlarıyla ilgili sohbetler dahil) göndermek ve bir ilana eklediğiniz fotoğraf yayımlanmadığında ya da ilanınızı gizlediğimizde sizi bilgilendirmek için saklanır. Ayrıca isteğe bağlı Cuma notu için kullanılır: hafta sonunun etkinlikleri ve gezilecek bir yer; Profil → «Bilgilendirmeler ve fırsatlar» bölümünden kapatabilirsiniz. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
 
-• Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için 30 gün saklanır, sonra kalıcı olarak silinir. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
+• Gönderdiğiniz mesajlar — diğer öğrencilere ve Bandabuliya ilanları hakkında diğer kullanıcılara gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için 30 gün saklanır, sonra kalıcı olarak silinir. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
 • Konuşma başlatma denemeleri — birine mesaj göndermeye çalıştığınızda, iletilip iletilmediğinden bağımsız olarak bu denemenin gerçekleştiğini kaydederiz. Bunu yalnızca yöneticiler görebilir ve 30 gün sonra silinir.
+
+Bandabuliya. Bir ilan verdiğinizde ilanın başlığını, açıklamasını, fiyatını, kategorisini, durumunu, ilçesini, yayın durumunu ve tarihlerini hesabınıza bağlı olarak saklarız. Diğer kullanıcılar kullanıcı adınızı görür, size bir ilan hakkında mesaj gönderen herkes ve mesaj gönderdiğiniz herkes ayrıca profil fotoğrafınızı görür; adınızı, telefon numaranızı ve e-posta adresinizi ise asla görmez.
+
+Fotoğraflar: eklediğiniz fotoğraflar özel olarak saklanır. Biz onaylayana kadar yalnızca siz ve inceleme ekibimiz görebilir. Onayladığımızda, yeniden boyutlandırılmış ve konum dahil gömülü tüm meta verileri silinmiş bir kopyasını yayımlarız ve aslını sileriz. Reddedilen fotoğrafın dosyası silinir; reddedilme gerekçesiyle birlikte kaydı, ilan kalıcı olarak silinene kadar ilanla birlikte kalır. Fotoğraflar, bir saat sonra geçerliliğini yitiren bağlantılarla gösterilir.
+
+Mesajlar: bir ilanla ilgili mesajlar, yukarıda anlatılan mesajlarla aynı şekilde ele alınır: silme, saklama ve şikâyet etme kuralları aynıdır. Bandabuliya güvenlik notunu ne zaman ve hangi sürümünü kabul ettiğinizi kaydederiz.
 
 Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar. Engelleme listeniz özeldir ve engellediğiniz kullanıcıya asla gösterilmez.
 
@@ -105,6 +111,8 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • 18 yaşından küçüklerin check-in'lerini, göstermeyi seçmedikleri sürece gizli tutmak — Küçükleri korumak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 • Check-in yaparken yakınınızdaki mekanları Google aracılığıyla bulmak — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • Restorana sipariş gönderdiğinizde sipariş kaydı oluşturmak ve oluşturulabilecek sipariş sayısını sınırlamak — Restoranın siparişi doğrulayabilmesi ve spam ile sahte siparişlerin önlenmesi için. Hukuki dayanak: Güvenilir ve kötüye kullanıma kapalı bir hizmetteki meşru menfaatimiz; sizinle yapılan sözleşmenin ifası
+• Bandabuliya ilanlarınızı ve fotoğraflarınızı diğer kullanıcılara göstermek, alıcıların ve satıcıların birbirine mesaj göndermesini sağlamak — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• Bandabuliya fotoğraflarını başkaları görmeden önce incelemek, bildirilen ilanları gizlemek ve güvenlik notunu ne zaman kabul ettiğinizi kaydetmek — Yasa dışı ya da tehlikeli ürünleri ve kötüye kullanımı diğer kullanıcılardan uzak tutmak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
@@ -117,6 +125,7 @@ Diğer kullanıcıların görebildikleri:
 • Yazdığınız değerlendirmelerin, soruların ve cevapların yanında görünen adınız.
 • Yazdığınız değerlendirmelerin, soruların ve cevapların içeriği ile verdiğiniz puanlar.
 • Görünür oldukları sürece check-in'leriniz: görünen adınız, profil fotoğrafınız, mekan ve ne kadar önce check-in yaptığınız. Bunlar mekanın son check-in'ler listesinde ve Keşfet → Check-in'ler'de, yalnızca giriş yapmış kullanıcılara görünür — misafirlere asla. Bir kişinin check-in'lerini listeleyen bir sayfa yoktur. 18 yaşında veya daha büyükseniz, profilinizdeki “Check-in'lerimi gizle” ayarını açmadığınız sürece check-in'leriniz görünür; 18 yaşından küçükseniz ya da doğum tarihinizi bilmiyorsak, bu ayarı kapatmadığınız sürece gizlidir. Bu, ilk check-in'inizde bir kez belirlenir ve 18 yaşına girdiğinizde kendiliğinden değişmez. Ayarı açmak check-in'lerinizi iki listeden de hemen kaldırır. Engellediğiniz kullanıcılar ve sizi engelleyen kullanıcılar check-in'lerinizi görmez. Check-in'lerinizden herhangi birini istediğiniz zaman profilinizden silebilirsiniz.
+• Bandabuliya'da, ilan yayındayken: ilanın başlığı, açıklaması, fiyatı (ya da ücretsiz olduğu), kategorisi, ürünün durumu, ilçesi, hâlâ satışta mı yoksa satıldı olarak mı işaretli olduğu, ne zaman yayımlandığı ve ne zaman sona ereceği; onaylanmış fotoğrafları; ve kullanıcı adınız. İncelemeyi bekleyen ya da reddedilen fotoğraflar başkalarına gösterilmez. Size bir ilan hakkında mesaj gönderen herkes ve bir ilan hakkında mesaj gönderdiğiniz herkes, sohbet listelerinde profil fotoğrafınızı da görür. Bandabuliya'yı açan herkes, giriş yapmış olsun ya da misafir olsun, ilanları görebilir. Uygulamanın ihtiyaç duyduğu bazı teknik ayrıntılar, ekranda gösterilmese de giriş yapmış kullanıcılar (misafirler dahil) tarafından okunabilir: satıcıya ait dahili bir hesap tanımlayıcısı ile ilanın en son ne zaman düzenlendiği, yenilendiği ya da satıldı olarak işaretlendiği.
 
 Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz ve e-posta adresiniz.
 
@@ -166,13 +175,14 @@ KKTC'den faaliyet gösterdiğimiz için yöneticilerimiz verilerinize AB/AEA dı
 Farklı veriler farklı sürelerle saklanır.
 
 • Hesabınız: hesabınızdaki verileri hesabınız etkin olduğu sürece saklarız. Hesabınızın silinmesini talep ederseniz, ilgili mevzuatın saklamayı zorunlu kıldığı hâller dışında kişisel verilerinizi 30 gün içinde sileriz.
-• Reddedilen gönderimler — 30 gün: bir gönderim içerik filtremiz tarafından reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz.
+• Reddedilen gönderimler — 30 gün: bir gönderim içerik filtremiz tarafından reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz. Tek istisna Bandabuliya ilanlarıdır: bir ilanın başlığı veya açıklaması reddedilirse reddedilen metni saklamayız. Bir ilan hakkındaki reddedilen mesaj ise yukarıdaki kural uyarınca saklanır.
 • Sildiğiniz içerikler — 30 gün: sildiğiniz değerlendirmeler, sorular ve mesajlar hemen gizlenir ve 30 gün sonra kalıcı olarak kaldırılır. Hâlâ açık bir şikâyetin parçasıysa, şikâyet sonuçlandığında kaldırılır. Bir soruyu silmek, ona verilen yanıtları da kaldırır.
 • Kaldırdığımız içerikler: topluluk kurallarımızı ihlal ettiği için kaldırılan içerikler, aynı hesabın tekrarlayan ihlallerini tespit edebilmemiz için dâhilî olarak saklanır. Diğer kullanıcılara artık görünmez.
 • Rota rozetleri: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Misafir kullanıcının rozeti yalnızca telefonda, 7 gün boyunca tutulur.
 • Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
 • Sipariş kayıtları — 30 gün: siparişin oluşturulmasından 30 gün sonra otomatik olarak silinir. Doğrulama sayfası, siparişi oluşturulmasından 2 saat sonra artık doğrulamaz.
 • Rezervasyon talepleri — 12 ay: bir talebin kaydı (daire, tarihler, misafir sayısı, gönderilme zamanı) 12 ay sonra otomatik olarak silinir.
+• Bandabuliya ilanları ve fotoğrafları: sildiğiniz bir ilan hemen gizlenir ve, hakkında hâlâ açık bir bildirim yoksa, fotoğraflarıyla birlikte 30 gün sonra kalıcı olarak silinir. Süresi 90 günden uzun süredir dolmuş olan bir ilan da aynı şekilde gizlenir ve, hakkında açık bir bildirim yoksa, yaklaşık 30 gün sonra kalıcı olarak silinir. Hiçbir ilanın kullanmadığı fotoğraf dosyaları iki gün içinde kaldırılır (her gece çalışan bir işlem, yüklenmesinin üzerinden 24 saatten fazla geçmiş bu tür tüm dosyaları kaldırır).
 • Oli'ye sor sohbet geçmişi — 90 gün: sorularınız ve Oli'nin yanıtları gönderildikten 90 gün sonra otomatik olarak, “Sohbet geçmişimi sil”i kullanırsanız hemen ve hesabınızla birlikte silinir.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 

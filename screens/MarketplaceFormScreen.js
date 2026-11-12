@@ -11,7 +11,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import SplashStatusBar from '../components/SplashStatusBar'
 import {
   MK_CATEGORIES, MK_CONDITIONS, MK_DISTRICTS, MK_TITLE_MIN, MK_TITLE_MAX, MK_DESC_MIN, MK_DESC_MAX, MK_PRICE_MAX,
-  MK_PHOTOS_MAX, mkErrorKey,
+  MK_PHOTOS_MAX, mkErrorKey, isTermsRequired,
 } from '../constants/marketplace'
 import { createListing, updateListing, photosFor, signedUrls, uploadPhoto, removePhoto } from '../utils/marketplaceApi'
 
@@ -36,7 +36,7 @@ const freePositions = (taken, n) => {
   return out
 }
 
-export default function MarketplaceFormScreen({ lang, session, listing = null, onBack, onSaved }) {
+export default function MarketplaceFormScreen({ lang, session, listing = null, onBack, onSaved, onTermsRequired }) {
   const [editingId, setEditingId] = useState(listing?.id || null)
   const [title, setTitle]         = useState(listing?.title || '')
   const [category, setCategory]   = useState(listing?.category || null)
@@ -103,9 +103,11 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
     const fields = { title: title.trim(), description: desc.trim(), is_free: isFree, price_tl: isFree ? null : Number(price),
                      category, condition, district }
     let id = editingId
+    let wrote = false   // the row write succeeded: a later refusal leaves a partly saved listing
     try {
       if (id) await updateListing(id, fields)
       else { id = await createListing(fields); setEditingId(id) }
+      wrote = true
       for (const pid of removed) await removePhoto(pid)
       setRemoved([])
       const slots = freePositions(new Set(keptExisting.map(p => p.position)), picked.length)
@@ -121,7 +123,10 @@ export default function MarketplaceFormScreen({ lang, session, listing = null, o
     } catch (e) {
       setProgress(null); setSaving(false)
       // The listing may already exist: stay here in edit mode so a retry sends only what is missing.
-      setError(t(id && !editingId ? 'mkErrPhotosPartial' : mkErrorKey(e), lang))
+      // TERMS_REQUIRED opens the terms gate over this form instead (nothing typed or picked is lost; the user taps Save again).
+      // If the row (and removals) already committed, the line stays visible after the gate closes: the save is incomplete.
+      if (onTermsRequired && isTermsRequired(e)) { onTermsRequired(); if (wrote) setError(t('mkErrPhotosPartial', lang)) }
+      else setError(t(id && !editingId ? 'mkErrPhotosPartial' : mkErrorKey(e), lang))
       if (id) {
         const ph = (await photosFor([id]).catch(() => ({ [id]: [] })))[id].filter(p => p.status !== 'rejected')
         const urls = await signedUrls(ph.map(p => p.storage_path)).catch(() => ({}))

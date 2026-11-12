@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Keyboard, AccessibilityInfo } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import { colors, category as CAT, type, radii } from '../constants/theme'
 import { ScreenHeader, BottomSheet, Button, InlineAlert, ModuleScreen } from '../components/ui'
-import { mkChatErrorKey } from '../constants/marketplace'
+import { mkChatErrorKey, isTermsRequired } from '../constants/marketplace'
 import { MARKETPLACE_CHAT, noticeAccepted, acceptNotice } from '../utils/marketplaceApi'
 import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
+import StudentHubTermsGate from './StudentHubTermsGate'
+import { needsMarketplaceTerms } from '../constants/legal'
+import { isGuest } from '../lib/supabase'
+import { OnPhotoContext } from '../components/ui/onPhoto'
 
 // ─── Bandabuliya chat: inbox, one thread, or a first message from a listing ─────
 // Student Hub's two screens with the listing adapter (utils/marketplaceApi.js MARKETPLACE_CHAT), so block, leave,
@@ -47,23 +51,51 @@ export function MarketplaceNoticeSheet({ visible, lang, onClose, onAccepted }) {
   )
 }
 
-// The listing a thread is about. listing_id is NULL once the listing is purged (20261185 keeps the chat).
-function listingState(row) {
-  if (!row?.listing_id) return 'removed'
-  if (row.listing_status === 'sold') return 'sold'
-  return row.listing_available ? 'live' : 'removed'
+// The terms re-ask (decision 6): an absolute-fill layer, NOT a Modal, so Android back reaches it through the backRef chain
+// and the screen under it stays mounted (a typed draft survives). Reuses Student Hub's gate with Bandabuliya's own copy.
+// OnPhotoContext false: the gate is an opaque light canvas, so over a ModuleScreen (list) its header must not go white,
+// and ScreenHeader's status bar then reads dark. accessibilityViewIsModal keeps VoiceOver on the gate (iOS).
+export function MarketplaceTermsLayer({ lang, userId, onAccepted, onCancel }) {
+  useEffect(() => { Keyboard.dismiss(); AccessibilityInfo.announceForAccessibility(t('mkTermsTitle', lang)) }, [])
+  return (
+    <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+      <OnPhotoContext.Provider value={false}>
+        <StudentHubTermsGate lang={lang} userId={userId} onAccepted={onAccepted} onCancel={onCancel}
+          titleKey="mkTermsTitle" bodyKey="mkTermsBody" />
+      </OnPhotoContext.Provider>
+    </View>
+  )
 }
-const STATE_BADGE = { sold: 'mkStateSold', removed: 'mkChatListingRemoved' }
+
+// The listing a thread is about. listing_id is NULL once the listing is purged (20261185 keeps the chat). The RPC nulls
+// listing_title for a hidden or deleted listing; MARKETPLACE_CHAT.list() adds listing_hidden + title (the seller's own
+// hidden row) and i_am_buyer. A buyer never learns a listing was hidden, so hidden/deleted read as the same neutral line.
+export function listingState(row) {
+  if (!row?.listing_id) return 'removed'
+  if (row.listing_hidden) return 'hidden'
+  if (row.listing_title == null) return row.i_am_buyer === true ? 'gone' : 'removed'
+  if (row.listing_status === 'sold') return 'sold'
+  return row.listing_available ? 'live' : 'expired'
+}
+const STATE_BADGE = { sold: 'mkStateSold', expired: 'mkStateExpired', hidden: 'mkStateHidden' }
+const CAN_OPEN = { live: true, sold: true, hidden: true }
+export function listingTitleText(row, lang) {
+  const state = listingState(row)
+  if (state === 'gone') return t('mkGoneTitle', lang)
+  if (state === 'removed') return t('mkChatListingRemoved', lang)
+  return row.listing_title
+}
 
 function ListingStrip({ row, lang, onOpen }) {
   const state = listingState(row)
-  const canOpen = state !== 'removed'
+  const canOpen = CAN_OPEN[state] === true
+  const title = listingTitleText(row, lang)
   return (
     <TouchableOpacity style={s.strip} onPress={() => onOpen(row.listing_id)} disabled={!canOpen} activeOpacity={0.8}
-      accessibilityRole={canOpen ? 'button' : 'text'} accessibilityLabel={`${row.listing_title ?? t('mkChatListingRemoved', lang)}`}>
+      accessibilityRole={canOpen ? 'button' : 'text'} accessibilityLabel={STATE_BADGE[state] ? `${title}, ${t(STATE_BADGE[state], lang)}` : title}>
       <Ionicons name="pricetag-outline" size={18} color={CAT.homeLife.ink} />
-      <Text style={s.stripTitle} numberOfLines={1}>{row.listing_title ?? t('mkChatListingRemoved', lang)}</Text>
-      {STATE_BADGE[state] && row.listing_title ? <Text style={s.badge}>{t(STATE_BADGE[state], lang)}</Text> : null}
+      <Text style={s.stripTitle} numberOfLines={1}>{title}</Text>
+      {STATE_BADGE[state] ? <Text style={s.badge}>{t(STATE_BADGE[state], lang)}</Text> : null}
       {canOpen && <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
     </TouchableOpacity>
   )
@@ -74,14 +106,14 @@ function InboxExtra({ row, lang }) {
   return (
     <View style={s.extra}>
       <Ionicons name="pricetag-outline" size={12} color={colors.textSecondary} />
-      <Text style={s.extraText} numberOfLines={1}>{row.listing_title ?? t('mkChatListingRemoved', lang)}</Text>
-      {STATE_BADGE[state] && row.listing_title ? <Text style={s.extraBadge}>{t(STATE_BADGE[state], lang)}</Text> : null}
+      <Text style={s.extraText} numberOfLines={1}>{listingTitleText(row, lang)}</Text>
+      {STATE_BADGE[state] ? <Text style={s.extraBadge}>{t(STATE_BADGE[state], lang)}</Text> : null}
     </View>
   )
 }
 
 // compose: { userId, displayName, listingId, listingTitle } — a buyer's first message from a listing page.
-export default function MarketplaceChatScreen({ lang, session, onBack, onOpenListing, compose = null, initialConversationId = null, backRef = null }) {
+export default function MarketplaceChatScreen({ lang, session, onBack, onOpenListing, compose = null, initialConversationId = null, backRef = null, termsVersion = null, onTermsAccepted, onTermsRefused }) {
   const myId = session?.user?.id
   const [thread, setThread]   = useState(null)          // a list_conversations row
   const [composing, setComposing] = useState(compose)
@@ -89,6 +121,10 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   const [noticeOpen, setNoticeOpen] = useState(false)
   const noticeOk = useRef(false)
   const resolveNotice = useRef(null)
+  const [termsOpen, setTermsOpen] = useState(false)
+  const termsOk = useRef(false)          // set on accept: the resumed send runs before App's profile re-renders
+  const termsForced = useRef(false)      // the server refused with TERMS_REQUIRED: due whatever the profile says, until an accept
+  const resolveTerms = useRef(null)
 
   const findThread = useCallback(async match => {
     const { data } = await MARKETPLACE_CHAT.list()
@@ -107,30 +143,44 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
   }, [compose, composing, thread, onBack])
   useEffect(() => {
     if (!backRef) return
-    backRef.current = () => { if (thread || composing) { leaveThread(); return true } return false }
+    backRef.current = () => { if (termsOpen) { answerTerms(false); return true } if (thread || composing) { leaveThread(); return true } return false }
     return () => { backRef.current = null }
   })
 
-  // The notice gate: known-accepted → go; otherwise ask once, and the send waits for the answer.
+  // Terms gate first (decision 6), then the notice, then the send. Like the notice, a second Send tap while it is open is not a second send.
+  // termsVersion null (profile not loaded) asks: never let an unchecked account through. A guest is never asked
+  // (it must not write profiles): the send's AUTH_REQUIRED refusal handles it as before.
   const beforeSend = useCallback(async () => {
+    if (resolveTerms.current) return false
+    if (!isGuest(session) && (termsForced.current || (!termsOk.current && needsMarketplaceTerms(termsVersion)))) {
+      setTermsOpen(true)
+      if (!(await new Promise(resolve => { resolveTerms.current = resolve }))) return false
+    }
     if (noticeOk.current) return true
     try { if (await noticeAccepted(myId)) { noticeOk.current = true; return true } } catch { /* ask */ }
     // A second tap on Send while the sheet is open is not a second send.
     if (resolveNotice.current) return false
     setNoticeOpen(true)
     return new Promise(resolve => { resolveNotice.current = resolve })
-  }, [myId])
+  }, [myId, termsVersion, session])
+  const answerTerms = ok => {
+    setTermsOpen(false)
+    resolveTerms.current?.(ok); resolveTerms.current = null
+  }
   const answerNotice = ok => {
     setNoticeOpen(false)
     if (ok) noticeOk.current = true
     resolveNotice.current?.(ok); resolveNotice.current = null
   }
   // The server is the backstop: a NOTICE_REQUIRED (an older accepted version) clears the cache so the next send asks.
+  // TERMS_REQUIRED does the same for the terms gate, but opens it at once (the draft stays in the composer; the user taps Send again).
+  // false = no error line (ConversationScreen shows only a truthy key).
   const errorKey = useCallback(e => {
+    if (isTermsRequired(e)) { termsOk.current = false; termsForced.current = true; onTermsRefused?.(); setTermsOpen(true); return false }
     const k = mkChatErrorKey(e)
     if (k === 'mkNoticeRequired') noticeOk.current = false
     return k
-  }, [])
+  }, [onTermsRefused])
 
   const onChanged = useCallback(async change => {
     setRefreshKey(k => k + 1)
@@ -140,6 +190,10 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
     if (row) { setComposing(null); setThread(row) }
   }, [composing, thread, findThread])
 
+  const termsLayer = termsOpen ? (
+    <MarketplaceTermsLayer lang={lang} userId={myId} onCancel={() => answerTerms(false)}
+      onAccepted={d => { termsOk.current = true; termsForced.current = false; onTermsAccepted?.(d); answerTerms(true) }} />
+  ) : null
   const notice = <MarketplaceNoticeSheet visible={noticeOpen} lang={lang} onClose={() => answerNotice(false)} onAccepted={() => answerNotice(true)} />
 
   if (thread || composing) {
@@ -157,6 +211,7 @@ export default function MarketplaceChatScreen({ lang, session, onBack, onOpenLis
           api={MARKETPLACE_CHAT} header={strip} beforeSend={beforeSend} errorKey={errorKey}
         />
         {notice}
+        {termsLayer}
       </>
     )
   }

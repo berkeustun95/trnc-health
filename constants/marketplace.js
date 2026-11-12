@@ -95,6 +95,9 @@ export function mkChatErrorKey(err) {
   return hit ? CHAT_ERROR_KEY[hit] : null
 }
 
+// The server's terms floor (20261190) refused the call. Not an error line: the screens re-open the terms gate.
+export const isTermsRequired = err => String(err?.message || err || '').includes('TERMS_REQUIRED')
+
 export function mkErrorKey(err) {
   const msg = String(err?.message || err || '')
   const hit = Object.keys(ERROR_KEY).find(k => msg.includes(k))
