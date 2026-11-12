@@ -115,6 +115,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
+import { signOutThisDevice, signOutEverywhere, rememberPushToken, isSigningOut, resetSigningOut } from './utils/signOut'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
@@ -1029,7 +1030,7 @@ export default function App() {
     setAuthMode('signup')
     toSignUpRef.current = true
     setShowWelcome(false)
-    await supabase.auth.signOut({ scope: 'local' })
+    await signOutThisDevice()
   }
 
   async function selectLang(langKey) {
@@ -1107,6 +1108,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
+      if (event === 'SIGNED_IN') resetSigningOut()
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { menuAnim.setValue(260); setShowMenu(false) }
       // A normal sign-out returns to the entry screen; a gate-driven one is on its way
       // to the sign-up form, so don't bounce it back to the entry screen.
@@ -1514,7 +1516,8 @@ export default function App() {
           })
         }
         const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c' })
-        if (token) {
+        if (token && !isSigningOut()) {
+          await rememberPushToken(token)
           await supabase.from('profiles').update({ push_token: token }).eq('id', session.user.id)
         }
       } catch (e) {
@@ -1988,8 +1991,8 @@ export default function App() {
     // A sign-out that failed offline would leave a session for a deleted user; retry it here.
     content = <AgeIneligibleScreen lang={lang} onDone={() => {
       setAgeDeletedNotice(false)
-      // Safety sign-out (under-13): every device.
-      if (sessionRef.current) supabase.auth.signOut({ scope: 'global' })
+      // Safety sign-out (under-13): every device. The Google/Apple account is already deleted (no row, no token to clear).
+      if (sessionRef.current) signOutEverywhere({ clearToken: false })
     }} />
   } else if (!session && showWelcome) {
     content = (
@@ -2738,7 +2741,7 @@ export default function App() {
       { key: 'share',        iconSet: 'feather',  icon: 'share-2',                   labelKey: 'menuShareApp',     onPress: shareApp },
       { key: 'about',        iconSet: 'ionicons', icon: 'information-circle-outline', labelKey: 'menuAbout',        onPress: showAbout },
       { key: 'tutorial',     iconSet: 'ionicons', icon: 'compass-outline',           labelKey: 'menuTutorial',     dividerBefore: true, onPress: () => { closeMenu(); startCoachMarks() } },
-      { key: 'signOut',      iconSet: 'feather',  icon: 'log-out',                   labelKey: 'signOut',          danger: true, onPress: () => supabase.auth.signOut({ scope: 'local' }) },
+      { key: 'signOut',      iconSet: 'feather',  icon: 'log-out',                   labelKey: 'signOut',          danger: true, onPress: () => signOutThisDevice() },
     ].filter(i => i.visible !== false)
     // Profil's settings rows (redesign). Every handler is App's own, so a setting behaves
     // the same wherever it is reached; the drawer that used to hold them is not rendered.
@@ -3387,7 +3390,7 @@ export default function App() {
             cancelLabel={t('uiNevermind', lang)}
             actions={[
               { label: t('hrGuestTitle', lang), variant: 'primary', onPress: () => { setSignOutAsk(null); gateSignUp() } },
-              { label: t('hrSignOutAnyway', lang), variant: 'danger', onPress: () => { setSignOutAsk(null); supabase.auth.signOut({ scope: 'local' }) } },
+              { label: t('hrSignOutAnyway', lang), variant: 'danger', onPress: () => { setSignOutAsk(null); signOutThisDevice() } },
             ]}
             onCancel={() => setSignOutAsk(null)}
             lang={lang}
@@ -3397,7 +3400,7 @@ export default function App() {
             title={t('hrSignOutTitle', lang)}
             confirmLabel={t('signOut', lang)}
             destructive
-            onConfirm={() => { setSignOutAsk(null); supabase.auth.signOut({ scope: 'local' }) }}
+            onConfirm={() => { setSignOutAsk(null); signOutThisDevice() }}
             onCancel={() => setSignOutAsk(null)}
             lang={lang}
           />
