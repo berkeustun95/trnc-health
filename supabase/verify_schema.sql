@@ -744,6 +744,11 @@ WITH report AS (
     ('20261185_marketplace_maintenance','marketplace_orphan_objects'),
     -- Bandabuliya terms gate (20261190): registered ahead of the apply; red until it runs.
     ('20261190_marketplace_terms','i_have_marketplace_terms'),
+    -- Only the server records a terms acceptance (20261191): registered ahead of the apply; red until it runs.
+    ('20261191_accept_terms_server','is_published_terms_version'),
+    ('20261191_accept_terms_server','is_terms_locale'),
+    ('20261191_accept_terms_server','accept_terms'),
+    ('20261191_accept_terms_server','guard_profile_terms_columns'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -783,6 +788,8 @@ WITH report AS (
     ('20261183_marketplace_listings','mkt_21_ugc_description'),
     ('20261183_marketplace_listings','mkt_30_update_guard'),
     ('20261183_marketplace_listings','mkp_10_insert_guard'),
+    -- 20261191: the soft guard on direct terms writes; registered ahead of the apply; red until it runs.
+    ('20261191_accept_terms_server','guard_profile_terms_columns'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
@@ -1483,6 +1490,8 @@ WITH report AS (
     ('20261183_marketplace_listings','marketplace_seller_names'),
     ('20261184_marketplace_messaging','start_listing_conversation'),
     ('20261190_marketplace_terms','i_have_marketplace_terms'),
+    -- 20261191: accept_terms is the app's one acceptance call; registered ahead of the apply; red until it runs.
+    ('20261191_accept_terms_server','accept_terms'),
     -- Check-ins (1092): registered ahead of the apply; red until it runs.
     ('1092_checkins','check_in'),
     ('1092_checkins','get_checkin_feed'),
@@ -5949,6 +5958,43 @@ WITH report AS (
          AND pg_get_functiondef(to_regprocedure('public.start_conversation(uuid,text)')) NOT LIKE '%RAISE EXCEPTION ''TERMS_REQUIRED''%'
          AND pg_get_functiondef(to_regprocedure('public.send_message(uuid,text)')) LIKE '%RETURN send_listing_message(p_conversation_id, p_body);%'
          AND pg_get_functiondef(to_regprocedure('public.start_conversation(uuid,text)')) LIKE '%IF NOT can_see_student_lists() THEN%', false)
+  -- 20261191: only the server records a terms acceptance. ONE published list (versions) and ONE language list, internal to the
+  -- owner; accept_terms for the caller only; a validate-only guard. Anchored to code shapes, never to a bare word a comment could
+  -- carry. Raising the list = a new migration re-creating is_published_terms_version: when LEGAL_VERSION moves, this token's
+  -- pins stay true (it pins the current members, not the count) and __tests__/termsVersionsPublished.test.js is what fails.
+  UNION ALL SELECT '20261191_accept_terms_server','is_published_terms_version: IMMUTABLE, lists 2026-09 (the first) and 2026-11-11 (the Bandabuliya floor) and 2026-11-09 (a merge-only value), no NULL; executable by nobody but the owner',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.is_published_terms_version(text)')) LIKE '%IMMUTABLE%'
+         AND pg_get_functiondef(to_regprocedure('public.is_published_terms_version(text)')) LIKE '%SELECT p_version IS NOT NULL AND p_version = ANY (ARRAY[%''2026-09'',%''2026-11-09'',%''2026-11-11''%]::text[]);%'
+         AND NOT has_function_privilege('anon', to_regprocedure('public.is_published_terms_version(text)'), 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.is_published_terms_version(text)'), 'EXECUTE')
+         AND NOT has_function_privilege('service_role', to_regprocedure('public.is_published_terms_version(text)'), 'EXECUTE'), false)
+  UNION ALL SELECT '20261191_accept_terms_server','is_terms_locale: IMMUTABLE, exactly the nine full English language names in LANGUAGES order, no ISO code; internal',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.is_terms_locale(text)')) LIKE '%IMMUTABLE%'
+         AND pg_get_functiondef(to_regprocedure('public.is_terms_locale(text)')) LIKE '%SELECT p_locale IS NOT NULL AND p_locale = ANY (ARRAY[%''English'',%''Turkish'',%''Arabic'',%''Russian'',%''Greek'',%''French'',%''Spanish'',%''German'',%''Persian''%]::text[]);%'
+         AND pg_get_functiondef(to_regprocedure('public.is_terms_locale(text)')) !~ '''(tr|en)'''
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.is_terms_locale(text)'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.is_terms_locale(text)'), 'EXECUTE'), false)
+  UNION ALL SELECT '20261191_accept_terms_server','accept_terms(text,text): the only overload (no user id), SECURITY DEFINER, sign-in then version then language then profile checks, never lowers (COLLATE "C"), switch set; authenticated yes / anon + service_role no',
+    COALESCE((SELECT count(*) FROM pg_proc WHERE proname = 'accept_terms' AND pronamespace = 'public'::regnamespace) = 1
+         AND pg_get_functiondef(to_regprocedure('public.accept_terms(text,text)')) LIKE '%SECURITY DEFINER%'
+         AND pg_get_functiondef(to_regprocedure('public.accept_terms(text,text)')) ~ 'IF v_me IS NULL OR is_anonymous_session\(\) THEN\s*RAISE EXCEPTION ''AUTH_REQUIRED'';.*NOT is_published_terms_version\(p_version\) THEN\s*RAISE EXCEPTION ''TERMS_VERSION_UNKNOWN'';.*NOT is_terms_locale\(p_locale\) THEN\s*RAISE EXCEPTION ''TERMS_LOCALE_UNKNOWN'';.*FROM profiles WHERE id = v_me FOR UPDATE;\s*IF NOT FOUND THEN\s*RAISE EXCEPTION ''PROFILE_MISSING'';'
+         AND pg_get_functiondef(to_regprocedure('public.accept_terms(text,text)')) LIKE '%IF v_ver IS NOT NULL AND v_ver COLLATE "C" >= p_version COLLATE "C" THEN%'
+         AND pg_get_functiondef(to_regprocedure('public.accept_terms(text,text)')) LIKE '%PERFORM set_config(''app.trusted_terms'', ''on'', true);%'
+         AND has_function_privilege('authenticated', to_regprocedure('public.accept_terms(text,text)'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.accept_terms(text,text)'), 'EXECUTE')
+         AND NOT has_function_privilege('service_role', to_regprocedure('public.accept_terms(text,text)'), 'EXECUTE'), false)
+  UNION ALL SELECT '20261191_accept_terms_server','guard_profile_terms_columns: SECURITY DEFINER, validates a moved version (published or NULL) and language (valid or NULL), a client session (user id, not admin) may not lower or clear the version, assigns nothing to NEW; one enabled BEFORE UPDATE OF terms_version, terms_locale trigger on profiles',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.guard_profile_terms_columns()')) LIKE '%SECURITY DEFINER%'
+         AND pg_get_functiondef(to_regprocedure('public.guard_profile_terms_columns()')) LIKE '%IF v_version_moved AND NEW.terms_version IS NOT NULL AND NOT is_published_terms_version(NEW.terms_version) THEN%'
+         AND pg_get_functiondef(to_regprocedure('public.guard_profile_terms_columns()')) LIKE '%IF v_locale_moved AND NEW.terms_locale IS NOT NULL AND NOT is_terms_locale(NEW.terms_locale) THEN%'
+         AND pg_get_functiondef(to_regprocedure('public.guard_profile_terms_columns()')) LIKE '%AND auth.uid() IS NOT NULL AND coalesce(get_my_role(), '''') <> ''admin''%'
+         AND pg_get_functiondef(to_regprocedure('public.guard_profile_terms_columns()')) LIKE '%(NEW.terms_version IS NULL OR NEW.terms_version COLLATE "C" < OLD.terms_version COLLATE "C") THEN%'
+         AND pg_get_functiondef(to_regprocedure('public.guard_profile_terms_columns()')) !~ 'NEW\.[a-z_]+ *:='
+         AND (SELECT count(*) FROM pg_trigger tg WHERE tg.tgrelid = to_regclass('public.profiles') AND NOT tg.tgisinternal AND tg.tgname = 'guard_profile_terms_columns' AND tg.tgenabled = 'O'
+                 AND tg.tgfoid = to_regprocedure('public.guard_profile_terms_columns()')
+                 AND pg_get_triggerdef(tg.oid) LIKE '%BEFORE UPDATE OF terms_version, terms_locale ON public.profiles FOR EACH ROW%') = 1
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.guard_profile_terms_columns()'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.guard_profile_terms_columns()'), 'EXECUTE'), false)
   -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
