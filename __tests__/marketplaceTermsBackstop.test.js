@@ -100,7 +100,7 @@ test('edit-save refused: gate opens over the form, fields kept, no error line, n
   await press(t('mkSave', L))
   expect(await screen.findByText(gateTitle())).toBeTruthy()
   expect(mockCalls.filter(c => c === 'marketplace_listings.update')).toHaveLength(2)
-})
+}, 20000)   // first render of the edit form: 5.2 s on a cold transform cache (over jest's 5 s), well under 1 s warm
 test('create refused (picked photo kept): gate opens, nothing saved, form stays in create mode', async () => {
   const { id: _id, ...noId } = mockListing()
   // a form over a listing without an id is the create form with its fields filled in
@@ -146,7 +146,7 @@ test('relist (mark available again) refused: gate opens, no error line', async (
   expect(await screen.findByText(gateTitle())).toBeTruthy()
   expect(screen.queryByText(t('mkErrGeneric', L))).toBeNull()
   expect(mockCalls.filter(c => c === 'marketplace_listings.update')).toHaveLength(1)
-})
+}, 20000)   // 2.5 s on a cold transform cache (first listing-page render), same cause
 
 // ── send paths ──
 const chatProps = { lang: L, session, termsVersion: legal.LEGAL_VERSION, onBack: () => {}, onOpenListing: () => {} }
