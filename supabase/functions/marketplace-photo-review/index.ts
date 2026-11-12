@@ -6,7 +6,10 @@
 // Approve: Storage resizes the pending original to fit 1600×1600 (image transformation, format kept), the shared
 // stripper removes what the transform leaves (Exif, IPTC — GPS is already gone), the result is re-scanned, written
 // to approved/<owner>/<listing>/<photo>.<ext>, and the row is settled; then the original is removed. Reject: the
-// row is settled, the original removed, and the seller gets one in-app notice + push per 10 minutes.
+// row is settled, the original removed, and the seller gets one in-app notice + push per 10 minutes. The notice row
+// carries notifications.listing_id (20261192) so a tap opens the listing. RELEASE ORDER: apply 20261192 FIRST, then
+// deploy this. Out of order (or after a rollback of the column) the insert with listing_id fails; review.ts retries
+// once WITHOUT it, logs notice_listing_id_dropped, and the notice and push still go out (the tap then opens the list).
 // Why Storage resizes (Berke, 2026-11-09): decoding a 12 MP photo inside the function measured 0.5–1.8 s of the
 // 2 s CPU cap; the transform costs no function CPU and accepts up to 50 MP.
 //
