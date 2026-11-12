@@ -1421,7 +1421,7 @@ export default function App() {
         }
       })
     setNotifsLoading(true)
-    fetchNotifications(supabase, session.user.id)
+    fetchNotifications(supabase, session.user.id, { guest: isGuest(session) })
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
 
     // Owns a garage? Drives the dark-launched garages tile for owners onboarded
@@ -2244,6 +2244,7 @@ export default function App() {
         const route = notificationRoute(item)
         if (route === 'weekend') openWeekendOnMap()
         else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
+        else if (route === 'marketplace_conversation') { closeNotifs(); setShowMarketplace({ view: 'inbox', conversationId: item.conversation_id }) }
         else setShowDutyList(true)
       }}
       onEnablePush={() => setPushRetry(n => n + 1)}

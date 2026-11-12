@@ -34,3 +34,21 @@ test('control: the same code opens on ADA Preview and on dev', () => {
   expect(load({ dev: false, variant: 'preview' }).route({ type: 'marketplace' })).toBe('marketplace')
   expect(load({ dev: true }).redesign.MARKETPLACE).toBe(true)
 })
+
+test('production bundle: a marked message row has no route and fetchNotifications never calls list_conversations', async () => {
+  global.__DEV__ = false
+  const { route } = load({ dev: false })
+  expect(route({ type: 'message', conversation_id: 'c1', listing_conversation: true })).toBeNull()
+  const { fetchNotifications } = require('../utils/notificationRoute')
+  const rows = [{ id: 'a', type: 'message', conversation_id: 'c1' }]
+  const rpc = jest.fn(async () => ({ data: [{ conversation_id: 'c1' }], error: null }))
+  const chain = { eq: () => chain, order: () => chain, limit: () => Promise.resolve({ data: rows, error: null }) }
+  const { data } = await fetchNotifications({ from: () => ({ select: () => chain }), rpc }, 'u1')
+  expect(rpc).not.toHaveBeenCalled()
+  expect(data[0].listing_conversation).toBeUndefined()
+})
+
+test('control: the same row routes on ADA Preview', () => {
+  const { route } = load({ dev: false, variant: 'preview' })
+  expect(route({ type: 'message', conversation_id: 'c1', listing_conversation: true })).toBe('marketplace_conversation')
+})
