@@ -11,9 +11,10 @@ import { getListing, photosFor, signedUrls, sellerName, setSold, deleteListing, 
 import ContentReportMenu from '../components/ContentReportMenu'
 
 // ─── Bandabuliya: one listing ────────────────────────────────────────────────────
-// Clean ground (DetailScaffold over PageCanvas). Others see approved photos only (RLS); while none is
-// approved the page shows the category placeholder and "Fotoğraflar inceleniyor". The seller sees every
-// photo of their own with its review state, and manages the listing here. Others write to the seller (slice 4) and
+// Clean ground (DetailScaffold over PageCanvas). Others see approved photos only (RLS), so with none approved they get
+// the category placeholder and no review banner (they cannot know whether a photo is pending). The seller sees every
+// photo of their own with its review state, "Fotoğraflar inceleniyor" only while a photo is pending (also next to an
+// approved one), the rejected note only when one is rejected, and manages the listing here. Others write to the seller (slice 4) and
 // report or block from the top-right menu; one report hides the listing for everyone (20261183), so after it this
 // page shows "gone".
 
@@ -127,9 +128,9 @@ export default function MarketplaceListingScreen({ id, lang, session, onBack, on
         {mine && state === 'hidden' && <InfoBanner icon="eye-off-outline" category="health" title={t('mkHiddenTitle', lang)} message={t('mkHiddenBanner', lang)} style={s.block} />}
         {mine && state === 'expired' && <InfoBanner icon="time-outline" category="homeLife" title={t('mkExpiredTitle', lang)} message={t('mkExpiredBanner', lang)} style={s.block} />}
 
-        {!approved.length && (
+        {mine && photos.some(p => p.status === 'pending') && (
           <InfoBanner icon="hourglass-outline" category="homeLife" title={t('mkPhotosInReview', lang)}
-            message={mine ? t('mkPhotosInReviewMine', lang) : t('mkPhotosInReviewOther', lang)} style={s.block} />
+            message={t('mkPhotosInReviewMine', lang)} style={s.block} />
         )}
 
         {visiblePhotos.length > (mine ? 0 : 1) && (
