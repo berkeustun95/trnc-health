@@ -9,8 +9,10 @@ import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile } from './migration-harness.mjs'
 
 const rel = p => fileURLToPath(new URL(p, import.meta.url))
-const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8')
-const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql', '20261185_marketplace_maintenance.sql', '20261190_marketplace_terms.sql']
+const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFileSync(rel('./fixtures/marketplace-prereqs.sql'), 'utf8') +
+  // 20261191 stands on the real profiles triggers (profiles-terms-prereqs.sql adds the columns the name trigger reads)
+  readFileSync(rel('./fixtures/profiles-terms-prereqs.sql'), 'utf8') + readFileSync(rel('./fixtures/profiles-triggers-live-2026-10-07.sql'), 'utf8')
+const FILES = ['20261183_marketplace_listings.sql', '20261184_marketplace_messaging.sql', '20261185_marketplace_maintenance.sql', '20261190_marketplace_terms.sql', '20261191_accept_terms_server.sql']
   .map(f => rel(`../supabase/migrations/${f}`))
 
 const CRON_STUB = `

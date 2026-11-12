@@ -32,8 +32,9 @@
 --   EVERY FUTURE LEGAL_VERSION BUMP NEEDS A MIGRATION THAT ADDS THE NEW VERSION TO is_published_terms_version(), APPLIED
 --   BEFORE THE OTA (or build) THAT CARRIES THE BUMP. Otherwise the app's new acceptance is refused (TERMS_VERSION_UNKNOWN)
 --   and every user is asked again on every launch. Raising the list = a new migration that re-creates that ONE function.
---   __tests__/termsVersionsPublished.test.js fails when LEGAL_VERSION, MARKETPLACE_TERMS_MIN or STUDENT_HUB_TERMS_MIN is not
---   in the newest definition of the helper, so the bump cannot be committed without it.
+--   __tests__/termsVersionsPublished.test.js fails (npx jest; no git hook runs jest) when LEGAL_VERSION, MARKETPLACE_TERMS_MIN
+--   or STUDENT_HUB_TERMS_MIN is not in the newest definition of the helper. It proves a migration FILE exists, not that it has
+--   been APPLIED: the apply-before-OTA order is a release step (verify_schema QUERY 1 pins the current members once applied).
 --
 -- ─── THE PUBLISHED LIST: every LEGAL_VERSION any shipped bundle could send (git history, ALL refs, merges included) ───
 --   First commit carrying each value (git log --all -m -G"LEGAL_VERSION *="):
@@ -64,9 +65,11 @@
 --   write rolls the whole statement back, stamp included.
 --   The guard is `BEFORE UPDATE OF terms_version, terms_locale`: an update that does not mention those columns (a push
 --   token, a profile edit) never fires it. It acts only when one of them actually changes (IS DISTINCT FROM), so an old
---   app re-writing the SAME version (a token refresh re-fires its flush) passes untouched. UPDATE only: profiles has no
---   permissive INSERT policy for a client (only the RESTRICTIVE no_anon_insert_profiles), the one inserter is
---   handle_new_user() (id, role only, terms NULL), so there is no client INSERT path to guard.
+--   app re-writing the SAME version (a token refresh re-fires its flush) passes untouched. UPDATE only. INSERT: the repo's
+--   migration files (the 2026-07 policy capture and everything after it) give profiles NO permissive INSERT policy for a
+--   client, only the RESTRICTIVE no_anon_insert_profiles, and the one inserter is handle_new_user() (id, role only, terms
+--   NULL); so no client INSERT path is guarded. That is a finding from FILES, not the live catalog: supabase/readonly/
+--   terms_reask_scope.sql prints any permissive INSERT / ALL policy on profiles; read it before the go.
 --
 -- ─── SERVER-ONLY SWITCH, ALREADY WIRED, NOT YET REQUIRED ─────────────────────
 --   accept_terms() sets the transaction-local app.trusted_terms = 'on' around its UPDATE (the 20261183 pattern:
@@ -369,7 +372,7 @@ END $assert$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261191_accept_terms_server.sql', '2279414bc73f536a60ae187054348487c8b89dc5ea27ce2684e14fe144875e86')
+VALUES ('20261191_accept_terms_server.sql', '221a5e06b760c96d70beebc8fd992eab93ef8b0661a437c1ea22cefd307801b8')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

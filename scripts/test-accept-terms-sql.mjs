@@ -196,6 +196,11 @@ const BAD_LOCALES = ['tr', 'en', 'TR', 'turkish', '', null]
   let prev = null, all = true
   for (const v of VERSIONS) { const r = await accept(d2, 'B', v, 'English'); const rec = await row(d2, 'B'); if (!r.ok || rec.v !== v || (prev && +new Date(rec.a) === +prev)) all = false; prev = new Date(rec.a) }
   check(`every published version (${VERSIONS.length}) is accepted by accept_terms, in ascending order, each one recorded`, all, await row(d2, 'B'))
+  // red-first for "same version writes nothing": with `>=` weakened to `>` the same version reaches the UPDATE and the language moves
+  const ms = await build(mutant(['IF v_ver IS NOT NULL AND v_ver COLLATE "C" >= p_version COLLATE "C" THEN', 'IF v_ver IS NOT NULL AND v_ver COLLATE "C" > p_version COLLATE "C" THEN']))
+  await accept(ms, 'A', '2026-10-25', 'Turkish'); await accept(ms, 'A', '2026-10-25', 'English')
+  console.log('RED (>= weakened to >): same-version re-accept with another language → recorded ' + (await row(ms, 'A')).l)
+  check('red-first: with `>=` weakened to `>` a same-version re-accept WRITES (the language changes), which the no-write check above would catch', (await row(ms, 'A')).l === 'English')
   // red-first for the early return: its mutant (a lower version goes to the UPDATE) is stopped by the guard with a WORD, not a silent no-op
   const mr = await build(mutant(['IF v_ver IS NOT NULL AND v_ver COLLATE "C" >= p_version COLLATE "C" THEN', 'IF false THEN']))
   await accept(mr, 'A', '2026-10-25', 'English')
@@ -357,6 +362,15 @@ const BAD_LOCALES = ['tr', 'en', 'TR', 'turkish', '', null]
   const got = await code(db, q1)
   console.log('QUERY 1 on the fixture database: ' + got + ' (a non-42601 error = past the parser, on a table this fixture lacks)')
   check('verify_schema QUERY 1 parses (any error but 42601 syntax)', q1.length > 100000 && got !== '42601', got)
+  // the C / D / G sections test existence by name; their conditions, evaluated here for this file's tuples (QUERY 1 cannot run whole on the fixture)
+  const cdg = await as(db, 'sql', `SELECT
+      (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname IN ('is_published_terms_version', 'is_terms_locale', 'accept_terms', 'guard_profile_terms_columns')) AS c,
+      (SELECT count(*) FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname = 'guard_profile_terms_columns') AS d,
+      EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE LEFT JOIN pg_roles r ON r.oid = a.grantee
+               WHERE n.nspname = 'public' AND p.proname = 'accept_terms' AND a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated') AS g`)
+  check('verify_schema C (4 functions by name), D (the trigger by name) and G (accept_terms → authenticated EXECUTE) conditions hold on the migrated database', cdg.ok && Number(cdg.rows[0].c) === 4 && Number(cdg.rows[0].d) === 1 && cdg.rows[0].g === true, cdg)
+  const regs = [...vs.matchAll(/'20261191_accept_terms_server','(is_published_terms_version|is_terms_locale|accept_terms|guard_profile_terms_columns)'/g)].map(m => m[1])
+  check('  …and the tuples are registered in verify_schema.sql: 4 in C, 1 in D, 1 in G', regs.length === 6 && regs.filter(r => r === 'guard_profile_terms_columns').length === 2 && regs.filter(r => r === 'accept_terms').length === 2, regs)
   const start = vs.indexOf('-- ── H. BEHAVIOR / VERSION TOKENS'), end = vs.indexOf('  ) z', start)
   const H = vs.slice(start, end)
   const marks = []
