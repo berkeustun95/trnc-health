@@ -606,14 +606,14 @@ export default function ProfileSetupScreen({
         onAgeIneligible()
         return
       }
-      // Consent BEFORE the profile data it covers, via the accept_terms RPC (20261191); only a
-      // returned version equal to the one sent counts (flushPendingConsent in App.js, same rule).
+      // Consent BEFORE the profile data it covers, via the accept_terms RPC (20261191); a returned
+      // version >= the one sent counts: the server never lowers, so a newer one on the account is still accepted.
       if (needsTerms) {
         setSaving(true)
         setSaveError(false)
         const { data, error: termsErr } = await supabase.rpc('accept_terms', { p_version: LEGAL_VERSION, p_locale: legalLocaleFor('terms', lang) })
         setSaving(false)
-        if (termsErr || data?.terms_version !== LEGAL_VERSION) { setSaveError('pgSaveError'); return }
+        if (termsErr || !(data?.terms_version >= LEGAL_VERSION)) { setSaveError('pgSaveError'); return }
         setTermsRecorded(true)
       }
       // ONE patch for all six fields. The merge makes this atomic rather than two

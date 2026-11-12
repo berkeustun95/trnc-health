@@ -65,8 +65,22 @@ describe('StudentHubTermsGate', () => {
     expect(await screen.findByText(t('shTermsSaveError', L))).toBeTruthy()
     expect(onAccepted).not.toHaveBeenCalled()
   })
-  test('a different version back (server kept a higher one): no onAccepted, save-error text', async () => {
+  test('a HIGHER version back (server never lowers): onAccepted gets that row, no error', async () => {
     mockRpc.mockResolvedValue({ data: row('2099-01-01'), error: null })
+    const onAccepted = jest.fn()
+    await open(onAccepted); await accept()
+    await waitFor(() => expect(onAccepted).toHaveBeenCalledWith(row('2099-01-01')))
+    expect(screen.queryByText(t('shTermsSaveError', L))).toBeNull()
+  })
+  test('a LOWER version back: save-error text, no onAccepted', async () => {
+    mockRpc.mockResolvedValue({ data: row('2000-01-01'), error: null })
+    const onAccepted = jest.fn()
+    await open(onAccepted); await accept()
+    expect(await screen.findByText(t('shTermsSaveError', L))).toBeTruthy()
+    expect(onAccepted).not.toHaveBeenCalled()
+  })
+  test('null data and no error: save-error text, no onAccepted', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null })
     const onAccepted = jest.fn()
     await open(onAccepted); await accept()
     expect(await screen.findByText(t('shTermsSaveError', L))).toBeTruthy()

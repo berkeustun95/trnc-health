@@ -23,7 +23,8 @@ export default function StudentHubTermsGate({ lang, userId, onAccepted, onCancel
   async function accept() {
     setSaving(true); setError(null)
     const { data, error: err } = await supabase.rpc('accept_terms', { p_version: LEGAL_VERSION, p_locale: legalLocaleFor('terms', lang) })
-    if (err || data?.terms_version !== LEGAL_VERSION) {
+    // >=, not ===: the server never lowers, so an account already on a newer version returns that row
+    if (err || !(data?.terms_version >= LEGAL_VERSION)) {
       setError(t('shTermsSaveError', lang)); setSaving(false); return
     }
     onAccepted(data)
