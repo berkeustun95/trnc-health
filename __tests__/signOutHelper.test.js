@@ -51,7 +51,7 @@ beforeEach(async () => {
   supabase.auth.signOut.mockClear()
   Object.keys(mockStore).forEach(k => delete mockStore[k])
   H.resetSigningOut()
-  await H.rememberPushToken('ExponentPushToken[this-phone]')
+  await H.savePushToken('ExponentPushToken[this-phone]', 'u1')
   mockOrder.length = 0
 })
 
@@ -119,13 +119,21 @@ test('(f) global after deletion: no update', async () => {
   expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: 'global' })
 })
 
-test('(g) registration is suppressed while signing out; re-armed on failure and on a new sign-in', async () => {
+test('(g) registration write is suppressed while signing out; re-armed on failure and on a new sign-in', async () => {
   expect(H.isSigningOut()).toBe(false)
+  H.resetSigningOut()
   mockState.signOutResult = { error: new Error('offline') }
   let during
-  mockState.updateImpl = () => { during = H.isSigningOut(); return Promise.resolve({ error: null }) }
+  mockState.updateImpl = async () => {
+    mockState.updateImpl = null
+    during = H.isSigningOut()
+    mockOrder.length = 0
+    await H.savePushToken('ExponentPushToken[racing]', 'u1') // the effect re-running mid sign-out
+    return { error: null }
+  }
   await H.signOutThisDevice()
   expect(during).toBe(true)
+  expect(mockOrder).toEqual(['signOut']) // the racing registration wrote nothing
   expect(H.isSigningOut()).toBe(false) // sign-out failed: session kept, registration allowed again
 
   mockState.signOutResult = null
@@ -133,6 +141,9 @@ test('(g) registration is suppressed while signing out; re-armed on failure and 
   expect(H.isSigningOut()).toBe(true) // succeeded: stays suppressed until SIGNED_IN
   H.resetSigningOut()
   expect(H.isSigningOut()).toBe(false)
+  mockOrder.length = 0
+  await H.savePushToken('ExponentPushToken[new]', 'u1')
+  expect(mockOrder).toEqual(['update']) // a registration after a new sign-in writes again
 })
 
 test('(h) remembered token is forgotten after success, kept after failure', async () => {
@@ -143,4 +154,13 @@ test('(h) remembered token is forgotten after success, kept after failure', asyn
   await H.signOutThisDevice()
   expect(mockStore.ada_registered_push_token).toBeUndefined()
   expect(AsyncStorage.removeItem).toHaveBeenCalled()
+})
+
+// App.js wiring the unit tests above cannot see: the effect must register through the helper (which remembers the
+// token and honours the sign-out flag) and a new sign-in must re-arm it.
+test('App.js registers via savePushToken and re-arms on SIGNED_IN', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'App.js'), 'utf8')
+  expect(src).toMatch(/await savePushToken\(token, session\.user\.id\)/)
+  expect(src).not.toMatch(/push_token:\s*token/)
+  expect(src).toMatch(/if \(event === 'SIGNED_IN'\) resetSigningOut\(\)/)
 })

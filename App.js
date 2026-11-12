@@ -115,7 +115,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
-import { signOutThisDevice, signOutEverywhere, rememberPushToken, isSigningOut, resetSigningOut } from './utils/signOut'
+import { signOutThisDevice, signOutEverywhere, savePushToken, resetSigningOut } from './utils/signOut'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
@@ -1516,9 +1516,8 @@ export default function App() {
           })
         }
         const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c' })
-        if (token && !isSigningOut()) {
-          await rememberPushToken(token)
-          await supabase.from('profiles').update({ push_token: token }).eq('id', session.user.id)
+        if (token) {
+          await savePushToken(token, session.user.id)
         }
       } catch (e) {
         if (__DEV__) console.log('Push registration skipped:', e.message)

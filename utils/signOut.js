@@ -15,9 +15,14 @@ let signingOut = false
 // The token THIS device registered, kept in AsyncStorage too so a launch where registration could
 // not run (offline, permission prompt pending) can still clear it. Local sign-out only clears a row
 // that still holds this exact token, so another phone's newer token on the same account survives.
-export async function rememberPushToken(token) {
+// The ONLY writer of profiles.push_token: remember, check the flag, write, in that order (nothing but the
+// flag check sits right before the write). Returns without writing while a sign-out is under way.
+export async function savePushToken(token, userId) {
+  if (signingOut) return
   rememberedToken = token
   try { await AsyncStorage.setItem(TOKEN_KEY, token) } catch {}
+  if (signingOut) return
+  await supabase.from('profiles').update({ push_token: token }).eq('id', userId)
 }
 
 // The registration effect re-runs on session churn and must not re-write the token between the
@@ -31,8 +36,9 @@ async function forgetPushToken() {
 }
 
 // Best effort and time-boxed: a failure or a hang never blocks the sign-out. Offline, the token stays
-// on the row until the next sign-in on any device overwrites it (auth-js returns early when /logout
-// has a network error and keeps the session, so the user is still signed in and can retry).
+// on the row until the next sign-in on any device overwrites it. auth-js (checked in the installed
+// GoTrueClient._signOut) calls /logout for 'local' too and returns { error } on a network failure without
+// removing the session, so offline the user stays signed in and can retry; the flag is re-armed then.
 function boxed(work) {
   let timer
   const timeout = new Promise(resolve => { timer = setTimeout(resolve, CLEAR_TIMEOUT_MS) })
