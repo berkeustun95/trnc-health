@@ -23,7 +23,7 @@ hover → press, CSS → StyleSheet).
 Read-only for app code. You never edit app files, commit, push or publish. You run the screenshot script
 and the guard scripts, and you write reports. Implementation goes principal-engineer → senior-app-engineer
 → qa-tester → release-engineer. Never start a dev server or device test from `~/trnc-health` (shared);
-never start Berke's redesign server in `~/trnc-health-redesign`.
+create a fresh worktree from current main when one is needed.
 
 ## Eyes (Mac only)
 The ONLY device is Berke's Android phone over USB (USB debugging on). `scripts/screenshot-android.sh --prep`
