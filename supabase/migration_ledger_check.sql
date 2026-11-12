@@ -297,8 +297,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261188_dealer_intake_bucket.sql', '4211d177fc44271ac4286e002098b159ff95cc1f11c3618c1b2ac9ec7566c558'),
   ('20261189_vehicles_partner_empty_fields.sql', 'db66b738ab40179189ba55ec86489cb75f634ac9e148a5a8c4827a16cb9b363f'),
   ('20261190_marketplace_terms.sql', 'b436cffa085b47c49d70b752becbdb3fee51682bd3c8b718367449acf62fa3fd'),
-  ('20261193_eatery_order_status.sql', 'c02dd3d72ebbd04b231eb83db80497f999da924db276249be9a45f9c95badaff'),
-  ('20261194_eatery_order_status_partner.sql', 'a09b67d4670706e584a63ec40e44af8206cd016852db2031d4d64c02f3def1e1')
+  ('20261193_eatery_order_status.sql', '23504239d716113ae3be194302d2019b1486919c2775c6e98489e5fb47365de0'),
+  ('20261194_eatery_order_status_partner.sql', '7f189edd2368a2fce716aecf99ef7822aef677c0f69bbf980af4a857c45b07c8')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

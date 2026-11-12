@@ -57,6 +57,21 @@ BEGIN
   RETURN currval(pg_get_serial_sequence('net.calls', 'id'));
 END $f$;
 `
+const ACTS12 = ['call','whatsapp','call_secondary','website','maps','route_complete','book','instagram','facebook','email','menu','order_whatsapp']
+const CE12 = `
+CREATE TABLE IF NOT EXISTS public.contact_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), module text NOT NULL, entity_id uuid NOT NULL,
+  action text NOT NULL, region text, lang text, created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT contact_events_module_check CHECK (module IN ('towing','eatery','hotels','connectivity')),
+  CONSTRAINT contact_events_action_check CHECK (action IN (${ACTS12.map(x => `'${x}'`).join(',')})));
+REVOKE ALL ON public.contact_events FROM anon, authenticated;
+GRANT INSERT (module, entity_id, action, region, id, lang) ON public.contact_events TO anon, authenticated;
+ALTER TABLE public.contact_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "ce_insert_public" ON public.contact_events FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "ce_select_admin" ON public.contact_events FOR SELECT TO authenticated USING (false);
+CREATE POLICY "ce_no_update" ON public.contact_events AS RESTRICTIVE FOR UPDATE TO public USING (false) WITH CHECK (false);
+CREATE POLICY "ce_no_delete" ON public.contact_events AS RESTRICTIVE FOR DELETE TO public USING (false);
+INSERT INTO public.schema_migrations_applied (filename, checksum) VALUES ('20261123_eatery_dish_tags_order_whatsapp.sql', 'fixture');`
 const FIXTURE = BASE + '\n' + PRIOR.slice(s0, s1) + '\n' + KEY.slice(pa, pb) + '\n' + STUBS
 
 let bad = 0
@@ -225,7 +240,7 @@ const tokens = async (d, label, sql, want, n) => {
   try {
     const rows = (await d.query(sql)).rows
     const okAll = want === null ? true : rows.every(r => r.ok === want)
-    t(`verify_schema ${label}: ${rows.length} tokens${want === null ? '' : `, all ${want}`}`, [rows.length === n || n === undefined, okAll], [true, true])
+    t(`verify_schema ${label}: ${rows.length} tokens${want === null ? '' : `, all ${want}`}`, [rows.length > 0 && (n === undefined || rows.length === n), okAll], [true, true])
     if (want !== null && rows.some(r => r.ok !== want)) console.log(rows.filter(r => r.ok !== want).map(r => '      ' + r.object.slice(0, 110)).join('\n'))
     return rows
   } catch (e) { t(`verify_schema ${label} does not error`, String(e.message).split('\n')[0], 'no error') }
@@ -234,6 +249,8 @@ const tokens = async (d, label, sql, want, n) => {
   const d = await after1144()
   await tokens(d, '1193 tokens BEFORE 1193 (must not error; red is fine)', T93, false)
   await tokens(d, '1194 tokens BEFORE 1193', T94, false)
+  // The OLDER tokens that name create / verify resolve whichever signature is live, so on the 1144 state (before 1193) they are exactly as green as before.
+  for (const [n, s] of [['1144', T44], ['1134', T34], ['1132', T32]]) await tokens(d, `older ${n} block BEFORE 1193 (the 1144 state)`, s, true)
   await applyFile(d, FA)
   await tokens(d, '1193 tokens AFTER 1193', T93, true)
   await tokens(d, '1194 tokens AFTER 1193 only (must not error)', T94, false)
@@ -247,6 +264,28 @@ const tokens = async (d, label, sql, want, n) => {
   for (const r of rows25) { try { const rr = (await d.query(tokq('    ' + r))).rows; n25 += rr.length; ok25 += rr.filter(x => x.ok).length } catch (e) { console.log('      1125 row error:', String(e.message).split('\n')[0]) } }
   t('verify_schema older 1125 rows naming create / verify AFTER 1194: all true', [n25 > 0, ok25 === n25], [true, true])
 }
+// The rewritten retention row (cron section): WRONG until 20261194 runs, OK after it (a newline-exact match of the whole command).
+{
+  const cslice = slice('-- ─── 1132 (command rewritten by 20261194', '\nUNION ALL\n-- ─── 20261148')
+  const cq = `SELECT migration, object, status FROM (${cslice.replace(/^--.*\n/, '')}) z(migration, object, status)`
+  const d = await after1144(); await applyFile(d, FA)
+  const r1 = (await d.query(cq)).rows[0]
+  await applyFile(d, FB)
+  const r2 = (await d.query(cq)).rows[0]
+  t('verify_schema retention row (labelled 20261194): not OK after 1193 only, OK after 1194', [r1.migration, r1.status !== 'OK', r2.status], ['20261194_eatery_order_status_partner', true, 'OK'])
+}
+// A fuller chain: the later eatery migrations that touch the same tables (banner path 1151, order_method website 1157) before 1193 / 1194.
+{
+  const d = await freshDb(FIXTURE)
+  for (const f of ['20261125_eatery_orders.sql', '20261132_eatery_orders_is_test.sql', '20261134_eatery_item_options.sql', '20261144_eatery_order_method.sql', '20261151_eatery_partners_banner_path.sql']) { const r = await applyFile(d, M(f)); if (!r.ok) throw new Error(f + ': ' + r.msg) }
+  await d.exec(CE12)
+  const r57 = await applyFile(d, M('20261157_eatery_order_website.sql'))
+  t('fuller chain: 1151 + 1157 apply before 1193', r57, { ok: true, msg: null })
+  if (r57.ok) {
+    t('fuller chain: 20261193 applies (sentinels green)', await applyFile(d, FA), { ok: true, msg: null })
+    t('fuller chain: 20261194 applies (sentinels green)', await applyFile(d, FB), { ok: true, msg: null })
+  }
+}
 t('verify_schema registers the new objects (A, B, C, E, F, G rows present)', [
   VS.includes("('20261193_eatery_order_status','eatery_order_events')"), VS.includes("('20261193_eatery_order_status','eatery_orders','fulfilment')"),
   VS.includes("('20261194_eatery_order_status_partner','eatery_order_set_status')"), VS.includes("('20261194_eatery_order_status_partner','eatery_partner_pins_scope_partner_check')"),
@@ -256,7 +295,7 @@ t('verify_schema registers the new objects (A, B, C, E, F, G rows present)', [
 // Each check is a named boolean. The green run needs all of them true; a mutant that applies must turn its named check red.
 const checks = async (d) => {
   const res = []
-  const ck = (name, ok, detail) => { res.push([name, ok === true]); if (ok !== true) console.log(`      (${name}) ${JSON.stringify(detail)}`) }
+  const ck = (name, ok, detail) => { res.push([name, ok === true]); if (ok !== true) console.log(`      (${name}) ${String(JSON.stringify(detail) ?? '').replace(/[0-9a-f]{32,}/g, '<hex>').slice(0, 160)}`) }
   await seed(d)
   const calls = async () => (await q(d, `SELECT count(*)::int n FROM net.calls`))[0].n
   const lastCall = async () => (await q(d, `SELECT body FROM net.calls ORDER BY id DESC LIMIT 1`))[0]?.body
@@ -301,8 +340,8 @@ const checks = async (d) => {
     const r = await setst(d, o, 'received', null, dev)
     const ev = (await q(d, `SELECT count(*)::int n FROM public.eatery_order_events e JOIN public.eatery_orders x ON x.id = e.order_id WHERE x.code = '${o}'`))[0].n
     ck('a push that FAILS (pg_net down) never undoes or fails the status change', r?.status === 'ok' && r?.changed === true && (await row(o)).status === 'received' && ev === 1, { r, ev })
-    const lg = (await q(d, `SELECT count(*)::int n FROM public.push_log WHERE request_id IS NULL AND kind = 'order_status'`))[0].n
-    ck('a failed push is still logged (NULL request id)', lg >= 1, lg)
+    const lg = (await q(d, `SELECT count(*)::int n FROM public.push_log WHERE request_id IS NULL AND kind = 'order_status' AND user_id = '${UID(1)}'`))[0].n
+    ck('a failed push is still logged (NULL request id) for this order\'s user', lg === 1, lg)
     await d.exec(`SELECT set_config('zz.net_fail', 'off', false)`)
   }
   {
@@ -383,7 +422,7 @@ const checks = async (d) => {
     await issue(d, null, 'test')
     ck('renewing the test PIN revokes the test devices only', (await can(to, td.token)) === false && (await can(po, pd.token)) === true, null)
     await issue(d, PA, 'partner')
-    ck('renewing a partner PIN revokes that partner\'s devices', (await can(po, pd.token)) === false && (await can(po, toks[1])) === false || true, null)
+    ck('renewing a partner PIN revokes that partner\'s devices', (await can(po, pd.token)) === false, null)
     const wb = await order(d, { partner: PB }); ck('... and not another partner\'s', (await can(wb, toks[1])) === true, null)
   }
   // admin RPC: positive control and the refusals
@@ -417,6 +456,18 @@ const checks = async (d) => {
     const g = (await q(d, `SELECT public.eatery_pin_generate() p FROM generate_series(1, 3000)`)).map(r => r.p)
     ck('PIN generator: 3000 PINs, all six digits, almost all distinct, a leading zero about one time in ten',
       g.every(x => /^[0-9]{6}$/.test(x)) && new Set(g).size > 2900 && g.filter(x => x[0] === '0').length > 200 && g.filter(x => x[0] === '0').length < 400, [new Set(g).size, g.filter(x => x[0] === '0').length])
+  }
+  // PIN table shape
+  {
+    const err = async (sql) => { try { await d.exec(sql); return 'no error' } catch (e) { return e.code } }
+    await issue(d, null, 'test'); await issue(d, PA, 'partner')
+    const salt = "repeat('a', 32)", hash = "repeat('b', 64)"
+    ck('PIN rows: a second test-scope row is refused (one test PIN)', (await err(`INSERT INTO private.eatery_partner_pins (scope, partner_id, salt, pin_sha256) VALUES ('test', NULL, ${salt}, ${hash})`)) === '23505', null)
+    ck('PIN rows: a second row for one partner is refused', (await err(`INSERT INTO private.eatery_partner_pins (scope, partner_id, salt, pin_sha256) VALUES ('partner', '${PA}', ${salt}, ${hash})`)) === '23505', null)
+    ck('PIN rows: scope partner without a partner is refused', (await err(`INSERT INTO private.eatery_partner_pins (scope, partner_id, salt, pin_sha256) VALUES ('partner', NULL, ${salt}, ${hash})`)) === '23514', null)
+    ck('PIN rows: a non-hex PIN hash is refused (plaintext cannot be stored)', (await err(`INSERT INTO private.eatery_partner_pins (scope, partner_id, salt, pin_sha256) VALUES ('partner', '${PB}', ${salt}, '123456')`)) === '23514', null)
+    ck('PIN rows: CONTROL a well-formed row for another partner is accepted', (await err(`DELETE FROM private.eatery_partner_pins WHERE partner_id = '${PB}'; INSERT INTO private.eatery_partner_pins (scope, partner_id, salt, pin_sha256) VALUES ('partner', '${PB}', ${salt}, ${hash})`)) === 'no error', null)
+    ck('worker key store: a non-hex hash is refused', (await err(`INSERT INTO private.eatery_worker_key_hashes (key_sha256) VALUES ('NOT-HEX')`)) === '23514', null)
   }
   // customer-side extras
   {
@@ -470,56 +521,76 @@ const run = async (d) => { const r = await checks(d); return r }
 
 // ── RED-FIRST mutants: break the thing, see the suite go red (the anchor is asserted present, so the break landed) ──
 const table = []
+// A static body / catalog assertion inside the migration would catch many of these before any behaviour ran. `neut` turns that one
+// assertion's RAISE EXCEPTION into RAISE NOTICE (the house pattern of test-eatery-orders-is-test-sql.mjs), so what goes red is the
+// BEHAVIOUR probe (a named sentinel STEP or a harness check), not the shape check. Mutants without `neut` are shape / catalog facts.
+const S = {
+  C: 'create_eatery_order body: a carried-forward', MY: 'my_eatery_orders body: owner filter', SUB: 'eatery_order_subscribe body: owner filter',
+  VER: 'verify_eatery_order body: new keys', GR: '% has the wrong owner', ISO: '% accepts an ISO code', EVG: '% grants: anon/authenticated must hold nothing',
+  DEF: 'create must default p_client_id + p_mode', ENR: 'eatery_partner_enrol body: worker key', DEV: 'eatery_order_device_id body: worker key',
+  SET: 'eatery_order_set_status body: a required shape', ADM: 'admin pin function: the admin / guest gate', RET: 'the retention command is not the 20261132',
+  ISS: 'eatery_pin_issue body: it must generate', CAN: 'eatery_order_can_manage still is not the real body', PRIV: 'private.% is reachable by anon / authenticated' }
 const MUTANTS = [
   // 20261193
-  { n: 'A1 p_mode check dropped (any mode accepted)', f: 'A', pairs: [[`  IF p_mode IS NOT NULL AND p_mode NOT IN ('pickup','delivery') THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'invalid_mode';\n  END IF;\n`, '']], fail: 'create_eatery_order body: a carried-forward or new shape is missing' },
+  { n: 'A1 p_mode check dropped (any mode accepted)', f: 'A', pairs: [[`  IF p_mode IS NOT NULL AND p_mode NOT IN ('pickup','delivery') THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'invalid_mode';\n  END IF;\n`, '']], neut: [S.C], fail: 'STEP "p_mode carryout refused"' },
   { n: 'A2 delivery ends on ready instead of on_the_way', f: 'A', pairs: [[`WHEN 'delivery' THEN ARRAY['on_the_way']`, `WHEN 'delivery' THEN ARRAY['ready']`]], fail: 'STEP "next: sent / delivery"' },
   { n: 'A3 skipping forward removed (sent -> received only)', f: 'A', pairs: [[`WHEN 'sent'      THEN ARRAY['received','preparing'] || f.fin || ARRAY['cancelled']`, `WHEN 'sent'      THEN ARRAY['received'] || ARRAY['cancelled']`]], fail: 'STEP "next: sent / delivery"' },
   { n: 'A4 cancel no longer allowed from preparing', f: 'A', pairs: [[`WHEN 'preparing' THEN f.fin || ARRAY['cancelled']`, `WHEN 'preparing' THEN f.fin`]], fail: 'STEP "next: preparing / delivery"' },
-  { n: 'A5 my_eatery_orders owner filter removed', f: 'A', pairs: [[`WHERE o.created_by = v_uid AND o.created_at > now() - interval '24 hours'`, `WHERE o.created_at > now() - interval '24 hours'`]], fail: 'my_eatery_orders body: owner filter missing' },
-  { n: 'A6 subscribe ownership removed', f: 'A', pairs: [[`WHERE code = v_c AND created_by = v_uid FOR UPDATE`, `WHERE code = v_c FOR UPDATE`]], fail: 'eatery_order_subscribe body: owner filter missing' },
-  { n: 'A7 my_eatery_orders granted to anon', f: 'A', pairs: [[`GRANT  EXECUTE ON FUNCTION public.my_eatery_orders() TO authenticated;`, `GRANT  EXECUTE ON FUNCTION public.my_eatery_orders() TO anon, authenticated;`]], fail: 'my_eatery_orders has the wrong owner' },
-  { n: 'A8 notify_lang CHECK also accepts the ISO code tr', f: 'A', pairs: [[`CHECK (notify_lang IN ('English',`, `CHECK (notify_lang IN ('tr','English',`]], fail: 'accepts an ISO code' },
-  { n: 'A9 order events readable by authenticated', f: 'A', pairs: [[`REVOKE ALL ON TABLE public.eatery_order_events FROM PUBLIC, anon, authenticated;`, `REVOKE ALL ON TABLE public.eatery_order_events FROM PUBLIC, anon, authenticated;\nGRANT SELECT ON public.eatery_order_events TO authenticated;`]], fail: 'anon/authenticated must hold nothing' },
-  { n: 'A10 the 3-argument create_eatery_order is NOT dropped (overload left)', f: 'A', pairs: [[`DROP FUNCTION IF EXISTS public.create_eatery_order(uuid, jsonb, text);\n`, '']], fail: 'an old create/verify signature survived' },
+  { n: 'A5 my_eatery_orders owner filter removed (another user sees my orders)', f: 'A', pairs: [[`WHERE o.created_by = v_uid AND o.created_at > now() - interval '24 hours'`, `WHERE o.created_at > now() - interval '24 hours'`]], neut: [S.MY], fail: 'STEP "my orders:' },
+  { n: 'A6 subscribe ownership removed', f: 'A', pairs: [[`WHERE code = v_c AND created_by = v_uid FOR UPDATE`, `WHERE code = v_c FOR UPDATE`]], neut: [S.SUB], fail: 'STEP "subscribe: another user gets not_found"' },
+  { n: 'A7 my_eatery_orders granted to anon', f: 'A', pairs: [[`GRANT  EXECUTE ON FUNCTION public.my_eatery_orders() TO authenticated;`, `GRANT  EXECUTE ON FUNCTION public.my_eatery_orders() TO anon, authenticated;`]], neut: [S.GR], fail: 'STEP "my orders: anon refused"' },
+  { n: 'A8 notify_lang CHECK also accepts the ISO code tr', f: 'A', pairs: [[`CHECK (notify_lang IN ('English',`, `CHECK (notify_lang IN ('tr','English',`]], neut: [S.ISO], fail: 'STEP "CHECK: ISO language tr refused"' },
+  { n: 'A9 order events readable by authenticated', f: 'A', pairs: [[`REVOKE ALL ON TABLE public.eatery_order_events FROM PUBLIC, anon, authenticated;`, `REVOKE ALL ON TABLE public.eatery_order_events FROM PUBLIC, anon, authenticated;\nGRANT SELECT ON public.eatery_order_events TO authenticated;`]], neut: [S.EVG], fail: 'STEP "authenticated cannot SELECT eatery_order_events"' },
+  { n: 'A10 the 3-argument create_eatery_order is NOT dropped (overload left) [catalog fact]', f: 'A', pairs: [[`DROP FUNCTION IF EXISTS public.create_eatery_order(uuid, jsonb, text);\n`, '']], fail: 'an old create/verify signature survived' },
   { n: 'A11 verify ignores the 12-hour window for status_open', f: 'A', pairs: [[`v_open := now() < v_o.created_at + interval '12 hours' AND `, `v_open := `]], fail: 'STEP "verify: 13 h old order status_open false"' },
-  { n: 'A12 verify returns the push token', f: 'A', pairs: [[`    'fulfilment',             v_o.fulfilment,`, `    'notify_token', v_o.notify_token,\n    'fulfilment',             v_o.fulfilment,`]], fail: 'verify_eatery_order body: new keys missing, or a forbidden key present' },
+  { n: 'A12 verify returns the push token', f: 'A', pairs: [[`    'fulfilment',             v_o.fulfilment,`, `    'notify_token', v_o.notify_token,\n    'fulfilment',             v_o.fulfilment,`]], neut: [S.VER], fail: 'STEP "verify: 18 keys"' },
   { n: 'A13 re-running 20261193 puts the can_manage stub back', f: 'A', pairs: [[`  IF to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)') IS NULL\n     OR NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261194_eatery_order_status_partner.sql') THEN`, `  IF true THEN`]], rerun: true },
-  { n: 'A14 create stores no fulfilment', f: 'A', pairs: [[`VALUES (v_code, p_partner, v_lines, v_total, v_cur, v_uid, p_client_id, v_guest, v_test, p_mode)`, `VALUES (v_code, p_partner, v_lines, v_total, v_cur, v_uid, p_client_id, v_guest, v_test, NULL)`]], fail: 'create_eatery_order body: a carried-forward or new shape is missing' },
+  { n: 'A14 create stores no fulfilment', f: 'A', pairs: [[`VALUES (v_code, p_partner, v_lines, v_total, v_cur, v_uid, p_client_id, v_guest, v_test, p_mode)`, `VALUES (v_code, p_partner, v_lines, v_total, v_cur, v_uid, p_client_id, v_guest, v_test, NULL)`]], neut: [S.C], fail: 'STEP "fulfilment of the delivery order is stored"' },
+  { n: 'A15 an older-app order (NULL fulfilment) offers only on_the_way as a final', f: 'A', pairs: [[`ELSE ARRAY['on_the_way','ready'] END AS fin`, `ELSE ARRAY['on_the_way'] END AS fin`]], fail: 'STEP "next: sent / unknown mode offers both finals"' },
+  { n: 'A16 my_eatery_orders counts a view', f: 'A', pairs: [[`RETURNS jsonb\n  LANGUAGE plpgsql\n  STABLE`, `RETURNS jsonb\n  LANGUAGE plpgsql\n  VOLATILE`], [`  SELECT COALESCE(jsonb_agg(x.j ORDER BY x.created_at DESC, x.code), '[]'::jsonb) INTO v_res`, `  UPDATE public.eatery_orders SET view_count = view_count + 1 WHERE created_by = v_uid;\n  SELECT COALESCE(jsonb_agg(x.j ORDER BY x.created_at DESC, x.code), '[]'::jsonb) INTO v_res`]], neut: [S.MY], fail: 'STEP "my orders: no view counted' },
+  { n: 'A17 create loses its defaults (an older app calling with 2 arguments breaks)', f: 'A', pairs: [[`p_client_id text DEFAULT NULL, p_mode text DEFAULT NULL)`, `p_client_id text, p_mode text)`]], neut: [S.DEF], fail: 'STEP "create, no p_mode (older app): accepted"' },
+  { n: 'A18 verify loses the p_device default (a one-argument caller breaks)', f: 'A', pairs: [[`verify_eatery_order(p_code text, p_device text DEFAULT NULL)`, `verify_eatery_order(p_code text, p_device text)`]], neut: [S.DEF], fail: 'STEP "verify (anon): order_status sent"' },
   // 20261194
-  { n: 'B1 enrol does not need the Worker key', f: 'B', pairs: [[`never an exception: a RAISE would roll back the attempt row just written.\n  IF NOT public.eatery_worker_key_ok() THEN`, `never an exception: a RAISE would roll back the attempt row just written.\n  IF false THEN`]], fail: 'eatery_partner_enrol body' },
-  { n: 'B2 the device gate ignores the Worker key', f: 'B', pairs: [[`   WHERE public.eatery_worker_key_ok()\n     AND p_device IS NOT NULL`, `   WHERE p_device IS NOT NULL`]], fail: 'eatery_order_device_id body' },
+  { n: 'B1 enrol does not need the Worker key', f: 'B', pairs: [[`never an exception: a RAISE would roll back the attempt row just written.\n  IF NOT public.eatery_worker_key_ok() THEN`, `never an exception: a RAISE would roll back the attempt row just written.\n  IF false THEN`]], neut: [S.ENR], fail: 'STEP "enrol with NO Worker key: forbidden"' },
+  { n: 'B2 the device gate ignores the Worker key', f: 'B', pairs: [[`   WHERE public.eatery_worker_key_ok()\n     AND p_device IS NOT NULL`, `   WHERE p_device IS NOT NULL`]], neut: [S.DEV], fail: 'STEP "device WITHOUT the Worker key: can_manage false"' },
   { n: 'B3 per-code cap 5 -> 50', f: 'B', pairs: [[`a.at > now() - interval '1 hour') >= 5`, `a.at > now() - interval '1 hour') >= 50`]], fail: 'STEP "6th attempt WITH THE CORRECT PIN: locked"' },
   { n: 'B4 per-bucket 15-minute cap 10 -> 100', f: 'B', pairs: [[`interval '15 minutes') >= 10`, `interval '15 minutes') >= 100`]], red: 'cap: 10 failures in 15 minutes lock' },
   { n: 'B5 per-bucket 24-hour cap 30 -> 300', f: 'B', pairs: [[`interval '24 hours') >= 30`, `interval '24 hours') >= 300`]], red: 'cap: 30 failures in 24 hours lock' },
   { n: 'B6 the lock never fires', f: 'B', pairs: [[`  IF (SELECT count(*) FROM private.eatery_pin_attempts a WHERE a.order_code = v_c`, `  IF false AND (SELECT count(*) FROM private.eatery_pin_attempts a WHERE a.order_code = v_c`]], fail: 'STEP "6th attempt WITH THE CORRECT PIN: locked"' },
   { n: 'B7 a test order is judged against the real partner PIN and bucket', f: 'B', pairs: [[`  v_scope   := CASE WHEN v_o.is_test THEN 'test' ELSE 'partner' END;\n  v_partner := CASE WHEN v_o.is_test THEN NULL ELSE v_o.partner_id END;`, `  v_scope   := 'partner';\n  v_partner := v_o.partner_id;`]], fail: 'STEP "test order with the REAL wa PIN: wrong_pin"' },
-  { n: 'B8 a test-scope device may manage a REAL order', f: 'B', pairs: [[`(d.scope = 'test' AND p_is_test IS TRUE)`, `(d.scope = 'test')`]], fail: 'eatery_order_device_id body' },
-  { n: 'B9 a revoked device still works', f: 'B', pairs: [[`     AND d.revoked_at IS NULL\n     AND ((d.scope`, `     AND ((d.scope`]], fail: 'eatery_order_device_id body' },
-  { n: 'B10 the freeze follows expires_at (2 h) instead of 12 h', f: 'B', pairs: [[`  IF now() >= v_o.created_at + interval '12 hours' THEN\n    RETURN jsonb_build_object('status', 'frozen');`, `  IF now() >= v_o.expires_at THEN\n    RETURN jsonb_build_object('status', 'frozen');`]], fail: 'eatery_order_set_status body' },
+  { n: 'B8 a test-scope device may manage a REAL order', f: 'B', pairs: [[`(d.scope = 'test' AND p_is_test IS TRUE)`, `(d.scope = 'test')`]], neut: [S.DEV], fail: 'STEP "test device on a REAL order: can_manage false"' },
+  { n: 'B9 a revoked device still works', f: 'B', pairs: [[`     AND d.revoked_at IS NULL\n     AND ((d.scope`, `     AND ((d.scope`]], neut: [S.DEV], fail: 'STEP "the old device is revoked: set_status forbidden"' },
+  { n: 'B10 the freeze follows expires_at (2 h) instead of 12 h', f: 'B', pairs: [[`  IF now() >= v_o.created_at + interval '12 hours' THEN\n    RETURN jsonb_build_object('status', 'frozen');`, `  IF now() >= v_o.expires_at THEN\n    RETURN jsonb_build_object('status', 'frozen');`]], neut: [S.SET], fail: 'STEP "3 h old order (expires_at passed): change works"' },
   { n: 'B11 the same status is not a no-op', f: 'B', pairs: [[`  IF p_status IS NOT DISTINCT FROM v_o.status THEN\n    RETURN jsonb_build_object('status', 'ok', 'changed', false);\n  END IF;\n`, '']], fail: 'STEP "same status again: ok, changed false"' },
   { n: 'B12 a push failure is NOT swallowed', f: 'B', pairs: [[`    EXCEPTION WHEN OTHERS THEN\n      v_req := NULL;\n    END;\n  END IF;\n  BEGIN\n    INSERT INTO public.push_log`, `    END;\n  END IF;\n  BEGIN\n    INSERT INTO public.push_log`]], red: 'a push that FAILS (pg_net down)' },
   { n: 'B13 push tokens are not cleared on a final status', f: 'B', pairs: [[`  IF p_status IN ('on_the_way','ready','cancelled') THEN\n    UPDATE public.eatery_orders SET notify_token`, `  IF false THEN\n    UPDATE public.eatery_orders SET notify_token`]], red: 'push token + language kept on a non-final status, cleared on a final one' },
   { n: 'B14 a guest order falls back to the profile push token', f: 'B', pairs: [[`IF v_tok IS NULL AND NOT v_o.created_as_guest THEN`, `IF v_tok IS NULL THEN`]], red: 'no order token on a guest order: NO http call' },
-  { n: 'B15 the admin gate is removed', f: 'B', pairs: [[`IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN`, `IF false THEN`]], fail: 'admin pin function: the admin / guest gate is missing' },
-  { n: 'B16 a guest session passes the admin gate', f: 'B', pairs: [[`IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN`, `IF auth.uid() IS NULL OR NOT public.is_admin() THEN`]], fail: 'admin pin function: the admin / guest gate is missing' },
-  { n: 'B17 retention no longer clears push tokens', f: 'B', pairs: [[String.raw`E';\nUPDATE public.eatery_orders SET notify_token = NULL, notify_lang = NULL WHERE created_at < now() - interval ''12 hours'' AND (notify_token IS NOT NULL OR notify_lang IS NOT NULL);\nDELETE`, String.raw`E';\nDELETE`]], fail: 'the retention command is not' },
+  { n: 'B15 the admin gate is removed', f: 'B', pairs: [[`IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN`, `IF false THEN`]], neut: [S.ADM], fail: 'STEP "admin RPC: a signed-in non-admin is refused"' },
+  { n: 'B16 a guest session passes the admin gate', f: 'B', pairs: [[`IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN`, `IF auth.uid() IS NULL OR NOT public.is_admin() THEN`]], neut: [S.ADM], red: 'admin RPC: the same identity as a GUEST session is refused' },
+  { n: 'B17 retention no longer clears push tokens', f: 'B', pairs: [[String.raw`E';\nUPDATE public.eatery_orders SET notify_token = NULL, notify_lang = NULL WHERE created_at < now() - interval ''12 hours'' AND (notify_token IS NOT NULL OR notify_lang IS NOT NULL);\nDELETE`, String.raw`E';\nDELETE`]], neut: [S.RET], red: 'retention: push tokens older than 12 hours are cleared' },
   { n: 'B18 the PIN is stored in plaintext', f: 'B', pairs: [[`VALUES ('partner', p_partner, v_salt, encode(sha256(convert_to(v_salt || ':' || v_pin, 'UTF8')), 'hex'))`, `VALUES ('partner', p_partner, v_salt, v_pin)`]], fail: 'STEP "issue a partner PIN for wa' },
-  { n: 'B19 the PIN is raised in a notice', f: 'B', pairs: [[`  RETURN jsonb_build_object('pin', v_pin,`, `  RAISE NOTICE 'pin %', v_pin;\n  RETURN jsonb_build_object('pin', v_pin,`]], fail: 'eatery_pin_issue body' },
+  { n: 'B19 the PIN is raised in a notice [shape fact: no behaviour probe can see a log line]', f: 'B', pairs: [[`  RETURN jsonb_build_object('pin', v_pin,`, `  RAISE NOTICE 'pin %', v_pin;\n  RETURN jsonb_build_object('pin', v_pin,`]], fail: 'eatery_pin_issue body' },
   { n: 'B20 device limit 5 -> 50', f: 'B', pairs: [[`d.revoked_at IS NULL) >= 5 THEN`, `d.revoked_at IS NULL) >= 50 THEN`]], red: 'device limit: the sixth is refused' },
-  { n: 'B21 enrol RAISES on a wrong PIN (the attempt row would roll back)', f: 'B', pairs: [[`VALUES (v_scope, v_partner, v_c, false);\n    RETURN jsonb_build_object('status', 'wrong_pin');`, `VALUES (v_scope, v_partner, v_c, false);\n    RAISE EXCEPTION 'wrong_pin';`]], fail: 'eatery_partner_enrol body' },
+  { n: 'B21 enrol RAISES on a wrong PIN (the attempt row would roll back)', f: 'B', pairs: [[`VALUES (v_scope, v_partner, v_c, false);\n    RETURN jsonb_build_object('status', 'wrong_pin');`, `VALUES (v_scope, v_partner, v_c, false);\n    RAISE EXCEPTION 'wrong_pin';`]], neut: [S.ENR], fail: 'STEP "malformed PIN: wrong_pin (returned, not raised)"' },
   { n: 'B22 a test order push has no TEST prefix', f: 'B', pairs: [[`'TEST ' || U&'\\00B7' || ' ' || v_pname`, `v_pname`]], red: 'push title is prefixed TEST' },
   { n: 'B23 enrol ignores the 12-hour closing', f: 'B', pairs: [[`  IF now() >= v_o.created_at + interval '12 hours' THEN\n    RETURN jsonb_build_object('status', 'closed');`, `  IF false THEN\n    RETURN jsonb_build_object('status', 'closed');`]], fail: 'STEP "13 h old order: closed even with the right PIN"' },
-  { n: 'B24 the private tables are not revoked from anon / authenticated', f: 'B', pairs: [[`REVOKE ALL ON TABLE private.%I FROM PUBLIC, anon, authenticated`, `REVOKE ALL ON TABLE private.%I FROM PUBLIC`]], fail: 'is reachable by anon / authenticated' },
-  { n: 'B25 the Worker key hash store is seeded with a value', f: 'B', pairs: [[`-- ─── (2) PINs, devices, attempts`, `INSERT INTO private.eatery_worker_key_hashes (key_sha256, note) VALUES ('${'ab'.repeat(32)}', 'x');\n-- ─── (2) PINs, devices, attempts`]], fail: 'the worker key store changed during this file' },
-  { n: 'B26 can_manage always true', f: 'B', pairs: [[`AS $fn$ SELECT public.eatery_order_device_id(p_partner, p_is_test, p_device) IS NOT NULL $fn$;`, `AS $fn$ SELECT true $fn$;`]], fail: 'eatery_order_can_manage still is not the real body' },
+  { n: 'B24 the private tables are not revoked from anon / authenticated', f: 'B', pairs: [[`REVOKE ALL ON TABLE private.%I FROM PUBLIC, anon, authenticated`, `REVOKE ALL ON TABLE private.%I FROM PUBLIC`]], neut: [S.PRIV], fail: 'STEP "private tables: authenticated denied (pins)"' },
+  { n: 'B25 the Worker key hash store is seeded with a value [the empty-start fact]', f: 'B', pairs: [[`-- ─── (2) PINs, devices, attempts`, `INSERT INTO private.eatery_worker_key_hashes (key_sha256, note) VALUES ('${'ab'.repeat(32)}', 'x');\n-- ─── (2) PINs, devices, attempts`]], fail: 'the worker key store changed during this file' },
+  { n: 'B26 can_manage always true', f: 'B', pairs: [[`AS $fn$ SELECT public.eatery_order_device_id(p_partner, p_is_test, p_device) IS NOT NULL $fn$;`, `AS $fn$ SELECT true $fn$;`]], neut: [S.CAN], fail: 'STEP "device WITHOUT the Worker key: can_manage false"' },
+  { n: 'B27 a device of partner X manages partner Y', f: 'B', pairs: [[`(d.scope = 'partner' AND d.partner_id = p_partner)`, `(d.scope = 'partner')`]], neut: [S.DEV], fail: 'STEP "wa device on a wb order: can_manage false"' },
+  { n: 'B28 a new PIN does not revoke the bucket\'s devices', f: 'B', pairs: [[`  UPDATE private.eatery_partner_devices SET revoked_at = now()\n   WHERE revoked_at IS NULL AND scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n`, '']], neut: [S.ISS], fail: 'STEP "the old device is revoked: set_status forbidden"' },
+  { n: 'B29 a reason is accepted on a non-cancel status', f: 'B', pairs: [[`  ELSIF p_reason IS NOT NULL THEN\n    RETURN jsonb_build_object('status', 'invalid_reason');\n  END IF;`, `  END IF;`]], fail: 'STEP "a reason on a non-cancel status: invalid_reason"' },
+  { n: 'B30 a cancel with an unknown reason is accepted', f: 'B', pairs: [[`IF p_reason IS NULL OR p_reason NOT IN ('closed','busy','item_out','no_delivery_there','unreachable','other') THEN`, `IF p_reason IS NULL THEN`]], fail: 'STEP "cancelled with an unknown reason: invalid_reason"' },
+  { n: 'B31 a wrong PIN leaves no attempt row', f: 'B', pairs: [[`    INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok) VALUES (v_scope, v_partner, v_c, false);\n    RETURN jsonb_build_object('status', 'wrong_pin');`, `    RETURN jsonb_build_object('status', 'wrong_pin');`]], fail: 'STEP "the failed attempts were recorded (not rolled back)"' },
+  { n: 'B32 renewing a PIN does not clear the lock counters', f: 'B', pairs: [[`  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n`, '']], neut: [S.ISS], fail: 'STEP "the lock counters of wa were cleared"' },
 ]
 if (process.argv.includes('--no-mutants')) console.log('\n(mutants skipped)')
 else {
   console.log('\nRED-FIRST mutants')
   for (const m of MUTANTS) {
     const src = m.f === 'A' ? SA : SB
-    const p = mutant(m.n, src, m.pairs)
+    const neutPairs = (m.neut ?? []).map(x => [`RAISE EXCEPTION '${x}`, `RAISE NOTICE '${x}`])
+    const p = mutant(m.n, src, [...m.pairs, ...neutPairs])
     if (!p) { table.push([m.n, 'ANCHOR MISSING', '']); continue }
     const fa = m.f === 'A' ? p : FA, fb = m.f === 'B' ? p : FB
     const d = await after1144()
