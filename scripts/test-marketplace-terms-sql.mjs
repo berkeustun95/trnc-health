@@ -16,6 +16,9 @@ const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFi
 const MIG = f => rel('../supabase/migrations/' + f)
 const F183 = MIG('20261183_marketplace_listings.sql'), F184 = MIG('20261184_marketplace_messaging.sql')
 const F185 = MIG('20261185_marketplace_maintenance.sql'), F190 = MIG('20261190_marketplace_terms.sql')
+const F191 = MIG('20261191_accept_terms_server.sql')
+// 20261191 (the terms guard) needs the real profiles triggers: its pre-flight and its guard sit beside branch (g) of check_profile_name_content.
+const PROFILE_TRIGGERS = readFileSync(rel('./fixtures/profiles-terms-prereqs.sql'), 'utf8') + readFileSync(rel('./fixtures/profiles-triggers-live-2026-10-07.sql'), 'utf8')
 const T190 = readFileSync(F190, 'utf8')
 const md5 = s => createHash('md5').update(s, 'utf8').digest('hex')
 
@@ -58,15 +61,19 @@ async function as(db, who, sql) {
   } catch (e) { return { ok: false, err: e.message } } finally { await db.exec('RESET role;') }
 }
 const errIs = (r, code) => !r.ok && r.err.includes(code)
-const setTerms = (db, who, v) => db.exec(`UPDATE profiles SET terms_version = ${v === null ? 'NULL' : `'${v}'`} WHERE id = '${U[who]}'`)
+// This suite probes the `>=` comparison with values that are NOT on the published list ('2026-11-10', 'z', ...), so its writes bypass
+// the 20261191 guard (disabled around the write); a published-list refusal is that file's own suite (test-accept-terms-sql.mjs).
+const setTerms = (db, who, v) => db.exec(`ALTER TABLE profiles DISABLE TRIGGER guard_profile_terms_columns;
+  UPDATE profiles SET terms_version = ${v === null ? 'NULL' : `'${v}'`} WHERE id = '${U[who]}';
+  ALTER TABLE profiles ENABLE TRIGGER guard_profile_terms_columns;`)
 const ITEM = (title = 'Gitar satılık') =>
   `INSERT INTO marketplace_listings (title, description, price_tl, is_free, category, condition, district)
    VALUES ('${title}', 'Akustik gitar, çok iyi durumda.', 3000, false, 'hobby_music', 'like_new', 'nicosia')`
 
 // withFull = true: 183 + 184 + 185 + 190. false: the same without 190 (the red-first database).
 async function build(withFull) {
-  const db = await freshDb(BASE + CRON_STUB + SEED)
-  for (const f of [F183, F184, F185, ...(withFull ? [F190] : [])]) {
+  const db = await freshDb(BASE + PROFILE_TRIGGERS + CRON_STUB + SEED)
+  for (const f of [F183, F184, F185, ...(withFull ? [F190] : []), F191]) {
     const r = await applyFile(db, f); if (!r.ok) throw new Error(f.split('/').pop() + ': ' + r.msg)
   }
   for (const w of ['S', 'B', 'P']) await as(db, w, `SELECT accept_marketplace_notice('2026-11-07')`)

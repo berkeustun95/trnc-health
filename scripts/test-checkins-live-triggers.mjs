@@ -17,7 +17,7 @@ const db = await freshDb(SEED)
 await db.exec(`
   ALTER TABLE public.profiles ADD COLUMN first_name text, ADD COLUMN last_name text, ADD COLUMN full_name text,
     ADD COLUMN display_name_normalized text, ADD COLUMN resident_status text, ADD COLUMN resident_status_updated_at timestamptz,
-    ADD COLUMN terms_version text, ADD COLUMN terms_accepted_at timestamptz, ADD COLUMN marketing_opt_in_at timestamptz;
+    ADD COLUMN terms_version text, ADD COLUMN terms_locale text, ADD COLUMN terms_accepted_at timestamptz, ADD COLUMN marketing_opt_in_at timestamptz;
   CREATE FUNCTION public.contains_blocked_term(t text) RETURNS boolean LANGUAGE sql AS $f$ SELECT t ILIKE '%badword%' $f$;
   CREATE FUNCTION public.normalize_display_name(t text) RETURNS text LANGUAGE sql AS $f$ SELECT nullif(lower(btrim(t)), '') $f$;
   CREATE FUNCTION public.is_reserved_display_name(t text) RETURNS boolean LANGUAGE sql AS $f$ SELECT t = 'admin' $f$;
@@ -27,7 +27,7 @@ await db.exec(`INSERT INTO public.profiles (id, display_name, date_of_birth, ter
   ('${U(1)}', NULL, '1990-01-01', '2026-09-27', now(), 'Ada'), ('${U(2)}', 'viewer', '1990-01-01', '2026-09-27', NULL, NULL);
   INSERT INTO auth.users (id) SELECT id FROM public.profiles ON CONFLICT DO NOTHING;
   UPDATE public.profiles SET terms_accepted_at = '2026-09-27 10:00+00', marketing_opt_in_at = '2026-09-01 10:00+00';`)
-for (const f of ['20261092_checkins.sql', '20261093_checkins_google_places.sql']) {
+for (const f of ['20261092_checkins.sql', '20261093_checkins_google_places.sql', '20261191_accept_terms_server.sql']) {
   const r = await applyFile(db, fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url)))
   if (!r.ok) { console.log('APPLY FAILED', f, r.msg); process.exit(1) }
 }
@@ -61,5 +61,14 @@ x = await as(U(1), `SELECT * FROM public.check_in('${P(1)}', 35.0005, 33.0, 10)`
 ok('check_in works with the live triggers present', x.ok && x.rows[0].already === false, x)
 x = await as(null, `SELECT * FROM public.check_in_google('${U(1)}', 'ChIJgooglePlace000001', 35.0, 33.0, 35.0005, 33.0, 10, true)`, 'service_role')
 ok('check_in_google works with the live triggers present', x.ok && x.rows[0].already === false, x)
+// 20261191 on top of the same live triggers: the check-in writes above ran with the terms guard present; now the guard itself.
+x = await as(U(2), `SELECT public.accept_terms('2026-11-11', 'Turkish') AS r`)
+ok('accept_terms works through both live triggers and branch (g) stamps the time', x.ok && x.rows[0].r.terms_version === '2026-11-11' && x.rows[0].r.terms_accepted_at, x)
+x = await as(U(1), `UPDATE public.profiles SET terms_version = '2026-11-11', terms_locale = 'English' WHERE id = '${U(1)}' RETURNING terms_version`)
+ok('an old-bundle direct write of a published version still passes (positive control for the refusal below)', x.ok && x.rows[0].terms_version === '2026-11-11', x)
+x = await as(U(1), `UPDATE public.profiles SET terms_version = '2099-01-01' WHERE id = '${U(1)}'`)
+ok('…and an unlisted version is refused with the live triggers present', x.msg === 'TERMS_VERSION_UNKNOWN', x)
+x = await as(U(1), `UPDATE public.profiles SET display_name = 'Gezgin 2', checkins_public = true WHERE id = '${U(1)}' RETURNING display_name_normalized`)
+ok('ordinary profile edits and the check-in switch are unaffected by the terms guard', x.ok && x.rows[0].display_name_normalized === 'gezgin 2', x)
 console.log(`${pass} pass, ${fail} fail`)
 process.exit(fail ? 1 : 0)

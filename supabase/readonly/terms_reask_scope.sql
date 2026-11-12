@@ -6,5 +6,8 @@ select json_build_object(
   'terms_older', (select count(*) from public.profiles where terms_version < '2026-09-20'),
   'terms_current', (select count(*) from public.profiles where terms_version >= '2026-09-20'),
   'versions', (select coalesce(json_object_agg(coalesce(terms_version, '(null)'), n), '{}'::json)
-                 from (select terms_version, count(*) as n from public.profiles group by 1) s)
+                 from (select terms_version, count(*) as n from public.profiles group by 1) s),
+  -- 20261191's pre-flight refuses a terms_locale outside the nine full English language names: shown here before its go.
+  'locales', (select coalesce(json_object_agg(coalesce(terms_locale, '(null)'), n), '{}'::json)
+                from (select terms_locale, count(*) as n from public.profiles group by 1) s)
 ) as terms_scope;

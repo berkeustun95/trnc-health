@@ -10,7 +10,8 @@ import { freshDb, applyFile } from './migration-harness.mjs'
 const MIGRATIONS = (process.env.MARKETPLACE_MIGRATIONS || '').split(' ').filter(Boolean)
   .map(f => fileURLToPath(new URL('../supabase/migrations/' + f, import.meta.url)))
 // With migrations: also the prerequisites they build on (Araçlar S1, storage, report constraints).
-const FIXTURE = ['./fixtures/messaging-live.sql', ...(MIGRATIONS.length ? ['./fixtures/marketplace-prereqs.sql'] : [])]
+// 20261191 (terms guard) stands on the real profiles triggers: loaded whenever migrations are applied on top.
+const FIXTURE = ['./fixtures/messaging-live.sql', ...(MIGRATIONS.length ? ['./fixtures/marketplace-prereqs.sql', './fixtures/profiles-terms-prereqs.sql', './fixtures/profiles-triggers-live-2026-10-07.sql'] : [])]
   .map(f => readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8')).join('\n')
 
 const U = {
