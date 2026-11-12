@@ -173,7 +173,8 @@ export const MARKETPLACE_CHAT = {
     if (fixture) return ok(fxThreads())
     const r = await supabase.rpc('list_conversations', { p_kind: 'listing' })
     if (r.error && useFixtureOr(r.error)) return ok(fxThreads())
-    return r
+    if (r.error || !r.data) return r
+    return ok(await withListingExtras(r.data))
   },
   async messages(conversationId) {
     if (fixture) return ok([...(fixture.messages[conversationId] || [])])
@@ -194,6 +195,37 @@ export const MARKETPLACE_CHAT = {
     if (fixture) return fxAct(rpc, args)
     return supabase.rpc(rpc, args)
   },
+}
+
+// list_conversations nulls listing_title for a hidden AND a deleted listing, so the rows alone cannot tell them apart.
+// For those rows only: the seller's own hidden listing (owner read policy; the owner filter matters, an admin can read all)
+// gives the title + listing_hidden, and the conversation's initiator (always the buyer of a listing thread) gives i_am_buyer.
+// A failed or impossible lookup leaves the row as the RPC returned it (shown as "removed").
+export function mergeListingExtras(rows, own = [], initiators = [], uid = null) {
+  const ownById = new Map(own.map(l => [l.id, l]))
+  const initByConv = new Map(initiators.map(c => [c.id, c.initiator_id]))
+  return rows.map(r => {
+    if (!r.listing_id || r.listing_title != null) return r
+    const l = ownById.get(r.listing_id)
+    const out = l?.hidden_at ? { ...r, listing_title: l.title, listing_hidden: true } : { ...r }
+    if (uid && initByConv.has(r.conversation_id)) out.i_am_buyer = initByConv.get(r.conversation_id) === uid
+    return out
+  })
+}
+async function withListingExtras(rows) {
+  const ambiguous = rows.filter(r => r.listing_id && r.listing_title == null)
+  if (!ambiguous.length) return rows
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    if (!uid) return rows
+    const rowsOf = async q => { try { const { data, error } = await q; return error ? [] : (data ?? []) } catch { return [] } }
+    const [own, initiators] = await Promise.all([
+      rowsOf(supabase.from('marketplace_listings').select('id, title, hidden_at').eq('owner_id', uid).in('id', ambiguous.map(r => r.listing_id))),
+      rowsOf(supabase.from('conversations').select('id, initiator_id').in('id', ambiguous.map(r => r.conversation_id))),
+    ])
+    return mergeListingExtras(rows, own, initiators, uid)
+  } catch { return rows }
 }
 
 // The notice is per user and versioned; the server refuses a listing message without it (NOTICE_REQUIRED).
@@ -225,14 +257,22 @@ export async function blockSeller(userId) {
 }
 
 function fxThreads() {
-  return fixture.threads.filter(c => !c.hidden).map(c => {
+  const me = fixture.me
+  const rows = fixture.threads.filter(c => !c.hidden).map(c => {
     const l = fixture.listings.find(x => x.id === c.listing_id)
     const msgs = fixture.messages[c.conversation_id] || []
     const last = msgs[msgs.length - 1]
+    const shown = l && !l.deleted_at && !l.hidden_at
     return { ...c, last_message_at: last?.created_at ?? c.created_at, last_body: last?.body ?? null,
-      listing_title: l?.title ?? null, listing_status: l?.status ?? null,
-      listing_available: !!l && l.status === 'active' && !l.deleted_at && !l.hidden_at }
+      listing_title: shown ? l.title : null, listing_status: l?.status ?? null,
+      listing_available: !!l && l.status === 'active' && !l.deleted_at && !l.hidden_at && !(l.expires_at && l.expires_at < new Date().toISOString()) }
   }).sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1))
+  const own = fixture.listings.filter(l => l.owner_id === me && !l.deleted_at)
+  const initiators = rows.map(r => {
+    const l = fixture.listings.find(x => x.id === r.listing_id)
+    return l ? { id: r.conversation_id, initiator_id: l.owner_id === me ? r.other_user_id : me } : null
+  }).filter(Boolean)
+  return mergeListingExtras(rows, own, initiators, me)
 }
 function fxMessage(cid, senderId, name, body) {
   const m = { id: `fx-m-${fixture.seq++}`, sender_id: senderId, sender_display_name: name, body, created_at: new Date().toISOString() }

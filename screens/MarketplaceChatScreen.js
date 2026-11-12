@@ -67,23 +67,35 @@ export function MarketplaceTermsLayer({ lang, userId, onAccepted, onCancel }) {
   )
 }
 
-// The listing a thread is about. listing_id is NULL once the listing is purged (20261185 keeps the chat).
-function listingState(row) {
+// The listing a thread is about. listing_id is NULL once the listing is purged (20261185 keeps the chat). The RPC nulls
+// listing_title for a hidden or deleted listing; MARKETPLACE_CHAT.list() adds listing_hidden + title (the seller's own
+// hidden row) and i_am_buyer. A buyer never learns a listing was hidden, so hidden/deleted read as the same neutral line.
+export function listingState(row) {
   if (!row?.listing_id) return 'removed'
+  if (row.listing_hidden) return 'hidden'
+  if (row.listing_title == null) return row.i_am_buyer === true ? 'gone' : 'removed'
   if (row.listing_status === 'sold') return 'sold'
-  return row.listing_available ? 'live' : 'removed'
+  return row.listing_available ? 'live' : 'expired'
 }
-const STATE_BADGE = { sold: 'mkStateSold', removed: 'mkChatListingRemoved' }
+const STATE_BADGE = { sold: 'mkStateSold', expired: 'mkStateExpired', hidden: 'mkStateHidden' }
+const CAN_OPEN = { live: true, sold: true, hidden: true }
+export function listingTitleText(row, lang) {
+  const state = listingState(row)
+  if (state === 'gone') return t('mkGoneTitle', lang)
+  if (state === 'removed') return t('mkChatListingRemoved', lang)
+  return row.listing_title
+}
 
 function ListingStrip({ row, lang, onOpen }) {
   const state = listingState(row)
-  const canOpen = state !== 'removed'
+  const canOpen = CAN_OPEN[state] === true
+  const title = listingTitleText(row, lang)
   return (
     <TouchableOpacity style={s.strip} onPress={() => onOpen(row.listing_id)} disabled={!canOpen} activeOpacity={0.8}
-      accessibilityRole={canOpen ? 'button' : 'text'} accessibilityLabel={`${row.listing_title ?? t('mkChatListingRemoved', lang)}`}>
+      accessibilityRole={canOpen ? 'button' : 'text'} accessibilityLabel={STATE_BADGE[state] ? `${title}, ${t(STATE_BADGE[state], lang)}` : title}>
       <Ionicons name="pricetag-outline" size={18} color={CAT.homeLife.ink} />
-      <Text style={s.stripTitle} numberOfLines={1}>{row.listing_title ?? t('mkChatListingRemoved', lang)}</Text>
-      {STATE_BADGE[state] && row.listing_title ? <Text style={s.badge}>{t(STATE_BADGE[state], lang)}</Text> : null}
+      <Text style={s.stripTitle} numberOfLines={1}>{title}</Text>
+      {STATE_BADGE[state] ? <Text style={s.badge}>{t(STATE_BADGE[state], lang)}</Text> : null}
       {canOpen && <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
     </TouchableOpacity>
   )
@@ -94,8 +106,8 @@ function InboxExtra({ row, lang }) {
   return (
     <View style={s.extra}>
       <Ionicons name="pricetag-outline" size={12} color={colors.textSecondary} />
-      <Text style={s.extraText} numberOfLines={1}>{row.listing_title ?? t('mkChatListingRemoved', lang)}</Text>
-      {STATE_BADGE[state] && row.listing_title ? <Text style={s.extraBadge}>{t(STATE_BADGE[state], lang)}</Text> : null}
+      <Text style={s.extraText} numberOfLines={1}>{listingTitleText(row, lang)}</Text>
+      {STATE_BADGE[state] ? <Text style={s.extraBadge}>{t(STATE_BADGE[state], lang)}</Text> : null}
     </View>
   )
 }
