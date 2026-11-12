@@ -12,6 +12,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase, isGuest } from '../lib/supabase'
+import { signOutThisDevice, signOutEverywhere } from '../utils/signOut'
 import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
 import { colors, shadow, radius, elevation, type, font, TAP } from '../constants/theme'
 import { Button, ConfirmDialog, useTabBarFootprint, PageCanvas } from '../components/ui'
@@ -731,7 +732,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       return
     }
     await clearBook()   // delivery addresses live on this phone only; gone with the account (not on sign-out)
-    await supabase.auth.signOut()
+    // Safety sign-out: the account was just deleted, so end it on every device.
+    await signOutEverywhere({ clearToken: false })
   }
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
@@ -1515,7 +1517,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+          <TouchableOpacity style={s.signOutBtn} onPress={() => signOutThisDevice()}>
             <Text style={s.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
 

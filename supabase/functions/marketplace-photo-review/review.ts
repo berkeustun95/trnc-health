@@ -21,7 +21,8 @@ export interface Deps {
   // conditional on status = 'pending'; false = someone else got there first (or the seller deleted it)
   settle(id: string, fields: Record<string, unknown>): Promise<boolean>
   seller(ownerId: string, listingId: string): Promise<{ lang: string; token: string | null; title: string; noticedAt: number | null }>
-  notify(row: { user_id: string; title: string; body: string }): Promise<void>
+  // listing_id (20261192) is optional: the retry in reject() calls it without
+  notify(row: { user_id: string; title: string; body: string; listing_id?: string }): Promise<void>
   push(message: Record<string, unknown>): Promise<void>
   now(): number
   log(code: string): void
@@ -92,7 +93,14 @@ async function reject(p: Photo, reason: Reason, reviewed: Record<string, unknown
     const s = await d.seller(p.owner_id, p.listing_id)
     if (s.noticedAt == null || d.now() - s.noticedAt >= NOTICE_GAP_MS) {
       const text = rejectText(s.lang, s.title)
-      await d.notify({ user_id: p.owner_id, ...text })
+      const row = { user_id: p.owner_id, ...text }
+      // 20261192: the notice carries the listing so a tap opens it. If that insert fails for ANY reason (column not
+      // there yet: wrong release order or a rollback; PostgREST's schema cache not reloaded; the listing hard-deleted
+      // between the photo read and now, so the FK fails), the notice and the push must not be lost with it: retry
+      // ONCE without listing_id. A second failure falls to the outer catch exactly as before (notice_failed, no push).
+      // We cannot rely on which error code PostgREST returns, so any error retries.
+      try { await d.notify({ ...row, listing_id: p.listing_id }) }
+      catch { await d.notify(row); d.log('notice_listing_id_dropped') }
       if (s.token) await d.push({ to: s.token, title: text.title, body: text.body, sound: 'default',
                                   data: { screen: 'marketplace', listing_id: p.listing_id } })
     }

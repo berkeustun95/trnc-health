@@ -24,7 +24,7 @@ const IDS = { admin: 'ad000000-0000-4000-8000-000000000001', user: 'b0000000-000
 const PENDING = `pending/${IDS.owner}/${IDS.listing}/1731000000000-0.jpg`
 
 function rig(o = {}) {
-  const calls = { uploads: [], removed: [], settled: [], notices: [], pushes: [], logs: [] }
+  const calls = { uploads: [], removed: [], settled: [], notices: [], attempts: [], pushes: [], logs: [] }
   const photo = o.photo === null ? null : { id: IDS.photo, listing_id: IDS.listing, owner_id: IDS.owner, status: 'pending', storage_path: PENDING, ...o.photo }
   const deps = {
     reviewer: async jwt => {
@@ -38,7 +38,11 @@ function rig(o = {}) {
     settle: async (id, f) => { if (o.lostRace) return false; calls.settled.push(f); return true },
     seller: async () => ({ lang: o.lang ?? 'Turkish', token: o.token === undefined ? 'ExponentPushToken[x]' : o.token, title: 'Bisiklet satılık',
                            noticedAt: o.noticedAgoMs == null ? null : 1_000_000 - o.noticedAgoMs }),
-    notify: async row => { if (o.notifyFails) throw new Error('x'); calls.notices.push(row) },
+    notify: async row => {
+      calls.attempts.push(row)
+      if (o.notifyFails || (o.notifyFailsWithListing && 'listing_id' in row)) throw new Error('x')
+      calls.notices.push(row)
+    },
     push: async m => { calls.pushes.push(m) },
     now: () => 1_000_000,
     log: c => calls.logs.push(c),
@@ -139,6 +143,38 @@ const CASES = [
     const { deps, calls } = rig({ notifyFails: true })
     const r = await handle('admin', body('reject', { reason: 'other' }), deps)
     return r.status === 200 && calls.settled.length === 1 && calls.logs.includes('notice_failed')
+  }],
+  // ── 20261192: the notice carries the listing; a DB that cannot take the column must not cost the notice or the push ──
+  ['reject: the notice row carries listing_id = the photo\'s listing; push payload unchanged', async () => {
+    const { deps, calls } = rig()
+    await handle('admin', body('reject', { reason: 'other' }), deps)
+    const m = calls.pushes[0]
+    return calls.attempts.length === 1 && calls.notices[0].listing_id === IDS.listing && calls.notices[0].user_id === IDS.owner
+      && Object.keys(m).sort().join() === 'body,data,sound,title,to' && JSON.stringify(m.data) === JSON.stringify({ screen: 'marketplace', listing_id: IDS.listing })
+      && !calls.logs.length
+  }],
+  ['reject: insert with listing_id fails → retried ONCE without it, notice stored, push still sent, code logged', async () => {
+    const { deps, calls } = rig({ notifyFailsWithListing: true })
+    const r = await handle('admin', body('reject', { reason: 'other' }), deps)
+    return r.status === 200 && calls.attempts.length === 2 && 'listing_id' in calls.attempts[0] && !('listing_id' in calls.attempts[1])
+      && calls.notices.length === 1 && calls.notices[0].user_id === IDS.owner && calls.pushes.length === 1
+      && calls.logs.join() === 'notice_listing_id_dropped'
+  }],
+  ['reject: both inserts fail → still 200, decision kept, no push, exactly two attempts, only notice_failed logged', async () => {
+    const { deps, calls } = rig({ notifyFails: true })
+    const r = await handle('admin', body('reject', { reason: 'other' }), deps)
+    return r.status === 200 && r.body.status === 'rejected' && calls.settled.length === 1 && calls.attempts.length === 2
+      && !calls.notices.length && !calls.pushes.length && calls.logs.join() === 'notice_failed'
+  }],
+  ['reject within the 10-minute gap: no insert attempt at all (throttle unchanged)', async () => {
+    const { deps, calls } = rig({ noticedAgoMs: NOTICE_GAP_MS - 1 })
+    await handle('admin', body('reject', { reason: 'other' }), deps)
+    return calls.attempts.length === 0 && !calls.pushes.length
+  }],
+  ['approve: never writes a notice', async () => {
+    const { deps, calls } = rig({ bytes: jpg })
+    const r = await handle('admin', body('approve'), deps)
+    return r.status === 200 && calls.attempts.length === 0 && !calls.pushes.length
   }],
   ['reject loses the race → 409, nothing removed, nobody told', async () => {
     const { deps, calls } = rig({ lostRace: true })
