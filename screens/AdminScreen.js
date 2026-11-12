@@ -4998,7 +4998,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
               <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.headerIcon} resizeMode="contain" />
               <Text style={s.headerLabel}>Admin</Text>
             </View>
-            <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+            <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut({ scope: 'local' })}>
               <Text style={s.signOutText}>Sign out</Text>
             </TouchableOpacity>
           </View>
@@ -5022,7 +5022,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
             <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
             <Text style={s.headerLabel}>User counts</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut({ scope: 'local' })}>
             <Text style={s.signOutText}>Sign out</Text>
           </TouchableOpacity>
         </View>

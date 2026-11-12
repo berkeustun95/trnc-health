@@ -500,7 +500,7 @@ export default function OrganizerScreen({ session, lang }) {
             <Text style={s.headerSub}>Event organiser</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={() => supabase.auth.signOut()} style={s.signOutBtn}>
+        <TouchableOpacity onPress={() => supabase.auth.signOut({ scope: 'local' })} style={s.signOutBtn}>
           <Text style={s.signOutText}>{t('signOut', lang)}</Text>
         </TouchableOpacity>
       </View>
