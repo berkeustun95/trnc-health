@@ -25,7 +25,8 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
-import { fetchNotifications, notificationRoute } from './utils/notificationRoute'
+import { fetchNotifications, notificationRoute, marketplaceListingTarget } from './utils/notificationRoute'
+import { getListing as getMarketplaceListing } from './utils/marketplaceApi'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
@@ -2244,6 +2245,7 @@ export default function App() {
         const route = notificationRoute(item)
         if (route === 'weekend') openWeekendOnMap()
         else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
+        else if (route === 'marketplace_listing') marketplaceListingTarget(item.listing_id, getMarketplaceListing).then(target => { closeNotifs(); setShowMarketplace(target) })
         else if (route === 'marketplace_conversation') { closeNotifs(); setShowMarketplace({ view: 'inbox', conversationId: item.conversation_id }) }
         else setShowDutyList(true)
       }}
