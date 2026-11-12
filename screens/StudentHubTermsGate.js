@@ -10,7 +10,7 @@ import { colors, type, radii } from '../constants/theme'
 // Student Hub terms re-ask (constants/legal STUDENT_HUB_TERMS_MIN). Shown INSTEAD of Student Hub to a
 // signed-in, non-guest account on older terms; nothing else in the app is interrupted. "Kabul
 // ediyorum" records acceptance through the accept_terms RPC (20261191), like sign-up (ProfileSetupScreen):
-// only a returned version equal to the one sent counts. The server acts on the signed-in caller, so
+// a returned version >= the one sent counts (the server never lowers). The server acts on the signed-in caller, so
 // `userId` is kept for callers but no longer used by the write. terms_accepted_at is stamped by the server. "Vazgeç" / back = close.
 // Bandabuliya reuses it as an overlay (MarketplaceChatScreen's MarketplaceTermsLayer) by passing its own title/body keys;
 // the defaults are Student Hub's, so its call is unchanged.
@@ -24,7 +24,7 @@ export default function StudentHubTermsGate({ lang, userId, onAccepted, onCancel
     setSaving(true); setError(null)
     const { data, error: err } = await supabase.rpc('accept_terms', { p_version: LEGAL_VERSION, p_locale: legalLocaleFor('terms', lang) })
     // >=, not ===: the server never lowers, so an account already on a newer version returns that row
-    if (err || !(data?.terms_version >= LEGAL_VERSION)) {
+    if (err || !(typeof data?.terms_version === 'string' && data.terms_version >= LEGAL_VERSION)) {
       setError(t('shTermsSaveError', lang)); setSaving(false); return
     }
     onAccepted(data)

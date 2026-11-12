@@ -79,6 +79,13 @@ describe('StudentHubTermsGate', () => {
     expect(await screen.findByText(t('shTermsSaveError', L))).toBeTruthy()
     expect(onAccepted).not.toHaveBeenCalled()
   })
+  test.each([['object', {}], ['array', ['2099-01-01']]])('a non-string terms_version (%s) back: save-error text, no onAccepted', async (_n, v) => {
+    mockRpc.mockResolvedValue({ data: row(v), error: null })
+    const onAccepted = jest.fn()
+    await open(onAccepted); await accept()
+    expect(await screen.findByText(t('shTermsSaveError', L))).toBeTruthy()
+    expect(onAccepted).not.toHaveBeenCalled()
+  })
   test('null data and no error: save-error text, no onAccepted', async () => {
     mockRpc.mockResolvedValue({ data: null, error: null })
     const onAccepted = jest.fn()

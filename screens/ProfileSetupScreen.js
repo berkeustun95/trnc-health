@@ -613,7 +613,7 @@ export default function ProfileSetupScreen({
         setSaveError(false)
         const { data, error: termsErr } = await supabase.rpc('accept_terms', { p_version: LEGAL_VERSION, p_locale: legalLocaleFor('terms', lang) })
         setSaving(false)
-        if (termsErr || !(data?.terms_version >= LEGAL_VERSION)) { setSaveError('pgSaveError'); return }
+        if (termsErr || !(typeof data?.terms_version === 'string' && data.terms_version >= LEGAL_VERSION)) { setSaveError('pgSaveError'); return }
         setTermsRecorded(true)
       }
       // ONE patch for all six fields. The merge makes this atomic rather than two
