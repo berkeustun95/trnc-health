@@ -1634,6 +1634,188 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='search_content'
           AND pg_get_functiondef(p.oid) ILIKE '%job_postings%') ok
+    -- ── 1193 / 1194: order status from the restaurant. Same discipline as the blocks around it: only to_regclass / to_regprocedure /
+    --    catalogs, COALESCE around every subquery, red until applied, never an error. The block sits OUTSIDE every other migration's
+    --    slice on purpose (the 1134 / 1132 / 1125 / 1144 probes cut their own). One count, one owner: the create / verify COMMENT
+    --    suffix halves of the 1144 / 1134 tokens moved here (they end `20261193.` now), and the 1132 retention row is rewritten
+    --    in the cron section for the new command. The function signatures in the older tokens were rewritten to the 4-arg / 2-arg ones.
+    -- 1193-BEGIN
+    UNION ALL SELECT '20261193_eatery_order_status','eatery_partners.order_status_enabled: boolean NOT NULL DEFAULT false (H token for the DEFAULT); no column ACL; still exactly the 2 policies',
+      COALESCE((SELECT a.atttypid = 'boolean'::regtype AND a.attnotnull AND a.attacl IS NULL FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_status_enabled' AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) = 'false' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                     WHERE d.adrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_status_enabled'), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_partners') = 2
+    UNION ALL SELECT '20261193_eatery_order_status','eatery_orders status columns: status text NOT NULL DEFAULT sent; the six statuses, six reasons, nine full-name languages (never tr / en); cancel pair; token + language both or neither; still 0 policies, still ONE FK',
+      COALESCE((SELECT a.atttypid = 'text'::regtype AND a.attnotnull FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_orders') AND a.attname = 'status' AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) LIKE '''sent''%' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                     WHERE d.adrelid = to_regclass('public.eatery_orders') AND a.attname = 'status'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%sent%' AND pg_get_constraintdef(c.oid) LIKE '%received%' AND pg_get_constraintdef(c.oid) LIKE '%preparing%' AND pg_get_constraintdef(c.oid) LIKE '%on_the_way%'
+                           AND pg_get_constraintdef(c.oid) LIKE '%ready%' AND pg_get_constraintdef(c.oid) LIKE '%cancelled%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_status_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%pickup%' AND pg_get_constraintdef(c.oid) LIKE '%delivery%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_fulfilment_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%closed%' AND pg_get_constraintdef(c.oid) LIKE '%busy%' AND pg_get_constraintdef(c.oid) LIKE '%item_out%' AND pg_get_constraintdef(c.oid) LIKE '%no_delivery_there%'
+                           AND pg_get_constraintdef(c.oid) LIKE '%unreachable%' AND pg_get_constraintdef(c.oid) LIKE '%other%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_cancel_reason_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%cancel_reason IS NOT NULL%' AND pg_get_constraintdef(c.oid) LIKE '%cancelled%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_cancel_pair_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%English%' AND pg_get_constraintdef(c.oid) LIKE '%Turkish%' AND pg_get_constraintdef(c.oid) LIKE '%Arabic%' AND pg_get_constraintdef(c.oid) LIKE '%Russian%'
+                           AND pg_get_constraintdef(c.oid) LIKE '%Greek%' AND pg_get_constraintdef(c.oid) LIKE '%French%' AND pg_get_constraintdef(c.oid) LIKE '%Spanish%' AND pg_get_constraintdef(c.oid) LIKE '%German%'
+                           AND pg_get_constraintdef(c.oid) LIKE '%Persian%' AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%' AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_lang_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%Expo(nent)?PushToken%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_token_check'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%notify_token IS NULL%' AND pg_get_constraintdef(c.oid) LIKE '%notify_lang IS NULL%' AND c.convalidated
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_pair_check'), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_orders') = 0
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.contype = 'f') = 1
+    UNION ALL SELECT '20261193_eatery_order_status','eatery_order_events: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes; one FK to eatery_orders ON DELETE CASCADE and none on device_id',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_order_events')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_order_events') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_any_column_privilege('anon', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,REFERENCES')
+               AND NOT has_any_column_privilege('authenticated', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,REFERENCES')
+               AND has_table_privilege('service_role', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_order_events') AND c.contype = 'f' AND c.confrelid = to_regclass('public.eatery_orders') AND c.confdeltype = 'c') = 1
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_order_events') AND c.contype = 'f') = 1
+    UNION ALL SELECT '20261193_eatery_order_status','create_eatery_order(uuid,jsonb,text,text): p_mode checked before any write / lock (invalid_mode), stored as fulfilment; names p_partner, p_items, p_client_id, p_mode with 2 defaults; the old 3-argument function is gone; one overload; the 1125-1144 shapes survive',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%MESSAGE = ''invalid_mode''%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%p_mode IS NOT NULL AND p_mode NOT IN (''pickup'',''delivery'')%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%client_id, created_as_guest, is_test, fulfilment)%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%p_client_id, v_guest, v_test, p_mode)%'
+           AND position('MESSAGE = ''invalid_mode''' IN pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')))
+               < position('pg_advisory_xact_lock' IN pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')))
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%MESSAGE = ''order_not_supported''%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%JOIN public.eatery_item_options io%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%v_test := public.is_previewer() OR public.is_order_tester(v_uid);%', false)
+      AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id','p_mode']::text[] AND p.pronargdefaults = 2 FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')), false)
+      AND to_regprocedure('public.create_eatery_order(uuid,jsonb,text)') IS NULL
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
+      AND COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), 'pg_proc') LIKE '%invalid_mode%'
+           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), 'pg_proc') LIKE '%20261193.', false)
+    UNION ALL SELECT '20261193_eatery_order_status','verify_eatery_order(text,text): the status keys, can_manage through the helper, the 12-hour window, still no created_by / client_id / option id / notify key; names p_code, p_device; the old 1-argument function is gone; one overload',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''order_status'',%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''status_open'',%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''status_enabled'',%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''can_manage'',%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''next'',%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%eatery_order_can_manage(v_o.partner_id, v_o.is_test, p_device)%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%interval ''12 hours''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%view_count = view_count + 1%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''detail'', l -> ''detail''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''created_by''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''client_id''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''notify_token''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''notify_lang''%'
+           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%option_id%', false)
+      AND COALESCE((SELECT p.proargnames = ARRAY['p_code','p_device']::text[] AND p.pronargdefaults = 1 FROM pg_proc p WHERE p.oid = to_regprocedure('public.verify_eatery_order(text,text)')), false)
+      AND to_regprocedure('public.verify_eatery_order(text)') IS NULL
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'verify_eatery_order') = 1
+      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%can_manage%'
+           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%20261193.', false)
+    UNION ALL SELECT '20261193_eatery_order_status','my_eatery_orders() / eatery_order_subscribe(): DEFINER, search_path pinned, authenticated EXECUTE only (not anon, not PUBLIC); own-orders filter; no view counting; no token returned',
+      COALESCE((SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp'] AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon')))
+                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.my_eatery_orders()'), to_regprocedure('public.eatery_order_subscribe(text,text,text)'))), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.my_eatery_orders()'), to_regprocedure('public.eatery_order_subscribe(text,text,text)'))) = 2
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) LIKE '%o.created_by = v_uid%'
+           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) LIKE '%interval ''24 hours''%'
+           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) LIKE '%LIMIT 20%'
+           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) NOT LIKE '%view_count = view_count%'
+           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) NOT LIKE '%''notify_token''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_subscribe(text,text,text)')) LIKE '%created_by = v_uid FOR UPDATE%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_subscribe(text,text,text)')) LIKE '%MESSAGE = ''invalid_lang''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_subscribe(text,text,text)')) NOT LIKE '%view_count%', false)
+    UNION ALL SELECT '20261193_eatery_order_status','eatery_order_next_statuses(text,text) IMMUTABLE and eatery_order_can_manage(uuid,boolean,text): owner postgres, search_path empty, NO EXECUTE for anon / authenticated / PUBLIC',
+      COALESCE((SELECT bool_and(p.proconfig @> ARRAY['search_path=""'] AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated'))))
+                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.eatery_order_next_statuses(text,text)'), to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)'))), false)
+      AND COALESCE((SELECT p.provolatile = 'i' FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_order_next_statuses(text,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.eatery_order_next_statuses(text,text)'), to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)'))) = 2
+    -- 1193-END
+    -- 1194-BEGIN
+    UNION ALL SELECT '20261194_eatery_order_status_partner','private.eatery_worker_key_hashes / _partner_pins / _partner_devices / _pin_attempts: RLS on, 0 policies, no anon/authenticated privilege (table, column), no PUBLIC; hash CHECKs; one PIN row per partner, at most one test PIN',
+      (SELECT count(*) FROM pg_class c WHERE c.oid IN (to_regclass('private.eatery_worker_key_hashes'), to_regclass('private.eatery_partner_pins'), to_regclass('private.eatery_partner_devices'), to_regclass('private.eatery_pin_attempts'))) = 4
+      AND COALESCE((SELECT bool_and(c.relrowsecurity
+                       AND NOT has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                       AND NOT has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                       AND NOT has_any_column_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+                       AND NOT has_any_column_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0))
+                  FROM pg_class c WHERE c.oid IN (to_regclass('private.eatery_worker_key_hashes'), to_regclass('private.eatery_partner_pins'), to_regclass('private.eatery_partner_devices'), to_regclass('private.eatery_pin_attempts'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'private' AND tablename IN ('eatery_worker_key_hashes','eatery_partner_pins','eatery_partner_devices','eatery_pin_attempts')) = 0
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conname IN ('eatery_worker_key_hashes_hash_check','eatery_partner_pins_hash_check','eatery_partner_devices_hash_check') AND pg_get_constraintdef(c.oid) LIKE '%{64}%') = 3
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('private.eatery_partner_pins') AND c.contype = 'u') = 1
+      AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'private' AND indexname = 'eatery_partner_pins_one_test_idx' AND indexdef LIKE '%UNIQUE%' AND indexdef LIKE '%scope = ''test''%') = 1
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('private.eatery_partner_devices') AND c.contype = 'u') = 1
+    UNION ALL SELECT '20261194_eatery_order_status_partner','1194 internal functions (worker_key_ok, pin_generate, device_id, can_manage, pin_issue, push_text): owner postgres, NO EXECUTE for anon / authenticated / PUBLIC; one overload each',
+      COALESCE((SELECT bool_and(pg_get_userbyid(p.proowner) = 'postgres'
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated'))))
+                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.eatery_worker_key_ok()'), to_regprocedure('public.eatery_pin_generate()'), to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)'),
+                       to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)'), to_regprocedure('public.eatery_pin_issue(uuid,text)'), to_regprocedure('public.eatery_order_push_text(text,text,text)'))), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
+             AND p.proname IN ('eatery_worker_key_ok','eatery_pin_generate','eatery_order_device_id','eatery_order_can_manage','eatery_pin_issue','eatery_order_push_text')) = 6
+    UNION ALL SELECT '20261194_eatery_order_status_partner','admin_set_eatery_partner_pin: DEFINER, authenticated EXECUTE only (not anon / PUBLIC), body refuses a guest / non-admin; eatery_partner_enrol + eatery_order_set_status: DEFINER, anon + authenticated EXECUTE, never RAISE',
+      COALESCE((SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp'] AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.privilege_type = 'EXECUTE' AND a.grantee = 0)
+                       AND (EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'anon') = (p.proname <> 'admin_set_eatery_partner_pin')))
+                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)'), to_regprocedure('public.eatery_partner_enrol(text,text)'), to_regprocedure('public.eatery_order_set_status(text,text,text,text)'))), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)'), to_regprocedure('public.eatery_partner_enrol(text,text)'), to_regprocedure('public.eatery_order_set_status(text,text,text,text)'))) = 3
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)')) LIKE '%public.is_admin()%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)')) LIKE '%public.is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)')) LIKE '%MESSAGE = ''forbidden''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) NOT LIKE '%RAISE EXCEPTION%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) NOT LIKE '%RAISE EXCEPTION%', false)
+    UNION ALL SELECT '20261194_eatery_order_status_partner','Worker proof + device gate: worker_key_ok reads x-ada-worker-key and not is_previewer; device_id needs the key, an un-revoked device, its own partner or (test scope AND a test order); can_manage = device_id IS NOT NULL',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_worker_key_ok()')) LIKE '%x-ada-worker-key%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_worker_key_ok()')) LIKE '%private.eatery_worker_key_hashes%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_worker_key_ok()')) NOT LIKE '%is_previewer%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%eatery_worker_key_ok()%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%d.revoked_at IS NULL%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%d.partner_id = p_partner%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%d.scope = ''test'' AND p_is_test IS TRUE%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)')) LIKE '%eatery_order_device_id(p_partner, p_is_test, p_device) IS NOT NULL%', false)
+    UNION ALL SELECT '20261194_eatery_order_status_partner','enrol: Worker key first, caps 5 / 10 / 30 on FAILED attempts checked before the PIN is compared, a salted hash compare, device limit 5; PIN issue: CSPRNG rejection sampling, salted hash, devices revoked, attempts cleared, PIN never raised',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%eatery_worker_key_ok()%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%NOT a.ok AND a.at > now() - interval ''1 hour'') >= 5%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''15 minutes'') >= 10%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''24 hours'') >= 30%'
+           AND position('''locked''' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)'))) < position('encode(sha256' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')))
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%revoked_at IS NULL%) >= 5%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%16000000%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%1000000%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%gen_random_uuid%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) LIKE '%revoked_at = now()%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) LIKE '%DELETE FROM private.eatery_pin_attempts%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) NOT LIKE '%RAISE NOTICE%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) NOT LIKE '%RAISE LOG%', false)
+    UNION ALL SELECT '20261194_eatery_order_status_partner','set_status: Worker key, FOR UPDATE, forbidden before not-found details, 12-hour freeze (never expires_at), no-op on the same status, push in swallowed sub-blocks, token cleared on a final status, never counts a view',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%eatery_worker_key_ok()%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%FOR UPDATE%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%now() >= v_o.created_at + interval ''12 hours''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) NOT LIKE '%expires_at%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) NOT LIKE '%view_count%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%p_status IS NOT DISTINCT FROM v_o.status%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%net.http_post%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%EXCEPTION WHEN OTHERS%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%''order_status''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%notify_token = NULL, notify_lang = NULL%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%NOT v_o.created_as_guest%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%''order_status''%', false)
+    UNION ALL SELECT '20261194_eatery_order_status_partner','eatery_order_push_text(text,text,text): IMMUTABLE, the approved Turkish and English words, the nine full English language names, no ISO code; push_log has no CHECK on kind',
+      COALESCE((SELECT p.provolatile = 'i' FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_order_push_text(text,text,text)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Siparişin hazır, gelip alabilirsin.%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Your order is ready for pick-up.%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Siparişin iptal edildi: {reason}%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Restoran bu adrese teslimat yapmıyor.%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%''English'',''Turkish'',''Arabic'',''Russian'',''Greek'',''French'',''Spanish'',''German'',''Persian''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) NOT LIKE '%''tr''%', false)
+      AND to_regclass('public.push_log') IS NOT NULL
+      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.push_log') AND c.contype = 'c' AND pg_get_constraintdef(c.oid) ILIKE '%kind%') = 0
+    -- 1194-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -4588,188 +4770,6 @@ WITH report AS (
                           AND EXISTS(SELECT 1 FROM public.eatery_menu_items i WHERE i.partner_id = p.id)
                           AND NOT EXISTS(SELECT 1 FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.partner_id = p.id)
                      FROM public.eatery_partners p WHERE p.slug = 'pasatiempo'), false)
-    -- ── 1193 / 1194: order status from the restaurant. Same discipline as the blocks around it: only to_regclass / to_regprocedure /
-    --    catalogs, COALESCE around every subquery, red until applied, never an error. The block sits OUTSIDE every other migration's
-    --    slice on purpose (the 1134 / 1132 / 1125 / 1144 probes cut their own). One count, one owner: the create / verify COMMENT
-    --    suffix halves of the 1144 / 1134 tokens moved here (they end `20261193.` now), and the 1132 retention row is rewritten
-    --    in the cron section for the new command. The function signatures in the older tokens were rewritten to the 4-arg / 2-arg ones.
-    -- 1193-BEGIN
-    UNION ALL SELECT '20261193_eatery_order_status','eatery_partners.order_status_enabled: boolean NOT NULL DEFAULT false (H token for the DEFAULT); no column ACL; still exactly the 2 policies',
-      COALESCE((SELECT a.atttypid = 'boolean'::regtype AND a.attnotnull AND a.attacl IS NULL FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_status_enabled' AND NOT a.attisdropped), false)
-      AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) = 'false' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-                     WHERE d.adrelid = to_regclass('public.eatery_partners') AND a.attname = 'order_status_enabled'), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_partners') = 2
-    UNION ALL SELECT '20261193_eatery_order_status','eatery_orders status columns: status text NOT NULL DEFAULT sent; the six statuses, six reasons, nine full-name languages (never tr / en); cancel pair; token + language both or neither; still 0 policies, still ONE FK',
-      COALESCE((SELECT a.atttypid = 'text'::regtype AND a.attnotnull FROM pg_attribute a WHERE a.attrelid = to_regclass('public.eatery_orders') AND a.attname = 'status' AND NOT a.attisdropped), false)
-      AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) LIKE '''sent''%' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-                     WHERE d.adrelid = to_regclass('public.eatery_orders') AND a.attname = 'status'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%sent%' AND pg_get_constraintdef(c.oid) LIKE '%received%' AND pg_get_constraintdef(c.oid) LIKE '%preparing%' AND pg_get_constraintdef(c.oid) LIKE '%on_the_way%'
-                           AND pg_get_constraintdef(c.oid) LIKE '%ready%' AND pg_get_constraintdef(c.oid) LIKE '%cancelled%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_status_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%pickup%' AND pg_get_constraintdef(c.oid) LIKE '%delivery%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_fulfilment_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%closed%' AND pg_get_constraintdef(c.oid) LIKE '%busy%' AND pg_get_constraintdef(c.oid) LIKE '%item_out%' AND pg_get_constraintdef(c.oid) LIKE '%no_delivery_there%'
-                           AND pg_get_constraintdef(c.oid) LIKE '%unreachable%' AND pg_get_constraintdef(c.oid) LIKE '%other%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_cancel_reason_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%cancel_reason IS NOT NULL%' AND pg_get_constraintdef(c.oid) LIKE '%cancelled%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_cancel_pair_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%English%' AND pg_get_constraintdef(c.oid) LIKE '%Turkish%' AND pg_get_constraintdef(c.oid) LIKE '%Arabic%' AND pg_get_constraintdef(c.oid) LIKE '%Russian%'
-                           AND pg_get_constraintdef(c.oid) LIKE '%Greek%' AND pg_get_constraintdef(c.oid) LIKE '%French%' AND pg_get_constraintdef(c.oid) LIKE '%Spanish%' AND pg_get_constraintdef(c.oid) LIKE '%German%'
-                           AND pg_get_constraintdef(c.oid) LIKE '%Persian%' AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%' AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_lang_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%Expo(nent)?PushToken%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_token_check'), false)
-      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%notify_token IS NULL%' AND pg_get_constraintdef(c.oid) LIKE '%notify_lang IS NULL%' AND c.convalidated
-                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.conname = 'eatery_orders_notify_pair_check'), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_orders') = 0
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_orders') AND c.contype = 'f') = 1
-    UNION ALL SELECT '20261193_eatery_order_status','eatery_order_events: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes; one FK to eatery_orders ON DELETE CASCADE and none on device_id',
-      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.eatery_order_events')), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'eatery_order_events') = 0
-      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-               AND NOT has_table_privilege('authenticated', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-               AND NOT has_any_column_privilege('anon', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,REFERENCES')
-               AND NOT has_any_column_privilege('authenticated', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,REFERENCES')
-               AND has_table_privilege('service_role', to_regclass('public.eatery_order_events'), 'SELECT,INSERT,UPDATE,DELETE'), false)
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_order_events') AND c.contype = 'f' AND c.confrelid = to_regclass('public.eatery_orders') AND c.confdeltype = 'c') = 1
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.eatery_order_events') AND c.contype = 'f') = 1
-    UNION ALL SELECT '20261193_eatery_order_status','create_eatery_order(uuid,jsonb,text,text): p_mode checked before any write / lock (invalid_mode), stored as fulfilment; names p_partner, p_items, p_client_id, p_mode with 2 defaults; the old 3-argument function is gone; one overload; the 1125-1144 shapes survive',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%MESSAGE = ''invalid_mode''%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%p_mode IS NOT NULL AND p_mode NOT IN (''pickup'',''delivery'')%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%client_id, created_as_guest, is_test, fulfilment)%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%p_client_id, v_guest, v_test, p_mode)%'
-           AND position('MESSAGE = ''invalid_mode''' IN pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')))
-               < position('pg_advisory_xact_lock' IN pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')))
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%MESSAGE = ''order_not_supported''%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%JOIN public.eatery_item_options io%'
-           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%v_test := public.is_previewer() OR public.is_order_tester(v_uid);%', false)
-      AND COALESCE((SELECT p.proargnames = ARRAY['p_partner','p_items','p_client_id','p_mode']::text[] AND p.pronargdefaults = 2 FROM pg_proc p WHERE p.oid = to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')), false)
-      AND to_regprocedure('public.create_eatery_order(uuid,jsonb,text)') IS NULL
-      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'create_eatery_order') = 1
-      AND COALESCE(obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), 'pg_proc') LIKE '%invalid_mode%'
-           AND obj_description(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), 'pg_proc') LIKE '%20261193.', false)
-    UNION ALL SELECT '20261193_eatery_order_status','verify_eatery_order(text,text): the status keys, can_manage through the helper, the 12-hour window, still no created_by / client_id / option id / notify key; names p_code, p_device; the old 1-argument function is gone; one overload',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''order_status'',%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''status_open'',%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''status_enabled'',%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''can_manage'',%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''next'',%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%eatery_order_can_manage(v_o.partner_id, v_o.is_test, p_device)%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%interval ''12 hours''%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%view_count = view_count + 1%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) LIKE '%''detail'', l -> ''detail''%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''created_by''%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''client_id''%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''notify_token''%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%''notify_lang''%'
-           AND pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')) NOT LIKE '%option_id%', false)
-      AND COALESCE((SELECT p.proargnames = ARRAY['p_code','p_device']::text[] AND p.pronargdefaults = 1 FROM pg_proc p WHERE p.oid = to_regprocedure('public.verify_eatery_order(text,text)')), false)
-      AND to_regprocedure('public.verify_eatery_order(text)') IS NULL
-      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'verify_eatery_order') = 1
-      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%can_manage%'
-           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%20261193.', false)
-    UNION ALL SELECT '20261193_eatery_order_status','my_eatery_orders() / eatery_order_subscribe(): DEFINER, search_path pinned, authenticated EXECUTE only (not anon, not PUBLIC); own-orders filter; no view counting; no token returned',
-      COALESCE((SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp'] AND pg_get_userbyid(p.proowner) = 'postgres'
-                       AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
-                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon')))
-                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.my_eatery_orders()'), to_regprocedure('public.eatery_order_subscribe(text,text,text)'))), false)
-      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.my_eatery_orders()'), to_regprocedure('public.eatery_order_subscribe(text,text,text)'))) = 2
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) LIKE '%o.created_by = v_uid%'
-           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) LIKE '%interval ''24 hours''%'
-           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) LIKE '%LIMIT 20%'
-           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) NOT LIKE '%view_count = view_count%'
-           AND pg_get_functiondef(to_regprocedure('public.my_eatery_orders()')) NOT LIKE '%''notify_token''%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_subscribe(text,text,text)')) LIKE '%created_by = v_uid FOR UPDATE%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_subscribe(text,text,text)')) LIKE '%MESSAGE = ''invalid_lang''%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_subscribe(text,text,text)')) NOT LIKE '%view_count%', false)
-    UNION ALL SELECT '20261193_eatery_order_status','eatery_order_next_statuses(text,text) IMMUTABLE and eatery_order_can_manage(uuid,boolean,text): owner postgres, search_path empty, NO EXECUTE for anon / authenticated / PUBLIC',
-      COALESCE((SELECT bool_and(p.proconfig @> ARRAY['search_path=""'] AND pg_get_userbyid(p.proowner) = 'postgres'
-                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated'))))
-                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.eatery_order_next_statuses(text,text)'), to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)'))), false)
-      AND COALESCE((SELECT p.provolatile = 'i' FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_order_next_statuses(text,text)')), false)
-      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.eatery_order_next_statuses(text,text)'), to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)'))) = 2
-    -- 1193-END
-    -- 1194-BEGIN
-    UNION ALL SELECT '20261194_eatery_order_status_partner','private.eatery_worker_key_hashes / _partner_pins / _partner_devices / _pin_attempts: RLS on, 0 policies, no anon/authenticated privilege (table, column), no PUBLIC; hash CHECKs; one PIN row per partner, at most one test PIN',
-      (SELECT count(*) FROM pg_class c WHERE c.oid IN (to_regclass('private.eatery_worker_key_hashes'), to_regclass('private.eatery_partner_pins'), to_regclass('private.eatery_partner_devices'), to_regclass('private.eatery_pin_attempts'))) = 4
-      AND COALESCE((SELECT bool_and(c.relrowsecurity
-                       AND NOT has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                       AND NOT has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                       AND NOT has_any_column_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
-                       AND NOT has_any_column_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
-                       AND NOT EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0))
-                  FROM pg_class c WHERE c.oid IN (to_regclass('private.eatery_worker_key_hashes'), to_regclass('private.eatery_partner_pins'), to_regclass('private.eatery_partner_devices'), to_regclass('private.eatery_pin_attempts'))), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'private' AND tablename IN ('eatery_worker_key_hashes','eatery_partner_pins','eatery_partner_devices','eatery_pin_attempts')) = 0
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conname IN ('eatery_worker_key_hashes_hash_check','eatery_partner_pins_hash_check','eatery_partner_devices_hash_check') AND pg_get_constraintdef(c.oid) LIKE '%{64}%') = 3
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('private.eatery_partner_pins') AND c.contype = 'u') = 1
-      AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'private' AND indexname = 'eatery_partner_pins_one_test_idx' AND indexdef LIKE '%UNIQUE%' AND indexdef LIKE '%scope = ''test''%') = 1
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('private.eatery_partner_devices') AND c.contype = 'u') = 1
-    UNION ALL SELECT '20261194_eatery_order_status_partner','1194 internal functions (worker_key_ok, pin_generate, device_id, can_manage, pin_issue, push_text): owner postgres, NO EXECUTE for anon / authenticated / PUBLIC; one overload each',
-      COALESCE((SELECT bool_and(pg_get_userbyid(p.proowner) = 'postgres'
-                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated'))))
-                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.eatery_worker_key_ok()'), to_regprocedure('public.eatery_pin_generate()'), to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)'),
-                       to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)'), to_regprocedure('public.eatery_pin_issue(uuid,text)'), to_regprocedure('public.eatery_order_push_text(text,text,text)'))), false)
-      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
-             AND p.proname IN ('eatery_worker_key_ok','eatery_pin_generate','eatery_order_device_id','eatery_order_can_manage','eatery_pin_issue','eatery_order_push_text')) = 6
-    UNION ALL SELECT '20261194_eatery_order_status_partner','admin_set_eatery_partner_pin: DEFINER, authenticated EXECUTE only (not anon / PUBLIC), body refuses a guest / non-admin; eatery_partner_enrol + eatery_order_set_status: DEFINER, anon + authenticated EXECUTE, never RAISE',
-      COALESCE((SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp'] AND pg_get_userbyid(p.proowner) = 'postgres'
-                       AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
-                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.privilege_type = 'EXECUTE' AND a.grantee = 0)
-                       AND (EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'anon') = (p.proname <> 'admin_set_eatery_partner_pin')))
-                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)'), to_regprocedure('public.eatery_partner_enrol(text,text)'), to_regprocedure('public.eatery_order_set_status(text,text,text,text)'))), false)
-      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)'), to_regprocedure('public.eatery_partner_enrol(text,text)'), to_regprocedure('public.eatery_order_set_status(text,text,text,text)'))) = 3
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)')) LIKE '%public.is_admin()%'
-           AND pg_get_functiondef(to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)')) LIKE '%public.is_anonymous_session()%'
-           AND pg_get_functiondef(to_regprocedure('public.admin_set_eatery_partner_pin(uuid,text)')) LIKE '%MESSAGE = ''forbidden''%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) NOT LIKE '%RAISE EXCEPTION%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) NOT LIKE '%RAISE EXCEPTION%', false)
-    UNION ALL SELECT '20261194_eatery_order_status_partner','Worker proof + device gate: worker_key_ok reads x-ada-worker-key and not is_previewer; device_id needs the key, an un-revoked device, its own partner or (test scope AND a test order); can_manage = device_id IS NOT NULL',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_worker_key_ok()')) LIKE '%x-ada-worker-key%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_worker_key_ok()')) LIKE '%private.eatery_worker_key_hashes%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_worker_key_ok()')) NOT LIKE '%is_previewer%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%eatery_worker_key_ok()%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%d.revoked_at IS NULL%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%d.partner_id = p_partner%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_device_id(uuid,boolean,text)')) LIKE '%d.scope = ''test'' AND p_is_test IS TRUE%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_can_manage(uuid,boolean,text)')) LIKE '%eatery_order_device_id(p_partner, p_is_test, p_device) IS NOT NULL%', false)
-    UNION ALL SELECT '20261194_eatery_order_status_partner','enrol: Worker key first, caps 5 / 10 / 30 on FAILED attempts checked before the PIN is compared, a salted hash compare, device limit 5; PIN issue: CSPRNG rejection sampling, salted hash, devices revoked, attempts cleared, PIN never raised',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%eatery_worker_key_ok()%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%NOT a.ok AND a.at > now() - interval ''1 hour'') >= 5%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''15 minutes'') >= 10%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%interval ''24 hours'') >= 30%'
-           AND position('''locked''' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)'))) < position('encode(sha256' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')))
-           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_enrol(text,text)')) LIKE '%revoked_at IS NULL%) >= 5%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%16000000%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%1000000%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_generate()')) LIKE '%gen_random_uuid%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) LIKE '%revoked_at = now()%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) LIKE '%DELETE FROM private.eatery_pin_attempts%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) NOT LIKE '%RAISE NOTICE%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_pin_issue(uuid,text)')) NOT LIKE '%RAISE LOG%', false)
-    UNION ALL SELECT '20261194_eatery_order_status_partner','set_status: Worker key, FOR UPDATE, forbidden before not-found details, 12-hour freeze (never expires_at), no-op on the same status, push in swallowed sub-blocks, token cleared on a final status, never counts a view',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%eatery_worker_key_ok()%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%FOR UPDATE%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%now() >= v_o.created_at + interval ''12 hours''%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) NOT LIKE '%expires_at%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) NOT LIKE '%view_count%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%p_status IS NOT DISTINCT FROM v_o.status%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%net.http_post%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%EXCEPTION WHEN OTHERS%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%''order_status''%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%notify_token = NULL, notify_lang = NULL%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%NOT v_o.created_as_guest%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_set_status(text,text,text,text)')) LIKE '%''order_status''%', false)
-    UNION ALL SELECT '20261194_eatery_order_status_partner','eatery_order_push_text(text,text,text): IMMUTABLE, the approved Turkish and English words, the nine full English language names, no ISO code; push_log has no CHECK on kind',
-      COALESCE((SELECT p.provolatile = 'i' FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_order_push_text(text,text,text)')), false)
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Siparişin hazır, gelip alabilirsin.%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Your order is ready for pick-up.%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Siparişin iptal edildi: {reason}%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%Restoran bu adrese teslimat yapmıyor.%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) LIKE '%''English'',''Turkish'',''Arabic'',''Russian'',''Greek'',''French'',''Spanish'',''German'',''Persian''%'
-           AND pg_get_functiondef(to_regprocedure('public.eatery_order_push_text(text,text,text)')) NOT LIKE '%''tr''%', false)
-      AND to_regclass('public.push_log') IS NOT NULL
-      AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.push_log') AND c.contype = 'c' AND pg_get_constraintdef(c.oid) ILIKE '%kind%') = 0
-    -- 1194-END
     -- ── 1144: eatery_partners.order_method + create_eatery_order refuses phone partners. Same discipline as the blocks below:
     --    only to_regclass / to_regprocedure / catalogs, COALESCE around every subquery, red until applied, never an error.
     --    It sits OUTSIDE every other migration's slice on purpose (the 1134 / 1132 / 1125 / 1135-1137 probes cut their own).
