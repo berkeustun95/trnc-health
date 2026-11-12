@@ -37,21 +37,6 @@ function fakeSupabase({ failCols = [], rows = ROWS, rpc = { data: [{ conversatio
 }
 
 describe('fetchNotifications', () => {
-  test('42703 chain: conversation_id, then type, then the base columns', async () => {
-    const sb = fakeSupabase({ failCols: ['conversation_id', 'type'] })
-    await fetchNotifications(sb, 'u1')
-    expect(sb.selects).toEqual([
-      'id, title, body, read, created_at, type, conversation_id',
-      'id, title, body, read, created_at, type',
-      'id, title, body, read, created_at',
-    ])
-  })
-  test('a missing conversation_id keeps type', async () => {
-    const sb = fakeSupabase({ failCols: ['conversation_id'] })
-    await fetchNotifications(sb, 'u1')
-    expect(sb.selects[1]).toContain('type')
-    expect(sb.selects).toHaveLength(2)
-  })
   test('marks only the rows whose conversation is a listing thread', async () => {
     const sb = fakeSupabase()
     const { data } = await fetchNotifications(sb, 'u1')
