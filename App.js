@@ -25,7 +25,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
-import { fetchNotifications, notificationRoute, marketplaceListingTarget } from './utils/notificationRoute'
+import { fetchNotifications, notificationRoute, marketplaceListingTarget, createListingTap } from './utils/notificationRoute'
 import { getListing as getMarketplaceListing } from './utils/marketplaceApi'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
@@ -638,6 +638,9 @@ export default function App() {
   const [facilityRatings, setFacilityRatings] = useState({})
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
+  // Pending Bandabuliya listing tap from Bildirimler; cancelled whenever Bildirimler closes, however that happens.
+  const listingTapRef = useRef(createListingTap())
+  useEffect(() => { if (!showNotifs) listingTapRef.current.cancel() }, [showNotifs])
   const [providerFacility, setProviderFacility] = useState(undefined)
   const [pendingClaim, setPendingClaim] = useState(undefined)
   const [ownsGarage, setOwnsGarage] = useState(false) // drives the dark-launched garages tile for owners (see gate)
@@ -967,6 +970,7 @@ export default function App() {
   // back chain, so the two can never drift apart again (2026-09-27: the chain forgot the
   // duty region, the events district, the beach region and the mark-all-read).
   function closeNotifs() {
+    listingTapRef.current.cancel()
     setShowNotifs(false)
     forgetScroll('notifs')
     const uid = sessionRef.current?.user?.id
@@ -2245,7 +2249,7 @@ export default function App() {
         const route = notificationRoute(item)
         if (route === 'weekend') openWeekendOnMap()
         else if (route === 'marketplace') { closeNotifs(); setShowMarketplace('mine') }
-        else if (route === 'marketplace_listing') marketplaceListingTarget(item.listing_id, getMarketplaceListing).then(target => { closeNotifs(); setShowMarketplace(target) })
+        else if (route === 'marketplace_listing') listingTapRef.current.run(() => marketplaceListingTarget(item.listing_id, getMarketplaceListing), target => { closeNotifs(); setShowMarketplace(target) })
         else if (route === 'marketplace_conversation') { closeNotifs(); setShowMarketplace({ view: 'inbox', conversationId: item.conversation_id }) }
         else setShowDutyList(true)
       }}

@@ -2,11 +2,12 @@
 // id, so fetchNotifications matches it to the user's own rejected photos by review time and annotates only an unambiguous,
 // still-existing listing. The tap re-checks that the listing is still there.
 jest.mock('../constants/redesign', () => ({ MARKETPLACE: true }))
-const { notificationRoute, fetchNotifications, marketplaceListingTarget } = require('../utils/notificationRoute')
+const { notificationRoute, fetchNotifications, marketplaceListingTarget, createListingTap } = require('../utils/notificationRoute')
 
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
 const iso = ms => new Date(ms).toISOString()
-const notice = (o = {}) => ({ id: 'n1', type: 'marketplace', created_at: iso(T0), ...o })
+const bodyFor = t => `“${t}” ilanındaki bir fotoğraf yayınlanmadı.`
+const notice = (o = {}) => ({ id: 'n1', type: 'marketplace', created_at: iso(T0), body: bodyFor('Title 1'), ...o })
 const photo = (listing_id, offsetMs) => ({ listing_id, reviewed_at: iso(T0 + offsetMs).replace('Z', '+00:00') })
 
 describe('notificationRoute', () => {
@@ -14,7 +15,7 @@ describe('notificationRoute', () => {
   test('without: İlanlarım', () => expect(notificationRoute(notice())).toBe('marketplace'))
 })
 
-function fakeSupabase({ notifs = [notice()], photos = [photo('l1', -2000)], count, live = [{ id: 'l1' }], photoError = null, liveError = null } = {}) {
+function fakeSupabase({ notifs = [notice()], photos = [photo('l1', -2000)], count, live = [{ id: 'l1', title: 'Title 1' }], photoError = null, liveError = null } = {}) {
   const log = []
   const answer = {
     notifications: { data: notifs, error: null },
@@ -92,12 +93,45 @@ describe('fetchNotifications: photo-decision rows', () => {
   test('two notices, each tied to its own listing', async () => {
     const T1 = T0 + 3_600_000
     const sb = fakeSupabase({
-      notifs: [notice({ id: 'a' }), notice({ id: 'b', created_at: iso(T1) })],
+      notifs: [notice({ id: 'a' }), notice({ id: 'b', created_at: iso(T1), body: bodyFor('Title 2') })],
       photos: [photo('l1', -2000), { listing_id: 'l2', reviewed_at: iso(T1 - 3000) }],
-      live: [{ id: 'l1' }, { id: 'l2' }],
+      live: [{ id: 'l1', title: 'Title 1' }, { id: 'l2', title: 'Title 2' }],
     })
     const data = await run(sb)
     expect(data.map(n => n.listing_id)).toEqual(['l1', 'l2'])
+  })
+  test('the body names a different title: not annotated', async () => {
+    expect((await run(fakeSupabase({ notifs: [notice({ body: bodyFor('Other listing') })] })))[0].listing_id).toBeUndefined()
+  })
+  test('a long title matches in the truncated form the edge function writes', async () => {
+    const long = 'A very long listing title that goes past forty characters'
+    const cut = long.slice(0, 39).trimEnd() + '…'
+    const sb = fakeSupabase({ notifs: [notice({ body: bodyFor(cut) })], live: [{ id: 'l1', title: long }] })
+    expect((await run(sb))[0].listing_id).toBe('l1')
+    const full = fakeSupabase({ notifs: [notice({ body: bodyFor(long) })], live: [{ id: 'l1', title: long }] })
+    expect((await run(full))[0].listing_id).toBeUndefined()
+  })
+  test('an empty title never matches', async () => {
+    expect((await run(fakeSupabase({ live: [{ id: 'l1', title: '' }] })))[0].listing_id).toBeUndefined()
+  })
+  test('the listings read asks for the title', async () => {
+    const sb = fakeSupabase()
+    await run(sb)
+    expect(sb.log.find(q => q.table === 'marketplace_listings').ops).toContainEqual(['select', 'id, title'])
+  })
+  test('both annotations land on one list, each row keeps its own mark', async () => {
+    const sb = fakeSupabase({ notifs: [notice(), { id: 'm', type: 'message', conversation_id: 'c1', created_at: iso(T0) }] })
+    sb.rpc = async () => ({ data: [{ conversation_id: 'c1' }], error: null })
+    const data = await run(sb)
+    expect(data.find(n => n.id === 'n1').listing_id).toBe('l1')
+    expect(data.find(n => n.id === 'n1').listing_conversation).toBeUndefined()
+    expect(data.find(n => n.id === 'm').listing_conversation).toBe(true)
+    expect(data.find(n => n.id === 'm').listing_id).toBeUndefined()
+  })
+  test('nothing changed: the same response object comes back', async () => {
+    const notifs = [notice()]
+    const res = await fetchNotifications(fakeSupabase({ notifs, live: [] }), 'u1')
+    expect(res.data).toBe(notifs)
   })
   test('a conversation-annotation failure does not cost the photo annotation', async () => {
     const sb = fakeSupabase({ notifs: [notice(), { id: 'm', type: 'message', conversation_id: 'c1', created_at: iso(T0) }] })
@@ -115,5 +149,42 @@ describe('marketplaceListingTarget (the tap)', () => {
   })
   test('a failed read: İlanlarım', async () => {
     expect(await marketplaceListingTarget('l1', async () => { throw new Error('x') })).toBe('mine')
+  })
+})
+
+describe('createListingTap (the pending tap guard)', () => {
+  const deferred = () => { let res; const p = new Promise(r => { res = r }); return { p, res } }
+  const flush = () => new Promise(r => setImmediate(r))
+  test('a normal tap navigates once', async () => {
+    const tap = createListingTap(); const go = jest.fn()
+    tap.run(async () => 'T', go)
+    await flush()
+    expect(go).toHaveBeenCalledTimes(1); expect(go).toHaveBeenCalledWith('T')
+  })
+  test('a second tap while pending is ignored', async () => {
+    const tap = createListingTap(); const go = jest.fn(); const d = deferred(); const resolve = jest.fn(() => d.p)
+    tap.run(resolve, go)
+    expect(tap.run(resolve, go)).toBe(false)
+    d.res('T'); await flush()
+    expect(resolve).toHaveBeenCalledTimes(1); expect(go).toHaveBeenCalledTimes(1)
+  })
+  test('a late result after cancel does not navigate', async () => {
+    const tap = createListingTap(); const go = jest.fn(); const d = deferred()
+    tap.run(() => d.p, go)
+    tap.cancel(); d.res('T'); await flush()
+    expect(go).not.toHaveBeenCalled()
+  })
+  test('after cancel a new tap works and the old late result still does nothing', async () => {
+    const tap = createListingTap(); const go = jest.fn(); const old = deferred()
+    tap.run(() => old.p, go); tap.cancel()
+    tap.run(async () => 'NEW', go)
+    old.res('OLD'); await flush()
+    expect(go).toHaveBeenCalledTimes(1); expect(go).toHaveBeenCalledWith('NEW')
+  })
+  test('after a finished tap the next one runs', async () => {
+    const tap = createListingTap(); const go = jest.fn()
+    tap.run(async () => 'A', go); await flush()
+    tap.run(async () => 'B', go); await flush()
+    expect(go.mock.calls.map(c => c[0])).toEqual(['A', 'B'])
   })
 })
