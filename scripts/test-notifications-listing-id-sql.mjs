@@ -267,7 +267,7 @@ await refuses('refuses cleanly when notifications has a trigger', async db => {
 }, /REFUSING: notifications has triggers/)
 
 // ── red-first: the in-file assertions must be able to fail ──
-async function mutated(name, prepare, transform, pattern) {
+async function mutated(name, prepare, transform, pattern, { prepCreatesColumn = false } = {}) {
   let ok = false, got
   try {
     const db = await freshDb(BASE + CRON_STUB + SEED)
@@ -280,8 +280,13 @@ async function mutated(name, prepare, transform, pattern) {
     writeFileSync(f, out)
     const r = await applyFile(db, f)
     await db.exec('ROLLBACK; RESET ROLE').catch(() => {})
-    got = r.msg
-    ok = !r.ok && pattern.test(r.msg) && (await count(db, `SELECT count(*)::int n FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'listing_id'`)) === 0
+    const led = await count(db, `SELECT count(*)::int n FROM schema_migrations_applied WHERE filename = '${THIS}'`)
+    const col = await count(db, `SELECT count(*)::int n FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'notifications' AND column_name = 'listing_id'`)
+    const fk = (await db.query(`SELECT confdeltype::text d FROM pg_constraint WHERE conrelid = 'public.notifications'::regclass AND conname = 'notifications_listing_id_fkey'`)).rows.map(x => x.d)
+    got = { msg: r.msg, led, col, fk, prepCreatesColumn }
+    // refused = no ledger row; the file altered nothing: column absent, or (when prepare made it) still there with its FK untouched
+    const unchanged = prepCreatesColumn ? col === 1 && fk.length === 1 && fk[0] === 'c' : col === 0
+    ok = !r.ok && pattern.test(r.msg) && led === 0 && unchanged
     await db.close()
   } catch (e) { got = e.message }
   check(name, ok, got)
@@ -295,7 +300,7 @@ await mutated('red: a client UPDATE grant on the new column → refused', async 
 await mutated('red: a leftover CASCADE foreign key on the column → refused', async db => {
   await db.exec(`ALTER TABLE public.notifications ADD COLUMN listing_id uuid;
     ALTER TABLE public.notifications ADD CONSTRAINT notifications_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.marketplace_listings(id) ON DELETE CASCADE`)
-}, s => s + '\n-- file unchanged: the prepared database is the mutation\n', /ON DELETE SET NULL/)
+}, s => s + '\n-- file unchanged: the prepared database is the mutation\n', /ON DELETE SET NULL/, { prepCreatesColumn: true })
 await mutated('red: the file\'s FK without SET NULL (NO ACTION) → refused', async () => {},
   s => s.replace('REFERENCES public.marketplace_listings(id) ON DELETE SET NULL;', 'REFERENCES public.marketplace_listings(id);'),
   /ON DELETE SET NULL/)
