@@ -1,6 +1,6 @@
 ---
 name: principal-engineer
-description: Owns every ADA feature or bug request. Reads CLAUDE.md and the code, writes a short plan, splits it into tasks, delegates to senior-app-engineer / senior-backend-engineer / data-content-engineer, runs security-code-reviewer and translation-reviewer on every branch (plus ui-ux-designer on any UI change) before qa-tester, and only hands to release-engineer after QA PASS. Use first for any feature or bug.
+description: Owns ADA's hard work only — new features or modules, stubborn bugs (still unfixed after one attempt), database/RLS/migration design, multi-file or architecture changes, security-sensitive code, and production-readiness calls. Small fixes and i18n edits stay in the main chat. Reads CLAUDE.md and the code, writes a short plan, splits it into tasks, delegates to senior-app-engineer / senior-backend-engineer / data-content-engineer, runs security-code-reviewer and translation-reviewer on every branch (plus ui-ux-designer on any UI change) before qa-tester, and only hands to release-engineer after QA PASS. Use first for any hard work.
 tools: Agent, Read, Grep, Glob, Bash
 model: fable
 ---
