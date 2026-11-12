@@ -63,14 +63,17 @@ async function as(db, who, sql) {
 const errIs = (r, code) => !r.ok && r.err.includes(code)
 // This suite probes the `>=` comparison with values that are NOT on the published list ('2026-11-10', 'z', ...), so its writes bypass
 // the 20261191 guard (disabled around the write); a published-list refusal is that file's own suite (test-accept-terms-sql.mjs).
-const setTerms = (db, who, v) => db.exec(`ALTER TABLE profiles DISABLE TRIGGER guard_profile_terms_columns;
-  UPDATE profiles SET terms_version = ${v === null ? 'NULL' : `'${v}'`} WHERE id = '${U[who]}';
-  ALTER TABLE profiles ENABLE TRIGGER guard_profile_terms_columns;`)
+async function setTerms(db, who, v) {
+  await db.exec('ALTER TABLE profiles DISABLE TRIGGER guard_profile_terms_columns;')
+  try { await db.exec(`UPDATE profiles SET terms_version = ${v === null ? 'NULL' : `'${v}'`} WHERE id = '${U[who]}';`) }
+  finally { await db.exec('ALTER TABLE profiles ENABLE TRIGGER guard_profile_terms_columns;') }
+}
 const ITEM = (title = 'Gitar satılık') =>
   `INSERT INTO marketplace_listings (title, description, price_tl, is_free, category, condition, district)
    VALUES ('${title}', 'Akustik gitar, çok iyi durumda.', 3000, false, 'hobby_music', 'like_new', 'nicosia')`
 
 // withFull = true: 183 + 184 + 185 + 190. false: the same without 190 (the red-first database).
+const BUILT = []
 async function build(withFull) {
   const db = await freshDb(BASE + PROFILE_TRIGGERS + CRON_STUB + SEED)
   for (const f of [F183, F184, F185, ...(withFull ? [F190] : []), F191]) {
@@ -80,6 +83,7 @@ async function build(withFull) {
   const l = await as(db, 'S', ITEM() + ' RETURNING id')   // posted while the terms were valid
   if (!l.ok) throw new Error(l.err)
   db.listing = l.value
+  BUILT.push(db)
   return db
 }
 const open = (db, who, body = 'Merhaba, hâlâ satılık mı?', id) => as(db, who, `SELECT start_listing_conversation('${id ?? db.listing}', '${body}')`)
@@ -485,6 +489,17 @@ async function sendOracle(db) {
   const marker = "('20261190_marketplace_terms','i_have_marketplace_terms'),"
   const broken = q1.replace(marker, "('20261190_marketplace_terms','i_have_marketplace_terms')")
   check('  …control: one comma removed from a registered tuple list is a syntax error (42601)', broken !== q1 && await code(broken) === '42601')
+}
+
+// ── 8. setTerms must never leave the 20261191 guard off: every database this suite built still has it enabled ─────────
+{
+  const bad = []
+  for (const [i, d] of BUILT.entries()) {
+    await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET role;').catch(() => {})
+    const r = await d.query(`SELECT tgenabled FROM pg_trigger WHERE tgname = 'guard_profile_terms_columns' AND tgrelid = 'public.profiles'::regclass`)
+    if (r.rows.length !== 1 || r.rows[0].tgenabled !== 'O') bad.push({ db: i, tgenabled: r.rows.map(x => x.tgenabled) })
+  }
+  check(`guard_profile_terms_columns is enabled (tgenabled = 'O') on all ${BUILT.length} databases built`, BUILT.length > 100 && bad.length === 0, bad)
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed')
