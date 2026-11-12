@@ -9,6 +9,14 @@
       "clearedOn": "2026-11-10",
       "clearedBy": "Berke, in chat: GO PRODUCTION on commit 18d66c7b, after Preview 57fcd332 (01a1c565) and the fix video",
       "clear": "Only when Berke has seen Explore combined on Preview (video or his own tap-through) and says go in chat. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 377,
+      "commit": "0166ba666a6bbe8b68dc9f0d98a6b45cce1daed5",
+      "what": "accept_terms client (terms acceptance through the server RPC), needs migration 20261191 applied first",
+      "since": "2026-11-12",
+      "cleared": false,
+      "clear": "Only after 20261191_accept_terms_server.sql is applied in production and verify_schema QUERY 1 is green, and Berke says go in chat. Then set cleared to true in a PR."
     }
   ]
 }

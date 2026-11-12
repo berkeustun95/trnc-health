@@ -16,6 +16,9 @@ const BASE = readFileSync(rel('./fixtures/messaging-live.sql'), 'utf8') + readFi
 const MIG = f => rel('../supabase/migrations/' + f)
 const F183 = MIG('20261183_marketplace_listings.sql'), F184 = MIG('20261184_marketplace_messaging.sql')
 const F185 = MIG('20261185_marketplace_maintenance.sql'), F190 = MIG('20261190_marketplace_terms.sql')
+const F191 = MIG('20261191_accept_terms_server.sql')
+// 20261191 (the terms guard) needs the real profiles triggers: its pre-flight and its guard sit beside branch (g) of check_profile_name_content.
+const PROFILE_TRIGGERS = readFileSync(rel('./fixtures/profiles-terms-prereqs.sql'), 'utf8') + readFileSync(rel('./fixtures/profiles-triggers-live-2026-10-07.sql'), 'utf8')
 const T190 = readFileSync(F190, 'utf8')
 const md5 = s => createHash('md5').update(s, 'utf8').digest('hex')
 
@@ -58,21 +61,29 @@ async function as(db, who, sql) {
   } catch (e) { return { ok: false, err: e.message } } finally { await db.exec('RESET role;') }
 }
 const errIs = (r, code) => !r.ok && r.err.includes(code)
-const setTerms = (db, who, v) => db.exec(`UPDATE profiles SET terms_version = ${v === null ? 'NULL' : `'${v}'`} WHERE id = '${U[who]}'`)
+// This suite probes the `>=` comparison with values that are NOT on the published list ('2026-11-10', 'z', ...), so its writes bypass
+// the 20261191 guard (disabled around the write); a published-list refusal is that file's own suite (test-accept-terms-sql.mjs).
+async function setTerms(db, who, v) {
+  await db.exec('ALTER TABLE profiles DISABLE TRIGGER guard_profile_terms_columns;')
+  try { await db.exec(`UPDATE profiles SET terms_version = ${v === null ? 'NULL' : `'${v}'`} WHERE id = '${U[who]}';`) }
+  finally { await db.exec('ALTER TABLE profiles ENABLE TRIGGER guard_profile_terms_columns;') }
+}
 const ITEM = (title = 'Gitar satılık') =>
   `INSERT INTO marketplace_listings (title, description, price_tl, is_free, category, condition, district)
    VALUES ('${title}', 'Akustik gitar, çok iyi durumda.', 3000, false, 'hobby_music', 'like_new', 'nicosia')`
 
 // withFull = true: 183 + 184 + 185 + 190. false: the same without 190 (the red-first database).
+const BUILT = []
 async function build(withFull) {
-  const db = await freshDb(BASE + CRON_STUB + SEED)
-  for (const f of [F183, F184, F185, ...(withFull ? [F190] : [])]) {
+  const db = await freshDb(BASE + PROFILE_TRIGGERS + CRON_STUB + SEED)
+  for (const f of [F183, F184, F185, ...(withFull ? [F190] : []), F191]) {
     const r = await applyFile(db, f); if (!r.ok) throw new Error(f.split('/').pop() + ': ' + r.msg)
   }
   for (const w of ['S', 'B', 'P']) await as(db, w, `SELECT accept_marketplace_notice('2026-11-07')`)
   const l = await as(db, 'S', ITEM() + ' RETURNING id')   // posted while the terms were valid
   if (!l.ok) throw new Error(l.err)
   db.listing = l.value
+  BUILT.push(db)
   return db
 }
 const open = (db, who, body = 'Merhaba, hâlâ satılık mı?', id) => as(db, who, `SELECT start_listing_conversation('${id ?? db.listing}', '${body}')`)
@@ -478,6 +489,17 @@ async function sendOracle(db) {
   const marker = "('20261190_marketplace_terms','i_have_marketplace_terms'),"
   const broken = q1.replace(marker, "('20261190_marketplace_terms','i_have_marketplace_terms')")
   check('  …control: one comma removed from a registered tuple list is a syntax error (42601)', broken !== q1 && await code(broken) === '42601')
+}
+
+// ── 8. setTerms must never leave the 20261191 guard off: every database this suite built still has it enabled ─────────
+{
+  const bad = []
+  for (const [i, d] of BUILT.entries()) {
+    await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET role;').catch(() => {})
+    const r = await d.query(`SELECT tgenabled FROM pg_trigger WHERE tgname = 'guard_profile_terms_columns' AND tgrelid = 'public.profiles'::regclass`)
+    if (r.rows.length !== 1 || r.rows[0].tgenabled !== 'O') bad.push({ db: i, tgenabled: r.rows.map(x => x.tgenabled) })
+  }
+  check(`guard_profile_terms_columns is enabled (tgenabled = 'O') on all ${BUILT.length} databases built`, BUILT.length > 100 && bad.length === 0, bad)
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed')

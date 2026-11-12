@@ -606,18 +606,14 @@ export default function ProfileSetupScreen({
         onAgeIneligible()
         return
       }
-      // Consent BEFORE the profile data it covers, and proven by reading it back: an update
-      // RLS filters to zero rows returns no error (flushPendingConsent in App.js, same rule).
+      // Consent BEFORE the profile data it covers, via the accept_terms RPC (20261191); a returned
+      // version >= the one sent counts: the server never lowers, so a newer one on the account is still accepted.
       if (needsTerms) {
         setSaving(true)
         setSaveError(false)
-        const { data, error: termsErr } = await supabase.from('profiles')
-          .update({ terms_version: LEGAL_VERSION, terms_locale: legalLocaleFor('terms', lang) })
-          .eq('id', session.user.id)
-          .select('terms_version')
-          .single()
+        const { data, error: termsErr } = await supabase.rpc('accept_terms', { p_version: LEGAL_VERSION, p_locale: legalLocaleFor('terms', lang) })
         setSaving(false)
-        if (termsErr || data?.terms_version !== LEGAL_VERSION) { setSaveError('pgSaveError'); return }
+        if (termsErr || !(typeof data?.terms_version === 'string' && data.terms_version >= LEGAL_VERSION)) { setSaveError('pgSaveError'); return }
         setTermsRecorded(true)
       }
       // ONE patch for all six fields. The merge makes this atomic rather than two
