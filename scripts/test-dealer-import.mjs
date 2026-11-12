@@ -163,7 +163,7 @@ check('upload command: admin only, never overwrites in place', up.includes("rpc(
 // Berke, 2026-11-10: the password is typed hidden each run; never stored, logged, cached, taken from argv / env / a file.
 check('upload command: the password is read hidden and goes only into signInWithPassword', up.includes("password: await askHidden(") && up.includes("const email = await ask('\\nAdmin e-mail: ', true)") && up.includes('if (!muted) process.stdout.write(chunk, enc)') && up.includes('output: screen, terminal: true')
   && (up.match(/askHidden\(/g) ?? []).length === 1 && !/password\s*=|PASSWORD|argv[^\n]*[Pp]ass/.test(up) && up.includes('persistSession: false'))
-check('upload command: signs out on every path after the sign-in', /finally \{\s*rl\.close\(\)\s*const \{ error \} = await db\.auth\.signOut\(\)/.test(up)
+check('upload command: signs out on every path after the sign-in', /finally \{\s*rl\.close\(\)\s*const \{ error \} = await db\.auth\.signOut\(\{ scope: 'local' \}\)/.test(up)
   && !up.slice(up.indexOf('signInWithPassword')).replace(/[^\n]*sign-in failed[^\n]*/, '').includes('fail('))
 
 
