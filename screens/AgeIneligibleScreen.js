@@ -49,7 +49,8 @@ export default function AgeIneligibleScreen({ lang, onDone }) {
     if (busy) return
     setBusy(true)
     setError(false)
-    const { error: signOutError } = await supabase.auth.signOut()
+    // Safety sign-out (under-13): every device.
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
     // On success the SIGNED_OUT listener in App.js unmounts this screen, so there is
     // nothing to reset. On failure the session is still here and so are we.
     if (signOutError) { setError(true); setBusy(false) }

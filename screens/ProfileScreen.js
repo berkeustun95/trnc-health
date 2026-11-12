@@ -731,7 +731,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       return
     }
     await clearBook()   // delivery addresses live on this phone only; gone with the account (not on sign-out)
-    await supabase.auth.signOut()
+    // Safety sign-out: the account was just deleted, so end it on every device.
+    await supabase.auth.signOut({ scope: 'global' })
   }
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
@@ -1515,7 +1516,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut({ scope: 'local' })}>
             <Text style={s.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
 

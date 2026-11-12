@@ -137,6 +137,7 @@
     "check:prod-writes": "node scripts/check-prod-write-guard.mjs",
     "googleplaces:edge": "deno run -A scripts/test-google-places-edge.ts",
     "googleplaces:anon": "node scripts/check-google-calls-anonymous.mjs && node scripts/check-google-calls-anonymous.mjs --self",
+    "test:signout": "jest --ci __tests__/signOutScope.test.js __tests__/ageIneligibleSignOut.test.js",
     "test:oli": "jest --ci __tests__/oliChat.test.js __tests__/oliHistory.test.js __tests__/otaLaunchApply.test.js && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-oli-intents.mjs",
     "holds:check": "node scripts/check-release-holds.mjs"
   },

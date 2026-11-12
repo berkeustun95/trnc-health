@@ -548,7 +548,7 @@ export default function ProfileSetupScreen({
       { text: t('signOut', lang), style: 'destructive', onPress: async () => {
         setSigningOut(true)
         setSignOutError(false)
-        const { error } = await supabase.auth.signOut()
+        const { error } = await supabase.auth.signOut({ scope: 'local' })
         // On success App.js unmounts this screen on SIGNED_OUT, so there is nothing to
         // reset. pendingConsent is deliberately NOT cleared: if one is still on the
         // device the flush failed, and dropping it would discard an acceptance that was
@@ -578,7 +578,8 @@ export default function ProfileSetupScreen({
     if (error) { setSaving(false); setSaveError('pgSaveError'); return }
     await clearBook()
     onAgeIneligibleDeleted()
-    await supabase.auth.signOut()
+    // Safety sign-out: the underage account was just deleted, so end it on every device.
+    await supabase.auth.signOut({ scope: 'global' })
   }
 
   async function advance() {
