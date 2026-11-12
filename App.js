@@ -129,6 +129,7 @@ import Game2048Screen from './screens/games/Game2048Screen'
 import SudokuScreen from './screens/games/SudokuScreen'
 import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { dutyStatus, localDateKey, DUTY_FRESH } from './utils/dutyStatus'
+import { parseAdaRoute } from './utils/deepLinkRoutes'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
   loadCityWelcomeState, shouldAskHomeCity, markAskShown, setHomeCity,
@@ -673,6 +674,7 @@ export default function App() {
   const [expandedMuni, setExpandedMuni] = useState(null)
   const [showEvents, setShowEvents] = useState(false)
   const [showAccommodation, setShowAccommodation] = useState(false)
+  const [accomLinkTab, setAccomLinkTab] = useState(null)   // ada://emlak opens Accommodation on its Emlak tab
   const [showHotels, setShowHotels] = useState(false)
   const [hotelsQuery, setHotelsQuery] = useState('')   // set by a Keşfet hotel pin: Oteller opens searched to it
   const [showPets, setShowPets] = useState(false)
@@ -693,6 +695,8 @@ export default function App() {
   const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — sole place-profile state (frozen beaches flow removed in Slice 5 pt B)
   const [showTransport, setShowTransport] = useState(false)
   const [showDuyurular, setShowDuyurular] = useState(false)
+  const [duyuruLinkId, setDuyuruLinkId] = useState(null)   // ada://duyurular/<id>
+  const [pendingLink, setPendingLink] = useState(null)   // an ada:// route waiting for a session
   const [showInsurance, setShowInsurance] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
   const [showGrooming, setShowGrooming] = useState(false)
@@ -703,6 +707,9 @@ export default function App() {
   const [showCars, setShowCars] = useState(false)
   const [carsStack, setCarsStack] = useState([])
   useEffect(() => { if (!showCars) setCarsStack([]) }, [showCars])
+  // A link's tab / item applies to that one opening; every close path (back, header, reset) clears it.
+  useEffect(() => { if (!showAccommodation) setAccomLinkTab(null) }, [showAccommodation])
+  useEffect(() => { if (!showDuyurular) setDuyuruLinkId(null) }, [showDuyurular])
   const openCarsLayer = layer => setCarsStack(st => pushCarsLayer(st, layer))
   const closeCarsLayer = () => setCarsStack(st => st.slice(0, -1))
   const [carsMineReload, setCarsMineReload] = useState(0)
@@ -2276,6 +2283,8 @@ export default function App() {
   } else if (showAccommodation) {
     content = (MODULE_FLAGS.accommodation || isAdmin) ? (
       <AccommodationScreen
+        key={accomLinkTab ?? 'landing'}
+        initialTab={accomLinkTab}
         onAdNavigate={openAdRoute}
         lang={lang}
         onClose={() => setShowAccommodation(false)}
@@ -2308,7 +2317,7 @@ export default function App() {
       : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={() => setShowTransport(false)} />
   } else if (showDuyurular) {
     content = (DUYURULAR || isAdmin)
-      ? <DuyurularScreen lang={lang} onBack={() => setShowDuyurular(false)} backRef={duyurularBackRef} />
+      ? <DuyurularScreen key={duyuruLinkId ?? 'list'} initialId={duyuruLinkId} lang={lang} onBack={() => setShowDuyurular(false)} backRef={duyurularBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="duyurular" titleKey="menuDuyurular" session={session} onBack={() => setShowDuyurular(false)} />
   } else if (showInsurance) {
     content = (MODULE_FLAGS.insurance || isAdmin)
@@ -3110,6 +3119,51 @@ export default function App() {
       case 'duty':    setActiveTab('home'); setDutyRegion(region); setShowDutyList(true); break
     }
   }
+
+  // ada:// links (home-screen widgets; utils/deepLinkRoutes.js). Same reset-then-open as Oli.
+  // A module that is dark on this bundle is NOT opened: a widget tap must never land on
+  // Coming Soon, so the user stays where they were.
+  const linkNavigate = ({ route, id }) => {
+    switch (route) {
+      case 'duty':   oliNavigate('pharmacy'); break
+      case 'explore': if (MODULE_FLAGS.explore) { oliNavigate('nearby'); setActiveTab('home') } break
+      case 'eatery':  if (EATERY) { oliNavigate('eatery'); setActiveTab('home') } break
+      case 'kesfet':
+        if (EXPLORE_MAP_LIVE) { oliNavigate(null); setActiveTab('map') }
+        break
+      case 'emlak':
+        if (MODULE_FLAGS.accommodation) { oliNavigate(null); setActiveTab('home'); setAccomLinkTab('property'); setShowAccommodation(true) }
+        break
+      case 'duyurular':
+        if (DUYURULAR) { oliNavigate(null); setActiveTab('home'); setDuyuruLinkId(id); setShowDuyurular(true) }
+        break
+      case 'events':
+        if (!MODULE_FLAGS.events) break
+        oliNavigate(null); setActiveTab('home')
+        if (id) openEventFromHome(id)
+        else setShowEvents(true)
+        break
+      case 'araclar':
+        if (CARS) { oliNavigate(null); setActiveTab('home'); setShowCars(true) }
+        break
+      // 'dukkan': the marketplace is not in this bundle yet.
+    }
+  }
+
+  // Cold start (getInitialURL) and warm (url event). Held until there is a session, like the
+  // cold-start notification tap: before it, Welcome / sign-in owns the screen. The sign-in
+  // link handler above is separate and unchanged; parseAdaRoute ignores its URLs.
+  useEffect(() => {
+    const take = url => { const r = parseAdaRoute(url); if (r) setPendingLink(r) }
+    Linking.getInitialURL().then(take).catch(() => {})
+    const sub = Linking.addEventListener('url', ({ url }) => take(url))
+    return () => sub.remove()
+  }, [])
+  useEffect(() => {
+    if (!pendingLink || !session) return
+    setPendingLink(null)
+    linkNavigate(pendingLink)
+  }, [pendingLink, session])
 
   // Oli is hidden under either sheet (same reason it hides for the drawer and
   // coach marks — they are root overlays and would cover the floating button).
