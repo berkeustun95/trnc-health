@@ -166,9 +166,9 @@ export const MODULE_FLAGS = {
   // + 20261167 (waitlist notify). Off = Coming Soon + waitlist. Plan: vault 10-ada/2026-11-07_araclar-PLAN.md.
   cars:         false,
   // Bandabuliya — users sell their own items to each other (vault 2026-11-07_marketplace-plan.md).
-  // DARK: no waitlist and no Coming Soon screen; dev and ADA Preview see it via MARKETPLACE
-  // (constants/redesign.js). Sellers 18+, photos approved by hand, chat via conversations.listing_id.
-  marketplace:  false,
+  // LIVE 2026-11-12 (20261183/84/85 + 20261190; terms 2026-11-11). No waitlist and no Coming Soon
+  // screen. Sellers 18+, photos approved by hand, chat via conversations.listing_id. Off = tile hidden again.
+  marketplace:  true,
 }
 
 // Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.
