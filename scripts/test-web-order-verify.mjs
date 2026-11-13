@@ -713,6 +713,15 @@ await test('client: restaurant buttons = next only; cancel needs a reason + conf
   assert.deepEqual(rr.calls.map(c => c[0].split('/').pop()), ['check', 'status', 'token', 'status'])
   assert.equal(JSON.parse(rr.calls[3][1].body).token, 'c'.repeat(64))
   assert.deepEqual(buttons(rr.box).map(label), ['İptal et Cancel', 'Bu cihazı unut · Forget this device'])
+  // already in that status (another phone, or a retried write that had committed): re-sync from /check, never a blank panel
+  let nc = 0
+  const same = await clientRun(null, {
+    check: () => (++nc === 1 ? { ...base, manage: true, next: ['received', 'cancelled'], token: tok } : { ...base, orderStatus: 'received', manage: true, next: ['preparing', 'cancelled'], token: tok }),
+    status: { status: 'ok', changed: false, orderStatus: 'received', next: [], statusAt: 'x', token: tok },
+  })
+  buttons(same.box)[0].onclick(); await flush()
+  assert.equal(nc, 2)
+  assert.deepEqual(buttons(same.box).map(label), ['Hazırlanıyor Preparing', 'İptal et Cancel', 'Bu cihazı unut · Forget this device'])
   // forget: panel gone, sign-in link back while the order is still open
   const fg = await clientRun({ ...base, manage: true, next: ['received'], token: tok }, { forget: { status: 'ok', token: 'b'.repeat(64) } })
   buttons(fg.box).at(-1).onclick(); await flush()

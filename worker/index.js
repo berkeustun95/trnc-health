@@ -154,7 +154,7 @@ return s}
 function btn(p,c){var b=two('button','btn'+(c?' '+c:''),p);b.type='button';return b}
 function lock(p){var b=p.getElementsByTagName?p.getElementsByTagName('button'):[];for(var i=0;i<b.length;i++)b[i].disabled=true}
 function setStatus(p,m,s,reason){lock(p);post('status',{status:s,reason:reason}).then(function(r){
-if(r&&r.status==='ok'){if(r.changed!==false){cur.orderStatus=r.orderStatus;cur.statusAt=r.statusAt;cur.cancelReason=r.orderStatus==='cancelled'?reason:null;cur.statusShown=true;cur.old2h=false}cur.next=r.next||[];show(cur);return}
+if(r&&r.status==='ok'){if(r.changed===false)return load();cur.orderStatus=r.orderStatus;cur.statusAt=r.statusAt;cur.cancelReason=r.orderStatus==='cancelled'?reason:null;cur.statusShown=true;cur.old2h=false;cur.next=r.next||[];show(cur);return}
 var k=r&&r.status;if(k==='frozen'){cur.frozen=true;cur.next=[]}if(k==='forbidden'){cur.pinable=cur.next.length>0;cur.manage=false;cur.next=[]}show(cur,SE[k]||SE.error)}).catch(function(){show(cur,SE.error)})}
 function chooser(p,m){var c=el('div');c.appendChild(two('div','sh',['İptal nedeni','Reason for cancelling']));var pick=null,opts=[];
 var cf=btn(['Siparişi iptal et','Cancel the order — this cannot be undone'],'bad');cf.disabled=true;
