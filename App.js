@@ -741,8 +741,9 @@ export default function App() {
   // to where the user came from; same shape as eventFromHome for an event opened from the Home banner.
   const [eateryOpenSlug, setEateryOpenSlug] = useState(null)
   const [eateryFromMap, setEateryFromMap] = useState(false)
-  // An order-status push tap (20261194: data { screen: 'eatery_order', code }) opens the module with that order's card first.
+  // An order-status push tap (20261194: data { screen: 'eatery_order', code }) opens the order's restaurant page and its card.
   const [eateryOrderTap, setEateryOrderTap] = useState(null)   // { code, at }: `at` makes a second tap for the same order re-read
+  const oliNavigateRef = useRef(null)   // set beside oliNavigate (defined further down); read only from a push tap
   useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false); setEateryOrderTap(null) } }, [showEatery])
   const closeEateryPartner = () => { if (eateryFromMap) setShowEatery(false); setEateryPartner(null) }
   const [showStudentHub, setShowStudentHub] = useState(false)
@@ -1544,13 +1545,15 @@ export default function App() {
   }
   // Yeme-İçme order status: close whatever is open the way oliNavigate('eatery') does (plus the screens it leaves open that sit
   // above Yeme-İçme in the selector), then EateryScreen opens the order's restaurant, whose page carries the card.
-  // Dark bundle: the tap does nothing. oliNavigate is defined further down; this runs only from a tap, after render.
+  // Dark bundle: the tap does nothing. oliNavigate is read through its ref (set on every render beside its definition), so a
+  // cold-start tap can never reach an unset binding; without it the module still opens.
   const openEateryOrderPush = data => {
     const code = orderPushCode(data)
     if (!EATERY || !code) return false
     setShowGames(false); setGamesSubScreen(null); setShowLegal(false); setShowGrooming(false); setShowGarages(false)
     setSelectedFacility(null); setUnclaimedFacility(null)
-    oliNavigate('eatery')
+    if (oliNavigateRef.current) oliNavigateRef.current('eatery')
+    else { setEateryPartner(null); setShowEatery(true) }
     setEateryFromMap(false)
     setEateryOrderTap({ code, at: Date.now() })
     return true
@@ -3132,6 +3135,7 @@ export default function App() {
       case 'insurance':     setShowInsurance(true); break
     }
   }
+  oliNavigateRef.current = oliNavigate
 
   // City-welcome routing: same reset-then-open shape as oliNavigate, but it also
   // carries the region so the target screen opens filtered to that city.

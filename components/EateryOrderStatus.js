@@ -78,7 +78,7 @@ async function subscribeOrder(code, lang) {
 }
 
 function NotifyRow({ order, lang, onDone }) {
-  const [state, setState] = useState('idle')   // idle | busy | off | fail
+  const [state, setState] = useState('idle')   // idle | busy | later | off | fail
   const busy = state === 'busy'
   const mounted = useRef(true)
   useEffect(() => () => { mounted.current = false }, [])
@@ -97,7 +97,7 @@ function NotifyRow({ order, lang, onDone }) {
     const r = await subscribeOrder(order.code, lang)
     if (!mounted.current) return
     if (r === 'on' || r === 'closed') { setState('idle'); onDone(); return }
-    setState(r === 'later' ? 'idle' : r)
+    setState(r)
   }
   if (state === 'off') {
     return (
@@ -119,18 +119,25 @@ function NotifyRow({ order, lang, onDone }) {
         <Text style={s.notifyText}>{t('eateryOsNotify', lang)}</Text>
       </Pressable>
       {state === 'fail' && <Text style={s.failText} accessibilityLiveRegion="polite">{t('eateryOsNotifyFail', lang)}</Text>}
+      {state === 'later' && <Text style={s.laterText}>{t('eateryOsNotifyLater', lang)}</Text>}
     </View>
   )
 }
 
-function Step({ label, at, done, current, last }) {
+// One step: done = solid primary dot; current = primary dot inside a primaryLight ring (never primary vs primaryDark alone);
+// upcoming = a fieldBorder ring. The rail is decoration; the step reads as "<label>, completed / current step / upcoming[, time]".
+// Only the current step's text is a live region, so an unchanged row is never re-announced.
+function Step({ label, at, done, current, last, lang }) {
+  const a11y = t(current ? 'eateryOsStepNowA11y' : done ? 'eateryOsStepDoneA11y' : 'eateryOsStepNextA11y', lang).replace('{label}', () => label) + (at ? `, ${at}` : '')
   return (
-    <View style={s.step}>
-      <View style={s.rail}>
-        <View style={[s.dot, done && s.dotDone, current && s.dotCur]} />
+    <View style={s.step} accessible accessibilityLabel={a11y}>
+      <View style={s.rail} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <View style={[s.ring, current && s.ringCur]}>
+          <View style={[s.dot, done && s.dotDone]} />
+        </View>
         {!last && <View style={[s.bar, done && !current && s.barDone]} />}
       </View>
-      <Text style={[s.stepText, done && s.stepDone, current && s.stepCur]}>
+      <Text style={[s.stepText, done && s.stepDone, current && s.stepCur]} accessibilityLiveRegion={current ? 'polite' : 'none'}>
         {label}{at ? <Text style={s.stepTime}>{'  ' + at}</Text> : null}
       </Text>
     </View>
@@ -143,7 +150,7 @@ const stepLabel = (order, lang) => {
 }
 
 // The restaurant page's card: "Siparişin" + the code, the timeline (or the cancel reason), the hint and the notify row.
-export function OrderStatusCard({ order, lang, onChanged, pushCovered = false }) {
+export function OrderStatusCard({ order, lang, onChanged, pushCovered = false, stale = false }) {
   const tl = orderTimeline(order)
   const code = formatOrderCode(order.code)
   const notified = order.notify_set === true || pushCovered
@@ -152,20 +159,24 @@ export function OrderStatusCard({ order, lang, onChanged, pushCovered = false })
       <View style={s.head}>
         <Text style={s.title} accessibilityRole="header">{t('eateryOsTitle', lang)}</Text>
         {order.is_test === true && <View style={s.test}><Text style={s.testText}>{t('eateryOsTest', lang)}</Text></View>}
-        {!!code && <View style={s.code} accessibilityLabel={t('eateryOsCode', lang).replace('{code}', () => code)}><Text style={s.codeText}>{code}</Text></View>}
+        {!!code && <View style={s.code} accessible accessibilityLabel={t('eateryOsCode', lang).replace('{code}', () => code)}><Text style={s.codeText}>{code}</Text></View>}
       </View>
       {tl.cancelled ? (
-        <View style={s.cancel} accessibilityLiveRegion="polite">
-          <Text style={s.cancelTitle}>{t('eateryOsCancelled', lang)}{tl.at ? '  ' + timeText(tl.at, lang) : ''}</Text>
-          <Text style={s.cancelReason}>{t(REASON_KEY[tl.reason], lang)}</Text>
+        <View style={s.cancel}>
+          <Text accessibilityLiveRegion="polite">
+            <Text style={s.cancelTitle}>{t('eateryOsCancelled', lang)}{tl.at ? '  ' + timeText(tl.at, lang) : ''}</Text>
+            {'\n'}
+            <Text style={s.cancelReason}>{t(REASON_KEY[tl.reason], lang)}</Text>
+          </Text>
         </View>
       ) : (
-        <View style={s.steps} accessibilityLiveRegion="polite">
+        <View style={s.steps}>
           {tl.steps.map((st, i) => (
-            <Step key={st.key} label={t(STEP_KEY[st.key], lang)} at={timeText(st.at, lang)} done={st.done} current={st.current} last={i === tl.steps.length - 1} />
+            <Step key={st.key} label={t(STEP_KEY[st.key], lang)} at={timeText(st.at, lang)} done={st.done} current={st.current} last={i === tl.steps.length - 1} lang={lang} />
           ))}
         </View>
       )}
+      {stale && <Text style={s.stale}>{t('eateryOsStale', lang)}</Text>}
       {order.status_open === true && <Text style={s.hint}>{t('eateryOsHint', lang)}</Text>}
       {order.status_open === true && (notified
         ? (
@@ -179,15 +190,18 @@ export function OrderStatusCard({ order, lang, onChanged, pushCovered = false })
   )
 }
 
-// The list's one-line strip: "Siparişin · <restaurant> · <status>" -> that restaurant's page, where the card is.
+// The list's one-line strip: <restaurant> (shrinks first) · [TEST] · <status> (never pushed off) -> that restaurant's page, where
+// the card is. "Siparişin" is spoken, not shown.
 function OrderStrip({ order, lang, onOpen }) {
-  const label = [t('eateryOsTitle', lang), order.partner_name, stepLabel(order, lang)].filter(Boolean).join(' · ')
+  const status = stepLabel(order, lang)
+  const label = [t('eateryOsTitle', lang), order.partner_name, order.is_test === true && t('eateryOsTest', lang), status].filter(Boolean).join(', ')
   return (
-    <Pressable onPress={() => onOpen(order)} accessibilityRole="button" accessibilityLabel={order.is_test === true ? `${label}, ${t('eateryOsTest', lang)}` : label}
+    <Pressable onPress={() => onOpen(order)} accessibilityRole="button" accessibilityLabel={label}
       style={({ pressed }) => [s.strip, pressed && { opacity: press.small }]}>
       <Ionicons name="receipt-outline" size={18} color={colors.primaryDark} />
-      <Text style={s.stripText} numberOfLines={1}>{label}</Text>
+      <Text style={s.stripName} numberOfLines={1}>{order.partner_name}</Text>
       {order.is_test === true && <View style={s.testSm}><Text style={s.testText}>{t('eateryOsTest', lang)}</Text></View>}
+      <Text style={s.stripStatus} numberOfLines={1}>{status}</Text>
       <Ionicons name="chevron-forward" size={18} color={colors.primaryDark} />
     </Pressable>
   )
@@ -205,11 +219,14 @@ export default function EateryOrderStatusList({ lang, active = true, partnerId =
 
   const keyRef = useRef(refreshKey)
   keyRef.current = refreshKey
+  const [stale, setStale] = useState(false)   // the last read failed: what is on screen may be old
   const load = useCallback(async () => {
     const key = keyRef.current
     const data = await fetchMyOrders()
-    if (!alive.current || !data) return   // offline: keep what is on screen
+    if (!alive.current) return
+    if (!data) { setStale(true); return }   // offline: keep what is on screen, and say so
     loadedKey.current = key
+    setStale(false)
     setOrders(data)
   }, [])
   const [pushCovered, setPushCovered] = useState(false)
@@ -242,13 +259,14 @@ export default function EateryOrderStatusList({ lang, active = true, partnerId =
   return (
     <View style={s.list}>
       {shown.map(o => (partnerId
-        ? <OrderStatusCard key={o.code} order={o} lang={lang} onChanged={load} pushCovered={pushCovered} />
+        ? <OrderStatusCard key={o.code} order={o} lang={lang} onChanged={load} pushCovered={pushCovered} stale={stale} />
         : <OrderStrip key={o.code} order={o} lang={lang} onOpen={onOpen} />))}
     </View>
   )
 }
 
 const DOT = 12
+const RING = DOT + 6
 const s = StyleSheet.create({
   list:        { gap: space[8] },
   head:        { flexDirection: 'row', alignItems: 'center', gap: space[8] },
@@ -260,14 +278,16 @@ const s = StyleSheet.create({
   codeText:    { ...type.meta, fontFamily: font.semibold, color: colors.textPrimary, fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
   hint:        { ...type.small, color: colors.textSecondary, marginTop: space[4] },
   strip:       { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: space[8], borderRadius: radii.md, backgroundColor: colors.primaryLight, paddingHorizontal: space[12], paddingVertical: space[8] },
-  stripText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flex: 1 },
+  stripName:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flex: 1, minWidth: 0 },
+  stripStatus: { ...type.small, fontFamily: font.semibold, color: colors.primaryDark, flexShrink: 0, maxWidth: '60%' },
   steps:       { marginTop: space[12] },
   step:        { flexDirection: 'row', gap: space[12], minHeight: 32 },
-  rail:        { width: DOT, alignItems: 'center' },
-  dot:         { width: DOT, height: DOT, borderRadius: DOT / 2, marginTop: 4, borderWidth: 2, borderColor: colors.border, backgroundColor: 'transparent' },
+  rail:        { width: RING, alignItems: 'center' },
+  ring:        { width: RING, height: RING, borderRadius: RING / 2, marginTop: 1, alignItems: 'center', justifyContent: 'center' },
+  ringCur:     { backgroundColor: colors.primaryLight },
+  dot:         { width: DOT, height: DOT, borderRadius: DOT / 2, borderWidth: 2, borderColor: colors.fieldBorder, backgroundColor: 'transparent' },
   dotDone:     { borderColor: colors.primary, backgroundColor: colors.primary },
-  dotCur:      { borderColor: colors.primaryDark, backgroundColor: colors.primaryDark },
-  bar:         { flex: 1, width: 2, minHeight: 12, backgroundColor: colors.border },
+  bar:         { flex: 1, width: 2, minHeight: 12, backgroundColor: colors.fieldBorder },
   barDone:     { backgroundColor: colors.primary },
   stepText:    { ...type.body, color: colors.textSecondary, flex: 1, paddingBottom: space[8] },
   stepDone:    { color: colors.textPrimary },
@@ -279,6 +299,8 @@ const s = StyleSheet.create({
   notify:      { marginTop: space[12], minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: space[8], borderRadius: radii.md, backgroundColor: colors.primaryLight, paddingHorizontal: space[12], paddingVertical: space[8] },
   notifyText:  { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flex: 1 },
   failText:    { ...type.small, color: colors.dangerInk, marginTop: space[4] },
+  laterText:   { ...type.small, color: colors.textSecondary, marginTop: space[4] },
+  stale:       { ...type.meta, color: colors.textSecondary, marginTop: space[4] },
   note:        { marginTop: space[12], flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[8], rowGap: space[4] },
   noteText:    { ...type.small, color: colors.textSecondary, flexShrink: 1, flexGrow: 1, flexBasis: 200 },
   link:        { minHeight: 44, justifyContent: 'center' },

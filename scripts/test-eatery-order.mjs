@@ -887,19 +887,27 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   const cold = cut('Notifications.getLastNotificationResponseAsync().then(', '}, [session])')
   eq('push tap: warm AND cold handlers route eatery_order', [warm.length > 0, cold.length > 0, warm.includes("screen === 'eatery_order'") && warm.includes('openEateryOrderPush(data)'), cold.includes("screen === 'eatery_order') openEateryOrderPush(data)")], [true, true, true, true])
   const opener = cut('const openEateryOrderPush = data => {', '\n  }\n')
-  eq('push tap: gated on EATERY, validated code, reset-then-open via oliNavigate(\'eatery\')', ['if (!EATERY || !code) return false', 'orderPushCode(data)', "oliNavigate('eatery')", 'setEateryOrderTap({ code, at: Date.now() })'].map(x => opener.includes(x)), [true, true, true, true])
+  eq('push tap: gated on EATERY, validated code, reset-then-open via oliNavigate(\'eatery\')', ['if (!EATERY || !code) return false', 'orderPushCode(data)', "('eatery')", 'setEateryOrderTap({ code, at: Date.now() })'].map(x => opener.includes(x)), [true, true, true, true])
   // Every selector branch ABOVE Yeme-İçme that a customer can be on must be closed by the tap (oliNavigate's resets + the extras).
   const oli = cut('const oliNavigate = (target) => {', "case 'eatery':")
   const sel = cut('} else if (showDutyList) {', '} else if (showEatery && EATERY) {')
   const above = [...new Set([...sel.matchAll(/\} else if \((\w+)/g)].map(m => m[1]))].filter(v => !['adminPreview', 'petsSubScreen', 'showAgentOnboarding'].includes(v))   // agent onboarding: DORMANT by product decision (CLAUDE.md), never reached by a customer
   const setterOf = v => 'set' + v[0].toUpperCase() + v.slice(1) + '('
   eq('push tap: closes every screen the selector draws above Yeme-İçme', [above.length > 20, above.filter(v => !(oli + opener).includes(setterOf(v)))], [true, []])
+  eq('push tap: oliNavigate read through a ref (a cold-start tap never hits an unset binding)', [opener.includes("oliNavigateRef.current"), /oliNavigateRef\.current = oliNavigate\b/.test(app), !/\boliNavigate\('eatery'\)/.test(opener)], [true, true, true])
+  const holds = JSON.parse(fs.readFileSync(new URL('../release-holds.json', import.meta.url), 'utf8')).holds
+  eq('release hold: this work is held from production until privacy F1-F6 is live', holds.filter(h => h.pr === 399 && h.cleared === false && /F1.F6/.test(h.what)).length, 1)
   eq("oliNavigate('eatery') still opens Yeme-İçme with no partner page", [oli.includes('setEateryPartner(null)'), /case 'eatery':\s*setShowEatery\(true\)/.test(app)], [true, true])
   const st = fs.readFileSync(new URL('../components/EateryOrderStatus.js', import.meta.url), 'utf8')
   // i18n: i18n:validate scans named surfaces only (not this card), so its keys are checked here.
   const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
   const osKeys = [...new Set([...st.matchAll(/'(eateryOs\w+)'/g)].map(m => m[1]))]
-  eq('status card: it uses 21 eateryOs keys (the scan saw them)', osKeys.length, 21)
+  eq('status card: it uses 26 eateryOs keys (the scan saw them)', osKeys.length, 26)
+  const SQL_JUNK = /'\)|"\)|AS r\(|VALUES/
+  eq('status card: no eateryOs text carries pasted SQL (\')  ") AS r( VALUES), any language', osKeys.flatMap(k => LANGS.filter(l => SQL_JUNK.test(t(k, l))).map(l => `${k}/${l}: ${t(k, l)}`)), [])
+  eq('status card: the Persian "other" reason exactly', t('eateryOsReasonOther', 'Persian'), 'رستوران سفارش را لغو کرد.')
+  eq('status card: German says Benachrichtigungen (Mitteilungen = the Duyurular module)', osKeys.filter(k => /Mitteilung/.test(t(k, 'German'))), [])
+  eq('status card: step a11y keys keep {label}, all 9', ['eateryOsStepDoneA11y', 'eateryOsStepNowA11y', 'eateryOsStepNextA11y'].flatMap(k => LANGS.filter(l => !t(k, l).includes('{label}')).map(l => `${k}/${l}`)), [])
   eq('status card: every eateryOs key has its own text in all 9 languages', osKeys.flatMap(k => LANGS.filter(l => !hasOwnTranslation(k, l)).map(l => `${k}/${l}`)), [])
   eq('status card: the approved first status, all 9', LANGS.map(l => t('eateryOsSent', l)), ['Sent to the restaurant', 'Restorana iletildi', 'أُرسل إلى المطعم', 'Передан в ресторан', 'Στάλθηκε στο εστιατόριο', 'Transmise au restaurant', 'Enviado al restaurante', 'An das Restaurant übermittelt', 'به رستوران ارسال شد'])
   // Customer side, "sen": only the FIRST status is the verify page's word; the cancel reasons are the customer push text of
@@ -909,11 +917,14 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   const pushSql = fs.readFileSync(new URL('../supabase/migrations/20261194_eatery_order_status_partner.sql', import.meta.url), 'utf8')
   const sqlText = expr => expr.split(/\s*\|\|\s*/).map(x => (/^U&'\\200C'$/.test(x) ? '\u200c' : x.replace(/^'|'$/g, '').replace(/''/g, "'"))).join('')
   const PUSH = {}
-  for (const m of pushSql.matchAll(/^\s*\('(\w+)',\s*'(closed|busy|item_out|no_delivery_there|unreachable|other)',\s*(.+?)\),?$/gm)) PUSH[`${m[1]}/${m[2]}`] = sqlText(m[3].trim())
+  // The value is SQL string literals joined by || and nothing else (a looser .+? once swallowed ")) AS r(lang, reason, txt" from the last row).
+  for (const m of pushSql.matchAll(/^\s*\('(\w+)',\s*'(closed|busy|item_out|no_delivery_there|unreachable|other)',\s*((?:U&'\\200C'|'(?:[^']|'')*')(?:\s*\|\|\s*(?:U&'\\200C'|'(?:[^']|'')*'))*)/gm)) PUSH[`${m[1]}/${m[2]}`] = sqlText(m[3].trim())
+  const PUSH_STATUS_TR_RECEIVED = pushSql.match(/\('Turkish', 'received',\s*'([^']*)'\)/)?.[1] ?? ''
   eq('push text parsed: 6 reasons x 9 languages (the scan saw them)', Object.keys(PUSH).length, 54)
   const RK = { closed: 'eateryOsReasonClosed', busy: 'eateryOsReasonBusy', item_out: 'eateryOsReasonItemOut', no_delivery_there: 'eateryOsReasonNoDelivery', unreachable: 'eateryOsReasonUnreachable', other: 'eateryOsReasonOther' }
   eq('status card: every cancel reason, all 9 languages, is the customer push text', LANGS.flatMap(l => Object.entries(RK).filter(([code, k]) => t(k, l) !== PUSH[`${l}/${code}`]).map(([code]) => `${l}/${code}: ${t(RK[code], l)} != ${PUSH[`${l}/${code}`]}`)), [])
-  eq('status card: Turkish statuses from the customer side, "sen"', ['eateryOsReceived', 'eateryOsReady', 'eateryOsEither'].map(k => t(k, 'Turkish')), ['Siparişi aldı', 'Hazır, gelip alabilirsin', 'Yolda / Hazır, gelip alabilirsin'])
+  eq('status card: Turkish statuses from the customer side, "sen"', ['eateryOsReceived', 'eateryOsReady', 'eateryOsEither'].map(k => t(k, 'Turkish')), ['Sipariş alındı', 'Hazır, gelip alabilirsin', 'Yolda / Hazır, gelip alabilirsin'])
+  eq('status card: Turkish "received" is the push text\'s word (Siparişin alındı.)', PUSH_STATUS_TR_RECEIVED.includes(t('eateryOsReceived', 'Turkish').split(' ')[1]), true)
   eq('status card: no Turkish string speaks as the restaurant (the verify page\'s "kapalıyız", "aldık", "Müşteri…") or says "siz"', [...new Set([...st.matchAll(/'(eateryOs\w+)'/g)].map(m => m[1]))].map(k => t(k, 'Turkish')).filter(x => /kapalıyız|yoğunuz|aldık|Müşteri|alabilirsiniz|teslimat yok\b/.test(x)), [])
   eq('status card: subscribe sends the code, the token and the app language only', st.includes("supabase.rpc('eatery_order_subscribe', { p_code: code, p_token: token, p_lang: lang })"), true)
   eq('status card: no profile write, no console, no analytics', (st.match(/from\('profiles'\)\s*\.\s*(update|upsert|insert|delete)|savePushToken|console\.|logContactEvent/g) || []), [])

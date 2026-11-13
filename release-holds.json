@@ -9,6 +9,14 @@
       "clearedOn": "2026-11-10",
       "clearedBy": "Berke, in chat: GO PRODUCTION on commit 18d66c7b, after Preview 57fcd332 (01a1c565) and the fix video",
       "clear": "Only when Berke has seen Explore combined on Preview (video or his own tap-through) and says go in chat. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 399,
+      "commit": "474c06518071dea0b199948cb352451a4c9168ca",
+      "what": "Order status app: not for production until privacy F1–F6 is live (Berke)",
+      "since": "2026-11-13",
+      "cleared": false,
+      "clear": "Only when the privacy F1–F6 text is live (in-app, web and docs) and Berke says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #399 is held (needs a merge commit, not a squash)."
     }
   ]
 }
