@@ -618,6 +618,11 @@ await test('timeline: Europe/Nicosia times (winter UTC+2), server page timeline,
   rpcImpl = () => json(okRow({ order_status: 'cancelled', cancel_reason: '<b>x</b>', status_enabled: true }))
   const e = await (await get('/o/7K3QX9MP')).text()
   assert.doesNotMatch(e, /<b>x<\/b>/)
+  for (const k of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    rpcImpl = () => json(okRow({ order_status: 'cancelled', cancel_reason: k, status_enabled: true }))
+    const j = await (await callE(env, '/o/7K3QX9MP/check', 'POST', BROWSER, SAME)).json()
+    assert.equal(j.cancelReason, null, `prototype key ${k} is not a reason`)
+  }
 })
 
 // Client script in a stub DOM with buttons/inputs.
@@ -688,6 +693,9 @@ await test('client: restaurant buttons = next only; cancel needs a reason + conf
     status: o => { posted = JSON.parse(o.body); return { status: 'ok', changed: true, orderStatus: 'cancelled', next: [], statusAt: '13.11.2026 12:30', token: tok } },
   })
   assert.ok(texts(r1.box).includes('2 saatten eski sipariş — müşteriyle teyit edin'))
+  assert.ok(!texts(r1.box).includes('Bu sipariş için güncellenecek durum yok'), 'no empty note while there is something to do')
+  const idle = await clientRun({ ...base, manage: true, next: [], token: tok })
+  assert.ok(texts(idle.box).includes('Bu sipariş için güncellenecek durum yok'), 'restaurant panel with no next step says so')
   assert.deepEqual(buttons(r1.box).map(label), ['Hazırlanıyor Preparing', 'Yolda On the way', 'İptal et Cancel', 'Bu cihazı unut · Forget this device'])
   buttons(r1.box)[2].onclick()
   const bs = buttons(r1.box)

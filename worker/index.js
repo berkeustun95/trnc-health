@@ -57,7 +57,7 @@ const CSS = `*{box-sizing:border-box}body{margin:0;background:#F4F6F5;color:#1A2
 .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .banner{border-radius:12px;padding:16px;margin-bottom:16px;background:#E6F4F4;color:#0A5E5D}.banner b{display:block;font-size:20px;line-height:1.25}
 .banner.bad{background:#FBE9EC;color:#C0384A}.en{font-size:13px;color:#55657A;margin-top:2px}.banner .en{color:inherit;opacity:.8}
-h2{margin:0 0 2px;font-size:20px}.meta{color:#55657A;font-size:14px;margin:2px 0}
+h2{margin:0 0 2px;font-size:20px;overflow-wrap:anywhere}li span:first-child{min-width:0;overflow-wrap:anywhere}.meta{color:#55657A;font-size:14px;margin:2px 0}
 ul{list-style:none;margin:16px 0 0;padding:0;border-top:1px solid #E3E8E6}li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #E3E8E6}
 li span:last-child{white-space:nowrap;color:#55657A}.total{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-top:12px;color:#0A5E5D}
 li span.d{display:block;white-space:normal;color:#55657A;font-size:13px;margin-top:2px}.grey{opacity:.55}.seen{margin-top:14px;font-size:14px;color:#55657A}.note{margin:16px 4px 0;font-size:13px;color:#55657A}
@@ -165,7 +165,8 @@ function rest(j,msg){var p=el('div','sec');p.appendChild(two('div','sh',['Restor
 if(j.frozen)p.appendChild(two('div','warn',['Durum artık değiştirilemez','The status can no longer be changed']));
 else{if(j.old2h)p.appendChild(two('div','warn',['2 saatten eski sipariş — müşteriyle teyit edin','Order is over 2 hours old — confirm with the customer']));
 for(var i=0;i<nx.length;i++)if(ACT[nx[i]])(function(s){var b=btn(ACT[s]);b.onclick=function(){setStatus(p,m,s,null)};p.appendChild(b)})(nx[i]);
-if(nx.indexOf('cancelled')>=0){var cb=btn(['İptal et','Cancel'],'ghost');cb.onclick=function(){p.textContent='';p.appendChild(chooser(p,m));p.appendChild(m)};p.appendChild(cb)}}
+if(nx.indexOf('cancelled')>=0){var cb=btn(['İptal et','Cancel'],'ghost');cb.onclick=function(){p.textContent='';p.appendChild(chooser(p,m));p.appendChild(m)};p.appendChild(cb)}
+if(nx.length===0)p.appendChild(two('div','meta',['Bu sipariş için güncellenecek durum yok','No status to update on this order']))}
 p.appendChild(m);say(m,msg);
 var f=el('button','lnk','Bu cihazı unut · Forget this device');f.type='button';f.onclick=function(){lock(p);post('forget',{}).then(function(r){if(r&&r.status==='ok'){cur.pinable=!cur.frozen&&cur.next.length>0;cur.manage=false;cur.next=[];show(cur)}else show(cur,SE.error)}).catch(function(){show(cur,SE.error)})};p.appendChild(f);return p}
 function pinPanel(){var p=el('div','sec');p.appendChild(two('div','sh',['Restoran girişi','Restaurant sign-in']));
