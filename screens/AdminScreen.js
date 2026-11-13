@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
@@ -19,6 +19,7 @@ import { normalizeForModeration } from '../utils/moderationNormalize'
 import GaragesScreen from './GaragesScreen'
 import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '../constants/cars'
 import { MARKETPLACE } from '../constants/redesign'
+import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoCount, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
@@ -101,7 +102,7 @@ const ROLES = ['customer', 'provider', 'admin']
 // Turning a partner OFF still needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
   'HomeServices',
-  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'Moderation']
+  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'RestaurantPins', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -4410,6 +4411,147 @@ function MarketplaceTab() {
   )
 }
 
+// ─── Restaurant PINs (getadaapp.com/o/<code>, 20261194) ─────────────────────
+// The PIN lives only in this tab's state until the modal closes: never logged, stored, put in a URL or an Alert.
+// Partners come through loadEateryPartners (the one reader); an admin's RLS returns active rows only.
+const PIN_TEST = { scope: 'test', id: null }
+const PIN_ERROR_KEY = { forbidden: 'adminPinsErrForbidden', invalid_partner: 'adminPinsErrPartner', invalid_scope: 'adminPinsErrScope' }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function PinShownModal({ shown, lang, onClose }) {
+  return (
+    <Modal visible={shown?.visible === true} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.pinOverlay}>
+        <View style={s.pinSheet}>
+          <Text style={s.rejectTitle}>{t('adminPinsShownTitle', lang).replace('{name}', shown?.name ?? '')}</Text>
+          <Text selectable style={s.pinDigits}>{shown?.pin ?? ''}</Text>
+          <View style={s.pinOnceRow}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Text style={s.pinOnceText}>{t('adminPinsShownOnce', lang)}</Text>
+          </View>
+          <TouchableOpacity style={s.primaryBtn} onPress={onClose} activeOpacity={0.85}>
+            <Text style={s.primaryBtnText}>{t('adminPinsClose', lang)}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function RestaurantPinsTab({ lang }) {
+  const [partners, setPartners] = useState(null)
+  const [loadError, setLoadError] = useState(false)
+  const [target, setTarget] = useState(null)
+  const [busy, setBusy] = useState(null)
+  const [shown, setShown] = useState(null)
+  const [feedback, setFeedback] = useState(null)
+  const inFlight = useRef(false)
+
+  useEffect(() => {
+    let alive = true
+    loadEateryPartners('id, name, slug').then(({ rows, error }) => {
+      if (!alive) return
+      setLoadError(!!error)
+      setPartners(rows.filter(r => UUID_RE.test(String(r.id))))
+    })
+    return () => { alive = false }
+  }, [])
+
+  const targetName = tg => (tg?.scope === 'test' ? t('adminPinsTestName', lang) : tg?.name ?? '')
+  const errorText = e => t(PIN_ERROR_KEY[e?.message] ?? 'adminPinsErrGeneric', lang)
+
+  async function run(kind, tg) {
+    if (inFlight.current) return
+    inFlight.current = true
+    setBusy(kind); setFeedback(null)
+    try {
+      const fn = kind === 'issue' ? 'admin_set_eatery_partner_pin' : 'admin_reset_eatery_pin_attempts'
+      const { data, error } = await supabase.rpc(fn, { p_partner: tg.id, p_scope: tg.scope })
+      if (error) setFeedback({ ok: false, text: errorText(error) })
+      else if (kind === 'reset') setFeedback({ ok: true, text: t('adminPinsResetDone', lang).replace('{name}', targetName(tg)) })
+      else if (typeof data?.pin === 'string' && /^\d{6}$/.test(data.pin)) setShown({ visible: true, pin: data.pin, name: targetName(tg) })
+      else setFeedback({ ok: false, text: t('adminPinsErrGeneric', lang) })
+    } catch {
+      setFeedback({ ok: false, text: t('adminPinsErrGeneric', lang) })
+    } finally {
+      inFlight.current = false
+      setBusy(null)
+    }
+  }
+
+  function confirmIssue() {
+    if (!target || inFlight.current) return
+    const tg = target
+    const body = tg.scope === 'test' ? t('adminPinsIssueConfirmBodyTest', lang) : t('adminPinsIssueConfirmBody', lang).replace('{name}', tg.name)
+    Alert.alert(t('adminPinsIssueConfirmTitle', lang), body, [
+      { text: t('cancel', lang), style: 'cancel' },
+      { text: t('adminPinsIssueConfirmBtn', lang), style: 'destructive', onPress: () => run('issue', tg) },
+    ])
+  }
+
+  function confirmReset() {
+    if (!target || inFlight.current) return
+    const tg = target
+    Alert.alert(t('adminPinsResetConfirmTitle', lang), t('adminPinsResetConfirmBody', lang).replace('{name}', targetName(tg)), [
+      { text: t('cancel', lang), style: 'cancel' },
+      { text: t('adminPinsResetConfirmBtn', lang), onPress: () => run('reset', tg) },
+    ])
+  }
+
+  const pick = tg => { if (!busy) { setTarget(tg); setFeedback(null) } }
+  const isPicked = tg => target?.scope === tg.scope && target?.id === tg.id
+  const disabled = !target || !!busy
+
+  const renderChoice = (tg, label, sub) => {
+    const on = isPicked(tg)
+    return (
+      <TouchableOpacity key={tg.id ?? 'test'} style={[s.pinChoice, on && s.pinChoiceOn]} onPress={() => pick(tg)} activeOpacity={0.8}
+        accessibilityRole="radio" accessibilityState={{ selected: on, disabled: !!busy }}>
+        <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? colors.primary : colors.textSecondary} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.cardTitle}>{label}</Text>
+          {!!sub && <Text style={s.cardSub}>{sub}</Text>}
+        </View>
+      </TouchableOpacity>
+    )
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+        <Text style={[s.cardSub, { marginBottom: 16, lineHeight: 18 }]}>{t('adminPinsIntro', lang)}</Text>
+        <Text style={s.sectionTitle}>{t('adminPinsChoose', lang)}</Text>
+        {renderChoice(PIN_TEST, t('adminPinsTestOption', lang), t('adminPinsTestNote', lang))}
+        {partners === null
+          ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} />
+          : loadError
+            ? <Text style={[s.errorText, { marginBottom: 10 }]}>{t('adminPinsLoadError', lang)}</Text>
+            : partners.length === 0
+              ? <Text style={[s.cardSub, { marginBottom: 10 }]}>{t('adminPinsNoPartners', lang)}</Text>
+              : partners.map(p => renderChoice({ scope: 'partner', id: p.id, name: p.name }, p.name, null))}
+
+        <View style={{ height: 8 }} />
+        {!target && <Text style={[s.cardSub, { marginBottom: 10 }]}>{t('adminPinsPickFirst', lang)}</Text>}
+        <TouchableOpacity style={[s.primaryBtn, disabled && s.primaryBtnDisabled]} onPress={confirmIssue} disabled={disabled} activeOpacity={0.85}>
+          {busy === 'issue' ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>{t('adminPinsIssue', lang)}</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.pinSecondaryBtn, disabled && s.primaryBtnDisabled]} onPress={confirmReset} disabled={disabled} activeOpacity={0.85}>
+          {busy === 'reset' ? <ActivityIndicator color={colors.primary} /> : <Text style={s.ghostBtnText}>{t('adminPinsReset', lang)}</Text>}
+        </TouchableOpacity>
+        <Text style={s.broadcastNote}>{t('adminPinsResetHint', lang)}</Text>
+
+        {!!feedback && (
+          <View style={[s.broadcastResult, { marginTop: 16 }, !feedback.ok && { backgroundColor: colors.dangerLight }]}>
+            <Ionicons name={feedback.ok ? 'checkmark-circle' : 'alert-circle'} size={18} color={feedback.ok ? colors.success : colors.danger} />
+            <Text style={[s.broadcastResultText, !feedback.ok && { color: colors.danger }]}>{feedback.text}</Text>
+          </View>
+        )}
+      </ScrollView>
+      <PinShownModal shown={shown} lang={lang} onClose={() => setShown(null)} />
+    </View>
+  )
+}
+
 function JobPostingsTab() {
   const [jobs,           setJobs]           = useState([])
   const [loading,        setLoading]        = useState(true)
@@ -5071,9 +5213,9 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           style={s.tabBar}
           contentContainerStyle={s.tabBarContent}
         >
-          {TABS.map(t => (
-            <TouchableOpacity key={t} style={[s.tabBtn, tab === t && s.tabBtnActive]} onPress={() => setTab(t)}>
-              <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive]}>{t}</Text>
+          {TABS.map(k => (
+            <TouchableOpacity key={k} style={[s.tabBtn, tab === k && s.tabBtnActive]} onPress={() => setTab(k)}>
+              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -5104,6 +5246,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'JobPostings'   && <JobPostingsTab />}
           {tab === 'Cars'          && <CarsTab />}
           {tab === 'Bandabuliya'   && <MarketplaceTab />}
+          {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>
@@ -5211,6 +5354,18 @@ const s = StyleSheet.create({
   swapFromBanner:     { backgroundColor: colors.accentLight, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   swapFromLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
   swapFromName:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
+
+  // restaurant PINs
+  pinChoice:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8,
+                        borderWidth: 1.5, borderColor: 'transparent', ...shadow },
+  pinChoiceOn:        { borderColor: colors.primary },
+  pinSecondaryBtn:    { borderRadius: 14, padding: 14, alignItems: 'center', backgroundColor: colors.primaryLight },
+  pinOverlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  pinSheet:           { backgroundColor: colors.bg, borderRadius: 20, padding: 20, paddingBottom: 8 },
+  pinDigits:          { fontSize: 44, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: 10, textAlign: 'center',
+                        paddingVertical: 20, paddingLeft: 10, writingDirection: 'ltr' },
+  pinOnceRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 18 },
+  pinOnceText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger, flexShrink: 1 },
 
   // urgency cards
   urgencyCard:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, ...shadow },
