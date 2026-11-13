@@ -50,6 +50,8 @@ WITH report AS (
     -- Bandabuliya (20261183): registered ahead of the apply; red until it runs.
     ('20261183_marketplace_listings','marketplace_listings'),
     ('20261183_marketplace_listings','marketplace_photos'),
+    -- Bandabuliya photo review reminder (20261196): the one-row "last sent" state. Registered ahead of the apply; red until it runs.
+    ('20261196_marketplace_photo_review_reminder','marketplace_photo_reminder_state'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_schools'),
     ('1108_driving_schools','driving_school_branches'),
@@ -762,6 +764,8 @@ WITH report AS (
     ('20261185_marketplace_maintenance','marketplace_orphan_objects'),
     -- Bandabuliya terms gate (20261190): registered ahead of the apply; red until it runs.
     ('20261190_marketplace_terms','i_have_marketplace_terms'),
+    -- Bandabuliya photo review reminder (20261196): the 5-minute job's function. Registered ahead of the apply; red until it runs.
+    ('20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder'),
     -- 20261148: 12-month retention on partner_booking_requests (the job is Q2).
     ('20261148_partner_booking_requests_retention','purge_partner_booking_requests'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
@@ -997,6 +1001,8 @@ WITH report AS (
     ('20261183_marketplace_listings','marketplace_photos_reject_reason_check'),
     ('20261183_marketplace_listings','marketplace_photos_review_source_check'),
     ('20261183_marketplace_listings','marketplace_photos_storage_path_key'),
+    ('20261196_marketplace_photo_review_reminder','marketplace_photo_reminder_state_pkey'),
+    ('20261196_marketplace_photo_review_reminder','marketplace_photo_reminder_state_one_row'),
     ('20261184_marketplace_messaging','conversations_kind_check'),
     ('20261184_marketplace_messaging','conversations_listing_kind_check'),
     ('20261184_marketplace_messaging','conversations_listing_id_fkey'),
@@ -6219,6 +6225,41 @@ WITH report AS (
               AND has_column_privilege('service_role', a.attrelid, a.attname, 'INSERT'))
                 FROM pg_attribute a
                WHERE a.attrelid = to_regclass('public.notifications') AND a.attname = 'listing_id' AND NOT a.attisdropped), false)
+  -- 20261196: the photo review reminder. (a) The grants are its ONLY guard (under cron auth.uid() is NULL): service_role
+  -- yes (positive), anon / authenticated no. Through to_regprocedure + COALESCE: absent = false, never an error. RED UNTIL IT RUNS.
+  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): SECURITY DEFINER, service_role EXECUTE, anon / authenticated none',
+    COALESCE((SELECT p.prosecdef FROM pg_proc p WHERE p.oid = to_regprocedure('public.marketplace_photo_review_reminder()'))
+         AND has_function_privilege('service_role', to_regprocedure('public.marketplace_photo_review_reminder()'), 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', to_regprocedure('public.marketplace_photo_review_reminder()'), 'EXECUTE')
+         AND NOT has_function_privilege('anon', to_regprocedure('public.marketplace_photo_review_reminder()'), 'EXECUTE'), false)
+  -- 20261196 (b) the rule, anchored to code shapes (pg_get_functiondef carries comments, so never a bare word): the 30-minute
+  -- window; ONE waiting predicate (pending AND the listing not deleted) feeding both the count and the "new" test; the stamp
+  -- only after at least one admin was told; admins only; the log kind.
+  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): 30-minute window, one waiting predicate (pending + deleted_at IS NULL) for count and new, stamp only when n > 0, admins only',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%IF v_last IS NOT NULL AND v_last > now() - interval ''30 minutes'' THEN%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%count(*) FILTER (WHERE v_last IS NULL OR p.created_at > v_last)%WHERE p.status = ''pending'' AND l.deleted_at IS NULL;%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%IF v_count < 1 OR v_new < 1 THEN%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%FROM profiles WHERE role = ''admin'' LOOP%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%VALUES (r.id, ''mk_photos_waiting'', req)%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%IF n > 0 THEN%INSERT INTO marketplace_photo_reminder_state (id, last_sent_at) VALUES (true, now())%ON CONFLICT (id) DO UPDATE SET last_sent_at = excluded.last_sent_at;%', false)
+  -- 20261196 (c) the push data. The tap must open the admin screen; the module's own screen key would send production
+  -- bundles to a listing with a null id. Negative anchored to the tuple shape ('tab', 'marketplace' is legitimate), paired
+  -- with the positive.
+  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): push data screen admin / tab marketplace / view photos, never screen marketplace; Turkish text',
+    COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''marketplace'', ''view'', ''photos'')%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) NOT LIKE '%''screen'', ''marketplace''%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%bdy := v_count || '' fotoğraf onay bekliyor'';%', false)
+  -- 20261196 (d) the state table: RLS on, NO policies (only the DEFINER function writes it), no privilege for anon /
+  -- authenticated, exactly one row. Section I sees RLS too; this token owns the zero-policy and no-grant halves.
+  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_reminder_state: RLS on, 0 policies, no anon / authenticated privilege, one row',
+    COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.marketplace_photo_reminder_state')), false)
+    AND to_regclass('public.marketplace_photo_reminder_state') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'marketplace_photo_reminder_state')
+    AND COALESCE((SELECT NOT has_table_privilege('anon', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+                     AND NOT has_table_privilege('authenticated', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+                   FROM pg_class c WHERE c.oid = to_regclass('public.marketplace_photo_reminder_state')), false)
+    AND COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM public.marketplace_photo_reminder_state', false, true, '')))[1]::text = '1'
+                   WHERE to_regclass('public.marketplace_photo_reminder_state') IS NOT NULL), false)
   -- 20261167: the go-live blast can reach the cars waitlist. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261167_cars_waitlist_notify','notify path covers cars (allow-list, Turkish row, English fallback)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.notify_module_waitlist(text)')) LIKE '%''duyurular'',''cars'')%', false)
@@ -6345,7 +6386,9 @@ FROM (VALUES
   -- 90-day retention on oli_messages (20261163), 03:57 UTC daily; exact schedule + command are the 20261163 row below.
   ('20261163_oli_messages','purge-oli-messages'),
   -- Bandabuliya retention (20261185), 01:23 UTC daily; exact schedule + command are the 20261185 row below.
-  ('20261185_marketplace_maintenance','marketplace-maintenance')
+  ('20261185_marketplace_maintenance','marketplace-maintenance'),
+  -- Bandabuliya photo review reminder (20261196), every 5 minutes; exact schedule + command are the 20261196 row below.
+  ('20261196_marketplace_photo_review_reminder','marketplace-photo-review-reminder')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -6411,6 +6454,16 @@ SELECT '20261185_marketplace_maintenance', 'marketplace-maintenance: schedule 23
                     AND command LIKE '%/functions/v1/marketplace-maintenance%'
                     AND command LIKE '%name = ''novest_sync_key''%'
                     AND command LIKE '%{"apply": true}%') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261196: marketplace-photo-review-reminder runs every 5 minutes and calls the reminder function (no edge function) ───
+SELECT '20261196_marketplace_photo_review_reminder', 'marketplace-photo-review-reminder: schedule */5 * * * * and the exact call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'marketplace-photo-review-reminder') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'marketplace-photo-review-reminder' AND active
+                    AND schedule = '*/5 * * * *'
+                    AND btrim(command) = 'SELECT public.marketplace_photo_review_reminder();') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
