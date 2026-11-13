@@ -792,7 +792,9 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','admin_set_eatery_partner_pin'),
     ('20261194_eatery_order_status_partner','eatery_order_push_text'),
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
-    ('20261194_eatery_order_status_partner','eatery_order_set_status')
+    ('20261194_eatery_order_status_partner','eatery_order_set_status'),
+    -- 20261197: registered ahead of the apply; red until it runs.
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
   ) e(m,o)
 
   UNION ALL
@@ -1628,7 +1630,9 @@ WITH report AS (
     ('20261193_eatery_order_status','eatery_order_subscribe'),
     ('20261194_eatery_order_status_partner','admin_set_eatery_partner_pin'),
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
-    ('20261194_eatery_order_status_partner','eatery_order_set_status')
+    ('20261194_eatery_order_status_partner','eatery_order_set_status'),
+    -- 1197. Missing = the admin "clear lock" button answers a permission error.
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
   ) e(m,o)
 
   UNION ALL
@@ -1830,6 +1834,25 @@ WITH report AS (
         (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM private.eatery_worker_key_hashes', false, true, '')))[1]::text = '1'
         AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM private.eatery_worker_key_hashes WHERE key_sha256 = ''e2521b10b0c909008d587b61f84f134b2626c05702f3b57d2029ad5b128195b4''', false, true, '')))[1]::text = '1'
       END, false)
+    -- 1197-BEGIN
+    -- 20261197 admin_reset_eatery_pin_attempts: red until applied, never an error (to_regprocedure / aclexplode / COALESCE). The
+    --     negatives are anchored to code shape (schema-qualified table names, a call paren) and paired with the positives.
+    UNION ALL SELECT '20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts(uuid,text): one overload, DEFINER, VOLATILE, owner postgres, search_path public, pg_temp; authenticated EXECUTE, no anon / PUBLIC; admin + non-guest gate; deletes ONE bucket of private.eatery_pin_attempts under the enrol lock; never touches the PIN or device tables',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 'v' AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND p.proconfig @> ARRAY['search_path=public, pg_temp']
+                       AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'admin_reset_eatery_pin_attempts') = 1
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%public.is_admin()%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%public.is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%MESSAGE = ''forbidden''%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%pg_advisory_xact_lock(hashtext(''eatery_enrol:'' || p_scope%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) NOT LIKE '%private.eatery_partner_pins%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) NOT LIKE '%private.eatery_partner_devices%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) NOT LIKE '%eatery_pin_issue(%', false)
+    -- 1197-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',

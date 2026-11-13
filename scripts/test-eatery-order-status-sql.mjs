@@ -1,4 +1,4 @@
-// 20261193_eatery_order_status.sql + 20261194_eatery_order_status_partner.sql against the PGlite harness (PostgreSQL 18; prod is older).
+// 20261193_eatery_order_status.sql + 20261194_eatery_order_status_partner.sql (+ 20261195 / 20261197) against the PGlite harness (PostgreSQL 18; prod is older).
 // Fixture: the SAME fixture text as scripts/test-eatery-orders-sql.mjs (sliced out of that file, not retyped) + the Crunchy seed row +
 // the 20261120 preview-key policies + stubs for what the real files only reference (profiles.role / push_token / preferred_language,
 // is_admin(), push_log, pg_net's net.http_post), then the REAL 20261125, 20261132, 20261134 and 20261144 files.
@@ -288,6 +288,99 @@ const tokens = async (d, label, sql, want, n) => {
   const r2 = await applyFile(e, FC)
   await e.exec('ROLLBACK;').catch(() => {})
   t('20261195 REFUSES when another hash is already stored, and adds nothing', [r2.ok, (r2.msg || '').includes('already holds another hash'), await hashes(e)], [false, true, ['a'.repeat(64)]])
+}
+// ── 20261197: admin clears ONE bucket's PIN lock counters (attempt rows only; PIN + devices untouched) ──
+// Three buckets: partner A, partner B, test. Each has a PIN row and an enrolled device (A + test) and two attempt rows, inserted as postgres.
+// checks97 returns named booleans; the real file must turn every one true, and each 1197 mutant must turn its named one false.
+const F97 = M('20261197_eatery_pin_attempts_reset.sql'), S97 = readFileSync(F97, 'utf8')
+const after1194 = async () => { const d = await after1144(); await stamped(d, FA); await stamped(d, FB); return d }
+const setup97 = async (d) => {
+  await seed(d)
+  await device(d, PA); await device(d, null, 'test'); await issue(d, PB)
+}
+const fill97 = async (d) => {
+  await d.exec(`DELETE FROM private.eatery_pin_attempts;
+    INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok) VALUES
+      ('partner', '${PA}', 'ZZAAAAA1', false), ('partner', '${PA}', 'ZZAAAAA2', false),
+      ('partner', '${PB}', 'ZZBBBBB1', false), ('partner', '${PB}', 'ZZBBBBB2', true),
+      ('test', NULL, 'ZZTTTTT1', false), ('test', NULL, 'ZZTTTTT2', false);`)
+}
+// Bucket -> attempt count, as postgres (the role allowed to read the private table).
+const buckets97 = async (d) => {
+  await d.exec('RESET ROLE;')
+  const r = await q(d, `SELECT CASE WHEN scope = 'test' THEN 'T' WHEN partner_id = '${PA}' THEN 'A' WHEN partner_id = '${PB}' THEN 'B' ELSE '?' END k, count(*)::int n
+    FROM private.eatery_pin_attempts GROUP BY 1 ORDER BY 1`)
+  return Object.fromEntries(r.map(x => [x.k, x.n]))
+}
+const keep97 = async (d) => { await d.exec('RESET ROLE;'); return JSON.stringify([
+  await q(d, `SELECT scope, partner_id, salt, pin_sha256, set_at FROM private.eatery_partner_pins ORDER BY scope, partner_id NULLS FIRST`),
+  await q(d, `SELECT id, scope, partner_id, token_sha256, created_at, last_used_at, revoked_at FROM private.eatery_partner_devices ORDER BY id`)]) }
+const reset97 = (d, who, partner, scope) => as(d, who, `SELECT public.admin_reset_eatery_pin_attempts(${partner ? `'${partner}'` : 'NULL'}, ${scope == null ? 'NULL' : `'${scope}'`}) AS r`, { key: false })
+const ALL3 = { A: 2, B: 2, T: 2 }
+const checks97 = async (d) => {
+  const res = []
+  const ck = (name, ok, detail) => { res.push([name, ok === true]); if (ok !== true) console.log(`      (${name}) ${String(JSON.stringify(detail) ?? '').replace(/[0-9a-f]{32,}/g, '<hex>').slice(0, 200)}`) }
+  await setup97(d)
+  const keep = await keep97(d)
+  const pinsDevs = await q(d, `SELECT (SELECT count(*)::int FROM private.eatery_partner_pins) p, (SELECT count(*)::int FROM private.eatery_partner_devices WHERE revoked_at IS NULL) v`)
+  ck('setup: 3 PIN rows and 2 live devices exist (so "unchanged" is not vacuous)', pinsDevs[0].p === 3 && pinsDevs[0].v === 2, pinsDevs)
+
+  await fill97(d)
+  const rA = await reset97(d, 'admin:9', PA, 'partner')
+  ck('admin resets partner A: returns {status ok, scope partner, partner_id A}', rA.ok && JSON.stringify(rA.rows[0].r) === JSON.stringify({ scope: 'partner', status: 'ok', partner_id: PA }), rA)
+  const bA = await buckets97(d)
+  ck('partner A reset: A attempts gone', bA.A === undefined, bA)
+  ck('partner A reset: B and test attempts untouched', bA.B === 2 && bA.T === 2, bA)
+  ck('partner A reset: PIN rows and devices unchanged', (await keep97(d)) === keep, null)
+
+  await fill97(d)
+  const rT = await reset97(d, 'admin:9', null, 'test')
+  ck('admin resets the test bucket: returns {status ok, scope test, partner_id null}', rT.ok && JSON.stringify(rT.rows[0].r) === JSON.stringify({ scope: 'test', status: 'ok', partner_id: null }), rT)
+  const bT = await buckets97(d)
+  ck('test reset: test attempts gone, A and B untouched', bT.T === undefined && bT.A === 2 && bT.B === 2, bT)
+  ck('test reset: PIN rows and devices unchanged', (await keep97(d)) === keep, null)
+
+  // Denials, each beside its positive control in the same setup (the admin call on the same bucket succeeds right after).
+  for (const [who, label, want] of [['customer:1', 'customer', 'P0001 forbidden'], ['guest:9', 'guest session of the admin account', 'P0001 forbidden'], ['anon', 'anon', '42501']]) {
+    await fill97(d)
+    const r = await reset97(d, who, PA, 'partner')
+    const got = r.ok ? 'ok' : r.code === 'P0001' ? `P0001 ${r.msg}` : r.code
+    const b = await buckets97(d)
+    ck(`${label} denied (${want}), nothing deleted`, got === want && JSON.stringify(b) === JSON.stringify(ALL3), { got, b })
+    const pc = await reset97(d, 'admin:9', PA, 'partner')
+    const b2 = await buckets97(d)
+    ck(`positive control after the ${label} denial: admin clears A in the same setup`, pc.ok && b2.A === undefined && b2.B === 2 && b2.T === 2, { pc, b2 })
+  }
+
+  // Invalid scope / partner: refused before anything is deleted.
+  for (const [partner, scope, want, label] of [[null, 'x', 'invalid_scope', 'scope x'], [PA, null, 'invalid_scope', 'scope NULL'], [PA, 'test', 'invalid_partner', 'test scope WITH a partner'],
+    [null, 'partner', 'invalid_partner', 'partner scope, partner NULL'], ['99999999-9999-4999-8999-999999999999', 'partner', 'invalid_partner', 'partner scope, unknown partner']]) {
+    await fill97(d)
+    const r = await reset97(d, 'admin:9', partner, scope)
+    const b = await buckets97(d)
+    ck(`${label}: P0001 ${want}, nothing deleted`, !r.ok && r.code === 'P0001' && r.msg === want && JSON.stringify(b) === JSON.stringify(ALL3), { r, b })
+  }
+  ck('after every call: PIN rows and devices unchanged', (await keep97(d)) === keep, null)
+  return res
+}
+{
+  const T97 = tokq(slice('    -- 1197-BEGIN', '    -- 1197-END'))
+  { const z = await after1144(); await stamped(z, FA)
+    const r0 = await applyFile(z, F97); await z.exec('ROLLBACK;').catch(() => {})
+    t('20261197 REFUSES before 20261194 (nothing applied)', [r0.ok, (r0.msg || '').includes('20261194_eatery_order_status_partner.sql is not in the ledger'),
+      (await q(z, `SELECT to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)') IS NULL AS x`))[0].x], [false, true, true]) }
+  { const z = await after1144(); await tokens(z, '1197 token on the 1144 state (red, no error)', T97, false, 1) }
+  const d = await after1194()
+  await tokens(d, '1197 token AFTER 1194, BEFORE 1197 (red, no error)', T97, false, 1)
+  t('20261197 applies on the 1194 state (in-file post-state green)', await applyFile(d, F97), { ok: true, msg: null })
+  t('20261197 applies a SECOND time (re-runnable)', await applyFile(d, F97), { ok: true, msg: null })
+  await tokens(d, '1197 token AFTER 1197', T97, true, 1)
+  t('20261197: grants as stated (authenticated yes; anon, PUBLIC no)', (await q(d, `SELECT has_function_privilege('authenticated', 'public.admin_reset_eatery_pin_attempts(uuid,text)', 'EXECUTE') au,
+      has_function_privilege('anon', 'public.admin_reset_eatery_pin_attempts(uuid,text)', 'EXECUTE') an,
+      EXISTS (SELECT 1 FROM aclexplode((SELECT proacl FROM pg_proc WHERE oid = 'public.admin_reset_eatery_pin_attempts(uuid,text)'::regprocedure)) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') pu`))[0], { au: true, an: false, pu: false })
+  const res = await checks97(d)
+  t(`20261197 behaviour: ${res.length} named checks, all true`, [res.length, res.filter(r => !r[1]).map(r => r[0])], [20, []])
+  t('verify_schema registers 20261197 (C and G rows)', VS.split("('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')").length - 1, 2)
 }
 // The rewritten retention row (cron section): WRONG until 20261194 runs, OK after it (a newline-exact match of the whole command).
 {
@@ -645,6 +738,41 @@ else {
     const hit = res.find(([n]) => n.includes(m.red))
     t(`${m.n}: the check "${m.red}" goes red`, [hit !== undefined, hit?.[1]], [true, false])
     table.push([m.n, hit && hit[1] === false ? 'RED' : 'GREEN (BAD)', m.red])
+  }
+  // 20261197: each body mutant is run twice — as written (the in-file post-state must refuse it) and with that one shape assertion
+  // neutralised (RAISE EXCEPTION -> NOTICE), where the named harness check must go red. Catalog mutants: the apply must fail.
+  const GATE97 = `  IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'forbidden';\n  END IF;\n`
+  const DEL97 = `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  RETURN`
+  const BODY97 = 'admin_reset_eatery_pin_attempts body'
+  const MUT97 = [
+    { n: 'C1 the admin gate is dropped', pairs: [[GATE97, '']], red: 'customer denied' },
+    { n: 'C2 a guest session passes the admin gate', pairs: [[`  IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'forbidden';`, `  IF auth.uid() IS NULL OR NOT public.is_admin() THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'forbidden';`]], red: 'guest session of the admin account denied' },
+    { n: 'C3 every bucket is deleted', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts;\n  RETURN`]], red: 'partner A reset: B and test attempts untouched' },
+    { n: 'C4 the bucket\'s devices are deleted too', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  DELETE FROM private.eatery_partner_devices WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  RETURN`]], red: 'partner A reset: PIN rows and devices unchanged' },
+    { n: 'C5 partner_id = (NULL never matches: the test bucket is never cleared)', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id = p_partner;\n  RETURN`]], red: 'test reset: test attempts gone' },
+    { n: 'C6 granted to anon [catalog fact]', pairs: [[`GRANT  EXECUTE ON FUNCTION public.admin_reset_eatery_pin_attempts(uuid, text) TO authenticated;`, `GRANT  EXECUTE ON FUNCTION public.admin_reset_eatery_pin_attempts(uuid, text) TO anon, authenticated;`]], fail: 'admin_reset_eatery_pin_attempts grants' },
+  ]
+  for (const m of MUT97) {
+    if (m.fail) {
+      const p = mutant(m.n, S97, m.pairs)
+      if (!p) { table.push([m.n, 'ANCHOR MISSING', '']); continue }
+      const d = await after1194(); const r = await applyFile(d, p); await d.exec('ROLLBACK;').catch(() => {})
+      const hit = !r.ok && r.msg.includes(m.fail)
+      t(`${m.n}: apply FAILS with "${m.fail}"`, [r.ok, hit], [false, true]); if (!hit) console.log(`      ${r.ok ? '(applied!)' : r.msg}`)
+      table.push([m.n, r.ok ? 'GREEN (BAD)' : hit ? 'RED' : 'RED, wrong message', r.ok ? '' : r.msg.slice(0, 120)]); continue
+    }
+    const p1 = mutant(m.n + ' shape', S97, m.pairs)
+    const p2 = mutant(m.n + ' neut', S97, [...m.pairs, [`RAISE EXCEPTION '${BODY97}`, `RAISE NOTICE '${BODY97}`]])
+    if (!p1 || !p2) { table.push([m.n, 'ANCHOR MISSING', '']); continue }
+    const d1 = await after1194(); const r1 = await applyFile(d1, p1); await d1.exec('ROLLBACK;').catch(() => {})
+    const shapeHit = !r1.ok && r1.msg.includes(BODY97)
+    t(`${m.n}: as written, the in-file post-state refuses it`, [r1.ok, shapeHit], [false, true]); if (!shapeHit) console.log(`      ${r1.ok ? '(applied!)' : r1.msg}`)
+    const d2 = await after1194(); const r2 = await applyFile(d2, p2)
+    if (!r2.ok) { bad++; console.log(`  ✗ ${m.n}: neutralised mutant did not apply: ${r2.msg}`); table.push([m.n, 'NEUT FAILED', r2.msg.slice(0, 100)]); continue }
+    const res = await checks97(d2)
+    const hit = res.find(([n]) => n.includes(m.red))
+    t(`${m.n}: the check "${m.red}" goes red`, [hit !== undefined, hit?.[1]], [true, false])
+    table.push([m.n, shapeHit && hit && hit[1] === false ? 'RED' : 'GREEN (BAD)', `in-file: ${shapeHit ? 'refused' : 'MISSED'}; harness: ${m.red}`])
   }
   console.log('\nMUTANT TABLE'); for (const r of table) console.log(`  ${r[1].padEnd(18)} ${r[0]}  ${r[2] ? '→ ' + r[2] : ''}`)
 }
