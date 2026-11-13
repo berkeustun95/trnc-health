@@ -40,15 +40,15 @@ select json_build_object(
         from net._http_response where created >= date_trunc('day', now()) group by 1) x),
 
   -- 14 days, per TRNC day: duty runs, in-app rows, users, users with more than one duty row that day
-  'duty_14d', (select coalesce(json_agg(x order by x.day), '[]'::json) from (
-      select r.day, r.runs, r.attempted, r.ok, n.rows_n, n.users_n, n.users_2plus
-        from (select to_char(started_at at time zone 'Asia/Famagusta', 'MM-DD') day, count(*) runs,
+  'duty_14d', (select coalesce(json_agg(x order by x.dlocal), '[]'::json) from (
+      select r.dlocal, r.runs, r.attempted, r.ok, n.rows_n, n.users_n, n.users_2plus
+        from (select to_char(started_at at time zone 'Asia/Famagusta', 'MM-DD') as dlocal, count(*) runs,
                      sum(push_attempted) attempted, sum(push_ok) ok
                 from public.duty_push_runs where started_at > now() - interval '14 days' group by 1) r
-        left join (select day, sum(k) rows_n, count(*) users_n, count(*) filter (where k > 1) users_2plus
-                     from (select to_char(created_at at time zone 'Asia/Famagusta', 'MM-DD') day, user_id, count(*) k
+        left join (select dlocal, sum(k) rows_n, count(*) users_n, count(*) filter (where k > 1) users_2plus
+                     from (select to_char(created_at at time zone 'Asia/Famagusta', 'MM-DD') as dlocal, user_id, count(*) k
                              from public.notifications where type = 'duty' and created_at > now() - interval '14 days'
-                            group by 1, 2) u group by day) n on n.day = r.day) x),
+                            group by 1, 2) u group by dlocal) n on n.dlocal = r.dlocal) x),
 
   'weekend_today', (select json_build_object('rows_n', count(*), 'users_n', count(distinct user_id))
     from public.notifications where type = 'weekend' and created_at >= date_trunc('day', now())),
