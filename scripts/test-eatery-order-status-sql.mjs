@@ -264,6 +264,31 @@ const tokens = async (d, label, sql, want, n) => {
   for (const r of rows25) { try { const rr = (await d.query(tokq('    ' + r))).rows; n25 += rr.length; ok25 += rr.filter(x => x.ok).length } catch (e) { console.log('      1125 row error:', String(e.message).split('\n')[0]) } }
   t('verify_schema older 1125 rows naming create / verify AFTER 1194: all true', [n25 > 0, ok25 === n25], [true, true])
 }
+
+// ── 20261195: the Worker key hash (data) ──
+{
+  const FC = M('20261195_eatery_worker_key.sql'), HASH = 'e2521b10b0c909008d587b61f84f134b2626c05702f3b57d2029ad5b128195b4'
+  const T95 = tokq(slice('    -- 20261195 Worker key hash (data).', '      END, false)\n') + '      END, false)\n')
+  const hashes = async (d) => (await q(d, `SELECT key_sha256 FROM private.eatery_worker_key_hashes ORDER BY 1`)).map(r => r.key_sha256)
+  { const z = await after1144(); await applyFile(z, FA)
+    const r0 = await applyFile(z, FC)
+    t('20261195 REFUSES before 20261194 (nothing applied)', [r0.ok, (r0.msg || '').includes('20261194 is not applied')], [false, true]) }
+  const d = await after1144()
+  await applyFile(d, FA)
+  await applyFile(d, FB)
+  await tokens(d, '1195 token BEFORE 1195 (red, no error)', T95, false, 1)
+  const r1 = await applyFile(d, FC)
+  t('20261195 applies on the 1194 state', r1, { ok: true, msg: null })
+  t('20261195: the store holds exactly the one hash', await hashes(d), [HASH])
+  await tokens(d, '1195 token AFTER 1195', T95, true, 1)
+  t('20261195 re-runs as a no-op', [(await applyFile(d, FC)).ok, await hashes(d)], [true, [HASH]])
+  t('a wrong key in the header is still refused (as the DEFINER callers see it)', val(await as(d, 'pg', `SELECT public.eatery_worker_key_ok() AS c`)), false)
+  const e = await after1144(); await applyFile(e, FA); await applyFile(e, FB)
+  await e.exec(`INSERT INTO private.eatery_worker_key_hashes (key_sha256, note) VALUES ('${'a'.repeat(64)}', 'other')`)
+  const r2 = await applyFile(e, FC)
+  await e.exec('ROLLBACK;').catch(() => {})
+  t('20261195 REFUSES when another hash is already stored, and adds nothing', [r2.ok, (r2.msg || '').includes('already holds another hash'), await hashes(e)], [false, true, ['a'.repeat(64)]])
+}
 // The rewritten retention row (cron section): WRONG until 20261194 runs, OK after it (a newline-exact match of the whole command).
 {
   const cslice = slice('-- ─── 1132 (command rewritten by 20261194', '\nUNION ALL\n-- ─── 20261148')
