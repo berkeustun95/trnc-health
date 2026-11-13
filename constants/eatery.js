@@ -340,11 +340,24 @@ export function orderCheck(basketLines, res) {
   return orderCodeLine(res.code) ? null : 'generic'
 }
 
-// 18+ ordering (adult_only partners). Age by the calendar date in Europe/Istanbul (fixed UTC+3 since 2016), dob 'YYYY-MM-DD'.
+// 18+ ordering (adult_only partners). Age by the calendar date in Europe/Nicosia WITH summer time (UTC+2 / UTC+3), dob 'YYYY-MM-DD'.
 // A missing or malformed dob is NOT an adult. ADULT_AGE is the one shared constant (constants/profileGate.js).
+// The date is built from formatToParts, not the formatted string: an engine's en-CA pattern is not guaranteed to be YYYY-MM-DD.
+// An engine without the time zone falls back to fixed UTC+3 (the old rule). The server gate still uses Europe/Istanbul (20261193),
+// so in winter between 23:00 and midnight the app is the stricter of the two, never the looser.
+let nicosiaFmt = null
+export function nicosiaDate(now = new Date()) {
+  try {
+    nicosiaFmt = nicosiaFmt || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Nicosia', year: 'numeric', month: '2-digit', day: '2-digit' })
+    const p = Object.fromEntries(nicosiaFmt.formatToParts(now).map(x => [x.type, x.value]))
+    const d = `${p.year}-${p.month}-${p.day}`
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+  } catch { /* falls through to the fixed offset */ }
+  return new Date(now.getTime() + 3 * 3600 * 1000).toISOString().slice(0, 10)
+}
 export function isAdultForOrder(dob, now = new Date()) {
   if (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false
-  const today = new Date(now.getTime() + 3 * 3600 * 1000).toISOString().slice(0, 10)
+  const today = nicosiaDate(now)
   return dob <= `${Number(today.slice(0, 4)) - ADULT_AGE}${today.slice(4)}`
 }
 
@@ -369,15 +382,59 @@ export function orderErrorKind(err) {
   return 'generic'
 }
 
-// The ONLY arguments create_eatery_order receives: ids and quantities (and, for a line with options, their ids and quantities).
-// Delivery details (address, location) travel in the WhatsApp text alone and never reach the server; a test pins this shape and
-// the call site. A plain line is exactly { item_id, qty }, as the shipped apps send it.
-export const orderRpcArgs = (partnerId, lines) => ({
+// The ONLY arguments create_eatery_order receives: ids and quantities (and, for a line with options, their ids and quantities),
+// plus p_mode = the order TYPE alone, 'pickup' | 'delivery' (20261193; Berke 2026-11-12), so the restaurant can show the right status.
+// Anything else as mode (an address object, a typo) sends no p_mode at all. Delivery details (address, phone, location) travel in the
+// WhatsApp text alone and never reach the server; a test pins this shape and the call site. A plain line is exactly { item_id, qty }.
+export const orderMode = d => (d?.mode === 'pickup' || d?.mode === 'delivery' ? d.mode : null)
+export const orderRpcArgs = (partnerId, lines, mode = null) => ({
   p_partner: partnerId,
   p_items: lines.map(l => (Array.isArray(l.opts) && l.opts.length > 0
     ? { item_id: l.id, qty: l.qty, opts: l.opts.map(o => ({ id: o.id, qty: o.qty })) }
     : { item_id: l.id, qty: l.qty })),
+  ...(mode === 'pickup' || mode === 'delivery' ? { p_mode: mode } : null),
 })
+
+// ─── Order status from the restaurant (20261193/94) ───
+// Same rule as the verify page (worker/index.js statusModel): a card shows only where status is in use — a TEST order, a restaurant
+// that has it switched on, or an order that has already moved past 'sent'.
+export const ORDER_STATUSES = ['sent', 'received', 'preparing', 'on_the_way', 'ready', 'cancelled']
+export const ORDER_CANCEL_REASONS = ['closed', 'busy', 'item_out', 'no_delivery_there', 'unreachable', 'other']
+export const ORDER_CODE_RE = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/
+export const ORDER_POLL_MS = 30000
+const orderStatusOf = o => (ORDER_STATUSES.includes(o?.order_status) ? o.order_status : 'sent')
+export const orderStatusShown = o => !!o && (o.is_test === true || o.status_enabled === true || orderStatusOf(o) !== 'sent')
+// Still worth polling: shown, and the restaurant can still move it (under 12 h, not final; the server decides status_open).
+export const orderStatusLive = o => orderStatusShown(o) && o.status_open === true
+// Poll only while the list is on screen, the app is in front and at least one shown order can still move.
+export const shouldPollOrders = ({ active, appActive, orders }) => active === true && appActive === true && Array.isArray(orders) && orders.some(orderStatusLive)
+// Status pushes already reach THIS phone (20261194 falls back to a signed-in customer's profile token): not a guest, notifications
+// allowed, and the profile's push_token is the token this phone registered.
+export const orderPushCovered = ({ guest, permGranted, profileToken, deviceToken }) =>
+  guest === false && permGranted === true && typeof deviceToken === 'string' && deviceToken.length > 0 && profileToken === deviceToken
+// The card's notify area: 'none' (the order can no longer move) | 'on' ("we'll let you know") | 'button' ("Durum değişince haber ver").
+export const orderNotifyView = (order, covered) => (order?.status_open !== true ? 'none' : order.notify_set === true || covered === true ? 'on' : 'button')
+export const formatOrderCode = c => (typeof c === 'string' && ORDER_CODE_RE.test(c) ? `${c.slice(0, 4)}-${c.slice(4)}` : '')
+// A push's data.code -> the code, or null (the push carries { screen: 'eatery_order', code }, 20261194).
+export const orderPushCode = data => (data?.screen === 'eatery_order' && typeof data.code === 'string' && ORDER_CODE_RE.test(data.code) ? data.code : null)
+// The timeline, as the verify page draws it: sent -> received -> preparing -> on_the_way (delivery) | ready (pickup) | 'either' (an
+// order from an older app, type unknown, not yet at the last step). A cancelled order is no timeline: { cancelled, reason }.
+// Times: the server keeps only the latest change (status_at), so the current step shows it and 'sent' shows created_at.
+// -> { cancelled: true, reason, at } | { cancelled: false, steps: [{ key, done, current, at }] }
+export function orderTimeline(o) {
+  const st = orderStatusOf(o)
+  if (st === 'cancelled') return { cancelled: true, reason: ORDER_CANCEL_REASONS.includes(o.cancel_reason) ? o.cancel_reason : 'other', at: o.status_at || null }
+  const last = o?.fulfilment === 'delivery' ? 'on_the_way' : o?.fulfilment === 'pickup' ? 'ready'
+    : st === 'on_the_way' || st === 'ready' ? st : 'either'
+  const rank = { sent: 0, received: 1, preparing: 2, on_the_way: 3, ready: 3 }[st]
+  return {
+    cancelled: false,
+    steps: ['sent', 'received', 'preparing', last].map((key, i) => ({
+      key, done: i <= rank, current: i === rank,
+      at: i === 0 ? o.created_at || null : i === rank ? o.status_at || null : null,
+    })),
+  }
+}
 
 // ─── Delivery choice (Sepetim) ───
 export const ADDRESS_FIELD_MAX = 100

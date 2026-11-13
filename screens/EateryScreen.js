@@ -12,6 +12,7 @@ import { EateryLogo, PlaceholderTag, useReduceMotion } from '../components/Eater
 import { QuizEntryCard, QuizPage } from '../components/EateryQuiz'
 import { quizHasMains, quizSteps, QUIZ_GENERAL } from '../constants/eateryQuiz'
 import EateryPartnerScreen from './EateryPartnerScreen'
+import EateryOrderStatusList, { fetchMyOrders } from '../components/EateryOrderStatus'
 
 // ─── Yeme-İçme: the partner list ────────────────────────────────────────────
 // Rows come from public.eatery_partners with their menu items and photos embedded; RLS returns
@@ -57,7 +58,9 @@ function PartnerCard({ partner, lang, onPress }) {
 
 // openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
 // once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
-export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null }) {
+// orderTap: a status push tap ({ code, at }; push data { screen: 'eatery_order' }): once the rows are in, the order's restaurant
+// opens (its page carries the "Siparişin" card). An order this account cannot see (or a restaurant not listed) stays on the list.
+export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null, orderTap = null }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,6 +85,17 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
     setRows(list)
     if (partner) { const fresh = list.find(r => r.id === partner.id); if (fresh) onOpenPartner(fresh) }
   }, [partner, onOpenPartner])
+  const openOrder = o => { const row = rows.find(r => r.id === o.partner_id); if (row) { setFocus(null); onOpenPartner(row) } }
+  useEffect(() => {
+    if (!orderTap?.code || rows.length === 0) return
+    let alive = true
+    fetchMyOrders().then(list => {
+      const o = alive && list?.find(x => x.code === orderTap.code)
+      const row = o && rows.find(r => r.id === o.partner_id)
+      if (row) { setFocus(null); onOpenPartner(row) }
+    })
+    return () => { alive = false }
+  }, [orderTap?.at, rows.length > 0])
   const retry = useCallback(() => { setError(false); setLoading(true); setAttempt(a => a + 1) }, [])
 
   useEffect(() => {
@@ -113,6 +127,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
         <ErrorState onRetry={retry} lang={lang} />
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
+          <EateryOrderStatusList lang={lang} active={!partner && quizOpen !== true} refreshKey={orderTap?.at ?? 0} onOpen={openOrder} />
           {showQuiz && <QuizEntryCard lang={lang} count={quizCount} onPress={openQuiz} />}
           {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => { setFocus(null); onOpenPartner(p) }} />)}
         </ScrollView>

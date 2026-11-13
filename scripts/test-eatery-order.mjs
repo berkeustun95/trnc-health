@@ -1,9 +1,9 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
-import { t } from '../constants/i18n.js'
+import { t, hasOwnTranslation } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eaterySiteCartUrl, eaterySiteHost, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eaterySiteCartUrl, eaterySiteHost, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk, orderMode, orderStatusShown, orderStatusLive, orderTimeline, formatOrderCode, orderPushCode, nicosiaDate, shouldPollOrders, orderPushCovered, orderNotifyView } from '../constants/eatery.js'
 import { heroPathOf } from '../utils/stripSlides.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
@@ -209,8 +209,19 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('not adult: 18th birthday tomorrow', isAdultForOrder('2008-10-22', now), false)
   eq('adult: long past', isAdultForOrder('1990-01-05', now), true)
   eq('not adult: a child', isAdultForOrder('2015-03-01', now), false)
-  eq('Istanbul date: 21:30 UTC on the 20th is already the 21st there', isAdultForOrder('2008-10-21', new Date('2026-10-20T21:30:00Z')), true)
-  eq('Istanbul date: 20:30 UTC on the 20th is still the 20th there', isAdultForOrder('2008-10-21', new Date('2026-10-20T20:30:00Z')), false)
+  eq('Nicosia date (summer, UTC+3): 21:30 UTC on the 20th is already the 21st there', isAdultForOrder('2008-10-21', new Date('2026-10-20T21:30:00Z')), true)
+  eq('Nicosia date (summer, UTC+3): 20:30 UTC on the 20th is still the 20th there', isAdultForOrder('2008-10-21', new Date('2026-10-20T20:30:00Z')), false)
+  // Europe/Nicosia keeps summer time (EET UTC+2 / EEST UTC+3); 2026 switches at 01:00 UTC on 29 Mar and 25 Oct.
+  eq('spring, still winter: 21:59 UTC on 28 Mar = 23:59 on the 28th', isAdultForOrder('2008-03-29', new Date('2026-03-28T21:59:00Z')), false)
+  eq('spring, still winter: 22:00 UTC on 28 Mar = 00:00 on the 29th', isAdultForOrder('2008-03-29', new Date('2026-03-28T22:00:00Z')), true)
+  eq('spring, now summer: 20:59 UTC on 29 Mar = 23:59 on the 29th', isAdultForOrder('2008-03-30', new Date('2026-03-29T20:59:00Z')), false)
+  eq('spring, now summer: 21:00 UTC on 29 Mar = 00:00 on the 30th', isAdultForOrder('2008-03-30', new Date('2026-03-29T21:00:00Z')), true)
+  eq('autumn, still summer: 20:59 UTC on 24 Oct = 23:59 on the 24th', isAdultForOrder('2008-10-25', new Date('2026-10-24T20:59:00Z')), false)
+  eq('autumn, still summer: 21:00 UTC on 24 Oct = 00:00 on the 25th', isAdultForOrder('2008-10-25', new Date('2026-10-24T21:00:00Z')), true)
+  eq('autumn, now winter: 21:59 UTC on 25 Oct = 23:59 on the 25th', isAdultForOrder('2008-10-26', new Date('2026-10-25T21:59:00Z')), false)
+  eq('autumn, now winter: 22:00 UTC on 25 Oct = 00:00 on the 26th', isAdultForOrder('2008-10-26', new Date('2026-10-25T22:00:00Z')), true)
+  eq('winter 23:30 Cyprus (21:30 UTC) is still the 10th: not 18 until the 11th (fixed +3 h said yes)', isAdultForOrder('2008-12-11', new Date('2026-12-10T21:30:00Z')), false)
+  eq('winter 00:30 Cyprus on the 11th (22:30 UTC on the 10th): 18 today', isAdultForOrder('2008-12-11', new Date('2026-12-10T22:30:00Z')), true)
   eq('no/garbage dob is not adult', [isAdultForOrder(null, now), isAdultForOrder('', now), isAdultForOrder('soon', now)], [false, false, false])
   eq('Feb 29 dob: 2008-02-29 is not yet 18 on 2026-02-28', isAdultForOrder('2008-02-29', new Date('2026-02-28T09:00:00Z')), false)
   eq('Feb 29 dob: adult on 2026-03-01', isAdultForOrder('2008-02-29', new Date('2026-03-01T09:00:00Z')), true)
@@ -266,10 +277,20 @@ eq('last added partner: a no-op does not move it', B.getLastAdded(), 'p4')
   eq('rpc args: each item has exactly item_id, qty', args.p_items.map(i => Object.keys(i)), [['item_id', 'qty'], ['item_id', 'qty']])
   eq('rpc args: values', args, { p_partner: 'partner-1', p_items: [{ item_id: 'a1', qty: 2 }, { item_id: 'b2', qty: 1 }] })
   eq('rpc args never carry the address or "Teslimat"', [JSON.stringify(args).includes(STREET), JSON.stringify(args).includes('Teslimat')], [false, false])
+  // p_mode (20261193): the order TYPE only, never the address / phone / pin; anything else sends no p_mode.
+  eq('rpc args + pickup: keys p_partner, p_items, p_mode', [Object.keys(orderRpcArgs('p', basket, 'pickup')), orderRpcArgs('p', basket, 'pickup').p_mode], [['p_partner', 'p_items', 'p_mode'], 'pickup'])
+  eq('rpc args + delivery: p_mode is the bare string', orderRpcArgs('p', basket, 'delivery').p_mode, 'delivery')
+  const DLV = { mode: 'delivery', kind: 'home', street: STREET, building: '4', district: 'Köşklüçiftlik', callPhone: '5331234567', directions: 'Mavi kapı', coords: { lat: 35.18974, lng: 33.34972 } }
+  const leak = JSON.stringify(orderRpcArgs('p', basket, DLV))
+  eq('rpc args: a whole delivery object as mode leaks nothing and sends no p_mode', [leak.includes(STREET), leak.includes('5331234567'), leak.includes('Mavi'), leak.includes('35.18'), leak.includes('p_mode')], [false, false, false, false, false])
+  eq('rpc args: unknown modes send no p_mode', ['Pickup', 'gel-al', '', null, undefined, 1, {}].map(m => Object.keys(orderRpcArgs('p', basket, m))), Array(7).fill(['p_partner', 'p_items']))
+  eq('orderMode: the type only, from the delivery state', [orderMode(DLV), orderMode({ mode: 'pickup', street: STREET }), orderMode({ mode: null }), orderMode(null), orderMode({ mode: 'x' })], ['delivery', 'pickup', null, null, null])
+  eq('rpc args + orderMode(delivery state): exactly the type', JSON.stringify(orderRpcArgs('p', basket, orderMode(DLV))), '{"p_partner":"p","p_items":[{"item_id":"a1","qty":2},{"item_id":"b2","qty":1}],"p_mode":"delivery"}')
 
   const src = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
   eq('screen: exactly one create_eatery_order rpc call', src.split("supabase.rpc('create_eatery_order'").length - 1, 1)
   eq('screen: that call is immediately orderRpcArgs(', src.includes("supabase.rpc('create_eatery_order', orderRpcArgs("), true)
+  eq('screen: the call passes the type from orderMode(delivery), read on its own line', [src.includes("supabase.rpc('create_eatery_order', orderRpcArgs(partner.id, sent, mode))"), src.includes('const mode = orderMode(delivery)')], [true, true])
   eq('screen: supabase is used only by that one rpc', (src.match(/supabase\s*\.\s*\w+/g) || []), ['supabase.rpc'])
   // every logContactEvent( call has exactly three top-level arguments
   const argCounts = []
@@ -856,6 +877,108 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   eq('theme tokens: every space[n] in EateryBanner.js exists', spaceUsed.filter(n => themeMod.space[n] === undefined), [])
   eq('theme tokens: the scan saw something (not measuring nothing)', [used.length > 10, spaceUsed.length > 2], [true, true])
   eq('theme tokens: no theme import of a name the file does not have', [...bn.matchAll(/import \{([^}]*)\} from '\.\.\/constants\/theme'/g)].flatMap(m => m[1].split(',').map(x => x.trim()).filter(Boolean)).filter(n => themeMod[n] === undefined), [])
+}
+
+// ─── Order status (20261193/94): the card's pure rules ───
+{
+  const app = fs.readFileSync(new URL('../App.js', import.meta.url), 'utf8')
+  const cut = (from, to) => { const i = app.indexOf(from); return i < 0 ? '' : app.slice(i, app.indexOf(to, i)) }
+  const warm = cut('addNotificationResponseReceivedListener(', 'return () => sub.remove()')
+  const cold = cut('Notifications.getLastNotificationResponseAsync().then(', '}, [session])')
+  eq('push tap: warm AND cold handlers route eatery_order', [warm.length > 0, cold.length > 0, warm.includes("screen === 'eatery_order'") && warm.includes('openEateryOrderPush(data)'), cold.includes("screen === 'eatery_order') openEateryOrderPush(data)")], [true, true, true, true])
+  const opener = cut('const openEateryOrderPush = data => {', '\n  }\n')
+  eq('push tap: gated on EATERY, validated code, reset-then-open via oliNavigate(\'eatery\')', ['if (!EATERY || !code) return false', 'orderPushCode(data)', "('eatery')", 'setEateryOrderTap({ code, at: Date.now() })'].map(x => opener.includes(x)), [true, true, true, true])
+  // Every selector branch ABOVE Yeme-İçme that a customer can be on must be closed by the tap (oliNavigate's resets + the extras).
+  const oli = cut('const oliNavigate = (target) => {', "case 'eatery':")
+  const sel = cut('} else if (showDutyList) {', '} else if (showEatery && EATERY) {')
+  const above = [...new Set([...sel.matchAll(/\} else if \((\w+)/g)].map(m => m[1]))].filter(v => !['adminPreview', 'petsSubScreen', 'showAgentOnboarding'].includes(v))   // agent onboarding: DORMANT by product decision (CLAUDE.md), never reached by a customer
+  const setterOf = v => 'set' + v[0].toUpperCase() + v.slice(1) + '('
+  eq('push tap: closes every screen the selector draws above Yeme-İçme', [above.length > 20, above.filter(v => !(oli + opener).includes(setterOf(v)))], [true, []])
+  eq('push tap: oliNavigate read through a ref (a cold-start tap never hits an unset binding)', [opener.includes("oliNavigateRef.current"), /oliNavigateRef\.current = oliNavigate\b/.test(app), !/\boliNavigate\('eatery'\)/.test(opener)], [true, true, true])
+  const holds = JSON.parse(fs.readFileSync(new URL('../release-holds.json', import.meta.url), 'utf8')).holds
+  eq('release hold: this work is held from production until privacy F1-F6 is live', holds.filter(h => h.pr === 399 && h.cleared === false && /F1.F6/.test(h.what)).length, 1)
+  eq("oliNavigate('eatery') still opens Yeme-İçme with no partner page", [oli.includes('setEateryPartner(null)'), /case 'eatery':\s*setShowEatery\(true\)/.test(app)], [true, true])
+  const st = fs.readFileSync(new URL('../components/EateryOrderStatus.js', import.meta.url), 'utf8')
+  // i18n: i18n:validate scans named surfaces only (not this card), so its keys are checked here.
+  const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  const osKeys = [...new Set([...st.matchAll(/'(eateryOs\w+)'/g)].map(m => m[1]))]
+  eq('status card: it uses 26 eateryOs keys (the scan saw them)', osKeys.length, 26)
+  const SQL_JUNK = /'\)|"\)|AS r\(|VALUES/
+  eq('status card: no eateryOs text carries pasted SQL (\')  ") AS r( VALUES), any language', osKeys.flatMap(k => LANGS.filter(l => SQL_JUNK.test(t(k, l))).map(l => `${k}/${l}: ${t(k, l)}`)), [])
+  eq('status card: the Persian "other" reason exactly', t('eateryOsReasonOther', 'Persian'), 'رستوران سفارش را لغو کرد.')
+  eq('status card: German says Benachrichtigungen (Mitteilungen = the Duyurular module)', osKeys.filter(k => /Mitteilung/.test(t(k, 'German'))), [])
+  eq('status card: step a11y keys keep {label}, all 9', ['eateryOsStepDoneA11y', 'eateryOsStepNowA11y', 'eateryOsStepNextA11y'].flatMap(k => LANGS.filter(l => !t(k, l).includes('{label}')).map(l => `${k}/${l}`)), [])
+  eq('status card: every eateryOs key has its own text in all 9 languages', osKeys.flatMap(k => LANGS.filter(l => !hasOwnTranslation(k, l)).map(l => `${k}/${l}`)), [])
+  eq('status card: the approved first status, all 9', LANGS.map(l => t('eateryOsSent', l)), ['Sent to the restaurant', 'Restorana iletildi', 'أُرسل إلى المطعم', 'Передан в ресторан', 'Στάλθηκε στο εστιατόριο', 'Transmise au restaurant', 'Enviado al restaurante', 'An das Restaurant übermittelt', 'به رستوران ارسال شد'])
+  // Customer side, "sen": only the FIRST status is the verify page's word; the cancel reasons are the customer push text of
+  // eatery_order_push_text (20261194), in all 9 languages.
+  const worker = fs.readFileSync(new URL('../worker/index.js', import.meta.url), 'utf8')
+  eq('status card: the first status is the verify page\'s (worker ST.sent)', worker.includes(`  sent: ['${t('eateryOsSent', 'Turkish')}', '${t('eateryOsSent', 'English')}'],`), true)
+  const pushSql = fs.readFileSync(new URL('../supabase/migrations/20261194_eatery_order_status_partner.sql', import.meta.url), 'utf8')
+  const sqlText = expr => expr.split(/\s*\|\|\s*/).map(x => (/^U&'\\200C'$/.test(x) ? '\u200c' : x.replace(/^'|'$/g, '').replace(/''/g, "'"))).join('')
+  const PUSH = {}
+  // The value is SQL string literals joined by || and nothing else (a looser .+? once swallowed ")) AS r(lang, reason, txt" from the last row).
+  for (const m of pushSql.matchAll(/^\s*\('(\w+)',\s*'(closed|busy|item_out|no_delivery_there|unreachable|other)',\s*((?:U&'\\200C'|'(?:[^']|'')*')(?:\s*\|\|\s*(?:U&'\\200C'|'(?:[^']|'')*'))*)/gm)) PUSH[`${m[1]}/${m[2]}`] = sqlText(m[3].trim())
+  const PUSH_STATUS_TR_RECEIVED = pushSql.match(/\('Turkish', 'received',\s*'([^']*)'\)/)?.[1] ?? ''
+  eq('push text parsed: 6 reasons x 9 languages (the scan saw them)', Object.keys(PUSH).length, 54)
+  const RK = { closed: 'eateryOsReasonClosed', busy: 'eateryOsReasonBusy', item_out: 'eateryOsReasonItemOut', no_delivery_there: 'eateryOsReasonNoDelivery', unreachable: 'eateryOsReasonUnreachable', other: 'eateryOsReasonOther' }
+  eq('status card: every cancel reason, all 9 languages, is the customer push text', LANGS.flatMap(l => Object.entries(RK).filter(([code, k]) => t(k, l) !== PUSH[`${l}/${code}`]).map(([code]) => `${l}/${code}: ${t(RK[code], l)} != ${PUSH[`${l}/${code}`]}`)), [])
+  eq('status card: Turkish statuses from the customer side, "sen"', ['eateryOsReceived', 'eateryOsReady', 'eateryOsEither'].map(k => t(k, 'Turkish')), ['Sipariş alındı', 'Hazır, gelip alabilirsin', 'Yolda / Hazır, gelip alabilirsin'])
+  eq('status card: Turkish "received" is the push text\'s word (Siparişin alındı.)', PUSH_STATUS_TR_RECEIVED.includes(t('eateryOsReceived', 'Turkish').split(' ')[1]), true)
+  eq('status card: no Turkish string speaks as the restaurant (the verify page\'s "kapalıyız", "aldık", "Müşteri…") or says "siz"', [...new Set([...st.matchAll(/'(eateryOs\w+)'/g)].map(m => m[1]))].map(k => t(k, 'Turkish')).filter(x => /kapalıyız|yoğunuz|aldık|Müşteri|alabilirsiniz|teslimat yok\b/.test(x)), [])
+  eq('status card: subscribe sends the code, the token and the app language only', st.includes("supabase.rpc('eatery_order_subscribe', { p_code: code, p_token: token, p_lang: lang })"), true)
+  eq('status card: no profile write, no console, no analytics', (st.match(/from\('profiles'\)\s*\.\s*(update|upsert|insert|delete)|savePushToken|console\.|logContactEvent/g) || []), [])
+  eq('status card: the one profiles read is push_token of the own row, one row', (st.match(/from\('profiles'\)[^\n]*/g) || []), ["from('profiles').select('push_token').eq('id', session.user.id).maybeSingle()"])
+  const o = (x) => ({ code: 'AB23CD45', created_at: '2026-11-13T10:00:00Z', status_at: null, order_status: 'sent', fulfilment: 'pickup', is_test: false, status_enabled: false, status_open: true, cancel_reason: null, ...x })
+  eq('shown: the verify page rule (test || enabled || moved)', [o({}), o({ is_test: true }), o({ status_enabled: true }), o({ order_status: 'received' }), o({ order_status: 'cancelled', cancel_reason: 'busy' }), null].map(orderStatusShown), [false, true, true, true, true, false])
+  eq('live: shown and still open', [o({ is_test: true }), o({ is_test: true, status_open: false }), o({ status_open: true })].map(orderStatusLive), [true, false, false])
+  eq('timeline: pickup ends at ready, delivery at on_the_way, unknown type at either', [o({}), o({ fulfilment: 'delivery' }), o({ fulfilment: null })].map(x => orderTimeline(x).steps.map(s => s.key).join('>')), ['sent>received>preparing>ready', 'sent>received>preparing>on_the_way', 'sent>received>preparing>either'])
+  eq('timeline: an old-app order shows the step it reached', orderTimeline(o({ fulfilment: null, order_status: 'on_the_way', status_at: 'T' })).steps.map(s => s.key).at(-1), 'on_the_way')
+  const tl = orderTimeline(o({ order_status: 'preparing', status_at: '2026-11-13T10:20:00Z' })).steps
+  eq('timeline: done / current / times (sent = created_at, current = status_at)', tl.map(s => [s.done, s.current, s.at]), [[true, false, '2026-11-13T10:00:00Z'], [true, false, null], [true, true, '2026-11-13T10:20:00Z'], [false, false, null]])
+  eq('timeline: sent is current with created_at', orderTimeline(o({})).steps[0], { key: 'sent', done: true, current: true, at: '2026-11-13T10:00:00Z' })
+  eq('timeline: cancelled carries the reason; an unknown reason reads as other', [orderTimeline(o({ order_status: 'cancelled', cancel_reason: 'item_out', status_at: 'T' })), orderTimeline(o({ order_status: 'cancelled', cancel_reason: 'rude' })).reason], [{ cancelled: true, reason: 'item_out', at: 'T' }, 'other'])
+  eq('timeline: an unknown status reads as sent', orderTimeline(o({ order_status: 'eaten' })).steps.filter(s => s.current).map(s => s.key), ['sent'])
+  eq('order code: XXXX-XXXX, else empty', [formatOrderCode('AB23CD45'), formatOrderCode('ab23cd45'), formatOrderCode('AB23CD4I'), formatOrderCode(null)], ['AB23-CD45', '', '', ''])
+  eq('push data -> code only for screen eatery_order and a valid code', [orderPushCode({ screen: 'eatery_order', code: 'AB23CD45' }), orderPushCode({ screen: 'eatery_order', code: 'AB23-CD45' }), orderPushCode({ screen: 'duty', code: 'AB23CD45' }), orderPushCode(null)], ['AB23CD45', null, null, null])
+  eq('push code: exactly 8 characters (7, 9 and 12 refused; lower case refused)', ['AB23CD4', 'AB23CD45Z', 'AB23CD45AB23', 'ab23cd45', 'AB23CD45'].map(code => orderPushCode({ screen: 'eatery_order', code })), [null, null, null, null, 'AB23CD45'])
+  // Poll: on screen AND app in front AND at least one shown order still open (status_open from the server).
+  const L = o({ is_test: true }), F = o({ is_test: true, status_open: false })
+  eq('poll: runs only when active + app active + a live order', [
+    shouldPollOrders({ active: true, appActive: true, orders: [L] }), shouldPollOrders({ active: false, appActive: true, orders: [L] }),
+    shouldPollOrders({ active: true, appActive: false, orders: [L] }), shouldPollOrders({ active: true, appActive: true, orders: [F] }),
+    shouldPollOrders({ active: true, appActive: true, orders: [] }), shouldPollOrders({ active: true, appActive: true, orders: [F, L] }),
+  ], [true, false, false, false, false, true])
+  eq("push covered: signed-in non-guest + permission + profile token === this phone's token, nothing else", [
+    orderPushCovered({ guest: false, permGranted: true, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: true, permGranted: true, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: false, permGranted: false, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: false, permGranted: true, profileToken: 'ExpoPushToken[b]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: false, permGranted: true, profileToken: null, deviceToken: null }),
+    orderPushCovered({ guest: false, permGranted: true, profileToken: '', deviceToken: '' }),
+    orderPushCovered({ permGranted: true, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+  ], [true, false, false, false, false, false, false])
+  eq('notify view: needs status_open; the button is replaced only when the order token is set or push is covered', [
+    orderNotifyView(o({ status_open: false }), false), orderNotifyView(o({ status_open: false, notify_set: true }), true),
+    orderNotifyView(o({}), false), orderNotifyView(o({ notify_set: true }), false), orderNotifyView(o({}), true), orderNotifyView(null, false),
+  ], ['none', 'none', 'button', 'on', 'on', 'none'])
+  {
+    const st = fs.readFileSync(new URL('../components/EateryOrderStatus.js', import.meta.url), 'utf8')
+    const fn = st.slice(st.indexOf('async function profilePushReachesThisPhone'), st.indexOf('\nconst STEP_KEY'))
+    eq('card wiring: guests never covered (early false), the poll and the notify area use the tested rules', [
+      fn.includes('if (!session || isGuest(session)) return false'), fn.includes("if (!mine || perm.status !== 'granted') return false"),
+      fn.includes('orderPushCovered({ guest: false, permGranted: true, profileToken: data?.push_token, deviceToken: mine })'),
+      st.includes('const poll = shouldPollOrders({ active, appActive, orders: shown })'), /if \(!poll\) return\s*\n\s*const id = setInterval\(load, ORDER_POLL_MS\)/.test(st),
+      st.includes("setAppActive(st === 'active')"), st.includes('const notify = orderNotifyView(order, pushCovered)'),
+      (st.match(/setPushCovered\(/g) || []).length === 1 && st.includes('profilePushReachesThisPhone().then(v => { if (alive.current) setPushCovered(v) })'),
+      !/notify_set === true|status_open === true/.test(st),
+    ], Array(9).fill(true))
+    const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
+    const headEnd = ps.indexOf('</Card>}', ps.indexOf('{showBanner ? <BannerHead'))
+    const between = ps.slice(headEnd, ps.indexOf('{gallery.length > 0 && <PhotoPager', headEnd))
+    eq('partner page: the order status list is an unconditional ScrollView child between the head card and the pager (so tabsIndex = 2 + …)', [headEnd > 0, /^<\/Card>\}\s*\n\s*<EateryOrderStatusList /.test(between), (between.match(/<EateryOrderStatusList/g) || []).length, /const tabsIndex = 2 \+ \(showQuizBanner \? 1 : 0\) \+ \(gallery\.length > 0 \? 1 : 0\)/.test(ps)], [true, true, 1, true])
+  }
+  eq('nicosiaDate: summer and winter midnight', [nicosiaDate(new Date('2026-07-01T20:59:00Z')), nicosiaDate(new Date('2026-07-01T21:00:00Z')), nicosiaDate(new Date('2026-12-01T21:59:00Z')), nicosiaDate(new Date('2026-12-01T22:00:00Z'))], ['2026-07-01', '2026-07-02', '2026-12-01', '2026-12-02'])
 }
 
 console.log(bad ? `eatery order: ${bad} FAILED` : 'eatery order: OK')
