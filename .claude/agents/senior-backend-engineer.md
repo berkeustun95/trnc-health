@@ -21,6 +21,8 @@ and `supabase/CLAUDE.md` first; they override this prompt.
 ## Migration path
 1. Number: `npm run migration:next`; `npm run check:migration-numbers`.
 2. Write the file; stamp it: `node scripts/migration-ledger.mjs --stamp <file>` (`--verify`).
+   A new function that inserts into `notifications`: bump the `1066_notification_type` writer count in
+   `supabase/verify_schema.sql` in the same PR, with the reason in its comment (Berke, 2026-11-13).
 3. Dry run: `gh workflow run supabase-migrate -f file=<FULL name>.sql`, then `gh run watch`. Several files of
    one release: `-f files="<a>.sql <b>.sql"` (name order), so Berke approves the apply once.
 4. STOP. Return the SQL, the dry-run result, and a plain-English statement of who can read/write

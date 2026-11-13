@@ -1122,6 +1122,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('eatery_order_events', 'cancel_reason', false, NULL, 'text'),
     ('eatery_order_events', 'at', true, 'now()', 'timestamp with time zone'),
     ('eatery_order_events', 'device_id', false, NULL, 'uuid'),
+    ('marketplace_photo_reminder_state', 'id', true, 'true', 'boolean'),
+    ('marketplace_photo_reminder_state', 'last_sent_at', false, NULL, 'timestamp with time zone'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1486,6 +1488,8 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('marketplace_listings_price_check', '1|1000000', 'is_free|price_tl'),
     ('marketplace_listings_status_check', 'active|sold', 'status'),
     ('marketplace_listings_title_check', '5|70', 'title'),
+    ('marketplace_photo_reminder_state_one_row', '', 'id'),
+    ('marketplace_photo_reminder_state_pkey', '', 'id'),
     ('marketplace_photos_listing_id_fkey', '', 'id|listing_id'),
     ('marketplace_photos_owner_id_fkey', '', 'id|owner_id'),
     ('marketplace_photos_path_check', '0|1|36|80|9|^(pending|approved)/[0-9a-f-]{36}/[0-9a-f-]{36}/[A-Za-z0-9._-]{1,80}$', 'storage_path'),

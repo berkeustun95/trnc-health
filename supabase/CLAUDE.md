@@ -53,6 +53,9 @@ Incident backstories: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
   D triggers · E constraints · F indexes · G grants · H tokens · Q2 cron · Q3 policies). A
   behaviour-only `CREATE OR REPLACE`, a changed DEFAULT, grant or comment needs an H-section token.
   Run the script after applying; the first row of QUERY 1 is the verdict.
+- **A new function that writes `notifications` bumps the `1066_notification_type` writer count in
+  `verify_schema.sql` in the SAME PR** (with the reason in its comment). Berke, 2026-11-13: 20261196 added a
+  seventh writer without it, and the apply went red after committing.
 - **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** after `RESET ROLE;`, or
   PostgREST reports 42703 for a column that exists.
 - **Prefixes are SEQUENCE NUMBERS, not dates.** Next file: `npm run migration:next` (highest prefix on
