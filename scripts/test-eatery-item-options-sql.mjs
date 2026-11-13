@@ -86,7 +86,18 @@ const i34 = VS.indexOf('    -- ── 1134: per-dish options'), i32 = VS.indexOf
   i25 = VS.indexOf('    -- ── 1125: WhatsApp order proof.'), i19 = VS.indexOf("    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2")
 if (i34 < 0 || i32 < i34 || i25 < i32 || i19 < i25) throw new Error('verify_schema 1134 / 1132 / 1125 token anchors missing')
 const tokq = (s) => `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${s}) z`
-const T34 = tokq(VS.slice(i34, i32)), T32 = tokq(VS.slice(i32, i25)), T25 = tokq(VS.slice(i25, i19))
+// Later migrations' tokens can sit inside these sections (20261133 in 1132's, 20261178 in 1125's). Postgres resolves every
+// relation a query names before it runs, so a foreign token errors the harness even if its rows are filtered out: cut the
+// slice down to this migration's own UNION ALL rows as TEXT, and print what was dropped so nothing vanishes silently.
+const pick = (text, name) => {
+  const parts = text.split(/\n(?=    UNION ALL SELECT ')/)
+  const keep = parts.filter(p => p.startsWith(`    UNION ALL SELECT '${name}'`))
+  const dropped = [...new Set(parts.filter(p => /^    UNION ALL SELECT '/.test(p) && !keep.includes(p)).map(p => p.match(/SELECT '([^']+)'/)[1]))]
+  if (dropped.length) console.log(`  (${name} token slice also holds: ${dropped.join(', ')} — excluded here, tested by their own files)`)
+  if (!keep.length) throw new Error(`no ${name} tokens found in its verify_schema section`)
+  return '\n' + keep.join('\n') + '\n'
+}
+const T34 = tokq(pick(VS.slice(i34, i32), '20261134_eatery_item_options')), T32 = tokq(pick(VS.slice(i32, i25), '20261132_eatery_orders_is_test')), T25 = tokq(pick(VS.slice(i25, i19), '20261125_eatery_orders'))
 const tokens = async (d, label, sql, want) => {
   try {
     const rows = (await d.query(sql)).rows

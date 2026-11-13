@@ -137,12 +137,18 @@ const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', i
 const i32 = VS.indexOf('    -- ── 1132: server-marked TEST orders'), i25 = VS.indexOf('    -- ── 1125: WhatsApp order proof.'), i19 = VS.indexOf("    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2")
 if (i32 < 0 || i25 < i32 || i19 < i25) throw new Error('verify_schema 1132 / 1125 token anchors missing')
 const tokq = (s) => `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${s}) z`
-// The 1132 section may be followed by later migrations' tokens before the 1125 header (20261133 sits there): keep only
-// 20261132's own rows, and print what the slice also contained so a token can never vanish from this test silently.
-const only = (sql, name) => `SELECT * FROM (${sql}) y WHERE migration = '${name}'`
-const T32 = only(tokq(VS.slice(i32, i25)), '20261132_eatery_orders_is_test'), T25 = tokq(VS.slice(i25, i19))
-const others = [...new Set([...VS.slice(i32, i25).matchAll(/UNION ALL SELECT '([0-9a-z_]+)'/g)].map(m => m[1]).filter(n => n !== '20261132_eatery_orders_is_test'))]
-console.log(`  (1132 token slice also holds: ${others.join(', ') || 'nothing else'} — excluded here, tested by their own files)`)
+// Later migrations' tokens can sit inside these sections (20261133 in 1132's, 20261178 in 1125's). Postgres resolves every
+// relation a query names before it runs, so a foreign token errors the harness even if its rows are filtered out: cut the
+// slice down to this migration's own UNION ALL rows as TEXT, and print what was dropped so nothing vanishes silently.
+const pick = (text, name) => {
+  const parts = text.split(/\n(?=    UNION ALL SELECT ')/)
+  const keep = parts.filter(p => p.startsWith(`    UNION ALL SELECT '${name}'`))
+  const dropped = [...new Set(parts.filter(p => /^    UNION ALL SELECT '/.test(p) && !keep.includes(p)).map(p => p.match(/SELECT '([^']+)'/)[1]))]
+  if (dropped.length) console.log(`  (${name} token slice also holds: ${dropped.join(', ')} — excluded here, tested by their own files)`)
+  if (!keep.length) throw new Error(`no ${name} tokens found in its verify_schema section`)
+  return '\n' + keep.join('\n') + '\n'
+}
+const T32 = tokq(pick(VS.slice(i32, i25), '20261132_eatery_orders_is_test')), T25 = tokq(pick(VS.slice(i25, i19), '20261125_eatery_orders'))
 const tokens = async (d, label, sql, want) => {
   try {
     const rows = (await d.query(sql)).rows

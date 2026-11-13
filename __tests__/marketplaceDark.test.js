@@ -36,6 +36,7 @@ test('production bundle with the flag on: gate open, tile live, both Bildirimler
   expect(groups.isLive('marketplace')).toBe(true)
   expect(groups.liveGroups().flatMap(g => g.modules.map(m => m.id))).toContain('marketplace')
   expect(route({ type: 'marketplace' })).toBe('marketplace')
+  expect(route({ type: 'marketplace', listing_id: 'l1' })).toBe('marketplace_listing')
   expect(route({ type: 'message', conversation_id: 'c1', listing_conversation: true })).toBe('marketplace_conversation')
   expect(route({ type: 'message', conversation_id: 'c2' })).toBeNull()
 })
@@ -47,6 +48,7 @@ test('off switch: production bundle with the flag forced off: gate closed, no ti
   expect(groups.isComingSoon('marketplace')).toBe(false)
   expect(groups.liveGroups().flatMap(g => g.modules.map(m => m.id))).not.toContain('marketplace')
   expect(route({ type: 'marketplace' })).toBeNull()
+  expect(route({ type: 'marketplace', listing_id: 'l1' })).toBeNull()
 })
 
 test('control: with the flag forced off the same code still opens on ADA Preview and on dev', () => {
