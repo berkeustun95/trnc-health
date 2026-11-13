@@ -498,7 +498,10 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
   const mkRow = MARKETPLACE && pendingMkPhotos !== 0 && (
     <TouchableOpacity style={s.urgencyCard} onPress={onOpenMarketplace} activeOpacity={0.75}>
       <View style={[s.urgencyDot, { backgroundColor: colors.danger }]} />
-      <Text style={s.urgencyLabel}>{pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : mkPhotosLabel(mkOldestAt)}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={s.urgencyLabel}>{pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review'}</Text>
+        {pendingMkPhotos !== null && mkOldestAt ? <Text style={s.cardSub}>Oldest waiting {photoWait(mkOldestAt)}</Text> : null}
+      </View>
       {pendingMkPhotos !== null && (
         <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
           <Text style={s.urgencyCount}>{pendingMkPhotos}</Text>
@@ -664,7 +667,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Places to review',                count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
     (stats.pendingCars ?? 0)         > 0 && { label: 'Car listings to approve',          count: stats.pendingCars,            tab: 'Cars',         color: colors.danger },
-    stats.pendingMkPhotos !== 0 && stats.pendingMkPhotos !== undefined && { label: stats.pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : mkPhotosLabel(stats.mkOldestAt), count: stats.pendingMkPhotos ?? '?', tab: 'Bandabuliya', color: colors.danger },
+    stats.pendingMkPhotos !== 0 && stats.pendingMkPhotos !== undefined && { label: stats.pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review', sub: stats.pendingMkPhotos !== null && stats.mkOldestAt ? `Oldest waiting ${photoWait(stats.mkOldestAt)}` : null, count: stats.pendingMkPhotos ?? '?', tab: 'Bandabuliya', color: colors.danger },
   ].filter(Boolean)
 
   return (
@@ -689,7 +692,10 @@ function DashboardTab({ onNavigate }) {
           {urgencies.map(u => (
             <TouchableOpacity key={u.tab} style={s.urgencyCard} onPress={() => onNavigate(u.tab)} activeOpacity={0.75}>
               <View style={[s.urgencyDot, { backgroundColor: u.color }]} />
-              <Text style={s.urgencyLabel}>{u.label}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.urgencyLabel}>{u.label}</Text>
+                {u.sub ? <Text style={s.cardSub}>{u.sub}</Text> : null}
+              </View>
               <View style={[s.urgencyBadge, { backgroundColor: u.color }]}>
                 <Text style={s.urgencyCount}>{u.count}</Text>
               </View>
@@ -769,11 +775,6 @@ const placeAdminName = (item) => {
   if (typeof n !== 'object') return String(n)
   const r = n.en ?? n.tr ?? Object.values(n)[0]
   return typeof r === 'object' ? (r.en ?? r.tr ?? '') : String(r ?? '')
-}
-
-// The count sits in the badge; the label carries how long the oldest photo has waited.
-function mkPhotosLabel(oldestAt) {
-  return oldestAt ? `Bandabuliya photos to review · oldest ${photoWait(oldestAt)}` : 'Bandabuliya photos to review'
 }
 
 function timeAgo(iso) {
@@ -4288,8 +4289,8 @@ const MK_REVIEW_ERROR = {
   NOT_ADMIN: 'This account is not an admin.',
 }
 
-function MarketplaceTab() {
-  const [view, setView]       = useState('Photos')
+function MarketplaceTab({ initialView = 'Photos' }) {
+  const [view, setView]       = useState(initialView)
   const [rows, setRows]       = useState(null)
   const [urls, setUrls]       = useState({})
   const [busy, setBusy]       = useState(null)
@@ -5147,9 +5148,9 @@ function ModerationTab() {
 export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, openRequest, onOpenRequestHandled }) {
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
-  // The photo-review push (App.js openAdminPush). The nonce keys MarketplaceTab, so every tap remounts it on Photos and
-  // reloads the queue, even when that tab is already open on Hidden / Recent. Kept locally: App clears its copy at once.
-  const [mkOpenAt, setMkOpenAt] = useState(null)
+  // The photo-review push (App.js openAdminPush). The nonce keys MarketplaceTab, so every tap remounts it on the requested
+  // view and reloads the queue, even when that tab is already open on Hidden / Recent. Kept locally: App clears its copy at once.
+  const [mkOpen, setMkOpen] = useState(null)
   const [pinBusy, setPinBusy] = useState(false)
   const navigateTo = t => setTab(t)
 
@@ -5159,7 +5160,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
     if (pinBusy) return
     setTab(openRequest.tab)
     setToolsOpen(true)
-    if (openRequest.tab === 'Bandabuliya') setMkOpenAt(openRequest.at)
+    if (openRequest.tab === 'Bandabuliya') setMkOpen({ at: openRequest.at, view: openRequest.view })
     onOpenRequestHandled?.()
   }, [openRequest?.at, pinBusy])
 
@@ -5283,7 +5284,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'PlaceClaims'   && <PlaceClaimsTab session={session} />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
           {tab === 'Cars'          && <CarsTab />}
-          {tab === 'Bandabuliya'   && <MarketplaceTab key={mkOpenAt ?? 'tab'} />}
+          {tab === 'Bandabuliya'   && <MarketplaceTab key={mkOpen?.at ?? 'tab'} initialView={mkOpen?.view} />}
           {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} onBusyChange={setPinBusy} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>

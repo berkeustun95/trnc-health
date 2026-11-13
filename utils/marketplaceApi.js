@@ -388,9 +388,10 @@ function fxPhotoSummary() {
   return { count: q.length, oldestAt: oldest }
 }
 
-// How long the oldest photo has waited: '45m', '2h', '3d' (AdminScreen's timeAgo steps, without "ago").
+// How long the oldest photo has waited: '<1m', '45m', '2h', '3d' (AdminScreen's timeAgo steps, without "ago").
 export function photoWait(iso, now = Date.now()) {
-  const mins = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000))
+  const mins = Math.floor((now - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return '<1m'
   if (mins < 60) return `${mins}m`
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h`

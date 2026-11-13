@@ -73,13 +73,25 @@ describe('App.js / AdminScreen.js wiring', () => {
       .toContain('openRequest={adminOpen} onOpenRequestHandled={() => setAdminOpen(null)}')
   })
 
-  test('AdminScreen opens the tab on each new request and remounts MarketplaceTab (Photos, fresh queue) by its nonce', () => {
+  test('AdminScreen opens the tab on each new request and remounts MarketplaceTab on the requested view by its nonce', () => {
     const eff = between(admin, 'if (!openRequest) return', '}, [openRequest?.at, pinBusy])')
     expect(eff).toContain('setTab(openRequest.tab)')
     expect(eff).toContain('setToolsOpen(true)')
-    expect(eff).toContain('setMkOpenAt(openRequest.at)')
-    expect(admin).toContain("<MarketplaceTab key={mkOpenAt ?? 'tab'} />")
-    expect(admin).toMatch(/function MarketplaceTab\(\) \{\n {2}const \[view, setView\] += useState\('Photos'\)/)
+    expect(eff).toContain('setMkOpen({ at: openRequest.at, view: openRequest.view })')
+    expect(admin).toContain("<MarketplaceTab key={mkOpen?.at ?? 'tab'} initialView={mkOpen?.view} />")
+    expect(admin).toMatch(/function MarketplaceTab\(\{ initialView = 'Photos' \}\) \{\n {2}const \[view, setView\] += useState\(initialView\)/)
+  })
+
+  test('the Bandabuliya urgency rows keep the sibling label; the wait sits on its own line beneath', () => {
+    const home = between(admin, 'const mkRow = MARKETPLACE', '</TouchableOpacity>')
+    expect(home).toContain("'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review'")
+    expect(home).toContain('<View style={{ flex: 1 }}>')
+    expect(home).toContain('<Text style={s.cardSub}>Oldest waiting {photoWait(mkOldestAt)}</Text>')
+    const dash = between(admin, "stats.pendingMkPhotos !== 0 && stats.pendingMkPhotos !== undefined", '\n')
+    expect(dash).toContain("'Bandabuliya photos to review', sub: stats.pendingMkPhotos !== null && stats.mkOldestAt ? `Oldest waiting ${photoWait(stats.mkOldestAt)}` : null")
+    const render = between(admin, '{urgencies.map(u => (', '))}')
+    expect(render).toContain('{u.sub ? <Text style={s.cardSub}>{u.sub}</Text> : null}')
+    expect(admin).not.toContain('mkPhotosLabel')
   })
 
   test('a request during a Restaurant PIN issue waits, unconsumed, and runs once the tab lock clears', () => {

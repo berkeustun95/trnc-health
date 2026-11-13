@@ -1,4 +1,4 @@
-// Admin urgency rows (Bandabuliya photos to review · oldest 2h): one read gives the exact pending count and the oldest
+// Admin urgency rows (Bandabuliya photos to review, "Oldest waiting 2h" beneath): one read gives the exact pending count and the oldest
 // photo; any non-missing error is null (the row says the queue could not be checked). photoWait formats the wait.
 
 let mockResult
@@ -57,11 +57,12 @@ describe('adminPendingPhotoSummary', () => {
 describe('photoWait', () => {
   const now = Date.parse('2026-11-13T12:00:00Z')
   const ago = mins => new Date(now - mins * 60000).toISOString()
-  test.each([[0, '0m'], [45, '45m'], [59, '59m'], [60, '1h'], [150, '2h'], [23 * 60 + 59, '23h'], [24 * 60, '1d'], [3 * 24 * 60 + 5, '3d']])(
+  test.each([[0, '<1m'], [1, '1m'], [45, '45m'], [59, '59m'], [60, '1h'], [150, '2h'], [23 * 60 + 59, '23h'], [24 * 60, '1d'], [3 * 24 * 60 + 5, '3d']])(
     '%i minutes → %s', (mins, out) => {
       expect(fresh().photoWait(ago(mins), now)).toBe(out)
     })
-  test('a clock skew (row a little in the future) reads 0m, never negative', () => {
-    expect(fresh().photoWait(ago(-3), now)).toBe('0m')
+  test('under a minute, and a clock skew (row a little in the future), read <1m, never 0m or negative', () => {
+    expect(fresh().photoWait(new Date(now - 30000).toISOString(), now)).toBe('<1m')
+    expect(fresh().photoWait(ago(-3), now)).toBe('<1m')
   })
 })
