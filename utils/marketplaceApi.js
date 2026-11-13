@@ -373,12 +373,28 @@ export async function adminSetHidden(id, hidden) {
   if (error) throw error
 }
 
-// null = could not be read (shown, not hidden as a zero — the AdminScreen rule).
-export async function adminPendingPhotoCount() {
-  if (fixture) return fxPhotoQueue().length
-  const { count, error } = await supabase.from('marketplace_photos').select('id', { count: 'exact', head: true }).eq('status', 'pending')
-  if (error) { if (useFixtureOr(error)) return fxPhotoQueue().length; return null }
-  return count
+// → { count, oldestAt } for the admin urgency rows (every pending photo, like the Photos tab), or null = could not be read
+// (shown, not hidden as a zero — the AdminScreen rule). One read: the exact count plus the oldest row.
+export async function adminPendingPhotoSummary() {
+  if (fixture) return fxPhotoSummary()
+  const { data, count, error } = await supabase.from('marketplace_photos').select('created_at', { count: 'exact' })
+    .eq('status', 'pending').order('created_at', { ascending: true }).limit(1)
+  if (error) { if (useFixtureOr(error)) return fxPhotoSummary(); return null }
+  return { count, oldestAt: data?.[0]?.created_at ?? null }
+}
+function fxPhotoSummary() {
+  const q = fxPhotoQueue()
+  const oldest = q.map(p => p.created_at).sort()[0] ?? null
+  return { count: q.length, oldestAt: oldest }
+}
+
+// How long the oldest photo has waited: '45m', '2h', '3d' (AdminScreen's timeAgo steps, without "ago").
+export function photoWait(iso, now = Date.now()) {
+  const mins = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000))
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  return `${Math.floor(hrs / 24)}d`
 }
 
 function fxPhotoQueue() {

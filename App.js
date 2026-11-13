@@ -25,7 +25,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
-import { fetchNotifications, notificationRoute, marketplaceListingTarget, createListingTap } from './utils/notificationRoute'
+import { fetchNotifications, notificationRoute, marketplaceListingTarget, createListingTap, adminPushRequest } from './utils/notificationRoute'
 import { getListing as getMarketplaceListing } from './utils/marketplaceApi'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
@@ -695,6 +695,7 @@ export default function App() {
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
+  const [adminOpen, setAdminOpen] = useState(null)                       // admin push → AdminScreen tab/view; `at` makes a repeat tap re-fire
   const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — sole place-profile state (frozen beaches flow removed in Slice 5 pt B)
   const [showTransport, setShowTransport] = useState(false)
   const [showDuyurular, setShowDuyurular] = useState(false)
@@ -1119,6 +1120,7 @@ export default function App() {
       if (event === 'SIGNED_OUT') {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
+        setAdminOpen(null)
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
@@ -1538,6 +1540,14 @@ export default function App() {
     if (data.screen === 'marketplace') { setShowMarketplace({ view: 'listing', listingId: data.listing_id ?? null }); return true }
     return false
   }
+  // The photo-review reminder (20261196): close any preview so the role-first selector lands on AdminScreen.
+  const openAdminPush = data => {
+    const req = adminPushRequest(data)
+    if (!req) return false
+    setAdminPreview(null)
+    setAdminOpen({ ...req, at: Date.now() })
+    return true
+  }
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
@@ -1560,7 +1570,7 @@ export default function App() {
         //   Doing nothing leaves the user where they were, which is honest.
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
-      } else openMarketplacePush(data)
+      } else if (!openAdminPush(data)) openMarketplacePush(data)
     })
     return () => sub.remove()
   }, [])
@@ -1586,7 +1596,7 @@ export default function App() {
       }
       else if (screen === 'profile') setActiveTab('profile')
       else if (screen === 'notifications') setShowNotifs(true)
-      else openMarketplacePush(data)
+      else if (!openAdminPush(data)) openMarketplacePush(data)
     })
   }, [session])
 
@@ -2141,7 +2151,8 @@ export default function App() {
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
       onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
-      onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined} />
+      onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined}
+      openRequest={adminOpen} onOpenRequestHandled={() => setAdminOpen(null)} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
