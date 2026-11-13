@@ -289,7 +289,7 @@ const tokens = async (d, label, sql, want, n) => {
   await e.exec('ROLLBACK;').catch(() => {})
   t('20261195 REFUSES when another hash is already stored, and adds nothing', [r2.ok, (r2.msg || '').includes('already holds another hash'), await hashes(e)], [false, true, ['a'.repeat(64)]])
 }
-// ── 20261197: admin clears ONE bucket's PIN lock counters (attempt rows only; PIN + devices untouched) ──
+// ── 20261197: admin clears ONE bucket's PIN lock counters (attempt rows only; PIN + devices untouched), 3 per bucket per 24 h, logged ──
 // Three buckets: partner A, partner B, test. Each has a PIN row and an enrolled device (A + test) and two attempt rows, inserted as postgres.
 // checks97 returns named booleans; the real file must turn every one true, and each 1197 mutant must turn its named one false.
 const F97 = M('20261197_eatery_pin_attempts_reset.sql'), S97 = readFileSync(F97, 'utf8')
@@ -298,7 +298,9 @@ const setup97 = async (d) => {
   await seed(d)
   await device(d, PA); await device(d, null, 'test'); await issue(d, PB)
 }
-const fill97 = async (d) => {
+// fill97 refills every bucket's attempts; by default it also empties the reset log (each scenario starts under the cap).
+const fill97 = async (d, { keepLog = false } = {}) => {
+  if (!keepLog) await d.exec(`DELETE FROM private.eatery_pin_resets;`)
   await d.exec(`DELETE FROM private.eatery_pin_attempts;
     INSERT INTO private.eatery_pin_attempts (scope, partner_id, order_code, ok) VALUES
       ('partner', '${PA}', 'ZZAAAAA1', false), ('partner', '${PA}', 'ZZAAAAA2', false),
@@ -315,6 +317,7 @@ const buckets97 = async (d) => {
 const keep97 = async (d) => { await d.exec('RESET ROLE;'); return JSON.stringify([
   await q(d, `SELECT scope, partner_id, salt, pin_sha256, set_at FROM private.eatery_partner_pins ORDER BY scope, partner_id NULLS FIRST`),
   await q(d, `SELECT id, scope, partner_id, token_sha256, created_at, last_used_at, revoked_at FROM private.eatery_partner_devices ORDER BY id`)]) }
+const log97 = async (d) => { await d.exec('RESET ROLE;'); return q(d, `SELECT id, scope, partner_id, admin_id, at FROM private.eatery_pin_resets ORDER BY id`) }
 const reset97 = (d, who, partner, scope) => as(d, who, `SELECT public.admin_reset_eatery_pin_attempts(${partner ? `'${partner}'` : 'NULL'}, ${scope == null ? 'NULL' : `'${scope}'`}) AS r`, { key: false })
 const ALL3 = { A: 2, B: 2, T: 2 }
 const checks97 = async (d) => {
@@ -332,6 +335,8 @@ const checks97 = async (d) => {
   ck('partner A reset: A attempts gone', bA.A === undefined, bA)
   ck('partner A reset: B and test attempts untouched', bA.B === 2 && bA.T === 2, bA)
   ck('partner A reset: PIN rows and devices unchanged', (await keep97(d)) === keep, null)
+  const lgA = await log97(d)
+  ck('partner A reset: ONE log row, carrying the calling admin\'s id, scope partner, partner A', lgA.length === 1 && lgA[0].admin_id === UID(9) && lgA[0].scope === 'partner' && lgA[0].partner_id === PA, lgA)
 
   await fill97(d)
   const rT = await reset97(d, 'admin:9', null, 'test')
@@ -345,8 +350,8 @@ const checks97 = async (d) => {
     await fill97(d)
     const r = await reset97(d, who, PA, 'partner')
     const got = r.ok ? 'ok' : r.code === 'P0001' ? `P0001 ${r.msg}` : r.code
-    const b = await buckets97(d)
-    ck(`${label} denied (${want}), nothing deleted`, got === want && JSON.stringify(b) === JSON.stringify(ALL3), { got, b })
+    const b = await buckets97(d), lg = await log97(d)
+    ck(`${label} denied (${want}), nothing deleted, nothing logged`, got === want && JSON.stringify(b) === JSON.stringify(ALL3) && lg.length === 0, { got, b, lg: lg.length })
     const pc = await reset97(d, 'admin:9', PA, 'partner')
     const b2 = await buckets97(d)
     ck(`positive control after the ${label} denial: admin clears A in the same setup`, pc.ok && b2.A === undefined && b2.B === 2 && b2.T === 2, { pc, b2 })
@@ -360,6 +365,40 @@ const checks97 = async (d) => {
     const b = await buckets97(d)
     ck(`${label}: P0001 ${want}, nothing deleted`, !r.ok && r.code === 'P0001' && r.msg === want && JSON.stringify(b) === JSON.stringify(ALL3), { r, b })
   }
+
+  // The cap: 3 resets per bucket per rolling 24 hours; the 4th is refused and changes nothing.
+  await fill97(d)
+  const three = []
+  for (let i = 0; i < 3; i++) { await fill97(d, { keepLog: true }); three.push((await reset97(d, 'admin:9', PA, 'partner')).ok) }
+  ck('cap: three resets of partner A in a row succeed', JSON.stringify(three) === '[true,true,true]', three)
+  await fill97(d, { keepLog: true })
+  const logBefore = JSON.stringify(await log97(d))
+  const r4 = await reset97(d, 'admin:9', PA, 'partner')
+  ck('cap: the 4th reset of A is refused with P0001 reset_limit', !r4.ok && r4.code === 'P0001' && r4.msg === 'reset_limit', r4)
+  const b4 = await buckets97(d)
+  ck('cap: the refused 4th reset leaves A\'s attempts (and every bucket) in place', JSON.stringify(b4) === JSON.stringify(ALL3), b4)
+  ck('cap: the refused 4th reset writes and prunes no log row', JSON.stringify(await log97(d)) === logBefore, null)
+  const rB = await reset97(d, 'admin:9', PB, 'partner')
+  const bB = await buckets97(d)
+  ck('cap: partner B is not capped by A\'s resets (B cleared, A untouched)', rB.ok && bB.B === undefined && bB.A === 2 && bB.T === 2, { rB, bB })
+  const rTc = await reset97(d, 'admin:9', null, 'test')
+  ck('cap: the test bucket is not capped by A\'s resets', rTc.ok, rTc)
+  // The window rolls: one of A's three resets moved to 25 hours ago no longer counts.
+  await d.exec(`UPDATE private.eatery_pin_resets SET at = now() - interval '25 hours' WHERE id = (SELECT min(id) FROM private.eatery_pin_resets WHERE partner_id = '${PA}')`)
+  await fill97(d, { keepLog: true })
+  const r5 = await reset97(d, 'admin:9', PA, 'partner')
+  ck('cap window: with one reset backdated 25 h, A can be reset again', r5.ok && (await buckets97(d)).A === undefined, r5)
+  const r6 = await reset97(d, 'admin:9', PA, 'partner')
+  ck('cap window: ... and is then at the cap again (reset_limit)', !r6.ok && r6.msg === 'reset_limit', r6)
+
+  // The 90-day prune (any bucket), in the same call.
+  await fill97(d)
+  await d.exec(`INSERT INTO private.eatery_pin_resets (scope, partner_id, admin_id, at) VALUES
+    ('test', NULL, '${UID(9)}', now() - interval '91 days'), ('partner', '${PB}', '${UID(9)}', now() - interval '89 days')`)
+  const rp = await reset97(d, 'admin:9', PA, 'partner')
+  const lgp = (await log97(d)).map(x => `${x.scope}:${x.partner_id === PA ? 'A' : x.partner_id === PB ? 'B' : '-'}`)
+  ck('prune: a log row over 90 days old (another bucket) is deleted, an 89-day one kept, the new one added', rp.ok && JSON.stringify(lgp) === JSON.stringify(['partner:B', 'partner:A']), { rp, lgp })
+
   ck('after every call: PIN rows and devices unchanged', (await keep97(d)) === keep, null)
   return res
 }
@@ -369,18 +408,26 @@ const checks97 = async (d) => {
     const r0 = await applyFile(z, F97); await z.exec('ROLLBACK;').catch(() => {})
     t('20261197 REFUSES before 20261194 (nothing applied)', [r0.ok, (r0.msg || '').includes('20261194_eatery_order_status_partner.sql is not in the ledger'),
       (await q(z, `SELECT to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)') IS NULL AS x`))[0].x], [false, true, true]) }
-  { const z = await after1144(); await tokens(z, '1197 token on the 1144 state (red, no error)', T97, false, 1) }
+  { const z = await after1144(); await tokens(z, '1197 token on the 1144 state (red, no error)', T97, false, 2) }
   const d = await after1194()
-  await tokens(d, '1197 token AFTER 1194, BEFORE 1197 (red, no error)', T97, false, 1)
+  await tokens(d, '1197 token AFTER 1194, BEFORE 1197 (red, no error)', T97, false, 2)
   t('20261197 applies on the 1194 state (in-file post-state green)', await applyFile(d, F97), { ok: true, msg: null })
   t('20261197 applies a SECOND time (re-runnable)', await applyFile(d, F97), { ok: true, msg: null })
-  await tokens(d, '1197 token AFTER 1197', T97, true, 1)
+  await tokens(d, '1197 token AFTER 1197', T97, true, 2)
   t('20261197: grants as stated (authenticated yes; anon, PUBLIC no)', (await q(d, `SELECT has_function_privilege('authenticated', 'public.admin_reset_eatery_pin_attempts(uuid,text)', 'EXECUTE') au,
       has_function_privilege('anon', 'public.admin_reset_eatery_pin_attempts(uuid,text)', 'EXECUTE') an,
       EXISTS (SELECT 1 FROM aclexplode((SELECT proacl FROM pg_proc WHERE oid = 'public.admin_reset_eatery_pin_attempts(uuid,text)'::regprocedure)) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') pu`))[0], { au: true, an: false, pu: false })
   const res = await checks97(d)
-  t(`20261197 behaviour: ${res.length} named checks, all true`, [res.length, res.filter(r => !r[1]).map(r => r[0])], [20, []])
-  t('verify_schema registers 20261197 (C and G rows)', VS.split("('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')").length - 1, 2)
+  t(`20261197 behaviour: ${res.length} named checks, all true`, [res.length, res.filter(r => !r[1]).map(r => r[0])], [30, []])
+  t('verify_schema registers 20261197 (C and G rows; E rows for the log)', [VS.split("('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')").length - 1,
+    ['eatery_pin_resets_pkey', 'eatery_pin_resets_scope_check', 'eatery_pin_resets_scope_partner_check'].every(c => VS.includes(`('20261197_eatery_pin_attempts_reset','${c}')`))], [2, true])
+  t('20261197: the log table is unreachable for anon / authenticated (table + sequence), RLS on, 0 policies', (await q(d, `SELECT
+      has_table_privilege('anon', 'private.eatery_pin_resets', 'SELECT,INSERT,UPDATE,DELETE') OR has_table_privilege('authenticated', 'private.eatery_pin_resets', 'SELECT,INSERT,UPDATE,DELETE') reach,
+      has_sequence_privilege('authenticated', pg_get_serial_sequence('private.eatery_pin_resets', 'id'), 'USAGE') seq,
+      (SELECT relrowsecurity FROM pg_class WHERE oid = 'private.eatery_pin_resets'::regclass) rls,
+      (SELECT count(*)::int FROM pg_policies WHERE schemaname = 'private' AND tablename = 'eatery_pin_resets') pol`))[0], { reach: false, seq: false, rls: true, pol: 0 })
+  t('20261197: an authenticated session cannot read the log directly (42501), postgres can (positive control)',
+    [(await as(d, 'admin:9', `SELECT count(*) FROM private.eatery_pin_resets`, { key: false })).code, (await as(d, 'pg', `SELECT count(*)::int >= 0 AS x FROM private.eatery_pin_resets`)).ok], ['42501', true])
 }
 // The rewritten retention row (cron section): WRONG until 20261194 runs, OK after it (a newline-exact match of the whole command).
 {
@@ -742,14 +789,22 @@ else {
   // 20261197: each body mutant is run twice — as written (the in-file post-state must refuse it) and with that one shape assertion
   // neutralised (RAISE EXCEPTION -> NOTICE), where the named harness check must go red. Catalog mutants: the apply must fail.
   const GATE97 = `  IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'forbidden';\n  END IF;\n`
-  const DEL97 = `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  RETURN`
+  const DEL97 = `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  INSERT`
+  const CAP97 = `  IF (SELECT count(*) FROM private.eatery_pin_resets r\n       WHERE r.scope = p_scope AND r.partner_id IS NOT DISTINCT FROM p_partner AND r.at > now() - interval '24 hours') >= 3 THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'reset_limit';\n  END IF;\n`
   const BODY97 = 'admin_reset_eatery_pin_attempts body'
   const MUT97 = [
     { n: 'C1 the admin gate is dropped', pairs: [[GATE97, '']], red: 'customer denied' },
     { n: 'C2 a guest session passes the admin gate', pairs: [[`  IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'forbidden';`, `  IF auth.uid() IS NULL OR NOT public.is_admin() THEN\n    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'forbidden';`]], red: 'guest session of the admin account denied' },
-    { n: 'C3 every bucket is deleted', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts;\n  RETURN`]], red: 'partner A reset: B and test attempts untouched' },
-    { n: 'C4 the bucket\'s devices are deleted too', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  DELETE FROM private.eatery_partner_devices WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  RETURN`]], red: 'partner A reset: PIN rows and devices unchanged' },
-    { n: 'C5 partner_id = (NULL never matches: the test bucket is never cleared)', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id = p_partner;\n  RETURN`]], red: 'test reset: test attempts gone' },
+    { n: 'C3 every bucket is deleted', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts;\n  INSERT`]], red: 'partner A reset: B and test attempts untouched' },
+    { n: 'C4 the bucket\'s devices are deleted too', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  DELETE FROM private.eatery_partner_devices WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n  INSERT`]], red: 'partner A reset: PIN rows and devices unchanged' },
+    { n: 'C5 partner_id = (NULL never matches: the test bucket is never cleared)', pairs: [[DEL97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id = p_partner;\n  INSERT`]], red: 'test reset: test attempts gone' },
+    { n: 'C7 the reset cap is removed', pairs: [[CAP97, '']], red: 'cap: the 4th reset of A is refused' },
+    { n: 'C8 the cap counts every bucket\'s resets', pairs: [[`\n       WHERE r.scope = p_scope AND r.partner_id IS NOT DISTINCT FROM p_partner AND r.at >`, `\n       WHERE r.at >`]], red: 'cap: partner B is not capped' },
+    { n: 'C9 a refused (capped) call still deletes the attempts (delete moved before the cap, refusal returned)', pairs: [[DEL97, '  INSERT'], [CAP97, `  DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner;\n` + CAP97],
+      [`    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'reset_limit';`, `    RETURN jsonb_build_object('status', 'reset_limit');`]], red: 'cap: the refused 4th reset leaves A' },
+    { n: 'C10 the reset is not logged', pairs: [[`  INSERT INTO private.eatery_pin_resets (scope, partner_id, admin_id) VALUES (p_scope, p_partner, auth.uid());\n`, '']], red: 'partner A reset: ONE log row' },
+    { n: 'C11 the 90-day prune is removed', pairs: [[`  DELETE FROM private.eatery_pin_resets WHERE at < now() - interval '90 days';\n`, '']], red: 'prune: a log row over 90 days old' },
+    { n: 'C12 the log table is left readable by authenticated [catalog fact]', pairs: [[`  REVOKE ALL ON TABLE private.eatery_pin_resets FROM PUBLIC, anon, authenticated;`, `  REVOKE ALL ON TABLE private.eatery_pin_resets FROM PUBLIC, anon, authenticated;\n  GRANT SELECT ON TABLE private.eatery_pin_resets TO authenticated;`]], fail: 'private.eatery_pin_resets is reachable' },
     { n: 'C6 granted to anon [catalog fact]', pairs: [[`GRANT  EXECUTE ON FUNCTION public.admin_reset_eatery_pin_attempts(uuid, text) TO authenticated;`, `GRANT  EXECUTE ON FUNCTION public.admin_reset_eatery_pin_attempts(uuid, text) TO anon, authenticated;`]], fail: 'admin_reset_eatery_pin_attempts grants' },
   ]
   for (const m of MUT97) {
