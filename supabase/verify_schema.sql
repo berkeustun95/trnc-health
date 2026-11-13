@@ -5496,12 +5496,14 @@ WITH report AS (
                LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
     -- ── 1066: notifications.type ────────────────────────────────────────────────
     -- (1) Every function that inserts a notification sets `type`. DERIVED: the writer set is
-    --     read from pg_proc, not named, so a seventh writer that forgets goes red here. Six
-    --     today; a legitimate new writer bumps the count in the same commit, saying why.
+    --     read from pg_proc, not named, so an eighth writer that forgets goes red here. Seven
+    --     since 20261196 added marketplace_photo_review_reminder (admin push when Bandabuliya
+    --     photos wait; it sets type 'admin_alert'); probe run 43428984651 printed exactly these
+    --     seven. A legitimate new writer bumps the count in the same PR, saying why.
     --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
     --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
-    UNION ALL SELECT '1066_notification_type','6 notification writers, all six set type, none uses the 3-column INSERT',
-      COALESCE((SELECT count(*) = 6
+    UNION ALL SELECT '1066_notification_type','7 notification writers, all seven set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 7
                    AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%')
                    AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
                   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
