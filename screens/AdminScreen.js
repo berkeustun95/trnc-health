@@ -20,6 +20,7 @@ import GaragesScreen from './GaragesScreen'
 import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '../constants/cars'
 import { MARKETPLACE } from '../constants/redesign'
 import { loadEateryPartners } from '../utils/loadEateryPartners'
+import { ConfirmDialog } from '../components/ui'
 import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoCount, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
@@ -4424,7 +4425,7 @@ function PinShownModal({ shown, lang, onClose }) {
       <View style={s.pinOverlay}>
         <View style={s.pinSheet}>
           <Text style={s.rejectTitle}>{t('adminPinsShownTitle', lang).replace('{name}', shown?.name ?? '')}</Text>
-          <Text selectable style={s.pinDigits}>{shown?.pin ?? ''}</Text>
+          <Text selectable numberOfLines={1} adjustsFontSizeToFit style={s.pinDigits}>{shown?.pin ?? ''}</Text>
           <View style={s.pinOnceRow}>
             <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
             <Text style={s.pinOnceText}>{t('adminPinsShownOnce', lang)}</Text>
@@ -4445,6 +4446,7 @@ function RestaurantPinsTab({ lang }) {
   const [busy, setBusy] = useState(null)
   const [shown, setShown] = useState(null)
   const [feedback, setFeedback] = useState(null)
+  const [confirm, setConfirm] = useState(null)
   const inFlight = useRef(false)
 
   useEffect(() => {
@@ -4464,12 +4466,18 @@ function RestaurantPinsTab({ lang }) {
     if (inFlight.current) return
     inFlight.current = true
     setBusy(kind); setFeedback(null)
+    const startedAt = Date.now()
     try {
       const fn = kind === 'issue' ? 'admin_set_eatery_partner_pin' : 'admin_reset_eatery_pin_attempts'
       const { data, error } = await supabase.rpc(fn, { p_partner: tg.id, p_scope: tg.scope })
       if (error) setFeedback({ ok: false, text: errorText(error) })
       else if (kind === 'reset') setFeedback({ ok: true, text: t('adminPinsResetDone', lang).replace('{name}', targetName(tg)) })
-      else if (typeof data?.pin === 'string' && /^\d{6}$/.test(data.pin)) setShown({ visible: true, pin: data.pin, name: targetName(tg) })
+      else if (typeof data?.pin === 'string' && /^\d{6}$/.test(data.pin)) {
+        // iOS will not present a Modal while the ConfirmDialog is still fading out; a fast reply waits for it.
+        const wait = 450 - (Date.now() - startedAt)
+        if (wait > 0) await new Promise(r => setTimeout(r, wait))
+        setShown({ visible: true, pin: data.pin, name: targetName(tg) })
+      }
       else setFeedback({ ok: false, text: t('adminPinsErrGeneric', lang) })
     } catch {
       setFeedback({ ok: false, text: t('adminPinsErrGeneric', lang) })
@@ -4479,24 +4487,12 @@ function RestaurantPinsTab({ lang }) {
     }
   }
 
-  function confirmIssue() {
-    if (!target || inFlight.current) return
-    const tg = target
-    const body = tg.scope === 'test' ? t('adminPinsIssueConfirmBodyTest', lang) : t('adminPinsIssueConfirmBody', lang).replace('{name}', tg.name)
-    Alert.alert(t('adminPinsIssueConfirmTitle', lang), body, [
-      { text: t('cancel', lang), style: 'cancel' },
-      { text: t('adminPinsIssueConfirmBtn', lang), style: 'destructive', onPress: () => run('issue', tg) },
-    ])
-  }
-
-  function confirmReset() {
-    if (!target || inFlight.current) return
-    const tg = target
-    Alert.alert(t('adminPinsResetConfirmTitle', lang), t('adminPinsResetConfirmBody', lang).replace('{name}', targetName(tg)), [
-      { text: t('cancel', lang), style: 'cancel' },
-      { text: t('adminPinsResetConfirmBtn', lang), onPress: () => run('reset', tg) },
-    ])
-  }
+  const ask = kind => { if (target && !inFlight.current) setConfirm({ kind, tg: target }) }
+  const onConfirm = () => { const c = confirm; setConfirm(null); if (c) run(c.kind, c.tg) }
+  const confirmMessage = !confirm ? ''
+    : confirm.kind === 'reset' ? t('adminPinsResetConfirmBody', lang).replace('{name}', targetName(confirm.tg))
+    : confirm.tg.scope === 'test' ? t('adminPinsIssueConfirmBodyTest', lang)
+    : t('adminPinsIssueConfirmBody', lang).replace('{name}', confirm.tg.name)
 
   const pick = tg => { if (!busy) { setTarget(tg); setFeedback(null) } }
   const isPicked = tg => target?.scope === tg.scope && target?.id === tg.id
@@ -4532,10 +4528,10 @@ function RestaurantPinsTab({ lang }) {
 
         <View style={{ height: 8 }} />
         {!target && <Text style={[s.cardSub, { marginBottom: 10 }]}>{t('adminPinsPickFirst', lang)}</Text>}
-        <TouchableOpacity style={[s.primaryBtn, disabled && s.primaryBtnDisabled]} onPress={confirmIssue} disabled={disabled} activeOpacity={0.85}>
+        <TouchableOpacity style={[s.primaryBtn, disabled && s.primaryBtnDisabled]} onPress={() => ask('issue')} disabled={disabled} activeOpacity={0.85}>
           {busy === 'issue' ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>{t('adminPinsIssue', lang)}</Text>}
         </TouchableOpacity>
-        <TouchableOpacity style={[s.pinSecondaryBtn, disabled && s.primaryBtnDisabled]} onPress={confirmReset} disabled={disabled} activeOpacity={0.85}>
+        <TouchableOpacity style={[s.pinSecondaryBtn, disabled && s.primaryBtnDisabled]} onPress={() => ask('reset')} disabled={disabled} activeOpacity={0.85}>
           {busy === 'reset' ? <ActivityIndicator color={colors.primary} /> : <Text style={s.ghostBtnText}>{t('adminPinsReset', lang)}</Text>}
         </TouchableOpacity>
         <Text style={s.broadcastNote}>{t('adminPinsResetHint', lang)}</Text>
@@ -4547,7 +4543,12 @@ function RestaurantPinsTab({ lang }) {
           </View>
         )}
       </ScrollView>
-      <PinShownModal shown={shown} lang={lang} onClose={() => setShown(null)} />
+      <ConfirmDialog visible={!!confirm} lang={lang} destructive={confirm?.kind === 'issue'}
+        title={t(confirm?.kind === 'reset' ? 'adminPinsResetConfirmTitle' : 'adminPinsIssueConfirmTitle', lang)}
+        message={confirmMessage}
+        confirmLabel={t(confirm?.kind === 'reset' ? 'adminPinsResetConfirmBtn' : 'adminPinsIssueConfirmBtn', lang)}
+        onConfirm={onConfirm} onCancel={() => setConfirm(null)} />
+      <PinShownModal shown={shown} lang={lang} onClose={() => setShown(prev => (prev ? { visible: false, pin: null, name: prev.name } : null))} />
     </View>
   )
 }
@@ -5356,9 +5357,8 @@ const s = StyleSheet.create({
   swapFromName:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
 
   // restaurant PINs
-  pinChoice:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8,
-                        borderWidth: 1.5, borderColor: 'transparent', ...shadow },
-  pinChoiceOn:        { borderColor: colors.primary },
+  pinChoice:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, ...shadow },
+  pinChoiceOn:        { backgroundColor: colors.primaryLight },
   pinSecondaryBtn:    { borderRadius: 14, padding: 14, alignItems: 'center', backgroundColor: colors.primaryLight },
   pinOverlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
   pinSheet:           { backgroundColor: colors.bg, borderRadius: 20, padding: 20, paddingBottom: 8 },
