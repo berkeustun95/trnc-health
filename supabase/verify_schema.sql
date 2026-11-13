@@ -798,7 +798,9 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
     ('20261194_eatery_order_status_partner','eatery_order_set_status'),
     -- 20261197: registered ahead of the apply; red until it runs.
-    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts'),
+    -- 20261198: registered ahead of the apply; red until it runs.
+    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke')
   ) e(m,o)
 
   UNION ALL
@@ -1642,7 +1644,9 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
     ('20261194_eatery_order_status_partner','eatery_order_set_status'),
     -- 1197. Missing = the admin "clear lock" button answers a permission error.
-    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts'),
+    -- 1198. Missing = "Bu cihazı unut" still clears the cookie but the phone keeps its slot of the 5-device cap.
+    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke')
   ) e(m,o)
 
   UNION ALL
@@ -1732,8 +1736,8 @@ WITH report AS (
       AND COALESCE((SELECT p.proargnames = ARRAY['p_code','p_device']::text[] AND p.pronargdefaults = 1 FROM pg_proc p WHERE p.oid = to_regprocedure('public.verify_eatery_order(text,text)')), false)
       AND to_regprocedure('public.verify_eatery_order(text)') IS NULL
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'verify_eatery_order') = 1
-      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%can_manage%'
-           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%20261193.', false)
+      -- RETIRED half: the comment ending '20261193.' (20261198 rewrote the comment for its view rule; the 1198 token owns it).
+      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%can_manage%', false)
     UNION ALL SELECT '20261193_eatery_order_status','my_eatery_orders() / eatery_order_subscribe(): DEFINER, search_path pinned, authenticated EXECUTE only (not anon, not PUBLIC); own-orders filter; no view counting; no token returned',
       COALESCE((SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp'] AND pg_get_userbyid(p.proowner) = 'postgres'
                        AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
@@ -1883,6 +1887,33 @@ WITH report AS (
       AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('private.eatery_pin_resets') AND a.attname = 'admin_id' AND a.attnotnull)
       AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'private' AND indexname = 'eatery_pin_resets_bucket_idx' AND indexdef LIKE '%(scope, partner_id, at)%') = 1
     -- 1197-END
+    -- 1198-BEGIN
+    -- 20261198 (order status slice 3): red until applied, never an error (to_regprocedure / aclexplode / COALESCE).
+    UNION ALL SELECT '20261198_eatery_order_status_slice3','eatery_partner_device_revoke(text): one overload, DEFINER, VOLATILE, owner postgres, search_path public, pg_temp; EXECUTE exactly anon + authenticated (no PUBLIC); Worker-key gate first, 96-hex token check, revokes one live device by token sha256; no DELETE, never raises',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 'v' AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND p.proconfig @> ARRAY['search_path=public, pg_temp']
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_partner_device_revoke(text)')), false)
+      AND COALESCE((SELECT string_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE r.rolname END, ',')
+                      FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                     WHERE p.oid = to_regprocedure('public.eatery_partner_device_revoke(text)') AND a.privilege_type = 'EXECUTE'
+                       AND a.grantee <> p.proowner AND r.rolname IS DISTINCT FROM 'service_role') = 'anon,authenticated', false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'eatery_partner_device_revoke') = 1
+      AND COALESCE(position('IF NOT public.eatery_worker_key_ok() THEN' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)'))) > 0
+           AND position('IF NOT public.eatery_worker_key_ok() THEN' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)'))) < position('UPDATE private.eatery_partner_devices' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')))
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) LIKE '%p_device !~ ''^[0-9a-f]{96}$''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) LIKE '%WHERE d.token_sha256 = encode(sha256(convert_to(p_device, ''UTF8'')), ''hex'')%AND d.revoked_at IS NULL;%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) NOT LIKE '%DELETE FROM%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) NOT LIKE '%RAISE EXCEPTION%', false)
+    UNION ALL SELECT '20261198_eatery_order_status_slice3','verify_eatery_order(text,text): can_manage computed before the view UPDATE, which runs only IF NOT COALESCE(v_can, false) (a managing restaurant phone is not a view); comment states the rule',
+      COALESCE(position('IF NOT COALESCE(v_can, false) THEN' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)'))) > 0
+           AND position('eatery_order_can_manage(v_o.partner_id, v_o.is_test, p_device)' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)'))) < position('IF NOT COALESCE(v_can, false) THEN' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')))
+           AND position('IF NOT COALESCE(v_can, false) THEN' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)'))) < position('view_count = view_count + 1' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')))
+           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%UNLESS can_manage is true%'
+           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%view rule 20261198.', false)
+    UNION ALL SELECT '20261198_eatery_order_status_slice3','create_eatery_order(uuid,jsonb,text,text): the 18+ gate''s today is (now() AT TIME ZONE ''Europe/Nicosia'')::date; no Europe/Istanbul left',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%eatery_order_age_gate(v_dob, (now() AT TIME ZONE ''Europe/Nicosia'')::date)%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) NOT LIKE '%Europe/Istanbul%', false)
+    -- 1198-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -5081,7 +5112,7 @@ WITH report AS (
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%v_partner.adult_only%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%eatery_order_age_gate(v_dob%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%MESSAGE = ''adult_only''%'
-           AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%Europe/Istanbul%'
+           -- RETIRED half: the age gate's time zone (Europe/Istanbul until 20261198, Europe/Nicosia since; the 1198 token owns it).
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%public.is_previewer()%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%public.is_anonymous_session()%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) NOT LIKE '%p_items -> %price%', false)

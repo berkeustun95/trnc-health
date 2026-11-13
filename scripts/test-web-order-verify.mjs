@@ -586,16 +586,45 @@ await test('/status: needs the device cookie, validates status/reason locally, s
   assert.equal((await act(envK, 'status', { status: 'received', token: tok }, withCookie(DEV))).status, 503)
 })
 
-await test('/forget: clears the cookie (Max-Age=0), no RPC, returns an anon token', async () => {
+await test('/forget: revokes this phone (RPC with key + device in the body) BEFORE clearing the cookie; clears it even if the RPC fails', async () => {
+  const CLEARED = `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/o/; Max-Age=0`
   rpcImpl = () => json(stRow({ can_manage: true }))
   const tok = await tokenFor(envK, withCookie(DEV))
   rpcCalls = []
-  const res = await act(envK, 'forget', { token: tok }, withCookie(DEV))
+  let cleared = null
+  rpcImpl = () => { cleared = false; return json({ status: 'ok' }) }
+  const res = await act(envK, 'forget', { token: tok }, { ...withCookie(DEV), 'x-ada-worker-key': 'evil' })
   assert.equal(res.status, 200)
-  assert.equal(res.headers.get('set-cookie'), `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/o/; Max-Age=0`)
-  const j = await res.json()
+  assert.equal(res.headers.get('set-cookie'), CLEARED)
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  const raw = await res.text()
+  assert.ok(!raw.includes(DEV), 'device token must not be in the JSON')
+  const j = JSON.parse(raw)
   assert.equal(j.status, 'ok'); assert.notEqual(j.token, tok)
-  assert.equal(rpcCalls.length, 0)
+  assert.equal(cleared, false, 'the RPC ran while handling /forget (before the response that clears the cookie)')
+  assert.equal(rpcCalls.length, 1)
+  assert.equal(rpcCalls[0].url, 'https://x.test/rest/v1/rpc/eatery_partner_device_revoke')
+  assert.equal(rpcCalls[0].init.method, 'POST')
+  assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_device: DEV })
+  assert.equal(keyHeader(rpcCalls[0]), KEY, 'the env key, never the client header')
+  assert.ok(!rpcCalls[0].url.includes(DEV), 'device token in a URL')
+  // the RPC failing in any way never keeps the cookie
+  for (const impl of [() => { throw new Error('down') }, () => json({ message: 'x' }, 500), () => json({ status: 'forbidden' }), () => json({ status: 'weird' }), () => new Response('not json', { status: 200 })]) {
+    rpcImpl = impl
+    rpcCalls = []
+    const r = await act(envK, 'forget', { token: tok }, withCookie(DEV))
+    assert.equal(r.status, 200, String(impl)); assert.equal(r.headers.get('set-cookie'), CLEARED, String(impl))
+    assert.equal((await r.json()).status, 'ok', String(impl)); assert.equal(rpcCalls.length, 1, String(impl))
+  }
+  // no cookie / a malformed cookie: nothing to revoke, no RPC, the cookie is still cleared
+  rpcImpl = () => { throw new Error('RPC must not be called') }
+  const anonTok = await (await act(envK, 'token', {})).json().then(x => x.token)
+  for (const extra of [{}, withCookie('A1'.repeat(48)), withCookie(DEV + '0')]) {
+    rpcCalls = []
+    const r = await act(envK, 'forget', { token: anonTok }, extra)
+    assert.equal(r.status, 200, JSON.stringify(extra)); assert.equal(r.headers.get('set-cookie'), CLEARED, JSON.stringify(extra))
+    assert.equal(rpcCalls.length, 0, JSON.stringify(extra))
+  }
 })
 
 await test('timeline: Europe/Nicosia times (winter UTC+2), server page timeline, cancelled reason text, view=1 never manages', async () => {
