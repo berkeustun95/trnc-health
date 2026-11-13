@@ -48,6 +48,7 @@ describe('adminPendingPhotoSummary', () => {
     const q = await api.adminPhotoQueue()
     expect(sum).toEqual({ count: q.length, oldestAt: q[0].created_at })
     expect(sum.count).toBe(1)
+    expect(await api.adminPendingPhotoSummary()).toEqual(sum)   // now served from the sticky fixture branch
     await api.adminReviewPhoto(q[0].id, 'approve')
     expect(await api.adminPendingPhotoSummary()).toEqual({ count: 0, oldestAt: null })
   })
