@@ -36,7 +36,7 @@ import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, EXPLORE_ROUTES_LIVE, HOTELS_LIVE, LIVE_SCORES_LIVE, GARAGES_LIVE, WELCOME_VIDEO_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS, DUYURULAR, EHLIYET, EATERY, OLI_CHAT, CARS, MARKETPLACE } from './constants/redesign'
 import { pushCarsLayer, layerKey } from './constants/cars'
-import { isAdultForOrder } from './constants/eatery'
+import { isAdultForOrder, orderPushCode } from './constants/eatery'
 import { FloatingTabBar, PageCanvas } from './components/ui'
 import { font } from './constants/theme'
 import BootSplash, { SPLASH_AVAILABLE, SPLASH_ON, claimSplash } from './components/BootSplash'
@@ -741,7 +741,9 @@ export default function App() {
   // to where the user came from; same shape as eventFromHome for an event opened from the Home banner.
   const [eateryOpenSlug, setEateryOpenSlug] = useState(null)
   const [eateryFromMap, setEateryFromMap] = useState(false)
-  useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false) } }, [showEatery])
+  // An order-status push tap (20261194: data { screen: 'eatery_order', code }) opens the module with that order's card first.
+  const [eateryOrderCode, setEateryOrderCode] = useState(null)
+  useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false); setEateryOrderCode(null) } }, [showEatery])
   const closeEateryPartner = () => { if (eateryFromMap) setShowEatery(false); setEateryPartner(null) }
   const [showStudentHub, setShowStudentHub] = useState(false)
   // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
@@ -1540,6 +1542,16 @@ export default function App() {
     if (data.screen === 'marketplace') { setShowMarketplace({ view: 'listing', listingId: data.listing_id ?? null }); return true }
     return false
   }
+  // Yeme-İçme order status: the landing, where "Siparişin" lists the order (no partner page over it). Dark bundle: the tap does nothing.
+  const openEateryOrderPush = data => {
+    const code = orderPushCode(data)
+    if (!EATERY || !code) return false
+    setEateryPartner(null)
+    setEateryFromMap(false)
+    setEateryOrderCode(code)
+    setShowEatery(true)
+    return true
+  }
   // The photo-review reminder (20261196): close any preview so the role-first selector lands on AdminScreen.
   const openAdminPush = data => {
     const req = adminPushRequest(data)
@@ -1570,6 +1582,8 @@ export default function App() {
         //   Doing nothing leaves the user where they were, which is honest.
         setPendingConvId(data.conversation_id ?? null)
         setShowStudentHub(true)
+      } else if (screen === 'eatery_order') {
+        openEateryOrderPush(data)
       } else if (!openAdminPush(data)) openMarketplacePush(data)
     })
     return () => sub.remove()
@@ -1596,6 +1610,7 @@ export default function App() {
       }
       else if (screen === 'profile') setActiveTab('profile')
       else if (screen === 'notifications') setShowNotifs(true)
+      else if (screen === 'eatery_order') openEateryOrderPush(data)
       else if (!openAdminPush(data)) openMarketplacePush(data)
     })
   }, [session])
@@ -2711,7 +2726,7 @@ export default function App() {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} session={session} dateOfBirth={profile?.date_of_birth ?? null} onRequireAccount={requireAccount} partner={eateryPartner} onOpenPartner={setEateryPartner}
       onClosePartner={closeEateryPartner} partnerBackRef={eateryPartnerBackRef} listBackRef={eateryListBackRef} onBack={() => setShowEatery(false)}
-      openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} />
+      openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} orderCode={eateryOrderCode} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.

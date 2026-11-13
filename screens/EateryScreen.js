@@ -12,6 +12,7 @@ import { EateryLogo, PlaceholderTag, useReduceMotion } from '../components/Eater
 import { QuizEntryCard, QuizPage } from '../components/EateryQuiz'
 import { quizHasMains, quizSteps, QUIZ_GENERAL } from '../constants/eateryQuiz'
 import EateryPartnerScreen from './EateryPartnerScreen'
+import EateryOrderStatusList from '../components/EateryOrderStatus'
 
 // ─── Yeme-İçme: the partner list ────────────────────────────────────────────
 // Rows come from public.eatery_partners with their menu items and photos embedded; RLS returns
@@ -57,7 +58,8 @@ function PartnerCard({ partner, lang, onPress }) {
 
 // openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
 // once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
-export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null }) {
+// orderCode: a status push tap ({ screen: 'eatery_order' }) — that order's card comes first on the list (App.js clears any open partner).
+export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null, orderCode = null }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
@@ -113,6 +115,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
         <ErrorState onRetry={retry} lang={lang} />
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
+          <EateryOrderStatusList lang={lang} active={!partner && quizOpen !== true} focusCode={orderCode} />
           {showQuiz && <QuizEntryCard lang={lang} count={quizCount} onPress={openQuiz} />}
           {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => { setFocus(null); onOpenPartner(p) }} />)}
         </ScrollView>
