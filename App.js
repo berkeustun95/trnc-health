@@ -1542,14 +1542,17 @@ export default function App() {
     if (data.screen === 'marketplace') { setShowMarketplace({ view: 'listing', listingId: data.listing_id ?? null }); return true }
     return false
   }
-  // Yeme-İçme order status: the landing, where "Siparişin" lists the order (no partner page over it). Dark bundle: the tap does nothing.
+  // Yeme-İçme order status: close whatever is open the way oliNavigate('eatery') does (plus the screens it leaves open that sit
+  // above Yeme-İçme in the selector), then EateryScreen opens the order's restaurant, whose page carries the card.
+  // Dark bundle: the tap does nothing. oliNavigate is defined further down; this runs only from a tap, after render.
   const openEateryOrderPush = data => {
     const code = orderPushCode(data)
     if (!EATERY || !code) return false
-    setEateryPartner(null)
+    setShowGames(false); setGamesSubScreen(null); setShowLegal(false); setShowGrooming(false); setShowGarages(false)
+    setSelectedFacility(null); setUnclaimedFacility(null)
+    oliNavigate('eatery')
     setEateryFromMap(false)
     setEateryOrderTap({ code, at: Date.now() })
-    setShowEatery(true)
     return true
   }
   // The photo-review reminder (20261196): close any preview so the role-first selector lands on AdminScreen.

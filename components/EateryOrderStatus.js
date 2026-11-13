@@ -6,18 +6,42 @@ import * as Device from 'expo-device'
 import { t, dateLocale } from '../constants/i18n'
 import { colors, type, font, space, radii, press } from '../constants/theme'
 import { Card } from './ui'
-import { supabase } from '../lib/supabase'
+import { supabase, isGuest } from '../lib/supabase'
+import { registeredPushToken } from '../utils/signOut'
 import { REDESIGN } from '../constants/redesign'
 import { requestWithPrimer } from '../utils/permissionPrimer'
 import { orderStatusShown, orderStatusLive, orderTimeline, formatOrderCode, ORDER_POLL_MS } from '../constants/eatery'
 
 // ─── Yeme-İçme: "Siparişin" — where the customer's recent orders stand (20261193/94) ──────────────────────
-// my_eatery_orders() returns the caller's own orders of the last 24 h; a card shows only where status is in use (the verify
-// page's rule, orderStatusShown). Polls every 30 s while it is on screen, the app is in front and an order can still move;
-// a push tap (data { screen: 'eatery_order', code }) opens the module with that card first. The words match the verify page.
-// "Durum değişince haber ver" attaches this phone's Expo token + the app language to that ONE order (guests too): no profile write.
+// Approved mock-up (dev page v27, item 6): a "Siparişin" card on the restaurant page for 24 h after sending, and a one-line strip
+// on the Yeme & İçme list. my_eatery_orders() returns the caller's own orders of the last 24 h; a card shows only where status
+// is in use (the verify page's rule, orderStatusShown). Polls every 30 s while on screen, the app is in front and an order can
+// still move. Words are the customer's side in "sen" (the reasons = eatery_order_push_text, 20261194).
+// "Durum değişince haber ver" attaches this phone's Expo token + the app language to that ONE order (guests too): no profile
+// write. Not offered where status pushes already reach this phone: 20261194 falls back to a signed-in customer's profile token.
 
 const EXPO_PROJECT_ID = '704d192a-1a80-41f8-ab98-cb3c8f078d7c'
+// Read the caller's own recent orders (the list, and the push tap that opens the order's restaurant). null on any failure.
+export async function fetchMyOrders() {
+  try {
+    const { data, error } = await supabase.rpc('my_eatery_orders')
+    return !error && Array.isArray(data) ? data : null
+  } catch { return null }
+}
+
+// true = eatery_order_set_status already pushes to THIS phone: a signed-in (not guest) account whose profile push_token is the
+// token this phone registered, with notifications allowed. Guests and every other case get the button.
+async function profilePushReachesThisPhone() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session || isGuest(session)) return false
+    const [mine, perm] = await Promise.all([registeredPushToken(), Notifications.getPermissionsAsync()])
+    if (!mine || perm.status !== 'granted') return false
+    const { data } = await supabase.from('profiles').select('push_token').eq('id', session.user.id).maybeSingle()
+    return data?.push_token === mine
+  } catch { return false }
+}
+
 const STEP_KEY = { sent: 'eateryOsSent', received: 'eateryOsReceived', preparing: 'eateryOsPreparing', on_the_way: 'eateryOsOnTheWay', ready: 'eateryOsReady', either: 'eateryOsEither' }
 const REASON_KEY = { closed: 'eateryOsReasonClosed', busy: 'eateryOsReasonBusy', item_out: 'eateryOsReasonItemOut', no_delivery_there: 'eateryOsReasonNoDelivery', unreachable: 'eateryOsReasonUnreachable', other: 'eateryOsReasonOther' }
 
@@ -113,19 +137,23 @@ function Step({ label, at, done, current, last }) {
   )
 }
 
-export function OrderStatusCard({ order, lang, onChanged }) {
+const stepLabel = (order, lang) => {
+  const tl = orderTimeline(order)
+  return tl.cancelled ? t('eateryOsCancelled', lang) : t(STEP_KEY[tl.steps.find(x => x.current)?.key || 'sent'], lang)
+}
+
+// The restaurant page's card: "Siparişin" + the code, the timeline (or the cancel reason), the hint and the notify row.
+export function OrderStatusCard({ order, lang, onChanged, pushCovered = false }) {
   const tl = orderTimeline(order)
   const code = formatOrderCode(order.code)
-  const kind = order.fulfilment === 'pickup' ? t('eateryOsPickup', lang) : order.fulfilment === 'delivery' ? t('eateryOsDelivery', lang) : ''
+  const notified = order.notify_set === true || pushCovered
   return (
     <Card>
       <View style={s.head}>
-        <Ionicons name="receipt-outline" size={18} color={colors.primaryDark} />
         <Text style={s.title} accessibilityRole="header">{t('eateryOsTitle', lang)}</Text>
         {order.is_test === true && <View style={s.test}><Text style={s.testText}>{t('eateryOsTest', lang)}</Text></View>}
+        {!!code && <View style={s.code} accessibilityLabel={t('eateryOsCode', lang).replace('{code}', () => code)}><Text style={s.codeText}>{code}</Text></View>}
       </View>
-      <Text style={s.partner}>{order.partner_name}</Text>
-      <Text style={s.meta}>{[code && t('eateryOsCode', lang).replace('{code}', () => code), kind].filter(Boolean).join(' · ')}</Text>
       {tl.cancelled ? (
         <View style={s.cancel} accessibilityLiveRegion="polite">
           <Text style={s.cancelTitle}>{t('eateryOsCancelled', lang)}{tl.at ? '  ' + timeText(tl.at, lang) : ''}</Text>
@@ -138,7 +166,8 @@ export function OrderStatusCard({ order, lang, onChanged }) {
           ))}
         </View>
       )}
-      {order.status_open === true && (order.notify_set === true
+      {order.status_open === true && <Text style={s.hint}>{t('eateryOsHint', lang)}</Text>}
+      {order.status_open === true && (notified
         ? (
           <View style={s.note}>
             <Ionicons name="notifications" size={18} color={colors.primaryDark} />
@@ -150,10 +179,24 @@ export function OrderStatusCard({ order, lang, onChanged }) {
   )
 }
 
-// active: the list is on screen (false while a partner page covers it). partnerId: only that restaurant's orders.
-// focusCode: a push tap's order, drawn first. refreshKey: bump to re-read (back from the WhatsApp hand-off); onReveal runs once
-// per bump when that read has a card to show (the partner page scrolls up to it).
-export default function EateryOrderStatusList({ lang, active = true, partnerId = null, focusCode = null, refreshKey = 0, onReveal = null }) {
+// The list's one-line strip: "Siparişin · <restaurant> · <status>" -> that restaurant's page, where the card is.
+function OrderStrip({ order, lang, onOpen }) {
+  const label = [t('eateryOsTitle', lang), order.partner_name, stepLabel(order, lang)].filter(Boolean).join(' · ')
+  return (
+    <Pressable onPress={() => onOpen(order)} accessibilityRole="button" accessibilityLabel={order.is_test === true ? `${label}, ${t('eateryOsTest', lang)}` : label}
+      style={({ pressed }) => [s.strip, pressed && { opacity: press.small }]}>
+      <Ionicons name="receipt-outline" size={18} color={colors.primaryDark} />
+      <Text style={s.stripText} numberOfLines={1}>{label}</Text>
+      {order.is_test === true && <View style={s.testSm}><Text style={s.testText}>{t('eateryOsTest', lang)}</Text></View>}
+      <Ionicons name="chevron-forward" size={18} color={colors.primaryDark} />
+    </Pressable>
+  )
+}
+
+// active: on screen (false while something covers it). partnerId set = the restaurant page: that restaurant's cards; unset = the
+// list: one strip per order, onOpen(order) opens its restaurant. refreshKey: bump to re-read (back from the WhatsApp hand-off,
+// a push tap); onReveal runs once per bump when that read has a card to show (the restaurant page scrolls up to it).
+export default function EateryOrderStatusList({ lang, active = true, partnerId = null, refreshKey = 0, onReveal = null, onOpen = null }) {
   const [orders, setOrders] = useState([])
   const [appActive, setAppActive] = useState(AppState.currentState === 'active')
   const alive = useRef(true)
@@ -164,23 +207,24 @@ export default function EateryOrderStatusList({ lang, active = true, partnerId =
   keyRef.current = refreshKey
   const load = useCallback(async () => {
     const key = keyRef.current
-    try {
-      const { data, error } = await supabase.rpc('my_eatery_orders')
-      if (!alive.current || error || !Array.isArray(data)) return
-      loadedKey.current = key
-      setOrders(data)
-    } catch { /* offline: keep what is on screen */ }
+    const data = await fetchMyOrders()
+    if (!alive.current || !data) return   // offline: keep what is on screen
+    loadedKey.current = key
+    setOrders(data)
   }, [])
+  const [pushCovered, setPushCovered] = useState(false)
+  useEffect(() => {
+    if (!partnerId) return
+    profilePushReachesThisPhone().then(v => { if (alive.current) setPushCovered(v) })
+  }, [partnerId])
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', st => setAppActive(st === 'active'))
     return () => sub.remove()
   }, [])
-  useEffect(() => { if (active && appActive) load() }, [active, appActive, focusCode, refreshKey, load])
+  useEffect(() => { if (active && appActive) load() }, [active, appActive, refreshKey, load])
 
-  const shown = orders
-    .filter(o => orderStatusShown(o) && (!partnerId || o.partner_id === partnerId))
-    .sort((a, b) => (b.code === focusCode) - (a.code === focusCode))
+  const shown = orders.filter(o => orderStatusShown(o) && (!partnerId || o.partner_id === partnerId))
   const live = shown.some(orderStatusLive)
   const revealed = useRef(0)
   useEffect(() => {
@@ -197,20 +241,26 @@ export default function EateryOrderStatusList({ lang, active = true, partnerId =
   if (shown.length === 0) return null
   return (
     <View style={s.list}>
-      {shown.map(o => <OrderStatusCard key={o.code} order={o} lang={lang} onChanged={load} />)}
+      {shown.map(o => (partnerId
+        ? <OrderStatusCard key={o.code} order={o} lang={lang} onChanged={load} pushCovered={pushCovered} />
+        : <OrderStrip key={o.code} order={o} lang={lang} onOpen={onOpen} />))}
     </View>
   )
 }
 
 const DOT = 12
 const s = StyleSheet.create({
-  list:        { gap: 14 },
+  list:        { gap: space[8] },
   head:        { flexDirection: 'row', alignItems: 'center', gap: space[8] },
-  title:       { ...type.sectionHeading, color: colors.textPrimary, flexShrink: 1 },
-  test:        { marginLeft: 'auto', borderRadius: radii.pill, backgroundColor: colors.dangerLight, paddingHorizontal: space[8], paddingVertical: 2 },
+  title:       { ...type.sectionHeading, color: colors.textPrimary, flex: 1 },
+  test:        { borderRadius: radii.pill, backgroundColor: colors.dangerLight, paddingHorizontal: space[8], paddingVertical: 2 },
+  testSm:      { borderRadius: radii.pill, backgroundColor: colors.dangerLight, paddingHorizontal: 6, paddingVertical: 1, flexShrink: 0 },
   testText:    { ...type.meta, fontFamily: font.semibold, color: colors.dangerInk },
-  partner:     { ...type.rowTitle, color: colors.textPrimary, marginTop: space[8] },
-  meta:        { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  code:        { borderRadius: radii.pill, backgroundColor: colors.soft, paddingHorizontal: space[8], paddingVertical: 2, flexShrink: 0 },
+  codeText:    { ...type.meta, fontFamily: font.semibold, color: colors.textPrimary, fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
+  hint:        { ...type.small, color: colors.textSecondary, marginTop: space[4] },
+  strip:       { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: space[8], borderRadius: radii.md, backgroundColor: colors.primaryLight, paddingHorizontal: space[12], paddingVertical: space[8] },
+  stripText:   { ...type.body, fontFamily: font.semibold, color: colors.primaryDark, flex: 1 },
   steps:       { marginTop: space[12] },
   step:        { flexDirection: 'row', gap: space[12], minHeight: 32 },
   rail:        { width: DOT, alignItems: 'center' },
