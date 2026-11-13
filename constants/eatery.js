@@ -406,6 +406,14 @@ const orderStatusOf = o => (ORDER_STATUSES.includes(o?.order_status) ? o.order_s
 export const orderStatusShown = o => !!o && (o.is_test === true || o.status_enabled === true || orderStatusOf(o) !== 'sent')
 // Still worth polling: shown, and the restaurant can still move it (under 12 h, not final; the server decides status_open).
 export const orderStatusLive = o => orderStatusShown(o) && o.status_open === true
+// Poll only while the list is on screen, the app is in front and at least one shown order can still move.
+export const shouldPollOrders = ({ active, appActive, orders }) => active === true && appActive === true && Array.isArray(orders) && orders.some(orderStatusLive)
+// Status pushes already reach THIS phone (20261194 falls back to a signed-in customer's profile token): not a guest, notifications
+// allowed, and the profile's push_token is the token this phone registered.
+export const orderPushCovered = ({ guest, permGranted, profileToken, deviceToken }) =>
+  guest === false && permGranted === true && typeof deviceToken === 'string' && deviceToken.length > 0 && profileToken === deviceToken
+// The card's notify area: 'none' (the order can no longer move) | 'on' ("we'll let you know") | 'button' ("Durum değişince haber ver").
+export const orderNotifyView = (order, covered) => (order?.status_open !== true ? 'none' : order.notify_set === true || covered === true ? 'on' : 'button')
 export const formatOrderCode = c => (typeof c === 'string' && ORDER_CODE_RE.test(c) ? `${c.slice(0, 4)}-${c.slice(4)}` : '')
 // A push's data.code -> the code, or null (the push carries { screen: 'eatery_order', code }, 20261194).
 export const orderPushCode = data => (data?.screen === 'eatery_order' && typeof data.code === 'string' && ORDER_CODE_RE.test(data.code) ? data.code : null)

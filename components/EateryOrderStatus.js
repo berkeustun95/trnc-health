@@ -10,7 +10,7 @@ import { supabase, isGuest } from '../lib/supabase'
 import { registeredPushToken } from '../utils/signOut'
 import { REDESIGN } from '../constants/redesign'
 import { requestWithPrimer } from '../utils/permissionPrimer'
-import { orderStatusShown, orderStatusLive, orderTimeline, formatOrderCode, ORDER_POLL_MS } from '../constants/eatery'
+import { orderStatusShown, orderTimeline, formatOrderCode, shouldPollOrders, orderPushCovered, orderNotifyView, ORDER_POLL_MS } from '../constants/eatery'
 
 // ─── Yeme-İçme: "Siparişin" — where the customer's recent orders stand (20261193/94) ──────────────────────
 // Approved mock-up (dev page v27, item 6): a "Siparişin" card on the restaurant page for 24 h after sending, and a one-line strip
@@ -38,7 +38,7 @@ async function profilePushReachesThisPhone() {
     const [mine, perm] = await Promise.all([registeredPushToken(), Notifications.getPermissionsAsync()])
     if (!mine || perm.status !== 'granted') return false
     const { data } = await supabase.from('profiles').select('push_token').eq('id', session.user.id).maybeSingle()
-    return data?.push_token === mine
+    return orderPushCovered({ guest: false, permGranted: true, profileToken: data?.push_token, deviceToken: mine })
   } catch { return false }
 }
 
@@ -153,7 +153,7 @@ const stepLabel = (order, lang) => {
 export function OrderStatusCard({ order, lang, onChanged, pushCovered = false, stale = false }) {
   const tl = orderTimeline(order)
   const code = formatOrderCode(order.code)
-  const notified = order.notify_set === true || pushCovered
+  const notify = orderNotifyView(order, pushCovered)
   return (
     <Card>
       <View style={s.head}>
@@ -177,8 +177,8 @@ export function OrderStatusCard({ order, lang, onChanged, pushCovered = false, s
         </View>
       )}
       {stale && <Text style={s.stale}>{t('eateryOsStale', lang)}</Text>}
-      {order.status_open === true && <Text style={s.hint}>{t('eateryOsHint', lang)}</Text>}
-      {order.status_open === true && (notified
+      {notify !== 'none' && <Text style={s.hint}>{t('eateryOsHint', lang)}</Text>}
+      {notify !== 'none' && (notify === 'on'
         ? (
           <View style={s.note}>
             <Ionicons name="notifications" size={18} color={colors.primaryDark} />
@@ -242,7 +242,7 @@ export default function EateryOrderStatusList({ lang, active = true, partnerId =
   useEffect(() => { if (active && appActive) load() }, [active, appActive, refreshKey, load])
 
   const shown = orders.filter(o => orderStatusShown(o) && (!partnerId || o.partner_id === partnerId))
-  const live = shown.some(orderStatusLive)
+  const poll = shouldPollOrders({ active, appActive, orders: shown })
   const revealed = useRef(0)
   useEffect(() => {
     if (!onReveal || refreshKey === 0 || revealed.current === refreshKey || loadedKey.current !== refreshKey || shown.length === 0) return
@@ -250,10 +250,10 @@ export default function EateryOrderStatusList({ lang, active = true, partnerId =
     onReveal()
   })
   useEffect(() => {
-    if (!active || !appActive || !live) return
+    if (!poll) return
     const id = setInterval(load, ORDER_POLL_MS)
     return () => clearInterval(id)
-  }, [active, appActive, live, load])
+  }, [poll, load])
 
   if (shown.length === 0) return null
   return (

@@ -3,7 +3,7 @@
 import * as B from '../utils/eateryBasketCore.js'
 import { t, hasOwnTranslation } from '../constants/i18n.js'
 import fs from 'node:fs'
-import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eaterySiteCartUrl, eaterySiteHost, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk, orderMode, orderStatusShown, orderStatusLive, orderTimeline, formatOrderCode, orderPushCode, nicosiaDate } from '../constants/eatery.js'
+import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eaterySiteCartUrl, eaterySiteHost, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk, orderMode, orderStatusShown, orderStatusLive, orderTimeline, formatOrderCode, orderPushCode, nicosiaDate, shouldPollOrders, orderPushCovered, orderNotifyView } from '../constants/eatery.js'
 import { heroPathOf } from '../utils/stripSlides.js'
 import * as AB from '../utils/eateryAddressCore.js'
 import { nearestArea, searchAreas, searchAreasTop, districtPrefill, NICOSIA, PIN_SEARCH_MAX, NEAREST_AREA_MAX_KM } from '../constants/deliveryAreas.js'
@@ -941,6 +941,43 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   eq('timeline: an unknown status reads as sent', orderTimeline(o({ order_status: 'eaten' })).steps.filter(s => s.current).map(s => s.key), ['sent'])
   eq('order code: XXXX-XXXX, else empty', [formatOrderCode('AB23CD45'), formatOrderCode('ab23cd45'), formatOrderCode('AB23CD4I'), formatOrderCode(null)], ['AB23-CD45', '', '', ''])
   eq('push data -> code only for screen eatery_order and a valid code', [orderPushCode({ screen: 'eatery_order', code: 'AB23CD45' }), orderPushCode({ screen: 'eatery_order', code: 'AB23-CD45' }), orderPushCode({ screen: 'duty', code: 'AB23CD45' }), orderPushCode(null)], ['AB23CD45', null, null, null])
+  eq('push code: exactly 8 characters (7, 9 and 12 refused; lower case refused)', ['AB23CD4', 'AB23CD45Z', 'AB23CD45AB23', 'ab23cd45', 'AB23CD45'].map(code => orderPushCode({ screen: 'eatery_order', code })), [null, null, null, null, 'AB23CD45'])
+  // Poll: on screen AND app in front AND at least one shown order still open (status_open from the server).
+  const L = o({ is_test: true }), F = o({ is_test: true, status_open: false })
+  eq('poll: runs only when active + app active + a live order', [
+    shouldPollOrders({ active: true, appActive: true, orders: [L] }), shouldPollOrders({ active: false, appActive: true, orders: [L] }),
+    shouldPollOrders({ active: true, appActive: false, orders: [L] }), shouldPollOrders({ active: true, appActive: true, orders: [F] }),
+    shouldPollOrders({ active: true, appActive: true, orders: [] }), shouldPollOrders({ active: true, appActive: true, orders: [F, L] }),
+  ], [true, false, false, false, false, true])
+  eq("push covered: signed-in non-guest + permission + profile token === this phone's token, nothing else", [
+    orderPushCovered({ guest: false, permGranted: true, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: true, permGranted: true, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: false, permGranted: false, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: false, permGranted: true, profileToken: 'ExpoPushToken[b]', deviceToken: 'ExpoPushToken[a]' }),
+    orderPushCovered({ guest: false, permGranted: true, profileToken: null, deviceToken: null }),
+    orderPushCovered({ guest: false, permGranted: true, profileToken: '', deviceToken: '' }),
+    orderPushCovered({ permGranted: true, profileToken: 'ExpoPushToken[a]', deviceToken: 'ExpoPushToken[a]' }),
+  ], [true, false, false, false, false, false, false])
+  eq('notify view: needs status_open; the button is replaced only when the order token is set or push is covered', [
+    orderNotifyView(o({ status_open: false }), false), orderNotifyView(o({ status_open: false, notify_set: true }), true),
+    orderNotifyView(o({}), false), orderNotifyView(o({ notify_set: true }), false), orderNotifyView(o({}), true), orderNotifyView(null, false),
+  ], ['none', 'none', 'button', 'on', 'on', 'none'])
+  {
+    const st = fs.readFileSync(new URL('../components/EateryOrderStatus.js', import.meta.url), 'utf8')
+    const fn = st.slice(st.indexOf('async function profilePushReachesThisPhone'), st.indexOf('\nconst STEP_KEY'))
+    eq('card wiring: guests never covered (early false), the poll and the notify area use the tested rules', [
+      fn.includes('if (!session || isGuest(session)) return false'), fn.includes("if (!mine || perm.status !== 'granted') return false"),
+      fn.includes('orderPushCovered({ guest: false, permGranted: true, profileToken: data?.push_token, deviceToken: mine })'),
+      st.includes('const poll = shouldPollOrders({ active, appActive, orders: shown })'), /if \(!poll\) return\s*\n\s*const id = setInterval\(load, ORDER_POLL_MS\)/.test(st),
+      st.includes("setAppActive(st === 'active')"), st.includes('const notify = orderNotifyView(order, pushCovered)'),
+      (st.match(/setPushCovered\(/g) || []).length === 1 && st.includes('profilePushReachesThisPhone().then(v => { if (alive.current) setPushCovered(v) })'),
+      !/notify_set === true|status_open === true/.test(st),
+    ], Array(9).fill(true))
+    const ps = fs.readFileSync(new URL('../screens/EateryPartnerScreen.js', import.meta.url), 'utf8')
+    const headEnd = ps.indexOf('</Card>}', ps.indexOf('{showBanner ? <BannerHead'))
+    const between = ps.slice(headEnd, ps.indexOf('{gallery.length > 0 && <PhotoPager', headEnd))
+    eq('partner page: the order status list is an unconditional ScrollView child between the head card and the pager (so tabsIndex = 2 + …)', [headEnd > 0, /^<\/Card>\}\s*\n\s*<EateryOrderStatusList /.test(between), (between.match(/<EateryOrderStatusList/g) || []).length, /const tabsIndex = 2 \+ \(showQuizBanner \? 1 : 0\) \+ \(gallery\.length > 0 \? 1 : 0\)/.test(ps)], [true, true, 1, true])
+  }
   eq('nicosiaDate: summer and winter midnight', [nicosiaDate(new Date('2026-07-01T20:59:00Z')), nicosiaDate(new Date('2026-07-01T21:00:00Z')), nicosiaDate(new Date('2026-12-01T21:59:00Z')), nicosiaDate(new Date('2026-12-01T22:00:00Z'))], ['2026-07-01', '2026-07-02', '2026-12-01', '2026-12-02'])
 }
 
