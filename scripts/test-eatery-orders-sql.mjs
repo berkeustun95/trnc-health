@@ -65,7 +65,14 @@ const db = await fx()
 const VS = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
 const ti = VS.indexOf("    -- ── 1125: WhatsApp order proof."), tj = VS.indexOf("    UNION ALL SELECT '1119_eatery_preview_read','eatery_partners: exactly 2")
 if (ti < 0 || tj < ti) throw new Error('verify_schema 1125 token anchors missing')
-const TOKQ = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS.slice(ti, tj)}) z`
+// Later migrations' tokens can sit inside the 1125 section (20261178 does). Postgres resolves every relation a query names
+// before it runs, so keep only 1125's own UNION ALL rows as TEXT and print what was dropped.
+const parts = VS.slice(ti, tj).split(/\n(?=    UNION ALL SELECT ')/)
+const own = parts.filter(p => p.startsWith("    UNION ALL SELECT '20261125_eatery_orders'"))
+const dropped = [...new Set(parts.filter(p => /^    UNION ALL SELECT '/.test(p) && !own.includes(p)).map(p => p.match(/SELECT '([^']+)'/)[1]))]
+if (dropped.length) console.log(`  (1125 token slice also holds: ${dropped.join(', ')} — excluded here, tested by their own files)`)
+if (!own.length) throw new Error('no 20261125_eatery_orders tokens found in its verify_schema section')
+const TOKQ = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${own.join('\n')}\n) z`
 const tokens = async (when, want) => {
   try {
     const rows = (await db.query(TOKQ)).rows
