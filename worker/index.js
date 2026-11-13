@@ -89,7 +89,7 @@ function respond(html, status, csp = CSP_NO_SCRIPT, body = html) {
 
 // Status words. TR primary, EN sub-line. Shared by the server page and the inline script (embedded as JSON).
 const ST = {
-  sent: ['Gönderildi', 'Sent'],
+  sent: ['Restorana iletildi', 'Sent to the restaurant'],
   received: ['Siparişi aldık', 'Order received'],
   preparing: ['Hazırlanıyor', 'Being prepared'],
   on_the_way: ['Yolda', 'On the way'],

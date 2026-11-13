@@ -650,14 +650,15 @@ await test('client: customer view never has buttons; PIN link only with pinable 
     const { box, calls } = await clientRun(p)
     assert.equal(buttons(box).length, 0, JSON.stringify(p))
     assert.equal(calls[0][1].credentials, 'same-origin')
-    assert.ok(texts(box).includes('Gönderildi'))
+    assert.ok(texts(box).includes('Restorana iletildi'))
+    assert.ok(texts(box).includes('Sent to the restaurant'), 'English line of the first step')
   }
   const { box } = await clientRun({ ...base, pinable: true, token: 'f'.repeat(64) })
   const b = buttons(box)
   assert.equal(b.length, 1); assert.equal(label(b[0]), 'Restoran girişi')
   assert.match(b[0].className, /\bquiet\b/, 'PIN entry is the low-key link'); assert.equal(box.children[box.children.length - 1], b[0], 'PIN link is last on the page')
   const off = await clientRun({ ...base, statusShown: false })
-  assert.ok(!texts(off.box).includes('Gönderildi'), 'no timeline when status is not in use')
+  assert.ok(!texts(off.box).includes('Restorana iletildi'), 'no timeline when status is not in use')
 })
 
 await test('client: PIN flow posts the PIN in the JSON body only, then re-checks; errors shown; seen line kept', async () => {
