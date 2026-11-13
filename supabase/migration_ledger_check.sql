@@ -300,7 +300,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261192_notifications_listing_id.sql', 'c1b9c8131f48ce5f76d976b7537879c879953119cb1f728bb68e0ad06d795eb4'),
   ('20261193_eatery_order_status.sql', '23504239d716113ae3be194302d2019b1486919c2775c6e98489e5fb47365de0'),
   ('20261194_eatery_order_status_partner.sql', '7f189edd2368a2fce716aecf99ef7822aef677c0f69bbf980af4a857c45b07c8'),
-  ('20261196_marketplace_photo_review_reminder.sql', '4ae0f5262af210ab97f95c7dd85c1fa4f02e7f1a2b6c273fde499c9394bf08e8')
+  ('20261196_marketplace_photo_review_reminder.sql', 'e309c74487856aa3b3241a90a4c3a74fbda8e76f75231285de71c9df2d01e317')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

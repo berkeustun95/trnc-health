@@ -37,8 +37,10 @@
 --
 -- WHO CAN READ / WRITE WHAT
 --   • marketplace_photo_reminder_state: RLS ON with NO policies, and every grant revoked from PUBLIC, anon and
---     authenticated. No app user (customer, guest, provider, admin) can read or change it through the API. Only
---     the postgres-owned function below writes it. It holds one timestamp and no user data.
+--     authenticated. No app user (customer, guest, provider, admin) can read or change it through the API.
+--     service_role (the server key: Edge Functions and GitHub Actions, never the app) keeps Supabase's default
+--     table privileges and bypasses RLS, as on every table; nothing but the function below writes it. It holds one
+--     timestamp and no user data.
 --   • marketplace_photo_review_reminder(): EXECUTE for service_role only (postgres owns it; pg_cron runs as
 --     postgres). anon and authenticated cannot call it. The grants are the ONLY guard: under cron auth.uid() is
 --     NULL, so the function cannot check a caller. It takes no arguments, so a caller cannot choose who is told
@@ -254,7 +256,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261196_marketplace_photo_review_reminder.sql', '4ae0f5262af210ab97f95c7dd85c1fa4f02e7f1a2b6c273fde499c9394bf08e8')
+VALUES ('20261196_marketplace_photo_review_reminder.sql', 'e309c74487856aa3b3241a90a4c3a74fbda8e76f75231285de71c9df2d01e317')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

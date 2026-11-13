@@ -288,6 +288,36 @@ for (const [name, fn] of CASES) {
   check(name, ok, got)
 }
 
+// Regression, derived: the whole marketplace chain is applied, then everything it left in the catalogs is snapshotted, then
+// 20261196 is applied. Every object that existed before must be byte-identical after (function definitions, policies,
+// triggers, table ACLs and RLS flags, cron jobs, constraints); the only new objects are the ones this file means to add.
+// Printed, never a remembered list.
+{
+  const SNAP = `
+    SELECT 'fn ' || p.oid::regprocedure::text AS k, md5(pg_get_functiondef(p.oid) || coalesce(p.proacl::text, '')) AS v
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('public', 'private', 'storage', 'auth', 'net', 'cron') AND p.prokind = 'f'
+    UNION ALL SELECT 'policy ' || schemaname || '.' || tablename || '.' || policyname, md5(row(permissive, roles, cmd, qual, with_check)::text) FROM pg_policies
+    UNION ALL SELECT 'trigger ' || t.tgrelid::regclass::text || '.' || t.tgname, md5(pg_get_triggerdef(t.oid)) FROM pg_trigger t WHERE NOT t.tgisinternal
+    UNION ALL SELECT 'table ' || c.oid::regclass::text, md5(row(c.relrowsecurity, c.relforcerowsecurity, coalesce(c.relacl::text, ''))::text)
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname IN ('public', 'private', 'storage', 'net', 'cron') AND c.relkind IN ('r', 'p')
+    UNION ALL SELECT 'constraint ' || conrelid::regclass::text || '.' || conname, md5(pg_get_constraintdef(oid)) FROM pg_constraint WHERE conrelid <> 0 AND contype <> 'n'  -- PG 18 catalogs NOT NULL; prod (17) does not
+    UNION ALL SELECT 'job ' || jobname, md5(row(schedule, command, active)::text) FROM cron.job`
+  const db = await freshDb(BASE + CRON_STUB + STUBS + seedSql())
+  for (const f of CHAIN) { const r = await applyFile(db, f); if (!r.ok) throw new Error(f + ': ' + r.msg) }
+  const before = new Map((await q(db, SNAP)).map(r => [r.k, r.v]))
+  const r = await applyFile(db, F196)
+  const after = new Map((await q(db, SNAP)).map(r => [r.k, r.v]))
+  const changed = [...before].filter(([k, v]) => after.get(k) !== v).map(([k]) => k)
+  const added = [...after.keys()].filter(k => !before.has(k)).sort()
+  const EXPECT_ADDED = ['constraint marketplace_photo_reminder_state.marketplace_photo_reminder_state_one_row',
+    'constraint marketplace_photo_reminder_state.marketplace_photo_reminder_state_pkey', 'fn marketplace_photo_review_reminder()',
+    'job marketplace-photo-review-reminder', 'table marketplace_photo_reminder_state']
+  console.log(`  snapshot: ${before.size} objects before, ${after.size} after; changed: ${JSON.stringify(changed)}; added: ${JSON.stringify(added)}`)
+  check('regression: no pre-existing function / policy / trigger / table ACL / constraint / job changed; only the three intended objects (+ their two constraints) added',
+    r.ok && changed.length === 0 && JSON.stringify(added) === JSON.stringify(EXPECT_ADDED), { r, changed, added })
+  await db.close()
+}
+
 // Refusals: the pre-flight must be able to fail.
 {
   const db = await freshDb(BASE + CRON_STUB + STUBS + seedSql() + 'DROP TABLE public.push_log;')
@@ -314,6 +344,12 @@ const MUTANTS = [
     red: '31 minutes later with NO new photo' },
   { n: 'M3 deleted_at dropped from the predicate (count)', pairs: [[`WHERE p.status = 'pending' AND l.deleted_at IS NULL;`, `WHERE p.status = 'pending';`]],
     red: 'photos on a deleted listing are not counted' },
+  { n: 'M3c deleted_at dropped (only deleted-listing photos waiting)', pairs: [[`WHERE p.status = 'pending' AND l.deleted_at IS NULL;`, `WHERE p.status = 'pending';`]],
+    red: 'only deleted-listing photos waiting' },
+  { n: 'M19 the pending half of the predicate dropped (approved / rejected counted)', pairs: [[`WHERE p.status = 'pending' AND l.deleted_at IS NULL;`, `WHERE l.deleted_at IS NULL;`]],
+    red: 'no waiting photos' },
+  { n: 'M20 never stamped (every tick sends)', pairs: [[`IF n > 0 THEN\n    INSERT INTO marketplace_photo_reminder_state`, `IF false THEN\n    INSERT INTO marketplace_photo_reminder_state`]],
+    red: 'rerun immediately' },
   { n: 'M3b deleted_at dropped from the "new" test only', pairs: [[`count(*) FILTER (WHERE v_last IS NULL OR p.created_at > v_last)`,
       `(SELECT count(*) FROM marketplace_photos p2 WHERE p2.status = 'pending' AND (v_last IS NULL OR p2.created_at > v_last))`]],
     red: 'a NEW photo on a since-deleted listing alone' },
