@@ -25,6 +25,13 @@ export function notificationRoute(item) {
   return DUTY_KEYWORDS.some(kw => title.includes(kw)) ? 'duty' : null
 }
 
+// The admin photo-review reminder push (20261196) → AdminScreen's Bandabuliya tab, Photos view. Only AdminScreen reads
+// the request, so a non-admin tap is a no-op; a dark bundle ignores it like every Bandabuliya push.
+export function adminPushRequest(data) {
+  if (!MARKETPLACE || data?.screen !== 'admin' || data.tab !== 'marketplace') return null
+  return { tab: 'Bandabuliya', view: 'Photos' }
+}
+
 // The in-app list. Asks for `type`, `conversation_id` and `listing_id`; a 42703 (this bundle is running against a database
 // from before 20261192 / 20261087 / 20261066) drops the newest column first, so a missing `listing_id` does not also lose
 // `conversation_id` or `type`. Rows without `type` route by keywords as above. Lets the app and the migrations ship in either order.

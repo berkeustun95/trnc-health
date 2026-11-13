@@ -21,7 +21,7 @@ import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '
 import { MARKETPLACE } from '../constants/redesign'
 import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { ConfirmDialog } from '../components/ui'
-import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoCount, signedUrls } from '../utils/marketplaceApi'
+import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoSummary, photoWait, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
 // expire. Requires an admin storage.objects SELECT policy on the bucket.
@@ -426,6 +426,7 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingCars, setPendingCars] = useState(0)
   const [pendingMkPhotos, setPendingMkPhotos] = useState(0)
+  const [mkOldestAt, setMkOldestAt] = useState(null)
   const [novestLastSeen, setNovestLastSeen] = useState(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -439,7 +440,11 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
       supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     ])
     setPendingCars(carsError ? null : carsCount)
-    if (MARKETPLACE) setPendingMkPhotos(await adminPendingPhotoCount())
+    if (MARKETPLACE) {
+      const mk = await adminPendingPhotoSummary()
+      setPendingMkPhotos(mk ? mk.count : null)
+      setMkOldestAt(mk?.oldestAt ?? null)
+    }
     setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
@@ -493,7 +498,10 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
   const mkRow = MARKETPLACE && pendingMkPhotos !== 0 && (
     <TouchableOpacity style={s.urgencyCard} onPress={onOpenMarketplace} activeOpacity={0.75}>
       <View style={[s.urgencyDot, { backgroundColor: colors.danger }]} />
-      <Text style={s.urgencyLabel}>{pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review'}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={s.urgencyLabel}>{pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review'}</Text>
+        {pendingMkPhotos !== null && mkOldestAt ? <Text style={s.cardSub}>Oldest waiting {photoWait(mkOldestAt)}</Text> : null}
+      </View>
       {pendingMkPhotos !== null && (
         <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
           <Text style={s.urgencyCount}>{pendingMkPhotos}</Text>
@@ -628,8 +636,9 @@ function DashboardTab({ onNavigate }) {
           .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       ])
       const pendingPlaces = pendingPlacesCount ?? 0
-      const pendingMkPhotos = MARKETPLACE ? await adminPendingPhotoCount() : 0
-      setStats({ pendingMkPhotos, novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingCars, pendingReports, esimTotal, esimTourist, esimStudent })
+      const mk = MARKETPLACE ? await adminPendingPhotoSummary() : { count: 0, oldestAt: null }
+      const pendingMkPhotos = mk ? mk.count : null
+      setStats({ pendingMkPhotos, mkOldestAt: mk?.oldestAt ?? null, novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingCars, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -658,7 +667,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Places to review',                count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
     (stats.pendingCars ?? 0)         > 0 && { label: 'Car listings to approve',          count: stats.pendingCars,            tab: 'Cars',         color: colors.danger },
-    stats.pendingMkPhotos !== 0 && stats.pendingMkPhotos !== undefined && { label: stats.pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review', count: stats.pendingMkPhotos ?? '?', tab: 'Bandabuliya', color: colors.danger },
+    stats.pendingMkPhotos !== 0 && stats.pendingMkPhotos !== undefined && { label: stats.pendingMkPhotos === null ? 'Bandabuliya photo queue could not be checked' : 'Bandabuliya photos to review', sub: stats.pendingMkPhotos !== null && stats.mkOldestAt ? `Oldest waiting ${photoWait(stats.mkOldestAt)}` : null, count: stats.pendingMkPhotos ?? '?', tab: 'Bandabuliya', color: colors.danger },
   ].filter(Boolean)
 
   return (
@@ -683,7 +692,10 @@ function DashboardTab({ onNavigate }) {
           {urgencies.map(u => (
             <TouchableOpacity key={u.tab} style={s.urgencyCard} onPress={() => onNavigate(u.tab)} activeOpacity={0.75}>
               <View style={[s.urgencyDot, { backgroundColor: u.color }]} />
-              <Text style={s.urgencyLabel}>{u.label}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.urgencyLabel}>{u.label}</Text>
+                {u.sub ? <Text style={s.cardSub}>{u.sub}</Text> : null}
+              </View>
               <View style={[s.urgencyBadge, { backgroundColor: u.color }]}>
                 <Text style={s.urgencyCount}>{u.count}</Text>
               </View>
@@ -4277,8 +4289,8 @@ const MK_REVIEW_ERROR = {
   NOT_ADMIN: 'This account is not an admin.',
 }
 
-function MarketplaceTab() {
-  const [view, setView]       = useState('Photos')
+function MarketplaceTab({ initialView = 'Photos' }) {
+  const [view, setView]       = useState(initialView)
   const [rows, setRows]       = useState(null)
   const [urls, setUrls]       = useState({})
   const [busy, setBusy]       = useState(null)
@@ -5133,11 +5145,24 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, openRequest, onOpenRequestHandled }) {
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
+  // The photo-review push (App.js openAdminPush). The nonce keys MarketplaceTab, so every tap remounts it on the requested
+  // view and reloads the queue, even when that tab is already open on Hidden / Recent. Kept locally: App clears its copy at once.
+  const [mkOpen, setMkOpen] = useState(null)
   const [pinBusy, setPinBusy] = useState(false)
   const navigateTo = t => setTab(t)
+
+  useEffect(() => {
+    if (!openRequest) return
+    // A tab switch now would lose an un-copied Restaurant PIN; left unconsumed, the request runs when the lock clears.
+    if (pinBusy) return
+    setTab(openRequest.tab)
+    setToolsOpen(true)
+    if (openRequest.tab === 'Bandabuliya') setMkOpen({ at: openRequest.at, view: openRequest.view })
+    onOpenRequestHandled?.()
+  }, [openRequest?.at, pinBusy])
 
   useEffect(() => {
     if (!toolsOpen) return
@@ -5259,7 +5284,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'PlaceClaims'   && <PlaceClaimsTab session={session} />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
           {tab === 'Cars'          && <CarsTab />}
-          {tab === 'Bandabuliya'   && <MarketplaceTab />}
+          {tab === 'Bandabuliya'   && <MarketplaceTab key={mkOpen?.at ?? 'tab'} initialView={mkOpen?.view} />}
           {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} onBusyChange={setPinBusy} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
