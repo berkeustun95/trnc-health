@@ -465,6 +465,7 @@ await test('/pin /status /forget /token: refuse wrong method, cross-origin, bots
       ['bad code', callE(envK, '/o/7K3QX9M0/' + what, 'POST', BROWSER, JSONH, JSON.stringify(body)), 404],
       ['not JSON', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, JSONH, '{pin:'), 400],
       ['huge', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, JSONH, JSON.stringify({ ...body, x: 'x'.repeat(2000) })), 400],
+      ['content-length over the cap, refused before reading', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, { ...JSONH, 'content-length': '5000' }, JSON.stringify(body)), 413],
     ]
     if (what !== 'token') cases.push(
       ['no token', act(envK, what, { ...body, token: undefined }), 403],
@@ -648,7 +649,8 @@ await test('client: customer view never has buttons; PIN link only with pinable 
   }
   const { box } = await clientRun({ ...base, pinable: true, token: 'f'.repeat(64) })
   const b = buttons(box)
-  assert.equal(b.length, 1); assert.equal(label(b[0]), 'Restoran mısınız? PIN ile giriş')
+  assert.equal(b.length, 1); assert.equal(label(b[0]), 'Restoran girişi')
+  assert.match(b[0].className, /\bquiet\b/, 'PIN entry is the low-key link'); assert.equal(box.children[box.children.length - 1], b[0], 'PIN link is last on the page')
   const off = await clientRun({ ...base, statusShown: false })
   assert.ok(!texts(off.box).includes('Gönderildi'), 'no timeline when status is not in use')
 })
@@ -726,7 +728,7 @@ await test('client: restaurant buttons = next only; cancel needs a reason + conf
   const fg = await clientRun({ ...base, manage: true, next: ['received'], token: tok }, { forget: { status: 'ok', token: 'b'.repeat(64) } })
   buttons(fg.box).at(-1).onclick(); await flush()
   assert.deepEqual(JSON.parse(fg.calls.at(-1)[1].body), { token: tok })
-  assert.deepEqual(buttons(fg.box).map(label), ['Restoran mısınız? PIN ile giriş'])
+  assert.deepEqual(buttons(fg.box).map(label), ['Restoran girişi'])
 })
 
 globalThis.fetch = realFetch

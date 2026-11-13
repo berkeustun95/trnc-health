@@ -71,6 +71,7 @@ li span.d{display:block;white-space:normal;color:#55657A;font-size:13px;margin-t
 .btn .en{color:inherit;opacity:.85;font-weight:400}.btn:disabled{opacity:.45}.btn.bad{background:#C0384A}
 .btn.opt,.btn.ghost{background-color:transparent;color:#1A2B33;border:1.5px solid #C5CFCB}.btn.opt.on{border-color:#C0384A;color:#C0384A}
 .lnk{display:inline-block;margin-top:12px;padding:6px 0;border:0;background:none;color:#0E7C7B;font:inherit;font-size:14px;font-weight:700;text-decoration:underline;cursor:pointer}
+.lnk.quiet{display:block;margin:24px auto 0;padding:10px 12px;color:#55657A;font-size:13px;font-weight:400}
 .pin{display:block;width:100%;margin-top:10px;padding:12px 14px;border:1.5px solid #C5CFCB;border-radius:12px;background-color:transparent;font:inherit;font-size:24px;letter-spacing:.3em;text-align:center}
 .msg{margin-top:10px;font-size:14px;color:#C0384A}.msg:empty{display:none}`
 
@@ -190,7 +191,7 @@ var t=el('div','total');t.appendChild(el('span',null,'Toplam'));t.appendChild(el
 var s=el('div','seen',j.seenTr);s.appendChild(el('div','en',j.seenEn));c.appendChild(s);
 var tl=j.statusShown===true?timeline(j):null,x=null;
 if(j.manage===true)x=rest(j,msg);
-else if(j.pinable===true&&tok){x=el('button','lnk','Restoran mısınız? PIN ile giriş');x.type='button';x.onclick=function(){put(b,c,tl,pinPanel())}}
+else if(j.pinable===true&&tok){x=el('button','lnk quiet','Restoran girişi');x.type='button';x.onclick=function(){put(b,c,tl,pinPanel())}}
 put(b,c,tl,x)}
 function load(){return fetch(base+'/check',{method:'POST',cache:'no-store',credentials:'same-origin'})
 .then(function(r){return r.json()}).then(function(j){if(j&&j.token)tok=j.token;if(j&&j.seenTr!=null){if(seen){j.seenTr=seen[0];j.seenEn=seen[1]}else seen=[j.seenTr,j.seenEn]}cur=j;show(j)}).catch(fail)}
@@ -405,6 +406,7 @@ async function writeGuard(request, url, env, code) {
   if (!isJson(request)) return { res: respondJson({ status: 'bad_request' }, 415) }
   if (!code) return { res: respondJson({ status: 'not_found' }, 404) }
   if (!hasKey(env)) return { res: respondJson({ status: 'unavailable' }, 403) }
+  if (Number(request.headers.get('content-length')) > 1024) return { res: respondJson({ status: 'bad_request' }, 413) }
   let body
   try {
     const raw = await request.text()
