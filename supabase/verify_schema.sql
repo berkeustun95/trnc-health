@@ -796,7 +796,9 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','admin_set_eatery_partner_pin'),
     ('20261194_eatery_order_status_partner','eatery_order_push_text'),
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
-    ('20261194_eatery_order_status_partner','eatery_order_set_status')
+    ('20261194_eatery_order_status_partner','eatery_order_set_status'),
+    -- 20261197: registered ahead of the apply; red until it runs.
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
   ) e(m,o)
 
   UNION ALL
@@ -1060,6 +1062,10 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','eatery_pin_attempts_pkey'),
     ('20261194_eatery_order_status_partner','eatery_pin_attempts_scope_check'),
     ('20261194_eatery_order_status_partner','eatery_pin_attempts_scope_partner_check'),
+    -- 20261197: the reset log; RLS / privileges / index are the 1197 H token.
+    ('20261197_eatery_pin_attempts_reset','eatery_pin_resets_pkey'),
+    ('20261197_eatery_pin_attempts_reset','eatery_pin_resets_scope_check'),
+    ('20261197_eatery_pin_attempts_reset','eatery_pin_resets_scope_partner_check'),
     -- 20261157: brand_color hex shape and item_id eatery-only; meanings are H tokens.
     ('20261157_eatery_order_website','eatery_partners_brand_color_check'),
     ('20261157_eatery_order_website','contact_events_item_id_check'),
@@ -1634,7 +1640,9 @@ WITH report AS (
     ('20261193_eatery_order_status','eatery_order_subscribe'),
     ('20261194_eatery_order_status_partner','admin_set_eatery_partner_pin'),
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
-    ('20261194_eatery_order_status_partner','eatery_order_set_status')
+    ('20261194_eatery_order_status_partner','eatery_order_set_status'),
+    -- 1197. Missing = the admin "clear lock" button answers a permission error.
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
   ) e(m,o)
 
   UNION ALL
@@ -1836,6 +1844,45 @@ WITH report AS (
         (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM private.eatery_worker_key_hashes', false, true, '')))[1]::text = '1'
         AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM private.eatery_worker_key_hashes WHERE key_sha256 = ''e2521b10b0c909008d587b61f84f134b2626c05702f3b57d2029ad5b128195b4''', false, true, '')))[1]::text = '1'
       END, false)
+    -- 1197-BEGIN
+    -- 20261197 admin_reset_eatery_pin_attempts: red until applied, never an error (to_regprocedure / aclexplode / COALESCE). The
+    --     negatives are anchored to code shape (schema-qualified table names, a call paren) and paired with the positives.
+    UNION ALL SELECT '20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts(uuid,text): one overload, DEFINER, VOLATILE, owner postgres, search_path public, pg_temp; authenticated EXECUTE, no anon / PUBLIC; admin + non-guest gate; under the enrol lock, 3 resets per bucket per 24 hours (reset_limit before any write), then deletes ONE bucket of private.eatery_pin_attempts and logs it; 90-day log prune; never touches the PIN or device tables',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 'v' AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND p.proconfig @> ARRAY['search_path=public, pg_temp']
+                       AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'admin_reset_eatery_pin_attempts') = 1
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%public.is_admin()%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%public.is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%MESSAGE = ''forbidden''%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%pg_advisory_xact_lock(hashtext(''eatery_enrol:'' || p_scope%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%DELETE FROM private.eatery_pin_attempts WHERE scope = p_scope AND partner_id IS NOT DISTINCT FROM p_partner%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) NOT LIKE '%private.eatery_partner_pins%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) NOT LIKE '%private.eatery_partner_devices%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) NOT LIKE '%eatery_pin_issue(%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%r.scope = p_scope AND r.partner_id IS NOT DISTINCT FROM p_partner AND r.at > now() - interval ''24 hours'') >= 3%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%MESSAGE = ''reset_limit''%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%INSERT INTO private.eatery_pin_resets (scope, partner_id, admin_id) VALUES (p_scope, p_partner, auth.uid())%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)')) LIKE '%DELETE FROM private.eatery_pin_resets WHERE at < now() - interval ''90 days''%'
+           AND position('''reset_limit''' IN pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)'))) < position('DELETE FROM private.eatery_pin_attempts' IN pg_get_functiondef(to_regprocedure('public.admin_reset_eatery_pin_attempts(uuid,text)'))), false)
+    UNION ALL SELECT '20261197_eatery_pin_attempts_reset','private.eatery_pin_resets (admin reset log, holds admin user ids): RLS on, 0 policies, no anon / authenticated privilege (table, column, sequence), no PUBLIC; admin_id NOT NULL; bucket index (scope, partner_id, at)',
+      to_regclass('private.eatery_pin_resets') IS NOT NULL
+      AND COALESCE((SELECT c.relrowsecurity
+                       AND NOT has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                       AND NOT has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                       AND NOT has_any_column_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+                       AND NOT has_any_column_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0)
+                  FROM pg_class c WHERE c.oid = to_regclass('private.eatery_pin_resets')), false)
+      AND COALESCE((SELECT bool_and(NOT has_sequence_privilege('anon', s.oid, 'USAGE,SELECT,UPDATE') AND NOT has_sequence_privilege('authenticated', s.oid, 'USAGE,SELECT,UPDATE'))
+                  FROM pg_class s JOIN pg_depend dp ON dp.objid = s.oid AND dp.classid = 'pg_class'::regclass AND dp.refclassid = 'pg_class'::regclass
+                 WHERE s.relkind = 'S' AND dp.refobjid = to_regclass('private.eatery_pin_resets')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'private' AND tablename = 'eatery_pin_resets') = 0
+      AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('private.eatery_pin_resets') AND a.attname = 'admin_id' AND a.attnotnull)
+      AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'private' AND indexname = 'eatery_pin_resets_bucket_idx' AND indexdef LIKE '%(scope, partner_id, at)%') = 1
+    -- 1197-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
