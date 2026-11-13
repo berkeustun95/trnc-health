@@ -5155,11 +5155,13 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
 
   useEffect(() => {
     if (!openRequest) return
+    // A tab switch now would lose an un-copied Restaurant PIN; left unconsumed, the request runs when the lock clears.
+    if (pinBusy) return
     setTab(openRequest.tab)
     setToolsOpen(true)
     if (openRequest.tab === 'Bandabuliya') setMkOpenAt(openRequest.at)
     onOpenRequestHandled?.()
-  }, [openRequest?.at])
+  }, [openRequest?.at, pinBusy])
 
   useEffect(() => {
     if (!toolsOpen) return

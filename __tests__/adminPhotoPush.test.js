@@ -74,11 +74,19 @@ describe('App.js / AdminScreen.js wiring', () => {
   })
 
   test('AdminScreen opens the tab on each new request and remounts MarketplaceTab (Photos, fresh queue) by its nonce', () => {
-    const eff = between(admin, 'if (!openRequest) return', '}, [openRequest?.at])')
+    const eff = between(admin, 'if (!openRequest) return', '}, [openRequest?.at, pinBusy])')
     expect(eff).toContain('setTab(openRequest.tab)')
     expect(eff).toContain('setToolsOpen(true)')
     expect(eff).toContain('setMkOpenAt(openRequest.at)')
     expect(admin).toContain("<MarketplaceTab key={mkOpenAt ?? 'tab'} />")
     expect(admin).toMatch(/function MarketplaceTab\(\) \{\n {2}const \[view, setView\] += useState\('Photos'\)/)
+  })
+
+  test('a request during a Restaurant PIN issue waits, unconsumed, and runs once the tab lock clears', () => {
+    const eff = between(admin, 'if (!openRequest) return', '}, [openRequest?.at, pinBusy])')
+    const bail = eff.indexOf('if (pinBusy) return')
+    expect(bail).toBeGreaterThan(-1)
+    expect(bail).toBeLessThan(eff.indexOf('setTab(openRequest.tab)'))
+    expect(bail).toBeLessThan(eff.indexOf('onOpenRequestHandled?.()'))
   })
 })
