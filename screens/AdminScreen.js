@@ -10,7 +10,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { signOutThisDevice } from '../utils/signOut'
-import { colors, placeColors, shadow } from '../constants/theme'
+import { colors, placeColors, shadow, type as typeScale, radii, elevation } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { addBackListener } from '../utils/backHandler'
@@ -4414,23 +4414,26 @@ function MarketplaceTab() {
 
 // ─── Restaurant PINs (getadaapp.com/o/<code>, 20261194) ─────────────────────
 // The PIN lives only in this tab's state until the modal closes: never logged, stored, put in a URL or an Alert.
-// Partners come through loadEateryPartners (the one reader); an admin's RLS returns active rows only.
+// Partners come through loadEateryPartners (the one reader). By design for now only active, ungated partners are listed:
+// an admin's RLS returns active rows only, and EATERY_GATES apply.
 const PIN_TEST = { scope: 'test', id: null }
 const PIN_ERROR_KEY = { forbidden: 'adminPinsErrForbidden', invalid_partner: 'adminPinsErrPartner', invalid_scope: 'adminPinsErrScope' }
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function PinShownModal({ shown, lang, onClose }) {
   return (
-    <Modal visible={shown?.visible === true} transparent animationType="fade" onRequestClose={onClose}>
+    // Android back must not discard a once-only PIN: only the button closes. No animation, so the digits never
+    // outlive their state during a fade.
+    <Modal visible={shown?.visible === true} transparent animationType="none" onRequestClose={() => {}}>
       <View style={s.pinOverlay}>
-        <View style={s.pinSheet}>
-          <Text style={s.rejectTitle}>{t('adminPinsShownTitle', lang).replace('{name}', shown?.name ?? '')}</Text>
-          <Text selectable numberOfLines={1} adjustsFontSizeToFit style={s.pinDigits}>{shown?.pin ?? ''}</Text>
+        <View style={[s.pinSheet, elevation.floating]} accessibilityViewIsModal>
+          <Text style={s.pinTitle} accessibilityRole="header">{t('adminPinsShownTitle', lang).replace('{name}', shown?.name ?? '')}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={s.pinDigits}>{shown?.pin ?? ''}</Text>
           <View style={s.pinOnceRow}>
-            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Ionicons name="alert-circle-outline" size={18} color={colors.dangerInk} />
             <Text style={s.pinOnceText}>{t('adminPinsShownOnce', lang)}</Text>
           </View>
-          <TouchableOpacity style={s.primaryBtn} onPress={onClose} activeOpacity={0.85}>
+          <TouchableOpacity style={s.primaryBtn} onPress={onClose} activeOpacity={0.85} accessibilityRole="button">
             <Text style={s.primaryBtnText}>{t('adminPinsClose', lang)}</Text>
           </TouchableOpacity>
         </View>
@@ -4439,7 +4442,7 @@ function PinShownModal({ shown, lang, onClose }) {
   )
 }
 
-function RestaurantPinsTab({ lang }) {
+function RestaurantPinsTab({ lang, onBusyChange }) {
   const [partners, setPartners] = useState(null)
   const [loadError, setLoadError] = useState(false)
   const [target, setTarget] = useState(null)
@@ -4458,6 +4461,10 @@ function RestaurantPinsTab({ lang }) {
     })
     return () => { alive = false }
   }, [])
+
+  // While a call runs the admin tab bar and the way back are locked, so a PIN issued mid-switch is never lost.
+  useEffect(() => { onBusyChange?.(!!busy) }, [busy, onBusyChange])
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange])
 
   const targetName = tg => (tg?.scope === 'test' ? t('adminPinsTestName', lang) : tg?.name ?? '')
   const errorText = e => t(PIN_ERROR_KEY[e?.message] ?? 'adminPinsErrGeneric', lang)
@@ -4517,29 +4524,34 @@ function RestaurantPinsTab({ lang }) {
       <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
         <Text style={[s.cardSub, { marginBottom: 16, lineHeight: 18 }]}>{t('adminPinsIntro', lang)}</Text>
         <Text style={s.sectionTitle}>{t('adminPinsChoose', lang)}</Text>
-        {renderChoice(PIN_TEST, t('adminPinsTestOption', lang), t('adminPinsTestNote', lang))}
-        {partners === null
-          ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} />
-          : loadError
-            ? <Text style={[s.errorText, { marginBottom: 10 }]}>{t('adminPinsLoadError', lang)}</Text>
-            : partners.length === 0
-              ? <Text style={[s.cardSub, { marginBottom: 10 }]}>{t('adminPinsNoPartners', lang)}</Text>
-              : partners.map(p => renderChoice({ scope: 'partner', id: p.id, name: p.name }, p.name, null))}
+        <View accessibilityRole="radiogroup" accessibilityLabel={t('adminPinsChoose', lang)}>
+          {renderChoice(PIN_TEST, t('adminPinsTestOption', lang), t('adminPinsTestNote', lang))}
+          {partners === null
+            ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} />
+            : loadError
+              ? <Text style={[s.errorText, { marginBottom: 10 }]}>{t('adminPinsLoadError', lang)}</Text>
+              : partners.length === 0
+                ? <Text style={[s.cardSub, { marginBottom: 10 }]}>{t('adminPinsNoPartners', lang)}</Text>
+                : partners.map(p => renderChoice({ scope: 'partner', id: p.id, name: p.name }, p.name, null))}
+        </View>
 
         <View style={{ height: 8 }} />
         {!target && <Text style={[s.cardSub, { marginBottom: 10 }]}>{t('adminPinsPickFirst', lang)}</Text>}
-        <TouchableOpacity style={[s.primaryBtn, disabled && s.primaryBtnDisabled]} onPress={() => ask('issue')} disabled={disabled} activeOpacity={0.85}>
+        <TouchableOpacity style={[s.primaryBtn, disabled && s.primaryBtnDisabled]} onPress={() => ask('issue')} disabled={disabled} activeOpacity={0.85}
+          accessibilityRole="button" accessibilityLabel={t('adminPinsIssue', lang)} accessibilityState={{ disabled, busy: busy === 'issue' }}>
           {busy === 'issue' ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>{t('adminPinsIssue', lang)}</Text>}
         </TouchableOpacity>
-        <TouchableOpacity style={[s.pinSecondaryBtn, disabled && s.primaryBtnDisabled]} onPress={() => ask('reset')} disabled={disabled} activeOpacity={0.85}>
+        <TouchableOpacity style={[s.pinSecondaryBtn, disabled && s.primaryBtnDisabled]} onPress={() => ask('reset')} disabled={disabled} activeOpacity={0.85}
+          accessibilityRole="button" accessibilityLabel={t('adminPinsReset', lang)} accessibilityState={{ disabled, busy: busy === 'reset' }}>
           {busy === 'reset' ? <ActivityIndicator color={colors.primary} /> : <Text style={s.ghostBtnText}>{t('adminPinsReset', lang)}</Text>}
         </TouchableOpacity>
         <Text style={s.broadcastNote}>{t('adminPinsResetHint', lang)}</Text>
 
         {!!feedback && (
-          <View style={[s.broadcastResult, { marginTop: 16 }, !feedback.ok && { backgroundColor: colors.dangerLight }]}>
-            <Ionicons name={feedback.ok ? 'checkmark-circle' : 'alert-circle'} size={18} color={feedback.ok ? colors.success : colors.danger} />
-            <Text style={[s.broadcastResultText, !feedback.ok && { color: colors.danger }]}>{feedback.text}</Text>
+          <View style={[s.pinFeedback, { backgroundColor: feedback.ok ? colors.primaryLight : colors.dangerLight }]}
+            accessibilityLiveRegion="polite" accessibilityRole="alert">
+            <Ionicons name={feedback.ok ? 'checkmark-circle' : 'alert-circle'} size={18} color={feedback.ok ? colors.primaryDark : colors.dangerInk} />
+            <Text style={[s.pinFeedbackText, { color: feedback.ok ? colors.primaryDark : colors.dangerInk }]}>{feedback.text}</Text>
           </View>
         )}
       </ScrollView>
@@ -4548,7 +4560,7 @@ function RestaurantPinsTab({ lang }) {
         message={confirmMessage}
         confirmLabel={t(confirm?.kind === 'reset' ? 'adminPinsResetConfirmBtn' : 'adminPinsIssueConfirmBtn', lang)}
         onConfirm={onConfirm} onCancel={() => setConfirm(null)} />
-      <PinShownModal shown={shown} lang={lang} onClose={() => setShown(prev => (prev ? { visible: false, pin: null, name: prev.name } : null))} />
+      <PinShownModal shown={shown} lang={lang} onClose={() => setShown(null)} />
     </View>
   )
 }
@@ -5124,13 +5136,14 @@ function ModerationTab() {
 export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor }) {
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [pinBusy, setPinBusy] = useState(false)
   const navigateTo = t => setTab(t)
 
   useEffect(() => {
     if (!toolsOpen) return
-    const sub = addBackListener(() => { setToolsOpen(false); return true })
+    const sub = addBackListener(() => { if (!pinBusy) setToolsOpen(false); return true })
     return () => sub.remove()
-  }, [toolsOpen])
+  }, [toolsOpen, pinBusy])
 
   if (!toolsOpen) {
     return (
@@ -5162,7 +5175,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
       <SplashStatusBar style="dark" />
       <View style={s.container}>
         <View style={s.header}>
-          <TouchableOpacity style={s.headerLeft} onPress={() => setToolsOpen(false)} activeOpacity={0.7} accessibilityLabel="Back to user counts">
+          <TouchableOpacity style={s.headerLeft} onPress={() => setToolsOpen(false)} disabled={pinBusy} activeOpacity={0.7} accessibilityLabel="Back to user counts">
             <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
             <Text style={s.headerLabel}>User counts</Text>
           </TouchableOpacity>
@@ -5215,7 +5228,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           contentContainerStyle={s.tabBarContent}
         >
           {TABS.map(k => (
-            <TouchableOpacity key={k} style={[s.tabBtn, tab === k && s.tabBtnActive]} onPress={() => setTab(k)}>
+            <TouchableOpacity key={k} style={[s.tabBtn, tab === k && s.tabBtnActive, pinBusy && tab !== k && { opacity: 0.45 }]} onPress={() => setTab(k)} disabled={pinBusy}>
               <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k}</Text>
             </TouchableOpacity>
           ))}
@@ -5247,7 +5260,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'JobPostings'   && <JobPostingsTab />}
           {tab === 'Cars'          && <CarsTab />}
           {tab === 'Bandabuliya'   && <MarketplaceTab />}
-          {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} />}
+          {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} onBusyChange={setPinBusy} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>
@@ -5361,11 +5374,15 @@ const s = StyleSheet.create({
   pinChoiceOn:        { backgroundColor: colors.primaryLight },
   pinSecondaryBtn:    { borderRadius: 14, padding: 14, alignItems: 'center', backgroundColor: colors.primaryLight },
   pinOverlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
-  pinSheet:           { backgroundColor: colors.bg, borderRadius: 20, padding: 20, paddingBottom: 8 },
+  pinSheet:           { width: '100%', maxWidth: 360, alignSelf: 'center', backgroundColor: colors.card, borderRadius: radii.widget, padding: 20, paddingBottom: 8 },
+  pinTitle:           { ...typeScale.sheetTitle, color: colors.textPrimary, textAlign: 'center' },
   pinDigits:          { fontSize: 44, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: 10, textAlign: 'center',
-                        paddingVertical: 20, paddingLeft: 10, writingDirection: 'ltr' },
-  pinOnceRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 18 },
-  pinOnceText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger, flexShrink: 1 },
+                        paddingVertical: 20, paddingLeft: 10, writingDirection: 'ltr', fontVariant: ['tabular-nums'] },
+  pinOnceRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 18,
+                        backgroundColor: colors.dangerLight, borderRadius: radii.sm, paddingVertical: 10, paddingHorizontal: 12 },
+  pinOnceText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.dangerInk, flexShrink: 1 },
+  pinFeedback:        { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 12, marginTop: 16 },
+  pinFeedbackText:    { fontSize: 13, fontFamily: 'Inter_700Bold', flex: 1 },
 
   // urgency cards
   urgencyCard:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, ...shadow },
