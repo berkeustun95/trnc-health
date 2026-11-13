@@ -40,7 +40,7 @@ await test('ok: renders order, formats, headers, RPC request shape', async () =>
   assert.match(html, /✓ Bu sipariş ADA üzerinden geldi/)
   assert.match(html, /This order came through ADA/)
   assert.match(html, /7K3Q-X9MP/)
-  assert.match(html, /21\.10\.2026 13:05/) // Istanbul = UTC+3
+  assert.match(html, /21\.10\.2026 13:05/) // Nicosia summer = UTC+3
   assert.match(html, /2 × Crunchy Burger/)
   assert.match(html, /1\.240,00 TL/)
   assert.match(html, /İlk kez görüntüleniyor/)
@@ -367,6 +367,376 @@ await test('RPC timeout (5 s abort) gives 503', async () => {
   globalThis.setTimeout = (fn, ms) => { ms5 = ms; return realSet(fn, 0) }
   try { assert.equal((await get('/o/7K3QX9MP')).status, 503) } finally { globalThis.setTimeout = realSet }
   assert.equal(ms5, 5000)
+})
+
+// ─── Order status: customer timeline, restaurant PIN / status (20261193 + 20261194) ───────────────────────────────
+const KEY = 'k'.repeat(64)
+const envK = { ...env, ADA_WORKER_KEY: KEY }
+const DEV = 'a1'.repeat(48) // 96 lowercase hex, the 20261194 token shape
+const DEV2 = 'b2'.repeat(48)
+const COOKIE = '__Secure-ada_rd'
+const PIN = '482915'
+const callE = (e, path, method, ua, extra = {}, body) => worker.fetch(new Request('https://getadaapp.com' + path, { method, headers: { ...(ua ? { 'user-agent': ua } : {}), ...extra }, ...(body != null ? { body } : {}) }), e)
+const checkE = (e, extra = {}) => callE(e, '/o/7K3QX9MP/check', 'POST', BROWSER, { ...SAME, ...extra })
+const JSONH = { ...SAME, 'content-type': 'application/json' }
+const act = (e, what, body, extra = {}, ua = BROWSER, method = 'POST') => callE(e, '/o/7K3QX9MP/' + what, method, ua, { ...JSONH, ...extra }, method === 'POST' ? JSON.stringify(body) : undefined)
+const withCookie = d => ({ cookie: `other=1; ${COOKIE}=${d}` })
+const tokenFor = async (e, extra = {}) => (await (await checkE(e, extra)).json()).token
+const ago = h => new Date(Date.now() - h * 3600e3).toISOString()
+const stRow = (over = {}) => okRow({ created_at: ago(0.5), fulfilment: 'delivery', order_status: 'sent', status_at: null, cancel_reason: null,
+  status_open: true, status_enabled: true, can_manage: false, next: [], ...over })
+const keyHeader = c => c.init.headers['x-ada-worker-key']
+
+await test('status: customer /check carries the timeline fields, never manage/next/buttons, even if the RPC said can_manage', async () => {
+  rpcImpl = () => json(stRow({ can_manage: true, next: ['received', 'cancelled'] }))
+  for (const e of [env, envK]) {
+    const j = await (await checkE(e)).json()
+    assert.equal(j.manage, false); assert.deepEqual(j.next, []); assert.equal(j.frozen, false); assert.equal(j.old2h, false)
+    assert.equal(j.orderStatus, 'sent'); assert.equal(j.fulfilment, 'delivery'); assert.equal(j.statusShown, true)
+    assert.deepEqual(JSON.parse(rpcCalls.at(-1).init.body), { p_code: '7K3QX9MP' }, 'no cookie: body stays { p_code }')
+    assert.equal(keyHeader(rpcCalls.at(-1)), undefined, 'no cookie: the key is not sent')
+  }
+  rpcImpl = () => json(stRow({ status_enabled: false }))
+  assert.equal((await (await checkE(envK)).json()).statusShown, false, 'switched-off partner, untouched order: no timeline')
+  rpcImpl = () => json(stRow({ status_enabled: false, is_test: true }))
+  assert.equal((await (await checkE(envK)).json()).statusShown, true, 'TEST order: timeline')
+})
+
+await test('status: can_manage + next only with the cookie AND the key; the key comes from env, never from a client header', async () => {
+  rpcImpl = () => json(stRow({ can_manage: true, next: ['received', 'preparing', 'on_the_way', 'cancelled', 'bogus', 'sent'] }))
+  const res = await checkE(envK, { ...withCookie(DEV), 'x-ada-worker-key': 'evil' })
+  const j = await res.json()
+  assert.equal(j.manage, true)
+  assert.deepEqual(j.next, ['received', 'preparing', 'on_the_way', 'cancelled'])
+  assert.deepEqual(JSON.parse(rpcCalls.at(-1).init.body), { p_code: '7K3QX9MP', p_device: DEV })
+  assert.equal(keyHeader(rpcCalls.at(-1)), KEY)
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  assert.match(j.token, /^[0-9a-f]{64}$/)
+  // key unset: cookie ignored, client header never forwarded, no token, customer-only
+  rpcCalls = []
+  const u = await (await checkE(env, { ...withCookie(DEV), 'x-ada-worker-key': KEY })).json()
+  assert.equal(u.manage, false); assert.equal(u.pinable, false); assert.equal(u.token, undefined); assert.deepEqual(u.next, [])
+  assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_code: '7K3QX9MP' })
+  assert.equal(keyHeader(rpcCalls[0]), undefined)
+  assert.ok(!JSON.stringify(rpcCalls[0].init.headers).includes(KEY))
+  // a malformed cookie is no cookie
+  for (const bad of ['A1'.repeat(48), 'a1'.repeat(47), DEV + '0', 'x', '']) {
+    rpcCalls = []
+    assert.equal((await (await checkE(envK, withCookie(bad))).json()).manage, false, bad)
+    assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_code: '7K3QX9MP' }, bad)
+  }
+  // too-short key counts as unset
+  assert.equal((await (await checkE({ ...env, ADA_WORKER_KEY: 'short' }, withCookie(DEV))).json()).manage, false)
+})
+
+await test('status: PIN link only when the key is set, the order is open and status is on (or TEST)', async () => {
+  const pin = async (over, e = envK) => { rpcImpl = () => json(stRow(over)); return (await (await checkE(e)).json()).pinable }
+  assert.equal(await pin({}), true)
+  assert.equal(await pin({}, env), false, 'key unset')
+  assert.equal(await pin({ status_enabled: false }), false, 'partner switched off')
+  assert.equal(await pin({ status_enabled: false, is_test: true }), true, 'TEST order')
+  assert.equal(await pin({ status_open: false }), false, 'final status')
+  assert.equal(await pin({ created_at: ago(13) }), false, 'over 12 h')
+})
+
+await test('status: restaurant 2 h warning and 12 h freeze come from created_at', async () => {
+  const m = async over => { rpcImpl = () => json(stRow({ can_manage: true, next: ['received', 'cancelled'], ...over })); return checkE(envK, withCookie(DEV)).then(r => r.json()) }
+  let j = await m({ created_at: ago(1.5) }); assert.equal(j.old2h, false); assert.equal(j.frozen, false)
+  j = await m({ created_at: ago(2.5) }); assert.equal(j.old2h, true); assert.equal(j.frozen, false); assert.deepEqual(j.next, ['received', 'cancelled'])
+  j = await m({ created_at: ago(2.5), order_status: 'received' }); assert.equal(j.old2h, false, 'only while still sent')
+  j = await m({ created_at: ago(12.5), status_open: false }); assert.equal(j.frozen, true); assert.equal(j.old2h, false); assert.deepEqual(j.next, [])
+})
+
+await test('/pin /status /forget /token: refuse wrong method, cross-origin, bots, non-JSON, unset key, missing/wrong action token — no RPC', async () => {
+  rpcImpl = () => json({ status: 'ok', device_token: DEV })
+  const tok = await tokenFor(envK)
+  rpcCalls = []
+  for (const what of ['pin', 'status', 'forget', 'token']) {
+    const body = { pin: PIN, status: 'received', reason: null, token: tok }
+    const cases = [
+      ['GET', act(envK, what, body, {}, BROWSER, 'GET'), 405],
+      ['cross-site', act(envK, what, body, { 'sec-fetch-site': 'cross-site' }), 403],
+      ['foreign Origin', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, { origin: 'https://evil.example', 'content-type': 'application/json' }, JSON.stringify(body)), 403],
+      ['no origin headers', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, { 'content-type': 'application/json' }, JSON.stringify(body)), 403],
+      ['bot', act(envK, what, body, {}, 'WhatsApp/2.23'), 403],
+      ['text/plain', act(envK, what, body, { 'content-type': 'text/plain' }), 415],
+      ['form', act(envK, what, body, { 'content-type': 'application/x-www-form-urlencoded' }), 415],
+      ['key unset', act(env, what, body), 403],
+      ['bad code', callE(envK, '/o/7K3QX9M0/' + what, 'POST', BROWSER, JSONH, JSON.stringify(body)), 404],
+      ['not JSON', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, JSONH, '{pin:'), 400],
+      ['huge', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, JSONH, JSON.stringify({ ...body, x: 'x'.repeat(2000) })), 400],
+      ['content-length over the cap, refused before reading', callE(envK, '/o/7K3QX9MP/' + what, 'POST', BROWSER, { ...JSONH, 'content-length': '5000' }, JSON.stringify(body)), 413],
+    ]
+    if (what !== 'token') cases.push(
+      ['no token', act(envK, what, { ...body, token: undefined }), 403],
+      ['forged token', act(envK, what, { ...body, token: 'f'.repeat(64) }), 403],
+      ['token of another code', act(envK, what, { ...body, token: await (async () => { rpcImpl = () => json(stRow()); const t = (await (await callE(envK, '/o/22222222/check', 'POST', BROWSER, SAME)).json()).token; rpcCalls = []; return t })() }), 403],
+      ['token for a different key', act(envK, what, { ...body, token: await tokenFor({ ...env, ADA_WORKER_KEY: 'z'.repeat(64) }).then(t => { rpcCalls = []; return t }) }), 403],
+    )
+    for (const [name, p, code] of cases) {
+      const r = await p
+      assert.equal(r.status, code, `${what}: ${name}`)
+      assert.equal(r.headers.get('cache-control'), 'no-store', `${what}: ${name}`)
+      assert.equal(r.headers.get('set-cookie'), null, `${what}: ${name}`)
+      if (code === 403 && name.endsWith('token')) assert.equal((await r.json()).status, 'retry', `${what}: ${name}`)
+    }
+  }
+  assert.equal(rpcCalls.length, 0)
+})
+
+await test('action token: bound to the device cookie, lives 10–20 min, /token renews it without the RPC', async () => {
+  const realNow = Date.now
+  const t0 = Math.floor(realNow() / 600e3) * 600e3 + 1000 // start of a 10-min bucket: no boundary flake
+  Date.now = () => t0
+  try {
+    rpcImpl = () => json(stRow())
+    const anon = await tokenFor(envK)
+    rpcCalls = []
+    rpcImpl = () => json({ status: 'wrong_pin' })
+    assert.equal((await act(envK, 'pin', { pin: PIN, token: anon }, withCookie(DEV))).status, 403, 'anon token with a device cookie')
+    assert.equal(rpcCalls.length, 0)
+    Date.now = () => t0 + 10 * 60e3
+    assert.equal((await act(envK, 'pin', { pin: PIN, token: anon })).status, 200, 'previous bucket still valid')
+    Date.now = () => t0 + 21 * 60e3
+    rpcCalls = []
+    const old = await act(envK, 'pin', { pin: PIN, token: anon })
+    assert.equal(old.status, 403); assert.equal((await old.json()).status, 'retry'); assert.equal(rpcCalls.length, 0)
+    const fresh = await (await act(envK, 'token', {})).json()
+    assert.equal(rpcCalls.length, 0)
+    assert.equal((await act(envK, 'pin', { pin: PIN, token: fresh.token })).status, 200)
+  } finally { Date.now = realNow }
+})
+
+await test('/pin: PIN only in the POST body to Supabase, cookie flags exact, device token never in the JSON, statuses mapped', async () => {
+  rpcImpl = () => json(stRow())
+  const tok = await tokenFor(envK, { 'x-ada-worker-key': 'evil' })
+  rpcCalls = []
+  rpcImpl = () => json({ status: 'ok', device_token: DEV })
+  const res = await act(envK, 'pin', { pin: PIN, token: tok }, { 'x-ada-worker-key': 'evil' })
+  const raw = await res.text()
+  assert.equal(res.status, 200)
+  assert.equal(res.headers.get('set-cookie'), `${COOKIE}=${DEV}; HttpOnly; Secure; SameSite=Strict; Path=/o/; Max-Age=15552000`)
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  assert.ok(!raw.includes(DEV), 'device token must not be in the JSON body')
+  assert.ok(!raw.includes(PIN))
+  const j = JSON.parse(raw)
+  assert.equal(j.status, 'ok'); assert.match(j.token, /^[0-9a-f]{64}$/); assert.notEqual(j.token, tok, 'new token bound to the new device')
+  assert.equal(rpcCalls.length, 1)
+  assert.equal(rpcCalls[0].url, 'https://x.test/rest/v1/rpc/eatery_partner_enrol')
+  assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_code: '7K3QX9MP', p_pin: PIN })
+  assert.equal(keyHeader(rpcCalls[0]), KEY)
+  for (const c of rpcCalls) assert.ok(!c.url.includes(PIN), 'PIN in a URL')
+  for (const st of ['wrong_pin', 'locked', 'closed', 'no_pin', 'device_limit', 'not_found', 'forbidden']) {
+    rpcImpl = () => json({ status: st })
+    const r = await act(envK, 'pin', { pin: PIN, token: tok })
+    assert.deepEqual(await r.json(), { status: st }, st); assert.equal(r.headers.get('set-cookie'), null, st)
+  }
+  for (const impl of [() => json({ status: 'ok' }), () => json({ status: 'ok', device_token: 'short' }), () => json({ status: 'weird' }), () => { throw new Error('x') }]) {
+    rpcImpl = impl
+    const r = await act(envK, 'pin', { pin: PIN, token: tok })
+    assert.equal(r.status, 503); assert.equal(r.headers.get('set-cookie'), null)
+  }
+  rpcCalls = []
+  for (const bad of ['12345', '1234567', 'abcdef', 482915, null]) assert.equal((await (await act(envK, 'pin', { pin: bad, token: tok })).json()).status, 'wrong_pin', String(bad))
+  assert.equal(rpcCalls.length, 0, 'malformed PINs never reach the RPC')
+})
+
+await test('/pin: per-IP rate-limit binding refuses before the RPC; absent binding = no-op', async () => {
+  rpcImpl = () => json(stRow())
+  const tok = await tokenFor(envK)
+  const keys = []
+  const limited = { ...envK, PIN_RATE_LIMITER: { limit: async o => { keys.push(o.key); return { success: false } } } }
+  rpcCalls = []
+  const r = await act(limited, 'pin', { pin: PIN, token: tok }, { 'cf-connecting-ip': '203.0.113.9' })
+  assert.equal(r.status, 429); assert.deepEqual(await r.json(), { status: 'rate_limited' }); assert.equal(rpcCalls.length, 0)
+  assert.deepEqual(keys, ['pin:203.0.113.9'])
+  rpcImpl = () => json({ status: 'wrong_pin' })
+  const allowed = { ...envK, PIN_RATE_LIMITER: { limit: async () => ({ success: true }) } }
+  assert.equal((await (await act(allowed, 'pin', { pin: PIN, token: tok })).json()).status, 'wrong_pin')
+  assert.equal((await (await act(envK, 'pin', { pin: PIN, token: tok })).json()).status, 'wrong_pin')
+})
+
+await test('/status: needs the device cookie, validates status/reason locally, sends device + key, maps results', async () => {
+  rpcImpl = () => json(stRow({ can_manage: true }))
+  const tok = await tokenFor(envK, withCookie(DEV))
+  rpcCalls = []
+  assert.equal((await act(envK, 'status', { status: 'received', token: tok })).status, 403, 'no cookie (and token bound to DEV)')
+  assert.equal((await act(envK, 'status', { status: 'received', token: tok }, withCookie(DEV2))).status, 403, 'other device')
+  const bad = [[{ status: 'sent' }, 'invalid_transition'], [{ status: 'delivered' }, 'invalid_transition'], [{ status: null }, 'invalid_transition'],
+    [{ status: 'cancelled' }, 'invalid_reason'], [{ status: 'cancelled', reason: 'rude' }, 'invalid_reason'], [{ status: 'cancelled', reason: 'toString' }, 'invalid_reason'], [{ status: 'preparing', reason: 'busy' }, 'invalid_reason']]
+  for (const [b, want] of bad) assert.equal((await (await act(envK, 'status', { ...b, token: tok }, withCookie(DEV))).json()).status, want, JSON.stringify(b))
+  assert.equal(rpcCalls.length, 0)
+  rpcImpl = () => json({ status: 'ok', changed: true, order_status: 'cancelled', next: [] })
+  const res = await act(envK, 'status', { status: 'cancelled', reason: 'item_out', token: tok }, { ...withCookie(DEV), 'x-ada-worker-key': 'evil' })
+  const j = await res.json()
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  assert.equal(j.status, 'ok'); assert.equal(j.orderStatus, 'cancelled'); assert.deepEqual(j.next, []); assert.match(j.statusAt, /^\d\d\.\d\d\.\d{4} \d\d:\d\d$/)
+  assert.equal(rpcCalls[0].url, 'https://x.test/rest/v1/rpc/eatery_order_set_status')
+  assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_code: '7K3QX9MP', p_status: 'cancelled', p_reason: 'item_out', p_device: DEV })
+  assert.equal(keyHeader(rpcCalls[0]), KEY)
+  assert.ok(!rpcCalls[0].url.includes(DEV))
+  rpcImpl = () => json({ status: 'ok', changed: true, order_status: 'received', next: ['preparing', 'on_the_way', 'cancelled'] })
+  assert.deepEqual((await (await act(envK, 'status', { status: 'received', token: tok }, withCookie(DEV))).json()).next, ['preparing', 'on_the_way', 'cancelled'])
+  assert.equal(JSON.parse(rpcCalls.at(-1).init.body).p_reason, null)
+  for (const st of ['forbidden', 'not_found', 'disabled', 'frozen', 'invalid_transition', 'invalid_reason']) {
+    rpcImpl = () => json({ status: st })
+    assert.deepEqual(await (await act(envK, 'status', { status: 'received', token: tok }, withCookie(DEV))).json(), { status: st })
+  }
+  rpcImpl = () => { throw new Error('x') }
+  assert.equal((await act(envK, 'status', { status: 'received', token: tok }, withCookie(DEV))).status, 503)
+})
+
+await test('/forget: clears the cookie (Max-Age=0), no RPC, returns an anon token', async () => {
+  rpcImpl = () => json(stRow({ can_manage: true }))
+  const tok = await tokenFor(envK, withCookie(DEV))
+  rpcCalls = []
+  const res = await act(envK, 'forget', { token: tok }, withCookie(DEV))
+  assert.equal(res.status, 200)
+  assert.equal(res.headers.get('set-cookie'), `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/o/; Max-Age=0`)
+  const j = await res.json()
+  assert.equal(j.status, 'ok'); assert.notEqual(j.token, tok)
+  assert.equal(rpcCalls.length, 0)
+})
+
+await test('timeline: Europe/Nicosia times (winter UTC+2), server page timeline, cancelled reason text, view=1 never manages', async () => {
+  rpcImpl = () => json(okRow({ created_at: '2026-11-13T10:05:00Z', status_at: '2026-11-13T10:20:00Z', order_status: 'preparing', fulfilment: 'pickup', status_enabled: true, can_manage: true, next: ['ready', 'cancelled'] }))
+  const j = await (await checkE(envK)).json()
+  assert.equal(j.time, '13.11.2026 12:05'); assert.equal(j.statusAt, '13.11.2026 12:20')
+  rpcCalls = []
+  const html = await (await callE(envK, '/o/7K3QX9MP?view=1', 'GET', BROWSER, withCookie(DEV))).text()
+  assert.deepEqual(JSON.parse(rpcCalls[0].init.body), { p_code: '7K3QX9MP' }, '?view=1 never sends the device')
+  assert.equal(keyHeader(rpcCalls[0]), undefined)
+  assert.match(html, /Sipariş durumu/)
+  assert.match(html, /<div class="step done cur"><span class="dot"><\/span><div><span>Hazırlanıyor<\/span><span class="tm"> · 13\.11\.2026 12:20<\/span>/)
+  assert.match(html, /Hazır, gelip alabilirsiniz/); assert.doesNotMatch(html, /Yolda/)
+  assert.doesNotMatch(html, /<button|PIN ile giriş|İptal et/)
+  rpcImpl = () => json(okRow({ order_status: 'cancelled', cancel_reason: 'no_delivery_there', status_at: '2026-11-13T10:20:00Z', status_enabled: true }))
+  const c = await (await get('/o/7K3QX9MP')).text()
+  assert.match(c, /İptal edildi · 13\.11\.2026 12:20/); assert.match(c, /Bu adrese teslimat yok/); assert.match(c, /No delivery to this address/)
+  rpcImpl = () => json(okRow({ order_status: 'sent', fulfilment: null, status_enabled: true }))
+  assert.match(await (await get('/o/7K3QX9MP')).text(), /Yolda \/ Hazır, gelip alabilirsiniz/)
+  rpcImpl = () => json(okRow({ order_status: 'cancelled', cancel_reason: '<b>x</b>', status_enabled: true }))
+  const e = await (await get('/o/7K3QX9MP')).text()
+  assert.doesNotMatch(e, /<b>x<\/b>/)
+  for (const k of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    rpcImpl = () => json(okRow({ order_status: 'cancelled', cancel_reason: k, status_enabled: true }))
+    const j = await (await callE(env, '/o/7K3QX9MP/check', 'POST', BROWSER, SAME)).json()
+    assert.equal(j.cancelReason, null, `prototype key ${k} is not a reason`)
+  }
+})
+
+// Client script in a stub DOM with buttons/inputs.
+const clientRun = async (payload, responses = {}) => {
+  const html = await (await plain('/o/7K3QX9MP')).text()
+  const js = html.match(/<script nonce="[^"]+">([\s\S]*)<\/script>/)[1]
+  const mkEl = tag => ({ tag, children: [], className: '', set textContent(v) { this._t = v; this.children = [] }, get textContent() { return this._t }, appendChild(c) { this.children.push(c) }, set innerHTML(_) { throw new Error('innerHTML used') } })
+  const box = mkEl('div'); const timers = []; const calls = []
+  const doc = { visibilityState: 'visible', readyState: 'complete', getElementById: () => box, createElement: mkEl, addEventListener() {} }
+  const fetchStub = (u, o) => { calls.push([u, o]); const k = u.split('/').pop(); const r = responses[k]; return Promise.resolve({ json: async () => (typeof r === 'function' ? r(o) : r ?? payload) }) }
+  new Function('document', 'window', 'location', 'fetch', 'setTimeout', js)(doc, { addEventListener() {} }, { pathname: '/o/7K3QX9MP' }, fetchStub, (f, ms) => timers.push([f, ms]))
+  timers[0][0](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r))
+  return { box, calls }
+}
+const flush = async () => { for (let i = 0; i < 6; i++) await new Promise(r => setImmediate(r)) }
+const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out }
+const texts = n => all(n).map(x => x._t).filter(Boolean)
+const buttons = n => all(n).filter(x => x.tag === 'button')
+const label = b => texts(b).join(' ')
+const base = { status: 'ok', partner: 'P', orderNo: '7K3Q-X9MP', time: '13.11.2026 12:05', lines: [], total: '0', seenTr: 'tr', seenEn: 'en', isTest: false,
+  orderStatus: 'sent', fulfilment: 'delivery', statusAt: '', cancelReason: null, statusShown: true, manage: false, pinable: false, next: [], frozen: false, old2h: false }
+
+await test('client: customer view never has buttons; PIN link only with pinable AND a token; fetches use credentials same-origin', async () => {
+  for (const p of [base, { ...base, next: ['received', 'cancelled'] }, { ...base, manage: 'true', next: ['received'] }, { ...base, pinable: true }, { ...base, pinable: true, token: undefined }]) {
+    const { box, calls } = await clientRun(p)
+    assert.equal(buttons(box).length, 0, JSON.stringify(p))
+    assert.equal(calls[0][1].credentials, 'same-origin')
+    assert.ok(texts(box).includes('Gönderildi'))
+  }
+  const { box } = await clientRun({ ...base, pinable: true, token: 'f'.repeat(64) })
+  const b = buttons(box)
+  assert.equal(b.length, 1); assert.equal(label(b[0]), 'Restoran girişi')
+  assert.match(b[0].className, /\bquiet\b/, 'PIN entry is the low-key link'); assert.equal(box.children[box.children.length - 1], b[0], 'PIN link is last on the page')
+  const off = await clientRun({ ...base, statusShown: false })
+  assert.ok(!texts(off.box).includes('Gönderildi'), 'no timeline when status is not in use')
+})
+
+await test('client: PIN flow posts the PIN in the JSON body only, then re-checks; errors shown; seen line kept', async () => {
+  const tok = 'f'.repeat(64)
+  let checks = 0
+  const { box, calls } = await clientRun(null, {
+    check: () => (++checks === 1 ? { ...base, pinable: true, token: tok } : { ...base, seenTr: 'tr2', manage: true, next: ['received', 'cancelled'], token: 'e'.repeat(64) }),
+    pin: o => (JSON.parse(o.body).pin === PIN ? { status: 'ok', token: 'd'.repeat(64) } : { status: 'locked' }),
+  })
+  buttons(box)[0].onclick()
+  const input = all(box).find(x => x.tag === 'input')
+  assert.equal(input.inputMode, 'numeric'); assert.equal(input.autocomplete, 'one-time-code'); assert.equal(input.maxLength, 6)
+  const signIn = buttons(box).find(b => label(b).startsWith('Giriş yap'))
+  input.value = '12'; signIn.onclick(); await flush()
+  assert.ok(texts(box).includes('6 haneli PIN girin'))
+  input.value = '000000'; signIn.onclick(); await flush()
+  assert.ok(texts(box).some(t => t.startsWith('Çok fazla hatalı deneme')))
+  input.value = PIN; signIn.onclick(); await flush()
+  for (const [u, o] of calls) { assert.ok(!u.includes(PIN), 'PIN in URL ' + u); assert.equal(o.credentials, 'same-origin') }
+  const pinCalls = calls.filter(c => c[0] === '/o/7K3QX9MP/pin')
+  assert.equal(pinCalls.length, 2)
+  assert.deepEqual(JSON.parse(pinCalls[1][1].body), { pin: PIN, token: tok })
+  assert.equal(pinCalls[1][1].headers['Content-Type'], 'application/json')
+  assert.equal(checks, 2)
+  assert.ok(texts(box).includes('tr'), 'first seen line kept after sign-in'); assert.ok(!texts(box).includes('tr2'))
+  assert.deepEqual(buttons(box).map(label), ['Siparişi aldık Order received', 'İptal et Cancel', 'Bu cihazı unut · Forget this device'])
+})
+
+await test('client: restaurant buttons = next only; cancel needs a reason + confirm; 2 h warning; 12 h freeze; TEST label', async () => {
+  const tok = 'f'.repeat(64)
+  let posted = null
+  const r1 = await clientRun({ ...base, manage: true, next: ['preparing', 'on_the_way', 'cancelled'], token: tok, old2h: true }, {
+    status: o => { posted = JSON.parse(o.body); return { status: 'ok', changed: true, orderStatus: 'cancelled', next: [], statusAt: '13.11.2026 12:30', token: tok } },
+  })
+  assert.ok(texts(r1.box).includes('2 saatten eski sipariş — müşteriyle teyit edin'))
+  assert.ok(!texts(r1.box).includes('Bu sipariş için güncellenecek durum yok'), 'no empty note while there is something to do')
+  const idle = await clientRun({ ...base, manage: true, next: [], token: tok })
+  assert.ok(texts(idle.box).includes('Bu sipariş için güncellenecek durum yok'), 'restaurant panel with no next step says so')
+  assert.deepEqual(buttons(r1.box).map(label), ['Hazırlanıyor Preparing', 'Yolda On the way', 'İptal et Cancel', 'Bu cihazı unut · Forget this device'])
+  buttons(r1.box)[2].onclick()
+  const bs = buttons(r1.box)
+  assert.deepEqual(bs.slice(0, 6).map(b => texts(b)[0]), ['Şu an kapalıyız', 'Çok yoğunuz', 'Ürün kalmadı', 'Bu adrese teslimat yok', 'Müşteriye ulaşılamadı', 'Diğer'])
+  const confirm = bs.find(b => texts(b)[0] === 'Siparişi iptal et')
+  assert.equal(confirm.disabled, true)
+  confirm.onclick(); await flush(); assert.equal(posted, null, 'no reason picked: nothing sent')
+  bs[1].onclick(); assert.equal(confirm.disabled, false)
+  confirm.onclick(); await flush()
+  assert.deepEqual(posted, { status: 'cancelled', reason: 'busy', token: tok })
+  assert.ok(texts(r1.box).includes('İptal edildi · 13.11.2026 12:30')); assert.ok(texts(r1.box).includes('Çok yoğunuz'))
+  assert.deepEqual(buttons(r1.box).map(label), ['Bu cihazı unut · Forget this device'], 'no undo')
+  const fr = await clientRun({ ...base, manage: true, frozen: true, next: [], token: tok })
+  assert.ok(texts(fr.box).includes('Durum artık değiştirilemez'))
+  assert.deepEqual(buttons(fr.box).map(label), ['Bu cihazı unut · Forget this device'])
+  const t = await clientRun({ ...base, isTest: true, manage: true, next: ['received'], token: tok })
+  assert.ok(texts(t.box).includes('TEST SİPARİŞİ — hazırlamayın')); assert.ok(texts(t.box).includes('Sipariş durumu · TEST'))
+  // retry: expired action token renewed via /token, then the action is re-sent once
+  let n2 = 0
+  const rr = await clientRun({ ...base, manage: true, next: ['received'], token: tok }, {
+    status: () => (++n2 === 1 ? { status: 'retry' } : { status: 'ok', changed: true, orderStatus: 'received', next: ['cancelled'], statusAt: 'x', token: tok }),
+    token: { status: 'ok', token: 'c'.repeat(64) },
+  })
+  buttons(rr.box)[0].onclick(); await flush()
+  assert.deepEqual(rr.calls.map(c => c[0].split('/').pop()), ['check', 'status', 'token', 'status'])
+  assert.equal(JSON.parse(rr.calls[3][1].body).token, 'c'.repeat(64))
+  assert.deepEqual(buttons(rr.box).map(label), ['İptal et Cancel', 'Bu cihazı unut · Forget this device'])
+  // already in that status (another phone, or a retried write that had committed): re-sync from /check, never a blank panel
+  let nc = 0
+  const same = await clientRun(null, {
+    check: () => (++nc === 1 ? { ...base, manage: true, next: ['received', 'cancelled'], token: tok } : { ...base, orderStatus: 'received', manage: true, next: ['preparing', 'cancelled'], token: tok }),
+    status: { status: 'ok', changed: false, orderStatus: 'received', next: [], statusAt: 'x', token: tok },
+  })
+  buttons(same.box)[0].onclick(); await flush()
+  assert.equal(nc, 2)
+  assert.deepEqual(buttons(same.box).map(label), ['Hazırlanıyor Preparing', 'İptal et Cancel', 'Bu cihazı unut · Forget this device'])
+  // forget: panel gone, sign-in link back while the order is still open
+  const fg = await clientRun({ ...base, manage: true, next: ['received'], token: tok }, { forget: { status: 'ok', token: 'b'.repeat(64) } })
+  buttons(fg.box).at(-1).onclick(); await flush()
+  assert.deepEqual(JSON.parse(fg.calls.at(-1)[1].body), { token: tok })
+  assert.deepEqual(buttons(fg.box).map(label), ['Restoran girişi'])
 })
 
 globalThis.fetch = realFetch

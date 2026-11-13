@@ -50,6 +50,11 @@
   "compatibility_date": "2026-06-19",
   // Public project URL (also in the app bundle). SUPABASE_ANON_KEY is a Worker SECRET: `wrangler secret put SUPABASE_ANON_KEY`.
   "vars": { "SUPABASE_URL": "https://jeihxnwqytnxtytgkzgf.supabase.co" },
+  // ADA_WORKER_KEY is a Worker SECRET too (restaurant order status; unset = customer-only page). Never a var.
+  // Per-IP limit on restaurant PIN tries (POST /o/<code>/pin); worker/index.js no-ops if the binding is absent.
+  "ratelimits": [
+    { "name": "PIN_RATE_LIMITER", "namespace_id": "2026111301", "simple": { "limit": 5, "period": 60 } }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": "./web",
