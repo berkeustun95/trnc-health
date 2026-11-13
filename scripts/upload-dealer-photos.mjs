@@ -181,7 +181,7 @@ try {
   console.error(`\n${e.message}`)
 } finally {
   rl.close()
-  const { error } = await db.auth.signOut()
+  const { error } = await db.auth.signOut({ scope: 'local' })
   console.log(error ? `sign-out failed: ${error.message}` : 'signed out')
 }
 process.exit(code)

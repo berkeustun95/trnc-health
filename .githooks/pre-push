@@ -153,6 +153,13 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs
   exit 1
 }
 
+# Sign-out scope. A bare or wrongly scoped supabase.auth.signOut() logs the user out of every device
+# (auth-js default is global). jest reads the WORKING TREE, not the commits being pushed.
+npm run --silent test:signout || {
+  echo "  push blocked: a sign-out has no scope or the wrong one — see __tests__/signOutScope.test.js."
+  exit 1
+}
+
 # Redesign S6. A style with fontWeight and no fontFamily renders in the Android SYSTEM font;
 # an icon-only control with no accessibilityLabel is announced as "button" and nothing else.
 # Both were swept to zero on 2026-10-01 (109 and 24); these keep them there. Role screens are

@@ -9,6 +9,7 @@ import SplashStatusBar from '../components/SplashStatusBar'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import { signOutThisDevice } from '../utils/signOut'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { storageObjectPath } from '../utils/facilityUtils'
@@ -4998,7 +4999,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
               <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.headerIcon} resizeMode="contain" />
               <Text style={s.headerLabel}>Admin</Text>
             </View>
-            <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+            <TouchableOpacity style={s.signOutBtn} onPress={() => signOutThisDevice()}>
               <Text style={s.signOutText}>Sign out</Text>
             </TouchableOpacity>
           </View>
@@ -5022,7 +5023,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
             <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
             <Text style={s.headerLabel}>User counts</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+          <TouchableOpacity style={s.signOutBtn} onPress={() => signOutThisDevice()}>
             <Text style={s.signOutText}>Sign out</Text>
           </TouchableOpacity>
         </View>

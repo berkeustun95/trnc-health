@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../lib/supabase'
+import { signOutEverywhere } from '../utils/signOut'
 import PageCanvas from '../components/ui/PageCanvas'
 import SplashStatusBar from '../components/SplashStatusBar'
 import { colors, shadow, radius } from '../constants/theme'
@@ -49,7 +49,8 @@ export default function AgeIneligibleScreen({ lang, onDone }) {
     if (busy) return
     setBusy(true)
     setError(false)
-    const { error: signOutError } = await supabase.auth.signOut()
+    // Safety sign-out (under-13): every device.
+    const { error: signOutError } = await signOutEverywhere({ clearToken: true })
     // On success the SIGNED_OUT listener in App.js unmounts this screen, so there is
     // nothing to reset. On failure the session is still here and so are we.
     if (signOutError) { setError(true); setBusy(false) }
