@@ -742,8 +742,8 @@ export default function App() {
   const [eateryOpenSlug, setEateryOpenSlug] = useState(null)
   const [eateryFromMap, setEateryFromMap] = useState(false)
   // An order-status push tap (20261194: data { screen: 'eatery_order', code }) opens the module with that order's card first.
-  const [eateryOrderCode, setEateryOrderCode] = useState(null)
-  useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false); setEateryOrderCode(null) } }, [showEatery])
+  const [eateryOrderTap, setEateryOrderTap] = useState(null)   // { code, at }: `at` makes a second tap for the same order re-read
+  useEffect(() => { if (!showEatery) { setEateryOpenSlug(null); setEateryFromMap(false); setEateryOrderTap(null) } }, [showEatery])
   const closeEateryPartner = () => { if (eateryFromMap) setShowEatery(false); setEateryPartner(null) }
   const [showStudentHub, setShowStudentHub] = useState(false)
   // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
@@ -1548,7 +1548,7 @@ export default function App() {
     if (!EATERY || !code) return false
     setEateryPartner(null)
     setEateryFromMap(false)
-    setEateryOrderCode(code)
+    setEateryOrderTap({ code, at: Date.now() })
     setShowEatery(true)
     return true
   }
@@ -2726,7 +2726,7 @@ export default function App() {
     // Dark section: no ComingSoon fallback (no waitlist). EATERY is true only when live or on dev / ADA Preview.
     content = <EateryScreen lang={lang} session={session} dateOfBirth={profile?.date_of_birth ?? null} onRequireAccount={requireAccount} partner={eateryPartner} onOpenPartner={setEateryPartner}
       onClosePartner={closeEateryPartner} partnerBackRef={eateryPartnerBackRef} listBackRef={eateryListBackRef} onBack={() => setShowEatery(false)}
-      openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} orderCode={eateryOrderCode} />
+      openSlug={eateryOpenSlug} onOpenSlugDone={opened => { setEateryOpenSlug(null); if (!opened) setEateryFromMap(false) }} orderTap={eateryOrderTap} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.

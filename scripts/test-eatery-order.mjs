@@ -1,7 +1,7 @@
 // Order via WhatsApp: the pure message builder. Runs the REAL constants/eatery.js (no stubs needed).
 //   node scripts/test-eatery-order.mjs
 import * as B from '../utils/eateryBasketCore.js'
-import { t } from '../constants/i18n.js'
+import { t, hasOwnTranslation } from '../constants/i18n.js'
 import fs from 'node:fs'
 import { eateryItemOptions, eateryOptionLabel, resolveLineOptions, basketLines, optionDetail, isFreeExtra, PHONE_INPUT_MAX, normalizePhone, formatPhone, sanitizeAddressField, orderRpcArgs, ADDRESS_FIELD_MAX, mapsLink, deliveryReady, deliveryLine, formatTl, buildOrderMessage, orderWhatsAppUrl, eateryOrderDigits, eateryContactNumbers, eateryLogsContacts, eateryContacts, eateryOrderable, eateryOrdersByWhatsapp, eateryListMode, orderTotal, orderCodeLine, orderCheck, isAdultForOrder, orderAgeGate, serverOrderLines, orderMismatch, orderErrorKind, withTimeout, locateOutcome, locateNote, addressComplete, editorBack, eateryPartnerBack, firstIncompleteStep, editorStartStep, addressMissing, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, shortAddress, cardState, canAddMore, MAPS_LINK_FORMAT, coordText, pickBestFix, accuracyNote, refineFix, askFreshFix, sheetFadeVisible, SHEET_FADE_TOL, LOCATE_REFINE_MS, LOCATE_GOOD_M, LOCATE_POOR_M, EATERY_BANNER_H, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn, eateryOrdersOnWebsite, eaterySiteOrderUrl, eaterySiteCartUrl, eaterySiteHost, eateryBrandInk, EATERY_UTM, eateryMenuSections, eateryAdultItemsOk, orderMode, orderStatusShown, orderStatusLive, orderTimeline, formatOrderCode, orderPushCode, nicosiaDate } from '../constants/eatery.js'
 import { heroPathOf } from '../utils/stripSlides.js'
@@ -889,6 +889,16 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   const opener = cut('const openEateryOrderPush = data => {', '\n  }\n')
   eq('push tap: gated on EATERY, validated code, landing (no partner page over it)', ['if (!EATERY || !code) return false', 'orderPushCode(data)', 'setEateryPartner(null)', 'setShowEatery(true)'].map(x => opener.includes(x)), [true, true, true, true])
   const st = fs.readFileSync(new URL('../components/EateryOrderStatus.js', import.meta.url), 'utf8')
+  // i18n: i18n:validate scans named surfaces only (not this card), so its keys are checked here.
+  const LANGS = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  const osKeys = [...new Set([...st.matchAll(/'(eateryOs\w+)'/g)].map(m => m[1]))]
+  eq('status card: it uses 22 eateryOs keys (the scan saw them)', osKeys.length, 22)
+  eq('status card: every eateryOs key has its own text in all 9 languages', osKeys.flatMap(k => LANGS.filter(l => !hasOwnTranslation(k, l)).map(l => `${k}/${l}`)), [])
+  eq('status card: the approved first status, all 9', LANGS.map(l => t('eateryOsSent', l)), ['Sent to the restaurant', 'Restorana iletildi', 'أُرسل إلى المطعم', 'Передан в ресторан', 'Στάλθηκε στο εστιατόριο', 'Transmise au restaurant', 'Enviado al restaurante', 'An das Restaurant übermittelt', 'به رستوران ارسال شد'])
+  const worker = fs.readFileSync(new URL('../worker/index.js', import.meta.url), 'utf8')
+  const WK = { received: 'eateryOsReceived', preparing: 'eateryOsPreparing', on_the_way: 'eateryOsOnTheWay', ready: 'eateryOsReady', either: 'eateryOsEither', cancelled: 'eateryOsCancelled',
+    closed: 'eateryOsReasonClosed', busy: 'eateryOsReasonBusy', item_out: 'eateryOsReasonItemOut', no_delivery_there: 'eateryOsReasonNoDelivery', unreachable: 'eateryOsReasonUnreachable', other: 'eateryOsReasonOther' }
+  eq('status card: Turkish + English words are the verify page\'s (worker/index.js ST / REASONS)', Object.entries(WK).filter(([code, k]) => !worker.includes(`  ${code}: [${JSON.stringify(t(k, 'Turkish')).replace(/"/g, "'")}, ${JSON.stringify(t(k, 'English')).replace(/"/g, "'")}]`)).map(([c]) => c), [])
   eq('status card: subscribe sends the code, the token and the app language only', st.includes("supabase.rpc('eatery_order_subscribe', { p_code: code, p_token: token, p_lang: lang })"), true)
   eq('status card: no profile write, no console, no analytics', (st.match(/from\('profiles'\)|savePushToken|console\.|logContactEvent/g) || []), [])
   const o = (x) => ({ code: 'AB23CD45', created_at: '2026-11-13T10:00:00Z', status_at: null, order_status: 'sent', fulfilment: 'pickup', is_test: false, status_enabled: false, status_open: true, cancel_reason: null, ...x })

@@ -33,12 +33,13 @@ function timeText(iso, lang) {
 }
 
 // Permission (with the ADA explanation first where the redesign is on), then the token, then the order-scoped subscribe.
-// -> 'on' | 'off' (not allowed; settings) | 'closed' (the order became final meanwhile) | 'fail'
+// -> 'on' | 'off' (the OS will not ask again: settings) | 'later' ("Şimdi değil" or a first OS "No": back to the button, no message)
+//    | 'closed' (the order became final meanwhile) | 'fail'
 async function subscribeOrder(code, lang) {
   try {
     if (!Device.isDevice) return 'fail'
     const perm = REDESIGN ? await requestWithPrimer('notifications', { auto: false }) : await Notifications.requestPermissionsAsync()
-    if (perm.status !== 'granted') return 'off'
+    if (perm.status !== 'granted') return perm.canAskAgain === false ? 'off' : 'later'
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', { name: 'default', importance: Notifications.AndroidImportance.MAX })
     }
@@ -72,7 +73,7 @@ function NotifyRow({ order, lang, onDone }) {
     const r = await subscribeOrder(order.code, lang)
     if (!mounted.current) return
     if (r === 'on' || r === 'closed') { setState('idle'); onDone(); return }
-    setState(r)
+    setState(r === 'later' ? 'idle' : r)
   }
   if (state === 'off') {
     return (

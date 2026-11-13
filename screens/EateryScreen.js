@@ -58,8 +58,9 @@ function PartnerCard({ partner, lang, onPress }) {
 
 // openSlug: the Explore map pin hands a slug, not a row (the map selects no menu or contact columns);
 // once the full rows are in, the matching partner opens and onOpenSlugDone clears the slug.
-// orderCode: a status push tap ({ screen: 'eatery_order' }) — that order's card comes first on the list (App.js clears any open partner).
-export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null, orderCode = null }) {
+// orderTap: a status push tap ({ code, at }; push data { screen: 'eatery_order' }) — that order's card comes first and is re-read
+// (App.js clears any open partner).
+export default function EateryScreen({ lang, session, dateOfBirth = null, onRequireAccount, partner, onOpenPartner, onClosePartner, partnerBackRef, onBack, openSlug, onOpenSlugDone, listBackRef = null, orderTap = null }) {
   const insets = useSafeAreaInsets()
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
@@ -115,7 +116,7 @@ export default function EateryScreen({ lang, session, dateOfBirth = null, onRequ
         <ErrorState onRetry={retry} lang={lang} />
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: listBottomPad(insets) }]} showsVerticalScrollIndicator={false}>
-          <EateryOrderStatusList lang={lang} active={!partner && quizOpen !== true} focusCode={orderCode} />
+          <EateryOrderStatusList lang={lang} active={!partner && quizOpen !== true} focusCode={orderTap?.code ?? null} refreshKey={orderTap?.at ?? 0} />
           {showQuiz && <QuizEntryCard lang={lang} count={quizCount} onPress={openQuiz} />}
           {rows.map(p => <PartnerCard key={p.id} partner={p} lang={lang} onPress={() => { setFocus(null); onOpenPartner(p) }} />)}
         </ScrollView>
