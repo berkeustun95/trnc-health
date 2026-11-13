@@ -1828,6 +1828,14 @@ WITH report AS (
       AND to_regclass('public.push_log') IS NOT NULL
       AND (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = to_regclass('public.push_log') AND c.contype = 'c' AND pg_get_constraintdef(c.oid) ILIKE '%kind%') = 0
     -- 1194-END
+    -- 20261195 Worker key hash (data). Red until applied, never an error: query_to_xml behind to_regclass. Exactly one row, and it
+    --     is the hash of the Worker secret set on 2026-11-13 (a rotation migration retires this token).
+    UNION ALL SELECT '20261195_eatery_worker_key','private.eatery_worker_key_hashes holds exactly one hash, the getadaapp Worker key of 2026-11-13, once 20261195 is applied',
+      EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261195_eatery_worker_key.sql')
+      AND COALESCE(CASE WHEN to_regclass('private.eatery_worker_key_hashes') IS NULL THEN false ELSE
+        (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM private.eatery_worker_key_hashes', false, true, '')))[1]::text = '1'
+        AND (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM private.eatery_worker_key_hashes WHERE key_sha256 = ''e2521b10b0c909008d587b61f84f134b2626c05702f3b57d2029ad5b128195b4''', false, true, '')))[1]::text = '1'
+      END, false)
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
