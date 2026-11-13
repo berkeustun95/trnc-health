@@ -108,6 +108,8 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
                   {duty && <Text style={r.hint}>{t('tapViewDuty', lang)}</Text>}
                   {route === 'weekend' && <Text style={r.hint}>{t('tapViewWeekend', lang)}</Text>}
                   {route === 'marketplace' && <Text style={r.hint}>{t('mkTapViewMine', lang)}</Text>}
+                  {route === 'marketplace_listing' && <Text style={r.hint}>{t('mkTapOpenListing', lang)}</Text>}
+                  {route === 'marketplace_conversation' && <Text style={r.hint}>{t('mkTapOpenChat', lang)}</Text>}
                 </View>
               </TouchableOpacity>
             )
