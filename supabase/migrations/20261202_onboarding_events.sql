@@ -28,8 +28,8 @@
 --     DELETE are pinned shut by policy AND have no grant. Reporting runs as postgres.
 --     (A client insert must not ask for the row back: `returning` needs SELECT.)
 --
--- No index on created_at: 20261051's index served its purge job, and retention for this table is
--- out of scope for this file. No retention cron here.
+-- Retention is 20261203: 90-day purge, pg_cron job purge-onboarding-events at 03:37 UTC, plus the
+-- created_at index that serves it.
 --
 -- No counts, ids or e-mails anywhere: supabase-migrate prints this file to public Actions logs.
 --
@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS public.onboarding_events (
 );
 
 COMMENT ON TABLE public.onboarding_events IS
-  'Onboarding v2: one row per start screen / notification offer shown and per answer. No identifiers of any '
-  'kind — counts only. Clients may INSERT event, platform, runtime_version; no client reads. 20261202.';
+  'Onboarding v2: one row per start screen / notification offer shown and per answer. No identifier column '
+  '— counts only. Clients may INSERT event, platform, runtime_version; no client reads. 20261202.';
 
 ALTER TABLE public.onboarding_events ENABLE ROW LEVEL SECURITY;
 
@@ -267,7 +267,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261202_onboarding_events.sql', 'db7978846e92c7b89082ed8f124a0fd315f31974e5aefd252460d652e32ecd9a')
+VALUES ('20261202_onboarding_events.sql', '2ebc3768d5380bd3e85909d4b79de053fe3b4b3ec29d47cb74d536cc324a9645')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

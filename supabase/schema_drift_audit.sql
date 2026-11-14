@@ -1801,6 +1801,7 @@ expected_index (iname) AS (VALUES
     ('idx_home_strip_pin_active_pool'),
     ('idx_insurance_companies_owner_id'),
     ('idx_notifications_user_id'),
+    ('idx_onboarding_events_created_at'),
     ('idx_place_claims_place_id'),
     ('idx_place_claims_requester_id'),
     ('idx_places_category'),

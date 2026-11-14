@@ -810,7 +810,9 @@ WITH report AS (
     -- 20261198: registered ahead of the apply; red until it runs.
     ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke'),
     -- 20261201: registered ahead of the apply; red until it runs.
-    ('20261201_set_guest_push','set_guest_push')
+    ('20261201_set_guest_push','set_guest_push'),
+    -- 20261203: registered ahead of the apply; red until it runs. Its no-client-EXECUTE half is the 1203 H token.
+    ('20261203_onboarding_events_retention','purge_onboarding_events')
   ) e(m,o)
 
   UNION ALL
@@ -1548,7 +1550,9 @@ WITH report AS (
     ('1070_live_scores','api_request_log_at_idx'),
     ('1071_live_scores_followup','f1_races_race_at_idx'),
     -- 1087: partial (conversation_id IS NOT NULL); serves the FK's lookup on a conversation delete.
-    ('1087_notifications_conversation_id','notifications_conversation_id_idx')
+    ('1087_notifications_conversation_id','notifications_conversation_id_idx'),
+    -- 20261203: serves the 90-day purge of onboarding_events (the 1051 shape). Registered ahead of the apply.
+    ('20261203_onboarding_events_retention','idx_onboarding_events_created_at')
 
   ) e(m,o)
 
@@ -1979,6 +1983,22 @@ WITH report AS (
       AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''start_shown''%' AND pg_get_constraintdef(c.oid) LIKE '%''reoffer_existing_declined''%'
                       FROM pg_constraint c WHERE c.conrelid = to_regclass('public.onboarding_events') AND c.conname = 'onboarding_events_event_check'), false)
     -- 1202-END
+    -- 1203-BEGIN
+    -- 20261203 purge_onboarding_events: red until applied, never an error (to_regprocedure / aclexplode / COALESCE).
+    --     NOT in section G on purpose: G asserts authenticated CAN execute; this purge must be executable by nobody but
+    --     its owner (the cron job). Derived from proacl, so a grant to ANY role (PUBLIC, anon, authenticated,
+    --     service_role or another) turns it red. The JOB is QUERY 2's (this query stays free of cron).
+    UNION ALL SELECT '20261203_onboarding_events_retention','purge_onboarding_events(interval): one overload, INVOKER, search_path public, owner postgres; EXECUTE held by no role but the owner (no PUBLIC / anon / authenticated / service_role); default 90 days; deletes created_at < cutoff',
+      COALESCE((SELECT NOT p.prosecdef AND p.proconfig = ARRAY['search_path=public'] AND p.proacl IS NOT NULL AND pg_get_userbyid(p.proowner) = 'postgres'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.purge_onboarding_events(interval)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
+                       WHERE p.oid = to_regprocedure('public.purge_onboarding_events(interval)')
+                         AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'purge_onboarding_events') = 1
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%p_older_than interval DEFAULT ''90 days''::interval%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%v_cut timestamptz := now() - p_older_than;%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%DELETE FROM public.onboarding_events WHERE created_at < v_cut;%', false)
+    -- 1203-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -6541,7 +6561,9 @@ FROM (VALUES
   -- Bandabuliya retention (20261185), 01:23 UTC daily; exact schedule + command are the 20261185 row below.
   ('20261185_marketplace_maintenance','marketplace-maintenance'),
   -- Bandabuliya photo review reminder (20261196), every 5 minutes; exact schedule + command are the 20261196 row below.
-  ('20261196_marketplace_photo_review_reminder','marketplace-photo-review-reminder')
+  ('20261196_marketplace_photo_review_reminder','marketplace-photo-review-reminder'),
+  -- 90-day retention on onboarding_events (20261203), 03:37 UTC daily; exact schedule + command are the 20261203 row below.
+  ('20261203_onboarding_events_retention','purge-onboarding-events')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -6597,6 +6619,18 @@ SELECT '20261163_oli_messages', 'purge-oli-messages: schedule 57 3 * * * and the
                     AND btrim(command) = 'SELECT public.purge_oli_messages()') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261203: purge-onboarding-events runs daily at 03:37 and calls the purge function (default 90 days) ───
+-- 1203-Q2-BEGIN
+SELECT '20261203_onboarding_events_retention', 'purge-onboarding-events: schedule 37 3 * * * and the exact purge call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-onboarding-events') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-onboarding-events' AND active
+                    AND schedule = '37 3 * * *'
+                    AND btrim(command) = 'SELECT public.purge_onboarding_events()') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+-- 1203-Q2-END
 
 UNION ALL
 -- ─── 20261185: marketplace-maintenance runs daily at 01:23 UTC and POSTs {"apply": true} with the Vault key ───
