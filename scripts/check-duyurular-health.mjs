@@ -220,12 +220,13 @@ const banner = e3 || bannerCount == null ? { error: e3 ? `${e3.code} ${e3.messag
 const certs = certGroups(srcs.filter(s => s.consecutive_failures >= FAILING_RUNS))
 const problems = verdict({ lastOk, failing, active: srcs.length, newest, banner, runs, certs })
 const down = sourcesDown(failing, srcs.length)
-// --down-out <file>: one "key(failures)" per line for daily-health's "sources down" issue
-// (empty file = none down). Keys and counts only: this log and that issue are public.
+// --down-out <file>: one "key(failures)" per line for daily-health's "sources down" issue, written
+// whenever any source is failing (warning OR red), so the issue never closes while they are down.
+// Empty file = none down. Keys and counts only: this log and that issue are public.
 const downOut = process.argv.indexOf('--down-out')
 if (downOut !== -1) {
   const { writeFileSync } = await import('node:fs')
-  writeFileSync(process.argv[downOut + 1], down.warning ? failing.join('\n') + '\n' : '')
+  writeFileSync(process.argv[downOut + 1], failing.length ? failing.join('\n') + '\n' : '')
 }
 
 const ago = ts => ts ? `${Math.round((Date.now() - Date.parse(ts)) / 6e4)} min ago` : '—'

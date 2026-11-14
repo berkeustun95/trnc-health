@@ -102,15 +102,17 @@ jobs:
           f="$RUNNER_TEMP/duyurular-down.txt"
           [ -f "$f" ] || { echo "duyurular:health wrote no list (it failed before the end); nothing to report."; exit 0; }
           list=$(sed 's/^/- /' "$f")
+          keys() { sed -E 's/\([0-9]+\)$//'; }   # failure counts grow every fetch; compare source keys only
           title='Duyurular sources down'
-          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title \
-            | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
+          # Exact title AND opened by this workflow's bot: anyone can open an issue on a public repo.
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title,author \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
           if [ -z "$list" ]; then
             [ -z "$num" ] || gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment 'No source is failing 3+ runs in a row.'
             exit 0
           fi
           body=$(printf '%s\n\n%s\n\n%s\n\nLatest run: %s/%s/actions/runs/%s' \
-            'These sources failed 3+ fetches in a row. This is a warning: daily-health stays green unless many fail at once.' \
+            'These sources failed 3+ fetches in a row (count in brackets). A few is a warning and daily-health stays green; 5+ or 20%+ at once is red.' \
             "$list" \
             'Fix: pause with `active: false` in scripts/duyurular/sources.mjs; duyurular-paused-recheck says when one is back.' \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
@@ -119,7 +121,7 @@ jobs:
           else
             old=$(gh issue view "$num" --repo "$GITHUB_REPOSITORY" --json body --jq .body | sed -n '/^- /p')
             gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
-            [ "$old" = "$list" ] || gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the sources down changed:"$'\n\n'"$list"
+            [ "$(keys <<<"$old")" = "$(keys <<<"$list")" ] || gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the sources down changed:"$'\n\n'"$list"
           fi
       - name: duyurular:staleness
         if: success() || failure()
@@ -162,8 +164,8 @@ jobs:
           failing=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
             --jq '[.jobs[].steps[] | select(.conclusion == "failure") | "- " + .name] | sort | join("\n")')
           title='Daily health is red'
-          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number,body \
-            --jq '.[0] // empty')
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title,body,author \
+            | jq -c --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0] // empty')
           num=$(jq -r '.number // empty' <<<"$issue")
           if [ -z "$failing" ]; then
             [ -z "$num" ] || gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment 'All checks are green again.'
@@ -176,12 +178,14 @@ jobs:
             gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the failing checks changed:"$'\n\n'"$failing"
           else
-            # Same set still red: when was Berke last mentioned (a comment, else the issue itself)?
-            last=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num/comments?per_page=100" \
-              --jq '[.[] | select(.body | contains("@berkeustun95")) | .created_at] | max // empty')
-            [ -n "$last" ] || last=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num" --jq .created_at)
-            days=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 86400 ))
-            if [ "$days" -ge 3 ]; then
-              gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 still red, $days days since the last mention:"$'\n\n'"$failing"
+            # Same set still red: re-mention unless THIS bot mentioned Berke in the last 70 h (about
+            # 3 daily runs; cron start drift would make a strict 72 h land on day 4). Only the bot's own
+            # comments count (public repo), and `since` keeps the read to the last few comments.
+            since=$(date -u -d '70 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+            recent=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$num/comments?since=$since&per_page=100" \
+              --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("@berkeustun95")) and .created_at >= "'"$since"'") | .id' | head -1)
+            created=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num" --jq .created_at)
+            if [ -z "$recent" ] && [[ "$created" < "$since" ]]; then
+              gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 still red for 3+ days:"$'\n\n'"$failing"
             fi
           fi
