@@ -271,8 +271,9 @@ for (const id of MUST_EXCLUDE) {
   if (!knownIds.has(id)) problems.push(`'${id}' is not a known tile id`)
 }
 
-// Production-like, in Home's group order: the 19 ids derived and printed by
-// __tests__/homeServices.test.js (synthetic here because this file cannot import homeGroups).
+// Hand-maintained, in Home's group order: a copy of the 19 ids printed by
+// __tests__/homeServices.test.js (this file cannot import homeGroups). The real gates are
+// covered by `npm run test:home`, which runs in the ota and ota:preview chains.
 const VISIBLE = [
   'duty', 'health', 'emergency',
   'exploreTab', 'events', 'walkingRoutes', 'hotels', 'eatery',
