@@ -35,8 +35,10 @@
       "commit": "f7b7c0523c1a2549076d19b38e23ea2189fffd55",
       "what": "Admin: remove the 'notify duty' button, RE-LANDED on main (revert of #414's revert b0e9b6fa), 2026-11-14",
       "since": "2026-11-14",
-      "cleared": false,
-      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: re-land #404 alone, #392 stays out). Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: re-land #404 alone, #392 stays out). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-14",
+      "clearedBy": "Berke, in chat 2026-11-14: \"Preview checked as admin: the notify duty button is gone, and Save duty schedule + pharmacy swap are still there. GO for production: #404 re-land only (#392 stays out).\" Preview 018f41c9 (Android 01a1da74) @ main 63c4a13c."
     }
   ]
 }
