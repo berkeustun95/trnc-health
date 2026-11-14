@@ -73,19 +73,24 @@ export function sharedTokenIds(profiles: { id: string; push_token: string | null
   return profiles.filter((p) => p.push_token && (n.get(p.push_token) ?? 0) > 1).map((p) => p.id)
 }
 
-// Best effort and bounded: a failed or missing lookup only means that account cannot win the tie. Never throws.
+// Best effort and bounded in COUNT and TIME: the lookups run in parallel under one budget, and whatever has not answered
+// by then simply cannot win the tie (security review #405: auth admin calls have no timeout, and before this the
+// broadcasts never depended on the Auth service). Never throws, never waits longer than budgetMs.
 export const MAX_SIGNIN_LOOKUPS = 50
+export const SIGNIN_LOOKUP_BUDGET_MS = 3_000
 export async function lastSignIns(
   ids: string[], getLastSignIn: (id: string) => Promise<string | null | undefined>,
+  budgetMs = SIGNIN_LOOKUP_BUDGET_MS,
 ): Promise<Map<string, number>> {
-  const out = new Map<string, number>()
-  for (const id of ids.slice(0, MAX_SIGNIN_LOOKUPS)) {
-    try {
-      const ms = Date.parse((await getLastSignIn(id)) ?? '')
-      if (Number.isFinite(ms)) out.set(id, ms)
-    } catch { /* this account just cannot win the tie */ }
-  }
-  return out
+  const found = new Map<string, number>()
+  const all = Promise.allSettled(ids.slice(0, MAX_SIGNIN_LOOKUPS).map(async (id) => {
+    const ms = Date.parse((await getLastSignIn(id)) ?? '')
+    if (Number.isFinite(ms)) found.set(id, ms)
+  }))
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([all, new Promise<void>((res) => { timer = setTimeout(res, budgetMs) })])
+  clearTimeout(timer)
+  return new Map(found)   // a snapshot: an answer arriving after the budget changes nothing
 }
 
 export interface SendDeps {

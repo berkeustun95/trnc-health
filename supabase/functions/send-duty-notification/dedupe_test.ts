@@ -40,3 +40,12 @@ Deno.test('sign-in lookups: failures and junk never throw, and are bounded', asy
   await lastSignIns(Array.from({ length: MAX_SIGNIN_LOOKUPS + 10 }, (_, i) => `u${i}`), async () => { calls++; return null })
   eq(calls, MAX_SIGNIN_LOOKUPS, 'bounded')
 })
+
+Deno.test('a hung sign-in lookup cannot stall the send: answers inside the budget count, the rest lose', async () => {
+  const t0 = Date.now()
+  const m = await lastSignIns(['fast', 'hang'], (id) =>
+    id === 'fast' ? Promise.resolve('2026-11-13T15:55:00Z') : new Promise(() => {}), 200)
+  const took = Date.now() - t0
+  eq([...m.keys()], ['fast'], 'only the answered one')
+  if (took > 1000) throw new Error(`waited ${took} ms, budget 200`)
+})
