@@ -28,6 +28,9 @@ const kind = process.argv[3] || 'plain'
 // message per account, the old behaviour, so a shared token shows the duplicate.
 const email2 = (process.argv[4] || '').trim().toLowerCase()
 const dedupe = process.argv[5] || 'on'
+// Optional unique text (2026-11-14: "ADA test A" to one tester, so he can say whether THAT push arrived). Title and body.
+const text = (process.argv[6] || '').trim()
+if (text && !/^[A-Za-z0-9 ]{1,24}$/.test(text)) fail('Refused: text must be 1-24 letters, digits or spaces.')
 if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
 if (!['plain', 'messages'].includes(kind)) fail(`Refused: kind must be plain or messages, got ${kind}.`)
 const mailbox = e => { const [l, d] = e.split('@'); return `${l.split('+')[0]}@${d}` }
@@ -65,9 +68,9 @@ const data = kind === 'messages' ? { screen: 'conversation', type: 'message' } :
 const send = await fetch('https://exp.host/--/api/v2/push/send', {
   method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
   body: JSON.stringify(recipients.map(({ push_token: to }) => ({ to, sound: 'default', data, channelId: 'default',
-    title: tr ? 'ADA test bildirimi' : 'ADA test notification',
-    body: kind === 'messages' ? (tr ? 'Dokun: Mesajlar açılmalı' : 'Tap: Messages should open')
-                              : (tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.') }))),
+    title: text || (tr ? 'ADA test bildirimi' : 'ADA test notification'),
+    body: text || (kind === 'messages' ? (tr ? 'Dokun: Mesajlar açılmalı' : 'Tap: Messages should open')
+                                       : (tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.')) }))),
 })
 const tickets = [].concat((await send.json().catch(() => ({})))?.data ?? [])
 const ticket = tickets[0]
