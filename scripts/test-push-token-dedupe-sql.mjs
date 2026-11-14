@@ -194,6 +194,19 @@ console.log('zero eligible groups')
   t('no tokens at all: passes (positive control is conditional on tokens before)', await applyFile(d2, MIG), { ok: true, msg: null })
 }
 
+console.log('a member with no auth.users row (the join must not shrink a group)')
+{
+  // Prod's FK makes this unreachable today; the rule is that groups come from profiles alone regardless.
+  const d = await freshDb(fixture(ROWS, `ALTER TABLE public.profiles DROP CONSTRAINT profiles_id_fkey;
+DELETE FROM auth.users WHERE id = '${id(1, 1)}';`))
+  const p = await probe(d)
+  const g1 = p.groups.find(g => g.members.some(m => m.email === 'u12@test.invalid'))
+  t('probe keeps the group whole, the auth-less member ranked last', g1.members.map(m => [m.email, m.kept_by_last_sign_in]),
+    [['u12@test.invalid', true], [null, false]])
+  t('applies', await applyFile(d, MIG), { ok: true, msg: null })
+  t('group 1 token now only on the member with a sign-in', await holders(d, [TOK(1)]), [id(1, 2)])
+}
+
 console.log('under-13 date of birth on a row to be cleared (the one trigger raise path)')
 {
   const d = await freshDb(fixture(ROWS, `UPDATE public.profiles SET date_of_birth = current_date - interval '5 years' WHERE id = '${id(1, 2)}';`))
