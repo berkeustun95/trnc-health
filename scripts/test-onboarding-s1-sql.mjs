@@ -213,7 +213,8 @@ console.log('4. who may call it')
 console.log('5. token and language validation')
 {
   const before = await rows(db)
-  for (const tok of ['ExpoPushToken[abcdefghijk]', 'ExponentPushToken[short]', 'ExponentPushToken[abc def ghij]', 'ExponentPushToken[abcdefghij.k]',
+  for (const tok of ['ExpoentPushToken[abcdefghijk]', 'ExponentPushTokens[abcdefghijk]', 'ExponentPushToken[abcdefghijk', 'ExponentPushTokenabcdefghijk]',
+                     'ExpoPushToken[short]', 'ExponentPushToken[short]', 'ExponentPushToken[abc def ghij]', 'ExponentPushToken[abcdefghij.k]',
                      '', 'ExponentPushToken[abcdefghijk]x', 'xExponentPushToken[abcdefghijk]', 'ExponentPushToken[]', 'ExponentPushToken[abcdefghijk]\n'])
     t(`token ${JSON.stringify(tok)} refused`, outcome(await call(db, [U.G1, true], tok, 'English')), 'bad_token')
   for (const lang of ['tr', 'en', 'turkish', 'TURKISH', 'Kurdish', '', null])
@@ -223,6 +224,12 @@ console.log('5. token and language validation')
   t('token of 9 inner characters refused (boundary)', outcome(await call(db, [U.G1, true], 'ExponentPushToken[abcdefghi]', 'English')), 'bad_token')
   t('token of exactly 64 inner characters accepted (upper boundary)', outcome(await call(db, [U.G1, true], 'ExponentPushToken[' + 'a'.repeat(64) + ']', 'English')), 'ok')
   t('token of 65 inner characters refused (upper boundary)', outcome(await call(db, [U.G1, true], 'ExponentPushToken[' + 'a'.repeat(65) + ']', 'English')), 'bad_token')
+  // ExpoPushToken[…] is the other prefix 20261193 accepts: same cap, same boundaries.
+  t('ExpoPushToken[abcdefghijk] accepted and stored', [outcome(await call(db, [U.G1, true], 'ExpoPushToken[abcdefghijk]', 'English')), (await row(db, U.G1)).push_token], ['ok', 'ExpoPushToken[abcdefghijk]'])
+  t('ExpoPushToken of exactly 10 inner characters accepted (boundary)', outcome(await call(db, [U.G1, true], 'ExpoPushToken[abcdefghij]', 'English')), 'ok')
+  t('ExpoPushToken of 9 inner characters refused (boundary)', outcome(await call(db, [U.G1, true], 'ExpoPushToken[abcdefghi]', 'English')), 'bad_token')
+  t('ExpoPushToken of exactly 64 inner characters accepted (upper boundary)', outcome(await call(db, [U.G1, true], 'ExpoPushToken[' + 'a'.repeat(64) + ']', 'English')), 'ok')
+  t('ExpoPushToken of 65 inner characters refused (upper boundary)', outcome(await call(db, [U.G1, true], 'ExpoPushToken[' + 'a'.repeat(65) + ']', 'English')), 'bad_token')
 
   // The nine names, read from constants/i18n.js LANGUAGES and compared to the SQL list.
   const block = I18N.slice(I18N.indexOf('export const LANGUAGES = ['), I18N.indexOf(']', I18N.indexOf('export const LANGUAGES = [')))
@@ -421,6 +428,9 @@ await behaves('regex loosened to {1,64}', mutant(SQLA, 'regex', '[A-Za-z0-9_-]{1
 })
 await behaves('regex cap removed ({10,})', mutant(SQLA, 'cap', '[A-Za-z0-9_-]{10,64}', '[A-Za-z0-9_-]{10,}'), async m => {
   t('  a 65-char token is NO LONGER refused (case 5 flips)', outcome(await call(m, [U.G1, true], 'ExponentPushToken[' + 'a'.repeat(65) + ']', 'English')), 'ok')
+})
+await behaves('regex prefix widened (Expo[a-z]*PushToken)', mutant(SQLA, 'prefix', "'^Expo(nent)?PushToken\\[", "'^Expo[a-z]*PushToken\\["), async m => {
+  t('  ExpoentPushToken[…] is NO LONGER refused (case 5 flips)', outcome(await call(m, [U.G1, true], 'ExpoentPushToken[abcdefghijk]', 'English')), 'ok')
 })
 await refusedA('EXECUTE granted to anon', mutant(SQLA, 'anon', 'TO authenticated;\n', 'TO authenticated;\nGRANT EXECUTE ON FUNCTION public.set_guest_push(text, text) TO anon;\n'), 'anon can EXECUTE')
 await refusedA('PUBLIC left in place', mutant(SQLA, 'public', 'FROM PUBLIC, anon, authenticated, service_role;', 'FROM anon, authenticated, service_role;'), 'PUBLIC can EXECUTE')

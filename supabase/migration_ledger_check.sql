@@ -306,7 +306,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261198_eatery_order_status_slice3.sql', 'a49eba2d2ee2330f639ca593931cf3e013fffae538b2035d058566fd10e99409'),
   ('20261199_push_token_dedupe.sql', '71626c575c579c3da1ea2ef7c6e5d832cb4f987d69f14f7848851cc3f0d16899'),
   ('20261200_delete_audit_guest.sql', '32ef89572cad1e558e1896bf8b586a5a151c6513258ea7033de1505f7f86665e'),
-  ('20261201_set_guest_push.sql', 'b21cf99afdd39f77909a3701296fab983722fbcf0c736758adf35d91d04825e9'),
+  ('20261201_set_guest_push.sql', '410906424127f5765d2e1f7a7c1ef6aa3ba1cf30b67005ecb76ac1bc239d067e'),
   ('20261202_onboarding_events.sql', '2ebc3768d5380bd3e85909d4b79de053fe3b4b3ec29d47cb74d536cc324a9645'),
   ('20261203_onboarding_events_retention.sql', '4f27e2421f90a4ba5dc92d4da2ffff67e9b3958ff886b0e49bd20c56c7485923')
 )

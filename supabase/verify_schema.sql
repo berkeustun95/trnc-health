@@ -1948,7 +1948,7 @@ WITH report AS (
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'set_guest_push') = 1
       AND COALESCE(position('IF public.is_anonymous_session() IS NOT TRUE THEN' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
            AND position('IF public.is_anonymous_session() IS NOT TRUE THEN' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) < position('UPDATE public.profiles' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')))
-           AND position('p_token !~ ''^ExponentPushToken\[[A-Za-z0-9_-]{10,64}\]$''' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
+           AND position('p_token !~ ''^Expo(nent)?PushToken\[[A-Za-z0-9_-]{10,64}\]$''' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
            AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%ARRAY[''English'',''Turkish'',''Arabic'',''Russian'',''Greek'',''French'',''Spanish'',''German'',''Persian'']%'
            AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%UPDATE public.profiles SET push_token = p_token, preferred_language = p_lang WHERE id = auth.uid();%'
            AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%IF v_rows IS DISTINCT FROM 1 THEN%', false)

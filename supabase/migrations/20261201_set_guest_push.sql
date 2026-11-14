@@ -15,7 +15,8 @@
 --     because that role includes every guest; the body is what refuses non-guests.
 --   • No session (anon), PUBLIC and service_role cannot EXECUTE it at all.
 --   • Nobody can read anything through it: it returns nothing.
---   • The token must look like an Expo push token, 10 to 64 characters inside the brackets (or be
+--   • The token must look like an Expo push token, ExponentPushToken[…] or ExpoPushToken[…] (the
+--     prefixes 20261193 accepts), 10 to 64 characters inside the brackets (or be
 --     NULL, which clears it). The cap exists because an oversized token on any row can fail a whole
 --     Expo batch: send-duty-notification's sendBatch counts a refused request as every message in
 --     it failed. The language must
@@ -71,7 +72,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'no_session';
   END IF;
-  IF p_token IS NOT NULL AND p_token !~ '^ExponentPushToken\[[A-Za-z0-9_-]{10,64}\]$' THEN
+  IF p_token IS NOT NULL AND p_token !~ '^Expo(nent)?PushToken\[[A-Za-z0-9_-]{10,64}\]$' THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'bad_token';
   END IF;
   IF p_lang IS NULL
@@ -182,7 +183,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261201_set_guest_push.sql', 'b21cf99afdd39f77909a3701296fab983722fbcf0c736758adf35d91d04825e9')
+VALUES ('20261201_set_guest_push.sql', '410906424127f5765d2e1f7a7c1ef6aa3ba1cf30b67005ecb76ac1bc239d067e')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
