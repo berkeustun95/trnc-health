@@ -4429,7 +4429,7 @@ function MarketplaceTab({ initialView = 'Photos' }) {
 // Partners come through loadEateryPartners (the one reader). By design for now only active, ungated partners are listed:
 // an admin's RLS returns active rows only, and EATERY_GATES apply.
 const PIN_TEST = { scope: 'test', id: null }
-const PIN_ERROR_KEY = { forbidden: 'adminPinsErrForbidden', invalid_partner: 'adminPinsErrPartner', invalid_scope: 'adminPinsErrScope', reset_limit: 'adminPinsErrResetLimit' }
+const PIN_ERROR_KEY = { forbidden: 'adminPinsErrForbidden', invalid_partner: 'adminPinsErrPartner', invalid_scope: 'adminPinsErrScope' }
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function PinShownModal({ shown, lang, onClose }) {
