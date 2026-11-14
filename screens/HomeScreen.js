@@ -585,12 +585,15 @@ export default function HomeScreen({
   }, [backRef, searchOpen, allServicesOpen, showFacilityList, forceFacilityList])
 
   // Re-tapping the Ana Sayfa tab returns to the Home top: Tüm hizmetler and the directory close and
-  // the hub's remembered offset is dropped, so the remounted ScrollView starts at 0.
+  // the hub's remembered offset is dropped, so the remounted ScrollView (keyed, below) starts at 0.
+  // No scroll event fires on that mount, so the status-strip and Oli state are reset by hand.
   useEffect(() => {
     if (!tabResetRef) return
     tabResetRef.current = () => {
       if (!allServicesOpen && !(showFacilityList && !forceFacilityList)) return
       forgetScroll('home:hub')
+      setOverCanvas(false)
+      setOliOnScreen(true)
       if (showFacilityList && !forceFacilityList) closeFacilityList()
       if (allServicesOpen) closeAllServices()
     }
@@ -1012,7 +1015,7 @@ export default function HomeScreen({
     return (
       <>
         <ScreenHeader inset lang={lang} onBack={closeAllServices} title={t('hrAllServices', lang)} />
-        <ScrollView {...allMem} showsVerticalScrollIndicator={false}
+        <ScrollView key="all" {...allMem} showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: PAGE_INSET, paddingTop: 8, paddingBottom: tabFootprint + FADE_H + 8 }}>
           <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />
         </ScrollView>
@@ -1030,7 +1033,9 @@ export default function HomeScreen({
     return (
       <>
         <SplashStatusBar style={overCanvas ? 'dark' : 'light'} />
-        <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+        {/* keyed: Tüm hizmetler swaps in at the same tree position, and an unkeyed ScrollView would be
+            reused with that page's offset */}
+        <ScrollView key="hub" {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
           scrollEventThrottle={32}
           onScroll={e => {
             hubMem.onScroll(e)

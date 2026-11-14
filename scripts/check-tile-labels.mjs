@@ -470,6 +470,11 @@ const SHEET_WIDTHS = [...new Set([320, 350, 360, 393, 430, NARROW_W])].filter(Bo
     if (!['duty', 'exploreTab', 'walkingRoutes'].every(id => extras.some(e => e.id === id))) {
       problems.push(`constants/homeGroups.js: EXTRA tiles not read (got ${JSON.stringify(extras.map(e => e.id))}) — update check-tile-labels.mjs`)
     }
+    const extraKeys = [...extraSrc.matchAll(/^\s*(\w+):\s*\{/gm)].map(m => m[1])
+    if (extraKeys.length !== extras.length) {
+      problems.push(`constants/homeGroups.js: EXTRA has ${extraKeys.length} entries ${JSON.stringify(extraKeys)} but ${extras.length} were read `
+        + `${JSON.stringify(extras.map(e => e.id))} — an unread entry is never measured; update check-tile-labels.mjs`)
+    }
     const offered = [...HOME_MODULES.filter(m => !HIDDEN_TILES.has(m.id)), ...extras]
     const gridFace = advance
     // ModuleTile caps font scale with Home's labelCap (asserted below), so the list is measured
