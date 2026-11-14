@@ -1388,6 +1388,8 @@ function DutyTab() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [upcoming, setUpcoming] = useState([])
+  const [notifying, setNotifying] = useState(false)
+  const [notified, setNotified] = useState(false)
   const [pharmacySearch, setPharmacySearch] = useState('')
 
   const [swapDate, setSwapDate] = useState(() => {
@@ -1445,6 +1447,22 @@ function DutyTab() {
       const { data } = await supabase.from('duty_schedule').select('date, facility_id, facilities(name)').gte('date', new Date().toISOString().slice(0, 10)).order('date').limit(10)
       setUpcoming(data ?? [])
     }
+  }
+
+  async function notifyDuty() {
+    if (!selectedId) return
+    setNotifying(true)
+    const pharmacyName = pharmacies.find(p => p.id === selectedId)?.name ?? 'Duty pharmacy'
+    const { data: customers } = await supabase.from('profiles').select('id, push_token, preferred_language').eq('role', 'customer')
+    for (const c of customers ?? []) {
+      const lang = c.preferred_language || 'English'
+      const title = t('notifDutyTitle', lang)
+      await recordNotification(c.id, title, pharmacyName)
+      if (c.push_token) await sendPushNotification(c.push_token, title, pharmacyName, { screen: 'duty' })
+    }
+    setNotifying(false)
+    setNotified(true)
+    setTimeout(() => setNotified(false), 3000)
   }
 
   async function removeDuty(d) {
@@ -1561,6 +1579,14 @@ function DutyTab() {
           disabled={!selectedId || saving}
         >
           <Text style={s.primaryBtnText}>{saved ? 'Saved!' : saving ? 'Saving…' : 'Save duty schedule'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.ghostBtn, { marginTop: 10, paddingVertical: 12, alignItems: 'center' }, (!selectedId || notifying) && s.primaryBtnDisabled]}
+          onPress={notifyDuty}
+          disabled={!selectedId || notifying}
+        >
+          <Text style={s.ghostBtnText}>{notified ? 'Notified!' : notifying ? 'Sending…' : "Notify users about today's duty"}</Text>
         </TouchableOpacity>
 
         {upcoming.length > 0 && (
