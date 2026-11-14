@@ -463,7 +463,14 @@ const SHEET_WIDTHS = [...new Set([320, 350, 360, 393, 430, NARROW_W])].filter(Bo
     const pickBox = W => (W - S.pad * 2) / GRID_COLUMNS - G.tilePad * 2
     const homeCol = W => (W - G.insetR * 2 - G.panelGutter * 2) / 4
     const slotBox = W => homeCol(W) - G.tilePadR * 2 - S.border * 2 - S.slotPadX * 2
-    const offered = HOME_MODULES.filter(m => !HIDDEN_TILES.has(m.id))
+    // The picker also offers homeGroups' EXTRA tiles (duty, exploreTab, walkingRoutes). homeGroups
+    // imports flags (expo-constants), so its EXTRA block is read from source; none found = error.
+    const extraSrc = (/const EXTRA = \{([\s\S]*?)\n\}/.exec(read('constants/homeGroups.js')) || [])[1] || ''
+    const extras = [...extraSrc.matchAll(/id: '(\w+)',[^}]*labelKey: '(\w+)'/g)].map(([, id, labelKey]) => ({ id, labelKey }))
+    if (!['duty', 'exploreTab', 'walkingRoutes'].every(id => extras.some(e => e.id === id))) {
+      problems.push(`constants/homeGroups.js: EXTRA tiles not read (got ${JSON.stringify(extras.map(e => e.id))}) — update check-tile-labels.mjs`)
+    }
+    const offered = [...HOME_MODULES.filter(m => !HIDDEN_TILES.has(m.id)), ...extras]
     const gridFace = advance
     // ModuleTile caps font scale with Home's labelCap (asserted below), so the list is measured
     // at normal and large text like Home.

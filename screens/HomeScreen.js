@@ -53,7 +53,7 @@ import { CustomiseCard, ServicesHeader, AllServicesButton } from '../components/
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
 import { useTabBarFootprint, RemoteImage, PageCanvas, ScreenHeader } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
-import { unplacedLiveModules, duplicatePlacements, visibleServiceIds, allServicesCount, moduleById } from '../constants/homeGroups'
+import { unplacedLiveModules, duplicatePlacements, visibleServiceIds, moduleById } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
 import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar, ModuleScreen, OnPhotoLabel } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
@@ -207,6 +207,7 @@ export default function HomeScreen({
   // Set to this screen's own back step, for App's hardware-back chain: search, then the
   // Health directory. Only the tab-shell Home passes it; the gate's directory has its own line.
   backRef = null,
+  tabResetRef = null,          // App calls it when the Ana Sayfa tab is tapped while Home is showing
   hideHeaderActions = false,   // no menu / notifications while gated
   onExitFacilityList,          // back leaves the screen instead of revealing the hub
   lang,
@@ -460,7 +461,6 @@ export default function HomeScreen({
   // re-run on every render.
   const homeUnlocked = useMemo(() => (liveScoresTester ? HOME_TESTER_UNLOCK : HOME_UNLOCK), [liveScoresTester])
   const visibleIds = useMemo(() => visibleServiceIds(homeUnlocked), [homeUnlocked])
-  const allCount = useMemo(() => allServicesCount(homeUnlocked), [homeUnlocked])
 
   useEffect(() => {
     if (!HOME_V2_LIVE || showFacilityList) return
@@ -583,6 +583,19 @@ export default function HomeScreen({
     }
     return () => { backRef.current = null }
   }, [backRef, searchOpen, allServicesOpen, showFacilityList, forceFacilityList])
+
+  // Re-tapping the Ana Sayfa tab returns to the Home top: Tüm hizmetler and the directory close and
+  // the hub's remembered offset is dropped, so the remounted ScrollView starts at 0.
+  useEffect(() => {
+    if (!tabResetRef) return
+    tabResetRef.current = () => {
+      if (!allServicesOpen && !(showFacilityList && !forceFacilityList)) return
+      forgetScroll('home:hub')
+      if (showFacilityList && !forceFacilityList) closeFacilityList()
+      if (allServicesOpen) closeAllServices()
+    }
+    return () => { tabResetRef.current = null }
+  }, [tabResetRef, allServicesOpen, showFacilityList, forceFacilityList])
 
   async function handleResultPress(result) {
     // The query and results are KEPT (they used to be cleared here): back from the item
@@ -1069,7 +1082,7 @@ export default function HomeScreen({
             )}
             <ServicesHeader lang={lang} onEdit={() => setFavEditOpen(true)} onSeeAll={() => setAllServicesOpen(true)} />
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
-            <AllServicesButton lang={lang} count={allCount} onPress={() => setAllServicesOpen(true)} />
+            <AllServicesButton lang={lang} count={visibleIds.length} onPress={() => setAllServicesOpen(true)} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after the AllServicesButton. */}

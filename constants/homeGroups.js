@@ -111,12 +111,6 @@ export function visibleServiceIds(unlocked) {
   return liveGroups(unlocked).flatMap(g => g.modules.filter(m => !m.soon).map(m => m.id))
 }
 
-// Every tile the Tüm hizmetler page draws (ServicePanels renders liveGroups), "Yakında" included: the
-// count on Home's button must match the page it opens. The favourites keep visibleServiceIds.
-export function allServicesCount(unlocked) {
-  return liveGroups(unlocked).reduce((n, g) => n + g.modules.length, 0)
-}
-
 // Live modules no panel places. Logged once in __DEV__ and read at the gate.
 export function unplacedLiveModules() {
   const placed = new Set(HOME_GROUPS.flatMap(g => g.ids))
