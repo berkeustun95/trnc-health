@@ -282,6 +282,7 @@ const SURFACES = [
   'components/home/redesign/Widgets.js',
   'components/home/redesign/OliBar.js',
   'components/home/redesign/ServicePanels.js',
+  'components/home/redesign/HomeServices.js',
   'constants/homeGroups.js',
   'components/OliSearchSheet.js',
   'components/ui/Button.js',
@@ -372,6 +373,7 @@ const SAME_AS_ENGLISH = {
   'menuMarketplace': Object.fromEntries(['Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
     .map(l => [l, 'Bandabuliya is the brand name in every language (Berke, 2026-11-09); mkTagline says what it is'])),
   // ─── Araçlar (cars), 2026-11-07: the same word in these languages ──────────────────
+  'homeServicesTitle': { French: 'Services is the French word' },
   'carsFilterDistrict': { French: 'District is French (as ddDistrict)' },
   'carsDescription': { French: 'Description is French' },
   'carsFuelDiesel': { French: 'Diesel is the French word', German: 'Diesel is the German word' },

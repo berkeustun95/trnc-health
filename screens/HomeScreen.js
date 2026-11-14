@@ -35,7 +35,7 @@ import { nextStripRotation } from '../utils/stripSlides'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { readStripDismissals, addStripDismissal } from '../utils/stripDismissals'
 import { resolveFavourites } from '../constants/homeFavourites'
-import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
+import { loadUsage, loadPins, savePins, recordModuleOpen, loadCustomiseCardDone, markCustomiseCardDone } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
   haversineKm, isOpenNow, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
@@ -49,8 +49,9 @@ import SplashStatusBar from '../components/SplashStatusBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
+import { CustomiseCard, ServicesHeader, AllServicesButton } from '../components/home/redesign/HomeServices'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
-import { SectionHeader, useTabBarFootprint, RemoteImage, PageCanvas } from '../components/ui'
+import { useTabBarFootprint, RemoteImage, PageCanvas, ScreenHeader } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements, visibleServiceIds, moduleById } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
@@ -306,6 +307,7 @@ export default function HomeScreen({
   // HOME_V2 only. Declared unconditionally — hooks cannot sit behind a flag — and inert
   // while HOME_V2_LIVE is false: nothing in the V1 path reads either one.
   const [searchOpen, setSearchOpen]             = useState(snap?.searchOpen ?? false)
+  const [allServicesOpen, setAllServicesOpen]   = useState(snap?.allServicesOpen ?? false)   // Tüm hizmetler page
   const [weatherOpen, setWeatherOpen]           = useState(false)
 
   // The live strip. `stripLoading` starts TRUE so the first paint is the fixed-height
@@ -325,6 +327,8 @@ export default function HomeScreen({
   const [favPins, setFavPins]         = useState([])
   const [favUsage, setFavUsage]       = useState({})
   const [favEditOpen, setFavEditOpen] = useState(false)
+  // null until the disk read resolves, so the card never flashes in after first paint.
+  const [customiseDone, setCustomiseDone] = useState(null)
   const stripPaused = weatherOpen || favEditOpen || searchOpen || overlayOpen === true   // Home's own overlays: the slider holds still under them
 
   // Global hub search
@@ -332,11 +336,12 @@ export default function HomeScreen({
   const [globalResults, setGlobalResults]   = useState(snap?.globalResults ?? [])
   const hubMem = useScrollMemory('home:hub')
   const searchMem = useScrollMemory('home:search')
+  const allMem = useScrollMemory('home:all')
   const listMem = useScrollMemory('home:facilities')
   useEffect(() => {
     if (!backRef) return
     homeState = { showFacilityList, searchText, activeType, activeSpecialty, openOnly, langFilter,
-                  searchOpen, globalQuery, globalResults }
+                  searchOpen, allServicesOpen, globalQuery, globalResults }
   })
   // Leaving the directory / search ON PURPOSE starts them fresh next time.
   const closeFacilityList = () => { setShowFacilityList(false); forgetScroll('home:facilities') }
@@ -345,6 +350,7 @@ export default function HomeScreen({
     setShowFacilityList(true)
     onFacilityListOpened?.()
   }, [openFacilityList])
+  const closeAllServices = () => { setAllServicesOpen(false); forgetScroll('home:all') }
   const closeSearch = () => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]); forgetScroll('home:search') }
   const [isSearching, setIsSearching]       = useState(false)
 
@@ -458,8 +464,9 @@ export default function HomeScreen({
   useEffect(() => {
     if (!HOME_V2_LIVE || showFacilityList) return
     let alive = true
-    Promise.all([loadUsage(), loadPins()]).then(([usage, pins]) => {
+    Promise.all([loadUsage(), loadPins(), loadCustomiseCardDone()]).then(([usage, pins, done]) => {
       if (!alive) return
+      setCustomiseDone(done)
       setFavUsage(usage)
       setFavPins(pins)
       setFavIds(resolveFavourites({ pins, usage, visible: visibleIds }))
@@ -566,12 +573,15 @@ export default function HomeScreen({
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
+      // Search and Tüm hizmetler cannot stack (search replaces the hub; Tüm hizmetler is opened from it),
+      // and neither coexists with the facility list; order is search, Tüm hizmetler, facility list.
       if (searchOpen) { closeSearch(); return true }
+      if (allServicesOpen) { closeAllServices(); return true }
       if (showFacilityList && !forceFacilityList) { closeFacilityList(); return true }
       return false
     }
     return () => { backRef.current = null }
-  }, [backRef, searchOpen, showFacilityList, forceFacilityList])
+  }, [backRef, searchOpen, allServicesOpen, showFacilityList, forceFacilityList])
 
   async function handleResultPress(result) {
     // The query and results are KEPT (they used to be cleared here): back from the item
@@ -982,6 +992,20 @@ export default function HomeScreen({
   // favourites · "Tüm hizmetler". Everything below the hero scrolls under the floating tab
   // bar, so the content pads by its footprint. Coach-mark refs: searchRef → the Oli bar,
   // dutyBannerRef → the tiles row, weatherRef → the weather chip.
+  // Tüm hizmetler: every visible module in its category panels, one page deep from Home.
+  // The footer ad slot stays on the hub (check-ad-placement.mjs asserts it is not here).
+  function renderAllServices() {
+    return (
+      <>
+        <ScreenHeader inset lang={lang} onBack={closeAllServices} title={t('hrAllServices', lang)} />
+        <ScrollView {...allMem} showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: PAGE_INSET, paddingTop: 8, paddingBottom: tabFootprint + FADE_H + 8 }}>
+          <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />
+        </ScrollView>
+      </>
+    )
+  }
+
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(visibleIds.map(id => [id, moduleById(id)]))
@@ -1037,15 +1061,17 @@ export default function HomeScreen({
                 onPress={handleStripPress} onDismiss={dismissStripItem} />
             </View>
 
-            <SectionHeader title={t('favSectionTitle', lang)}
-              action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
+            {customiseDone === false && (
+              <CustomiseCard lang={lang}
+                onOpen={() => { markCustomiseCardDone(); setCustomiseDone(true); setFavEditOpen(true) }}
+                onDismiss={() => { markCustomiseCardDone(); setCustomiseDone(true) }} />
+            )}
+            <ServicesHeader lang={lang} onEdit={() => setFavEditOpen(true)} onSeeAll={() => setAllServicesOpen(true)} />
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
-
-            <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />
+            <AllServicesButton lang={lang} count={visibleIds.length} onPress={() => setAllServicesOpen(true)} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
-                (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}
+                (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after the AllServicesButton. */}
             <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
@@ -1716,7 +1742,7 @@ export default function HomeScreen({
   // directory — keeps its shell (header, back, hideHeaderActions) in both states; since S3
   // REDESIGN restyles the list INSIDE renderFacilityList() and adds no navigation.
   if (REDESIGN && !showFacilityList) {
-    return <PageCanvas>{renderHubRedesign()}</PageCanvas>
+    return <PageCanvas>{allServicesOpen ? renderAllServices() : renderHubRedesign()}</PageCanvas>
   }
 
   const v2Hub = HOME_V2_LIVE && !showFacilityList

@@ -177,14 +177,14 @@ const s = StyleSheet.create({
   // maxHeight rather than a fixed one: the module list scrolls, and on a short screen the
   // sheet must not push its own Bitti button off the bottom.
   sheet:       { backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-                 padding: 20, paddingHorizontal: PAGE_INSET, paddingBottom: 30, maxHeight: '78%' },
+                 padding: 20, paddingHorizontal: PAGE_INSET, paddingBottom: 24, maxHeight: '78%' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title:       { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   done:        { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   hint:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
-  slots:       { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, marginTop: 16, paddingHorizontal: PANEL_GUTTER },
+  slots:       { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, marginTop: 12, paddingHorizontal: PANEL_GUTTER },
   slotCell:    { width: TILE_WIDTH, paddingHorizontal: TILE_PAD },
-  slot:        { alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 0,
+  slot:        { alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 0,
                  borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
                  backgroundColor: 'transparent' },
   // Selection is carried by BORDER + BACKGROUND + label colour, not by colour alone —
