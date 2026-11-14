@@ -29,6 +29,11 @@ on:
         type: choice
         options: ['on', 'off']
         default: 'on'
+      text:
+        description: 'Optional unique title+body, 1-24 letters/digits/spaces (e.g. ADA test A)'
+        type: string
+        required: false
+        default: ''
 
 concurrency: { group: push-test, cancel-in-progress: false }
 
@@ -44,6 +49,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_KIND: ${{ inputs.kind }}
       IN_DEDUPE: ${{ inputs.dedupe }}
+      IN_TEXT: ${{ inputs.text }}
     steps:
       # Read from the event, not `env:`, which GitHub prints in every step before a mask can apply.
       - name: Mask the email
@@ -62,4 +68,4 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with: { node-version: '24' }
       - name: Send
-        run: node --disable-warning=ExperimentalWarning scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND" "$IN_EMAIL2" "$IN_DEDUPE"
+        run: node --disable-warning=ExperimentalWarning scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND" "$IN_EMAIL2" "$IN_DEDUPE" "$IN_TEXT"
