@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile } from './migration-harness.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261200_delete_audit_guest.sql', import.meta.url))
-const IN = "'2026-11-14 14:46:10+00'", BEFORE = "'2026-11-14 14:45:00+00'", AFTER = "'2026-11-14 14:49:00+00'"
+const IN = "'2026-11-14 14:46:29+00'", BEFORE = "'2026-11-14 14:46:04.999+00'", AFTER = "'2026-11-14 14:46:40+00'"  // edges exactly at the bounds
 const G = n => `c0000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 
 const FIXTURE = `

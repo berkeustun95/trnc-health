@@ -6,10 +6,11 @@
 -- which created a guest in production (Preview shares the production database). QA then signed in on top
 -- of it. Berke (2026-11-14): delete that guest, nothing else.
 --
--- WHAT IT DELETES: the guest matching this signature: anonymous, no email, created 14:45:30–14:48:30 UTC on
--- 2026-11-14, a customer profile, no push token. Read-only probe run 43612514010 (sealed, vault) found
--- exactly one, and the app never deletes guests itself, so it is the audit's. The file refuses unless
--- exactly one row matches, so a different set deletes nothing.
+-- WHAT IT DELETES: the guest matching this signature: anonymous, no email, created 14:46:05–14:46:40 UTC on
+-- 2026-11-14, a customer profile, no push token. The window comes from the audit's screenshot timestamps (Welcome
+-- on screen 14:46:12, Home after the tap 14:46:31), inside the wider window that read-only probe run 43612514010
+-- (sealed, vault) checked and found exactly one guest in. The app never deletes or converts guests, so that one is
+-- the audit's. The file refuses unless exactly one row matches, so a different set deletes nothing.
 -- WHY NO ID HERE: the workflow prints this file to Actions logs, which are public. Messages carry no counts.
 -- Signed-up accounts cannot be reached: the match and the DELETE require is_anonymous, and the file asserts
 -- the signed-up count is unchanged.
@@ -36,7 +37,7 @@ BEGIN
     FROM auth.users u
     JOIN public.profiles p ON p.id = u.id
    WHERE u.is_anonymous AND u.email IS NULL AND u.deleted_at IS NULL
-     AND u.created_at >= '2026-11-14 14:45:30+00' AND u.created_at < '2026-11-14 14:48:30+00'
+     AND u.created_at >= '2026-11-14 14:46:05+00' AND u.created_at < '2026-11-14 14:46:40+00'
      AND p.role = 'customer' AND p.push_token IS NULL;
 
   IF coalesce(array_length(v_ids, 1), 0) IS DISTINCT FROM 1 THEN
@@ -75,7 +76,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261200_delete_audit_guest.sql', 'cc47a070fc21f56d10b3fff1f9120dd2cd5d050e3130e506ce27aad35991b050')
+VALUES ('20261200_delete_audit_guest.sql', '32ef89572cad1e558e1896bf8b586a5a151c6513258ea7033de1505f7f86665e')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

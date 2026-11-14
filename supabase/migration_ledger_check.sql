@@ -305,7 +305,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261197_eatery_pin_attempts_reset.sql', '4ae1718f128fb06f26c9354fab5eb9ed49c667b34ec3ae3ac50b9498d4d76708'),
   ('20261198_eatery_order_status_slice3.sql', 'a49eba2d2ee2330f639ca593931cf3e013fffae538b2035d058566fd10e99409'),
   ('20261199_push_token_dedupe.sql', '71626c575c579c3da1ea2ef7c6e5d832cb4f987d69f14f7848851cc3f0d16899'),
-  ('20261200_delete_audit_guest.sql', 'cc47a070fc21f56d10b3fff1f9120dd2cd5d050e3130e506ce27aad35991b050')
+  ('20261200_delete_audit_guest.sql', '32ef89572cad1e558e1896bf8b586a5a151c6513258ea7033de1505f7f86665e')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
