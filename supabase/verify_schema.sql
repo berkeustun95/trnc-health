@@ -152,7 +152,9 @@ WITH report AS (
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
     ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents'),
     -- Bağlantı & eSIM landing link targets (1113).
-    ('1113_connectivity_links','connectivity_links')
+    ('1113_connectivity_links','connectivity_links'),
+    -- Onboarding v2 offer counter (20261202): registered ahead of the apply; red until it runs.
+    ('20261202_onboarding_events','onboarding_events')
   ) e(m,o)
 
   UNION ALL
@@ -573,7 +575,13 @@ WITH report AS (
     ('1113_connectivity_links','connectivity_links','is_active'),
     ('1113_connectivity_links','connectivity_links','created_at'),
     -- 1129. The landing's logo square resolves it through constants/partnerAssets.js.
-    ('1129_connectivity_logo_key','connectivity_operators','logo_key')
+    ('1129_connectivity_logo_key','connectivity_operators','logo_key'),
+    -- 20261202. The app inserts event, platform, runtime_version; id and created_at are the server's.
+    ('20261202_onboarding_events','onboarding_events','id'),
+    ('20261202_onboarding_events','onboarding_events','event'),
+    ('20261202_onboarding_events','onboarding_events','platform'),
+    ('20261202_onboarding_events','onboarding_events','runtime_version'),
+    ('20261202_onboarding_events','onboarding_events','created_at')
 
   ) e(m,t,c)
 
@@ -800,7 +808,9 @@ WITH report AS (
     -- 20261197: registered ahead of the apply; red until it runs.
     ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts'),
     -- 20261198: registered ahead of the apply; red until it runs.
-    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke')
+    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke'),
+    -- 20261201: registered ahead of the apply; red until it runs.
+    ('20261201_set_guest_push','set_guest_push')
   ) e(m,o)
 
   UNION ALL
@@ -1391,7 +1401,12 @@ WITH report AS (
     ('1113_connectivity_links','connectivity_links_slug_check'),
     ('1113_connectivity_links','connectivity_links_url_check'),
     -- 1129. Its key format is an H token.
-    ('1129_connectivity_logo_key','connectivity_operators_logo_key_check')
+    ('1129_connectivity_logo_key','connectivity_operators_logo_key_check'),
+    -- 20261202. The event list and the policy that repeats it are the 1202 H token.
+    ('20261202_onboarding_events','onboarding_events_pkey'),
+    ('20261202_onboarding_events','onboarding_events_event_check'),
+    ('20261202_onboarding_events','onboarding_events_platform_check'),
+    ('20261202_onboarding_events','onboarding_events_runtime_len_check')
 
   ) e(m,o)
 
@@ -1646,7 +1661,9 @@ WITH report AS (
     -- 1197. Missing = the admin "clear lock" button answers a permission error.
     ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts'),
     -- 1198. Missing = "Bu cihazı unut" still clears the cookie but the phone keeps its slot of the 5-device cap.
-    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke')
+    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke'),
+    -- 1201. Missing = a guest's "Allow notifications" saves nothing (the role includes every guest; the body refuses non-guests).
+    ('20261201_set_guest_push','set_guest_push')
   ) e(m,o)
 
   UNION ALL
@@ -1914,6 +1931,54 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%eatery_order_age_gate(v_dob, (now() AT TIME ZONE ''Europe/Nicosia'')::date)%'
            AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) NOT LIKE '%Europe/Istanbul%', false)
     -- 1198-END
+    -- 1201-BEGIN
+    -- 20261201 set_guest_push: red until applied, never an error (to_regprocedure / aclexplode / COALESCE). Negatives are
+    --     anchored to code shape and paired with positives.
+    UNION ALL SELECT '20261201_set_guest_push','set_guest_push(text,text): one overload, DEFINER, owner postgres, search_path empty; EXECUTE exactly authenticated (no PUBLIC / anon / service_role); guest-only gate (IS NOT TRUE) first; Expo token regex (10-64 inner chars); the nine full language names; updates only the caller''s row; exactly-one-row check',
+      COALESCE((SELECT p.prosecdef AND p.proconfig = ARRAY['search_path=""'] AND p.proacl IS NOT NULL AND pg_get_userbyid(p.proowner) = 'postgres'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.set_guest_push(text,text)')), false)
+      AND COALESCE((SELECT string_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE r.rolname END, ',')
+                      FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                     WHERE p.oid = to_regprocedure('public.set_guest_push(text,text)') AND a.privilege_type = 'EXECUTE'
+                       AND a.grantee <> p.proowner) = 'authenticated', false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'set_guest_push') = 1
+      AND COALESCE(position('IF public.is_anonymous_session() IS NOT TRUE THEN' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
+           AND position('IF public.is_anonymous_session() IS NOT TRUE THEN' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) < position('UPDATE public.profiles' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')))
+           AND position('p_token !~ ''^ExponentPushToken\[[A-Za-z0-9_-]{10,64}\]$''' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
+           AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%ARRAY[''English'',''Turkish'',''Arabic'',''Russian'',''Greek'',''French'',''Spanish'',''German'',''Persian'']%'
+           AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%UPDATE public.profiles SET push_token = p_token, preferred_language = p_lang WHERE id = auth.uid();%'
+           AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%IF v_rows IS DISTINCT FROM 1 THEN%', false)
+    -- Berke: guest tokens must not outlive the guest. The token sits on profiles, which goes with the auth user.
+    UNION ALL SELECT '20261201_set_guest_push','profiles(id) -> auth.users(id): exactly one foreign key, ON DELETE CASCADE',
+      COALESCE((SELECT count(*) = 1 AND bool_and(c.confdeltype = 'c')
+                  FROM pg_constraint c
+                 WHERE c.contype = 'f' AND c.conrelid = to_regclass('public.profiles') AND c.confrelid = to_regclass('auth.users')
+                   AND c.conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('public.profiles') AND a.attname = 'id')]::smallint[]
+                   AND c.confkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('auth.users') AND a.attname = 'id')]::smallint[]), false)
+    -- 1201-END
+    -- 1202-BEGIN
+    -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
+    UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the 11 events / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
+      COALESCE((SELECT c.relrowsecurity
+                       AND NOT has_table_privilege('anon', c.oid, 'SELECT,UPDATE,DELETE,TRUNCATE')
+                       AND NOT has_table_privilege('authenticated', c.oid, 'SELECT,UPDATE,DELETE,TRUNCATE')
+                       AND NOT has_any_column_privilege('anon', c.oid, 'SELECT,UPDATE')
+                       AND NOT has_any_column_privilege('authenticated', c.oid, 'SELECT,UPDATE')
+                       AND has_column_privilege('anon', c.oid, 'event', 'INSERT') AND has_column_privilege('authenticated', c.oid, 'event', 'INSERT')
+                       AND has_column_privilege('anon', c.oid, 'platform', 'INSERT') AND has_column_privilege('authenticated', c.oid, 'platform', 'INSERT')
+                       AND has_column_privilege('anon', c.oid, 'runtime_version', 'INSERT') AND has_column_privilege('authenticated', c.oid, 'runtime_version', 'INSERT')
+                       AND NOT has_column_privilege('anon', c.oid, 'id', 'INSERT') AND NOT has_column_privilege('authenticated', c.oid, 'id', 'INSERT')
+                       AND NOT has_column_privilege('anon', c.oid, 'created_at', 'INSERT') AND NOT has_column_privilege('authenticated', c.oid, 'created_at', 'INSERT')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0)
+                  FROM pg_class c WHERE c.oid = to_regclass('public.onboarding_events')), false)
+      AND COALESCE((SELECT string_agg(policyname || ':' || cmd || ':' || permissive, ',' ORDER BY policyname)
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events')
+                   = 'oe_insert_public:INSERT:PERMISSIVE,oe_no_delete:DELETE:PERMISSIVE,oe_no_update:UPDATE:PERMISSIVE', false)
+      AND COALESCE((SELECT with_check LIKE '%reoffer_existing_declined%' AND with_check LIKE '%''android''%' AND with_check LIKE '%length(runtime_version) <= 64%'
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events' AND policyname = 'oe_insert_public'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''start_shown''%' AND pg_get_constraintdef(c.oid) LIKE '%''reoffer_existing_declined''%'
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.onboarding_events') AND c.conname = 'onboarding_events_event_check'), false)
+    -- 1202-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
