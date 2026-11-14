@@ -34,6 +34,13 @@ export const LANGUAGES = [
 ]
 const translations = {
   en: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — North Cyprus Assistant",
+    startCta: "Get started",
+    startHaveAccount: "Already have an account?",
+    dutyAlertsTitle: "Never miss the duty pharmacy",
+    dutyAlertsBody: "Every day when the duty shift starts, we'll send you that day's duty pharmacies. Tap the notification and your city's pharmacies are at the top.",
+    dutyAlertsOutsideTrnc: "You seem to be outside North Cyprus right now. Pick your city above.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "Türkiye national team",
     lsF1Race: "Race",
@@ -2788,6 +2795,13 @@ const translations = {
     mkErrGeneric: "Something went wrong. Please try again.",
   },
   tr: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — Kuzey Kıbrıs Asistanı",
+    startCta: "Hemen başla",
+    startHaveAccount: "Hesabın var mı?",
+    dutyAlertsTitle: "Nöbetçi eczaneyi kaçırma",
+    dutyAlertsBody: "Her gün nöbet saatinde o günün nöbetçi eczanelerini sana bildirelim. Bildirime dokununca şehrinin eczaneleri en üstte.",
+    dutyAlertsOutsideTrnc: "Şu an Kuzey Kıbrıs dışında görünüyorsun. Şehrini yukarıdan seç.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "A Milli Takım",
     lsF1Race: "Yarış",
@@ -5513,6 +5527,13 @@ const translations = {
     mkErrGeneric: "Bir sorun oluştu. Lütfen tekrar dene.",
   },
   ar: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — مساعد شمال قبرص",
+    startCta: "ابدأ الآن",
+    startHaveAccount: "لديك حساب بالفعل؟",
+    dutyAlertsTitle: "لا تفوّت الصيدلية المناوبة",
+    dutyAlertsBody: "كل يوم عند بدء المناوبة نرسل إليك الصيدليات المناوبة في ذلك اليوم. اضغط على الإشعار لتجد صيدليات مدينتك في الأعلى.",
+    dutyAlertsOutsideTrnc: "يبدو أنك خارج شمال قبرص الآن. اختر مدينتك من الأعلى.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "منتخب تركيا",
     lsF1Race: "السباق",
@@ -8018,6 +8039,13 @@ const translations = {
     mkErrGeneric: "حدث خطأ ما. يُرجى المحاولة مجددًا.",
   },
   ru: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — Помощник Северного Кипра",
+    startCta: "Начать",
+    startHaveAccount: "Уже есть аккаунт?",
+    dutyAlertsTitle: "Не пропустите дежурную аптеку",
+    dutyAlertsBody: "Каждый день к началу дежурства мы будем присылать вам дежурные аптеки на этот день. Нажмите на уведомление — аптеки вашего города будут в начале списка.",
+    dutyAlertsOutsideTrnc: "Похоже, сейчас вы не на Северном Кипре. Выберите свой город выше.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "Сборная Турции",
     lsF1Race: "Гонка",
@@ -10539,6 +10567,13 @@ const translations = {
     mkErrGeneric: "Что-то пошло не так. Попробуйте ещё раз.",
   },
   el: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — Βοηθός Βόρειας Κύπρου",
+    startCta: "Ξεκινήστε",
+    startHaveAccount: "Έχετε ήδη λογαριασμό;",
+    dutyAlertsTitle: "Μη χάνετε το εφημερεύον φαρμακείο",
+    dutyAlertsBody: "Κάθε μέρα, την ώρα που ξεκινά η εφημερία, θα σας στέλνουμε τα εφημερεύοντα φαρμακεία της ημέρας. Πατήστε την ειδοποίηση και τα φαρμακεία της πόλης σας εμφανίζονται πρώτα.",
+    dutyAlertsOutsideTrnc: "Φαίνεται ότι αυτή τη στιγμή βρίσκεστε εκτός Βόρειας Κύπρου. Επιλέξτε την πόλη σας παραπάνω.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "Εθνική Τουρκίας",
     lsF1Race: "Αγώνας",
@@ -13038,6 +13073,13 @@ const translations = {
     mkErrGeneric: "Κάτι πήγε στραβά. Δοκιμάστε ξανά.",
   },
   fr: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — Assistant Chypre du Nord",
+    startCta: "Commencer",
+    startHaveAccount: "Vous avez déjà un compte ?",
+    dutyAlertsTitle: "Ne manquez plus la pharmacie de garde",
+    dutyAlertsBody: "Chaque jour, à l'heure de la garde, nous vous envoyons les pharmacies de garde du jour. Touchez la notification : les pharmacies de votre ville s'affichent en premier.",
+    dutyAlertsOutsideTrnc: "Vous semblez être hors de Chypre du Nord en ce moment. Choisissez votre ville ci-dessus.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "Équipe de Turquie",
     lsF1Race: "Course",
@@ -15542,6 +15584,13 @@ const translations = {
     mkErrGeneric: "Une erreur s’est produite. Veuillez réessayer.",
   },
   es: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — Asistente del norte de Chipre",
+    startCta: "Empezar",
+    startHaveAccount: "¿Ya tienes una cuenta?",
+    dutyAlertsTitle: "No te pierdas la farmacia de guardia",
+    dutyAlertsBody: "Cada día, a la hora de la guardia, te avisamos de las farmacias de guardia de ese día. Toca la notificación y las farmacias de tu ciudad aparecen primero.",
+    dutyAlertsOutsideTrnc: "Parece que ahora estás fuera del norte de Chipre. Elige tu ciudad arriba.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "Selección de Turquía",
     lsF1Race: "Carrera",
@@ -18043,6 +18092,13 @@ const translations = {
     mkErrGeneric: "Algo ha fallado. Inténtalo de nuevo.",
   },
   de: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — Nordzypern-Assistent",
+    startCta: "Jetzt starten",
+    startHaveAccount: "Schon ein Konto?",
+    dutyAlertsTitle: "Verpasse nie die Notdienst-Apotheke",
+    dutyAlertsBody: "Jeden Tag zu Dienstbeginn schicken wir dir die Notdienst-Apotheken des Tages. Tippe auf die Benachrichtigung, und die Apotheken deiner Stadt stehen ganz oben.",
+    dutyAlertsOutsideTrnc: "Du scheinst gerade nicht in Nordzypern zu sein. Wähle oben deine Stadt aus.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "Türkische Nationalmannschaft",
     lsF1Race: "Rennen",
@@ -20543,6 +20599,13 @@ const translations = {
     mkErrGeneric: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
   },
   fa: {
+    // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
+    startTagline: "ADA — دستیار قبرس شمالی",
+    startCta: "شروع کنید",
+    startHaveAccount: "حساب کاربری دارید؟",
+    dutyAlertsTitle: "داروخانه کشیک را از دست ندهید",
+    dutyAlertsBody: "هر روز در ساعت شروع کشیک، داروخانه‌های کشیک همان روز را برایتان می‌فرستیم. با لمس اعلان، داروخانه‌های شهرتان در بالای فهرست نمایش داده می‌شوند.",
+    dutyAlertsOutsideTrnc: "به نظر می‌رسد اکنون خارج از قبرس شمالی هستید. شهر خود را از بالا انتخاب کنید.",
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
     lsTurkeyTeam: "تیم ملی ترکیه",
     lsF1Race: "مسابقه",

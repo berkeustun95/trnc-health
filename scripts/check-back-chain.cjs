@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases (+2 for Yeme-İçme) from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery basket page (rides eateryPartnerBackRef). +3 on 2026-10-21 for the Eatery "Ne yesem?" quiz page (rides eateryListBackRef). +2 for Sepetim opened from the quiz results bar. +2 on 2026-10-28 for a North Houses apartment over Konaklama (Günlük Kiralık). +4 on 2026-11-07 for Araçlar (list, car, dealer over car, car over dealer). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery basket page (rides eateryPartnerBackRef). +3 on 2026-10-21 for the Eatery "Ne yesem?" quiz page (rides eateryListBackRef). +2 for Sepetim opened from the quiz results bar. +2 on 2026-10-28 for a North Houses apartment over Konaklama (Günlük Kiralık). +4 on 2026-11-07 for Araçlar (list, car, dealer over car, car over dealer). +4 on 2026-11-14 for Onboarding v2 (Start exits, Start exits even with stale module state behind it, Auth returns to Start, Screen 2 exits without deciding; the proxy's session is overridden with sessionRef in the case state). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -98,6 +98,11 @@ const cases4=[
  ['S10 Towing detail over Garages -> closes detail only', {...base, showGarages:true, showTowing:true}, {towingBackRef:()=>true, garagesBackRef:()=>{throw new Error('garages asked')}}, r=>r.calls===''],
  ['S10 Towing detail standalone -> closes detail only', {...base, showTowing:true}, {towingBackRef:()=>true}, r=>r.calls===''],
  ['Beaches layer -> module step', {...base, showExploreBeach:true}, {exploreBackRef:()=>true}, r=>r.calls===''],
+ // Onboarding v2. No session: only Start or Auth renders, so nothing behind them may consume back.
+ ['Start (no session) -> exits the app, as Welcome did', {...base, sessionRef:{current:null}, showWelcome:true}, {homeBackRef:()=>{throw new Error('home asked')}}, r=>r.r===false && r.calls===''],
+ ['Start with stale module state from the signed-out session -> still exits, closes nothing unseen', {...base, sessionRef:{current:null}, showWelcome:true, showEvents:true, activeTab:'profile'}, {}, r=>r.r===false && r.calls===''],
+ ['Auth (no session) -> back to Start', {...base, sessionRef:{current:null}, showWelcome:false}, {}, r=>r.r===true && r.calls==='setShowWelcome(true)'],
+ ['Screen 2 (duty offer) -> exits without deciding (pending survives; no tab or module close)', {...base, onbStepRef:{current:'duty'}, activeTab:'profile', showEvents:true}, {}, r=>r.r===false && r.calls===''],
 ]
 const cases=[
  ['Pets vet overlay open -> closes facility only', {...base, showPets:true, petsSubScreen:'vetdirectory', selectedFacility:{id:1}}, null,null, r=>r.calls==='setSelectedFacility(null)'],
