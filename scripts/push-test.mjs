@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 import { seal } from './lib/readonly-seal.mjs'
-import { onePerToken } from '../supabase/functions/send-duty-notification/push.ts'
+import { errorKind, onePerToken } from '../supabase/functions/send-duty-notification/push.ts'
 
 prodWriteGuard({ wouldWrite: false, workflow: 'push-test' })
 
@@ -76,7 +76,11 @@ console.log(seal(JSON.stringify({ account: `${id.slice(0, 8)}…`, role, languag
   ...(email2 ? { dedupe, same_token: accounts[0].push_token === accounts[1].push_token, messages_sent: recipients.length, tickets } : {}) }), publicKey))
 if (email2) console.log(`two-account mode: dedupe ${dedupe}, messages sent: ${recipients.length}`)
 console.log(`ticket: ${ticket?.status ?? 'none'}`)
-if (tickets.length !== recipients.length || tickets.some(x => x?.status !== 'ok')) fail(`Expo refused the message: ${ticket?.details?.error ?? ticket?.message ?? send.status}`)
+if (tickets.length !== recipients.length || tickets.some(x => x?.status !== 'ok')) {
+  // Never Expo's free-text message: for DeviceNotRegistered it embeds the push token (public log).
+  const bad = tickets.find(x => x?.status !== 'ok')
+  fail(`Expo refused the message: ${bad ? errorKind(bad.details?.error) : `HTTP ${send.status}, ${tickets.length}/${recipients.length} tickets`}`)
+}
 
 // Receipts appear after the provider answers; poll briefly.
 for (let i = 0; i < 6; i++) {
@@ -88,7 +92,7 @@ for (let i = 0; i < 6; i++) {
   if (receipts.every(Boolean)) {
     const receipt = receipts.find(x => x.status !== 'ok') ?? receipts[0]
     console.log(`receipts: ${receipts.map(x => x.status).join(', ')}`)
-    if (receipt.status !== 'ok') fail(`Delivery refused by FCM/APNs: ${receipt.details?.error ?? receipt.message}`)
+    if (receipt.status !== 'ok') fail(`Delivery refused by FCM/APNs: ${errorKind(receipt.details?.error)}`)
     console.log('✓ accepted by FCM/APNs — now check the device.')
     process.exit(0)
   }
