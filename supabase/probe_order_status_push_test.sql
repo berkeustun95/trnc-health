@@ -19,8 +19,8 @@ select json_build_object(
              (select count(*) from public.profiles p2 where p2.push_token = p.push_token and p.push_token is not null) as profiles_sharing_token,
              p.preferred_language,
              (select coalesce(json_agg(json_build_object('status', ev.status,
-                        'at_utc', to_char(ev.created_at at time zone 'utc','MM-DD HH24:MI:SS'),
-                        'by_device', ev.device_id is not null) order by ev.created_at), '[]'::json)
+                        'at_utc', to_char(ev.at at time zone 'utc','MM-DD HH24:MI:SS'),
+                        'by_device', ev.device_id is not null) order by ev.at), '[]'::json)
                 from public.eatery_order_events ev where ev.order_id = eo.id) as events,
              (select coalesce(json_agg(json_build_object(
                         'sent_utc', to_char(pl.sent_at at time zone 'utc','MM-DD HH24:MI:SS'),
