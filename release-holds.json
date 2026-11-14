@@ -15,16 +15,20 @@
       "commit": "9c986f5df02b1504eef92dac7276b72d746ad55f",
       "what": "Admin: remove the 'notify duty' button, merged to main 2026-11-14",
       "since": "2026-11-14",
-      "cleared": false,
-      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: held out of the #408 production update). Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: held out of the #408 production update). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-14",
+      "clearedBy": "NOT approved for production: REVERTED on main (Berke 2026-11-14, so #408 ships alone from main). The change can only return through a re-land PR (a revert of the revert), which gets its own hold until Berke has seen it on Preview."
     },
     {
       "pr": 392,
       "commit": "7ce25528656833c934da71ccf29d3815ee870401",
       "what": "Admin Restaurant PINs: reset-cap explanation (9 languages), merged to main 2026-11-14",
       "since": "2026-11-14",
-      "cleared": false,
-      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: held out of the #408 production update). Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: held out of the #408 production update). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-14",
+      "clearedBy": "NOT approved for production: REVERTED on main (Berke 2026-11-14, so #408 ships alone from main). The change can only return through a re-land PR (a revert of the revert), which gets its own hold until Berke has seen it on Preview."
     }
   ]
 }
