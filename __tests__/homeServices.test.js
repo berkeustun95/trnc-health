@@ -95,3 +95,12 @@ test('Yakında tiles are placed in their group but never in the visible list', (
   const visible = groups.visibleServiceIds()
   for (const id of soon) expect([id, visible.includes(id)]).toEqual([id, false])
 })
+
+test('usage outranks the defaults, and a pin outranks usage', () => {
+  const { groups, fav } = load({ dev: false })
+  const visible = groups.visibleServiceIds()
+  const used = fav.resolveFavourites({ pins: [], usage: { health: 9, municipal: 5 }, visible })
+  expect(used.slice(0, 2)).toEqual(['health', 'municipal'])
+  const pinned = fav.resolveFavourites({ pins: ['towing'], usage: { health: 9 }, visible })
+  expect(pinned.slice(0, 2)).toEqual(['towing', 'health'])
+})

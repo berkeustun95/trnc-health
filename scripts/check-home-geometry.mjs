@@ -271,12 +271,13 @@ for (const id of MUST_EXCLUDE) {
   if (!knownIds.has(id)) problems.push(`'${id}' is not a known tile id`)
 }
 
-// Production-like, in Home's group order (synthetic: the real list is derived in jest).
+// Production-like, in Home's group order: the 19 ids derived and printed by
+// __tests__/homeServices.test.js (synthetic here because this file cannot import homeGroups).
 const VISIBLE = [
   'duty', 'health', 'emergency',
   'exploreTab', 'events', 'walkingRoutes', 'hotels', 'eatery',
-  'accommodation', 'homeServices', 'pets', 'studentHub',
-  'municipal', 'towing', 'ehliyet', 'cars', 'exchangeRates', 'newcomerEssentials',
+  'accommodation', 'homeServices', 'marketplace', 'pets', 'studentHub',
+  'esim', 'municipal', 'towing', 'ehliyet', 'exchangeRates', 'newcomerEssentials',
 ]
 for (const id of VISIBLE) {
   if (!knownIds.has(id)) problems.push(`synthetic VISIBLE names '${id}', which is not a known tile id`)
@@ -338,7 +339,9 @@ scenario('pin not in visible (a hidden tile) is skipped',
 scenario('duplicate pins show once',
   { pins: ['pets', 'pets', 'pets'], usage: {}, visible: VISIBLE },
   { check: out => out[0] === 'pets' && out.filter(id => id === 'pets').length === 1 ? null : 'pets doubled or lost' })
-scenario('garbage usage does not scramble the row',
+// Length/dup/visibility only: loadUsage() sanitises counts before they reach the resolver, so the
+// resolver is not asked to order garbage (no independent red beyond the generic asserts).
+scenario('garbage usage does not break the row',
   { pins: [], usage: { events: NaN, pets: 'x', hotels: -5, health: undefined }, visible: VISIBLE },
   { check: out => out.length === FAVOURITE_SLOTS ? null : 'garbage usage changed the length' })
 

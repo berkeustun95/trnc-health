@@ -933,7 +933,7 @@ export default function HomeScreen({
                 branch — the auto-fill pool is every visible tile (visibleServiceIds), far more
                 than eight, so this heading can never be left standing over nothing.
 
-                ⚠ THESE FOUR TILES ALSO REMAIN IN THE GRID BELOW, AND THAT DUPLICATION IS
+                ⚠ THESE EIGHT TILES ALSO REMAIN IN THE GRID BELOW, AND THAT DUPLICATION IS
                   THE DESIGN. The grid is the app's navigation and must be complete and
                   identical for every user; this row is a per-device shortcut. Removing a
                   favourite from the grid would make the grid's contents depend on
