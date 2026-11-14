@@ -428,6 +428,8 @@ violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal re
 0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
 Berke's `production-db` approval.
 Sync PRs from `main` into a release branch (`release/**`) count as Mac Code's own PRs.
+**Never merge a PR whose title contains DRAFT or WIP** (any case, any brackets), even when GitHub does not mark it
+draft (Berke, 2026-11-14; #401 merged as "[DRAFT] …"). Retitle it first, and only once it is really ready.
 **Draft → ready is Code's job** (Berke, 2026-10-31): when a PR is ready (reviews/QA passed, checks green), Code
 runs `gh pr ready <n>` itself and tells Berke "ready to merge" with the PR link; he never has to undraft it.
 
