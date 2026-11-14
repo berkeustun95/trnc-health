@@ -1,10 +1,11 @@
 -- Duplicate push report 4, 2026-11-14: one iPhone (a former tester) showed the identical ENGLISH digest + duty twice.
 -- READ-ONLY, one statement. The result is SEALED and lists account e-mails and names for Berke's vault only.
--- Nothing personal is in this file: the account is found by sha256(lower(email)), and the look-alike search terms are
+-- RAN ONCE (run 43565219477, result in the vault). The account fingerprint was removed afterwards, so this file now
+-- matches nothing. Originally the account was found by sha256(lower(email)), and the look-alike search terms are
 -- derived at run time from that account's own row. Tokens are never printed, only left(md5(token), 8).
 with me as (
   select u.id, u.email from auth.users u
-   where encode(sha256(convert_to(lower(u.email), 'UTF8')), 'hex') = 'fa4f90e6ed2b03b5b1f06aee2d8e573cf8a1c3f940846bcfb1810bdbdc1049bb'),
+   where encode(sha256(convert_to(lower(u.email), 'UTF8')), 'hex') = '<removed>'),   -- fingerprint removed 2026-11-14 (Berke): probes never commit e-mails, hashes, ids or tokens
 acct as (
   select u.id, u.email, u.created_at, u.last_sign_in_at, u.is_anonymous,
          p.role, p.full_name, p.display_name, p.preferred_language, p.weekend_digest, p.push_token
