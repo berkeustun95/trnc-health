@@ -11,7 +11,7 @@ import { SOURCES } from './sources.mjs'
 import { X509Certificate } from 'node:crypto'
 import tls from 'node:tls'
 import { RAPIDSSL_G1_PEM, RAPIDSSL_G1_SHA256, LE_YR1_PEM, LE_YR1_SHA256, ISRG_ROOT_YR_BY_X1_PEM, ISRG_ROOT_YR_BY_X1_SHA256 } from './lib/ca.mjs'
-import { PARSERS } from './lib/parsers.mjs'
+import { PARSERS, GOV_CT_TR_HOST } from './lib/parsers.mjs'
 import { errorClass, systemicFailure, withTimeoutRetry, isCertError, isMissingIssuer } from './lib/runhealth.mjs'
 import { buildChain, fetchIssuer, caIssuerUrls } from './lib/aia.mjs'
 import { GOV_CT_TR_LEAF, ISRG_ROOT_YR_SELF, FORGED_YR1, TEST_ROOT, TEST_NONCA_INTER, TEST_LEAF } from './aia-fixtures.mjs'
@@ -119,6 +119,21 @@ export async function runSelftest() {
   const eu = PARSERS.euburs(res(`<div><strong class="yellow-stroke">INTERNSHIP FOR GIZ 2026</strong><p>10.06.2026</p><a href="announcement/153" class="border-button">LEARN MORE</a></div>`, 'https://www.euburs.eu/announcements'))
   t('EU Burs: title from the <strong> above "LEARN MORE"', eu.map(i => i.title), ['INTERNSHIP FOR GIZ 2026'])
   t('EasyDNN date "Eyl 24, 2026"', parseListingDate('Yayınlanma tarihi: Eyl 24, 2026')?.toISOString(), '2026-09-23T21:00:00.000Z')
+  // EasyDNN item links: real *.gov.ct.tr hosts only, judged on the HOSTNAME (2026-11-14).
+  const dnnHtml = links => `<div class="article_list_wrapper">${links.map((u, i) => `<a href="${u}"><h2>Duyuru başlığı ${i}</h2></a>`).join('')}</div>`
+  const dnnKept = (links, base) => PARSERS.easydnn(res(dnnHtml(links), base)).map(it => it.url)
+  const GENCLIK = 'http://genclik.gov.ct.tr/HABERLER/gen231lik-dairesi-cumhuriyet-s246lenine-davet'
+  const TICARET = 'https://ticaret.gov.ct.tr/HABERLER/hizmet-i231i-e%c4%9fitim'
+  t('EasyDNN: Gençlik on http passes', dnnKept([GENCLIK], 'http://genclik.gov.ct.tr/HABERLER'), [GENCLIK])
+  t('EasyDNN: Ticaret on https passes', dnnKept([TICARET], 'https://ticaret.gov.ct.tr/HABERLER'), [TICARET])
+  t('EasyDNN: relative link resolves on the real host', dnnKept(['/HABERLER/sanayi-dairesi-yeni-duyuru-metni'], 'https://sanayi.gov.ct.tr/HABERLER'), ['https://sanayi.gov.ct.tr/HABERLER/sanayi-dairesi-yeni-duyuru-metni'])
+  t('EasyDNN: ".gov.ct.tr/" in the PATH of another site fails', dnnKept(['http://evil.example/x.gov.ct.tr/aa/long-slug-123456'], 'http://genclik.gov.ct.tr/HABERLER'), [])
+  t('EasyDNN: look-alike host gov.ct.tr.evil.example fails', dnnKept(['https://ticaret.gov.ct.tr.evil.example/HABERLER/long-slug-123456'], 'https://ticaret.gov.ct.tr/HABERLER'), [])
+  t('EasyDNN: user@host trick fails', dnnKept(['https://ticaret.gov.ct.tr@evil.example/HABERLER/long-slug-123456'], 'https://ticaret.gov.ct.tr/HABERLER'), [])
+  t('EasyDNN: suffix look-alike notgov.ct.tr fails', dnnKept(['https://ticaret.notgov.ct.tr/HABERLER/long-slug-123456'], 'https://ticaret.gov.ct.tr/HABERLER'), [])
+  t('EasyDNN: mixed list keeps only the real one', dnnKept([GENCLIK, 'http://evil.example/genclik.gov.ct.tr/HABERLER/long-slug-123456'], 'http://genclik.gov.ct.tr/HABERLER'), [GENCLIK])
+  t('host rule: gov.ct.tr itself and subdomains', ['gov.ct.tr', 'genclik.gov.ct.tr', 'a.b.gov.ct.tr'].every(h => GOV_CT_TR_HOST.test(h)), true)
+  t('host rule: lookalikes', ['gov.ct.tr.evil.example', 'evilgov.ct.tr', 'gov.ct.tr.', 'ct.tr'].some(h => GOV_CT_TR_HOST.test(h)), false)
   let threw = false; try { PARSERS.ssd(res('<html>redesigned</html>', 'https://ssd.gov.ct.tr/')) } catch { threw = true }
   t('a redesigned page throws (failing source), not []', threw, true)
 
