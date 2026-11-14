@@ -67,11 +67,13 @@ jobs:
     runs-on: ubuntu-24.04
     environment: production
     # Setting this block zeroes every scope it does not list, so contents: read is
-    # what keeps checkout working. issues: write is for the unmapped-category step
-    # only; the repo default token is read-only.
+    # what keeps checkout working. issues: write is for the three issue steps
+    # (unmapped category, rows needing a decision, red sync); actions: read lets
+    # the red-sync step read this run's own step results.
     permissions:
       contents: read
       issues: write
+      actions: read
     timeout-minutes: 20
     env:
       GISEKIBRIS_FEED_URL: ${{ secrets.GISEKIBRIS_FEED_URL }}
@@ -192,8 +194,9 @@ jobs:
             fi
           done
 
-      # --apply nulls any ticket_url that no longer resolves. Exits non-zero if a
-      # row in the feed is cancelled, which halts the job on purpose.
+      # --apply nulls any ticket_url that no longer resolves, and takes a row the
+      # partner marks cancelled OUT of the seed (meta.feed_cancelled) instead of
+      # halting the job (Berke, 2026-11-14). It is listed in the issue below.
       - name: Probe ticket URLs and cancellation flags
         run: node scripts/check-gisekibris-urls.mjs --apply
 
@@ -201,12 +204,78 @@ jobs:
         run: node scripts/import-gisekibris-events.mjs
 
       # Runs LAST: it decides on absence from the feed just imported.
+      # Leaves rows prepare skipped and rows cancelled in the feed alone (held for
+      # Berke), and writes which of them are live in the app for the next step.
       - name: Sweep cancellations
-        run: node scripts/sweep-gisekibris-cancellations.mjs
+        run: node scripts/sweep-gisekibris-cancellations.mjs --report "$RUNNER_TEMP/gk-held.json"
 
       # The content question the exit codes above cannot answer.
       - name: Content health
         run: node scripts/check-gisekibris-staleness.mjs
+
+      # One issue, "Gişe Kıbrıs: rows need a decision", for every row this run left
+      # out: skipped by prepare (no id, unknown city, …) or cancelled on the partner's
+      # site. The body is rewritten each run; Berke is mentioned only when the set of
+      # rows changes; it closes itself when the set is empty. Nothing here cancels
+      # anything. Partner text travels only through jq, never into shell source.
+      - name: Report rows that need a decision
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          seed=supabase/seed/gisekibris-events-clean.json
+          rep="$RUNNER_TEMP/gk-held.json"
+          if [ ! -s "$rep" ]; then
+            [ -s "$seed" ] || { echo "No seed: prepare did not run."; exit 0; }
+            jq '{skipped: (.meta.skipped // []), feed_cancelled: (.meta.feed_cancelled // [])}' "$seed" > "$rep"
+          fi
+          list=$(jq -r '
+            def live: if .in_app == true then " — **LIVE IN APP**" elif .in_app == false then "" else " — (live status not read)" end;
+            ([.feed_cancelled[] | "- CANCELLED on Gişe Kıbrıs: \(.title) (`\(.external_id)`, \(.start_date[0:10]))" + live]
+             + [.skipped[] | "- SKIPPED: \(.title)" + (if .external_id then " (`\(.external_id)`)" else "" end) + " — \(.reason)" + live])
+            | join("\n")' "$rep")
+          title='Gişe Kıbrıs: rows need a decision'
+          num=$(gh issue list --state open --limit 200 --json number,title | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
+          if [ -z "$list" ]; then
+            [ -z "$num" ] || gh issue close "$num" --comment 'No skipped or cancelled rows in the latest sync.'
+            echo "Nothing held."; exit 0
+          fi
+          body=$(printf '%s\n\n%s\n\n%s\n' \
+            "The latest sync left these rows out. Nothing was cancelled automatically: a row marked LIVE IN APP is still showing and needs a decision." \
+            "$list" \
+            "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
+          printf '%s\n' "$list" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$num" ]; then
+            gh issue create --title "$title" --body "$body"$'\n\n@berkeustun95'
+          else
+            old=$(gh issue view "$num" --json body --jq .body | sed -n '/^- /p')
+            gh issue edit "$num" --body "$body"
+            [ "$old" = "$list" ] || gh issue comment "$num" --body "@berkeustun95 the rows changed:"$'\n\n'"$list"
+          fi
+
+      # A red sync used to email at best (finding 1 of the 2026-11 audit: six red days,
+      # no issue). One issue stays open while the sync is red; it closes on green.
+      - name: Alert on a red sync
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          failing=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
+            --jq '[.jobs[] | select(.name == "sync") | .steps[] | select(.conclusion == "failure") | "- " + .name] | sort | join("\n")')
+          title='Gişe Kıbrıs sync is red'
+          num=$(gh issue list --state open --limit 200 --json number,title | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
+          if [ -z "$failing" ]; then
+            [ -z "$num" ] || gh issue close "$num" --comment 'The sync is green again.'
+            exit 0
+          fi
+          body=$(printf 'Failing steps:\n\n%s\n\nRun: %s/%s/actions/runs/%s' "$failing" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [ -z "$num" ]; then
+            gh issue create --title "$title" --body "$body"$'\n\n@berkeustun95'
+          else
+            gh issue comment "$num" --body "$body"
+          fi
 
       - name: Summary
         if: always()

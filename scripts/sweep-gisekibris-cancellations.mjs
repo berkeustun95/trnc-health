@@ -53,7 +53,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { readAllResult } from './lib/read-all-rows.mjs'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
@@ -106,11 +106,20 @@ export function decide(row, probe) {
   if (!(new Date(row.start_date) >= new Date(row.now ?? Date.now())))
                                       return { verdict: 'skip',    why: 'past-dated' }
   if (row.inFeed)                     return { verdict: 'skip',    why: 'present in the current feed' }
+  if (row.held)                       return { verdict: 'skip',    why: 'held for Berke (skipped or cancelled in this feed)' }
   if (!row.ticket_url)                return { verdict: 'unknown', why: 'no ticket_url to probe' }
   if (!probe || probe.ok !== true)    return { verdict: 'unknown', why: `probe failed: ${probe?.error ?? `HTTP ${probe?.status ?? '?'}`}` }
   if (probe.flag === true)            return { verdict: 'cancel',  why: 'isCancelled reads literally TRUE' }
   if (probe.flag === false)           return { verdict: 'live',    why: 'isCancelled reads false' }
   return { verdict: 'unknown', why: 'isCancelled absent or contradictory on the page' }
+}
+
+// Rows this run deliberately left OUT of the seed: prepare's skipped rows (when their
+// id is known) and the probe's feed_cancelled rows. They are absent from the feed for
+// a reason we already know, so they are never swept: Berke decides (2026-11-14).
+export function heldIds(meta) {
+  return new Set([...(meta?.skipped ?? []), ...(meta?.feed_cancelled ?? [])]
+    .map(r => r?.external_id).filter(Boolean))
 }
 
 // ─── Self-test ──────────────────────────────────────────────────────────────
@@ -131,6 +140,13 @@ if (selftest) {
   T('flag TRUE but already cancelled (never un-cancels)', {...base, status:'cancelled'}, {ok:true,status:200,flag:true}, 'skip')
   T('flag TRUE but a draft row',     {...base, status:'draft'},                    {ok:true,status:200,flag:true}, 'skip')
   T('flag TRUE but not our source',  {...base, source:'manual'},                   {ok:true,status:200,flag:true}, 'skip')
+  T('flag TRUE but HELD (skipped / feed-cancelled)', {...base, held:true}, {ok:true,status:200,flag:true}, 'skip')
+  {
+    const h = heldIds({ skipped: [{ external_id: 'gk-A' }, { external_id: null }], feed_cancelled: [{ external_id: 'gk-B' }] })
+    const ok = [...h].sort().join(',') === 'gk-A,gk-B'
+    if (!ok) FAILS++
+    console.log(`    ${ok ? '✓' : '✗'} ${'heldIds: skipped (with id) + feed_cancelled'.padEnd(52)} ${[...h].sort().join(',')}`)
+  }
   console.log('\n  an ABSENT / unreadable flag that must NOT fire')
   T('flag ABSENT (seat-map render)', base, {ok:true,status:200,flag:null},          'unknown')
   T('flag contradictory (two values)', base, {ok:true,status:200,flag:null},        'unknown')
@@ -180,7 +196,9 @@ try {
 if (!key) fail('No service-role key: not in the Keychain and SUPABASE_SERVICE_ROLE_KEY is unset.')
 
 if (!existsSync(SEED)) fail(`Seed not found: ${SEED}. Run fetch + prepare first.`)
-const seedEvents = JSON.parse(readFileSync(SEED,'utf8')).events ?? []
+const seedJson = JSON.parse(readFileSync(SEED,'utf8'))
+const seedEvents = seedJson.events ?? []
+const held = heldIds(seedJson.meta)
 // The feed set is what decides ABSENCE, so an empty one would make every row a
 // candidate. prepare cannot emit an empty seed, but this script must not depend on
 // that being true somewhere else.
@@ -210,11 +228,32 @@ const { data: rows, error } = await readAllResult((a, b) => sb.from('events')
   .eq('source', SOURCE).eq('status','approved').gte('start_date', nowIso).order('start_date').order('id').range(a, b))
 if (error) fail(`read failed: ${error.message}`)
 
-const eligible = rows.filter(r => !feedIds.has(r.external_id))
+// Held rows: which are LIVE in the app right now (approved and not over by the app's own
+// rule), so the issue can say so. Read separately: a live event may have started already.
+const reportArg = args.indexOf('--report')
+if (held.size) {
+  const { isEventOver } = await import('../utils/eventVisibility.js')
+  const { data: heldRows, error: hErr } = await sb.from('events')
+    .select('external_id,title,start_date,end_date,status').eq('source', SOURCE).in('external_id', [...held])
+  if (hErr) fail(`read of held rows failed: ${hErr.message}`)
+  const byId = new Map((heldRows ?? []).map(r => [r.external_id, r]))
+  const tag = r => { const d = byId.get(r.external_id)
+    return { ...r, in_app: !!d && d.status === 'approved' && !isEventOver(d), db_status: d?.status ?? null } }
+  const report = { skipped: (seedJson.meta?.skipped ?? []).map(r => r.external_id ? tag(r) : { ...r, in_app: false, db_status: null }),
+                   feed_cancelled: (seedJson.meta?.feed_cancelled ?? []).map(tag) }
+  console.log(`\n  held (never swept): ${held.size}`)
+  for (const r of [...report.skipped, ...report.feed_cancelled].filter(r => r.external_id))
+    console.log(`    ${r.in_app ? 'LIVE IN APP' : 'not in app '}  ${r.external_id}  ${r.title.slice(0, 44)}`)
+  if (reportArg !== -1) writeFileSync(resolve(args[reportArg + 1]), JSON.stringify(report, null, 2) + '\n')
+} else if (reportArg !== -1) {
+  writeFileSync(resolve(args[reportArg + 1]), JSON.stringify({ skipped: seedJson.meta?.skipped ?? [], feed_cancelled: [] }, null, 2) + '\n')
+}
+
+const eligible = rows.filter(r => !feedIds.has(r.external_id) && !held.has(r.external_id))
 console.log('')
 console.log(`Gişe Kıbrıs cancellation sweep${dry ? '  (DRY RUN — nothing written)' : ''}`)
 console.log(`  feed: ${feedIds.size} events · approved & future-dated in DB: ${rows.length}`)
-console.log(`  candidates (absent from the feed): ${eligible.length}`)
+console.log(`  candidates (absent from the feed, not held): ${eligible.length}`)
 if (!eligible.length) { console.log('\n  Nothing to consider.\n'); process.exit(0) }
 
 // probe with a small pool
