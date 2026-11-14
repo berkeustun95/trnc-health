@@ -573,11 +573,11 @@ export default function HomeScreen({
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
-      // Search and Tüm hizmetler cannot stack (search replaces the hub; Tüm hizmetler is opened from it),
-      // and neither coexists with the facility list; order is search, Tüm hizmetler, facility list.
+      // Topmost layer first. The facility list CAN open over Tüm hizmetler (the health tile in its grid,
+      // an App deep link) and is drawn above it (render gate !showFacilityList), so it closes first.
       if (searchOpen) { closeSearch(); return true }
-      if (allServicesOpen) { closeAllServices(); return true }
       if (showFacilityList && !forceFacilityList) { closeFacilityList(); return true }
+      if (allServicesOpen) { closeAllServices(); return true }
       return false
     }
     return () => { backRef.current = null }

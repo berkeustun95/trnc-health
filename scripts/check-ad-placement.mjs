@@ -391,7 +391,6 @@ const CHECKS = [
     const body = clean.slice(start, end)
     const grid = body.indexOf('<AllServicesButton')
     if (grid < 0) return `the ${p.span} span (${start}..${end}) does not contain <AllServicesButton>. A slice without the hub's own service section is not the hub.`
-    if (body.includes('<ServicePanels')) return `${p.span}() contains <ServicePanels> again: the full grid lives on the Tüm hizmetler page (renderAllServices), and the footer slot was reviewed against the hub's section order.`
     if (/renderSearchResults|searchOpen/.test(body)) {
       return `${p.span}() now contains a search branch (renderSearchResults / searchOpen). The global search results are excluded from ads — reinstate that exclusion here before mounting near it.`
     }
@@ -401,12 +400,33 @@ const CHECKS = [
     if (m.index < grid) {
       return `<${n}> is before <AllServicesButton>. list_bottom on home is the FOOTER slot; a mount above the service section is not the placement that was reviewed.`
     }
-    // The Tüm hizmetler page is a second surface in the same file: it must not host the footer.
-    const aSpan = functionSpan(clean, 'renderAllServices')
-    if (!aSpan) return `renderAllServices() not found in ${pHost} — the Tüm hizmetler page is unchecked, refusing to conclude anything`
-    if (aSpan[1] <= aSpan[0] || aSpan[1] - aSpan[0] < 100) return `the renderAllServices() span in ${pHost} looks wrong (${aSpan[0]}..${aSpan[1]})`
-    if (!clean.slice(aSpan[0], aSpan[1]).includes('<ServicePanels')) return `renderAllServices() no longer holds <ServicePanels> — the span is not the Tüm hizmetler page`
-    if (new RegExp(`<\\s*${n}\\b`).test(clean.slice(aSpan[0], aSpan[1]))) return `<${n}> is mounted inside renderAllServices(): the Tüm hizmetler page is not a reviewed ad surface.`
+    return null
+  }],
+
+  ['the Tüm hizmetler page does not host the footer', ({ files, ads }) => {
+    // renderAllServices() (the full category grid, one page deep from Home) shares HomeScreen.js with the
+    // hub. It is not a reviewed ad surface: the footer slot belongs to the hub only.
+    const p = ads.AD_PLACEMENTS.find(x => x.module === 'home')
+    if (!p) return null
+    const pHost = (p.hosts || [])[0]
+    const clean = stripComments(files[pHost] || '')
+    const a = functionSpan(clean, 'renderAllServices')
+    if (!a) return `renderAllServices() not found in ${pHost} — the Tüm hizmetler page is unchecked, refusing to conclude anything`
+    if (a[1] <= a[0] || a[1] - a[0] < 100) return `the renderAllServices() span in ${pHost} looks wrong (${a[0]}..${a[1]})`
+    const body = clean.slice(a[0], a[1])
+    if (!body.includes('<ServicePanels')) return `renderAllServices() no longer holds <ServicePanels> — the span is not the Tüm hizmetler page`
+    if (new RegExp(`<\\s*${wrapperName(p.file)}\\b`).test(body)) return `<${wrapperName(p.file)}> is mounted inside renderAllServices(): the Tüm hizmetler page is not a reviewed ad surface.`
+    return null
+  }],
+
+  ['the hub keeps the service section, the full grid lives on Tüm hizmetler', ({ files, ads }) => {
+    const p = ads.AD_PLACEMENTS.find(x => x.module === 'home')
+    if (!p) return null
+    const pHost = (p.hosts || [])[0]
+    const clean = stripComments(files[pHost] || '')
+    const span = functionSpan(clean, p.span)
+    if (!span) return `${p.span}() not found in ${pHost} — this check is measuring nothing`
+    if (clean.slice(span[0], span[1]).includes('<ServicePanels')) return `${p.span}() contains <ServicePanels> again: the full grid lives on the Tüm hizmetler page, and the footer slot was reviewed against the hub's section order (…FavouritePanel, AllServicesButton, footer).`
     return null
   }],
 
@@ -644,6 +664,12 @@ const CASES = [
     const f = 'screens/HomeScreen.js'
     i.files[f] = base.files[f].replace('          <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />', '          <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />\n          <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />')
     return [i, s => s.files[f].includes('unlocked={homeUnlocked} />\n          <HomeListBottomSlot')]
+  }],
+  ['the hub keeps the service section, the full grid lives on Tüm hizmetler', () => {
+    const i = clone()
+    const f = 'screens/HomeScreen.js'
+    i.files[f] = base.files[f].replace('            <AllServicesButton ', '            <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />\n            <AllServicesButton ')
+    return [i, s => s.files[f].includes('<ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />\n            <AllServicesButton')]
   }],
   ['inline hosts use the page inset the bleed assumes', () => {
     const i = clone(); i.ads.AD_PAGE_INSET = 20
