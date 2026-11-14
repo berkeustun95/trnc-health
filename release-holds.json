@@ -29,6 +29,14 @@
       "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: held out of the #408 production update). Then set cleared to true in a PR.",
       "clearedOn": "2026-11-14",
       "clearedBy": "NOT approved for production: REVERTED on main (Berke 2026-11-14, so #408 ships alone from main). The change can only return through a re-land PR (a revert of the revert), which gets its own hold until Berke has seen it on Preview."
+    },
+    {
+      "pr": 417,
+      "commit": "f7b7c0523c1a2549076d19b38e23ea2189fffd55",
+      "what": "Admin: remove the 'notify duty' button, RE-LANDED on main (revert of #414's revert b0e9b6fa), 2026-11-14",
+      "since": "2026-11-14",
+      "cleared": false,
+      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: re-land #404 alone, #392 stays out). Then set cleared to true in a PR."
     }
   ]
 }
