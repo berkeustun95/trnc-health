@@ -239,7 +239,7 @@ jobs:
              + [.skipped[] | "- SKIPPED: \(.title)" + (if .external_id then " (`\(.external_id)`)" else "" end) + " — \(.reason)" + live])
             | join("\n") | gsub("@"; "@\u200b")' "$rep")
           title='Gişe Kıbrıs: rows need a decision'
-          num=$(gh issue list --state open --limit 200 --json number,title | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
+          num=$(gh issue list --state open --limit 200 --json number,title,author | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
           if [ -z "$list" ]; then
             [ -z "$num" ] || gh issue close "$num" --comment 'No skipped or cancelled rows in the latest sync.'
             echo "Nothing held."; exit 0
@@ -268,7 +268,7 @@ jobs:
           failing=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
             --jq '[.jobs[] | select(.name == "sync") | .steps[] | select(.conclusion == "failure") | "- " + .name] | sort | join("\n")')
           title='Gişe Kıbrıs sync is red'
-          num=$(gh issue list --state open --limit 200 --json number,title | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
+          num=$(gh issue list --state open --limit 200 --json number,title,author | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
           if [ -z "$failing" ]; then
             [ -z "$num" ] || gh issue close "$num" --comment 'The sync is green again.'
             exit 0
