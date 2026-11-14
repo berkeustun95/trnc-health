@@ -52,7 +52,7 @@ import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/re
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
 import { SectionHeader, useTabBarFootprint, RemoteImage, PageCanvas } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
-import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
+import { unplacedLiveModules, duplicatePlacements, visibleServiceIds, moduleById } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
 import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar, ModuleScreen, OnPhotoLabel } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
@@ -449,12 +449,11 @@ export default function HomeScreen({
   // Gated on HOME_V2_LIVE for the same reason the strip is: the V1 hub renders no
   // favourites row, so this would be two disk reads for a row nobody can see, and it
   // would make the V1 path observably different from today.
-  // The one case a MODULE_FLAGS entry cannot express. HomeScreen already receives
-  // garagesTileVisible (GARAGES_LIVE || admin || ownsGarage), and a garage owner genuinely
-  // uses that module while it is dark for everybody else — so for them it is a legitimate
-  // favourite. Memoised because a fresh object literal in a dependency array re-runs the
-  // effect on every render, which would quietly become the on-tap design.
-  const favOverrides = useMemo(() => ({ garages: !!garagesTileVisible }), [garagesTileVisible])
+  // One unlock set and one visible-id list for the whole screen: the favourites resolver, the
+  // picker and "Tüm hizmetler" all read the same answer. Memoised so the resolve effect does not
+  // re-run on every render.
+  const homeUnlocked = useMemo(() => (liveScoresTester ? HOME_TESTER_UNLOCK : HOME_UNLOCK), [liveScoresTester])
+  const visibleIds = useMemo(() => visibleServiceIds(homeUnlocked), [homeUnlocked])
 
   useEffect(() => {
     if (!HOME_V2_LIVE || showFacilityList) return
@@ -463,10 +462,10 @@ export default function HomeScreen({
       if (!alive) return
       setFavUsage(usage)
       setFavPins(pins)
-      setFavIds(resolveFavourites({ pins, usage, overrides: favOverrides }))
+      setFavIds(resolveFavourites({ pins, usage, visible: visibleIds }))
     })
     return () => { alive = false }
-  }, [showFacilityList, favOverrides])
+  }, [showFacilityList, visibleIds])
 
   // Every V2 tile tap, from the grid AND from the favourites row. recordModuleOpen is
   // fire-and-forget by design — awaiting it would put a disk write between the finger and
@@ -489,7 +488,7 @@ export default function HomeScreen({
     // Re-resolve immediately. This is NOT the shuffle the mount-only rule forbids — it is
     // the direct result of the user pressing Bitti, and a row that ignored an edit until
     // the next launch would read as the edit having failed.
-    setFavIds(resolveFavourites({ pins, usage: favUsage, overrides: favOverrides }))
+    setFavIds(resolveFavourites({ pins, usage: favUsage, visible: visibleIds }))
   }
 
   // The strip's `action` is a plain descriptor, never a closure — the resolver has no
@@ -931,9 +930,8 @@ export default function HomeScreen({
                 The heading sits here rather than inside FavouritesRow so all three
                 section headings on this screen share ONE type token and cannot drift.
                 Safe for the same reason it was safe for the strip: the row has no empty
-                branch — UNGATED_MODULES holds seven ids no flag can switch off, so the
-                auto-fill pool cannot run dry and this heading can never be left standing
-                over nothing.
+                branch — the auto-fill pool is every visible tile (visibleServiceIds), far more
+                than eight, so this heading can never be left standing over nothing.
 
                 ⚠ THESE FOUR TILES ALSO REMAIN IN THE GRID BELOW, AND THAT DUPLICATION IS
                   THE DESIGN. The grid is the app's navigation and must be complete and
@@ -969,7 +967,7 @@ export default function HomeScreen({
           visible={favEditOpen}
           pins={favPins}
           usage={favUsage}
-          overrides={favOverrides}
+          visibleIds={visibleIds}
           lang={lang}
           onSave={saveFavourites}
           onClose={() => setFavEditOpen(false)}
@@ -986,7 +984,7 @@ export default function HomeScreen({
   // dutyBannerRef → the tiles row, weatherRef → the weather chip.
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
-    const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
+    const byId = new Map(visibleIds.map(id => [id, moduleById(id)]))
     const heroH = heroHeight(insets.top)
     const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
     const cur = weatherData?.current
@@ -1044,7 +1042,7 @@ export default function HomeScreen({
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
 
             <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? HOME_TESTER_UNLOCK : HOME_UNLOCK} />
+            <ServicePanels lang={lang} onPress={openModule} unlocked={homeUnlocked} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}
@@ -1057,7 +1055,7 @@ export default function HomeScreen({
 
         <WeatherSheet visible={weatherOpen} weatherData={weatherData} lang={lang} locale={locale}
           photo={wxPhoto?.source} onClose={() => setWeatherOpen(false)} />
-        <FavouritesEditSheet visible={favEditOpen} pins={favPins} usage={favUsage} overrides={favOverrides}
+        <FavouritesEditSheet visible={favEditOpen} pins={favPins} usage={favUsage} visibleIds={visibleIds}
           lang={lang} onSave={saveFavourites} onClose={() => setFavEditOpen(false)} />
       </>
     )

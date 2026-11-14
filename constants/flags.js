@@ -643,7 +643,7 @@ export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 // writes a module_waitlist row. There is nothing for the notify path to notify.
 //
 // ⚠ DEMAND FOR THIS MODULE IS ALREADY CAPTURED, AND NOT WHERE THE NOTIFY PATH LOOKS.
-//   The esim tile is UNGATED (constants/homeFavourites.js UNGATED_MODULES) and has been
+//   The esim tile was UNGATED in the favourites rules (retired) and has been
 //   since launch, so EsimScreen has been collecting real signups into `esim_waitlist` —
 //   its own table, keyed by user_id, with no `module` column and unknown to
 //   notify_module_waitlist. Those people CANNOT be reached by the RPC. Notifying them on

@@ -3,8 +3,9 @@ import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet, useWindowD
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { HOME_MODULES, tileLabel } from '../../constants/homeModules'
-import { FAVOURITE_SLOTS, eligibleModules, resolveFavourites, SLOT_LABEL_PX, SLOT_LABEL_FIT } from '../../constants/homeFavourites'
+import { tileLabel } from '../../constants/homeModules'
+import { moduleById } from '../../constants/homeGroups'
+import { FAVOURITE_SLOTS, resolveFavourites, SLOT_LABEL_PX, SLOT_LABEL_FIT } from '../../constants/homeFavourites'
 import ModuleTile from './ModuleTile'
 import { PAGE_INSET, PANEL_GUTTER, TILE_PAD, TILE_WIDTH, labelCap } from './redesign/ServicePanels'
 
@@ -63,7 +64,7 @@ function SlotBox({ mod, index, selected, lang, onPress }) {
   )
 }
 
-export default function FavouritesEditSheet({ visible, pins, usage, overrides, lang, onSave, onClose }) {
+export default function FavouritesEditSheet({ visible, pins, usage, visibleIds, lang, onSave, onClose }) {
   const [draft, setDraft]       = useState(pins)
   const [selected, setSelected] = useState(0)
 
@@ -76,9 +77,8 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
 
   // What Home would show given the current draft — so the slot boxes preview the real
   // outcome, auto-filled entries included, rather than showing four holes.
-  const resolved = resolveFavourites({ pins: draft, usage, overrides })
-  const byId     = new Map(HOME_MODULES.map(m => [m.id, m]))
-  const options  = eligibleModules({ overrides }).map(id => byId.get(id)).filter(Boolean)
+  const resolved = resolveFavourites({ pins: draft, usage, visible: visibleIds })
+  const options  = visibleIds.map(moduleById).filter(Boolean)
 
   function assign(mod) {
     const next = [...draft]
@@ -122,7 +122,7 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
               <SlotBox
                 key={i}
                 index={i}
-                mod={byId.get(resolved[i])}
+                mod={moduleById(resolved[i])}
                 selected={selected === i}
                 lang={lang}
                 onPress={setSelected}
@@ -182,7 +182,7 @@ const s = StyleSheet.create({
   title:       { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   done:        { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   hint:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
-  slots:       { flexDirection: 'row', marginTop: 16, paddingHorizontal: PANEL_GUTTER },
+  slots:       { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, marginTop: 16, paddingHorizontal: PANEL_GUTTER },
   slotCell:    { width: TILE_WIDTH, paddingHorizontal: TILE_PAD },
   slot:        { alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 0,
                  borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,

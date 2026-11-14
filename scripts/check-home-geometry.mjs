@@ -20,11 +20,8 @@ import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { HOME_MODULES } from '../constants/homeModules.js'
 import {
-  DEFAULT_FAVOURITES, MODULE_FLAG_KEY, UNGATED_MODULES, FAVOURITE_SLOTS,
-  resolveFavourites, moduleEligible, FAVOURITE_FLAGS,
+  DEFAULT_FAVOURITES, FAVOURITE_SLOTS, AUTO_FILL_EXCLUDE, resolveFavourites,
 } from '../constants/homeFavourites.js'
-// The flag set eligibility actually reads: MODULE_FLAGS plus HOTELS_LIVE as `hotels`.
-const MODULE_FLAGS = FAVOURITE_FLAGS
 import { HIDDEN_TILES } from '../constants/homeModules.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -232,185 +229,129 @@ if (!useFontsBlock) {
     + `(${[...usedFamilies.keys()].sort().join(', ')}), all registered among ${registered.size} in App.js`
 }
 
-// ─── D. The favourites row can only offer modules that actually work ────────
+// ─── D. The favourites row: pure rules over a `visible` id list ─────────────
 //
-// The tile id and the flag key are two namespaces that do not always agree — HOME_MODULES
-// says `jobPostings`, MODULE_FLAGS says `jobs` — and neither may be renamed to close the
-// gap (the flag key is the module_waitlist `module` value, its CHECK, and the notify RPC;
-// the tile id is in moduleHandlers and in every stored favourite on every device).
-//
-// So the map is the fix, and this is what keeps the map honest. Without it a NEW tile
-// whose id drifts from its flag key resolves to `undefined`, and the only thing standing
-// between that and a Coming Soon tile pinned to somebody's home screen is a fail-closed
-// branch nobody would notice had started firing.
+// Eligibility is ONE thing now: is the id in `visible` (visibleServiceIds in
+// constants/homeGroups.js — flags, HIDDEN_TILES and Yakında are all decided there). This
+// file cannot import homeGroups (it pulls expo-constants), so the resolver is exercised
+// here with a SYNTHETIC visible list, and the live gates are covered by
+// __tests__/homeServices.test.js.
 //
 // ⚠ WHAT A HEALTHY RUN PRINTS: the counts, so the numbers can be read rather than trusted.
-//   A guard that prints only "OK" cannot be told apart from one whose scraper matched
-//   nothing — and both sides of this comparison come from imported modules that a rename
-//   could empty.
 const ids = HOME_MODULES.map(m => m.id)
 if (ids.length === 0) {
   problems.push('HOME_MODULES is empty — this whole section just passed on nothing')
 }
 
-let gated = 0
-for (const id of ids) {
-  const ungated = UNGATED_MODULES.has(id)
-  const key     = MODULE_FLAG_KEY[id] ?? id
-  const known   = typeof MODULE_FLAGS[key] === 'boolean'
-  if (ungated && known) {
-    problems.push(`'${id}' is listed in UNGATED_MODULES but MODULE_FLAGS also has a '${key}' `
-      + `entry. One of the two is wrong, and eligibility currently answers "ungated" — so a `
-      + `dark module would be offered as a favourite.`)
-  }
-  if (!ungated && !known) {
-    problems.push(`'${id}' is not in UNGATED_MODULES and resolves to flag key '${key}', which `
-      + `is not a boolean in MODULE_FLAGS. It will be INELIGIBLE for favourites forever. `
-      + `Add it to UNGATED_MODULES if nothing gates it, or to MODULE_FLAG_KEY if its flag `
-      + `is named differently. (This is the jobPostings/jobs shape.)`)
-  }
-  if (!ungated && known) gated++
-}
-
-// A mapping entry that points at a flag which does not exist is the same defect wearing a
-// disguise — it LOOKS handled.
-for (const [id, key] of Object.entries(MODULE_FLAG_KEY)) {
-  if (!ids.includes(id)) {
-    problems.push(`MODULE_FLAG_KEY maps '${id}', which is not a HOME_MODULES id — a stale entry`)
-  }
-  if (typeof MODULE_FLAGS[key] !== 'boolean') {
-    problems.push(`MODULE_FLAG_KEY maps '${id}' -> '${key}', which is not in MODULE_FLAGS`)
+// Tiles that are not HOME_MODULES entries live in the EXTRA table of homeGroups.js; its ids
+// are read off the source text.
+const extraBlock = read('constants/homeGroups.js').match(/const EXTRA = \{([\s\S]*?)\n\}/)
+const extraIds = extraBlock ? [...extraBlock[1].matchAll(/\bid:\s*'([A-Za-z0-9_]+)'/g)].map(m => m[1]) : []
+// Positive control: the scrape must have found the ids this check depends on.
+for (const must of ['duty', 'exploreTab']) {
+  if (!extraIds.includes(must)) {
+    problems.push(`CONTROL FAILED: EXTRA ids read from homeGroups.js are [${extraIds.join(', ')}], `
+      + `missing '${must}' — the scraper matched nothing useful`)
   }
 }
+const knownIds = new Set([...ids, ...extraIds])
 
 // A typo in the editorial defaults costs a slot with NO error at runtime, because an
-// unknown id is silently skipped. That silence is correct for a stored favourite from an
-// old build and wrong for a constant somebody just typed.
+// unknown id is silently skipped.
 for (const id of DEFAULT_FAVOURITES) {
-  if (!ids.includes(id)) {
-    problems.push(`DEFAULT_FAVOURITES names '${id}', which is not a HOME_MODULES id. It would `
-      + `be skipped silently and the row would quietly fall back to grid order.`)
+  if (!knownIds.has(id)) {
+    problems.push(`DEFAULT_FAVOURITES names '${id}', which is neither a HOME_MODULES id nor an EXTRA id `
+      + `in homeGroups.js. It would be skipped silently.`)
   }
 }
-
-// DEFAULT_FAVOURITES is a preference ORDER and may legitimately be longer than the row,
-// carrying entries that are dark today. What must NOT happen is the row falling through to
-// grid order because too few of them are eligible — that is invisible at runtime (an
-// ineligible default is correctly skipped) and it is precisely how the row ends up
-// mirroring the grid's opening tiles again.
-const eligibleDefaults = DEFAULT_FAVOURITES.filter(id => moduleEligible(id))
-if (eligibleDefaults.length < FAVOURITE_SLOTS) {
-  problems.push(`only ${eligibleDefaults.length} of ${DEFAULT_FAVOURITES.length} DEFAULT_FAVOURITES `
-    + `are eligible under today's flags (${eligibleDefaults.join(', ') || 'none'}), but the row has `
-    + `${FAVOURITE_SLOTS} slots — so ${FAVOURITE_SLOTS - eligibleDefaults.length} slot(s) would be `
-    + `filled from GRID ORDER instead of from editorial intent. Add another live entry to the `
-    + `list; dark entries may stay, they just cannot be counted on.`)
+// Literal on purpose: comparing the resolver to the very set it reads would pass with the set emptied.
+const MUST_EXCLUDE = ['duty', 'emergency']
+for (const id of MUST_EXCLUDE) {
+  if (!AUTO_FILL_EXCLUDE.has(id)) problems.push(`AUTO_FILL_EXCLUDE no longer contains '${id}'`)
+  if (!knownIds.has(id)) problems.push(`'${id}' is not a known tile id`)
 }
 
-// ─── The row can never come up empty — computed, not asserted in prose ──────
-// The heading lives in HomeScreen, so an empty row leaves it standing over nothing. Run
-// the real resolver against the WORST case: every flag false, no pins, no usage.
-const allFalse = Object.fromEntries(Object.keys(MODULE_FLAGS).map(k => [k, false]))
-const worstCase = resolveFavourites({ pins: [], usage: {}, flags: allFalse, overrides: {} })
-if (worstCase.length !== FAVOURITE_SLOTS) {
-  problems.push(`with every module flag false the favourites row resolves to `
-    + `${worstCase.length} tile(s), not ${FAVOURITE_SLOTS}. The section heading in `
-    + `HomeScreen would be left standing over a short or empty row. Ungated modules: `
-    + `${[...UNGATED_MODULES].join(', ')}`)
+// Production-like, in Home's group order (synthetic: the real list is derived in jest).
+const VISIBLE = [
+  'duty', 'health', 'emergency',
+  'exploreTab', 'events', 'walkingRoutes', 'hotels', 'eatery',
+  'accommodation', 'homeServices', 'pets', 'studentHub',
+  'municipal', 'towing', 'ehliyet', 'cars', 'exchangeRates', 'newcomerEssentials',
+]
+for (const id of VISIBLE) {
+  if (!knownIds.has(id)) problems.push(`synthetic VISIBLE names '${id}', which is not a known tile id`)
 }
-// Control: the same call must NOT be padded with ineligible ids.
-for (const id of worstCase) {
-  if (!moduleEligible(id, { flags: allFalse })) {
-    problems.push(`CONTROL FAILED: resolveFavourites returned '${id}' under all-false flags, `
-      + `but moduleEligible says it is ineligible — the filter and the fill disagree`)
-  }
-}
-if (new Set(worstCase).size !== worstCase.length) {
-  problems.push(`resolveFavourites returned a duplicate: ${worstCase.join(', ')}`)
+const LOCKED_FRESH = ['events', 'accommodation', 'exchangeRates', 'newcomerEssentials', 'exploreTab', 'eatery', 'hotels', 'pets']
+
+if (FAVOURITE_SLOTS !== 8) problems.push(`FAVOURITE_SLOTS is ${FAVOURITE_SLOTS}, the locked row is 8`)
+
+const resolvable = DEFAULT_FAVOURITES.filter(id => VISIBLE.includes(id))
+if (resolvable.length < FAVOURITE_SLOTS) {
+  problems.push(`only ${resolvable.length} of ${DEFAULT_FAVOURITES.length} DEFAULT_FAVOURITES are in a `
+    + `production-like visible list (${resolvable.join(', ') || 'none'}), but the row has ${FAVOURITE_SLOTS} slots`)
 }
 
-// ─── The four degradation rules, exercised rather than described ───────────
-// A stored favourite is read off a device we have never seen, written by a build we may
-// no longer have. Each of these is a scenario the row must survive SILENTLY — no dead
-// tile, no crash, no gap.
-const liveFlags = Object.fromEntries(Object.keys(MODULE_FLAGS).map(k => [k, true]))
 let scenarioCount = 0
-const scenario = (name, args, check) => {
+const scenario = (name, args, { len, check } = {}) => {
   scenarioCount++
   let out
   try { out = resolveFavourites(args) } catch (e) {
-    problems.push(`degradation "${name}" THREW: ${e.message}`); return
+    problems.push(`scenario "${name}" THREW: ${e.message}`); return
   }
-  if (new Set(out).size !== out.length) problems.push(`degradation "${name}" returned duplicates: ${out.join(', ')}`)
-  if (out.length !== FAVOURITE_SLOTS)   problems.push(`degradation "${name}" returned ${out.length} tiles, not ${FAVOURITE_SLOTS}: ${out.join(', ')}`)
-  const msg = check(out)
-  if (msg) problems.push(`degradation "${name}": ${msg} (got ${out.join(', ')})`)
+  if (new Set(out).size !== out.length) problems.push(`scenario "${name}" returned duplicates: ${out.join(', ')}`)
+  if (out.some(id => !args.visible.includes(id))) {
+    problems.push(`scenario "${name}" returned an id that is not visible: ${out.join(', ')}`)
+  }
+  const want = len ?? FAVOURITE_SLOTS
+  if (out.length !== want) problems.push(`scenario "${name}" returned ${out.length} tiles, not ${want}: ${out.join(', ')}`)
+  const msg = check?.(out)
+  if (msg) problems.push(`scenario "${name}": ${msg} (got ${out.join(', ')})`)
 }
 
-// 1. REMOVED — a pin naming a module that no longer exists.
-scenario('pin points at a deleted module', { pins: ['nopeNotAModule', null, null, null], flags: liveFlags },
-  out => out.includes('nopeNotAModule') ? 'the dead id reached the row' : null)
+// 1. A fresh install is exactly the locked eight, in order.
+scenario('fresh install = the locked eight', { pins: [], usage: {}, visible: VISIBLE },
+  { check: out => out.join(',') === LOCKED_FRESH.join(',') ? null : `expected [${LOCKED_FRESH.join(', ')}]` })
 
-// 2. DARK — a pin naming a real module whose flag is false.
-//
-//    ⚠ `pets`, NOT `grooming` or `insurance`. This scenario used grooming until 2026-09-10, when
-//      grooming entered HIDDEN_TILES — at which point it stopped being a test of DARKNESS
-//      and became a test of hiddenness, and scenario 3 below (the same pin coming back
-//      when the flag flips) could never pass again. The subject has to be a module that is
-//      dark and NOT hidden, or the pair asserts something other than what it says.
-//      insurance then took its place until it, too, was hidden on 2026-10-10; pets is live
-//      and unhidden, made dark here by the scenario's own flags.
-scenario('pin points at a dark module',
-  { pins: ['pets', null, null, null], flags: { ...liveFlags, pets: false } },
-  out => out.includes('pets') ? 'a Coming Soon module reached the row' : null)
+// 2. Excluded ids never auto-fill — even with the heaviest usage — but a pin is honoured.
+scenario('duty and emergency never auto-fill',
+  { pins: [], usage: { duty: 999, emergency: 998 }, visible: VISIBLE },
+  { check: out => out.some(id => MUST_EXCLUDE.includes(id)) ? 'duty or emergency was auto-filled' : null })
+scenario('a manual pin of duty is honoured in its slot',
+  { pins: [null, null, 'duty'], usage: {}, visible: VISIBLE },
+  { check: out => out[2] === 'duty' ? null : 'the duty pin did not land in slot 3' })
 
-// 3. The same pin must COME BACK when the module goes live — storage is never rewritten,
-//    so the user's arrangement survives a module being dark for a release.
-scenario('the same pin once the module is live', { pins: ['pets', null, null, null], flags: liveFlags },
-  out => out[0] === 'pets' ? null : 'the pin did not return to slot 1 once eligible')
-
-// 3b. HIDDEN beats everything, including a live flag and an explicit override. A shortcut
-//     to a tile the grid does not render is an orphan the user cannot find again.
-for (const hid of HIDDEN_TILES) {
-  scenario(`hidden tile '${hid}' never reaches the row, even live and pinned`,
-    { pins: [hid, null, null, null], usage: { [hid]: 999 }, flags: liveFlags, overrides: { [hid]: true } },
-    out => out.includes(hid) ? 'a HIDDEN tile reached the row' : null)
-}
-
-// 4. A pin holds its SLOT, and unpinned slots still auto-fill around it.
-scenario('a pin in slot 3 holds position 3', { pins: [null, null, 'municipal', null], flags: liveFlags },
-  out => out[2] === 'municipal' ? null : 'the pin did not land in slot 3')
-
-// 5. Usage outranks the editorial defaults once it exists, and a pin outranks usage.
-scenario('usage reorders the auto-filled slots',
-  { pins: [], usage: { health: 90, municipal: 80, newcomerEssentials: 70, exchangeRates: 60 }, flags: liveFlags },
-  out => out[0] === 'health' && out[1] === 'municipal' ? null : 'usage did not drive the order')
+// 3. A pin holds its slot and outranks usage; usage outranks the defaults.
 scenario('a pin outranks a heavily-used module',
-  // The heavy user must be VISIBLE (health, not a hidden tile) or this passes without testing anything.
-  { pins: ['municipal', null, null, null], usage: { health: 90 }, flags: liveFlags },
-  out => out[0] === 'municipal' ? null : 'usage beat an explicit pin')
+  { pins: ['municipal'], usage: { health: 90 }, visible: VISIBLE },
+  { check: out => out[0] === 'municipal' && out[1] === 'health' ? null : 'pin or usage order wrong' })
+scenario('usage reorders the auto-filled slots',
+  { pins: [], usage: { health: 90, municipal: 80 }, visible: VISIBLE },
+  { check: out => out[0] === 'health' && out[1] === 'municipal' ? null : 'usage did not drive the order' })
 
-// 6. A fresh device shows the editorial defaults, in their editorial order. The one that
-//    would break silently if the tie-break lost the defaults.
-//
-//    ⚠ COMPARED AGAINST THE FIRST FAVOURITE_SLOTS *ELIGIBLE* DEFAULTS, not against the
-//      whole array. DEFAULT_FAVOURITES is a preference ORDER and is deliberately longer
-//      than the row, so an earlier draft of this scenario — which compared the row to the
-//      entire array — went red the moment a fifth entry was added, against a resolver that
-//      was behaving perfectly. The check was wrong, not the system; this is what it should
-//      have said all along.
-const expectFresh = DEFAULT_FAVOURITES
-  .filter(id => moduleEligible(id, { flags: liveFlags }))
-  .slice(0, FAVOURITE_SLOTS)
-scenario('fresh install shows the defaults in order', { pins: [], usage: {}, flags: liveFlags },
-  out => out.join(',') === expectFresh.join(',')
-    ? null : `expected the first ${FAVOURITE_SLOTS} eligible defaults [${expectFresh.join(', ')}]`)
+// 4. Degradations: nothing dead, nothing doubled, no hole.
+scenario('pin to an unknown id is skipped',
+  { pins: ['nopeNotAModule'], usage: {}, visible: VISIBLE },
+  { check: out => out.includes('nopeNotAModule') ? 'the dead id reached the row' : null })
+scenario('pin not in visible (a hidden tile) is skipped',
+  { pins: ['garages', 'transport'], usage: {}, visible: VISIBLE },
+  { check: out => out.includes('garages') || out.includes('transport') ? 'a non-visible pin reached the row' : null })
+scenario('duplicate pins show once',
+  { pins: ['pets', 'pets', 'pets'], usage: {}, visible: VISIBLE },
+  { check: out => out[0] === 'pets' && out.filter(id => id === 'pets').length === 1 ? null : 'pets doubled or lost' })
+scenario('garbage usage does not scramble the row',
+  { pins: [], usage: { events: NaN, pets: 'x', hotels: -5, health: undefined }, visible: VISIBLE },
+  { check: out => out.length === FAVOURITE_SLOTS ? null : 'garbage usage changed the length' })
 
-favReport = `favourites: ${ids.length} tiles (${gated} flag-gated, ${UNGATED_MODULES.size} ungated, `
-  + `${HIDDEN_TILES.size} hidden: ${[...HIDDEN_TILES].join('/')}), `
-  + `defaults [${DEFAULT_FAVOURITES.join(', ')}], worst-case row fills ${worstCase.length}/${FAVOURITE_SLOTS}, `
-  + `${eligibleDefaults.length}/${DEFAULT_FAVOURITES.length} defaults eligible now, `
-  + `${scenarioCount} degradation scenarios pass`
+// 5. A short visible list fills what it can with no holes.
+const SEVEN = VISIBLE.slice(3, 10)
+scenario('a 7-id visible list returns 7, no holes', { pins: [], usage: {}, visible: SEVEN }, { len: 7 })
+// All-excluded visible list: nothing to auto-fill.
+scenario('only excluded ids visible returns nothing', { pins: [], usage: {}, visible: ['duty', 'emergency'] }, { len: 0 })
+
+favReport = `favourites: ${ids.length} tiles + ${extraIds.length} extra, ${HIDDEN_TILES.size} hidden: `
+  + `${[...HIDDEN_TILES].join('/')}, defaults [${DEFAULT_FAVOURITES.join(', ')}], `
+  + `${resolvable.length}/${DEFAULT_FAVOURITES.length} resolve in the synthetic list, `
+  + `${scenarioCount} scenarios pass`
 
 if (problems.length) {
   console.error('\n  ┌─ HOME GEOMETRY CHECK FAILED ───────────────────────────────────┐')
