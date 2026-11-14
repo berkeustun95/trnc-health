@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { profileReadKinds, readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { pushOutcome, RUN_DEADLINE_MS, sendBatch } from './push.ts'
+import { lastSignIns, onePerToken, pushOutcome, RUN_DEADLINE_MS, sendBatch, sharedTokenIds } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -150,9 +150,10 @@ serve(async () => {
     if (insertError) console.error('notifications insert failed', insertError.message)
   }
 
-  // Send push notifications — each message in the user's language
-  const messages = profiles
-    .filter(p => p.push_token)
+  // Send push notifications — each message in the user's language, ONE per token (push.ts onePerToken)
+  const signIns = await lastSignIns(sharedTokenIds(profiles),
+    async (id) => (await supabase.auth.admin.getUserById(id)).data?.user?.last_sign_in_at)
+  const messages = onePerToken(profiles, signIns)
     .map(p => {
       const lang = p.preferred_language || 'English'
       return {

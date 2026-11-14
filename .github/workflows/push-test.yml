@@ -19,6 +19,16 @@ on:
         type: choice
         options: [plain, messages]
         default: plain
+      email2:
+        description: 'Optional: a +tag of the SAME mailbox (two accounts on one phone; duplicate-push proof)'
+        type: string
+        required: false
+        default: ''
+      dedupe:
+        description: 'Two-account mode only: on = one push per token (what the broadcasts send), off = one per account (old)'
+        type: choice
+        options: ['on', 'off']
+        default: 'on'
 
 concurrency: { group: push-test, cancel-in-progress: false }
 
@@ -33,6 +43,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       IN_KIND: ${{ inputs.kind }}
+      IN_DEDUPE: ${{ inputs.dedupe }}
     steps:
       # Read from the event, not `env:`, which GitHub prints in every step before a mask can apply.
       - name: Mask the email
@@ -41,8 +52,14 @@ jobs:
           echo "::add-mask::$e"
           [[ "$e" =~ ^[^[:space:]@\']+@[^[:space:]@\']+\.[^[:space:]@\']+$ ]] || { echo "::error::that is not an email"; exit 1; }
           echo "IN_EMAIL=$e" >> "$GITHUB_ENV"
+          e2=$(jq -r '.inputs.email2 // ""' "$GITHUB_EVENT_PATH")
+          if [ -n "$e2" ]; then
+            echo "::add-mask::$e2"
+            [[ "$e2" =~ ^[^[:space:]@\']+@[^[:space:]@\']+\.[^[:space:]@\']+$ ]] || { echo "::error::the second e-mail is not an email"; exit 1; }
+          fi
+          echo "IN_EMAIL2=$e2" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with: { node-version: '24' }
       - name: Send
-        run: node scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND"
+        run: node --disable-warning=ExperimentalWarning scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND" "$IN_EMAIL2" "$IN_DEDUPE"

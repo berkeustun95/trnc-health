@@ -11,7 +11,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { readAllById } from '../send-duty-notification/page.ts'
-import { pushOutcome, RUN_DEADLINE_MS, sendBatch } from '../send-duty-notification/push.ts'
+import { lastSignIns, onePerToken, pushOutcome, RUN_DEADLINE_MS, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
 import { weekendWindow, inWindow, weekPick, digestMessage, type DigestEvent, type DigestPlace } from './digest.ts'
 
 const MAX_ERROR_KINDS = 20
@@ -100,7 +100,10 @@ serve(async (req) => {
     else notified += Math.min(500, notifRows.length - i)
   }
 
-  const messages = profiles.filter(p => p.push_token).map(p => ({
+  // ONE push per token (push.ts onePerToken); the in-app rows above still go to every account.
+  const signIns = await lastSignIns(sharedTokenIds(profiles),
+    async (id) => (await supabase.auth.admin.getUserById(id)).data?.user?.last_sign_in_at)
+  const messages = onePerToken(profiles, signIns).map(p => ({
     to: p.push_token, ...msgOf(p.preferred_language),
     data: { screen: 'weekend' }, sound: 'default', channelId: 'default',
   }))
