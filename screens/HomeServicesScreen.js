@@ -281,7 +281,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
         <SafeAreaView style={r.safe} edges={['top']}>
           <UiHeader onBack={handleBack} title={t('hsTitle', lang)} lang={lang} />
           <ScrollView {...landingMem} contentContainerStyle={r.scroll} showsVerticalScrollIndicator={false}>
-            <InfoBanner icon="ribbon-outline" category="homeLife" message={t('hsPartnersIntro', lang)} style={r.banner} />
+            <InfoBanner icon="construct-outline" category="homeLife" message={t('hsPartnersIntro', lang)} style={r.banner} />
             <View style={r.grid}>
               {HS_CATEGORIES.map(cat => (
                 <RCategoryTile key={cat.key} item={cat} lang={lang} onPress={() => selectCategory(cat.key)} />
@@ -491,7 +491,7 @@ const r = StyleSheet.create({
   catScroll:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   banner:      { marginBottom: 16 },
   partnerWrap: { marginBottom: 16 },
-  grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
+  grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catTile:     { width: '47%', minHeight: 112, backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20,
                  padding: 16, alignItems: 'center', justifyContent: 'center', gap: 10, ...elevation.card },
   catIconWrap: { width: 48, height: 48, borderRadius: radii.tile, backgroundColor: CAT.homeLife.bg,
