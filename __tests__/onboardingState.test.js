@@ -161,6 +161,18 @@ describe('events', () => {
   })
 })
 
+describe('launchMayRegisterPush', () => {
+  test('declined offers block the silent launch registration', () => {
+    expect(S.launchMayRegisterPush('later')).toBe(false)
+    expect(S.launchMayRegisterPush('denied')).toBe(false)
+  })
+  test('granted and no stored offer (existing users) register as before', () => {
+    expect(S.launchMayRegisterPush('granted')).toBe(true)
+    expect(S.launchMayRegisterPush(null)).toBe(true)
+    expect(S.launchMayRegisterPush(undefined)).toBe(true)
+  })
+})
+
 describe('constants', () => {
   test('keys and values are exact', () => {
     expect([S.KEY_ONBOARDED, S.KEY_LANG, S.KEY_POLICY_SEEN, S.KEY_PENDING, S.KEY_DUTY_OFFER, S.KEY_REOFFER, S.KEY_TOUR_CHIP])

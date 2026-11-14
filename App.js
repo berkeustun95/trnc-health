@@ -117,7 +117,8 @@ import StartScreen from './screens/StartScreen'
 import DutyAlertsScreen from './screens/DutyAlertsScreen'
 import {
   KEY_ONBOARDED, KEY_LANG, KEY_POLICY_SEEN, KEY_PENDING, KEY_DUTY_OFFER, KEY_TOUR_CHIP,
-  PENDING_SIGNUP, PENDING_DUTY, TOUR_CHIP_ON, decideOnboardingStep, shouldArmPending, pendingAfterWizard,
+  PENDING_SIGNUP, PENDING_DUTY, TOUR_CHIP_ON, OFFER_GRANTED, decideOnboardingStep, shouldArmPending, pendingAfterWizard,
+  launchMayRegisterPush,
 } from './utils/onboardingState'
 import { signOutGoogle } from './utils/socialAuth'
 import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
@@ -621,6 +622,9 @@ export default function App() {
   // Onboarding v2 (utils/onboardingState.js): KEY_PENDING as read at mount, then kept in step with storage.
   // undefined = not read yet (boot waits for it); null = none.
   const [onbPending, setOnbPending] = useState(undefined)
+  // Screen 2's stored outcome (KEY_DUTY_OFFER), read with KEY_PENDING and kept in step on every write: the
+  // launch push registration reads it, and only ever after onbPending is set.
+  const dutyOfferRef = useRef(null)
   // Whose row `profile` is: on a session switch without a sign-out the previous row is still held until the
   // new one loads, and Screen 2's routing must not decide on it.
   const [profileUid, setProfileUid] = useState(null)
@@ -1307,7 +1311,9 @@ export default function App() {
       AsyncStorage.getItem('@trnc_lang'),
       AsyncStorage.getItem('@trnc_policy_seen'),
       AsyncStorage.getItem(KEY_PENDING),
-    ]).then(([onboardedVal, langVal, policySeenVal, pendingVal]) => {
+      AsyncStorage.getItem(KEY_DUTY_OFFER),
+    ]).then(([onboardedVal, langVal, policySeenVal, pendingVal, dutyOfferVal]) => {
+      dutyOfferRef.current = dutyOfferVal
       if (langVal) setPendingLang(langVal)
       setOnboarded(onboardedVal === 'true')
       setReturningDevice(onboardedVal === 'true')
@@ -1421,6 +1427,7 @@ export default function App() {
   // re-shows Screen 2 rather than skipping it), then Home.
   async function resolveDutyOffer({ outcome, city }) {
     if (city) { await setHomeCity(city); setDeviceRegion(city) }
+    dutyOfferRef.current = outcome   // before setPending(null) re-runs the registration effect
     try { await AsyncStorage.multiSet([[KEY_DUTY_OFFER, outcome], [KEY_TOUR_CHIP, TOUR_CHIP_ON]]) } catch {}
     await setPending(null)
     try { await AsyncStorage.setItem(KEY_ONBOARDED, 'true') } catch {}
@@ -1588,6 +1595,8 @@ export default function App() {
     // "Bildirimleri aç") keeps its primer.
     if (!session) return
     if (pushRetry === 0 && onbPending !== null) return
+    // "Şimdi değil" / denied on Screen 2: a launch never registers (Android <= 12 reports granted by default).
+    if (pushRetry === 0 && !launchMayRegisterPush(dutyOfferRef.current)) return
     async function registerPushToken() {
       try {
         if (!Device.isDevice) return
@@ -1597,6 +1606,11 @@ export default function App() {
             ? await requestWithPrimer('notifications')
             : await Notifications.requestPermissionsAsync()
         if (status !== 'granted') return
+        if (pushRetry > 0 && dutyOfferRef.current !== OFFER_GRANTED) {
+          // A tap that ends granted lifts a Screen 2 "later"/"denied", so later launches register again.
+          dutyOfferRef.current = OFFER_GRANTED
+          AsyncStorage.setItem(KEY_DUTY_OFFER, OFFER_GRANTED).catch(() => {})
+        }
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
             name: 'default',

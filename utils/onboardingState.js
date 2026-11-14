@@ -77,6 +77,15 @@ export function pendingAfterWizard(pending) {
   return pending === PENDING_SIGNUP ? PENDING_DUTY : pending
 }
 
+// --- push registration at launch -------------------------------------------
+//
+// A launch registers silently only if Screen 2 was not declined: Android <= 12 reports notifications
+// granted by default, so "Şimdi değil" would otherwise still register. No offer stored (existing
+// users) or granted: unchanged. A tap (the inbox's "Bildirimleri aç") is not governed by this.
+export function launchMayRegisterPush(offer) {
+  return offer !== OFFER_LATER && offer !== OFFER_DENIED
+}
+
 // --- S4 second offer ----------------------------------------------------------
 //
 // Returns null | 'later' | 'existing'. The caller writes KEY_REOFFER BEFORE showing, so anything

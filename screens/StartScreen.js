@@ -6,6 +6,7 @@ import { colors, type, font, radii, press, TAP } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { Button, InlineAlert, PageCanvas } from '../components/ui'
 import { LanguageSheet } from '../components/shell/Sheets'
+import SplashStatusBar from '../components/SplashStatusBar'
 import { logOnboardingEvent } from '../utils/onboardingEvents'
 import { START_SHOWN_EVENT } from '../utils/onboardingState'
 
@@ -32,6 +33,7 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
 
   return (
     <PageCanvas>
+      <SplashStatusBar style="dark" />
       <SafeAreaView style={s.root} edges={['top', 'bottom']}>
         <View style={s.topRow}>
           <TouchableOpacity style={s.langPill} onPress={() => setShowLang(true)} activeOpacity={press.small}
@@ -44,7 +46,7 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
 
         <ScrollView contentContainerStyle={s.scroll} bounces={false} showsVerticalScrollIndicator={false}>
           <View style={s.brand}>
-            <Image source={LOGO} style={s.logo} resizeMode="contain" accessibilityRole="image" accessibilityLabel="ADA" />
+            <Image source={LOGO} style={s.logo} resizeMode="contain" accessible={false} importantForAccessibility="no" />
             <Text style={s.tagline} accessibilityRole="header">{t('startTagline', lang)}</Text>
           </View>
 
@@ -54,13 +56,13 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
             <View style={s.accountRow}>
               <Text style={s.accountText}>{t('startHaveAccount', lang)}</Text>
               <View style={s.links}>
-                <TouchableOpacity onPress={onLogin} disabled={busy} activeOpacity={press.small} style={s.link}
-                  accessibilityRole="button">
+                <TouchableOpacity onPress={onLogin} disabled={busy} activeOpacity={press.small} style={[s.link, busy && s.linkBusy]}
+                  accessibilityRole="link" accessibilityState={{ disabled: busy }}>
                   <Text style={s.linkText}>{t('login', lang)}</Text>
                 </TouchableOpacity>
                 <Text style={s.dot} importantForAccessibility="no">·</Text>
-                <TouchableOpacity onPress={onSignUp} disabled={busy} activeOpacity={press.small} style={s.link}
-                  accessibilityRole="button">
+                <TouchableOpacity onPress={onSignUp} disabled={busy} activeOpacity={press.small} style={[s.link, busy && s.linkBusy]}
+                  accessibilityRole="link" accessibilityState={{ disabled: busy }}>
                   <Text style={s.linkText}>{t('signup', lang)}</Text>
                 </TouchableOpacity>
               </View>
@@ -80,17 +82,18 @@ const s = StyleSheet.create({
   topRow:      { flexShrink: 0, flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 8 },
   // borderRadius + borderWidth: an explicit fill, or Android may draw it opaque.
   langPill:    { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TAP, paddingHorizontal: 14,
-                 borderRadius: radii.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+                 borderRadius: radii.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
   langPillText:{ ...type.meta, fontFamily: font.bold, color: colors.primaryDark, letterSpacing: 0.5 },
   scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 16, width: '100%', maxWidth: 560, alignSelf: 'center' },
   brand:       { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
   logo:        { width: 156, height: 191 },
   tagline:     { ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginTop: 20 },
   actions:     { gap: 12 },
-  accountRow:  { alignItems: 'center', marginTop: 4 },
+  accountRow:  { alignItems: 'center', marginTop: 8 },
   accountText: { ...type.body, color: colors.textSecondaryOnPage, textAlign: 'center' },
-  links:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
+  links:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 8 },
   link:        { minHeight: TAP, paddingHorizontal: 10, justifyContent: 'center' },
+  linkBusy:    { opacity: 0.45 },
   linkText:    { ...type.rowTitle, color: colors.primaryDark },
   dot:         { ...type.rowTitle, color: colors.textSecondaryOnPage },
 })
