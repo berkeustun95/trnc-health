@@ -96,6 +96,26 @@ test('Yakında tiles are placed in their group but never in the visible list', (
   for (const id of soon) expect([id, visible.includes(id)]).toEqual([id, false])
 })
 
+// The pill's N must equal the tiles the Tüm hizmetler page draws (ServicePanels renders liveGroups, soon tiles
+// included). With HIDDEN_TILES emptied a soon tile exists, so the count must exceed the favourites list; under
+// production gates none exists and the two agree.
+test('allServicesCount counts every tile the page draws', () => {
+  jest.resetModules()
+  global.__DEV__ = false
+  jest.doMock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: {} } } }))
+  jest.doMock('../constants/homeModules', () => ({ ...jest.requireActual('../constants/homeModules'), HIDDEN_TILES: new Set() }))
+  const unhidden = require('../constants/homeGroups')
+  jest.dontMock('../constants/homeModules')
+  const drawn = unhidden.liveGroups().flatMap(g => g.modules.map(m => `${g.key}:${m.id}${m.soon ? ' (soon)' : ''}`))
+  const rows = `\n${drawn.join('\n')}`
+  expect({ n: unhidden.allServicesCount(), rows }).toEqual({ n: drawn.length, rows })
+  expect({ more: unhidden.allServicesCount() > unhidden.visibleServiceIds().length, rows }).toEqual({ more: true, rows })
+
+  const { groups } = load({ dev: false })
+  const prodRows = `\n${groups.liveGroups().flatMap(g => g.modules.map(m => `${g.key}:${m.id}${m.soon ? ' (soon)' : ''}`)).join('\n')}`
+  expect({ n: groups.allServicesCount(), rows: prodRows }).toEqual({ n: groups.visibleServiceIds().length, rows: prodRows })
+})
+
 test('usage outranks the defaults, and a pin outranks usage', () => {
   const { groups, fav } = load({ dev: false })
   const visible = groups.visibleServiceIds()

@@ -35,18 +35,22 @@ export function ServicesHeader({ lang, onEdit, onSeeAll }) {
         <Text style={s.headTitle} numberOfLines={1} accessibilityRole="header">{t('homeServicesTitle', lang)}</Text>
       </View>
       <TouchableOpacity onPress={onEdit} activeOpacity={press.small} style={s.link}
-        hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} accessibilityRole="button">
+        hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} accessibilityRole="button"
+        accessibilityLabel={`${t('favEdit', lang)}, ${t('homeServicesTitle', lang)}`}>
         <Text style={s.linkText} numberOfLines={1}>{t('favEdit', lang)}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onSeeAll} activeOpacity={press.small} style={s.link}
-        hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} accessibilityRole="button">
+        hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} accessibilityRole="button"
+        accessibilityLabel={t('hrAllServices', lang)}>
         <Text style={s.linkText} numberOfLines={1}>{t('homeServicesSeeAll', lang)}</Text>
-        <Ionicons name="chevron-forward" size={14} color={colors.primaryDark} />
+        <Ionicons name="chevron-forward" size={14} color={colors.primaryDark}
+          accessible={false} importantForAccessibility="no" />
       </TouchableOpacity>
     </View>
   )
 }
 
+// Not components/ui Button: it has no outline variant.
 // Outline pill. backgroundColor is explicit: Android draws borderRadius + borderWidth opaque otherwise.
 export function AllServicesButton({ lang, count, onPress }) {
   const label = t('homeServicesAllButton', lang).replace('{n}', String(count))
@@ -77,5 +81,5 @@ const s = StyleSheet.create({
 
   pill:      { height: 48, marginTop: 12, borderRadius: radii.pill, borderWidth: 1.5, borderColor: colors.primary,
                backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  pillText:  { ...type.rowTitle, color: colors.primaryDark },
+  pillText:  { ...type.rowTitle, color: colors.primaryDark, fontVariant: ['tabular-nums'] },
 })
