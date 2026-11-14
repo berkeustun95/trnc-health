@@ -5,7 +5,12 @@
 # Each step runs even if an earlier one failed, so one email carries every red; the
 # job fails if any did — that failure IS the alert (GitHub emails on failure).
 #
-# Gişe Kıbrıs health is not here: gisekibris-feed runs it daily as its last step.
+# Gişe Kıbrıs content health is not here: gisekibris-feed runs it as its last step. Whether
+# the Gişe sync (and every other feed) RAN is here: feeds:freshness, 48 h (Berke 2026-11-14).
+#
+# Red vs warning (2026-11-14): one Duyurular source down is THEIR site, so it is a warning
+# with its own issue ("Duyurular sources down") and the job stays green. Three dead sites
+# kept this job red for 16 days, and a red job that is always red hides the next real red.
 #
 #   gh workflow run daily-health
 
@@ -85,7 +90,37 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duyurular-health.mjs --self
-          npm run -s duyurular:health
+          npm run -s duyurular:health -- --down-out "$RUNNER_TEMP/duyurular-down.txt"
+      # A few sources failing = a warning (above). One issue lists them; Berke is mentioned
+      # when the set changes; it closes when none are down. Source keys and counts only.
+      - name: Duyurular sources down (warning, not red)
+        if: success() || failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f="$RUNNER_TEMP/duyurular-down.txt"
+          [ -f "$f" ] || { echo "duyurular:health wrote no list (it failed before the end); nothing to report."; exit 0; }
+          list=$(sed 's/^/- /' "$f")
+          title='Duyurular sources down'
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
+          if [ -z "$list" ]; then
+            [ -z "$num" ] || gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment 'No source is failing 3+ runs in a row.'
+            exit 0
+          fi
+          body=$(printf '%s\n\n%s\n\n%s\n\nLatest run: %s/%s/actions/runs/%s' \
+            'These sources failed 3+ fetches in a row. This is a warning: daily-health stays green unless many fail at once.' \
+            "$list" \
+            'Fix: pause with `active: false` in scripts/duyurular/sources.mjs; duyurular-paused-recheck says when one is back.' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [ -z "$num" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"$'\n\n@berkeustun95'
+          else
+            old=$(gh issue view "$num" --repo "$GITHUB_REPOSITORY" --json body --jq .body | sed -n '/^- /p')
+            gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+            [ "$old" = "$list" ] || gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the sources down changed:"$'\n\n'"$list"
+          fi
       - name: duyurular:staleness
         if: success() || failure()
         run: |
@@ -105,9 +140,20 @@ jobs:
         if: success() || failure()
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partner-ids.mjs
 
+      # Every feed synced in the last 48 h (Gişe Kıbrıs, Duyurular, Novest photos), measured from
+      # each workflow's last SUCCESSFUL run. The Mac launchd job runs the same script every 6 h.
+      - name: feeds:freshness (every feed synced in 48 h)
+        if: success() || failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/check-feed-freshness.mjs --self
+          node scripts/check-feed-freshness.mjs
+
       # GitHub emails a scheduled job's failure to whoever last edited the schedule, which is a bot, so a red run told
       # nobody: Novest and the duty push were down for days. One issue stays open while anything is red, and Berke is
-      # mentioned only when the set of failing checks changes. Step names only: this repo and its issues are public.
+      # mentioned when the set of failing checks changes, and again every 3 days while it stays red (2026-11-14: the
+      # same set from 11-07 on meant no mention for a week). Step names only: this repo and its issues are public.
       - name: Alert Berke
         if: always()
         env:
@@ -129,4 +175,13 @@ jobs:
           elif [ "$(jq -r '.body' <<<"$issue" | sed -n '/^- /p')" != "$failing" ]; then
             gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the failing checks changed:"$'\n\n'"$failing"
+          else
+            # Same set still red: when was Berke last mentioned (a comment, else the issue itself)?
+            last=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num/comments?per_page=100" \
+              --jq '[.[] | select(.body | contains("@berkeustun95")) | .created_at] | max // empty')
+            [ -n "$last" ] || last=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num" --jq .created_at)
+            days=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 86400 ))
+            if [ "$days" -ge 3 ]; then
+              gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 still red, $days days since the last mention:"$'\n\n'"$failing"
+            fi
           fi

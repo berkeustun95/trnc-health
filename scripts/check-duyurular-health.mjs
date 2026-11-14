@@ -6,7 +6,11 @@
 //
 // Five questions (Berke 2026-10-11; 5 added 2026-10-17), each answered from the thing itself:
 //   1. a successful fetch in the last 2 h      max(announcement_sources.last_ok_at)
-//   2. no source failing 3+ runs in a row      consecutive_failures >= 3
+//   2. no source failing 3+ runs in a row      consecutive_failures >= 3 — a WARNING for a few
+//                                              sources (their site, not our pipeline), RED only when
+//                                              MANY_DOWN_MIN+ or MANY_DOWN_SHARE of active sources fail
+//                                              at once (2026-11-14: three dead sites kept daily-health
+//                                              red for 16 days and hid the next real failure)
 //   3. a new item in the last 3 days           max(announcements.created_at)
 //   4. the Home banner count is readable       the banner's own query, AS ANON (the role the
 //                                              app reads with; a service-role read would pass
@@ -32,6 +36,18 @@ export const FAILING_RUNS = 3
 export const MAX_NO_NEW_DAYS = 3
 export const RED_RUN_WINDOW_H = 24
 export const CERT_GROUP_MIN = 3
+export const MANY_DOWN_MIN = 5
+export const MANY_DOWN_SHARE = 0.2
+
+// Question 2 split in two. A few sources failing = those sites are down: a warning, listed in
+// its own issue by daily-health. Many at once = something on OUR side (network, certificates,
+// the fetcher): red.
+export function sourcesDown(failing, active) {
+  if (!failing.length) return {}
+  const many = failing.length >= MANY_DOWN_MIN || (active > 0 && failing.length / active >= MANY_DOWN_SHARE)
+  const line = `${failing.length} of ${active} source(s) failing ${FAILING_RUNS}+ runs in a row: ${failing.join(', ')}`
+  return many ? { problem: `${line} — too many at once to be their sites` } : { warning: line }
+}
 
 // 2026-10-17: 13 gov.ct.tr sources failed 190 runs with UNABLE_TO_VERIFY_LEAF_SIGNATURE and this
 // check said only "13 source(s) failing". When CERT_GROUP_MIN+ failing sources share one TLS
@@ -76,10 +92,11 @@ export function runVerdict(seq = []) {
   return { red }
 }
 
-export function verdict({ lastOk, failing, newest, banner, runs = { red: [] }, certs = [] }, now = Date.now()) {
+export function verdict({ lastOk, failing, active = 60, newest, banner, runs = { red: [] }, certs = [] }, now = Date.now()) {
   const problems = [...certs]
   if (!lastOk || now - Date.parse(lastOk) > MAX_FETCH_GAP_H * H) problems.push(`no successful fetch in ${MAX_FETCH_GAP_H}+ h (last ${lastOk ?? 'never'})`)
-  if (failing.length) problems.push(`${failing.length} source(s) failing ${FAILING_RUNS}+ runs in a row: ${failing.join(', ')}`)
+  const down = sourcesDown(failing, active)
+  if (down.problem) problems.push(down.problem)
   if (!newest || now - Date.parse(newest) > MAX_NO_NEW_DAYS * D) problems.push(`no new item in ${MAX_NO_NEW_DAYS}+ days (newest ${newest ?? 'none'})`)
   if (banner.error) problems.push(`banner count unreadable as anon: ${banner.error}`)
   if (runs.error) problems.push(`duyurular-fetch runs unreadable: ${runs.error}`)
@@ -103,7 +120,13 @@ if (process.argv.includes('--self')) {
   t('last fetch 1h59m ago           ', verdict({ ...ok, lastOk: '2026-10-11T10:01:00Z' }, now).length, 0)
   t('last fetch 2h01m ago           ', verdict({ ...ok, lastOk: '2026-10-11T09:59:00Z' }, now).length, 1)
   t('never fetched                  ', verdict({ ...ok, lastOk: null }, now).length, 1)
-  t('one source failing 3 runs      ', verdict({ ...ok, failing: ['khk-yukselme-munhal(3)'] }, now).length, 1)
+  t('one source failing 3 runs → not red', verdict({ ...ok, failing: ['khk-yukselme-munhal(3)'] }, now).length, 0)
+  t('…but it is a warning           ', sourcesDown(['khk-yukselme-munhal(3)'], 58).warning?.startsWith('1 of 58 source'), true)
+  t('3 sources down (2026-11-14) → warning', sourcesDown(['a(635)', 'b(174)', 'c(347)'], 58).warning != null, true)
+  t('4 of 58 down → still a warning ', verdict({ ...ok, failing: ['a(3)', 'b(3)', 'c(3)', 'd(3)'], active: 58 }, now).length, 0)
+  t('5 of 58 down → red             ', verdict({ ...ok, failing: ['a(3)', 'b(3)', 'c(3)', 'd(3)', 'e(3)'], active: 58 }, now).length, 1)
+  t('2 of 10 down (20%) → red       ', verdict({ ...ok, failing: ['a(3)', 'b(3)'], active: 10 }, now).length, 1)
+  t('no source down → no warning    ', JSON.stringify(sourcesDown([], 58)), '{}')
   t('newest item 2d23h old          ', verdict({ ...ok, newest: '2026-10-08T13:00:00Z' }, now).length, 0)
   t('newest item 3d1h old           ', verdict({ ...ok, newest: '2026-10-08T11:00:00Z' }, now).length, 1)
   t('banner read error              ', verdict({ ...ok, banner: { error: '42501' } }, now).length, 1)
@@ -121,7 +144,7 @@ if (process.argv.includes('--self')) {
   t('latest cancelled, before it red → red', verdict({ ...ok, runs: { seq: [{ id: 3, conclusion: 'cancelled' }, x(2), g(1)] } }, now).length, 1)
   t('fetch runs unreadable          ', verdict({ ...ok, runs: { error: 'HTTP 403' } }, now).length, 1)
   t('no token outside CI = skipped  ', verdict({ ...ok, runs: { skipped: true } }, now).length, 0)
-  t('everything broken at once      ', verdict({ lastOk: null, failing: ['a(9)'], newest: null, banner: { error: 'x' }, runs: { seq: [x(1)] } }, now).length, 5)
+  t('everything broken at once      ', verdict({ lastOk: null, failing: ['a(9)', 'b(9)', 'c(9)', 'd(9)', 'e(9)'], newest: null, banner: { error: 'x' }, runs: { seq: [x(1)] } }, now).length, 5)
   const row = (host, cls) => ({ url: `https://${host}/x`, last_error: `[${cls}] fetch failed` })
   const gov = ['khk', 'saglik', 'rkmmd', 'ticaret'].map(h => row(`${h}.gov.ct.tr`, 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'))
   t('4 gov.ct.tr leaf-signature → named', certGroups(gov)[0]?.startsWith('certificate change on gov.ct.tr: 4 sources'), true)
@@ -195,13 +218,25 @@ const failing = srcs.filter(s => s.consecutive_failures >= FAILING_RUNS).map(s =
 const newest = top?.[0]?.created_at ?? null
 const banner = e3 || bannerCount == null ? { error: e3 ? `${e3.code} ${e3.message}` : 'no count returned' } : { count: bannerCount }
 const certs = certGroups(srcs.filter(s => s.consecutive_failures >= FAILING_RUNS))
-const problems = verdict({ lastOk, failing, newest, banner, runs, certs })
+const problems = verdict({ lastOk, failing, active: srcs.length, newest, banner, runs, certs })
+const down = sourcesDown(failing, srcs.length)
+// --down-out <file>: one "key(failures)" per line for daily-health's "sources down" issue
+// (empty file = none down). Keys and counts only: this log and that issue are public.
+const downOut = process.argv.indexOf('--down-out')
+if (downOut !== -1) {
+  const { writeFileSync } = await import('node:fs')
+  writeFileSync(process.argv[downOut + 1], down.warning ? failing.join('\n') + '\n' : '')
+}
 
 const ago = ts => ts ? `${Math.round((Date.now() - Date.parse(ts)) / 6e4)} min ago` : '—'
 console.log('\n── Duyurular pipeline health ──')
 console.log(`  active sources      : ${srcs.length}`)
 console.log(`  last successful fetch: ${lastOk ?? 'never'} (${ago(lastOk)}; limit ${MAX_FETCH_GAP_H} h)`)
 console.log(`  failing ${FAILING_RUNS}+ in a row  : ${failing.length ? failing.join(', ') : 'none'}`)
+if (down.warning) {
+  console.log(`  ⚠ warning: ${down.warning} (their sites; pause with active:false in sources.mjs)`)
+  console.log(`::warning title=Duyurular source down::${down.warning}`)
+}
 if (certs.length) console.log(`  ⚠ ${certs.join('\n  ⚠ ')}`)
 console.log(`  newest item         : ${newest ?? 'none'} (limit ${MAX_NO_NEW_DAYS} days)`)
 console.log(`  banner count (anon) : ${banner.error ? 'UNREADABLE — ' + banner.error : banner.count}`)

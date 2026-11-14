@@ -35,7 +35,8 @@ export const SOURCES = [
   rss({ key: 'khk-sozlu-sinav-sonuclari', name: 'KHK — Sözlü sınav sonuçları', institution: 'Kamu Hizmeti Komisyonu', url: KHK + 's%C3%B6zl%C3%BC-s%C4%B1nav-sonu%C3%A7lar%C4%B1', category: 'kamu', filter_mode: 'all', crawl_delay_s: 5, rank: 3 }),
   rss({ key: 'vergi', name: 'Gelir ve Vergi Dairesi', institution: 'Gelir ve Vergi Dairesi', url: 'https://vergi.gov.ct.tr/?q=rss.xml', category: 'kamu', crawl_delay_s: 10, rank: 3 }),
   rss({ key: 'merkez-bankasi', name: 'KKTC Merkez Bankası', institution: 'KKTC Merkez Bankası', url: 'https://www.kktcmerkezbankasi.org/tr/rss.xml', category: 'kamu', rank: 3,
-    drop: /dibs|borçlanma senedi|merkez bankası senedi|^\d{1,2} \S+ \d{4}$/ }),
+    drop: /dibs|borçlanma senedi|merkez bankası senedi|^\d{1,2} \S+ \d{4}$/,
+    active: false }),   // paused 2026-11-14: times out from GitHub runners for 177+ runs (works from Cyprus: their firewall drops datacenter traffic); weekly recheck
   rss({ key: 'mahkemeler', name: 'KKTC Mahkemeleri — Duyurular', institution: 'KKTC Mahkemeleri', url: 'https://www.mahkemeler.net/?cat=46&feed=rss2', category: 'kamu', rank: 3 }),
   rss({ key: 'saglik-duyurular', name: 'Sağlık Bakanlığı — Duyurular', institution: 'Sağlık Bakanlığı', url: 'https://saglik.gov.ct.tr/DUYURULAR/rss/category/1012/duyurular', category: 'kamu', crawl_delay_s: 5, rank: 3 }),
   rss({ key: 'ysk', name: 'Yüksek Seçim Kurulu', institution: 'Yüksek Seçim Kurulu', url: 'https://ysk.gov.ct.tr/feed/', category: 'kamu', filter_mode: 'all', rank: 3 }),
@@ -83,14 +84,16 @@ export const SOURCES = [
   html({ key: 'gonyeli-ihaleler', name: 'Gönyeli-Alayköy Belediyesi — İhaleler', institution: 'Gönyeli-Alayköy Belediyesi', url: 'https://gonyelibelediyesi.org/sayfa/ihaleler', parser: 'gonyeli', category: 'ihale', filter_mode: 'all', region: 'lefkosa', rank: 2 }),
   html({ key: 'mucahitler-ihaleler', name: 'Mücahitler Dairesi — İhale duyuruları', institution: 'Mücahitler Dairesi', url: 'https://mucahit.gov.ct.tr/Sayfa/IhaleDuyuru', parser: 'mucahit', category: 'ihale', filter_mode: 'all', rank: 3 }),
   html({ key: 'evkaf-ihaleler', name: 'Kıbrıs Vakıflar İdaresi — İhaleler', institution: 'Kıbrıs Vakıflar İdaresi', url: 'https://evkaf.org/ihaleler/', parser: 'evkaf', category: 'ihale', filter_mode: 'all', rank: 2 }),
-  html({ key: 'lapta-alsancak-ihaleler', name: 'Lapta-Alsancak-Çamlıbel Belediyesi — İhaleler', institution: 'Lapta-Alsancak-Çamlıbel Belediyesi', url: 'https://lacbelediyesi.org/ihaleler', parser: 'lac', category: 'ihale', filter_mode: 'all', region: 'girne', rank: 2 }),
+  html({ key: 'lapta-alsancak-ihaleler', name: 'Lapta-Alsancak-Çamlıbel Belediyesi — İhaleler', institution: 'Lapta-Alsancak-Çamlıbel Belediyesi', url: 'https://lacbelediyesi.org/ihaleler', parser: 'lac', category: 'ihale', filter_mode: 'all', region: 'girne', rank: 2,
+    active: false }),   // paused 2026-11-14: CERT_HAS_EXPIRED for 638+ runs (Let's Encrypt leaf expired 2026-11-01, their renewal); weekly recheck
   html({ key: 'lefke-ihaleler', name: 'Lefke Belediyesi — İhale duyuruları', institution: 'Lefke Belediyesi', url: 'https://lefkebelediyesi.com/ihale-duyurulari/', parser: 'lefkeihale', category: 'ihale', filter_mode: 'all', region: 'lefke', rank: 2 }),
   html({ key: 'rkmmd-duyurular', name: 'Ruhsat ve Kamu Mal Müdürlüğü — Duyurular', institution: 'Ruhsat ve Kamu Mal Müdürlüğü', url: 'https://rkmmd.gov.ct.tr/DUYURULAR', parser: 'easydnn', category: 'ihale', crawl_delay_s: 5, rank: 3 }),
   html({ key: 'ticaret', name: 'Ticaret Dairesi', institution: 'Ticaret Dairesi', url: 'https://ticaret.gov.ct.tr/HABERLER', parser: 'easydnn', category: 'ihale', crawl_delay_s: 5, rank: 3 }),
 
   // ─── Belediyeler ─────────────────────────────────────────────────────────
   rss({ key: 'gazimagusa-duyurular', name: 'Gazimağusa Belediyesi — Duyurular', institution: 'Gazimağusa Belediyesi', url: 'https://www.gazimagusabelediyesi.org/kat/duyurular/feed/', category: 'belediye', filter_mode: 'all', region: 'gazimagusa', rank: 2 }),
-  rss({ key: 'ktbb', name: 'Belediyeler Birliği — Üye haberleri', institution: 'Kıbrıs Türk Belediyeler Birliği', url: 'https://ktbb.org/category/uyelerimizin-haberleri/feed/', category: 'belediye', rank: 2 }),
+  rss({ key: 'ktbb', name: 'Belediyeler Birliği — Üye haberleri', institution: 'Kıbrıs Türk Belediyeler Birliği', url: 'https://ktbb.org/category/uyelerimizin-haberleri/feed/', category: 'belediye', rank: 2,
+    active: false }),   // paused 2026-11-14: whole site HTTP 503 'Sitemiz yenileniyor' for 350+ runs (new platform; feed path may change); weekly recheck
   rss({ key: 'lefke-belediye', name: 'Lefke Belediyesi', institution: 'Lefke Belediyesi', url: 'https://lefkebelediyesi.com/feed/', category: 'belediye', region: 'lefke', rank: 2 }),
 
   // ─── Destek ve hibeler ───────────────────────────────────────────────────
