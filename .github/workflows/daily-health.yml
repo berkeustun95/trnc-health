@@ -183,7 +183,7 @@ jobs:
             # comments count (public repo), and `since` keeps the read to the last few comments.
             since=$(date -u -d '70 hours ago' +%Y-%m-%dT%H:%M:%SZ)
             recent=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$num/comments?since=$since&per_page=100" \
-              --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("@berkeustun95")) and .created_at >= "'"$since"'") | .id' | head -1)
+              --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("@berkeustun95")) and .created_at >= "'"$since"'") | .id] | first // empty')
             created=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num" --jq .created_at)
             if [ -z "$recent" ] && [[ "$created" < "$since" ]]; then
               gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 still red for 3+ days:"$'\n\n'"$failing"
