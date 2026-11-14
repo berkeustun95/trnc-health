@@ -66,6 +66,13 @@ import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 //   anywhere in the module. The card still shows its own service areas (coverage row), so
 //   the reader can see where the firm works. Do NOT restore the district filter without
 //   his decision. The selected district still goes into the WhatsApp draft and the log.
+//
+// ⚠ CATEGORY PAGES ONLY (Berke, 2026-11-14; replaces the 2026-09-28 "landing too" call):
+//   the partner cards render inside the twelve category pages and NOT on the landing, where
+//   the same card sat above the grid and again on every page behind it. The landing is the
+//   intro banner + grid. The fetch still runs on mount so a category opens without a wait,
+//   and its loading / error states live on the category page. Do not put the card back on
+//   the landing without his decision.
 
 const PARTNER_PREVIEW = __DEV__ && PREVIEW_PENDING_PARTNERS
 
@@ -165,9 +172,8 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   }
 
   function handleBack() {
-    // The partner overlay is FIRST in the chain: it can be opened from the landing, where
-    // selectedCategory is null, so any later branch would close the module instead of the
-    // overlay.
+    // The partner overlay is FIRST in the chain: it is drawn over a category page, so the
+    // category branch below would otherwise close the page underneath instead of the overlay.
     if (selectedPartner) {
       setSelectedPartner(null)
     } else if (selectedCategory) {
@@ -243,18 +249,18 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
   // ─── Redesign (REDESIGN only; same state, handlers, order and pinning) ─────
   // The partner card itself (HomeServicePartnerCard) is untouched: same component, same
-  // props, same position at the top of the landing and of every category page.
+  // props, at the top of every category page (and no longer on the landing).
   if (REDESIGN) {
-    const partnerList = (forCategory) => {
+    const partnerList = () => {
       if (!loaded) return <CardSkeleton height={190} />
       if (loadError) return <ErrorState lang={lang} onRetry={retry} />
       return cards.map(({ partner, row }) => {
         // Same covered-only rule as the legacy path below: the draft names the category
         // only when the firm lists it.
-        const serviceContext = forCategory && (row.service_types || []).includes(selectedCategory) && activeCat
+        const serviceContext = (row.service_types || []).includes(selectedCategory) && activeCat
           ? { tr: t(activeCat.labelKey, 'Turkish'), en: t(activeCat.labelKey, 'English') }
           : null
-        const region = forCategory ? selectedDistrict : null
+        const region = selectedDistrict
         return (
           <View key={partner.id} style={r.partnerWrap}>
             <HomeServicePartnerCard
@@ -276,7 +282,6 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
           <UiHeader onBack={handleBack} title={t('hsTitle', lang)} lang={lang} />
           <ScrollView {...landingMem} contentContainerStyle={r.scroll} showsVerticalScrollIndicator={false}>
             <InfoBanner icon="ribbon-outline" category="homeLife" message={t('hsPartnersIntro', lang)} style={r.banner} />
-            {partnerList(false)}
             <View style={r.grid}>
               {HS_CATEGORIES.map(cat => (
                 <RCategoryTile key={cat.key} item={cat} lang={lang} onPress={() => selectCategory(cat.key)} />
@@ -312,7 +317,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
           />
         </FilterBar>
         <ScrollView contentContainerStyle={r.catScroll} showsVerticalScrollIndicator={false}>
-          {partnerList(true)}
+          {partnerList()}
         </ScrollView>
       </SafeAreaView>
     )
@@ -332,29 +337,6 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
             subtitle={t('hsPartnersIntro', lang)}
             style={s.introCard}
           />
-
-          {!loaded ? (
-            <ActivityIndicator size="large" color={colors.primary} style={s.spinner} />
-          ) : loadError ? (
-            <ErrorState lang={lang} onRetry={retry} />
-          ) : cards.length > 0 ? (
-            cards.map(({ partner, row }) => (
-              <View key={partner.id} style={s.partnerWrap}>
-                <HomeServicePartnerCard
-                  partner={partner}
-                  row={row}
-                  lang={lang}
-                  // No category context on the landing, so the WhatsApp draft uses its
-                  // generic fallback ("tadilat işleri" / "renovation work") and
-                  // logContactEvent records no district. Both correct here: the user has
-                  // not told us which job they mean.
-                  serviceContext={null}
-                  region={null}
-                  onPress={() => setSelectedPartner({ partner, row, serviceContext: null, region: null })}
-                />
-              </View>
-            ))
-          ) : null}
 
           <View style={s.grid}>
             {HS_CATEGORIES.map(cat => (
