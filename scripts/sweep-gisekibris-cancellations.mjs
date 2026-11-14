@@ -119,7 +119,7 @@ export function decide(row, probe) {
 // a reason we already know, so they are never swept: Berke decides (2026-11-14).
 export function heldIds(meta) {
   return new Set([...(meta?.skipped ?? []), ...(meta?.feed_cancelled ?? [])]
-    .map(r => r?.external_id).filter(Boolean))
+    .flatMap(r => [r?.external_id, r?.also_external_id]).filter(Boolean))
 }
 
 // ─── Self-test ──────────────────────────────────────────────────────────────
@@ -142,10 +142,10 @@ if (selftest) {
   T('flag TRUE but not our source',  {...base, source:'manual'},                   {ok:true,status:200,flag:true}, 'skip')
   T('flag TRUE but HELD (skipped / feed-cancelled)', {...base, held:true}, {ok:true,status:200,flag:true}, 'skip')
   {
-    const h = heldIds({ skipped: [{ external_id: 'gk-A' }, { external_id: null }], feed_cancelled: [{ external_id: 'gk-B' }] })
-    const ok = [...h].sort().join(',') === 'gk-A,gk-B'
+    const h = heldIds({ skipped: [{ external_id: 'gk-A', also_external_id: 'gk-C' }, { external_id: null }], feed_cancelled: [{ external_id: 'gk-B' }] })
+    const ok = [...h].sort().join(',') === 'gk-A,gk-B,gk-C'
     if (!ok) FAILS++
-    console.log(`    ${ok ? '✓' : '✗'} ${'heldIds: skipped (with id) + feed_cancelled'.padEnd(52)} ${[...h].sort().join(',')}`)
+    console.log(`    ${ok ? '✓' : '✗'} ${'heldIds: skipped (both ids) + feed_cancelled'.padEnd(52)} ${[...h].sort().join(',')}`)
   }
   console.log('\n  an ABSENT / unreadable flag that must NOT fire')
   T('flag ABSENT (seat-map render)', base, {ok:true,status:200,flag:null},          'unknown')

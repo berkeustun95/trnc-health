@@ -315,6 +315,9 @@ if (cancelled.length) {
 
 if (apply && cancelled.length) {
   const out = new Set(cancelled.map(c => c.ev.external_id))
+  if (seed.events.every(e => out.has(e.external_id))) {
+    fail('Every event in the feed is cancelled — refusing to hand an empty seed to the import. Seed left untouched.')
+  }
   seed.events = seed.events.filter(e => !out.has(e.external_id))
   seed.meta.feed_cancelled = cancelled.map(c => ({
     external_id: c.ev.external_id, title: c.ev.title, start_date: c.ev.start_date, ticket_url: c.ev.ticket_url }))
@@ -347,5 +350,4 @@ if (apply) {
 
 // --apply: cancelled rows are already out of the seed, so the chain continues.
 // Report mode: non-zero on a cancelled event, as before.
-if (!seed.events.length) fail('Every event in the feed is cancelled — refusing to hand an empty seed to the import.')
 process.exit(cancelled.length && !apply ? 1 : 0)

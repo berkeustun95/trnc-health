@@ -186,12 +186,38 @@ function idFromPage(html) {
 
 const PAGE_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
                 '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+// Only the partner's own event pages are ever fetched (the url is feed-supplied text, and
+// this job holds the service key): https, gisekibris.com, /etkinlikler/<slug>. Redirects are
+// followed by hand and only to the SAME event path on the same site (gisekibris.com → www,
+// slug--id → slug), so a removed slug that redirects to some other event cannot lend that
+// event's id to this row. Body capped at 3 MB (pages measure ~150–400 KB).
+const PAGE_HOSTS = new Set(['www.gisekibris.com', 'gisekibris.com'])
+const PAGE_MAX_BYTES = 3 * 1024 * 1024
+const eventSlug = u => {
+  let x
+  try { x = new URL(u) } catch { return null }
+  if (x.protocol !== 'https:' || !PAGE_HOSTS.has(x.hostname)) return null
+  const m = x.pathname.replace(/\/+$/, '').match(/^\/etkinlikler\/([^/]+)$/)
+  return m ? m[1].split('--')[0].toLowerCase() : null
+}
 async function fetchPageId(url) {
   if (process.env.GK_PREPARE_OFFLINE === '1') return { id: null, why: 'offline' }
+  const slug = eventSlug(url)
+  if (!slug) return { id: null, why: 'url is not a gisekibris.com event page' }
   try {
-    const res = await fetch(url, { headers: { 'user-agent': PAGE_UA }, redirect: 'follow', signal: AbortSignal.timeout(20000) })
+    let at = url, res
+    for (let hop = 0; ; hop++) {
+      res = await fetch(at, { headers: { 'user-agent': PAGE_UA }, redirect: 'manual', signal: AbortSignal.timeout(20000) })
+      if (res.status < 300 || res.status >= 400) break
+      const next = new URL(res.headers.get('location') ?? '', at).toString()
+      if (hop >= 3 || eventSlug(next) !== slug) return { id: null, why: `page redirects away from this event (${res.status})` }
+      at = next
+    }
     if (!res.ok) return { id: null, why: `page HTTP ${res.status}` }
-    const id = idFromPage(await res.text())
+    if (Number(res.headers.get('content-length') ?? 0) > PAGE_MAX_BYTES) return { id: null, why: 'page too large' }
+    const body = await res.text()
+    if (body.length > PAGE_MAX_BYTES) return { id: null, why: 'page too large' }
+    const id = idFromPage(body)
     return { id, why: id ? null : 'page carries no single id' }
   } catch (e) {
     return { id: null, why: `page fetch failed: ${e.name === 'TimeoutError' ? 'timeout' : e.message}` }
@@ -325,6 +351,12 @@ if (selftest) {
   t('page: escaped JSON',      idFromPage('{\\"id\\":\\"cmwarum9l0036cxud6c7ej42i\\"}'), 'cmwarum9l0036cxud6c7ej42i')
   t('page: two ids → none',    idFromPage('"id":"aaaaaaaaaaaaaaaaaaaa" "id":"bbbbbbbbbbbbbbbbbbbb"'), null)
   t('page: no id → none',      idFromPage('<html>404</html>'), null)
+  t('page host: www event page',  eventSlug('https://www.gisekibris.com/etkinlikler/born-to-be-wild?code=AF1'), 'born-to-be-wild')
+  t('page host: slug--id = same slug', eventSlug('https://gisekibris.com/etkinlikler/born-to-be-wild--cmw1/'), 'born-to-be-wild')
+  t('page host: http refused',    eventSlug('http://www.gisekibris.com/etkinlikler/x'), null)
+  t('page host: other host refused', eventSlug('https://169.254.169.254/etkinlikler/x'), null)
+  t('page host: look-alike refused', eventSlug('https://gisekibris.com.evil.example/etkinlikler/x'), null)
+  t('page host: non-event path refused', eventSlug('https://www.gisekibris.com/admin/x'), null)
 
   console.log('\n  one bad row skips ONE row; zero usable rows refuses')
   {
@@ -345,13 +377,16 @@ if (selftest) {
       row({ name: 'BAD CITY', image: 'https://img-cdn.gisekibris.com/event/CityBad1234567890ab/banner.jpg', city: 'Atlantis' }),
       row({ name: 'NO DATE', image: 'https://img-cdn.gisekibris.com/event/NoDate1234567890abc/banner.jpg', startdate: null }),
       row({ name: 'DISAGREE', image: 'https://img-cdn.gisekibris.com/event/Img11111111111111111/banner.jpg', url: 'https://x/etkinlikler/d--Url22222222222222222' }),
+      null,
     ])
     t('exit 0 with good + bad rows',        r1.status, 0)
+    t('disagreement keeps both ids',        [r1.out?.meta?.skipped?.find(x => x.title === 'DISAGREE')].map(x => `${x?.external_id}|${x?.also_external_id}`)[0], 'gk-Url22222222222222222|gk-Img11111111111111111')
+    t('a null row is skipped, not a crash', r1.out?.meta?.skipped?.some(x => x.title === '(not an event object)'), true)
     t('url-only row kept, id from url',     r1.out?.events?.map(e => e.external_id).join(','), 'gk-UrlOnly1234567890')
-    t('4 rows skipped',                     r1.out?.meta?.skipped?.length, 4)
+    t('5 rows skipped',                     r1.out?.meta?.skipped?.length, 5)
     t('skipped keeps the id when known',    r1.out?.meta?.skipped?.find(x => x.title === 'BAD CITY')?.external_id, 'gk-CityBad1234567890ab')
     t('no-id row skipped with null id',     r1.out?.meta?.skipped?.find(x => x.title === 'NO ID ANYWHERE')?.external_id, null)
-    t('a ::warning:: per skipped row',      (r1.stdout.match(/::warning title=Gise Kibris skipped row::/g) || []).length, 4)
+    t('a ::warning:: per skipped row',      (r1.stdout.match(/::warning title=Gise Kibris skipped row::/g) || []).length, 5)
     const r2 = run([row({ name: 'ONLY BAD', image: NEWIMG, url: 'https://www.gisekibris.com/etkinlikler/no-id' })])
     t('zero usable rows → exit 1',          r2.status, 1)
     t('…and nothing written',               r2.out, null)
@@ -390,7 +425,7 @@ if (!Array.isArray(feed) || !feed.length) {
 // Page lookups first, only for rows with no id in url or image (few; 4 at a time).
 const pageIds = new Map()
 {
-  const need = feed.map((ev, i) => ({ ev, i })).filter(({ ev }) => !idFromUrl(ev.url) && !idFromImage(ev.image) && ev.url)
+  const need = feed.map((ev, i) => ({ ev, i })).filter(({ ev }) => ev && typeof ev === 'object' && !idFromUrl(ev.url) && !idFromImage(ev.image) && ev.url)
   for (let k = 0; k < need.length; k += 4) {
     const batch = need.slice(k, k + 4)
     const got = await Promise.all(batch.map(({ ev }) => fetchPageId(ev.url)))
@@ -404,12 +439,21 @@ const unmapped = new Map()
 const idSources = []
 const seenId = new Map()
 
-feed.forEach((ev, i) => {
+// Two passes: rows identified by url/image first, then rows identified only by their page.
+// A page id that collides with any other row loses (skipped), never the url/image row.
+const fromPageOnly = ev => ev && typeof ev === 'object' && !idFromUrl(ev.url) && !idFromImage(ev.image)
+const order = [...feed.keys()].sort((a, b) => fromPageOnly(feed[a]) - fromPageOnly(feed[b]))
+order.forEach(i => {
+  const ev = feed[i]
+  if (!ev || typeof ev !== 'object' || Array.isArray(ev)) {
+    skipped.push({ external_id: null, title: '(not an event object)', position: i + 1, reason: `feed row is ${JSON.stringify(ev)?.slice(0, 40)}` })
+    return
+  }
   const urlId = idFromUrl(ev.url)
   const imgId = idFromImage(ev.image)
   const page = pageIds.get(i)
-  const skip = (reason, externalId = null) =>
-    skipped.push({ external_id: externalId, title: cleanTitle(ev.name) || '(untitled)', position: i + 1, reason })
+  const skip = (reason, externalId = null, extra = {}) =>
+    skipped.push({ external_id: externalId, title: cleanTitle(ev.name) || '(untitled)', position: i + 1, reason, ...extra })
 
   // ── IDENTITY, AND THE ONE ROW THAT FORCED A FALLBACK ──────────────────────
   //
@@ -437,7 +481,8 @@ feed.forEach((ev, i) => {
   // 2026-11-14: new images (event_images/banner-<ts>-<hash>.jpg) carry no id, so a
   // url-only row is now normal, and a row with neither is looked up on its own page.
   if (urlId && imgId && urlId !== imgId) {
-    return skip(`id disagreement — url says "${urlId}", image path says "${imgId}"`)
+    // Both ids are kept so the sweep holds either row (heldIds reads also_external_id).
+    return skip(`id disagreement — url says "${urlId}", image path says "${imgId}"`, `gk-${urlId}`, { also_external_id: `gk-${imgId}` })
   }
   const rawId = urlId ?? imgId ?? page?.id ?? null
   if (!rawId) {
@@ -450,7 +495,7 @@ feed.forEach((ev, i) => {
 
   const externalId = `gk-${rawId}`
   if (seenId.has(externalId)) {
-    return skip(`duplicate id — also used by "${seenId.get(externalId)}"`, externalId)
+    return skip(`duplicate id — also used by "${seenId.get(externalId)}"${idSource === 'page' ? ' (the event-page lookup loses)' : ''}`, idSource === 'page' ? null : externalId)
   }
   seenId.set(externalId, cleanTitle(ev.name))
 

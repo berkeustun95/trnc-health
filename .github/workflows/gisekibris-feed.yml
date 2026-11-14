@@ -36,12 +36,12 @@
 # away. The database is the live record; the committed seed is a snapshot a human
 # refreshes. Nothing bot-commits, so nothing can churn the repo or race a push.
 #
-# ─── A HALTED RUN IS A DELIBERATE OUTCOME, NOT A BUG ────────────────────────
-# check-gisekibris-urls.mjs exits non-zero if a row IN the feed reads
-# isCancelled=TRUE — the partner asserting a row is both active and cancelled is a
-# contradiction that wants a human, so the import does not run that day and the
-# data simply stays as it was. Same for the sweep's cap. Both fail the job, which
-# is what makes GitHub send the email.
+# ─── ONE BAD ROW SKIPS ONE ROW (Berke, 2026-11-14) ──────────────────────────
+# A row prepare cannot use, or one IN the feed that reads isCancelled=TRUE, is left
+# out of the import and listed in the "rows need a decision" issue; the rest of the
+# feed still syncs (8 such rows had stopped every sync 11-08 → 11-14). Nothing is
+# cancelled automatically for those rows. A feed with no usable row, and the
+# sweep's cap, still fail the job, which opens the "sync is red" issue.
 
 name: gisekibris-feed
 
@@ -157,6 +157,7 @@ jobs:
         run: node scripts/fetch-gisekibris-feed.mjs
 
       - name: Transform to the clean seed
+        id: prepare
         run: node scripts/prepare-gisekibris-feed.mjs supabase/seed/gisekibris-feed-raw.json
 
       # An unmapped category no longer halts the sync: prepare imports it as 'other'
@@ -218,8 +219,10 @@ jobs:
       # site. The body is rewritten each run; Berke is mentioned only when the set of
       # rows changes; it closes itself when the set is empty. Nothing here cancels
       # anything. Partner text travels only through jq, never into shell source.
+      # Only after THIS run's prepare succeeded: otherwise the seed on disk is the committed
+      # one, which carries no skipped rows, and the step would close the issue on a red sync.
       - name: Report rows that need a decision
-        if: always()
+        if: always() && steps.prepare.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -227,14 +230,14 @@ jobs:
           seed=supabase/seed/gisekibris-events-clean.json
           rep="$RUNNER_TEMP/gk-held.json"
           if [ ! -s "$rep" ]; then
-            [ -s "$seed" ] || { echo "No seed: prepare did not run."; exit 0; }
             jq '{skipped: (.meta.skipped // []), feed_cancelled: (.meta.feed_cancelled // [])}' "$seed" > "$rep"
           fi
+          # gsub defuses @mentions in partner titles (a zero-width space after the @).
           list=$(jq -r '
             def live: if .in_app == true then " — **LIVE IN APP**" elif .in_app == false then "" else " — (live status not read)" end;
             ([.feed_cancelled[] | "- CANCELLED on Gişe Kıbrıs: \(.title) (`\(.external_id)`, \(.start_date[0:10]))" + live]
              + [.skipped[] | "- SKIPPED: \(.title)" + (if .external_id then " (`\(.external_id)`)" else "" end) + " — \(.reason)" + live])
-            | join("\n")' "$rep")
+            | join("\n") | gsub("@"; "@\u200b")' "$rep")
           title='Gişe Kıbrıs: rows need a decision'
           num=$(gh issue list --state open --limit 200 --json number,title | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
           if [ -z "$list" ]; then
