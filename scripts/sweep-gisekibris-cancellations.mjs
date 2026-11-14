@@ -233,6 +233,7 @@ if (error) fail(`read failed: ${error.message}`)
 const reportArg = args.indexOf('--report')
 if (held.size) {
   const { isEventOver } = await import('../utils/eventVisibility.js')
+  // unpaged-ok: .in() over this run's held ids, at most the feed's own size (tens of rows)
   const { data: heldRows, error: hErr } = await sb.from('events')
     .select('external_id,title,start_date,end_date,status').eq('source', SOURCE).in('external_id', [...held])
   if (hErr) fail(`read of held rows failed: ${hErr.message}`)
