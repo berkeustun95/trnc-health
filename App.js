@@ -123,6 +123,7 @@ import {
 } from './utils/onboardingState'
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent } from './utils/onboardingEvents'
+import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
 import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
@@ -3067,6 +3068,7 @@ export default function App() {
       onLegal:         () => setShowLegal(true),
       onAbout:         () => setShowAboutSheet(true),
       onSignOut:       () => setSignOutAsk(isGuest(session) ? 'guest' : 'user'),
+      onResetOnboarding: CAN_RESET_ONBOARDING ? () => confirmResetOnboarding(lang) : null,
     }
     content = (
       <View style={{ flex: 1 }}>

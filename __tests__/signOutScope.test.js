@@ -26,7 +26,8 @@ const EXPECTED_UNDER13 = 2 // AgeIneligibleScreen + App.js ageDeletedNotice
 const HELPER_FILE = path.join('utils', 'signOut.js')
 const EXPECTED_DIRECT_GLOBAL = 1
 const EXPECTED_DIRECT_LOCAL = 1
-const EXPECTED_THIS_DEVICE = { 'App.js': 4, [path.join('screens', 'ProfileScreen.js')]: 1, [path.join('screens', 'ProfileSetupScreen.js')]: 1, [path.join('screens', 'AdminScreen.js')]: 2 }
+// utils/previewTools.js: the Preview-only "reset onboarding" row signs out through the normal helper.
+const EXPECTED_THIS_DEVICE = { 'App.js': 4, [path.join('screens', 'ProfileScreen.js')]: 1, [path.join('screens', 'ProfileSetupScreen.js')]: 1, [path.join('screens', 'AdminScreen.js')]: 2, [path.join('utils', 'previewTools.js')]: 1 }
 const EXPECTED_EVERYWHERE = 4 // 2 deletion (ProfileScreen, ProfileSetupScreen) + 2 under-13 (AgeIneligibleScreen, App.js ageDeletedNotice)
 const EXPECTED_BARE = 14
 const HELPERS = new Set(['signOutThisDevice', 'signOutEverywhere'])
@@ -202,7 +203,7 @@ describe('auth.signOut scope guard (real source)', () => {
     expect(viaHelper.map(c => `${c.helper}:${c.clearToken}`)).toEqual(['signOutEverywhere:false', 'signOutEverywhere:false'])
   })
 
-  test('helper call sites: 8 this-device, 4 everywhere (2 deletion + 2 under-13)', () => {
+  test('helper call sites: 9 this-device, 4 everywhere (2 deletion + 2 under-13)', () => {
     console.log('signOutThisDevice sites:\n' + thisDevice.map(c => `  ${fmt(c)}`).join('\n') +
       '\nsignOutEverywhere sites:\n' + everywhere.map(c => `  ${fmt(c)} clearToken ${c.clearToken}`).join('\n'))
     const perFile = {}
