@@ -79,24 +79,26 @@ export function pendingAfterWizard(pending) {
 
 // --- push registration at launch -------------------------------------------
 //
-// A launch registers silently only if Screen 2 was not declined: Android <= 12 reports notifications
-// granted by default, so "Şimdi değil" would otherwise still register. No offer stored (existing
-// users) or granted: unchanged. A tap (the inbox's "Bildirimleri aç") is not governed by this.
+// A launch registers silently unless Screen 2 said "Şimdi değil": Android <= 12 reports notifications
+// granted by default, so 'later' would otherwise still register. 'denied' is not blocked: an OS grant
+// after it means the user allowed notifications in Settings. A tap (the inbox's "Bildirimleri aç",
+// the second offer) is not governed by this.
 export function launchMayRegisterPush(offer) {
-  return offer !== OFFER_LATER && offer !== OFFER_DENIED
+  return offer !== OFFER_LATER
 }
 
 // --- S4 second offer ----------------------------------------------------------
 //
 // Returns null | 'later' | 'existing'. The caller writes KEY_REOFFER BEFORE showing, so anything
 // unknown (no permission read yet) must answer null: a wrong yes burns the only offer.
+// 'later' is offered even when the OS reports granted (Android <= 12 by default): launches do not
+// register for 'later', so the sheet is that user's way back. 'existing' needs the OS to be able to ask.
 export function decideReoffer({ offer, reoffer, onboarded, fromPush, canRender, perm }) {
   if (reoffer === REOFFER_SHOWN || fromPush || !canRender) return null
   if (!perm || typeof perm.status !== 'string') return null
-  if (perm.status === 'granted') return null
-  if (perm.canAskAgain === false) return null
+  const granted = perm.status === 'granted'
 
-  if (offer === OFFER_LATER) return 'later'
-  if (offer == null && onboarded === 'true') return 'existing'
+  if (offer === OFFER_LATER) return granted || perm.canAskAgain !== false ? 'later' : null
+  if (offer == null && onboarded === 'true' && !granted && perm.canAskAgain !== false) return 'existing'
   return null
 }

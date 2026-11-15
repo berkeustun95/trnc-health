@@ -127,9 +127,14 @@ describe('decideReoffer', () => {
   test('cannot render now -> null', () => {
     expect(re({ canRender: false })).toBe(null)
   })
-  test('permission granted -> null', () => {
+  test('existing user, permission granted -> null', () => {
     expect(re({ perm: { status: 'granted', canAskAgain: true } })).toBe(null)
-    expect(re({ offer: 'later', perm: { status: 'granted', canAskAgain: true } })).toBe(null)
+  })
+  test("'later' while the OS reports granted (Android <= 12 default) -> 'later', even with canAskAgain false", () => {
+    expect(re({ offer: 'later', perm: { status: 'granted', canAskAgain: true } })).toBe('later')
+    expect(re({ offer: 'later', perm: { status: 'granted', canAskAgain: false } })).toBe('later')
+    expect(re({ offer: 'later', reoffer: 'shown', perm: { status: 'granted', canAskAgain: true } })).toBe(null)
+    expect(re({ offer: 'later', fromPush: true, perm: { status: 'granted', canAskAgain: true } })).toBe(null)
   })
   test("'denied' or 'granted' at Screen 2 -> null", () => {
     expect(re({ offer: 'denied' })).toBe(null)
@@ -162,9 +167,11 @@ describe('events', () => {
 })
 
 describe('launchMayRegisterPush', () => {
-  test('declined offers block the silent launch registration', () => {
+  test("'later' blocks the silent launch registration", () => {
     expect(S.launchMayRegisterPush('later')).toBe(false)
-    expect(S.launchMayRegisterPush('denied')).toBe(false)
+  })
+  test("'denied' does not: OS granted later means the user allowed it in Settings", () => {
+    expect(S.launchMayRegisterPush('denied')).toBe(true)
   })
   test('granted and no stored offer (existing users) register as before', () => {
     expect(S.launchMayRegisterPush('granted')).toBe(true)

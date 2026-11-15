@@ -115,11 +115,13 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import StartScreen from './screens/StartScreen'
 import DutyAlertsScreen from './screens/DutyAlertsScreen'
+import DutyReofferSheet from './components/DutyReofferSheet'
 import {
-  KEY_ONBOARDED, KEY_LANG, KEY_POLICY_SEEN, KEY_PENDING, KEY_DUTY_OFFER, KEY_TOUR_CHIP,
-  PENDING_SIGNUP, PENDING_DUTY, TOUR_CHIP_ON, OFFER_GRANTED, decideOnboardingStep, shouldArmPending, pendingAfterWizard,
-  launchMayRegisterPush,
+  KEY_ONBOARDED, KEY_LANG, KEY_POLICY_SEEN, KEY_PENDING, KEY_DUTY_OFFER, KEY_REOFFER, KEY_TOUR_CHIP,
+  PENDING_SIGNUP, PENDING_DUTY, TOUR_CHIP_ON, OFFER_GRANTED, OFFER_LATER, REOFFER_SHOWN, REOFFER_EVENTS,
+  decideOnboardingStep, shouldArmPending, pendingAfterWizard, launchMayRegisterPush, decideReoffer,
 } from './utils/onboardingState'
+import { logOnboardingEvent } from './utils/onboardingEvents'
 import { signOutGoogle } from './utils/socialAuth'
 import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
@@ -162,6 +164,9 @@ const LAUNCHED_AT = Date.now()
 const PUSH_PROJECT_ID = '704d192a-1a80-41f8-ab98-cb3c8f078d7c'
 // Screen 2 "Bildirimleri aç": how long Home waits for the token + save after the OS grant.
 const DUTY_PUSH_WAIT_MS = 4000
+// The second duty-alert offer waits this long after the list closes: the screen beneath renders first,
+// and anything it raises (policy notice, city welcome) is then seen and wins.
+const REOFFER_SETTLE_MS = 700
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -615,6 +620,17 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
   const [showDutyList, setShowDutyList] = useState(false)
+  // Onboarding v2 S4, the one-time second offer: 'later' | 'existing' while the sheet is up, else null.
+  // dutyFromPushRef: the open list came from a push tap (never offered then). reofferBlockedRef: anything
+  // that rules the sheet out right now, recomputed every render and read after the async checks.
+  const [dutyReoffer, setDutyReoffer] = useState(null)
+  const dutyFromPushRef = useRef(false)
+  const reofferBlockedRef = useRef(true)
+  const reofferCheckingRef = useRef(false)
+  const reofferBusyRef = useRef(false)
+  const reofferResolvedRef = useRef(false)
+  // Closers that bypass closeDutyList (Oli, city links) must not leave a push mark for the next visit.
+  useEffect(() => { if (!showDutyList) dutyFromPushRef.current = false }, [showDutyList])
   // One-shot: Oli's clinic card asks Home to open its facility list (Home-local state). Home
   // opens it and clears this, so a later return to the Home tab does not reopen the list.
   const [openFacilityList, setOpenFacilityList] = useState(false)
@@ -625,6 +641,9 @@ export default function App() {
   // Screen 2's stored outcome (KEY_DUTY_OFFER), read with KEY_PENDING and kept in step on every write: the
   // launch push registration reads it, and only ever after onbPending is set.
   const dutyOfferRef = useRef(null)
+  // The same value as state, for the inbox's "Bildirimleri aç" row (OS granted but 'later' still stored).
+  const [dutyOffer, setDutyOffer] = useState(null)
+  function rememberDutyOffer(value) { dutyOfferRef.current = value; setDutyOffer(value) }
   // Whose row `profile` is: on a session switch without a sign-out the previous row is still held until the
   // new one loads, and Screen 2's routing must not decide on it.
   const [profileUid, setProfileUid] = useState(null)
@@ -1014,7 +1033,56 @@ export default function App() {
     supabase.from('notifications').update({ read: true }).eq('user_id', uid)
       .then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))))
   }
-  function closeDutyList()     { setShowDutyList(false); setDutyRegion(null) }
+  function closeDutyList() {
+    const fromPush = dutyFromPushRef.current
+    dutyFromPushRef.current = false
+    setShowDutyList(false); setDutyRegion(null)
+    maybeOfferDutyAgain(fromPush)
+  }
+  // Onboarding v2 S4 (rules: decideReoffer). Eligibility is decided in full, then KEY_REOFFER is written,
+  // then the sheet shows: a failed write shows nothing, so the offer can never repeat.
+  async function maybeOfferDutyAgain(fromPush) {
+    if (fromPush || reofferCheckingRef.current) return
+    reofferCheckingRef.current = true
+    try {
+      const [[, offer], [, reoffer], [, onboardedVal]] = await AsyncStorage.multiGet([KEY_DUTY_OFFER, KEY_REOFFER, KEY_ONBOARDED])
+      if (reoffer === REOFFER_SHOWN) return
+      const perm = await Notifications.getPermissionsAsync()
+      await new Promise(r => setTimeout(r, REOFFER_SETTLE_MS))
+      const canRender = !reofferBlockedRef.current && AppState.currentState === 'active'
+      const variant = decideReoffer({ offer, reoffer, onboarded: onboardedVal, fromPush, canRender, perm })
+      if (!variant) return
+      await AsyncStorage.setItem(KEY_REOFFER, REOFFER_SHOWN)
+      reofferResolvedRef.current = false
+      setDutyReoffer(variant)
+      logOnboardingEvent(REOFFER_EVENTS[variant].shown)
+    } catch {} finally {
+      reofferCheckingRef.current = false
+    }
+  }
+  // "Bildirimleri aç": straight to the OS (the sheet is the explanation), through Screen 2's own path.
+  async function acceptDutyReoffer() {
+    const variant = dutyReoffer
+    if (!variant || reofferResolvedRef.current || reofferBusyRef.current) return
+    reofferBusyRef.current = true
+    let granted = false
+    try { granted = (await enableDutyPush()) === true } catch {}
+    reofferBusyRef.current = false
+    reofferResolvedRef.current = true
+    if (granted) {
+      rememberDutyOffer(OFFER_GRANTED)
+      AsyncStorage.setItem(KEY_DUTY_OFFER, OFFER_GRANTED).catch(() => {})
+    }
+    logOnboardingEvent(REOFFER_EVENTS[variant][granted ? 'granted' : 'declined'])
+    setDutyReoffer(null)
+  }
+  // "Şimdi değil", backdrop, drag, Android back. Once per sheet; ignored while the OS ask is running.
+  function closeDutyReoffer() {
+    if (!dutyReoffer || reofferResolvedRef.current || reofferBusyRef.current) return
+    reofferResolvedRef.current = true
+    logOnboardingEvent(REOFFER_EVENTS[dutyReoffer].declined)
+    setDutyReoffer(null)
+  }
   function closeEvents()       { setShowEvents(false); setEventsDistrict(null); setOpenedEvent(null); setEventFromHome(false) }
   // Same columns as EventsScreen's list query, so EventDetailScreen gets the row it expects.
   // Not found (unapproved since, offline) → the list, which is where the generic card goes.
@@ -1222,6 +1290,9 @@ export default function App() {
         if (showDutyList) { closeDutyList(); return true }
         return true
       }
+      // The second duty-alert offer (Onboarding v2 S4). A Modal, whose onRequestClose takes Android back
+      // first; this covers any dispatch that still reaches the chain. Topmost, so above the root overlays.
+      if (dutyReoffer) { closeDutyReoffer(); return true }
       // These are root overlays, not <Modal>s, so there is no onRequestClose to catch
       // the hardware back button. They are topmost, so they go first — Oli's sheet above
       // the other two. OliGuide registers its own handler while open (which wins, being
@@ -1315,7 +1386,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
 
   useEffect(() => {
     Promise.all([
@@ -1325,7 +1396,7 @@ export default function App() {
       AsyncStorage.getItem(KEY_PENDING),
       AsyncStorage.getItem(KEY_DUTY_OFFER),
     ]).then(([onboardedVal, langVal, policySeenVal, pendingVal, dutyOfferVal]) => {
-      dutyOfferRef.current = dutyOfferVal
+      rememberDutyOffer(dutyOfferVal)
       if (langVal) setPendingLang(langVal)
       setOnboarded(onboardedVal === 'true')
       setReturningDevice(onboardedVal === 'true')
@@ -1401,9 +1472,10 @@ export default function App() {
     else if (mode === 'signup' && armPending()) setPending(PENDING_SIGNUP)
   }
 
-  // Screen 2 "Bildirimleri aç": the screen IS the explanation, so straight to the OS (no primer). Android
-  // channel first (Android 13 shows the prompt only once a channel exists). Resolves true when granted; a
-  // token or save failure never blocks Home (the next launch's silent registration retries).
+  // Screen 2 and the second offer's "Bildirimleri aç": the screen IS the explanation, so straight to the OS
+  // (no primer); already granted (Android <= 12 by default) skips the ask. Android channel first (Android
+  // 13 shows the prompt only once a channel exists). Resolves true when granted; a token or save failure
+  // never blocks Home (the next launch's silent registration retries).
   async function enableDutyPush() {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
@@ -1411,7 +1483,8 @@ export default function App() {
         importance: Notifications.AndroidImportance.MAX,
       }).catch(() => {})
     }
-    const { status } = await Notifications.requestPermissionsAsync()
+    const current = await Notifications.getPermissionsAsync().catch(() => null)
+    const { status } = current?.status === 'granted' ? current : await Notifications.requestPermissionsAsync()
     if (status !== 'granted') return false
     // Time-boxed: on a poor connection the token fetch can hang, and Home must not wait on it. Whatever
     // does not finish here is redone by the registration effect once pending clears.
@@ -1448,7 +1521,7 @@ export default function App() {
   // re-shows Screen 2 rather than skipping it), then Home.
   async function resolveDutyOffer({ outcome, city }) {
     if (city) { await setHomeCity(city); homeCityChanged(city) }
-    dutyOfferRef.current = outcome   // before setPending(null) re-runs the registration effect
+    rememberDutyOffer(outcome)   // before setPending(null) re-runs the registration effect
     try { await AsyncStorage.multiSet([[KEY_DUTY_OFFER, outcome], [KEY_TOUR_CHIP, TOUR_CHIP_ON]]) } catch {}
     setTourChip(true)
     await setPending(null)
@@ -1619,7 +1692,8 @@ export default function App() {
     // "Bildirimleri aç") keeps its primer.
     if (!session) return
     if (pushRetry === 0 && onbPending !== null) return
-    // "Şimdi değil" / denied on Screen 2: a launch never registers (Android <= 12 reports granted by default).
+    // "Şimdi değil" on Screen 2: a launch never registers (Android <= 12 reports granted by default); the way
+    // back is a tap (the second offer, the inbox row). 'denied' + granted = allowed later in Settings: registers.
     if (pushRetry === 0 && !launchMayRegisterPush(dutyOfferRef.current)) return
     async function registerPushToken() {
       try {
@@ -1632,7 +1706,7 @@ export default function App() {
         if (status !== 'granted') return
         if (pushRetry > 0 && dutyOfferRef.current !== OFFER_GRANTED) {
           // A tap that ends granted lifts a Screen 2 "later"/"denied", so later launches register again.
-          dutyOfferRef.current = OFFER_GRANTED
+          rememberDutyOffer(OFFER_GRANTED)
           AsyncStorage.setItem(KEY_DUTY_OFFER, OFFER_GRANTED).catch(() => {})
         }
         if (Platform.OS === 'android') {
@@ -1677,6 +1751,7 @@ export default function App() {
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') {
+        dutyFromPushRef.current = true
         setShowDutyList(true)
       } else if (screen === 'weekend') {
         openWeekendOnMap()
@@ -1705,7 +1780,7 @@ export default function App() {
       if (!response) return
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
-      if (screen === 'duty') setShowDutyList(true)
+      if (screen === 'duty') { dutyFromPushRef.current = true; setShowDutyList(true) }
       else if (screen === 'weekend') openWeekendOnMap()
       // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
       //   case for a message notification — the app is not usually already open when one
@@ -2440,6 +2515,7 @@ export default function App() {
         else setShowDutyList(true)
       }}
       onEnablePush={() => setPushRetry(n => n + 1)}
+      offerLater={dutyOffer === OFFER_LATER}
     />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
@@ -3341,7 +3417,16 @@ export default function App() {
   const appUpdateVisible = !splashUp && session !== undefined && fontsLoaded && onboarded !== null &&
     (forceBlocking || (updateTier === 'soft' && onboarded === true && !policyNoticeVisible && !showCoachMarks))
   // A launch sheet may be a Modal, whose touches the root never sees: one on screen counts as in use.
-  sheetUpRef.current = policyNoticeVisible || appUpdateVisible || homeCityAskVisible || cityWelcomeVisible || showCoachMarks || oliSheetOpen
+  sheetUpRef.current = policyNoticeVisible || appUpdateVisible || homeCityAskVisible || cityWelcomeVisible || showCoachMarks || oliSheetOpen || dutyReoffer !== null
+  // Onboarding v2 S4: the second offer opens only for a guest or a customer, past every gate, with
+  // nothing else up (sheetUpRef: policy notice, app update, city ask/welcome, coach marks, Oli).
+  reofferBlockedRef.current = !(
+    !!session && (isGuest(session) || (profileUid === session.user.id && profile?.role === 'customer')) &&
+    updateTier !== 'force' && !gateActive && !ageIneligible && !ageDeletedNotice && onbPending === null &&
+    !splashUp && !showDutyList && !sheetUpRef.current &&
+    !showEmergencyModal && !showMunicipalModal && !showMenu && !showPasswordReset && !showCitySettings &&
+    !showLangModal && !showAboutSheet && !signOutAsk && !notifClearAsk && !gateKey && !profileGateKey
+  )
   // Seen, NOT accepted: nothing is written to profiles.
   // The notice closes on the STATE change, before and regardless of the storage write — a
   // failed write can never keep it on screen. The write is retried so it also stays closed
@@ -3543,6 +3628,7 @@ export default function App() {
           onTurnOff={() => { setCityWelcomeEnabled(false); setCityWelcome(null) }}
         />
       )}
+      <DutyReofferSheet visible={dutyReoffer !== null} lang={lang} onEnable={acceptDutyReoffer} onDecline={closeDutyReoffer} />
       {homeCityAskVisible && (
         <HomeCitySheet
           detectedRegion={detectedRegion}
