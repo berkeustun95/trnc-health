@@ -1552,7 +1552,12 @@ export default function App() {
   }
 
   useEffect(() => {
+    const dbg = (tag) => Notifications.getLastNotificationResponseAsync()
+      .then(r => console.log(`[push-dbg] ${tag} t=${Date.now() - LAUNCHED_AT} upd=${String(Updates.updateId).slice(0, 8)} last=${r ? JSON.stringify(r.notification?.request?.content?.data ?? null) : 'null'} keys=${r ? Object.keys(r.notification?.request?.content ?? {}).join(',') : '-'}`))
+      .catch(e => console.log(`[push-dbg] ${tag} threw ${e?.message}`))
+    dbg('mount'); const dbgTimers = [500, 1500, 3000, 6000].map(ms => setTimeout(() => dbg(`at${ms}`), ms))
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log(`[push-dbg] listener t=${Date.now() - LAUNCHED_AT} session=${!!sessionRef.current} data=${JSON.stringify(response?.notification?.request?.content?.data ?? null)}`)
       if (!sessionRef.current) return
       pushRoutedRef.current = true
       const data   = response.notification.request.content.data ?? {}
@@ -1575,14 +1580,16 @@ export default function App() {
         setShowStudentHub(true)
       } else if (!openAdminPush(data)) openMarketplacePush(data)
     })
-    return () => sub.remove()
+    return () => { sub.remove(); dbgTimers.forEach(clearTimeout) }
   }, [])
 
   // Handle cold-start notification tap (app killed → tapped → opened)
   useEffect(() => {
     if (!session || handledColdStartRef.current) return
     handledColdStartRef.current = true
+    console.log(`[push-dbg] cold-handler session t=${Date.now() - LAUNCHED_AT}`)
     Notifications.getLastNotificationResponseAsync().then(response => {
+      console.log(`[push-dbg] cold-handler got t=${Date.now() - LAUNCHED_AT} ${response ? JSON.stringify(response.notification?.request?.content?.data ?? null) : 'null'}`)
       if (!response) return
       pushRoutedRef.current = true
       const data = response.notification.request.content.data ?? {}
