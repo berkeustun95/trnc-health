@@ -1602,7 +1602,7 @@ export default function App() {
       else if (screen === 'notifications') setShowNotifs(true)
       else if (!openAdminPush(data)) openMarketplacePush(data)
       // Handled once: cleared, so nothing in this runtime reads the same tap again.
-      Notifications.clearLastNotificationResponse()
+      try { Notifications.clearLastNotificationResponse() } catch {}
     })
   }, [session])
 
