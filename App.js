@@ -1145,7 +1145,7 @@ export default function App() {
     setProfile(prev => ({ ...prev, preferred_language: langKey }))
     setPendingLang(langKey)
     setShowLangModal(false)
-    AsyncStorage.setItem('@trnc_lang', langKey)
+    AsyncStorage.setItem('@trnc_lang', langKey).catch(() => {})
     // Guests cannot update their row; the device copy above is their store, and a registered push token is
     // re-sent with the new language (set_guest_push also sets preferred_language, which the duty push reads).
     if (isGuest(session)) { await saveGuestPushLang(session.user.id, langKey).catch(() => {}); return }
@@ -2241,14 +2241,14 @@ export default function App() {
     content = (
       <StartScreen
         lang={lang}
-        onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }}
+        onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }}
         onStart={startAsGuest}
         onLogin={startLogin}
         onSignUp={startSignUp}
       />
     )
   } else if (!session) {
-    content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
+    content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
   } else if (loading || !profile) {
     content = (
       <PageCanvas>
