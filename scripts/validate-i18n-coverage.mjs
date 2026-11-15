@@ -92,6 +92,10 @@ const SURFACES = [
   //   than assumed — with the Arabic value set to the raw English string, i18n:validate
   //   still reported OK.
   'screens/OnboardingScreen.js',
+  // Onboarding v2 (2026-11-14): Start replaced Welcome + the intro as the first screen of a fresh install,
+  // and Screen 2 follows it for every new user. Guarded from the commit that renders them.
+  'screens/StartScreen.js',
+  'screens/DutyAlertsScreen.js',
   'screens/ExploreMapScreen.js',
   // The walking-routes layer drawn on that map (Visit NCY). Added with the component, while
   // EXPLORE_ROUTES_LIVE is still false — guarded before the flip, not after.
@@ -281,6 +285,7 @@ const SURFACES = [
   'components/home/redesign/RedesignHero.js',
   'components/home/redesign/Widgets.js',
   'components/home/redesign/OliBar.js',
+  'components/home/redesign/TourChip.js',   // Onboarding v2 "Tura başla"
   'components/home/redesign/ServicePanels.js',
   'components/home/redesign/HomeServices.js',
   'constants/homeGroups.js',
