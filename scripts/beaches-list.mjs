@@ -341,7 +341,8 @@ export function validate(obj, snap, byRef) {
   if (used.size < 100) f.push(`20261179 ids parsed: only ${used.size} (parser broken?)`)
   for (const r of obj.rows) if (used.has(r.source_id)) f.push(`${r.source_id} already exists in 20261179`)
   const lt = obj.live_translations || {}
-  if (Object.keys(lt).sort().join() !== LIVE.map(l => l.id).sort().join()) f.push('live_translations keys are not exactly the 4 live ids')
+  const META = ['needs_native_check', 'source_discrepancies_live_today', '_source_discrepancies_note']
+  if (Object.keys(lt).filter(k => !META.includes(k)).sort().join() !== LIVE.map(l => l.id).sort().join()) f.push('live_translations keys are not exactly the 4 live ids')
   for (const L of LIVE) {
     const t = lt[L.id]
     if (!t) continue
