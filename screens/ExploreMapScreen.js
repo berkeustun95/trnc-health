@@ -957,6 +957,13 @@ export default function ExploreMapScreen({
     }, 350)
   }, [index, width, height])
 
+  const pickKeys = next => {
+    setSelected(null); leaveRoutes()
+    // Mirror of onOfficial: a pick with no EEMD site under "Müze & Ören Yeri" would blank the map.
+    if (officialOnly && next.size > 0 && !officialVisitApplicable(selectedPins(sources, next, servicesOn))) setOfficialOnly(false)
+    setSelectedKeys(next)
+  }
+
   return (
     <View style={s.container}>
       {REDESIGN && <StatusBar style="dark" />}
@@ -1079,14 +1086,11 @@ export default function ExploreMapScreen({
       <ChipRow
         sources={sources}
         selectedKeys={selectedKeys}
-        onSetKeys={keys => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set(keys)) }}
+        onSetKeys={keys => pickKeys(new Set(keys))}
         onToggleKey={key => {
-          setSelected(null); leaveRoutes()
           const next = new Set(selectedKeys)
           if (!next.delete(key)) next.add(key)
-          // Mirror of onOfficial: a pick with no EEMD site under "Müze & Ören Yeri" would blank the map.
-          if (officialOnly && next.size > 0 && !officialVisitApplicable(selectedPins(sources, next, servicesOn))) setOfficialOnly(false)
-          setSelectedKeys(next)
+          pickKeys(next)
         }}
         servicesOn={servicesOn}
         onServices={() => { setSelected(null); leaveRoutes(); setServicesOn(v => !v) }}
