@@ -1,6 +1,6 @@
 // Pure helpers for the admin "Data jobs" screen. `state` is computed by the server
 // (admin_data_jobs); nothing here recomputes it, it only groups and counts.
-// Display groups, in order. Server order is kept inside a group (Array.prototype.sort is stable).
+// Display group index (see GROUP_IDS).
 // `attention` is computed by the server; a deliberately-off job is inactive with attention false.
 const groupOf = job => {
   if (job?.attention === true) return 0
@@ -17,8 +17,13 @@ export function countNoRecord(jobs) {
   return (jobs || []).filter(j => j?.state === 'no_record').length
 }
 
-export function sortJobs(jobs) {
-  return (jobs || []).map((j, i) => [j, i]).sort((a, b) => groupOf(a[0]) - groupOf(b[0]) || a[1] - b[1]).map(x => x[0])
+// Non-empty groups only, in display order: attention, paused / off, no run record (also unknown states), healthy.
+// Server order is kept inside a group.
+const GROUP_IDS = ['attention', 'paused', 'noRecord', 'ok']
+export function groupJobs(jobs) {
+  const buckets = GROUP_IDS.map(id => ({ id, jobs: [] }))
+  for (const j of jobs || []) buckets[groupOf(j)].jobs.push(j)
+  return buckets.filter(g => g.jobs.length > 0)
 }
 
 // An empty or non-array result is an error: the registry cannot legitimately be empty.

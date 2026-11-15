@@ -520,11 +520,12 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
   // Data jobs: always shown once read. null = could not be read; that shows too, a silent zero would hide a red job.
   const jobsAttn = jobsAttention?.attention ?? 0
   const jobsNoRec = jobsAttention?.noRecord ?? 0
+  const jobsLabel = jobsAttention === null ? t('adminJobsUnread', lang) : jobsAttn > 0 ? t('adminJobsAttention', lang) : jobsNoRec > 0 ? t('adminJobsNoRecordCount', lang).replace('{count}', String(jobsNoRec)) : t('adminJobsAllClear', lang)
   const jobsRow = jobsAttention !== undefined && (
-    <TouchableOpacity style={s.urgencyCard} onPress={onOpenDataJobs} activeOpacity={0.75}>
+    <TouchableOpacity style={s.urgencyCard} onPress={onOpenDataJobs} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={jobsLabel + (jobsAttn > 0 ? `, ${jobsAttn}` : '')}>
       <View style={[s.urgencyDot, { backgroundColor: jobsAttention === null || jobsAttn > 0 ? colors.danger : jobsNoRec > 0 ? colors.textSecondary : colors.success }]} />
       <Text style={s.urgencyLabel}>
-        {jobsAttention === null ? t('adminJobsUnread', lang) : jobsAttn > 0 ? t('adminJobsAttention', lang) : jobsNoRec > 0 ? t('adminJobsNoRecordCount', lang).replace('{count}', String(jobsNoRec)) : t('adminJobsAllClear', lang)}
+        {jobsLabel}
       </Text>
       {jobsAttn > 0 && (
         <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
@@ -564,6 +565,7 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
       {reportsRow}
       {carsRow}
       {mkRow}
+      {jobsRow}
       <FeedHealthBanner lastSeenAt={novestLastSeen} />
       <View style={s.totalCard}>
         <Text style={s.totalValue}>{formatCount(counts.total - TEST_ACCOUNTS)}</Text>
