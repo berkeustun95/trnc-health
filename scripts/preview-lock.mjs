@@ -40,6 +40,9 @@
 // the clean re-run took 18 s instead of 337 s. Only QA and a session's own pre-merge check run the
 // suite (reviewers read code), jest is capped at 2 workers (package.json), and this lock serialises
 // the runs. The ota / ota:preview chains run their small jest files under the publish locks instead.
+// Heavy single checks take the same lock (their npm scripts start with `--suite check`): labels:check,
+// ads:check, ads:selftest, release-lane:test, check:migration-numbers (>= 5 s CPU, measured 2026-11-15;
+// labels:check by Berke's pick). The pre-push hook and the publish chains call the node scripts directly.
 
 // Hermes publishes only runtime-1.4.0 Previews (ada-publish), which this phone's 1.4.2 build never
 // loads, and has no vault: `check` there finds no lock directory and passes, saying so.
