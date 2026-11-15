@@ -76,7 +76,7 @@ import { MODULE_FLAGS, PET_HOTEL_LIVE, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, EXPLOR
 import { colors, typeColors, placeColors } from '../constants/theme.js'
 import { PET_PARTNERS } from '../constants/petPartners.js'
 import { eateryPartnerVisible } from '../constants/eatery.js'
-import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey, stubsFor } from '../constants/walkingRoutes.js'
+import { isMinistrySource, routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey, stubsFor } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES, ICON_PIN } from '../constants/exploreCategories.js'
@@ -184,6 +184,8 @@ check('Plajlar sits before Doğa, Doğa before heritage', carveLive.map(s => s.k
 check('a beach pin is an icon pin (umbrella)', carveLive[0].pins.map(p => [p.iconPin, p.icon]).filter(([i, n]) => !i || n !== 'umbrella'), [])
 check('a nature_scenic pin is a default pin', carveLive[1].pins.map(p => [p.iconPin, p.icon]), [[false, null]])
 check('Plajlar label resolves in all 9 locales', Object.keys(LANG_CODES).filter(l => !t('blFilterBeaches', l) || t('blFilterBeaches', l) === 'blFilterBeaches'), [])
+
+check('ministry credit covers walking-map and beach rows only', ['visitncy', 'visitncy_beaches', 'osm', null].map(isMinistrySource), [true, true, false, false])
 
 console.log('\nchip selection — "All" must mean the union of VISIBLE sources')
 // Berke's requirement, and the reason it is a requirement: if "All" is ever implemented
