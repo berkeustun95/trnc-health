@@ -850,6 +850,7 @@ export default function App() {
   // Tab-shell back hooks (see the hardware-back chain): Home's directory/search, Profile's
   // Legal view + unsaved-changes guard. Set by the screens, null while they are unmounted.
   const homeBackRef = useRef(null)
+  const homeTabResetRef = useRef(null)
   // Explore module + place profile back steps (slice 2), asked by the chain like homeBackRef.
   const exploreBackRef = useRef(null)
   const checkinFeedBackRef = useRef(null)
@@ -3028,6 +3029,7 @@ export default function App() {
           <HomeScreen
             dutyWindows={dutyWindows}
             backRef={homeBackRef}
+            tabResetRef={homeTabResetRef}
             lang={lang}
             facilities={facilities}
             dutyFacilityId={dutyFacilityId}
@@ -3224,6 +3226,7 @@ export default function App() {
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
               profileGuardRef.current.leave(() => { setMapRoutesMode(false); setMapEventsMode(false); setMapEventRange(null); setActiveTab(tab) }); return
             }
+            if (tab === 'home' && activeTab === 'home') homeTabResetRef.current?.()
             setMapRoutesMode(false)
             setMapEventsMode(false)
             setMapEventRange(null)

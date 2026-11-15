@@ -64,8 +64,8 @@ export async function loadPins() {
     const parsed = raw ? JSON.parse(raw) : null
     if (!Array.isArray(parsed)) return new Array(FAVOURITE_SLOTS).fill(null)
     // Normalised to exactly FAVOURITE_SLOTS entries so every consumer can index blindly.
-    // A longer array from a future build that added a fifth slot truncates rather than
-    // confusing a four-slot row.
+    // An older four-slot array reads as slots 1-4 plus nulls; a longer one from a
+    // future build truncates.
     const out = new Array(FAVOURITE_SLOTS).fill(null)
     for (let i = 0; i < FAVOURITE_SLOTS; i++) {
       out[i] = typeof parsed[i] === 'string' && parsed[i] ? parsed[i] : null
@@ -110,6 +110,18 @@ export function recordModuleOpen(id) {
 //   then arrives with its interest already measured, instead of starting from zero on the
 //   day it becomes eligible. Filtering at write time would throw that away and would also
 //   bake today's flag values into stored data.
+
+// One-time "customise your Home" card: dismissed state, device-local like everything here.
+// Deliberately NOT cleared with the usage counts, so it survives sign-out.
+const KEY_CUSTOMISE_CARD = '@ada_home_customise_card_done'
+
+export async function loadCustomiseCardDone() {
+  try { return (await AsyncStorage.getItem(KEY_CUSTOMISE_CARD)) === '1' } catch { return false }
+}
+
+export async function markCustomiseCardDone() {
+  try { await AsyncStorage.setItem(KEY_CUSTOMISE_CARD, '1') } catch { /* shows again next time; harmless */ }
+}
 
 export async function clearModuleUsage() {
   try { await AsyncStorage.multiRemove([KEY_USAGE, KEY_PINS]) } catch { /* nothing to do */ }

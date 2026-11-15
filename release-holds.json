@@ -39,6 +39,16 @@
       "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: re-land #404 alone, #392 stays out). Then set cleared to true in a PR.",
       "clearedOn": "2026-11-14",
       "clearedBy": "Berke, in chat 2026-11-14: \"Preview checked as admin: the notify duty button is gone, and Save duty schedule + pharmacy swap are still there. GO for production: #404 re-land only (#392 stays out).\" Preview 018f41c9 (Android 01a1da74) @ main 63c4a13c."
+    },
+    {
+      "pr": 432,
+      "commit": "9a8cbc313d3029ede3765c37c3f92b9297bbcee4",
+      "what": "Admin Restaurant PINs: reset-cap explanation (9 languages), RE-LANDED on main (revert of #414's revert 7c550901), 2026-11-14",
+      "since": "2026-11-14",
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: re-land #392, Preview only). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-15",
+      "clearedBy": "Berke, in chat 2026-11-15: \"#432 looks good on Preview, so you have the production go. Clear the hold and publish ONLY #432 to production.\" Checked on Preview c3c59d99 (Android 01a1dbea)."
     }
   ]
 }
