@@ -352,6 +352,7 @@ export function validate(obj, snap, byRef) {
       for (const code of NEW_LOCALES) if (typeof t[k]?.[code] !== 'string' || t[k][code].trim().length < 3) f.push(`live ${L.name} ${k}.${code} is empty`)
       for (const code of ['en', 'tr']) if (typeof t.source?.[k]?.[code] !== 'string' || !t.source[k][code]) f.push(`live ${L.name} source.${k}.${code} missing`)
     }
+    for (const code of ['ar', 'fa']) if (/[()]/.test(t.name_i18n?.[code] || '')) f.push(`live ${L.name} name_i18n.${code} contains parentheses`)
     if (/Caretta caretta/.test(t.source?.description_i18n?.en || '')) for (const code of NEW_LOCALES) if (!t.description_i18n?.[code]?.includes('Caretta caretta')) f.push(`live ${L.name} description ${code} lost "Caretta caretta"`)
   }
   return f
