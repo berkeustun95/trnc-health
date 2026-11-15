@@ -48,15 +48,15 @@ const DROP = {
   'way/180583742': `${GENERIC}: "Beach" (natural=beach + leisure=beach_resort, fee=yes, charge 5.00 EUR, 35.350 N 33.226 E, about 0.7 km west of Escape Beach)`,
   'way/225385316': `${GENERIC}: "Beach" (35.3515 N 33.1696 E, beside Suna's Beach and Restaurant)`,
   'way/606238633': `${GENERIC}: "Beach Club" (35.167 N 33.910 E, between Glapsides and Silver Beach)`,
-  'node/5860707914': 'Duplicate OSM element of way/608212204 (Bella Marin Beach, 450 m away): the node "Bella Marin" is a beach_resort point, the way is the beach outline; the way is kept, the node supplies the resort tags',
+  'way/606238634': 'resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the "Kapalı Maraş" restricted-area relation r12196193 (tagged "Very approximate"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note "Only Northern Cyprus and Turkish Citizens allowed") 1.6 km west',
+  'node/5860707914': 'Probable duplicate of way/608212204 (Bella Marin Beach): the node "Bella Marin" (leisure=beach_resort, fee=yes) is 452 m from the way and NOT on its outline, so same-beach is a guess by name; the way is kept (pin on the outline), and the node\'s tags are NOT applied to the row — question for Berke',
 }
 // Kept as ONE row from two OSM elements: the dropped element's resort tags are carried onto the kept row.
 const MERGED = { 'way/608212204': 'node/5860707914' }
 
 const REVIEW = {
-  'way/396559851': 'Palm beach — sits inside the Maraş (Varosha) fenced area as OSM maps it; whether this stretch is the beach opened to visitors in 2020 or still closed cannot be established from OSM',
-  'relation/12567504': 'Glossa Beach — a 2.7 km multipolygon across the Maraş south shore running toward the Derinya buffer zone; open/closed status unknown',
-  'way/606238634': 'Derinya Halk Plajı — at the eastern tip of the Derinya (Deryneia) coast beside the UN buffer-zone coast line; cannot establish it is an open public place',
+  'way/396559851': 'Palm beach — OSM test result: 9 of its 47 outline vertices fall inside the "Kapalı Maraş" restricted-area relation r12196193 (OSM tags that relation "Very approximate"; its stitched rings did not contain the pin itself); 0 inside the UN buffer zone r3263735. The OSM node "Varosha Entrance" (barrier=gate, access=no, fee=no, foot:conditional=permissive in daily opening hours, motor_vehicle=no) is 355 m from the pin. OSM cannot establish whether this stretch is open to the public',
+  'relation/12567504': 'Glossa Beach — OSM test result: 47 of its 93 outline vertices fall inside the "Kapalı Maraş" relation r12196193 ("Very approximate"), 20 inside the military-landuse relation r12567503 "Gazimağusa Orduevi" (name:en "Turkish Army Base"), 0 inside the UN buffer zone; OSM carries military checkpoints at 35.1014 N 33.9646 E (access=no) and 35.1057 N 33.9615 E. A 2.7 km shore strip; OSM cannot establish that it is open to the public',
   'relation/15456405': 'Makenzi Plajı (OSM name:en "Mckenzie Beach") — 1.5 km multipolygon near Salamis Bay at about 35.251 N 33.905 E; possible Long Beach candidate (Salamis Bay), not confident',
   'node/6595054185': 'Lapta Belediye Plajı (name:en Lapta Municipality Public Beach) — a beach_resort point tagged fee=no that sits on the way/208111924 "Güzelyalı Beach" outline: one beach with two names or two neighbours; also the resort rule would call a free municipal beach private_resort=true',
 }
@@ -221,6 +221,7 @@ const resortEvidence = t => {
   if (t.access === 'private') ev.push('access=private')
   return ev
 }
+const resortTagsOf = t => { const o = {}; for (const k of ['leisure', 'fee', 'access', 'operator']) if (t[k] != null) o[k] = t[k]; return o }
 const areaFor = (region, name) => {
   if (name == null) return null
   const hit = (AREAS_BY_REGION[region] || []).find(n => n === name)
@@ -255,17 +256,13 @@ export function build() {
     const el = byRef.get(ref)
     if (!el) continue
     const { t, pin, region } = rowFor(el)
-    let ev = resortEvidence(t), tags = seen(t), merged = null
-    if (MERGED[ref]) {
-      const sib = byRef.get(MERGED[ref])
-      const sev = resortEvidence(sib.tags)
-      if (sev.length) ev = ev.concat(sev.map(x => `${x} (on merged duplicate ${MERGED[ref]})`))
-      tags = { ...seen(sib.tags), ...tags }; merged = MERGED[ref]
-    }
+    const ev = resortEvidence(t), tags = seen(t)
+    const merged = MERGED[ref] || null
+    const sibTags = merged ? resortTagsOf(byRef.get(merged).tags) : null
     rows.push({
       name: nameOf(t), name_tr: t['name:tr'] || null, name_en: t['name:en'] || null,
       region, area: areaFor(region, cfg.area), area_why: cfg.why || null, latitude: pin.lat, longitude: pin.lng,
-      source: 'osm', source_id: ref, osm: { type: el.type, id: el.id }, merged_duplicate: merged, pin_method: pin.pin_method,
+      source: 'osm', source_id: ref, osm: { type: el.type, id: el.id }, merged_duplicate: merged, merged_duplicate_tags_for_berke: sibTags, pin_method: pin.pin_method,
       private_resort: ev.length > 0, resort_evidence: ev, osm_tags_seen: tags,
       description: null, amenities: [], blue_flag: null, access_type: null,
     })
@@ -277,7 +274,10 @@ export function build() {
     const el = byRef.get(ref), p = el ? pinOf(el) : null
     return { name: nameOf(el?.tags || {}), osm: ref, at: p ? [p.lat, p.lng] : null, resolveRegion: p ? resolveRegion(p.lat, p.lng) : null, note }
   })
-  needs_review.push({ name: 'Long Beach (Ministry)', osm: null, at: null, resolveRegion: null, note: 'No OSM element is named Long Beach; the row exists with null coordinates/region/area until Berke picks a pin' })
+  const LB = ['way/1568098280', 'way/1568098281', 'way/1365670207', 'way/309630489', 'way/435771324', 'relation/15456405']
+  needs_review.push({ name: 'Long Beach (Ministry)', osm: null, at: null, resolveRegion: null,
+    note: 'No OSM element is named Long Beach; the row exists with null coordinates/region/area until Berke picks a pin. Candidates (all unnamed except Makenzi) with what resolveRegion says at each pin:',
+    candidates: LB.filter(r => byRef.has(r)).map(r => { const p = pinOf(byRef.get(r)); const t = byRef.get(r).tags; return { osm: r, name: nameOf(t), tags: { natural: t.natural, leisure: t.leisure, surface: t.surface }, at: [p.lat, p.lng], resolveRegion: resolveRegion(p.lat, p.lng) } }) })
   const unnamed = snap.elements.length - named.length
   return {
     obj: {
@@ -336,6 +336,10 @@ export function validate(obj, snap, byRef) {
       if (geo[i].el && onElement(geo[i].el, L.lat, L.lng) && !allowed(geo[i].id, L.id)) f.push(`LIVE ${L.name} pin lies on the outline of ${geo[i].id}`)
     }
   }
+  const mig = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20261179_osm_free_listings.sql'), 'utf8')
+  const used = new Set([...mig.matchAll(/'osm', '((?:node|way|relation)\/\d+)'/g)].map(m => m[1]))
+  if (used.size < 100) f.push(`20261179 ids parsed: only ${used.size} (parser broken?)`)
+  for (const r of obj.rows) if (used.has(r.source_id)) f.push(`${r.source_id} already exists in 20261179`)
   const lt = obj.live_translations || {}
   if (Object.keys(lt).sort().join() !== LIVE.map(l => l.id).sort().join()) f.push('live_translations keys are not exactly the 4 live ids')
   for (const L of LIVE) {

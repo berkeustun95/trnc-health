@@ -2,7 +2,10 @@
   "fa39492b-57e6-4ebd-b22c-89a9cf20ffe2": {
     "live_name": "Alagadi Turtle Beach",
     "source": {
-      "name_i18n": { "en": "Alagadi Turtle Beach", "tr": "Alagadı Kaplumbağa Plajı" },
+      "name_i18n": {
+        "en": "Alagadi Turtle Beach",
+        "tr": "Alagadı Kaplumbağa Plajı"
+      },
       "description_i18n": {
         "en": "A protected natural beach and one of the most important loggerhead turtle (Caretta caretta) nesting sites in the Mediterranean. Minimal development by design. Visiting at night during nesting season (Jun–Aug) requires a guide permit.",
         "tr": "Akdeniz'deki en önemli Caretta caretta yumurtlama alanlarından biri olup doğal yapısı koruma altındadır. Gelişim kasıtlı olarak asgari düzeyde tutulmuştur. Yumurtlama sezonunda (Haz–Ağu) geceleri ziyaret için rehber izni gerekir."
@@ -30,7 +33,10 @@
   "4a29cce8-8c3a-4541-8a07-fc7ceda6a4ff": {
     "live_name": "Escape Beach",
     "source": {
-      "name_i18n": { "en": "Escape Beach", "tr": "Escape Plajı" },
+      "name_i18n": {
+        "en": "Escape Beach",
+        "tr": "Escape Plajı"
+      },
       "description_i18n": {
         "en": "One of Kyrenia's most popular beaches. Calm, clear water with a mix of fine sand and pebbles. Well-equipped with sunbeds and beachside dining. Often busy on weekends.",
         "tr": "Girne'nin en kalabalık plajlarından biri. Sakin, berrak suyu ve ince kum-çakıl karışımı kıyısıyla tanınır. Şezlong ve sahil restoranları mevcuttur. Hafta sonları yoğun olabilir."
@@ -58,7 +64,10 @@
   "b52cdf3a-ce3f-4e6f-88b8-57afb95f2e67": {
     "live_name": "Glapsides Beach",
     "source": {
-      "name_i18n": { "en": "Glapsides Beach", "tr": "Glapsides Plajı" },
+      "name_i18n": {
+        "en": "Glapsides Beach",
+        "tr": "Glapsides Plajı"
+      },
       "description_i18n": {
         "en": "A sandy beach just north of Famagusta with calm, shallow water — popular with families. Close to the Salamis ruins, making it a convenient stop on a day out.",
         "tr": "Gazimagusa'nın kuzeyinde, sakin ve sığ sularıyla ailelerin gözde sahil noktası. Yakınındaki Salamis harabelerine günübirlik ziyaretle kolayca birleştirilebilir."
@@ -86,20 +95,23 @@
   "95b6d924-e3c0-40e4-a2bd-b55ca1a105ef": {
     "live_name": "Golden Beach (Altın Kumsal)",
     "source": {
-      "name_i18n": { "en": "Golden Beach (Altın Kumsal)", "tr": "Altın Kumsal" },
+      "name_i18n": {
+        "en": "Golden Beach (Altın Kumsal)",
+        "tr": "Altın Kumsal"
+      },
       "description_i18n": {
         "en": "A long, undeveloped stretch of golden sand at the tip of the Karpaz Peninsula — widely considered the most beautiful beach in North Cyprus. Remote and unspoiled. Wild donkeys roam the area.",
         "tr": "Karpaz Yarımadası'nın ucundaki uzun, bakir altın kumsal — Kuzey Kıbrıs'ın en güzel plajı olarak kabul edilir. Ulaşılması güç ve el değmemiş yapısıyla öne çıkar. Bölgede yabani eşekler görülür."
       }
     },
     "name_i18n": {
-      "ar": "الشاطئ الذهبي (Altın Kumsal)",
-      "ru": "Золотой пляж (Altın Kumsal)",
-      "el": "Χρυσή Ακτή (Altın Kumsal)",
-      "fr": "Plage dorée (Altın Kumsal)",
-      "es": "Playa Dorada (Altın Kumsal)",
-      "de": "Goldstrand (Altın Kumsal)",
-      "fa": "ساحل طلایی (Altın Kumsal)"
+      "ar": "شاطئ Golden (Altın Kumsal)",
+      "ru": "Пляж Golden (Altın Kumsal)",
+      "el": "Παραλία Golden (Altın Kumsal)",
+      "fr": "Plage Golden (Altın Kumsal)",
+      "es": "Playa Golden (Altın Kumsal)",
+      "de": "Golden-Strand (Altın Kumsal)",
+      "fa": "ساحل Golden (Altın Kumsal)"
     },
     "description_i18n": {
       "ar": "امتداد طويل وغير مطوَّر من الرمال الذهبية عند طرف شبه جزيرة كارباز، ويُعدّ على نطاق واسع أجمل شاطئ في شمال قبرص. بعيد وبكر. تجوب الحمير البرية المنطقة.",
@@ -109,6 +121,15 @@
       "es": "Una larga franja de arena dorada sin urbanizar en el extremo de la península de Karpasia, considerada ampliamente la playa más bella del norte de Chipre. Remota y virgen. Por la zona vagan burros salvajes.",
       "de": "Ein langer, unbebauter Streifen goldenen Sandes an der Spitze der Karpas-Halbinsel – weithin als schönster Strand Nordzyperns angesehen. Abgelegen und unberührt. In der Gegend streifen Wildesel umher.",
       "fa": "نوار بلند و دست‌نخورده‌ای از ماسه‌ی طلایی در انتهای شبه‌جزیره‌ی کارپاز که به‌طور گسترده زیباترین ساحل شمال قبرس شناخته می‌شود. دورافتاده و بکر. الاغ‌های وحشی در این منطقه پرسه می‌زنند."
+    },
+    "name_i18n_alt_translated_golden": {
+      "ar": "الشاطئ الذهبي (Altın Kumsal)",
+      "ru": "Золотой пляж (Altın Kumsal)",
+      "el": "Χρυσή Ακτή (Altın Kumsal)",
+      "fr": "Plage dorée (Altın Kumsal)",
+      "es": "Playa Dorada (Altın Kumsal)",
+      "de": "Goldstrand (Altın Kumsal)",
+      "fa": "ساحل طلایی (Altın Kumsal)"
     }
   }
 }

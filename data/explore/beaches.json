@@ -11,8 +11,8 @@
     "named": 41,
     "unnamed_not_candidates": 48,
     "rows": 27,
-    "dropped": 10,
-    "needs_review": 6
+    "dropped": 11,
+    "needs_review": 5
   },
   "rows": [
     {
@@ -117,6 +117,7 @@
         "id": 225386412
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -142,13 +143,14 @@
         "id": 608212204
       },
       "merged_duplicate": "node/5860707914",
+      "merged_duplicate_tags_for_berke": {
+        "leisure": "beach_resort",
+        "fee": "yes"
+      },
       "pin_method": "centroid",
-      "private_resort": true,
-      "resort_evidence": [
-        "leisure=beach_resort (on merged duplicate node/5860707914)"
-      ],
+      "private_resort": false,
+      "resort_evidence": [],
       "osm_tags_seen": {
-        "fee": "yes",
         "surface": "sand"
       },
       "description": null,
@@ -172,6 +174,7 @@
         "id": 225382750
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -197,6 +200,7 @@
         "id": 1484271058
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": true,
       "resort_evidence": [
@@ -226,6 +230,7 @@
         "id": 286275732
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -253,6 +258,7 @@
         "id": 603986283
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -280,6 +286,7 @@
         "id": 208111924
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -305,6 +312,7 @@
         "id": 208150337
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -332,6 +340,7 @@
         "id": 286276160
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -359,6 +368,7 @@
         "id": 229043037
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -384,6 +394,7 @@
         "id": 225383964
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": false,
       "resort_evidence": [],
@@ -409,6 +420,7 @@
         "id": 244561269
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -434,6 +446,7 @@
         "id": 11994931556
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "node",
       "private_resort": false,
       "resort_evidence": [],
@@ -459,6 +472,7 @@
         "id": 208241783
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -484,6 +498,7 @@
         "id": 666114116
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": false,
       "resort_evidence": [],
@@ -509,6 +524,7 @@
         "id": 11231014679
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "node",
       "private_resort": true,
       "resort_evidence": [
@@ -536,6 +552,7 @@
         "id": 435771323
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -561,6 +578,7 @@
         "id": 606238631
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -588,6 +606,7 @@
         "id": 1395325670
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -613,6 +632,7 @@
         "id": 952236170
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": false,
       "resort_evidence": [],
@@ -640,6 +660,7 @@
         "id": 13040159
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": true,
       "resort_evidence": [
@@ -667,6 +688,7 @@
         "id": 1951274050
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "node",
       "private_resort": false,
       "resort_evidence": [],
@@ -692,6 +714,7 @@
         "id": 510986434
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -719,6 +742,7 @@
         "id": 435772839
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -744,6 +768,7 @@
         "id": 603896219
       },
       "merged_duplicate": null,
+      "merged_duplicate_tags_for_berke": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -758,7 +783,7 @@
     {
       "name": "Bella Marin",
       "osm": "node/5860707914",
-      "reason": "Duplicate OSM element of way/608212204 (Bella Marin Beach, 450 m away): the node \"Bella Marin\" is a beach_resort point, the way is the beach outline; the way is kept, the node supplies the resort tags"
+      "reason": "Probable duplicate of way/608212204 (Bella Marin Beach): the node \"Bella Marin\" (leisure=beach_resort, fee=yes) is 452 m from the way and NOT on its outline, so same-beach is a guess by name; the way is kept (pin on the outline), and the node's tags are NOT applied to the row — question for Berke"
     },
     {
       "name": "Golden Beach",
@@ -804,6 +829,11 @@
       "name": "Beach Club",
       "osm": "way/606238633",
       "reason": "Generic name, not a proper name: \"Beach Club\" (35.167 N 33.910 E, between Glapsides and Silver Beach)"
+    },
+    {
+      "name": "Derinya Halk Plajı",
+      "osm": "way/606238634",
+      "reason": "resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (tagged \"Very approximate\"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note \"Only Northern Cyprus and Turkish Citizens allowed\") 1.6 km west"
     }
   ],
   "needs_review": [
@@ -815,7 +845,7 @@
         33.958293
       ],
       "resolveRegion": "famagusta",
-      "note": "Palm beach — sits inside the Maraş (Varosha) fenced area as OSM maps it; whether this stretch is the beach opened to visitors in 2020 or still closed cannot be established from OSM"
+      "note": "Palm beach — OSM test result: 9 of its 47 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (OSM tags that relation \"Very approximate\"; its stitched rings did not contain the pin itself); 0 inside the UN buffer zone r3263735. The OSM node \"Varosha Entrance\" (barrier=gate, access=no, fee=no, foot:conditional=permissive in daily opening hours, motor_vehicle=no) is 355 m from the pin. OSM cannot establish whether this stretch is open to the public"
     },
     {
       "name": "Glossa Beach",
@@ -825,17 +855,7 @@
         33.969657
       ],
       "resolveRegion": "famagusta",
-      "note": "Glossa Beach — a 2.7 km multipolygon across the Maraş south shore running toward the Derinya buffer zone; open/closed status unknown"
-    },
-    {
-      "name": "Derinya Halk Plajı",
-      "osm": "way/606238634",
-      "at": [
-        35.083471,
-        33.98153
-      ],
-      "resolveRegion": null,
-      "note": "Derinya Halk Plajı — at the eastern tip of the Derinya (Deryneia) coast beside the UN buffer-zone coast line; cannot establish it is an open public place"
+      "note": "Glossa Beach — OSM test result: 47 of its 93 outline vertices fall inside the \"Kapalı Maraş\" relation r12196193 (\"Very approximate\"), 20 inside the military-landuse relation r12567503 \"Gazimağusa Orduevi\" (name:en \"Turkish Army Base\"), 0 inside the UN buffer zone; OSM carries military checkpoints at 35.1014 N 33.9646 E (access=no) and 35.1057 N 33.9615 E. A 2.7 km shore strip; OSM cannot establish that it is open to the public"
     },
     {
       "name": "Makenzi Plajı",
@@ -862,7 +882,83 @@
       "osm": null,
       "at": null,
       "resolveRegion": null,
-      "note": "No OSM element is named Long Beach; the row exists with null coordinates/region/area until Berke picks a pin"
+      "note": "No OSM element is named Long Beach; the row exists with null coordinates/region/area until Berke picks a pin. Candidates (all unnamed except Makenzi) with what resolveRegion says at each pin:",
+      "candidates": [
+        {
+          "osm": "way/1568098280",
+          "name": null,
+          "tags": {
+            "leisure": "beach_resort"
+          },
+          "at": [
+            35.266136,
+            33.915938
+          ],
+          "resolveRegion": "iskele"
+        },
+        {
+          "osm": "way/1568098281",
+          "name": null,
+          "tags": {
+            "leisure": "beach_resort"
+          },
+          "at": [
+            35.267364,
+            33.91661
+          ],
+          "resolveRegion": "iskele"
+        },
+        {
+          "osm": "way/1365670207",
+          "name": null,
+          "tags": {
+            "natural": "beach",
+            "surface": "sand"
+          },
+          "at": [
+            35.198425,
+            33.900524
+          ],
+          "resolveRegion": "famagusta"
+        },
+        {
+          "osm": "way/309630489",
+          "name": null,
+          "tags": {
+            "natural": "beach"
+          },
+          "at": [
+            35.187587,
+            33.903676
+          ],
+          "resolveRegion": "famagusta"
+        },
+        {
+          "osm": "way/435771324",
+          "name": null,
+          "tags": {
+            "natural": "beach"
+          },
+          "at": [
+            35.192476,
+            33.901879
+          ],
+          "resolveRegion": "famagusta"
+        },
+        {
+          "osm": "relation/15456405",
+          "name": "Makenzi Plajı",
+          "tags": {
+            "natural": "beach",
+            "surface": "sand"
+          },
+          "at": [
+            35.249506,
+            33.903753
+          ],
+          "resolveRegion": "famagusta"
+        }
+      ]
     }
   ],
   "live_translations": {
@@ -972,13 +1068,13 @@
         }
       },
       "name_i18n": {
-        "ar": "الشاطئ الذهبي (Altın Kumsal)",
-        "ru": "Золотой пляж (Altın Kumsal)",
-        "el": "Χρυσή Ακτή (Altın Kumsal)",
-        "fr": "Plage dorée (Altın Kumsal)",
-        "es": "Playa Dorada (Altın Kumsal)",
-        "de": "Goldstrand (Altın Kumsal)",
-        "fa": "ساحل طلایی (Altın Kumsal)"
+        "ar": "شاطئ Golden (Altın Kumsal)",
+        "ru": "Пляж Golden (Altın Kumsal)",
+        "el": "Παραλία Golden (Altın Kumsal)",
+        "fr": "Plage Golden (Altın Kumsal)",
+        "es": "Playa Golden (Altın Kumsal)",
+        "de": "Golden-Strand (Altın Kumsal)",
+        "fa": "ساحل Golden (Altın Kumsal)"
       },
       "description_i18n": {
         "ar": "امتداد طويل وغير مطوَّر من الرمال الذهبية عند طرف شبه جزيرة كارباز، ويُعدّ على نطاق واسع أجمل شاطئ في شمال قبرص. بعيد وبكر. تجوب الحمير البرية المنطقة.",
@@ -988,6 +1084,15 @@
         "es": "Una larga franja de arena dorada sin urbanizar en el extremo de la península de Karpasia, considerada ampliamente la playa más bella del norte de Chipre. Remota y virgen. Por la zona vagan burros salvajes.",
         "de": "Ein langer, unbebauter Streifen goldenen Sandes an der Spitze der Karpas-Halbinsel – weithin als schönster Strand Nordzyperns angesehen. Abgelegen und unberührt. In der Gegend streifen Wildesel umher.",
         "fa": "نوار بلند و دست‌نخورده‌ای از ماسه‌ی طلایی در انتهای شبه‌جزیره‌ی کارپاز که به‌طور گسترده زیباترین ساحل شمال قبرس شناخته می‌شود. دورافتاده و بکر. الاغ‌های وحشی در این منطقه پرسه می‌زنند."
+      },
+      "name_i18n_alt_translated_golden": {
+        "ar": "الشاطئ الذهبي (Altın Kumsal)",
+        "ru": "Золотой пляж (Altın Kumsal)",
+        "el": "Χρυσή Ακτή (Altın Kumsal)",
+        "fr": "Plage dorée (Altın Kumsal)",
+        "es": "Playa Dorada (Altın Kumsal)",
+        "de": "Goldstrand (Altın Kumsal)",
+        "fa": "ساحل طلایی (Altın Kumsal)"
       }
     }
   }
