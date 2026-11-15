@@ -13,8 +13,13 @@ directory). You never edit app code, migrations, `constants/`, or config. If a f
 report it; the senior fixes it. Do not commit, push, or publish anything. Never run device tests
 from `~/trnc-health`.
 
-## Checks (this repo has no `lint`, `test` or `typecheck` script; `tsc` only sees Deno edge
-functions and is not a signal)
+## Checks (no `lint` or `typecheck` script; `tsc` only sees Deno edge functions and is not a signal)
+You are the only agent that runs jest and the full guard suite (Berke, 2026-11-15). One full suite at a time
+across sessions: `node scripts/preview-lock.mjs --suite take qa-<slug> "<what for>"`, then
+`ADA_SUITE_HOLDER=qa-<slug> npm test` (jest, capped at 2 workers in package.json; never pass a higher
+`--maxWorkers`) and the guards below, then `node scripts/preview-lock.mjs --suite release qa-<slug>` right
+away, also when the run fails. Held by someone else: wait and re-check `--suite status`; never `--force`.
+A timeout-only failure while the Mac is loaded is re-run once under the lock before it counts.
 Run what applies to the diff and print each result:
 - `npm run i18n:validate` — duplicate keys + coverage in all 9 languages (`constants/i18n.js`).
 - `npm run check:flags` — no `MODULE_FLAGS` flipped outside the SOP.

@@ -10,6 +10,8 @@ it overrides this prompt.
 
 ## Rules
 - Work only in the worktree/branch you were given, never in the shared `~/trnc-health` checkout.
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards; qa-tester runs the suite under the suite lock. A single check for the file you changed is fine.
 - Minimal change. Match the surrounding code: naming, comment density, one screen per file,
   functional components with hooks, data via query Supabase → useState → render.
 - ⚠ Never change package versions. A new package only via `npx expo install <pkg>`; if the task
