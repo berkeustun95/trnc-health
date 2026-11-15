@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases (+2 for Yeme-İçme) from the "back keeps your place" slices
-// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery basket page (rides eateryPartnerBackRef). +3 on 2026-10-21 for the Eatery "Ne yesem?" quiz page (rides eateryListBackRef). +2 for Sepetim opened from the quiz results bar. +2 on 2026-10-28 for a North Houses apartment over Konaklama (Günlük Kiralık). +4 on 2026-11-07 for Araçlar (list, car, dealer over car, car over dealer). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner, +2 on 2026-10-02 for the check-in feed, +1 on 2026-10-07 for its add-place form. +1 on 2026-10-09 for Oteller as its own screen. +2 on 2026-10-10 for Duyurular (detail, then module). +1 on 2026-10-13 for Ehliyet (closes the module). +1 on 2026-10-18 for an Eatery partner opened from the Explore map pin. +2 on 2026-10-20 for the Eatery basket page (rides eateryPartnerBackRef). +3 on 2026-10-21 for the Eatery "Ne yesem?" quiz page (rides eateryListBackRef). +2 for Sepetim opened from the quiz results bar. +2 on 2026-10-28 for a North Houses apartment over Konaklama (Günlük Kiralık). +4 on 2026-11-07 for Araçlar (list, car, dealer over car, car over dealer). +1 on 2026-11-14 for Home's Tüm hizmetler layer (consumed by homeBackRef) and +6 for the HomeScreen backRef body itself (run against its own state: search, Tüm hizmetler, directory, gate directory, nothing open). Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -104,6 +104,7 @@ const cases=[
  ['Pets sub page -> petsSubBack (to origin)', {...base, showPets:true, petsSubScreen:'vetdirectory'}, null,null, r=>r.calls==='petsSubBack()'],
  ['Home, search open', {...base}, ()=>{return true}, null, r=>r.r===true],
  ['Home, directory open', {...base}, ()=>true, null, r=>r.r===true],
+ ['Home tab, Tüm hizmetler layer open -> homeBackRef consumes it (true, no other close)', {...base}, ()=>true, null, r=>r.r===true && r.calls===''],
  ['Home, nothing open -> exit (root)', {...base}, ()=>false, null, r=>r.r===false],
  ['Profile, legal/dirty handled by guard', {...base, activeTab:'profile'}, null, {back:()=>true}, r=>r.r===true && !r.calls.includes('setActiveTab')],
  ['Profile, clean -> Home tab', {...base, activeTab:'profile'}, null, {back:()=>false}, r=>r.calls.includes("setActiveTab(\"home\")")],
@@ -120,5 +121,35 @@ const cases=[
 let bad=0
 for (const [n,st,refs,ok] of cases4){ let r; try{ r=run(st,null,null,refs) }catch(e){ r={r:'THREW '+e.message,calls:''} } const pass=ok(r); if(!pass)bad++; console.log((pass?'PASS ':'FAIL ')+n+'  -> '+r.r+' | '+r.calls) }
 for (const [n,st,h,p,ok] of cases){ let r; try{ r=run(st,h,p) }catch(e){ r={r:'THREW '+e.message,calls:''} } const pass=ok(r); if(!pass)bad++; console.log((pass?'PASS ':'FAIL ')+n+'  -> '+r.r+' | '+r.calls) }
-console.log(bad?`back chain: ${bad} of ${cases4.length+cases.length} FAILED`:`back chain: OK (${cases4.length+cases.length}/${cases4.length+cases.length})`)
+// HomeScreen's own backRef body (what homeBackRef.current runs): proven against the state it reads,
+// so "Home consumed it" above is also true of the real handler, not only of a stub.
+const HOME=path.join(__dirname,'..','screens','HomeScreen.js')
+const hsrc=fs.readFileSync(HOME,'utf8')
+const HANCHOR='backRef.current = () => {'
+const hs=hsrc.indexOf(HANCHOR)
+if(hs===-1){ console.error('back chain: HomeScreen backRef anchor not found: '+HANCHOR); process.exit(1) }
+let hi=hs+HANCHOR.length-1, hd=0, hj=hi
+for(;hj<hsrc.length;hj++){ if(hsrc[hj]==='{')hd++; else if(hsrc[hj]==='}'){hd--; if(!hd)break} }
+const hbody=hsrc.slice(hi+1,hj)
+if(!/return false\s*$/.test(hbody)){ console.error('back chain: extracted HomeScreen body is not the backRef\n'+hbody.slice(0,200)); process.exit(1) }
+const hfn=new Function('ctx',`with(ctx){ ${hbody} }`)
+function runHome(state){
+  const calls=[]
+  const ctx=new Proxy({}, {has:()=>true, get:(_,k)=>{
+    if(k===Symbol.unscopables) return undefined
+    if(k in state) return state[k]
+    if(typeof k==='string' && /^close/.test(k)) return ()=>calls.push(k)
+    return undefined }})
+  return {r:hfn(ctx), calls:calls.join(' ')}
+}
+const homeCases=[
+ ['HomeScreen backRef: Tüm hizmetler open -> closeAllServices, true', {allServicesOpen:true}, r=>r.r===true && r.calls==='closeAllServices'],
+ ['HomeScreen backRef: search open -> closeSearch only', {searchOpen:true}, r=>r.r===true && r.calls==='closeSearch'],
+ ['HomeScreen backRef: directory open -> closeFacilityList', {showFacilityList:true}, r=>r.r===true && r.calls==='closeFacilityList'],
+ ['HomeScreen backRef: gate directory (forceFacilityList) -> not consumed', {showFacilityList:true, forceFacilityList:true}, r=>r.r===false && r.calls===''],
+ ['HomeScreen backRef: directory opened OVER Tüm hizmetler (health tile / deep link) -> closes the directory first, page stays', {allServicesOpen:true, showFacilityList:true}, r=>r.r===true && r.calls==='closeFacilityList'],
+ ['HomeScreen backRef: nothing open -> false (exit chain continues)', {}, r=>r.r===false && r.calls===''],
+]
+for (const [n,st,ok] of homeCases){ let r; try{ r=runHome(st) }catch(e){ r={r:'THREW '+e.message,calls:''} } const pass=ok(r); if(!pass)bad++; console.log((pass?'PASS ':'FAIL ')+n+'  -> '+r.r+' | '+r.calls) }
+console.log(bad?`back chain: ${bad} of ${cases4.length+cases.length+homeCases.length} FAILED`:`back chain: OK (${cases4.length+cases.length+homeCases.length}/${cases4.length+cases.length+homeCases.length})`)
 if(bad) process.exit(1)
