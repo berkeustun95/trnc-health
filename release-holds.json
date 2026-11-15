@@ -49,6 +49,14 @@
       "clear": "Only after Berke has seen it on Preview and says go in chat (Berke 2026-11-14: re-land #392, Preview only). Then set cleared to true in a PR.",
       "clearedOn": "2026-11-15",
       "clearedBy": "Berke, in chat 2026-11-15: \"#432 looks good on Preview, so you have the production go. Clear the hold and publish ONLY #432 to production.\" Checked on Preview c3c59d99 (Android 01a1dbea)."
+    },
+    {
+      "pr": 451,
+      "commit": "55a4db1fa2b990b4e5c5d10ac1b99afb4c2c13e4",
+      "what": "Admin: read-only Data jobs section (slice 1), merged to main 2026-11-15",
+      "since": "2026-11-15",
+      "cleared": false,
+      "clear": "Only after Berke has tried the Data jobs screen on Preview (or seen a video) and says go in chat (Berke 2026-11-15: Preview only). Then set cleared to true in a PR."
     }
   ]
 }
