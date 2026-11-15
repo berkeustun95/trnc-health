@@ -1,6 +1,6 @@
 # ─── One test push to one account's device ────────────────────────────────────
 #
-#   gh workflow run push-test -f email=<account email> [-f kind=plain|messages]
+#   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty]
 #
 # Reads the token read-only, sends one push, prints the ticket and receipt status. Writes nothing.
 # Actions logs are public: the email is masked, and details are sealed. Engine: scripts/push-test.mjs.
@@ -15,9 +15,9 @@ on:
         type: string
         required: true
       kind:
-        description: 'plain, or messages (Student Hub payload without a thread → Messages tab)'
+        description: 'plain, messages (Student Hub payload without a thread → Messages tab) or duty (duty push payload → Nöbetçi Eczane)'
         type: choice
-        options: [plain, messages]
+        options: [plain, messages, duty]
         default: plain
       email2:
         description: 'Optional: a +tag of the SAME mailbox (two accounts on one phone; duplicate-push proof)'
