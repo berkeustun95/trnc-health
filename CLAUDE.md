@@ -417,6 +417,14 @@ ui-ux-designer preloads `.claude/skills/` ada-style + frontend-design + ada-*-au
 no emulator on this Mac, no device on Hermes. One screen per polish PR. Parked
 backlog: `~/trnc-health/.designer/backlog.md` (local, git-excluded).
 Principal never ships its own unreviewed code; release-engineer never runs without a QA PASS.
+**Test runs on this Mac (Berke, 2026-11-15; load average 293 and 8 jest timeouts when a review fan-out and a
+pre-merge suite ran at once on 4 cores).** (1) Only **qa-tester** runs jest and the full guard suite; reviewers
+(security, translation, design) only read code, and seniors leave the suite to QA. The main chat runs it only for
+its own pre-merge check. (2) jest is capped at 2 workers (`"maxWorkers": 2` in package.json); never pass a higher
+`--maxWorkers`. (3) One full suite at a time across sessions: `node scripts/preview-lock.mjs --suite take <holder>
+"<what for>"`, run `ADA_SUITE_HOLDER=<holder> npm test` (refused without the lock) plus the guards, then
+`--suite release <holder>` right away. Held by someone else: wait. The small jest files in `ota`/`ota:preview` run
+under the publish locks instead. Hermes has no vault, so the check passes there and says so.
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
 

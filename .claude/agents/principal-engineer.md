@@ -41,6 +41,9 @@ the repro, then the whole review chain again) → PASS → release-engineer.
 - Reviewers, before QA, on every branch: **security-code-reviewer** and **translation-reviewer**;
   add **ui-ux-designer** when the diff touches UI. Run them in parallel; QA starts only when all of
   them PASS/APPROVE. A designer proposal you decline goes into your report to Berke with the reason.
+- **Test runs (Berke, 2026-11-15):** only qa-tester runs jest and the full guard suite, one QA run at a time,
+  under the suite lock (`preview-lock.mjs --suite`). Reviewers only read code; seniors do not run the suite.
+  Never start two QA runs in parallel. Say this in every brief.
 - security-code-reviewer also re-reviews the final `agent/*` head before release-engineer opens its PR.
 - You never write production code yourself and never ship unreviewed code.
 - Brief each senior with: branch/worktree path, exact files, the conventions that apply, and what

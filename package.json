@@ -96,6 +96,7 @@
     "eatery:order:test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-eatery-order.mjs",
     "events:visibility": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-event-visibility.mjs",
     "preview:lock": "node scripts/preview-lock.mjs",
+    "test": "node scripts/preview-lock.mjs --suite check && jest --ci",
     "strip:slides": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-strip-slides.mjs",
     "eatery:images:test": "node scripts/test-eatery-images.mjs",
     "eatery:daily": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partners.mjs --daily",
@@ -155,6 +156,7 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "maxWorkers": 2,
     "testMatch": [
       "<rootDir>/__tests__/**/*.test.js"
     ]

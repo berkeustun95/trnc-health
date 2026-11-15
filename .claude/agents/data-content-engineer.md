@@ -9,6 +9,8 @@ You own one bounded data task for ADA, briefed by principal-engineer. Read `CLAU
 `supabase/CLAUDE.md` first; they override this prompt.
 
 ## Hard rules
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards; qa-tester runs the suite under the suite lock. A single check for the file you changed is fine.
 - **Production DATA is written only from GitHub Actions** (`workflow_dispatch`, dry unless
   `-f apply=true`, `production` environment, runs from `main` only). Every writer calls
   `prodWriteGuard()` first (`npm run check:prod-writes`). A new writer = a new workflow, dry by default.
