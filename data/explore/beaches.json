@@ -833,7 +833,7 @@
     {
       "name": "Derinya Halk Plajı",
       "osm": "way/606238634",
-      "reason": "resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (tagged \"Very approximate\"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note \"Only Northern Cyprus and Turkish Citizens allowed\") 1.6 km west"
+      "reason": "resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (tagged \"Very approximate\"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note \"Only Northern Cyprus and Turkish Citizens allowed\") about 2.3 km west"
     }
   ],
   "needs_review": [
