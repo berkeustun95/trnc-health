@@ -33,10 +33,59 @@ test('setPending writes KEY_PENDING (or removes it) inside a try', () => {
   expect(b).toMatch(/try \{\s*if \(value\) await AsyncStorage\.setItem\(KEY_PENDING, value\)\s*else await AsyncStorage\.removeItem\(KEY_PENDING\)\s*\} catch \{\}/)
 })
 
-test('Giriş yap clears pending and never arms it', () => {
+test('Giriş yap (Start and the Auth login tab) arms signin on a device not yet onboarded, else clears pending', () => {
   const b = fnBody('startLogin')
-  expect(b).toContain('await setPending(null)')
+  expect(b).toContain('await setPending(armPending() ? PENDING_SIGNIN : null)')
   expect(b).not.toMatch(/PENDING_(DUTY|SIGNUP)/)
+  const m = fnBody('authModeChanged')
+  expect(m).toContain("if (mode === 'login') setPending(armPending() ? PENDING_SIGNIN : null)")
+  expect(m).not.toContain('logOnboardingEvent')
+})
+
+test('Giriş yap: the permission is read once per session while signin is pending, a failed read means Home, and it feeds the decision', () => {
+  const i = at(src, 'if (!session || onbPending !== PENDING_SIGNIN || signinPerm) return', 'perm effect guard')
+  const effect = src.slice(i, src.indexOf('}, [session?.user?.id, onbPending, signinPerm])', i))
+  expect(effect).toContain('Notifications.getPermissionsAsync()')
+  expect(effect).not.toContain('requestPermissionsAsync')
+  expect(effect).toContain("setSigninPerm({ status: 'unavailable', canAskAgain: false })")
+  expect(src).toMatch(/decideOnboardingStep\(\{[^}]*\n\s*perm: signinPerm,\n\s*\}\)/)
+  const so = at(src, "if (event === 'SIGNED_OUT') {", 'signed-out handler')
+  expect(src.slice(so, src.indexOf('\n      }\n', so))).toContain('setSigninPerm(null)')
+})
+
+test('Giriş yap -> Screen 2: the city chip is pre-selected from the profile region (regions only)', () => {
+  expect(src).toMatch(/<DutyAlertsScreen [^>]*initialCity=\{REGIONS\.includes\(profile\?\.region\) \? profile\.region : null\}/)
+  const duty = fs.readFileSync(path.join(__dirname, '..', 'screens', 'DutyAlertsScreen.js'), 'utf8')
+  expect(duty).toMatch(/initialCity = null \}\) \{\s*const \[city, setCity\] = useState\(initialCity\)/)
+})
+
+test('a signin hand-off shows the spinner, not the Home skeleton, while the profile loads', () => {
+  expect(src).toContain('} else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {')
+})
+
+test('weather with no fix: device home city, then the profile city, then Lefkoşa', () => {
+  expect(src).toContain('resolvedCoords = weatherPointFor(REGIONS.includes(st?.home) ? st.home : profileRegionRef.current)')
+  expect(fnBody('homeCityChanged')).toContain('fetchWeather(weatherPointFor(isRegion ? home : profileRegionRef.current))')
+  const i = at(src, 'profileRegionRef.current = region', 'profile region effect')
+  const effect = src.slice(i, src.indexOf('}, [profile?.region, userLocation])', i))
+  expect(effect).toContain('if (!region || userLocation) return')
+  expect(effect).toContain('if (!cancelled && !REGIONS.includes(st?.home)) fetchWeather(weatherPointFor(region))')
+})
+
+const startSrc = fs.readFileSync(process.env.ONB_START_SRC || path.join(__dirname, '..', 'screens', 'StartScreen.js'), 'utf8')
+
+test('Start: Kayıt ol primary, Giriş yap secondary, guest a visible text button; each tap logs its event before acting', () => {
+  const fn = name => startSrc.slice(at(startSrc, `function ${name}(`, name), startSrc.indexOf('\n  }\n', at(startSrc, `function ${name}(`, name)))
+  expect(at(fn('signUp'), 'logOnboardingEvent(START_CHOICE_EVENTS.signup)', 'log')).toBeLessThan(at(fn('signUp'), 'onSignUp()', 'act'))
+  expect(at(fn('logIn'), 'logOnboardingEvent(START_CHOICE_EVENTS.signin)', 'log')).toBeLessThan(at(fn('logIn'), 'onLogin()', 'act'))
+  const g = fn('start')
+  expect(at(g, 'logOnboardingEvent(START_CHOICE_EVENTS.guest)', 'log')).toBeLessThan(at(g, 'await onStart()', 'act'))
+  expect(startSrc).toMatch(/<Button size="lg" title=\{t\('signup', lang\)\} onPress=\{signUp\} disabled=\{busy\}/)
+  expect(startSrc).toMatch(/<Button size="lg" variant="secondary" title=\{t\('login', lang\)\} onPress=\{logIn\} disabled=\{busy\}/)
+  expect(startSrc).toMatch(/<Button variant="text" title=\{t\('continueAsGuest', lang\)\} onPress=\{start\} loading=\{busy\}/)
+  expect(startSrc).toContain('<InlineAlert message={error} />')
+  // The App handlers stay unlogged: only a Start tap counts.
+  for (const name of ['startAsGuest', 'startLogin', 'startSignUp']) expect(fnBody(name)).not.toContain('logOnboardingEvent')
 })
 
 test('SIGNED_OUT removes the pending key (state + storage)', () => {
@@ -129,7 +178,7 @@ test('second offer only for a guest or this session\'s customer, past force / wi
 
 test('Hermes: every value the selector reads for onboarding is declared above `let content`', () => {
   for (const decl of ['const onbStep =', 'const dutyInitialRegion =', 'const tourChipVisible =', 'const gateActive =',
-    'const ageIneligible =', 'const policyNoticeDue =', 'const lang ='])
+    'const ageIneligible =', 'const policyNoticeDue =', 'const lang =', 'const [signinPerm, setSigninPerm]', 'const profileRegionRef ='])
     expect(at(src, decl, decl)).toBeLessThan(selectorStart)
 })
 

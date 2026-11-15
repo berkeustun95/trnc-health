@@ -8,13 +8,14 @@ import { Button, InlineAlert, PageCanvas } from '../components/ui'
 import { LanguageSheet } from '../components/shell/Sheets'
 import SplashStatusBar from '../components/SplashStatusBar'
 import { logOnboardingEvent } from '../utils/onboardingEvents'
-import { START_SHOWN_EVENT } from '../utils/onboardingState'
+import { START_SHOWN_EVENT, START_CHOICE_EVENTS } from '../utils/onboardingState'
 
 const LOGO = require('../assets/brand/v2/ada-logo-keyline.png')
 
-// Onboarding v2, the entry screen: one primary path (guest -> Screen 2) and the account paths
-// underneath. Replaces Welcome and is where sign-out lands. App owns every storage write;
-// onStart resolves to the sign-in's { error }.
+// Onboarding v2, the entry screen: a choice. Kayıt ol (primary), Giriş yap, and the guest path as a
+// clearly visible link (App Store 5.1.1: using the app without an account stays a real option).
+// Replaces Welcome and is where sign-out lands. App owns every storage write; onStart resolves to
+// the guest sign-in's { error }. Each tap is logged before it acts.
 export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSignUp }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -22,7 +23,17 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
 
   useEffect(() => { logOnboardingEvent(START_SHOWN_EVENT) }, [])
 
+  function signUp() {
+    logOnboardingEvent(START_CHOICE_EVENTS.signup)
+    onSignUp()
+  }
+  function logIn() {
+    logOnboardingEvent(START_CHOICE_EVENTS.signin)
+    onLogin()
+  }
   async function start() {
+    if (busy) return
+    logOnboardingEvent(START_CHOICE_EVENTS.guest)
     setBusy(true)
     setError(null)
     let failed = true
@@ -52,21 +63,9 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
 
           <View style={s.actions}>
             <InlineAlert message={error} />
-            <Button size="lg" title={t('startCta', lang)} onPress={start} loading={busy} fullWidth />
-            <View style={s.accountRow}>
-              <Text style={s.accountText}>{t('startHaveAccount', lang)}</Text>
-              <View style={s.links}>
-                <TouchableOpacity onPress={onLogin} disabled={busy} activeOpacity={press.small} style={[s.link, busy && s.linkBusy]}
-                  accessibilityRole="link" accessibilityState={{ disabled: busy }}>
-                  <Text style={s.linkText}>{t('login', lang)}</Text>
-                </TouchableOpacity>
-                <Text style={s.dot} importantForAccessibility="no">·</Text>
-                <TouchableOpacity onPress={onSignUp} disabled={busy} activeOpacity={press.small} style={[s.link, busy && s.linkBusy]}
-                  accessibilityRole="link" accessibilityState={{ disabled: busy }}>
-                  <Text style={s.linkText}>{t('signup', lang)}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <Button size="lg" title={t('signup', lang)} onPress={signUp} disabled={busy} wrap fullWidth />
+            <Button size="lg" variant="secondary" title={t('login', lang)} onPress={logIn} disabled={busy} wrap fullWidth />
+            <Button variant="text" title={t('continueAsGuest', lang)} onPress={start} loading={busy} wrap fullWidth style={s.guest} />
           </View>
         </ScrollView>
 
@@ -89,11 +88,5 @@ const s = StyleSheet.create({
   logo:        { width: 156, height: 191 },
   tagline:     { ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginTop: 20 },
   actions:     { gap: 12 },
-  accountRow:  { alignItems: 'center', marginTop: 8 },
-  accountText: { ...type.body, color: colors.textSecondaryOnPage, textAlign: 'center' },
-  links:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 8 },
-  link:        { minHeight: TAP, paddingHorizontal: 10, justifyContent: 'center' },
-  linkBusy:    { opacity: 0.45 },
-  linkText:    { ...type.rowTitle, color: colors.primaryDark },
-  dot:         { ...type.rowTitle, color: colors.textSecondaryOnPage },
+  guest:       { marginTop: 4 },
 })

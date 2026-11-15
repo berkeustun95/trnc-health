@@ -6,13 +6,14 @@
 export const KEY_ONBOARDED   = '@trnc_onboarded'    // 'true'
 export const KEY_LANG        = '@trnc_lang'
 export const KEY_POLICY_SEEN = '@trnc_policy_seen'  // LEGAL_VERSION
-export const KEY_PENDING     = '@trnc_onb2_pending' // PENDING_SIGNUP | PENDING_DUTY
+export const KEY_PENDING     = '@trnc_onb2_pending' // PENDING_SIGNUP | PENDING_DUTY | PENDING_SIGNIN
 export const KEY_DUTY_OFFER  = '@trnc_duty_offer'   // OFFER_GRANTED | OFFER_DENIED | OFFER_LATER
 export const KEY_REOFFER     = '@trnc_duty_reoffer' // REOFFER_SHOWN, once per device ever
 export const KEY_TOUR_CHIP   = '@trnc_tour_chip'    // TOUR_CHIP_ON
 
 export const PENDING_SIGNUP = 'signup'
 export const PENDING_DUTY   = 'duty'
+export const PENDING_SIGNIN = 'signin'
 
 export const OFFER_GRANTED = 'granted'
 export const OFFER_DENIED  = 'denied'
@@ -24,6 +25,13 @@ export const TOUR_CHIP_ON  = '1'
 // --- onboarding_events.event values ------------------------------------------
 
 export const START_SHOWN_EVENT = 'start_shown'
+
+// Start's three choices, logged on the tap before anything else runs.
+export const START_CHOICE_EVENTS = {
+  signup: 'start_choice_signup',
+  signin: 'start_choice_signin',
+  guest:  'start_choice_guest',
+}
 
 export const OFFER_EVENTS = {
   shown: 'offer_shown',
@@ -42,13 +50,14 @@ export const REOFFER_EVENTS = {
 // Returns { step, writeOnboarded, clearPending }; step is 'start' | 'app' | 'duty' | 'wait'.
 // 'app' means "the normal selector decides": the age screen and the profile wizard sit above
 // Screen 2 there, so those cases leave pending untouched and the wizard can hand 'signup' on.
-export function decideOnboardingStep({ onboarded, pending, hasSession, isGuest, role, ageIneligible, gateActive, profileLoaded }) {
+// `perm` is this device's notification permission (getPermissionsAsync), read only for 'signin'.
+export function decideOnboardingStep({ onboarded, pending, hasSession, isGuest, role, ageIneligible, gateActive, profileLoaded, perm }) {
   const result = (step, writeOnboarded = false, clearPending = false) => ({ step, writeOnboarded, clearPending })
 
   if (!hasSession) return result('start')
 
   // No pending key with a session = an existing user (or an onboarded device): heal the flag.
-  if (pending !== PENDING_DUTY && pending !== PENDING_SIGNUP) {
+  if (pending !== PENDING_DUTY && pending !== PENDING_SIGNUP && pending !== PENDING_SIGNIN) {
     return result('app', onboarded !== 'true', pending != null)
   }
 
@@ -64,6 +73,15 @@ export function decideOnboardingStep({ onboarded, pending, hasSession, isGuest, 
 
   if (pending === PENDING_DUTY) return result('duty')
 
+  // "Giriş yap": Screen 2 only while the OS can still show its prompt. Android 13+ reports a never-asked
+  // permission as 'denied' (notifications off) with canAskAgain true, so 'undetermined' alone would never
+  // match there; iOS 'denied' always carries canAskAgain false. Granted or blocked: straight to Home.
+  if (pending === PENDING_SIGNIN) {
+    if (!perm || typeof perm.status !== 'string') return result('wait')
+    if (perm.status !== 'granted' && perm.canAskAgain !== false) return result('duty')
+    return result('app', onboarded !== 'true', true)
+  }
+
   // pending 'signup' on a profile that never needed the wizard: an existing complete account.
   return result('app', onboarded !== 'true', true)
 }
@@ -73,6 +91,7 @@ export function shouldArmPending({ onboarded }) {
   return onboarded !== 'true'
 }
 
+// 'signin' stays 'signin': it is decided on the permission once the wizard is done.
 export function pendingAfterWizard(pending) {
   return pending === PENDING_SIGNUP ? PENDING_DUTY : pending
 }

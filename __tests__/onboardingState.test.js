@@ -5,6 +5,7 @@ const ALLOWED_EVENTS = [
   'start_shown', 'offer_shown', 'offer_granted', 'offer_denied', 'offer_later',
   'reoffer_shown', 'reoffer_granted', 'reoffer_declined',
   'reoffer_existing_shown', 'reoffer_existing_granted', 'reoffer_existing_declined',
+  'start_choice_signup', 'start_choice_signin', 'start_choice_guest',
 ]
 
 const base = {
@@ -75,6 +76,8 @@ describe('decideOnboardingStep', () => {
   test('applying the returned writes converges: a second decision asks for nothing more', () => {
     const cases = [
       {}, { pending: 'signup' }, { pending: 'duty', role: 'admin' }, { pending: 'bogus' }, { onboarded: 'true' },
+      { pending: 'signin', perm: { status: 'granted', canAskAgain: true } },
+      { pending: 'signin', perm: { status: 'denied', canAskAgain: false } },
     ]
     for (const c of cases) {
       const first = step(c)
@@ -83,6 +86,73 @@ describe('decideOnboardingStep', () => {
       if (first.clearPending) next.pending = null
       expect(step(next)).toEqual(r(first.step))
     }
+  })
+})
+
+describe('decideOnboardingStep: Giriş yap (pending signin, decided by this device\'s permission)', () => {
+  const undetermined = { status: 'undetermined', canAskAgain: true }
+  test('undetermined -> Screen 2', () => {
+    expect(step({ pending: 'signin', perm: undetermined })).toEqual(r('duty'))
+    expect(step({ pending: 'signin', isGuest: true, perm: undetermined })).toEqual(r('duty'))
+  })
+  test('Android 13+ never asked reads denied + canAskAgain true -> Screen 2', () => {
+    expect(step({ pending: 'signin', perm: { status: 'denied', canAskAgain: true } })).toEqual(r('duty'))
+  })
+  test('granted -> app, pending cleared, onboarded healed', () => {
+    expect(step({ pending: 'signin', perm: { status: 'granted', canAskAgain: true } })).toEqual(r('app', true, true))
+  })
+  test('denied for good (the OS will not ask) -> app, pending cleared', () => {
+    expect(step({ pending: 'signin', perm: { status: 'denied', canAskAgain: false } })).toEqual(r('app', true, true))
+    expect(step({ pending: 'signin', perm: { status: 'undetermined', canAskAgain: false } })).toEqual(r('app', true, true))
+  })
+  test("a failed read (App's fallback object) -> app, never a stuck spinner", () => {
+    expect(step({ pending: 'signin', perm: { status: 'unavailable', canAskAgain: false } })).toEqual(r('app', true, true))
+  })
+  test('permission not read yet -> wait', () => {
+    expect(step({ pending: 'signin', perm: null })).toEqual(r('wait'))
+    expect(step({ pending: 'signin' })).toEqual(r('wait'))
+    expect(step({ pending: 'signin', perm: {} })).toEqual(r('wait'))
+  })
+  test('profile not loaded -> wait, whatever the permission', () => {
+    expect(step({ pending: 'signin', profileLoaded: false, perm: undetermined })).toEqual(r('wait'))
+  })
+  test('the wizard runs first (pending kept, permission not needed); after it, the permission decides', () => {
+    expect(step({ pending: 'signin', gateActive: true })).toEqual(r('app', false, false))
+    const pending = S.pendingAfterWizard('signin')
+    expect(pending).toBe('signin')
+    expect(step({ pending, perm: undetermined })).toEqual(r('duty'))
+    expect(step({ pending, perm: { status: 'granted', canAskAgain: true } })).toEqual(r('app', true, true))
+  })
+  test.each(['admin', 'provider', 'estate_agent'])('%s -> app + clearPending, without waiting on the permission', role => {
+    expect(step({ pending: 'signin', role })).toEqual(r('app', true, true))
+  })
+  test('ageIneligible -> app, writes nothing', () => {
+    expect(step({ pending: 'signin', ageIneligible: true, perm: undetermined })).toEqual(r('app', false, false))
+  })
+  test('no pending -> app (the permission is never read)', () => {
+    expect(step({ pending: null, perm: undetermined })).toEqual(r('app', true, false))
+  })
+  test('pending survives no sign-out: no session -> start', () => {
+    expect(step({ pending: 'signin', hasSession: false, perm: undetermined })).toEqual(r('start'))
+  })
+})
+
+// The pending value each Start / Auth action leaves behind (App.js startAsGuest / startLogin / startSignUp /
+// authModeChanged on a device not yet onboarded), then the decision it leads to.
+describe('Start choices in sequence', () => {
+  const undetermined = { status: 'undetermined', canAskAgain: true }
+  const arm = { guest: S.PENDING_DUTY, signup: S.PENDING_SIGNUP, signin: S.PENDING_SIGNIN }
+  test('Kayıt ol -> back -> Misafir olarak devam et: duty', () => {
+    let pending = arm.signup
+    pending = arm.guest
+    expect(pending).toBe('duty')
+    expect(step({ pending, isGuest: true, role: undefined })).toEqual(r('duty'))
+  })
+  test('Kayıt ol -> back -> Giriş yap: signin, then the permission decides', () => {
+    let pending = arm.signup
+    pending = arm.signin
+    expect(pending).toBe('signin')
+    expect(step({ pending, perm: undetermined })).toEqual(r('duty'))
   })
 })
 
@@ -174,14 +244,15 @@ describe('dutyReofferBodyNoCity copy', () => {
 })
 
 describe('events', () => {
-  test('exported event strings are exactly the 11 allowed, no duplicates', () => {
+  test('exported event strings are exactly the 14 allowed, no duplicates', () => {
     const exported = [
       S.START_SHOWN_EVENT,
+      ...Object.values(S.START_CHOICE_EVENTS),
       ...Object.values(S.OFFER_EVENTS),
       ...Object.values(S.REOFFER_EVENTS).flatMap(v => Object.values(v)),
     ]
-    expect(exported).toHaveLength(11)
-    expect(new Set(exported).size).toBe(11)
+    expect(exported).toHaveLength(14)
+    expect(new Set(exported).size).toBe(14)
     expect([...exported].sort()).toEqual([...ALLOWED_EVENTS].sort())
   })
   test('lookups by the stored offer values and decideReoffer results are defined', () => {
@@ -210,7 +281,7 @@ describe('constants', () => {
   test('keys and values are exact', () => {
     expect([S.KEY_ONBOARDED, S.KEY_LANG, S.KEY_POLICY_SEEN, S.KEY_PENDING, S.KEY_DUTY_OFFER, S.KEY_REOFFER, S.KEY_TOUR_CHIP])
       .toEqual(['@trnc_onboarded', '@trnc_lang', '@trnc_policy_seen', '@trnc_onb2_pending', '@trnc_duty_offer', '@trnc_duty_reoffer', '@trnc_tour_chip'])
-    expect([S.PENDING_SIGNUP, S.PENDING_DUTY, S.OFFER_GRANTED, S.OFFER_DENIED, S.OFFER_LATER, S.REOFFER_SHOWN, S.TOUR_CHIP_ON])
-      .toEqual(['signup', 'duty', 'granted', 'denied', 'later', 'shown', '1'])
+    expect([S.PENDING_SIGNUP, S.PENDING_DUTY, S.PENDING_SIGNIN, S.OFFER_GRANTED, S.OFFER_DENIED, S.OFFER_LATER, S.REOFFER_SHOWN, S.TOUR_CHIP_ON])
+      .toEqual(['signup', 'duty', 'signin', 'granted', 'denied', 'later', 'shown', '1'])
   })
 })

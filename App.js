@@ -118,7 +118,7 @@ import DutyAlertsScreen from './screens/DutyAlertsScreen'
 import DutyReofferSheet from './components/DutyReofferSheet'
 import {
   KEY_ONBOARDED, KEY_LANG, KEY_POLICY_SEEN, KEY_PENDING, KEY_DUTY_OFFER, KEY_REOFFER, KEY_TOUR_CHIP,
-  PENDING_SIGNUP, PENDING_DUTY, TOUR_CHIP_ON, OFFER_GRANTED, OFFER_LATER, REOFFER_SHOWN, REOFFER_EVENTS,
+  PENDING_SIGNUP, PENDING_DUTY, PENDING_SIGNIN, TOUR_CHIP_ON, OFFER_GRANTED, OFFER_LATER, REOFFER_SHOWN, REOFFER_EVENTS,
   decideOnboardingStep, shouldArmPending, pendingAfterWizard, launchMayRegisterPush, decideReoffer, reofferNoCity,
 } from './utils/onboardingState'
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
@@ -640,6 +640,11 @@ export default function App() {
   // Onboarding v2 (utils/onboardingState.js): KEY_PENDING as read at mount, then kept in step with storage.
   // undefined = not read yet (boot waits for it); null = none.
   const [onbPending, setOnbPending] = useState(undefined)
+  // This device's notification permission, read once per session while 'signin' is pending (null = not yet).
+  // Never refreshed while Screen 2 is up: its own OS prompt would flip the decision under it.
+  const [signinPerm, setSigninPerm] = useState(null)
+  // profiles.region when it is a region: the weather fallback reads it from inside load()'s closure.
+  const profileRegionRef = useRef(null)
   // Screen 2's stored outcome (KEY_DUTY_OFFER), read with KEY_PENDING and kept in step on every write: the
   // launch push registration reads it, and only ever after onbPending is set.
   const dutyOfferRef = useRef(null)
@@ -1232,6 +1237,7 @@ export default function App() {
         setAdminOpen(null)
         // A sign-out ends any onboarding hand-off: Screen 2 belongs to the session that armed it.
         setOnbPending(null)
+        setSigninPerm(null)
         AsyncStorage.removeItem(KEY_PENDING).catch(() => {})
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
@@ -1461,11 +1467,12 @@ export default function App() {
     if (armPending()) await setPending(PENDING_DUTY)
     return supabase.auth.signInAnonymously()
   }
-  // "Giriş yap" never leads to Screen 2, whatever an abandoned Hemen başla / Kayıt ol left behind.
+  // "Giriş yap": 'signin' replaces whatever an abandoned Hemen başla / Kayıt ol left behind; after the sign-in
+  // (and the wizard, if it runs) this device's notification permission decides Screen 2 or Home.
   async function startLogin() {
     await startFirstAction()
     setAuthMode('login'); setShowWelcome(false)
-    await setPending(null)
+    await setPending(armPending() ? PENDING_SIGNIN : null)
   }
   async function startSignUp() {
     await startFirstAction()
@@ -1474,7 +1481,7 @@ export default function App() {
   }
   // AuthScreen's login/signup tabs (a user toggle only; the post-signup "log in" step keeps 'signup').
   function authModeChanged(mode) {
-    if (mode === 'login') setPending(null)
+    if (mode === 'login') setPending(armPending() ? PENDING_SIGNIN : null)
     else if (mode === 'signup' && armPending()) setPending(PENDING_SIGNUP)
   }
 
@@ -1521,7 +1528,7 @@ export default function App() {
     const isRegion = REGIONS.includes(home)
     const gps = userLocation ? resolveRegion(userLocation.latitude, userLocation.longitude) : null
     setDeviceRegion(isRegion ? home : gps)
-    if (!userLocation) fetchWeather(weatherPointFor(home))
+    if (!userLocation) fetchWeather(weatherPointFor(isRegion ? home : profileRegionRef.current))
   }
   // Screen 2 resolves: city, outcome, tour chip, pending removed, THEN onboarded (so a kill in between
   // re-shows Screen 2 rather than skipping it), then Home.
@@ -1683,6 +1690,30 @@ export default function App() {
     }).catch(() => {})
     return () => { cancelled = true }
   }, [userLocation])
+
+  // Onboarding v2 "Giriş yap": the permission read that decides Screen 2 or Home (decideOnboardingStep).
+  // A failed read must not hold the spinner: it counts as "the OS cannot ask", i.e. Home.
+  useEffect(() => {
+    if (!session || onbPending !== PENDING_SIGNIN || signinPerm) return
+    let cancelled = false
+    Notifications.getPermissionsAsync()
+      .then(p => { if (!cancelled) setSigninPerm(p) })
+      .catch(() => { if (!cancelled) setSigninPerm({ status: 'unavailable', canAskAgain: false }) })
+    return () => { cancelled = true }
+  }, [session?.user?.id, onbPending, signinPerm])
+
+  // The profile's city is the weather fallback before Lefkoşa (load() reads the ref). It usually arrives
+  // after load() has fetched, so with no fix and no device home city the weather follows it here.
+  useEffect(() => {
+    const region = REGIONS.includes(profile?.region) ? profile.region : null
+    profileRegionRef.current = region
+    if (!region || userLocation) return
+    let cancelled = false
+    loadCityWelcomeState().then(st => {
+      if (!cancelled && !REGIONS.includes(st?.home)) fetchWeather(weatherPointFor(region))
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [profile?.region, userLocation])
 
   // Route medals earned as a guest (or whose award failed offline) land on the account at
   // the first signed-in session. Keyed on the user id: the session object churns on refresh.
@@ -1864,10 +1895,10 @@ export default function App() {
         setLocationDenied(true)
       }
 
-      // No fix: the home city's weather point, else Lefkoşa's (a read fallback, never stored).
+      // No fix: the home city's weather point, else the profile's city, else Lefkoşa's (a read fallback, never stored).
       if (!resolvedCoords) {
         const st = await loadCityWelcomeState().catch(() => null)
-        resolvedCoords = weatherPointFor(st?.home)
+        resolvedCoords = weatherPointFor(REGIONS.includes(st?.home) ? st.home : profileRegionRef.current)
       }
       await fetchWeather(resolvedCoords)
 
@@ -2094,6 +2125,7 @@ export default function App() {
     ageIneligible,
     gateActive,
     profileLoaded: !!session && !!profile && profileUid === session.user.id,
+    perm: signinPerm,
   })
   const onbReady = session !== undefined && onboarded !== null && onbPending !== undefined
   const onbStep = onbReady ? onbDecision.step : null
@@ -2259,8 +2291,9 @@ export default function App() {
     )
   } else if (!session) {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
-  } else if ((loading || !profile) && onbPending === 'duty') {
-    // Onboarding v2: Screen 2 comes next, so a Home-shaped skeleton here would flash a screen the user is not going to.
+  } else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {
+    // Onboarding v2: Screen 2 comes next (or may, after Giriş yap), so a Home-shaped skeleton here would flash
+    // a screen the user is not going to.
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (loading || !profile) {
     content = (
@@ -2321,7 +2354,8 @@ export default function App() {
     // returns 'duty' while gateActive or ageIneligible holds (the wizard runs first and hands 'signup' on as
     // 'duty'), nor for any role but customer / guest. It sits above the gate block because check-profile-gate
     // pins that block's end to the admin branch.
-    content = <DutyAlertsScreen lang={lang} onEnableNotifications={enableDutyPush} onResolve={resolveDutyOffer} onLocation={dutyLocation} />
+    content = <DutyAlertsScreen lang={lang} onEnableNotifications={enableDutyPush} onResolve={resolveDutyOffer} onLocation={dutyLocation}
+      initialCity={REGIONS.includes(profile?.region) ? profile.region : null} />
   } else if (gateActive) {
     // ONE READABLE ALLOW-LIST of what a gated user may reach. This block renders the
     // exempt screens ITSELF rather than falling through to the ~25-branch chain below:

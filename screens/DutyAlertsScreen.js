@@ -17,8 +17,9 @@ import { OFFER_EVENTS, OFFER_GRANTED, OFFER_DENIED, OFFER_LATER } from '../utils
 // wizard). It IS the explanation, so both permissions go straight to the OS, and only on a tap.
 // App owns the writes: onEnableNotifications asks + registers and resolves to true when granted;
 // onResolve({ outcome, city }) saves and goes Home; onLocation hands a fix back so Home needs no relaunch.
-export default function DutyAlertsScreen({ lang, onEnableNotifications, onResolve, onLocation }) {
-  const [city, setCity] = useState(null)
+// initialCity (a region slug or null) pre-selects the chip: the profile's city after Giriş yap.
+export default function DutyAlertsScreen({ lang, onEnableNotifications, onResolve, onLocation, initialCity = null }) {
+  const [city, setCity] = useState(initialCity)
   const [outside, setOutside] = useState(false)
   const [locating, setLocating] = useState(false)
   const [busy, setBusy] = useState(null)   // 'enable' | 'later' while resolving
