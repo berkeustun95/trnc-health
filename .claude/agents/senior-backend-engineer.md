@@ -9,6 +9,8 @@ You implement one bounded Supabase task for ADA, briefed by principal-engineer. 
 and `supabase/CLAUDE.md` first; they override this prompt.
 
 ## Hard rules
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards; qa-tester runs the suite under the suite lock. A single check for the file you changed is fine.
 - Never disable RLS. Every table with user data has RLS on with role-appropriate policies. A
   customer must never read another customer's data. `TO authenticated` includes guests; only
   `NOT is_anonymous_session()` excludes them.

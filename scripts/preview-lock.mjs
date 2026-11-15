@@ -29,6 +29,18 @@
 // first update and refuses unless HEAD contains it (check-ota-preflight.mjs). Separate file, so a
 // Preview check on the phone never blocks a production publish or the reverse.
 
+// ─── --suite: one full local test suite at a time across sessions ────────────────────────────
+//
+//   node scripts/preview-lock.mjs --suite take <holder> "<what for>"   # before jest / the full guard run
+//   ADA_SUITE_HOLDER=<holder> npm test                                 # jest, refused without the lock
+//   node scripts/preview-lock.mjs --suite release <holder>             # right after the run
+//
+// WHY (2026-11-15): on this 4-core Mac a review fan-out ran ~7 jest runs plus guard batches in one
+// session while another session ran its pre-merge suite: load average 293, 8 tests timed out, and
+// the clean re-run took 18 s instead of 337 s. Only QA and a session's own pre-merge check run the
+// suite (reviewers read code), jest is capped at 2 workers (package.json), and this lock serialises
+// the runs. The ota / ota:preview chains run their small jest files under the publish locks instead.
+
 // Hermes publishes only runtime-1.4.0 Previews (ada-publish), which this phone's 1.4.2 build never
 // loads, and has no vault: `check` there finds no lock directory and passes, saying so.
 
@@ -42,10 +54,12 @@ const TEST_PHONE_SERIAL = 'R58N602DHYT'
 
 const DIR = process.env.ADA_LOCK_DIR || join(homedir(), 'ObsidianVault', '10-ada', 'locks')
 const PROD = process.argv.includes('--production')
-const FILE = join(DIR, PROD ? 'production-ota.lock.json' : 'preview-phone.lock.json')
-const NAME = PROD ? 'production lock' : 'preview lock'
-const HOLDER_ENV = PROD ? 'ADA_PRODUCTION_HOLDER' : 'ADA_PREVIEW_HOLDER'
-const [cmd, holderArg, ...rest] = process.argv.slice(2).filter(a => a !== '--production')
+const SUITE = process.argv.includes('--suite')
+if (PROD && SUITE) { console.error('preview-lock: --production and --suite are separate locks; pass one'); process.exit(2) }
+const FILE = join(DIR, PROD ? 'production-ota.lock.json' : SUITE ? 'test-suite.lock.json' : 'preview-phone.lock.json')
+const NAME = PROD ? 'production lock' : SUITE ? 'suite lock' : 'preview lock'
+const HOLDER_ENV = PROD ? 'ADA_PRODUCTION_HOLDER' : SUITE ? 'ADA_SUITE_HOLDER' : 'ADA_PREVIEW_HOLDER'
+const [cmd, holderArg, ...rest] = process.argv.slice(2).filter(a => a !== '--production' && a !== '--suite')
 
 function read() {
   try { return JSON.parse(readFileSync(FILE, 'utf8')) } catch { return null }
@@ -123,6 +137,8 @@ if (cmd === 'check') {
     console.error(NAME + ': REFUSED — nobody holds the lock. Take it first:')
     console.error(PROD
       ? '  node scripts/preview-lock.mjs --production take <holder> "<what for>"  then  ADA_PRODUCTION_HOLDER=<holder> npm run ota'
+      : SUITE
+      ? '  node scripts/preview-lock.mjs --suite take <holder> "<what for>"  then  ADA_SUITE_HOLDER=<holder> npm test'
       : '  node scripts/preview-lock.mjs take <holder> "<what for>"  then  ADA_PREVIEW_HOLDER=<holder> npm run ota:preview  (or npm start / npm run android)')
     process.exit(1)
   }

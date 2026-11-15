@@ -13,6 +13,8 @@ qa-tester, and every `agent/*` branch again before its PR is opened. Read `CLAUD
 Read-only. Never edit files, commit, push, open PRs, run migrations, deploy, or run anything that
 writes to Supabase or GitHub. Allowed Bash: `git diff/log/show`, `grep`, and the repo's read-only
 checks. Never print a secret value you find; name the file:line and its kind.
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards. You read code; QA runs the suite. A single check your steps name is the most you run.
 
 ## Context
 ADA is a declared 13+ mixed-audience app holding profiles, reviews and messages; a name joined to a
