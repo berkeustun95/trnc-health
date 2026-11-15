@@ -117,6 +117,13 @@ is('derived string re-parses to its source entry',
 //   `const` in the same file whose initializer is string literals joined by `+`. ANYTHING
 //   ELSE — an import, a call, a template with ${} — FAILS and prints what it read. An
 //   argument this check cannot see through is not evidence the column is selected.
+//
+//   Since 2026-11-15 two more shapes resolve (ExploreScreen's `review ? \`${BROWSE_COLS}, status\` :
+//   BROWSE_COLS` failed this check from e3b1c0b1, 2026-09-23, although both branches select the column):
+//   - `cond ? A : B` — BOTH branches must resolve and BOTH must carry the columns, because either
+//     one can be the query that runs. The condition is not read.
+//   - a template literal whose every ${…} is a bare identifier resolving to a const as above.
+//   Any other interpolation, a call, an import or an unbalanced argument still FAILS.
 import { readFileSync as _read } from 'node:fs'
 import { resolve as _resolve, dirname as _dirname } from 'node:path'
 import { fileURLToPath as _url } from 'node:url'
@@ -146,34 +153,112 @@ function readLiteralChain(s) {
   }
 }
 
-// → { cols } on success, { why } on failure. Never guesses.
+// The const NAME's initializer, if it is plain string literals joined by `+`; else null.
+function constLiteral(src, name) {
+  const decl = new RegExp(`(?:^|\\n)\\s*(?:export\\s+)?const\\s+${name}\\s*=`).exec(src)
+  return decl ? readLiteralChain(src.slice(decl.index + decl[0].length)) : undefined
+}
+
+// The text of the first argument of a call whose `(` is just before s[0]: up to the top-level `,`
+// or the matching `)`, skipping strings and nesting. null if it never closes.
+function firstArg(s) {
+  let depth = 0
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (c === "'" || c === '"' || c === '`') {
+      let j = i + 1
+      for (; j < s.length && s[j] !== c; j++) {
+        if (s[j] === '\\') j++
+        else if (c === '`' && s[j] === '$' && s[j + 1] === '{') {
+          let d = 1; j += 2
+          for (; j < s.length && d; j++) { if (s[j] === '{') d++; else if (s[j] === '}') d-- }
+          j--
+        }
+      }
+      if (j >= s.length) return null
+      i = j; continue
+    }
+    if (c === '(' || c === '[' || c === '{') depth++
+    else if (c === ')' || c === ']' || c === '}') { if (depth === 0) return s.slice(0, i); depth-- }
+    else if (c === ',' && depth === 0) return s.slice(0, i)
+  }
+  return null
+}
+
+// Splits `cond ? A : B` at its top-level ? and : (outside strings and brackets). null if not a ternary.
+function splitTernary(e) {
+  let depth = 0, q = -1
+  for (let i = 0; i < e.length; i++) {
+    const c = e[i]
+    if (c === "'" || c === '"' || c === '`') {
+      let j = i + 1
+      for (; j < e.length && e[j] !== c; j++) if (e[j] === '\\') j++
+      i = j; continue
+    }
+    if (c === '(' || c === '[' || c === '{') depth++
+    else if (c === ')' || c === ']' || c === '}') depth--
+    else if (depth === 0 && c === '?' && e[i + 1] !== '.' && e[i + 1] !== '?' && q === -1) q = i
+    else if (depth === 0 && c === ':' && q !== -1) return [e.slice(q + 1, i), e.slice(i + 1)]
+  }
+  return null
+}
+
+// One select expression → { cols, via } or { why }. Literal, const, const-only template, or ternary.
+function resolveExpr(src, raw) {
+  const e = raw.trim()
+  const t = splitTernary(e)
+  if (t) {
+    const sides = t.map(b => resolveExpr(src, b))
+    const bad = sides.find(r => r.why)
+    if (bad) return { why: `ternary branch unreadable: ${bad.why}` }
+    return { branches: sides, via: sides.map(r => r.via || 'literal').join(' | ') }
+  }
+  if (e.startsWith('`')) {
+    if (!e.endsWith('`')) return { why: `unreadable template — read: ${JSON.stringify(e.slice(0, 60))}` }
+    let bad = null
+    const cols = e.slice(1, -1).replace(/\$\{([^}]*)\}/g, (_, inner) => {
+      const name = inner.trim()
+      const v = /^[A-Za-z_$][\w$]*$/.test(name) ? constLiteral(src, name) : null
+      if (v == null) { bad ??= name; return '' }
+      return v
+    })
+    if (bad != null) return { why: `template interpolates ${JSON.stringify(bad)}, which is not a plain string-literal const in this file` }
+    return { cols, via: 'template' }
+  }
+  if (/^['"]/.test(e)) {
+    const cols = readLiteralChain(e)
+    return cols == null ? { why: `unreadable literal — read: ${JSON.stringify(e.slice(0, 60))}` } : { cols }
+  }
+  if (/^[A-Za-z_$][\w$]*$/.test(e)) {
+    const cols = constLiteral(src, e)
+    if (cols === undefined) return { why: `${e} is not declared as a const in this file` }
+    return cols == null ? { why: `${e} is not a plain string-literal initializer` } : { cols, via: e }
+  }
+  return { why: `select argument is not a literal, a const, a const-only template or a ternary of those — read: ${JSON.stringify(e.slice(0, 60))}` }
+}
+
+// → { cols } / { branches } on success, { why } on failure. Never guesses.
 function resolveSelectedCols(src) {
   const a = src.indexOf(ANCHOR)
   if (a === -1) return { why: `anchor ${ANCHOR} not found` }
   const after = src.slice(a + ANCHOR.length)
   const m = /^\s*\.select\(\s*/.exec(after)
   if (!m) return { why: `no .select( directly after the anchor — read: ${JSON.stringify(after.slice(0, 60))}` }
-  const arg = after.slice(m[0].length)
-  if (/^['"`]/.test(arg)) {
-    const cols = readLiteralChain(arg)
-    return cols == null ? { why: `unreadable literal — read: ${JSON.stringify(arg.slice(0, 60))}` } : { cols }
-  }
-  const id = /^([A-Za-z_$][\w$]*)\s*\)/.exec(arg)
-  if (!id) return { why: `select argument is neither a literal nor a bare identifier — read: ${JSON.stringify(arg.slice(0, 60))}` }
-  const decl = new RegExp(`(?:^|\\n)\\s*(?:export\\s+)?const\\s+${id[1]}\\s*=`).exec(src)
-  if (!decl) return { why: `${id[1]} is not declared as a const in this file` }
-  const cols = readLiteralChain(src.slice(decl.index + decl[0].length))
-  return cols == null ? { why: `${id[1]} is not a plain string-literal initializer` } : { cols, via: id[1] }
+  const arg = firstArg(after.slice(m[0].length))
+  if (arg == null) return { why: `select( never closes — read: ${JSON.stringify(after.slice(m[0].length, m[0].length + 60))}` }
+  return resolveExpr(src, arg)
 }
 
 const hasCol = (cols, c) => new RegExp(`(^|[\\s,(])${c}($|[\\s,)])`).test(cols)
 const coverage = src => {
   const r = resolveSelectedCols(src)
   if (r.why) return { ok: false, why: r.why }
-  const missing = ['photo_credits', 'photo_attribution'].filter(c => !hasCol(r.cols, c))
-  return missing.length
-    ? { ok: false, why: `select${r.via ? ` (via ${r.via})` : ''} omits ${missing.join(', ')} — read: ${JSON.stringify(r.cols)}` }
-    : { ok: true, via: r.via }
+  const flat = x => x.branches ? x.branches.flatMap(flat) : [x]
+  for (const b of flat(r)) {
+    const missing = ['photo_credits', 'photo_attribution'].filter(c => !hasCol(b.cols, c))
+    if (missing.length) return { ok: false, why: `select${r.via ? ` (via ${r.via})` : ''} omits ${missing.join(', ')} in ${r.branches ? 'a ternary branch' : 'its columns'} — read: ${JSON.stringify(b.cols)}` }
+  }
+  return { ok: true, via: r.via }
 }
 
 // The resolver must be seen to go red on every shape it refuses, every run — not once, in
@@ -187,6 +272,11 @@ for (const [want, name, src] of [
   [false, 'look-alike column name',              "supabase.from('places').select('id, photo_credits, photo_attribution_old')"],
   [false, 'identifier not declared here',        "import { C } from './x'\nsupabase.from('places').select(C)"],
   [false, 'template with interpolation',         "const C = `id, ${extra}, photo_credits, photo_attribution`\nsupabase.from('places').select(C)"],
+  [true,  'ternary, both branches carry both',   "const C = 'id, photo_credits, photo_attribution'\nsupabase.from('places').select(r ? `${C}, status` : C).in('s', x)"],
+  [false, 'ternary, one branch omits a column',  "const C = 'id, photo_credits, photo_attribution'\nsupabase.from('places').select(r ? `${C}, status` : 'id, photo_credits')"],
+  [false, 'ternary branch is a call',            "const C = 'id, photo_credits, photo_attribution'\nsupabase.from('places').select(r ? cols() : C)"],
+  [false, 'template interpolates an expression', "const C = 'id, photo_credits, photo_attribution'\nsupabase.from('places').select(`${r ? C : ''}, status`)"],
+  [true,  'inline template of a const',          "const C = 'id, photo_credits, photo_attribution'\nsupabase.from('places').select(`${C}, status`, { count: 'exact' })"],
   // unpaged-ok: a test fixture string, not a query
   [false, 'anchor absent',                       "supabase.from('events').select('photo_credits, photo_attribution')"],
 ]) {

@@ -24,6 +24,12 @@ Read-only for app code. You never edit app files, commit, push or publish. You r
 and the guard scripts, and you write reports. Implementation goes principal-engineer → senior-app-engineer
 → qa-tester → release-engineer. Never start a dev server or device test from `~/trnc-health` (shared);
 create a fresh worktree from current main when one is needed.
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards. You read code; QA runs the suite. Light checks your steps name (e.g. `i18n:validate`,
+  `home:check`, `hero:check`, `labels:check`, `refs:check`, `check:secrets`) are free. Heavy ones (`ads:check`,
+  `ads:selftest`, `release-lane:test`, `check:migration-numbers`) refuse without the suite lock: take it
+  (`node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`), run with `ADA_SUITE_HOLDER=<you>-<slug>`,
+  release right after; held by someone else = wait, or leave it to QA and say so.
 
 ## Eyes (Mac only)
 The ONLY device is Berke's Android phone over USB (USB debugging on). `scripts/screenshot-android.sh --prep`
