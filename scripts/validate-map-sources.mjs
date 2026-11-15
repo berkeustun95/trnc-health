@@ -149,10 +149,11 @@ console.log('\nexplore DARK (simulated — the pre-launch world, still asserted)
 const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false, eateryLive: false })
 const darkCounts = summarise(dark)
 
-check('sources are exactly clinic, hospital, nature', Object.keys(darkCounts),
-  ['health:clinic', 'health:hospital', 'explore:nature'])
+check('sources are exactly clinic, hospital, beach', Object.keys(darkCounts),
+  ['health:clinic', 'health:hospital', 'explore:beach'])
 check('heritage contributes NO pins', darkCounts['explore:heritage'] ?? 0, 0)
-check('beaches stay live (nature = 4)', darkCounts['explore:nature'], 4)
+check('beaches stay live as their own source (beach = 4)', darkCounts['explore:beach'], 4)
+check('an empty Doğa draws no chip', 'explore:nature' in darkCounts, false)
 check('pharmacy earns no chip (0 geocoded)', darkCounts['health:pharmacy'] ?? 0, 0)
 check('dentist earns no chip (0 rows)', darkCounts['health:dentist'] ?? 0, 0)
 check('hidden + pending facilities excluded', darkCounts['health:hospital'], 6)
@@ -166,11 +167,23 @@ const live = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacil
 const liveCounts = summarise(live)
 
 check('heritage appears with all 38', liveCounts['explore:heritage'], 38)
-check('nature still 4', liveCounts['explore:nature'], 4)
+check('beach still 4', liveCounts['explore:beach'], 4)
 check('empty groups draw no chip', Object.keys(liveCounts).filter(k => k.startsWith('explore:')),
-  ['explore:nature', 'explore:heritage'])
+  ['explore:beach', 'explore:heritage'])
 check('TOTAL PINNABLE = 49', live.reduce((n, s) => n + s.pins.length, 0), 49)
 check('fetch is unnarrowed', mapFetchCategories(true), null)
+
+// beach and nature are ONE gate: carved from the nature group, both inherit its `visible`.
+console.log('\nPlajlar carved out of nature — one gate, icon pin for beaches only')
+const SCENIC = [{ id: 'scn-0', category: 'nature_scenic', status: 'active', region: 'girne', latitude: 35.4, longitude: 33.4 }]
+const carveDark = summarise(buildMapSources({ facilities: [], places: [...PLACES, ...SCENIC], dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false, eateryLive: false }))
+const carveLive = buildMapSources({ facilities: [], places: [...PLACES, ...SCENIC], dutyFacilityId: null, isAdmin: true, petHotelLive: false, eateryLive: false })
+check('dark: beach and nature both follow LIVE_TILE_GROUPS', [carveDark['explore:beach'], carveDark['explore:nature']], [4, 1])
+check('live: beach and nature both appear', [summarise(carveLive)['explore:beach'], summarise(carveLive)['explore:nature']], [4, 1])
+check('Plajlar sits before Doğa, Doğa before heritage', carveLive.map(s => s.key), ['explore:beach', 'explore:nature', 'explore:heritage'])
+check('a beach pin is an icon pin (umbrella)', carveLive[0].pins.map(p => [p.iconPin, p.icon]).filter(([i, n]) => !i || n !== 'umbrella'), [])
+check('a nature_scenic pin is a default pin', carveLive[1].pins.map(p => [p.iconPin, p.icon]), [[false, null]])
+check('Plajlar label resolves in all 9 locales', Object.keys(LANG_CODES).filter(l => !t('blFilterBeaches', l) || t('blFilterBeaches', l) === 'blFilterBeaches'), [])
 
 console.log('\nchip selection — "All" must mean the union of VISIBLE sources')
 // Berke's requirement, and the reason it is a requirement: if "All" is ever implemented
@@ -183,7 +196,9 @@ const everyKey = selectedPins(dark, new Set(dark.map(s => s.key)))
 check('All totals 11, not 49', allDark.length, 11)
 check('All === ticking every chip by hand', [allDark.length, everyKey.length], [11, 11])
 check('All draws no heritage pin', allDark.filter(p => p.group === 'heritage').length, 0)
-check('one chip selects only that chip', selectedPins(dark, new Set(['explore:nature'])).length, 4)
+check('one chip selects only that chip', selectedPins(dark, new Set(['explore:beach'])).length, 4)
+check('the empty Doğa key selects nothing', selectedPins(dark, new Set(['explore:nature'])).length, 0)
+check('All includes the beaches', allDark.filter(p => p.row.category === 'beach').length, 4)
 // A key for a gated source must select NOTHING — it must never fall through to "All".
 check('a dark source key selects nothing', selectedPins(dark, new Set(['explore:heritage'])).length, 0)
 check('All totals 49 once explore is reachable', selectedPins(live, new Set()).length, 49)
