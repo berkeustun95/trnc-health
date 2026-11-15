@@ -3,8 +3,9 @@ const { withMainActivity } = require('expo/config-plugins');
 const MARKER = 'ada-held-new-intent';
 
 const MEMBERS = `  // @generated ${MARKER}
-  // expo-updates delays the app load, and the Expo wrapper drops onNewIntent until then, so a tap that
-  // recreates the activity (process reclaimed, task kept) never reaches expo-notifications. Hold it and replay once.
+  // Notification taps only (deep links are not covered). expo-updates delays the app load, and the Expo wrapper
+  // drops onNewIntent until then, so a tap that recreates the activity (process reclaimed, task kept) never reaches
+  // expo-notifications. Hold it and replay once.
   private var adaAppLoaded = false
   private var adaHeldIntent: Intent? = null
 
@@ -24,6 +25,16 @@ const MEMBERS = `  // @generated ${MARKER}
     }
   }
 
+`;
+
+const ONCREATE_RE = /^([ \t]*override\s+fun\s+onCreate\s*\(\s*savedInstanceState\s*:\s*Bundle\?\s*\)\s*\{[ \t]*\n)/m;
+
+const ONCREATE_STRIP = `    // @generated ${MARKER}
+    // A restored task comes back with its old launch intent; expo-notifications would queue those stale
+    // extras and then ignore the real tap that follows in onNewIntent.
+    if (savedInstanceState != null) {
+      intent?.replaceExtras(null as Bundle?)
+    }
 `;
 
 const DELEGATE_BODY = ` {
@@ -52,8 +63,13 @@ function applyHeldNewIntent(src) {
     throw new Error('withHeldNewIntent: anchor not found: "class MainActivity ... {"');
   }
 
+  if (!ONCREATE_RE.test(src)) {
+    throw new Error('withHeldNewIntent: anchor not found: "override fun onCreate(savedInstanceState: Bundle?) {"');
+  }
+
   let out = src.replace(delegateRe, (_, head) => head + DELEGATE_BODY);
   out = out.replace(classRe, (m) => m + MEMBERS);
+  out = out.replace(ONCREATE_RE, (m) => m + ONCREATE_STRIP);
   if (!/^import android\.content\.Intent\s*$/m.test(out)) {
     if (!/^import .*$/m.test(out)) {
       throw new Error('withHeldNewIntent: anchor not found: an import line');

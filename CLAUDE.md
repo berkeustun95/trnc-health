@@ -484,7 +484,14 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     foreground + themed (monochrome) icon, splash, notification icon and both Preview icons (`assets/brand/v2/`).
     Check on device (Android: launcher, themed icons on, splash, a push) and in TestFlight (iOS: home screen,
     splash) BEFORE submission. Old logo files stay until that release is out. Vault `2026-10-24_logo-v2-compass.md`.
-  - **Closed-app tap test (Android, new with `plugins/withHeldNewIntent.js`)**: open ADA, background it, `adb shell am kill com.berkeustun95.ada` (process reclaimed, task kept), send `gh workflow run push-test -f email=<QA account> -f kind=duty`, tap the push → must open Nöbetçi Eczaneler, not Home. Repeat with the task first opened from a notification (stale-extras variant), and once swiped out of recents (fresh onCreate, must still work). Device-only; the plugin is inert until a native build.
+  - **Closed-app tap test (Android, new with `plugins/withHeldNewIntent.js`; device-only, inert until a native build)**:
+    `<QA account>` stays a placeholder. Cases, each must open the tapped push's screen, not Home: (a) open ADA from the
+    launcher icon, background it, `adb shell am kill com.berkeustun95.ada` (process reclaimed, task kept),
+    `gh workflow run push-test -f email=<QA account> -f kind=duty`, tap → Nöbetçi Eczaneler; (b) stale extras: first
+    open ADA by tapping a `kind=messages` push, then background, `am kill`, send `kind=duty`, tap → Nöbetçi Eczaneler
+    (not the Messages tab from the first push); (c) swiped out of recents (fresh onCreate) → still works; (d) warm tap
+    (app in background, process alive) → still works, once. Baseline: case (a) fails on the 1.4.2 store build, so see
+    it red there first. Not covered: an `ada://` link arriving in the same window.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.

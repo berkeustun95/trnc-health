@@ -40,6 +40,41 @@ describe('withHeldNewIntent transform', () => {
     expect(applyHeldNewIntent(out)).toBe(out);
   });
 
+  describe('restored-task extras strip', () => {
+    const withSplash = template.replace(
+      '    setTheme(R.style.AppTheme);\n',
+      '    SplashScreenManager.registerOnActivity(this)\n    setTheme(R.style.AppTheme);\n'
+    );
+    const strip = 'intent?.replaceExtras(null as Bundle?)';
+
+    test.each([['plain template', template], ['template with splash lines', withSplash]])(
+      'strip is present once, in onCreate before super.onCreate, guarded (%s)',
+      (_, src) => {
+        const o = applyHeldNewIntent(src);
+        expect(count(o, strip)).toBe(1);
+        const create = o.indexOf('override fun onCreate(savedInstanceState: Bundle?) {');
+        const at = o.indexOf(strip);
+        const sup = o.indexOf('super.onCreate(');
+        expect(create).toBeGreaterThan(-1);
+        expect(at).toBeGreaterThan(create);
+        expect(at).toBeLessThan(sup);
+        expect(o.slice(create, at)).toContain('if (savedInstanceState != null) {');
+        expect(o.slice(create, at)).not.toContain('setTheme(');
+        expect(applyHeldNewIntent(o)).toBe(o);
+      }
+    );
+
+    test('splash fixture really differs from the template', () => {
+      expect(withSplash).not.toBe(template);
+    });
+
+    test('throws without the onCreate anchor', () => {
+      const broken = template.replace('override fun onCreate(savedInstanceState: Bundle?)', 'override fun onStart()');
+      expect(broken).not.toBe(template);
+      expect(() => applyHeldNewIntent(broken)).toThrow(/onCreate/);
+    });
+  });
+
   test('throws without the delegate anchor', () => {
     const broken = template.replace('DefaultReactActivityDelegate(', 'OtherDelegate(');
     expect(() => applyHeldNewIntent(broken)).toThrow(/DefaultReactActivityDelegate/);
