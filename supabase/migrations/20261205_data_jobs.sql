@@ -17,6 +17,12 @@
 --   Only runner cron_sql (the statement runs inside the database) reads cron.job_run_details,
 --   status + start/end times only. return_message and cron.job.command are NEVER read or returned
 --   (commands carry auth headers).
+--   KNOWN LIMIT, two cron_sql jobs: 'featured-expiry-reminder' (process_featured_expiring(), read in
+--   20261066_notification_type.sql, its latest definition) and 'marketplace-photo-review-reminder'
+--   (marketplace_photo_review_reminder(), read in 20261196_marketplace_photo_review_reminder.sql) write
+--   their rows and then queue the Expo push with net.http_post from inside the SQL function. For
+--   them cron's "succeeded" proves only the in-database half (rows written, push request queued),
+--   NOT that the push was delivered: pg_net answers later and nothing here reads net._http_response.
 --
 -- ─── WHO CAN READ / WRITE WHAT ──────────────────────────────────────────────
 --   data_jobs, data_job_runs: RLS ON, ZERO policies, every privilege revoked from PUBLIC, anon and
@@ -24,8 +30,10 @@
 --     provider, guest or admin-in-the-app can read or write them directly.
 --   admin_data_jobs(): the ONLY way the app reads the registry. SECURITY DEFINER, refuses unless
 --     the session has a user, is NOT an anonymous (guest) session, and is an admin. is_admin() alone
---     is not enough: it only checks profiles.role and guests are `authenticated` too. EXECUTE is
---     granted to authenticated only (revoked from PUBLIC and anon). It writes nothing. It returns
+--     is not enough: it only checks profiles.role and guests are `authenticated` too. EXECUTE is held by authenticated
+--     (by grant), and by service_role and postgres (service_role through Supabase's default function
+--     privileges, postgres as owner); revoked from PUBLIC and anon. service_role and postgres are still
+--     refused inside by the uid gate (no uid in their session). It writes nothing. It returns
 --     job names, schedules and run outcomes: no user rows, no ids, no counts of people.
 --   record_data_job_run(): inserts one finished run row. EXECUTE for service_role ONLY. An
 --     unknown job key raises UNKNOWN_JOB; outcome 'running' is not accepted here (a finished row).
@@ -61,6 +69,10 @@
 --   attention false) when they have no own record, because their writers do not exist yet; a later
 --   release tightens it. Known limit: a github / cron_http job whose own records were ALL purged
 --   (data_job_runs keeps 90 days) reads 'no_record', not 'stale'.
+--   Rescheduling: any cron.unschedule + cron.schedule of a job (a re-apply of this file, or any future
+--   reschedule migration) gives it a NEW jobid, and the new jobid has no cron.job_run_details rows. So a
+--   cron_sql job with expected_every reads 'stale' with attention true until its next run lands. Slice
+--   5's watchdog must allow for that (e.g. a grace period after a reschedule), not page on it.
 --   First apply: 'purge-data-job-runs' is scheduled by this very file and has no run yet, so it
 --   legitimately reads 'stale' (attention true) until its first 03:43 UTC run: the screen shows it
 --   as stale for up to a day after the apply. That is expected, not a fault.
@@ -211,7 +223,7 @@ CREATE OR REPLACE FUNCTION public.data_jobs_overview(p_now timestamptz DEFAULT n
  RETURNS jsonb
  LANGUAGE sql
  STABLE
- SET search_path TO 'public', 'pg_catalog'
+ SET search_path TO 'public'
 AS $function$
   WITH runs AS (
     -- own records: data_job_runs (github + cron_http jobs only)
@@ -322,7 +334,7 @@ CREATE OR REPLACE FUNCTION public.admin_data_jobs()
  LANGUAGE plpgsql
  STABLE
  SECURITY DEFINER
- SET search_path TO 'public', 'pg_catalog'
+ SET search_path TO 'public'
 AS $function$
 BEGIN
   IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN
@@ -347,7 +359,7 @@ CREATE OR REPLACE FUNCTION public.record_data_job_run(
   p_started_at  timestamptz DEFAULT NULL)
  RETURNS bigint
  LANGUAGE plpgsql
- SET search_path TO 'public', 'pg_catalog'
+ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_id bigint;
@@ -497,6 +509,7 @@ BEGIN
     v_at       text[] := ARRAY[]::text[];
     v_ls       jsonb;
     v_ls_cron  int;
+    v_ina      text[] := ARRAY[]::text[];
   BEGIN
     SELECT count(*) INTO v_before FROM public.data_job_runs;
     BEGIN
@@ -514,7 +527,7 @@ BEGIN
         v_badout := 'ACCEPTED';
       EXCEPTION WHEN raise_exception THEN v_badout := SQLERRM;
       END;
-      RESET ROLE;
+      SET LOCAL ROLE postgres;
 
       SET LOCAL ROLE anon;
       BEGIN
@@ -527,7 +540,7 @@ BEGIN
         v_anon_fn := 'ALLOWED';
       EXCEPTION WHEN insufficient_privilege THEN v_anon_fn := 'denied';
       END;
-      RESET ROLE;
+      SET LOCAL ROLE postgres;
 
       SET LOCAL ROLE authenticated;
       BEGIN
@@ -540,7 +553,7 @@ BEGIN
         v_auth_fn := 'ALLOWED';
       EXCEPTION WHEN insufficient_privilege THEN v_auth_fn := 'denied';
       END;
-      RESET ROLE;
+      SET LOCAL ROLE postgres;
 
       -- the table CHECKs hold
       BEGIN
@@ -592,6 +605,16 @@ BEGIN
       v_st := v_st || ('paused:' || v_own);
       v_at := v_at || (v_att);
 
+      -- inactive WITH expected_every needs attention; WITHOUT it, none. A probe row naming a cron job that does
+      -- not exist reads 'inactive' (a covered job is missing), so no cron.* row is touched.
+      INSERT INTO public.data_jobs (key, runner, kind, cron_jobnames, expected_every, sort)
+        VALUES ('probe-inactive-cron', 'cron_sql', 'maintenance', ARRAY['zz-probe-no-such-cron-job'], interval '1 hour', 9999);
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'probe-inactive-cron';
+      v_ina := v_ina || ('with_expected:' || v_own || ':' || v_att);
+      UPDATE public.data_jobs SET expected_every = NULL WHERE key = 'probe-inactive-cron';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'probe-inactive-cron';
+      v_ina := v_ina || ('without_expected:' || v_own || ':' || v_att);
+
       SELECT e INTO v_ls FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'live-scores';
       SELECT count(*) INTO v_ls_cron FROM cron.job j JOIN public.data_jobs dj ON j.jobname = ANY (dj.cron_jobnames)
        WHERE dj.key = 'live-scores' AND j.active;
@@ -600,7 +623,7 @@ BEGIN
     EXCEPTION WHEN raise_exception THEN
       IF SQLERRM IS DISTINCT FROM 'ZZ_PROBE_ROLLBACK' THEN RAISE; END IF;
     END;
-    RESET ROLE;
+    SET LOCAL ROLE postgres;
 
     IF v_svc_n     IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'service_role record_data_job_run wrote % rows, expected 1', v_svc_n; END IF;
     IF v_unknown   IS DISTINCT FROM 'UNKNOWN_JOB' THEN RAISE EXCEPTION 'unknown job key was %', v_unknown; END IF;
@@ -618,6 +641,9 @@ BEGIN
     IF v_at IS DISTINCT FROM ARRAY['false', 'true', 'true', 'true', 'false', 'false'] THEN
       RAISE EXCEPTION 'attention probe (ok, failed, stale, cut_off, no_record, paused): %', v_at;
     END IF;
+    IF v_ina IS DISTINCT FROM ARRAY['with_expected:inactive:true', 'without_expected:inactive:false'] THEN
+      RAISE EXCEPTION 'inactive attention probe: %', v_ina;
+    END IF;
     -- live-scores: judged against what cron.job says; deliberately off (expected_every NULL) = no attention
     IF v_ls IS NULL THEN RAISE EXCEPTION 'live-scores missing from the overview'; END IF;
     IF v_ls_cron = 0 THEN
@@ -627,7 +653,7 @@ BEGIN
     ELSE
       RAISE NOTICE 'live-scores has active cron jobs here; the inactive-and-deliberate assertion is skipped';
     END IF;
-    IF (SELECT count(*) FROM public.data_job_runs) IS DISTINCT FROM v_before OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused OR switchable OR key = 'probe-github-with-cron') THEN
+    IF (SELECT count(*) FROM public.data_job_runs) IS DISTINCT FROM v_before OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused OR switchable OR key IN ('probe-github-with-cron', 'probe-inactive-cron')) THEN
       RAISE EXCEPTION 'probe rows leaked';
     END IF;
   END;
@@ -672,7 +698,7 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN v_r := SQLERRM;
   END;
   IF v_r IS DISTINCT FROM 'ADMIN_ONLY' THEN
-    RESET ROLE; PERFORM set_config('request.jwt.claims', '', true);
+    SET LOCAL ROLE postgres; PERFORM set_config('request.jwt.claims', '', true);
     RAISE EXCEPTION 'an anonymous-flagged admin session got: %', v_r;
   END IF;
 
@@ -685,7 +711,7 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN v_r := SQLERRM;
   END;
   IF v_r IS DISTINCT FROM 'ADMIN_ONLY' THEN
-    RESET ROLE; PERFORM set_config('request.jwt.claims', '', true);
+    SET LOCAL ROLE postgres; PERFORM set_config('request.jwt.claims', '', true);
     RAISE EXCEPTION 'a random non-admin session got: %', v_r;
   END IF;
 
@@ -697,7 +723,7 @@ BEGIN
     v_r := 'ALLOWED';
   EXCEPTION WHEN raise_exception THEN v_r := SQLERRM;
   END;
-  RESET ROLE;
+  SET LOCAL ROLE postgres;
   PERFORM set_config('request.jwt.claims', '', true);
   IF v_r IS DISTINCT FROM 'ADMIN_ONLY' THEN
     RAISE EXCEPTION 'a session with no uid got: %', v_r;
@@ -750,7 +776,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261205_data_jobs.sql', 'a874befd7ece6965b34181759836323be19848583bd39ba8b5e47e617f4ef6d1')
+VALUES ('20261205_data_jobs.sql', '0192ca097272de0ba8b7eaf058da7e91a14cf849ac9b76b3991507a07306077a')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

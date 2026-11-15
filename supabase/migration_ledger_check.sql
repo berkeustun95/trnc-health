@@ -310,7 +310,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261202_onboarding_events.sql', '2ebc3768d5380bd3e85909d4b79de053fe3b4b3ec29d47cb74d536cc324a9645'),
   ('20261203_onboarding_events_retention.sql', '4f27e2421f90a4ba5dc92d4da2ffff67e9b3958ff886b0e49bd20c56c7485923'),
   ('20261204_onboarding_events_start_choice.sql', '0338f3daee79b884fbd6f6aab339651ac17b9415c1657c0360abfb08b187d437'),
-  ('20261205_data_jobs.sql', 'a874befd7ece6965b34181759836323be19848583bd39ba8b5e47e617f4ef6d1')
+  ('20261205_data_jobs.sql', '0192ca097272de0ba8b7eaf058da7e91a14cf849ac9b76b3991507a07306077a')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
