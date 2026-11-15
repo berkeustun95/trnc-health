@@ -2250,6 +2250,9 @@ export default function App() {
     )
   } else if (!session) {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
+  } else if ((loading || !profile) && onbPending === 'duty') {
+    // Onboarding v2: Screen 2 comes next, so a Home-shaped skeleton here would flash a screen the user is not going to.
+    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (loading || !profile) {
     content = (
       <PageCanvas>
