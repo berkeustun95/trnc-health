@@ -137,22 +137,15 @@ describe('decideOnboardingStep: Giriş yap (pending signin, decided by this devi
   })
 })
 
-// The pending value each Start / Auth action leaves behind (App.js startAsGuest / startLogin / startSignUp /
-// authModeChanged on a device not yet onboarded), then the decision it leads to.
+// The pending value each Start / Auth action leaves behind on a device not yet onboarded (the overwrite
+// itself is pinned in onboardingAppWiring.test.js), and the decision it leads to.
 describe('Start choices in sequence', () => {
-  const undetermined = { status: 'undetermined', canAskAgain: true }
-  const arm = { guest: S.PENDING_DUTY, signup: S.PENDING_SIGNUP, signin: S.PENDING_SIGNIN }
-  test('Kayıt ol -> back -> Misafir olarak devam et: duty', () => {
-    let pending = arm.signup
-    pending = arm.guest
-    expect(pending).toBe('duty')
-    expect(step({ pending, isGuest: true, role: undefined })).toEqual(r('duty'))
+  test('Kayıt ol -> back -> Misafir olarak devam et: duty replaces signup -> Screen 2', () => {
+    expect(step({ pending: S.PENDING_DUTY, isGuest: true, role: undefined })).toEqual(r('duty'))
   })
-  test('Kayıt ol -> back -> Giriş yap: signin, then the permission decides', () => {
-    let pending = arm.signup
-    pending = arm.signin
-    expect(pending).toBe('signin')
-    expect(step({ pending, perm: undetermined })).toEqual(r('duty'))
+  test('Kayıt ol -> back -> Giriş yap: signin replaces signup -> the permission decides', () => {
+    expect(step({ pending: S.PENDING_SIGNIN, perm: { status: 'undetermined', canAskAgain: true } })).toEqual(r('duty'))
+    expect(step({ pending: S.PENDING_SIGNIN, perm: { status: 'granted', canAskAgain: true } })).toEqual(r('app', true, true))
   })
 })
 
