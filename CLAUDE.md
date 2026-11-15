@@ -484,6 +484,17 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     foreground + themed (monochrome) icon, splash, notification icon and both Preview icons (`assets/brand/v2/`).
     Check on device (Android: launcher, themed icons on, splash, a push) and in TestFlight (iOS: home screen,
     splash) BEFORE submission. Old logo files stay until that release is out. Vault `2026-10-24_logo-v2-compass.md`.
+  - **Closed-app tap test (Android, new with `plugins/withHeldNewIntent.js`; device-only, inert until a native build)**:
+    `<QA account>` stays a placeholder. Run every case on a release-variant build (store or Preview APK), never a debug /
+    dev-client build (there the dev menu skips the replay and the fix looks absent). Cases, each must open the tapped
+    push's screen, not Home: (a) open ADA from the launcher icon, background it,
+    `adb shell am kill com.berkeustun95.ada` (process reclaimed, task kept),
+    `gh workflow run push-test -f email=<QA account> -f kind=duty`, tap → Nöbetçi Eczaneler; (b) stale extras: swipe ADA
+    out of recents, send `kind=messages`, tap it (cold open, so the push is the task's root intent), then background,
+    `am kill`, send `kind=duty`, tap → Nöbetçi Eczaneler (not the Messages tab from the first push); (c) swiped out of
+    recents (fresh onCreate) → still works; (d) warm tap (app in background, process alive) → still works, once.
+    Baseline: case (a) fails on the 1.4.2 store build, so see it red there first; (b) has no separate red baseline (on
+    1.4.2 it fails for the same reason as (a)). Not covered: an `ada://` link arriving in the same window.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.

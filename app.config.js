@@ -120,6 +120,7 @@ export default {
     },
     plugins: [
       '@react-native-community/datetimepicker',
+      './plugins/withHeldNewIntent',
       // Native splash = the 1.4.1 look: the v2 logo on white. BootSplash.js draws an identical frame
       // (MorphFrame) and cross-fades it into the clip's first still. Every value is set: the props
       // path defaults differ from the legacy one (imageWidth 100, no fullscreen).
