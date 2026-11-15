@@ -424,9 +424,9 @@ its own pre-merge check. (2) jest is capped at 2 workers (`"maxWorkers": 2` in p
 `--maxWorkers`. (3) One full suite at a time across sessions: `node scripts/preview-lock.mjs --suite take <holder>
 "<what for>"`, run `ADA_SUITE_HOLDER=<holder> npm test` (refused without the lock) plus the guards, then
 `--suite release <holder>` right away. Held by someone else: wait. **Heavy single checks take the same lock**
-(Berke, 2026-11-15; the npm scripts refuse without it): `labels:check` (Berke's pick), `ads:selftest` (~86 s CPU),
+(Berke, 2026-11-15; the npm scripts refuse without it): `ads:selftest` (~86 s CPU),
 `release-lane:test` (~31 s), `check:migration-numbers` (~21 s), `ads:check` (~6 s). Measured 2026-11-15; heavy =
-5 s CPU or more. Every other check is light (under 2 s) and free to run, reviewers included. The small jest files in `ota`/`ota:preview` run
+5 s CPU or more. Every other check is light (under 2 s, `labels:check` included) and free to run, reviewers included. The small jest files in `ota`/`ota:preview` run
 under the publish locks instead. Hermes has no vault, so the check passes there and says so.
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
