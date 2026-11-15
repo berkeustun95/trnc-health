@@ -51,6 +51,11 @@
 -- ─── STATE (first match wins) ───────────────────────────────────────────────
 --   inactive (a covered cron job is missing or inactive) → paused → no_record → failed →
 --   stale (expected_every set and last_ok_at older than it, or none) → ok.
+--   attention (boolean, never null, one more key on every element, derived from state): true when
+--   state is failed or stale, or inactive on a job that HAS an expected_every. An inactive job with
+--   expected_every NULL (live-scores: six cron jobs paused on purpose since 20261090) is deliberately
+--   off: attention false. paused, no_record and ok never need attention. The screen and slice 5's
+--   watchdog count `attention`, not a list of states, so a deliberate pause cannot sit red forever.
 --
 -- ─── expected_every: HOW IT WAS CHOSEN ──────────────────────────────────────
 --   GitHub schedules start about 7 h late (measured: 4.2–8.7 h on the four daily workflows), and
@@ -259,6 +264,16 @@ AS $function$
       FROM public.data_jobs d
       LEFT JOIN last_run l ON l.job_key = d.key
       LEFT JOIN last_ok o ON o.job_key = d.key
+  ), judged AS (
+    SELECT j.*,
+           CASE
+             WHEN j.cron_active IS NOT DISTINCT FROM false THEN 'inactive'
+             WHEN j.paused THEN 'paused'
+             WHEN j.l_key IS NULL THEN 'no_record'
+             WHEN j.l_outcome = 'failed' OR j.l_cut THEN 'failed'
+             WHEN j.expected_every IS NOT NULL AND (j.last_ok_at IS NULL OR j.last_ok_at < p_now - j.expected_every) THEN 'stale'
+             ELSE 'ok' END AS state
+      FROM job j
   )
   SELECT coalesce(jsonb_agg(jsonb_build_object(
     'key', j.key,
@@ -277,15 +292,10 @@ AS $function$
                   'source', j.l_source) END,
     'last_ok_at', j.last_ok_at,
     'record_source', CASE WHEN j.l_key IS NULL THEN NULL ELSE j.l_rec END,
-    'state', CASE
-      WHEN j.cron_active IS NOT DISTINCT FROM false THEN 'inactive'
-      WHEN j.paused THEN 'paused'
-      WHEN j.l_key IS NULL THEN 'no_record'
-      WHEN j.l_outcome = 'failed' OR j.l_cut THEN 'failed'
-      WHEN j.expected_every IS NOT NULL AND (j.last_ok_at IS NULL OR j.last_ok_at < p_now - j.expected_every) THEN 'stale'
-      ELSE 'ok' END
+    'state', j.state,
+    'attention', (j.state IN ('failed', 'stale') OR (j.state = 'inactive' AND j.expected_every IS NOT NULL))
   ) ORDER BY j.sort, j.key), '[]'::jsonb)
-  FROM job j
+  FROM judged j
 $function$;
 
 REVOKE ALL ON FUNCTION public.data_jobs_overview(timestamptz) FROM PUBLIC, anon, authenticated, service_role;
@@ -467,6 +477,10 @@ BEGIN
     v_before   int;
     v_st       text[] := ARRAY[]::text[];
     v_own      text;
+    v_att      text;
+    v_at       text[] := ARRAY[]::text[];
+    v_ls       jsonb;
+    v_ls_cron  int;
   BEGIN
     SELECT count(*) INTO v_before FROM public.data_job_runs;
     BEGIN
@@ -534,27 +548,37 @@ BEGIN
       DELETE FROM public.data_job_runs WHERE job_key = 'araclar-photo-cleanup';
       INSERT INTO public.data_job_runs (job_key, started_at, finished_at, outcome, source) VALUES
         ('araclar-photo-cleanup', now() - interval '1 hour', now() - interval '59 minutes', 'ok', 'github');
-      SELECT e->>'state' INTO v_own FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
       v_st := v_st || ('ok_run:' || v_own);
+      v_at := v_at || (v_att);
       INSERT INTO public.data_job_runs (job_key, started_at, finished_at, outcome, error_class, source) VALUES
         ('araclar-photo-cleanup', now() - interval '30 minutes', now() - interval '29 minutes', 'failed', 'http_500', 'github');
-      SELECT e->>'state' INTO v_own FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
       v_st := v_st || ('failed_run:' || v_own);
+      v_at := v_at || (v_att);
       DELETE FROM public.data_job_runs WHERE job_key = 'araclar-photo-cleanup';
       INSERT INTO public.data_job_runs (job_key, started_at, finished_at, outcome, source) VALUES
         ('araclar-photo-cleanup', now() - interval '40 hours', now() - interval '40 hours', 'ok', 'github');
-      SELECT e->>'state' INTO v_own FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
       v_st := v_st || ('old_ok:' || v_own);
+      v_at := v_at || (v_att);
       INSERT INTO public.data_job_runs (job_key, started_at, outcome, source) VALUES
         ('araclar-photo-cleanup', now() - interval '20 minutes', 'running', 'github');
-      SELECT e->>'state' INTO v_own FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
       v_st := v_st || ('cut_off:' || v_own);
+      v_at := v_at || (v_att);
       DELETE FROM public.data_job_runs WHERE job_key = 'araclar-photo-cleanup';
-      SELECT e->>'state' INTO v_own FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
       v_st := v_st || ('none:' || v_own);
+      v_at := v_at || (v_att);
       UPDATE public.data_jobs SET switchable = true, paused = true WHERE key = 'araclar-photo-cleanup';
-      SELECT e->>'state' INTO v_own FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
+      SELECT e->>'state', e->>'attention' INTO v_own, v_att FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'araclar-photo-cleanup';
       v_st := v_st || ('paused:' || v_own);
+      v_at := v_at || (v_att);
+
+      SELECT e INTO v_ls FROM jsonb_array_elements(public.data_jobs_overview()) e WHERE e->>'key' = 'live-scores';
+      SELECT count(*) INTO v_ls_cron FROM cron.job j JOIN public.data_jobs dj ON j.jobname = ANY (dj.cron_jobnames)
+       WHERE dj.key = 'live-scores' AND j.active;
 
       RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
     EXCEPTION WHEN raise_exception THEN
@@ -574,6 +598,18 @@ BEGIN
     IF v_chk_gh    IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'cron_jobnames on a github row was %', v_chk_gh; END IF;
     IF v_st IS DISTINCT FROM ARRAY['ok_run:ok', 'failed_run:failed', 'old_ok:stale', 'cut_off:failed', 'none:no_record', 'paused:paused'] THEN
       RAISE EXCEPTION 'state logic probe: %', v_st;
+    END IF;
+    IF v_at IS DISTINCT FROM ARRAY['false', 'true', 'true', 'true', 'false', 'false'] THEN
+      RAISE EXCEPTION 'attention probe (ok, failed, stale, cut_off, no_record, paused): %', v_at;
+    END IF;
+    -- live-scores: judged against what cron.job says; deliberately off (expected_every NULL) = no attention
+    IF v_ls IS NULL THEN RAISE EXCEPTION 'live-scores missing from the overview'; END IF;
+    IF v_ls_cron = 0 THEN
+      IF v_ls->>'state' IS DISTINCT FROM 'inactive' OR v_ls->'attention' IS DISTINCT FROM 'false'::jsonb THEN
+        RAISE EXCEPTION 'live-scores (all cron jobs inactive) read state %, attention %', v_ls->>'state', v_ls->>'attention';
+      END IF;
+    ELSE
+      RAISE NOTICE 'live-scores has active cron jobs here; the inactive-and-deliberate assertion is skipped';
     END IF;
     IF (SELECT count(*) FROM public.data_job_runs) IS DISTINCT FROM v_before OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused OR switchable OR key = 'probe-github-with-cron') THEN
       RAISE EXCEPTION 'probe rows leaked';
@@ -639,9 +675,12 @@ BEGIN
   -- shape: every element carries exactly the contract keys
   IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_arr) e
               WHERE (SELECT array_agg(k ORDER BY k COLLATE "C") FROM jsonb_object_keys(e) k)
-                    IS DISTINCT FROM ARRAY['cron_active', 'expected_every_seconds', 'key', 'kind', 'last_ok_at', 'last_run', 'paused',
+                    IS DISTINCT FROM ARRAY['attention', 'cron_active', 'expected_every_seconds', 'key', 'kind', 'last_ok_at', 'last_run', 'paused',
                                            'paused_at', 'paused_note', 'record_source', 'runner', 'schedule', 'state', 'switchable']) THEN
     RAISE EXCEPTION 'admin_data_jobs element keys differ from the contract';
+  END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_arr) e WHERE jsonb_typeof(e->'attention') IS DISTINCT FROM 'boolean') THEN
+    RAISE EXCEPTION 'an admin_data_jobs element has a non-boolean attention';
   END IF;
   -- the core rule, on the live output: a cron_http / github job with no own record has NO last run,
   -- whatever cron says; and nothing but a cron_sql job may carry record_source cron_sql
@@ -677,7 +716,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261205_data_jobs.sql', 'c52503a1637914d8da87ee82468c846176cdc55975fdfb788e528bdc032d3053')
+VALUES ('20261205_data_jobs.sql', '0c8952ab37b4ca6ffe3c9eab7fd683328d34e04a1d92a25157d369c5d6e25ce2')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

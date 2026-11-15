@@ -2078,7 +2078,7 @@ WITH report AS (
       AND COALESCE((SELECT bool_and(pg_get_userbyid(p.proowner) = 'postgres') FROM pg_proc p
                      WHERE p.oid IN (to_regprocedure('public.data_jobs_overview(timestamptz)'), to_regprocedure('public.admin_data_jobs()'),
                                      to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'))), false)
-    UNION ALL SELECT '20261205_data_jobs','admin_data_jobs: DEFINER, pinned search_path, three-part gate (uid null / anonymous session / not admin); overview reads cron.job_run_details only in the cron_sql arm, never return_message or command',
+    UNION ALL SELECT '20261205_data_jobs','admin_data_jobs: DEFINER, pinned search_path, three-part gate (uid null / anonymous session / not admin); overview reads cron.job_run_details only in the cron_sql arm, never return_message or command, and carries the attention key',
       COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proconfig IS NOT NULL FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_data_jobs()')), false)
       AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN%'
                AND pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%RAISE EXCEPTION ''ADMIN_ONLY'';%', false)
@@ -2086,7 +2086,8 @@ WITH report AS (
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND d.start_time >%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
-               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%', false)
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%''attention'', (j.state IN (''failed'', ''stale'') OR (j.state = ''inactive'' AND j.expected_every IS NOT NULL))%', false)
     UNION ALL SELECT '20261205_data_jobs','data_jobs: no row switchable or paused yet (the 8 switches come in a later release: bump this token then)',
       COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM public.data_jobs WHERE switchable OR paused', false, true, '')))[1]::text = '0'
                  WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
