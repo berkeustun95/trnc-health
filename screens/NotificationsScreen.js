@@ -39,7 +39,9 @@ function timeAgoLocal(isoString, lang) {
 
 // Notifications are not allowed: one quiet row, no nagging. The OS will still ask → "Bildirimleri
 // aç" (the explanation, then the OS pop-up); it will not → "Ayarları aç". Re-read on return.
-function PushOffRow({ lang, onEnablePush }) {
+// offerLater: Screen 2 said "Şimdi değil" while the OS reports granted (Android <= 12 by default), so
+// nothing registers at launch: the row stays, and its tap registers (no OS ask needed).
+function PushOffRow({ lang, onEnablePush, offerLater }) {
   const [perm, setPerm] = useState(null)
   useEffect(() => {
     let gone = false
@@ -48,8 +50,10 @@ function PushOffRow({ lang, onEnablePush }) {
     const sub = AppState.addEventListener('change', st => { if (st === 'active') check() })
     return () => { gone = true; sub.remove() }
   }, [])
-  if (!perm || perm.status === 'granted') return null
-  const settings = perm.canAskAgain === false
+  if (!perm) return null
+  const granted = perm.status === 'granted'
+  if (granted && !offerLater) return null
+  const settings = !granted && perm.canAskAgain === false
   return (
     <View style={r.pushOff}>
       <Ionicons name="notifications-off-outline" size={18} color={C.textSecondary} />
@@ -60,14 +64,14 @@ function PushOffRow({ lang, onEnablePush }) {
   )
 }
 
-function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead, onEnablePush }) {
+function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead, onEnablePush, offerLater }) {
   const listMem = useScrollMemory('notifs')
   const unread = notifications.filter(n => !n.read).length
   return (
     <ModuleScreen topic="notifications">
     <SafeAreaView style={r.safe} edges={['top']}>
       <ScreenHeader title={t('notifications', lang)} onBack={onBack} lang={lang} />
-      <PushOffRow lang={lang} onEnablePush={onEnablePush} />
+      <PushOffRow lang={lang} onEnablePush={onEnablePush} offerLater={offerLater} />
       {notifications.length > 0 && (
         <View style={r.actions}>
           {unread > 0
