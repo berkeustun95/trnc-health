@@ -150,7 +150,7 @@ import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
 import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
 import { withReadableTitle } from './utils/readableTitle'
-import { otaApplyBlocker, OTA_APPLIED_KEY, LAUNCH_TAP_MS } from './utils/otaLaunchApply'
+import { otaApplyBlocker, openedByPush, OTA_APPLIED_KEY } from './utils/otaLaunchApply'
 import { BOOT_SPLASH_KEY, localDay, splashRecord } from './utils/bootSplashDay'
 
 const LAUNCHED_AT = Date.now()
@@ -857,6 +857,8 @@ export default function App() {
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
   const handledColdStartRef = useRef(false)
+  // A push tap navigated in this runtime: the launch-time OTA reload must not throw that screen away.
+  const pushRoutedRef = useRef(false)
   const prevUidRef = useRef(undefined)
 
   function openMenu() {
@@ -1092,11 +1094,10 @@ export default function App() {
           Linking.getInitialURL().catch(() => null),
           AsyncStorage.getItem(OTA_APPLIED_KEY).catch(() => null),
         ])
-        const tapAt = tap?.notification?.date
         const blocker = otaApplyBlocker({
           fetchedId, runningId: Updates.updateId, emergency: Updates.isEmergencyLaunch,
           elapsedMs: Date.now() - LAUNCHED_AT, touched: touchedRef.current || sheetUpRef.current, appState: AppState.currentState,
-          launchedByTap: !!tap && (!tapAt || Date.now() - tapAt < LAUNCH_TAP_MS), launchedByLink: !!url, lastAppliedId,
+          launchedByTap: openedByPush(tap, pushRoutedRef.current), launchedByLink: !!url, lastAppliedId,
         })
         console.log(`[ota-apply] ${blocker ?? 'reloading'} ${fetchedId.slice(0, 8)} after ${Date.now() - LAUNCHED_AT} ms`)
         if (blocker) return
@@ -1106,7 +1107,7 @@ export default function App() {
         if (splashPlayRef.current === true && !splashUpRef.current) {
           await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(localDay(), fetchedId)).catch(() => {})
         }
-        if (touchedRef.current || sheetUpRef.current || AppState.currentState !== 'active') return
+        if (touchedRef.current || sheetUpRef.current || pushRoutedRef.current || AppState.currentState !== 'active') return
         await Updates.reloadAsync()
       }).catch(() => {})
   }, [])
@@ -1553,6 +1554,7 @@ export default function App() {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       if (!sessionRef.current) return
+      pushRoutedRef.current = true
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') {
@@ -1582,6 +1584,7 @@ export default function App() {
     handledColdStartRef.current = true
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return
+      pushRoutedRef.current = true
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') setShowDutyList(true)
@@ -1598,6 +1601,8 @@ export default function App() {
       else if (screen === 'profile') setActiveTab('profile')
       else if (screen === 'notifications') setShowNotifs(true)
       else if (!openAdminPush(data)) openMarketplacePush(data)
+      // Handled once: cleared, so nothing in this runtime reads the same tap again.
+      try { Notifications.clearLastNotificationResponse() } catch {}
     })
   }, [session])
 
