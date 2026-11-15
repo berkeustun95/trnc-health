@@ -49,8 +49,21 @@
 --   A 'running' record older than 15 minutes is a run cut off: state 'failed', error_class 'cut_off'.
 --
 -- ─── STATE (first match wins) ───────────────────────────────────────────────
---   inactive (a covered cron job is missing or inactive) → paused → no_record → failed →
---   stale (expected_every set and last_ok_at older than it, or none) → ok.
+--   inactive (a covered cron job is missing or inactive) → paused → stale-for-silent-cron_sql →
+--   no_record → failed → stale (expected_every set and last_ok_at older than it, or none) → ok.
+--   The alarm must not silence itself: a cron_sql job WITH expected_every and no run row in the
+--   30-day cron.job_run_details window reads 'stale' (attention true), never 'no_record'. Otherwise a
+--   job that stopped running would read stale until its last row aged out, then turn neutral.
+--   Its last_run and record_source stay null (there is nothing to show). A run row's time is
+--   coalesce(start_time, end_time), so a pre-start failure (start_time NULL) still counts; a row with
+--   both NULL is left out, and the job then reads stale by the rule above.
+--   NOT changed in this release (known limit): github and cron_http jobs keep 'no_record' (neutral,
+--   attention false) when they have no own record, because their writers do not exist yet; a later
+--   release tightens it. Known limit: a github / cron_http job whose own records were ALL purged
+--   (data_job_runs keeps 90 days) reads 'no_record', not 'stale'.
+--   First apply: 'purge-data-job-runs' is scheduled by this very file and has no run yet, so it
+--   legitimately reads 'stale' (attention true) until its first 03:43 UTC run: the screen shows it
+--   as stale for up to a day after the apply. That is expected, not a fault.
 --   attention (boolean, never null, one more key on every element, derived from state): true when
 --   state is failed or stale, or inactive on a job that HAS an expected_every. An inactive job with
 --   expected_every NULL (live-scores: six cron jobs paused on purpose since 20261090) is deliberately
@@ -232,8 +245,10 @@ AS $function$
     UNION ALL
     -- cron_sql jobs ONLY: the statement runs inside the database, so cron's status is the result.
     -- Reads status + start/end times, nothing else (never return_message, never the command).
-    -- Last 30 days only (the 5-minute job's history is large); older = no record.
-    SELECT dj.key, d.start_time, d.end_time,
+    -- Last 30 days only (the 5-minute job's history is large); older = no run row (reads stale when
+    -- the job has expected_every). The row's time is coalesce(start_time, end_time): a pre-start
+    -- failure has no start_time; a row with neither time is left out.
+    SELECT dj.key, coalesce(d.start_time, d.end_time), d.end_time,
            CASE d.status WHEN 'succeeded' THEN 'ok'
                          WHEN 'starting' THEN 'running' WHEN 'connecting' THEN 'running'
                          WHEN 'sending' THEN 'running' WHEN 'running' THEN 'running' ELSE 'failed' END,
@@ -242,7 +257,7 @@ AS $function$
       FROM public.data_jobs dj
       JOIN cron.job j ON j.jobname = ANY (dj.cron_jobnames)
       JOIN cron.job_run_details d ON d.jobid = j.jobid
-     WHERE dj.runner = 'cron_sql' AND d.start_time > p_now - interval '30 days'
+     WHERE dj.runner = 'cron_sql' AND coalesce(d.start_time, d.end_time) > p_now - interval '30 days'
   ), last_run AS (
     SELECT DISTINCT ON (job_key) job_key, started_at, finished_at, outcome, error_class, source, rec,
            (outcome = 'running' AND started_at < p_now - interval '15 minutes') AS cut_off
@@ -269,6 +284,7 @@ AS $function$
            CASE
              WHEN j.cron_active IS NOT DISTINCT FROM false THEN 'inactive'
              WHEN j.paused THEN 'paused'
+             WHEN j.runner = 'cron_sql' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN 'stale'
              WHEN j.l_key IS NULL THEN 'no_record'
              WHEN j.l_outcome = 'failed' OR j.l_cut THEN 'failed'
              WHEN j.expected_every IS NOT NULL AND (j.last_ok_at IS NULL OR j.last_ok_at < p_now - j.expected_every) THEN 'stale'
@@ -616,6 +632,24 @@ BEGIN
     END IF;
   END;
 
+  -- the alarm must not silence itself: with every cron run row out of the 30-day window (a clock far in
+  -- the future, nothing written), each active, unpaused cron_sql job WITH expected_every reads stale +
+  -- attention, with no last_run and no record_source. The count is the positive control (not vacuous).
+  IF (SELECT count(*) FROM jsonb_array_elements(public.data_jobs_overview(now() + interval '100 years')) e
+       WHERE e->>'runner' = 'cron_sql' AND e->>'expected_every_seconds' IS NOT NULL
+         AND e->'cron_active' = 'true'::jsonb AND e->>'paused' = 'false') = 0 THEN
+    RAISE EXCEPTION 'no active cron_sql job with expected_every to check the silent-job rule on';
+  END IF;
+  SELECT string_agg(e->>'key', ', ') INTO v_names
+    FROM jsonb_array_elements(public.data_jobs_overview(now() + interval '100 years')) e
+   WHERE e->>'runner' = 'cron_sql' AND e->>'expected_every_seconds' IS NOT NULL
+     AND e->'cron_active' = 'true'::jsonb AND e->>'paused' = 'false'
+     AND (e->>'state' IS DISTINCT FROM 'stale' OR e->'attention' IS DISTINCT FROM 'true'::jsonb
+          OR e->'last_run' IS DISTINCT FROM 'null'::jsonb OR e->>'record_source' IS NOT NULL);
+  IF v_names IS NOT NULL THEN
+    RAISE EXCEPTION 'cron_sql jobs with no run rows that did not read stale + attention: %', v_names;
+  END IF;
+
   -- admin_data_jobs, measured as the role the app uses
   SELECT id INTO v_admin FROM public.profiles WHERE role = 'admin' LIMIT 1;
   IF v_admin IS NULL THEN
@@ -716,7 +750,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261205_data_jobs.sql', '0c8952ab37b4ca6ffe3c9eab7fd683328d34e04a1d92a25157d369c5d6e25ce2')
+VALUES ('20261205_data_jobs.sql', 'a874befd7ece6965b34181759836323be19848583bd39ba8b5e47e617f4ef6d1')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

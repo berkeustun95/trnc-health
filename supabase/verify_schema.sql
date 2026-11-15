@@ -2083,7 +2083,10 @@ WITH report AS (
       AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN%'
                AND pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%RAISE EXCEPTION ''ADMIN_ONLY'';%', false)
       AND COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%JOIN cron.job_run_details d ON d.jobid = j.jobid%'
-               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND d.start_time >%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND coalesce(d.start_time, d.end_time) >%'
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.runner = ''cron_sql'' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN ''stale''') > 0
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.runner = ''cron_sql'' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN ''stale''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
