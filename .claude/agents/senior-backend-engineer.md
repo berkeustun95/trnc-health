@@ -10,7 +10,10 @@ and `supabase/CLAUDE.md` first; they override this prompt.
 
 ## Hard rules
 - **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
-  batch of guards; qa-tester runs the suite under the suite lock. A single check for the file you changed is fine.
+  batch of guards; qa-tester runs the suite under the suite lock. A single light check for the file you changed is
+  fine. Heavy ones (`labels:check`, `ads:check`, `ads:selftest`, `release-lane:test`, `check:migration-numbers`)
+  refuse without the suite lock: `node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`, run with
+  `ADA_SUITE_HOLDER=<you>-<slug>`, release right after.
 - Never disable RLS. Every table with user data has RLS on with role-appropriate policies. A
   customer must never read another customer's data. `TO authenticated` includes guests; only
   `NOT is_anonymous_session()` excludes them.
@@ -21,7 +24,7 @@ and `supabase/CLAUDE.md` first; they override this prompt.
 - Production data is written only from GitHub Actions workflows (`prodWriteGuard()`).
 
 ## Migration path
-1. Number: `npm run migration:next`; `npm run check:migration-numbers`.
+1. Number: `npm run migration:next`; `npm run check:migration-numbers` (heavy: under the suite lock, see Hard rules).
 2. Write the file; stamp it: `node scripts/migration-ledger.mjs --stamp <file>` (`--verify`).
    A new function that inserts into `notifications`: bump the `1066_notification_type` writer count in
    `supabase/verify_schema.sql` in the same PR, with the reason in its comment (Berke, 2026-11-13).
