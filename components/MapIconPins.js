@@ -7,7 +7,7 @@ import { View, Image, StyleSheet } from 'react-native'
 import { Marker } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, placeColors } from '../constants/theme'
-import { GROUP_META, ICON_PIN } from '../constants/exploreCategories'
+import { GROUP_META } from '../constants/exploreCategories'
 import { eateryImageUrl } from './EateryBits'
 
 // Android snapshots a custom-child Marker: track briefly after mount, then stop (HotelMarker).
@@ -28,7 +28,7 @@ export function PlaceIconMarker({ pin, onPress }) {
     <Marker coordinate={{ latitude: pin.lat, longitude: pin.lng }} tracksViewChanges={tracks} anchor={{ x: 0.5, y: 0.5 }}
       onPress={e => { e.stopPropagation(); onPress() }}>
       <View collapsable={false} style={[m.disc, { backgroundColor: ink }]}>
-        <Ionicons name={ICON_PIN[pin.group].icon} size={14} color="#fff" />
+        <Ionicons name={pin.icon} size={14} color="#fff" />
       </View>
     </Marker>
   )

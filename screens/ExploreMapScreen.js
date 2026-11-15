@@ -35,7 +35,7 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   officialVisitApplicable, applyOfficialVisit, TRNC_CENTER, inTrncFrame, NEAR_ME_DELTA,
 } from '../constants/mapSources'
-import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup, ICON_PIN } from '../constants/exploreCategories'
+import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup, ICON_PIN, CATEGORY_ICON_PIN } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import { PlaceIconMarker, PartnerMarker } from '../components/MapIconPins'
@@ -175,7 +175,7 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onSetKeys, servicesOn, onServices, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
+function ChipRow({ sources, selectedKeys, onSetKeys, onToggleKey, servicesOn, onServices, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
   const layerMode = routesMode || eventsMode || hotelsMode
   return (
     <ScrollView
@@ -196,6 +196,17 @@ function ChipRow({ sources, selectedKeys, onSetKeys, servicesOn, onServices, ope
         onChange={onSetKeys}
         style={{ marginRight: 8 }}
       />
+      {/* Plajlar: a quick toggle of the explore:beach source, on the same selectedKeys as the dropdown. */}
+      {!layerMode && sources.some(src => src.key === 'explore:beach') && (
+        <Chip
+          label={t('blFilterBeaches', lang)}
+          ionicon={CATEGORY_ICON_PIN.beach.icon}
+          active={selectedKeys.has('explore:beach')}
+          color={GROUP_META.nature.colorToken.text}
+          colorBg={GROUP_META.nature.colorToken.bg}
+          onPress={() => onToggleKey('explore:beach')}
+        />
+      )}
       {/* Services start OFF on the map (DEFAULT_OFF_KEYS, Berke 2026-11-08): this chip adds them. */}
       {!layerMode && sources.some(src => src.key === 'explore:services') && (
         <Chip
@@ -1044,7 +1055,7 @@ export default function ExploreMapScreen({
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} drawAt={c.drawAt} onPress={expandCluster} />
           }
           const pin = c.properties.pin
-          if (pin.kind === 'place' && ICON_PIN[pin.group]) {
+          if (pin.kind === 'place' && pin.iconPin) {
             return <PlaceIconMarker key={pin.id} pin={pin} onPress={() => setSelected(pin)} />
           }
           return (
@@ -1068,6 +1079,10 @@ export default function ExploreMapScreen({
         sources={sources}
         selectedKeys={selectedKeys}
         onSetKeys={keys => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set(keys)) }}
+        onToggleKey={key => {
+          setSelected(null); leaveRoutes()
+          setSelectedKeys(prev => { const n = new Set(prev); if (!n.delete(key)) n.add(key); return n })
+        }}
         servicesOn={servicesOn}
         onServices={() => { setSelected(null); leaveRoutes(); setServicesOn(v => !v) }}
         openNow={openNow}
