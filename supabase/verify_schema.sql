@@ -42,6 +42,9 @@ WITH report AS (
   FROM (VALUES
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages'),
+    -- Data jobs (20261205): registry + run log; registered ahead of the apply; red until it runs.
+    ('20261205_data_jobs','data_jobs'),
+    ('20261205_data_jobs','data_job_runs'),
     -- Araçlar car listings (20261165): registered ahead of the apply; red until it runs.
     ('20261165_vehicles','vehicle_sources'),
     ('20261165_vehicles','dealers'),
@@ -298,6 +301,27 @@ WITH report AS (
     ('20261163_oli_messages','oli_messages','body'),
     ('20261163_oli_messages','oli_messages','payload'),
     ('20261163_oli_messages','oli_messages','created_at'),
+    -- 20261205: data jobs; registered ahead of the apply; red until it runs.
+    ('20261205_data_jobs','data_jobs','key'),
+    ('20261205_data_jobs','data_jobs','runner'),
+    ('20261205_data_jobs','data_jobs','kind'),
+    ('20261205_data_jobs','data_jobs','cron_jobnames'),
+    ('20261205_data_jobs','data_jobs','schedule_note'),
+    ('20261205_data_jobs','data_jobs','switchable'),
+    ('20261205_data_jobs','data_jobs','paused'),
+    ('20261205_data_jobs','data_jobs','paused_note'),
+    ('20261205_data_jobs','data_jobs','paused_by'),
+    ('20261205_data_jobs','data_jobs','paused_at'),
+    ('20261205_data_jobs','data_jobs','expected_every'),
+    ('20261205_data_jobs','data_jobs','sort'),
+    ('20261205_data_jobs','data_job_runs','id'),
+    ('20261205_data_jobs','data_job_runs','job_key'),
+    ('20261205_data_jobs','data_job_runs','started_at'),
+    ('20261205_data_jobs','data_job_runs','finished_at'),
+    ('20261205_data_jobs','data_job_runs','outcome'),
+    ('20261205_data_jobs','data_job_runs','error_class'),
+    ('20261205_data_jobs','data_job_runs','source'),
+    ('20261205_data_jobs','data_job_runs','run_ref'),
     -- 20261165: the columns the read policies, the guard and the report flow depend on (column count in H).
     ('20261165_vehicles','vehicles','status'),
     ('20261165_vehicles','vehicles','expires_at'),
@@ -812,7 +836,11 @@ WITH report AS (
     -- 20261201: registered ahead of the apply; red until it runs.
     ('20261201_set_guest_push','set_guest_push'),
     -- 20261203: registered ahead of the apply; red until it runs. Its no-client-EXECUTE half is the 1203 H token.
-    ('20261203_onboarding_events_retention','purge_onboarding_events')
+    ('20261203_onboarding_events_retention','purge_onboarding_events'),
+    -- 20261205: registered ahead of the apply; red until it runs. Grants and bodies are the 1205 H token's.
+    ('20261205_data_jobs','data_jobs_overview'),
+    ('20261205_data_jobs','admin_data_jobs'),
+    ('20261205_data_jobs','record_data_job_run')
   ) e(m,o)
 
   UNION ALL
@@ -981,6 +1009,23 @@ WITH report AS (
     ('20261163_oli_messages','oli_messages_role_check'),
     ('20261163_oli_messages','oli_messages_shape_check'),
     ('20261163_oli_messages','oli_messages_payload_check'),
+    -- 20261205: data jobs; registered ahead of the apply; red until it runs.
+    ('20261205_data_jobs','data_jobs_pkey'),
+    ('20261205_data_jobs','data_jobs_key_check'),
+    ('20261205_data_jobs','data_jobs_runner_check'),
+    ('20261205_data_jobs','data_jobs_kind_check'),
+    ('20261205_data_jobs','data_jobs_cron_jobnames_check'),
+    ('20261205_data_jobs','data_jobs_schedule_note_check'),
+    ('20261205_data_jobs','data_jobs_paused_switchable_check'),
+    ('20261205_data_jobs','data_jobs_no_switch_retention_check'),
+    ('20261205_data_jobs','data_jobs_expected_every_check'),
+    ('20261205_data_jobs','data_job_runs_pkey'),
+    ('20261205_data_jobs','data_job_runs_job_key_fkey'),
+    ('20261205_data_jobs','data_job_runs_finished_check'),
+    ('20261205_data_jobs','data_job_runs_outcome_check'),
+    ('20261205_data_jobs','data_job_runs_error_class_check'),
+    ('20261205_data_jobs','data_job_runs_source_check'),
+    ('20261205_data_jobs','data_job_runs_run_ref_check'),
     -- 20261165: Araçlar. Who owns a listing follows its source; prices follow intent; a source goes live only checked.
     ('20261165_vehicles','vehicles_ownership_check'),
     ('20261165_vehicles','vehicles_price_check'),
@@ -1552,7 +1597,9 @@ WITH report AS (
     -- 1087: partial (conversation_id IS NOT NULL); serves the FK's lookup on a conversation delete.
     ('1087_notifications_conversation_id','notifications_conversation_id_idx'),
     -- 20261203: serves the 90-day purge of onboarding_events (the 1051 shape). Registered ahead of the apply.
-    ('20261203_onboarding_events_retention','idx_onboarding_events_created_at')
+    ('20261203_onboarding_events_retention','idx_onboarding_events_created_at'),
+    -- 20261205: serves 'last run of a job' and the 90-day purge. Registered ahead of the apply.
+    ('20261205_data_jobs','idx_data_job_runs_job_started')
 
   ) e(m,o)
 
@@ -1667,7 +1714,9 @@ WITH report AS (
     -- 1198. Missing = "Bu cihazı unut" still clears the cookie but the phone keeps its slot of the 5-device cap.
     ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke'),
     -- 1201. Missing = a guest's "Allow notifications" saves nothing (the role includes every guest; the body refuses non-guests).
-    ('20261201_set_guest_push','set_guest_push')
+    ('20261201_set_guest_push','set_guest_push'),
+    -- 1205. Missing = the admin Data jobs section answers a permission error. record_data_job_run / data_jobs_overview are DELIBERATELY ABSENT (not client-callable; the 1205 H token asserts that).
+    ('20261205_data_jobs','admin_data_jobs')
   ) e(m,o)
 
   UNION ALL
@@ -2009,6 +2058,56 @@ WITH report AS (
       AND COALESCE((SELECT with_check LIKE '%''start_choice_signup''%' AND with_check LIKE '%''start_choice_signin''%' AND with_check LIKE '%''start_choice_guest''%'
                       FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events' AND policyname = 'oe_insert_public'), false)
     -- 1204-END
+    -- 1205-BEGIN
+    -- 20261205 data jobs. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
+    -- (a) both tables: RLS on, ZERO policies, no anon/authenticated privilege (table or any column), service_role keeps it;
+    -- (b) record_data_job_run: EXECUTE for service_role, none for PUBLIC / anon / authenticated; data_jobs_overview: EXECUTE held by nobody but the owner;
+    --     admin_data_jobs: authenticated yes, anon no; (c) the admin gate is the three-part shape and the overview reads cron's result ONLY for cron_sql;
+    -- (d) every row is switchable=false and paused=false until the switch release (bump this token then, with the reason).
+    UNION ALL SELECT '20261205_data_jobs','data_jobs + data_job_runs: RLS on, 0 policies, no client privilege (table or column), service_role writes',
+      COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c WHERE c.oid IN (to_regclass('public.data_jobs'), to_regclass('public.data_job_runs'))), false)
+      AND to_regclass('public.data_jobs') IS NOT NULL AND to_regclass('public.data_job_runs') IS NOT NULL
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('data_jobs', 'data_job_runs')) = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.data_jobs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.data_jobs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('anon', to_regclass('public.data_job_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.data_job_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid IN (to_regclass('public.data_jobs'), to_regclass('public.data_job_runs')) AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
+               AND has_table_privilege('service_role', to_regclass('public.data_jobs'), 'SELECT,INSERT,UPDATE,DELETE')
+               AND has_table_privilege('service_role', to_regclass('public.data_job_runs'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    UNION ALL SELECT '20261205_data_jobs','record_data_job_run: service_role only; data_jobs_overview: owner only; admin_data_jobs: authenticated yes, anon no; all owned by postgres',
+      COALESCE(has_function_privilege('service_role', to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'), 'EXECUTE')
+           AND has_function_privilege('authenticated', to_regprocedure('public.admin_data_jobs()'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.admin_data_jobs()'), 'EXECUTE'), false)
+      AND COALESCE((SELECT p.proacl IS NOT NULL AND NOT p.prosecdef FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_overview(timestamptz)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
+                       WHERE p.oid = to_regprocedure('public.data_jobs_overview(timestamptz)') AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+      AND COALESCE((SELECT bool_and(pg_get_userbyid(p.proowner) = 'postgres') FROM pg_proc p
+                     WHERE p.oid IN (to_regprocedure('public.data_jobs_overview(timestamptz)'), to_regprocedure('public.admin_data_jobs()'),
+                                     to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'))), false)
+    UNION ALL SELECT '20261205_data_jobs','admin_data_jobs: DEFINER, all three functions pinned to search_path=public, three-part gate (uid null / anonymous session / not admin); overview reads cron.job_run_details only in the cron_sql arm, never return_message or command, and carries the attention key',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proconfig IS NOT NULL FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_data_jobs()')), false)
+      AND COALESCE((SELECT bool_and(p.proconfig = ARRAY['search_path=public']) FROM pg_proc p
+                     WHERE p.oid IN (to_regprocedure('public.data_jobs_overview(timestamptz)'), to_regprocedure('public.admin_data_jobs()'),
+                                     to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'))), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN%'
+               AND pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%RAISE EXCEPTION ''ADMIN_ONLY'';%', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%JOIN cron.job_run_details d ON d.jobid = j.jobid%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND coalesce(d.start_time, d.end_time) >%'
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.runner = ''cron_sql'' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN ''stale''') > 0
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.runner = ''cron_sql'' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN ''stale''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%''attention'', (j.state IN (''failed'', ''stale'') OR (j.state = ''inactive'' AND j.expected_every IS NOT NULL))%', false)
+    UNION ALL SELECT '20261205_data_jobs','data_jobs: no row switchable or paused yet (the 8 switches come in a later release: bump this token then)',
+      COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM public.data_jobs WHERE switchable OR paused', false, true, '')))[1]::text = '0'
+                 WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
+    -- 1205-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -6573,7 +6672,9 @@ FROM (VALUES
   -- Bandabuliya photo review reminder (20261196), every 5 minutes; exact schedule + command are the 20261196 row below.
   ('20261196_marketplace_photo_review_reminder','marketplace-photo-review-reminder'),
   -- 90-day retention on onboarding_events (20261203), 03:37 UTC daily; exact schedule + command are the 20261203 row below.
-  ('20261203_onboarding_events_retention','purge-onboarding-events')
+  ('20261203_onboarding_events_retention','purge-onboarding-events'),
+  -- 90-day retention on data_job_runs (20261205), 03:43 UTC daily.
+  ('20261205_data_jobs','purge-data-job-runs')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -6663,6 +6764,40 @@ SELECT '20261196_marketplace_photo_review_reminder', 'marketplace-photo-review-r
                     AND btrim(command) = 'SELECT public.marketplace_photo_review_reminder();') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261205: EVERY cron job has exactly one data_jobs row, and every listed name exists ───
+-- DERIVED from cron.job and data_jobs, never from a list: a new cron job nobody registered turns this red and names itself.
+-- (The 27 pre-existing jobs + purge-data-job-runs are covered at apply; this keeps it true.) The tables are reached through
+-- query_to_xml so a missing data_jobs reads MISSING instead of killing QUERY 2.
+-- 1205-Q2-BEGIN
+SELECT '20261205_data_jobs',
+       CASE WHEN to_regclass('public.data_jobs') IS NULL THEN 'every cron job has a data_jobs row'
+            ELSE coalesce('uncovered: ' || (xpath('/row/n/text()', query_to_xml(
+                   'SELECT string_agg(j.jobname, '', '' ORDER BY j.jobname) AS n FROM cron.job j WHERE (SELECT count(*) FROM public.data_jobs d WHERE j.jobname = ANY (d.cron_jobnames)) IS DISTINCT FROM 1',
+                   false, true, '')))[1]::text,
+                 'listed but absent: ' || (xpath('/row/n/text()', query_to_xml(
+                   'SELECT string_agg(DISTINCT n, '', '' ORDER BY n) AS n FROM public.data_jobs d, unnest(d.cron_jobnames) AS n WHERE NOT EXISTS (SELECT 1 FROM cron.job j WHERE j.jobname = n)',
+                   false, true, '')))[1]::text,
+                 'every cron job has a data_jobs row') END,
+       CASE WHEN to_regclass('public.data_jobs') IS NULL THEN 'MISSING'
+            WHEN (xpath('/row/n/text()', query_to_xml(
+                   'SELECT count(*) AS n FROM cron.job j WHERE (SELECT count(*) FROM public.data_jobs d WHERE j.jobname = ANY (d.cron_jobnames)) IS DISTINCT FROM 1',
+                   false, true, '')))[1]::text IS DISTINCT FROM '0'
+              OR (xpath('/row/n/text()', query_to_xml(
+                   'SELECT count(*) AS n FROM public.data_jobs d, unnest(d.cron_jobnames) AS n WHERE NOT EXISTS (SELECT 1 FROM cron.job j WHERE j.jobname = n)',
+                   false, true, '')))[1]::text IS DISTINCT FROM '0'
+              THEN 'UNREGISTERED CRON JOB ← FIX'
+            ELSE 'OK' END
+UNION ALL
+SELECT '20261205_data_jobs', 'purge-data-job-runs: schedule 43 3 * * * and the exact 90-day delete',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-data-job-runs') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-data-job-runs' AND active
+                    AND schedule = '43 3 * * *'
+                    AND btrim(command) = 'DELETE FROM public.data_job_runs WHERE started_at < now() - interval ''90 days''') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+-- 1205-Q2-END
 
 UNION ALL
 -- ─── 1139: duty-push and google-places-refresh wait 60 s for pg_net's reply (the 5 s default logged a timeout 2026-10-26 15:00Z) ───
