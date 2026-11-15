@@ -31,6 +31,11 @@ export function isUsableJobs(data) {
   return Array.isArray(data) && data.length > 0
 }
 
+// A row the screen can trust: boolean attention, string key and state. An unknown state string is still valid.
+export function isValidJob(j) {
+  return !!j && typeof j.attention === 'boolean' && typeof j.key === 'string' && typeof j.state === 'string'
+}
+
 // { key, n } for "just now" (key 'AgoNow', no n) / minutes / hours / days. Null when unparseable.
 export function ageParts(iso, now = Date.now()) {
   const ms = Date.parse(iso)

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { Button } from './ui'
 import { t, dateLocale } from '../constants/i18n'
-import { isUsableJobs, groupJobs, ageParts, formatFamagusta } from '../utils/dataJobs'
+import { isUsableJobs, isValidJob, groupJobs, ageParts, formatFamagusta } from '../utils/dataJobs'
 
 // One read for both the admin-home row and the tab. null = could not be read (RPC error, or an
 // empty/odd result: the registry cannot legitimately be empty), never a silent zero.
@@ -13,7 +13,7 @@ export async function loadDataJobs() {
     const { data, error } = await supabase.rpc('admin_data_jobs')
     if (error || !Array.isArray(data)) return null
     const jobs = data.filter(j => j && typeof j === 'object')
-    return isUsableJobs(jobs) ? jobs : null
+    return isUsableJobs(jobs) && jobs.every(isValidJob) ? jobs : null
   } catch {
     return null
   }
@@ -60,7 +60,7 @@ function JobRow({ job, lang }) {
   const known = !!STATE_KEY[job.state]
   const st = job.state === 'inactive' && job.attention === true ? STATE_STYLE.failed : STATE_STYLE[job.state] || OUTLINED
   const run = job.last_run
-  const lastOk = job.state === 'no_record' || run?.outcome === 'ok' ? null : job.last_ok_at
+  const showLastOk = job.state !== 'no_record' && run?.outcome !== 'ok'
   return (
     <View style={styles.card}>
       <View style={styles.head}>
@@ -77,16 +77,16 @@ function JobRow({ job, lang }) {
         <>
           <Text style={styles.sub}>{(run?.started_at && timeLine('adminJobsLastRun', run.started_at, lang)) || t('adminJobsNoRun', lang)}</Text>
           {run?.outcome === 'running' && <Text style={styles.sub}>{t('adminJobsRunning', lang)}</Text>}
-          {lastOk !== null && (
-            <Text style={styles.sub}>{(lastOk && timeLine('adminJobsLastOk', lastOk, lang)) || t('adminJobsNoOk', lang)}</Text>
+          {showLastOk && (
+            <Text style={styles.sub}>{(job.last_ok_at && timeLine('adminJobsLastOk', job.last_ok_at, lang)) || t('adminJobsNoOk', lang)}</Text>
           )}
         </>
       )}
       {job.state === 'failed' && !!run?.error_class && (
-        <Text style={[styles.sub, { color: colors.dangerInk }]}>{t('adminJobsError', lang).replace('{error}', run.error_class)}</Text>
+        <Text style={[styles.sub, { color: colors.dangerInk }]}>{t('adminJobsError', lang).replace('{error}', () => run.error_class)}</Text>
       )}
       {job.state === 'paused' && !!job.paused_note && (
-        <Text style={styles.sub}>{t('adminJobsPaused', lang).replace('{note}', job.paused_note)}</Text>
+        <Text style={styles.sub}>{t('adminJobsPaused', lang).replace('{note}', () => job.paused_note)}</Text>
       )}
     </View>
   )
