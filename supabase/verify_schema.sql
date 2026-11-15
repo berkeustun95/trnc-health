@@ -1404,7 +1404,7 @@ WITH report AS (
     ('1113_connectivity_links','connectivity_links_url_check'),
     -- 1129. Its key format is an H token.
     ('1129_connectivity_logo_key','connectivity_operators_logo_key_check'),
-    -- 20261202. The event list and the policy that repeats it are the 1202 H token.
+    -- 20261202. The event list and the policy that repeats it are the 1202 H token (the three start_choice_* values: 1204).
     ('20261202_onboarding_events','onboarding_events_pkey'),
     ('20261202_onboarding_events','onboarding_events_event_check'),
     ('20261202_onboarding_events','onboarding_events_platform_check'),
