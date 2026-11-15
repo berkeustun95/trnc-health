@@ -9,8 +9,14 @@
 
 export const OTA_APPLY_WINDOW_MS = 8000
 export const OTA_APPLIED_KEY = '@ada_ota_applied'
-// A push tapped this long ago or less opened this launch; an older response is a stale one.
-export const LAUNCH_TAP_MS = 60000
+
+// Was this launch opened from a push? Any last response counts: expo-notifications keeps it per JS runtime, and this
+// runs once, at mount, so it was tapped during this launch. Never age it by notification.date: that is not the tap time
+// (iOS gives seconds since 1970, Android the server's send time), and the age check let a 17:00 duty push tapped at 17:10
+// reload the app onto Home. `routed` = a push handler already navigated (and cleared the response).
+export function openedByPush(tap, routed) {
+  return routed === true || !!tap
+}
 
 // Returns null to reload now, or why not.
 export function otaApplyBlocker({ fetchedId, runningId, emergency, elapsedMs, touched, appState, launchedByTap, launchedByLink, lastAppliedId }) {
