@@ -288,6 +288,7 @@ export default function HomeScreen({
   onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
   liveScoresTester = false, // a score editor sees the tile before the flag flips (App.js asks is_score_editor)
   tourChip = false,       // Onboarding v2 "Tura başla": App.js decides (new users, no other prompt up)
+  tourChipArmed = false,  // @trnc_tour_chip is set (even while the chip waits behind another prompt)
   onStartTour,
   onDismissTourChip,
 }) {
@@ -1062,13 +1063,6 @@ export default function HomeScreen({
               </View>
             )}
 
-            {/* Onboarding v2: under the Oli bar, above the fold, gone after one tap (either target). */}
-            {tourChip && !hideHeaderActions && (
-              <View style={{ marginTop: WIDGET_GAP }}>
-                <TourChip lang={lang} onStart={onStartTour} onDismiss={onDismissTourChip} />
-              </View>
-            )}
-
             <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
               <View style={s.rCol}>
                 <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
@@ -1077,6 +1071,14 @@ export default function HomeScreen({
                 <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
               </View>
             </View>
+
+            {/* Onboarding v2: below the Nöbetçi/Acil tiles (Berke: nothing pushes them down), gone after
+                one tap (either target). */}
+            {tourChip && !hideHeaderActions && (
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <TourChip lang={lang} onStart={onStartTour} onDismiss={onDismissTourChip} />
+              </View>
+            )}
 
             {/* Duyurular: no tile, a banner (Berke 2026-10-11). Nothing at all for production users
                 until the flag flips; dev and ADA Preview show it (constants/redesign.js DUYURULAR). */}
@@ -1091,7 +1093,8 @@ export default function HomeScreen({
                 onPress={handleStripPress} onDismiss={dismissStripItem} />
             </View>
 
-            {customiseDone === false && (
+            {/* One prompt at a time: hidden while the tour chip is armed (@trnc_tour_chip). */}
+            {customiseDone === false && !tourChipArmed && (
               <CustomiseCard lang={lang}
                 onOpen={() => { markCustomiseCardDone(); setCustomiseDone(true); setFavEditOpen(true) }}
                 onDismiss={() => { markCustomiseCardDone(); setCustomiseDone(true) }} />

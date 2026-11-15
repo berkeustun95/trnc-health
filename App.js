@@ -119,8 +119,9 @@ import DutyReofferSheet from './components/DutyReofferSheet'
 import {
   KEY_ONBOARDED, KEY_LANG, KEY_POLICY_SEEN, KEY_PENDING, KEY_DUTY_OFFER, KEY_REOFFER, KEY_TOUR_CHIP,
   PENDING_SIGNUP, PENDING_DUTY, TOUR_CHIP_ON, OFFER_GRANTED, OFFER_LATER, REOFFER_SHOWN, REOFFER_EVENTS,
-  decideOnboardingStep, shouldArmPending, pendingAfterWizard, launchMayRegisterPush, decideReoffer,
+  decideOnboardingStep, shouldArmPending, pendingAfterWizard, launchMayRegisterPush, decideReoffer, reofferNoCity,
 } from './utils/onboardingState'
+import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent } from './utils/onboardingEvents'
 import { signOutGoogle } from './utils/socialAuth'
 import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
@@ -624,6 +625,7 @@ export default function App() {
   // dutyFromPushRef: the open list came from a push tap (never offered then). reofferBlockedRef: anything
   // that rules the sheet out right now, recomputed every render and read after the async checks.
   const [dutyReoffer, setDutyReoffer] = useState(null)
+  const [reofferHome, setReofferHome] = useState(null)   // @trnc_city_home when the sheet was decided
   const dutyFromPushRef = useRef(false)
   const reofferBlockedRef = useRef(true)
   const reofferCheckingRef = useRef(false)
@@ -1046,7 +1048,7 @@ export default function App() {
     if (fromPush || reofferCheckingRef.current) return
     reofferCheckingRef.current = true
     try {
-      const [[, offer], [, reoffer], [, onboardedVal]] = await AsyncStorage.multiGet([KEY_DUTY_OFFER, KEY_REOFFER, KEY_ONBOARDED])
+      const [[, offer], [, reoffer], [, onboardedVal], [, homeCity]] = await AsyncStorage.multiGet([KEY_DUTY_OFFER, KEY_REOFFER, KEY_ONBOARDED, KEY_CITY_HOME])
       if (reoffer === REOFFER_SHOWN) return
       const perm = await Notifications.getPermissionsAsync()
       await new Promise(r => setTimeout(r, REOFFER_SETTLE_MS))
@@ -1055,6 +1057,7 @@ export default function App() {
       if (!variant) return
       await AsyncStorage.setItem(KEY_REOFFER, REOFFER_SHOWN)
       reofferResolvedRef.current = false
+      setReofferHome(homeCity ?? null)
       setDutyReoffer(variant)
       logOnboardingEvent(REOFFER_EVENTS[variant].shown)
     } catch {} finally {
@@ -3124,6 +3127,7 @@ export default function App() {
             onShowLiveScores={() => setShowLiveScores(true)}
             liveScoresTester={liveScoresTester}
             tourChip={tourChipVisible}
+            tourChipArmed={tourChip}
             onStartTour={startCoachMarks}
             onDismissTourChip={retireTourChip}
           />
@@ -3634,7 +3638,8 @@ export default function App() {
           onTurnOff={() => { setCityWelcomeEnabled(false); setCityWelcome(null) }}
         />
       )}
-      <DutyReofferSheet visible={dutyReoffer !== null} lang={lang} onEnable={acceptDutyReoffer} onDecline={closeDutyReoffer} />
+      <DutyReofferSheet visible={dutyReoffer !== null} lang={lang} onEnable={acceptDutyReoffer} onDecline={closeDutyReoffer}
+        noCity={reofferNoCity({ home: reofferHome, hasFix: !!userLocation })} />
       {homeCityAskVisible && (
         <HomeCitySheet
           detectedRegion={detectedRegion}

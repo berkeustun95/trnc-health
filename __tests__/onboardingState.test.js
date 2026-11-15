@@ -147,6 +147,32 @@ describe('decideReoffer', () => {
   })
 })
 
+describe('reofferNoCity', () => {
+  test('no home city (unset or visiting) and no fix -> short copy', () => {
+    expect(S.reofferNoCity({ home: null, hasFix: false })).toBe(true)
+    expect(S.reofferNoCity({ home: undefined, hasFix: false })).toBe(true)
+    expect(S.reofferNoCity({ home: 'visiting', hasFix: false })).toBe(true)
+  })
+  test('a home city or a GPS fix -> full copy', () => {
+    expect(S.reofferNoCity({ home: 'kyrenia', hasFix: false })).toBe(false)
+    expect(S.reofferNoCity({ home: null, hasFix: true })).toBe(false)
+    expect(S.reofferNoCity({ home: 'visiting', hasFix: true })).toBe(false)
+  })
+})
+
+describe('dutyReofferBodyNoCity copy', () => {
+  const { LANGUAGES, t, hasOwnTranslation } = require('../constants/i18n')
+  test.each(LANGUAGES.map(l => l.key))('%s: exactly the first sentence of dutyAlertsBody', lang => {
+    expect(hasOwnTranslation('dutyReofferBodyNoCity', lang)).toBe(true)
+    const full = t('dutyAlertsBody', lang)
+    const short = t('dutyReofferBodyNoCity', lang)
+    expect(short.endsWith('.')).toBe(true)
+    expect(short.length).toBeLessThan(full.length)
+    expect(full.startsWith(short + ' ')).toBe(true)
+    expect(short.slice(0, -1)).not.toContain('. ')
+  })
+})
+
 describe('events', () => {
   test('exported event strings are exactly the 11 allowed, no duplicates', () => {
     const exported = [

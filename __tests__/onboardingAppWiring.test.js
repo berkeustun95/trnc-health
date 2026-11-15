@@ -138,3 +138,28 @@ test("'nicosia' is a read fallback only: never written, never a device region or
   expect(src).not.toMatch(/prefillRegion=\{[^}]*'nicosia'/)
   expect(src).not.toMatch(/KEY_HOME[^\n]*'nicosia'/)
 })
+
+const homeSrc = fs.readFileSync(path.join(__dirname, '..', 'screens', 'HomeScreen.js'), 'utf8')
+
+test('tour chip sits below the Nöbetçi/Acil tiles, never above them', () => {
+  const tiles = at(homeSrc, '<View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>', 'tiles row')
+  const emergency = at(homeSrc, '<EmergencyTile ', 'emergency tile')
+  const chip = at(homeSrc, '<TourChip ', 'tour chip')
+  expect(chip).toBeGreaterThan(emergency)
+  expect(homeSrc.slice(at(homeSrc, 'function renderHubRedesign', 'hub'), tiles)).not.toContain('<TourChip')
+})
+
+test('Make Home yours hides while @trnc_tour_chip is armed; App passes the raw state, live', () => {
+  expect(src).toMatch(/\n\s*tourChipArmed=\{tourChip\}/)
+  expect(homeSrc).toMatch(/\{customiseDone === false && !tourChipArmed && \(\s*<CustomiseCard/)
+  expect(fnBody('retireTourChip')).toContain('setTourChip(false)')
+})
+
+test('second offer: home city read with the decision; short copy only with no home city and no fix', () => {
+  const b = fnBody('maybeOfferDutyAgain')
+  expect(b).toMatch(/\[, homeCity\]\] = await AsyncStorage\.multiGet\(\[KEY_DUTY_OFFER, KEY_REOFFER, KEY_ONBOARDED, KEY_CITY_HOME\]\)/)
+  expect(at(b, 'setReofferHome(homeCity ?? null)', 'home')).toBeLessThan(at(b, 'setDutyReoffer(variant)', 'show'))
+  expect(src).toMatch(/<DutyReofferSheet [^>]*noCity=\{reofferNoCity\(\{ home: reofferHome, hasFix: !!userLocation \}\)\}/)
+  const sheet = fs.readFileSync(path.join(__dirname, '..', 'components', 'DutyReofferSheet.js'), 'utf8')
+  expect(sheet).toContain("noCity ? t('dutyReofferBodyNoCity', lang) : t('dutyAlertsBody', lang)")
+})

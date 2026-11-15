@@ -102,3 +102,9 @@ export function decideReoffer({ offer, reoffer, onboarded, fromPush, canRender, 
   if (offer == null && onboarded === 'true' && !granted && perm.canAskAgain !== false) return 'existing'
   return null
 }
+
+// The sheet's second sentence promises the home city's pharmacies on top. With no home city
+// (@trnc_city_home unset or 'visiting') and no GPS fix there is no such list, so it is left out.
+export function reofferNoCity({ home, hasFix }) {
+  return !hasFix && (home == null || home === 'visiting')
+}
