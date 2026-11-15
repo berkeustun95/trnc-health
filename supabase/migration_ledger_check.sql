@@ -309,7 +309,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261201_set_guest_push.sql', '410906424127f5765d2e1f7a7c1ef6aa3ba1cf30b67005ecb76ac1bc239d067e'),
   ('20261202_onboarding_events.sql', '2ebc3768d5380bd3e85909d4b79de053fe3b4b3ec29d47cb74d536cc324a9645'),
   ('20261203_onboarding_events_retention.sql', '4f27e2421f90a4ba5dc92d4da2ffff67e9b3958ff886b0e49bd20c56c7485923'),
-  ('20261205_data_jobs.sql', 'f794d1d050e50a356ebbdaea1fe7d891fc529c406ff7af9a4611422aa31623e2')
+  ('20261205_data_jobs.sql', 'c52503a1637914d8da87ee82468c846176cdc55975fdfb788e528bdc032d3053')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

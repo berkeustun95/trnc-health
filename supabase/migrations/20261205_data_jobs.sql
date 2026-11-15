@@ -464,9 +464,11 @@ BEGIN
     v_chk_gh   text := 'unset';
     v_svc_id   bigint;
     v_svc_n    int := -1;
+    v_before   int;
     v_st       text[] := ARRAY[]::text[];
     v_own      text;
   BEGIN
+    SELECT count(*) INTO v_before FROM public.data_job_runs;
     BEGIN
       -- service_role records a run through the function (positive control for the denials below)
       SET LOCAL ROLE service_role;
@@ -573,7 +575,7 @@ BEGIN
     IF v_st IS DISTINCT FROM ARRAY['ok_run:ok', 'failed_run:failed', 'old_ok:stale', 'cut_off:failed', 'none:no_record', 'paused:paused'] THEN
       RAISE EXCEPTION 'state logic probe: %', v_st;
     END IF;
-    IF EXISTS (SELECT 1 FROM public.data_job_runs) OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused OR switchable OR key = 'probe-github-with-cron') THEN
+    IF (SELECT count(*) FROM public.data_job_runs) IS DISTINCT FROM v_before OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused OR switchable OR key = 'probe-github-with-cron') THEN
       RAISE EXCEPTION 'probe rows leaked';
     END IF;
   END;
@@ -675,7 +677,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261205_data_jobs.sql', 'f794d1d050e50a356ebbdaea1fe7d891fc529c406ff7af9a4611422aa31623e2')
+VALUES ('20261205_data_jobs.sql', 'c52503a1637914d8da87ee82468c846176cdc55975fdfb788e528bdc032d3053')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

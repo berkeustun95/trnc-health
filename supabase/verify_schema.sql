@@ -6772,6 +6772,14 @@ SELECT '20261205_data_jobs',
                    false, true, '')))[1]::text IS DISTINCT FROM '0'
               THEN 'UNREGISTERED CRON JOB ← FIX'
             ELSE 'OK' END
+UNION ALL
+SELECT '20261205_data_jobs', 'purge-data-job-runs: schedule 43 3 * * * and the exact 90-day delete',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-data-job-runs') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-data-job-runs' AND active
+                    AND schedule = '43 3 * * *'
+                    AND btrim(command) = 'DELETE FROM public.data_job_runs WHERE started_at < now() - interval ''90 days''') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 -- 1205-Q2-END
 
 UNION ALL
