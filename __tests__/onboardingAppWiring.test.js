@@ -74,14 +74,14 @@ test('weather with no fix: device home city, then the profile city, then Lefkoş
 
 const startSrc = fs.readFileSync(process.env.ONB_START_SRC || path.join(__dirname, '..', 'screens', 'StartScreen.js'), 'utf8')
 
-test('Start: Kayıt ol primary, Giriş yap secondary, guest a visible text button; each tap logs its event before acting', () => {
+test('Start: Kayıt ol primary, Giriş yap outline (visible edge on the page ground), guest a visible text button; each tap logs its event before acting', () => {
   const fn = name => startSrc.slice(at(startSrc, `function ${name}(`, name), startSrc.indexOf('\n  }\n', at(startSrc, `function ${name}(`, name)))
   expect(at(fn('signUp'), 'logOnboardingEvent(START_CHOICE_EVENTS.signup)', 'log')).toBeLessThan(at(fn('signUp'), 'onSignUp()', 'act'))
   expect(at(fn('logIn'), 'logOnboardingEvent(START_CHOICE_EVENTS.signin)', 'log')).toBeLessThan(at(fn('logIn'), 'onLogin()', 'act'))
   const g = fn('start')
   expect(at(g, 'logOnboardingEvent(START_CHOICE_EVENTS.guest)', 'log')).toBeLessThan(at(g, 'await onStart()', 'act'))
   expect(startSrc).toMatch(/<Button size="lg" title=\{t\('signup', lang\)\} onPress=\{signUp\} disabled=\{busy\}/)
-  expect(startSrc).toMatch(/<Button size="lg" variant="secondary" title=\{t\('login', lang\)\} onPress=\{logIn\} disabled=\{busy\}/)
+  expect(startSrc).toMatch(/<Button size="lg" variant="outline" title=\{t\('login', lang\)\} onPress=\{logIn\} disabled=\{busy\}/)
   expect(startSrc).toMatch(/<Button variant="text" title=\{t\('continueAsGuest', lang\)\} onPress=\{start\} loading=\{busy\}/)
   expect(startSrc).toContain('<InlineAlert message={error} />')
   // The App handlers stay unlogged: only a Start tap counts.
@@ -212,4 +212,14 @@ test('second offer: copy fixed at decision (device city, else profile region, el
   expect(src).toMatch(/<DutyReofferSheet [^>]*noCity=\{reofferNoCityCopy\}/)
   const sheet = fs.readFileSync(path.join(__dirname, '..', 'components', 'DutyReofferSheet.js'), 'utf8')
   expect(sheet).toContain("noCity ? t('dutyReofferBodyNoCity', lang) : t('dutyAlertsBody', lang)")
+})
+
+test('design pass: outline edge is primary, short screens shrink the logo, reset row reads destructive', () => {
+  const btn = fs.readFileSync(path.join(__dirname, '..', 'components', 'ui', 'Button.js'), 'utf8')
+  expect(btn).toMatch(/outline:\s*\{ bg: colors\.card,\s*fg: colors\.primaryDark, border: colors\.primary \}/)
+  const start = fs.readFileSync(path.join(__dirname, '..', 'screens', 'StartScreen.js'), 'utf8')
+  expect(start).toContain('const short = useWindowDimensions().height < 700')
+  expect(start).toContain('style={short ? s.logoShort : s.logo}')
+  const settings = fs.readFileSync(path.join(__dirname, '..', 'components', 'shell', 'Settings.js'), 'utf8')
+  expect(settings).toContain("row('refresh-outline', 'health', 'devResetOnboarding', a.onResetOnboarding, { destructive: true, chevron: false })")
 })

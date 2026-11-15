@@ -11,6 +11,8 @@ import { haptic } from './haptics'
 const VARIANTS = {
   primary:   { bg: colors.primary,  fg: colors.onPrimary, border: null },
   secondary: { bg: colors.card,     fg: colors.primaryDark, border: colors.border },
+  // On the page ground, where secondary's #E8EDF2 edge vanishes (1.1:1): primary edge 4.3:1+.
+  outline:   { bg: colors.card,     fg: colors.primaryDark, border: colors.primary },
   text:      { bg: 'transparent',   fg: colors.primaryDark, border: null },
   danger:    { bg: colors.dangerInk, fg: colors.onPrimary, border: null },
   // On the teal Oli ground (welcome, auth): primaryDark on white 7.58:1; white on #084B4A 9.93:1.

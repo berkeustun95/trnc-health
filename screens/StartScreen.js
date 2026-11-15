@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type, font, radii, press, TAP } from '../constants/theme'
@@ -20,6 +20,8 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [showLang, setShowLang] = useState(false)
+  // Short screens (360×640 at large font): a smaller logo keeps the guest link above the fold.
+  const short = useWindowDimensions().height < 700
 
   useEffect(() => { logOnboardingEvent(START_SHOWN_EVENT) }, [])
 
@@ -56,15 +58,15 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} bounces={false} showsVerticalScrollIndicator={false}>
-          <View style={s.brand}>
-            <Image source={LOGO} style={s.logo} resizeMode="contain" accessible={false} importantForAccessibility="no" />
+          <View style={[s.brand, short && s.brandShort]}>
+            <Image source={LOGO} style={short ? s.logoShort : s.logo} resizeMode="contain" accessible={false} importantForAccessibility="no" />
             <Text style={s.tagline} accessibilityRole="header">{t('startTagline', lang)}</Text>
           </View>
 
           <View style={s.actions}>
             <InlineAlert message={error} />
             <Button size="lg" title={t('signup', lang)} onPress={signUp} disabled={busy} wrap fullWidth />
-            <Button size="lg" variant="secondary" title={t('login', lang)} onPress={logIn} disabled={busy} wrap fullWidth />
+            <Button size="lg" variant="outline" title={t('login', lang)} onPress={logIn} disabled={busy} wrap fullWidth />
             <Button variant="text" title={t('continueAsGuest', lang)} onPress={start} loading={busy} wrap fullWidth style={s.guest} />
           </View>
         </ScrollView>
@@ -85,7 +87,9 @@ const s = StyleSheet.create({
   langPillText:{ ...type.meta, fontFamily: font.bold, color: colors.primaryDark, letterSpacing: 0.5 },
   scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 16, width: '100%', maxWidth: 560, alignSelf: 'center' },
   brand:       { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
+  brandShort:  { paddingVertical: 16 },
   logo:        { width: 156, height: 191 },
+  logoShort:   { width: 120, height: 147 },
   tagline:     { ...type.sectionHeading, color: colors.textPrimary, textAlign: 'center', marginTop: 20 },
   actions:     { gap: 12 },
   guest:       { marginTop: 4 },

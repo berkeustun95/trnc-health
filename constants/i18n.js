@@ -8988,7 +8988,7 @@ const translations = {
     facilityLoadError: 'Не удалось загрузить учреждения. Проверьте подключение.',
     tryAgain: 'Повторить', chooseAvatar: 'Выбрать аватар', uploadPhoto: 'Загрузить фото', orPickAvatar: 'Или выберите аватар',
     getStarted: 'Начать', welcomeTagline: 'Ваш гид по жизни на Северном Кипре',
-    continueAsGuest: 'Войти как гость', guestLabel: 'Гость',
+    continueAsGuest: 'Продолжить как гость', guestLabel: 'Гость',
     guestSignInFailed: 'Не удалось продолжить как гость. Проверьте подключение и попробуйте снова.',
     socialOr: 'или',
     continueWithGoogle: 'Продолжить с Google',

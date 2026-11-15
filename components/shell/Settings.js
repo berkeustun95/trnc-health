@@ -49,7 +49,7 @@ export function SettingsGroups({ lang, a, isGuest = false }) {
           row('trash-outline', 'health', 'hrRowDelete', a.onDeleteAccount, { destructive: true, chevron: false })}
         {/* ADA Preview installs only (utils/previewTools.js); the handler checks again. */}
         {CAN_RESET_ONBOARDING && !!a.onResetOnboarding &&
-          row('refresh-outline', 'health', 'devResetOnboarding', a.onResetOnboarding, { chevron: false })}
+          row('refresh-outline', 'health', 'devResetOnboarding', a.onResetOnboarding, { destructive: true, chevron: false })}
       </Group>
     </View>
   )
