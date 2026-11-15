@@ -1,6 +1,6 @@
 import { TouchableOpacity, Text, View, ActivityIndicator, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, type, radii, press, TAP } from '../../constants/theme'
+import { colors, type, radii, press, space, TAP } from '../../constants/theme'
 import { haptic } from './haptics'
 
 // primary · secondary · text · danger · inverse / onDark / onDarkText (on the teal Oli ground). Min 44pt tall whatever the label size, so a short
@@ -79,7 +79,7 @@ const s = StyleSheet.create({
   // ratio relative to its own fill.
   off:     { opacity: 0.45 },
   label:   { ...type.rowTitle },
-  wrapBtn: { paddingVertical: 6 },
+  wrapBtn: { paddingVertical: space[8] },
   wrapLabel: { flexShrink: 1, textAlign: 'center' },
   hint:    { ...type.meta, color: colors.textSecondaryOnPage, marginTop: 6, textAlign: 'center' },
 })

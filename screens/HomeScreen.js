@@ -1022,7 +1022,7 @@ export default function HomeScreen({
             )}
 
             {/* Onboarding v2: under the Oli bar, above the fold, gone after one tap (either target). */}
-            {tourChip && (
+            {tourChip && !hideHeaderActions && (
               <View style={{ marginTop: WIDGET_GAP }}>
                 <TourChip lang={lang} onStart={onStartTour} onDismiss={onDismissTourChip} />
               </View>
