@@ -370,3 +370,29 @@ export const TRNC_OUTLINE = [
 // with no populated place near it (open sea inside a slack coastline, the
 // Beşparmak ridge, the buffer zone). Better to say nothing than to guess.
 export const MAX_ANCHOR_KM = 25
+
+// ---------------------------------------------------------------------------
+// REGION_WEATHER_POINT — where Home reads the weather for a home city when the
+// device has no GPS fix. One point per REGIONS slug, each copied verbatim from an
+// ANCHORS row above, never invented. Six are the district's own "centre" row
+// (pharmacy-geocoded); karpaz has none, so it uses Yenierenköy (a verified Google
+// Places locality centroid, see the karpaz block), the peninsula's midway town,
+// rather than Kumyalı at the base or Dipkarpaz at the tip. __tests__/regionWeatherPoint.test.js keeps the keys
+// equal to REGIONS and checks each point resolves to its own slug.
+// ---------------------------------------------------------------------------
+
+export const REGION_WEATHER_POINT = {
+  nicosia:   { latitude: 35.1853773, longitude: 33.3610135 }, // Lefkoşa centre / walled city
+  kyrenia:   { latitude: 35.3396291, longitude: 33.3205287 }, // Girne centre
+  famagusta: { latitude: 35.1205261, longitude: 33.9387919 }, // Gazimağusa centre
+  morphou:   { latitude: 35.1993042, longitude: 32.9928829 }, // Güzelyurt centre
+  iskele:    { latitude: 35.2856770, longitude: 33.8930603 }, // İskele centre
+  lefke:     { latitude: 35.1137814, longitude: 32.8495971 }, // Lefke centre
+  karpaz:    { latitude: 35.5353100, longitude: 34.1894100 }, // Yenierenköy — midway
+}
+
+// A home city's weather point; anything that is not a region ('visiting', null) reads Lefkoşa.
+// The fallback is a READ default only, never stored.
+export function weatherPointFor(home) {
+  return REGION_WEATHER_POINT[REGIONS.includes(home) ? home : 'nicosia']
+}

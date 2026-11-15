@@ -47,7 +47,7 @@ import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
-import { REGIONS } from './constants/regions'
+import { REGIONS, weatherPointFor } from './constants/regions'
 import { LEGAL_VERSION, needsStudentHubTerms } from './constants/legal'
 import StudentHubTermsGate from './screens/StudentHubTermsGate'
 import { shouldShowPolicyNotice } from './utils/policyNoticeRules'
@@ -861,6 +861,15 @@ export default function App() {
   const oliOpenRef = useRef(null)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
+  // Onboarding v2: the "Tura başla" chip on Home, armed by Screen 2 (@trnc_tour_chip); read at mount.
+  const [tourChip, setTourChip] = useState(false)
+  useEffect(() => {
+    AsyncStorage.getItem(KEY_TOUR_CHIP).then(v => { if (v === TOUR_CHIP_ON) setTourChip(true) }).catch(() => {})
+  }, [])
+  function retireTourChip() {
+    setTourChip(false)
+    AsyncStorage.removeItem(KEY_TOUR_CHIP).catch(() => {})
+  }
   const hamburgerRef       = useRef(null)
   const searchRef          = useRef(null)
   const filterBarRef       = useRef(null)
@@ -898,6 +907,9 @@ export default function App() {
   }
 
   async function startCoachMarks() {
+    // Any tour start (the chip, Profile, the menu) retires the chip, before the 400 ms wait so the
+    // marks measure Home without it.
+    if (tourChip) retireTourChip()
     setActiveTab('home')
     setShowNotifs(false)
     await new Promise(r => setTimeout(r, 400))
@@ -1423,12 +1435,22 @@ export default function App() {
     setLocationDenied(false)
     fetchWeather(coords)
   }
+  // The home city just changed (Screen 2, Profile's city settings): Home follows without a relaunch.
+  // `home` is the value just chosen (the storage write may still be in flight). Not a region
+  // ('visiting', removed) → back to the GPS district, or none: Lefkoşa is a read fallback only.
+  function homeCityChanged(home) {
+    const isRegion = REGIONS.includes(home)
+    const gps = userLocation ? resolveRegion(userLocation.latitude, userLocation.longitude) : null
+    setDeviceRegion(isRegion ? home : gps)
+    if (!userLocation) fetchWeather(weatherPointFor(home))
+  }
   // Screen 2 resolves: city, outcome, tour chip, pending removed, THEN onboarded (so a kill in between
   // re-shows Screen 2 rather than skipping it), then Home.
   async function resolveDutyOffer({ outcome, city }) {
-    if (city) { await setHomeCity(city); setDeviceRegion(city) }
+    if (city) { await setHomeCity(city); homeCityChanged(city) }
     dutyOfferRef.current = outcome   // before setPending(null) re-runs the registration effect
     try { await AsyncStorage.multiSet([[KEY_DUTY_OFFER, outcome], [KEY_TOUR_CHIP, TOUR_CHIP_ON]]) } catch {}
+    setTourChip(true)
     await setPending(null)
     try { await AsyncStorage.setItem(KEY_ONBOARDED, 'true') } catch {}
     setOnboarded(true)
@@ -1545,9 +1567,11 @@ export default function App() {
     weatherKeyRef.current = key
     try {
       const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
+      // Latest request wins: a home-city change can overtake a slower earlier fetch.
+      if (weatherKeyRef.current !== key) return
       if (weatherJson?.current) setWeatherData(weatherJson)
       else weatherKeyRef.current = null
-    } catch { weatherKeyRef.current = null }
+    } catch { if (weatherKeyRef.current === key) weatherKeyRef.current = null }
   }
 
   // Which district is this device in, as far as the DEVICE knows.
@@ -1735,7 +1759,7 @@ export default function App() {
         setFacilityRatings(ratings)
       }
 
-      let resolvedCoords = { latitude: 35.1856, longitude: 33.3823 }
+      let resolvedCoords = null
       // Onboarding v2: launch never asks. Location is asked in context only (Screen 2's "Konumumu kullan",
       // "near me", the map); a permission already granted is still read silently. locationDenied /
       // locationCanAsk are set as before, so distance sort and the "turn on location" offers still work.
@@ -1755,6 +1779,11 @@ export default function App() {
         setLocationDenied(true)
       }
 
+      // No fix: the home city's weather point, else Lefkoşa's (a read fallback, never stored).
+      if (!resolvedCoords) {
+        const st = await loadCityWelcomeState().catch(() => null)
+        resolvedCoords = weatherPointFor(st?.home)
+      }
       await fetchWeather(resolvedCoords)
 
       setLoading(false)
@@ -1912,6 +1941,18 @@ export default function App() {
   // this makes the precedence explicit rather than incidental.)
   const homeCityAskVisible = showHomeCityAsk && inCustomerHub && !splashUp
   const cityWelcomeVisible = !!cityWelcome && inCustomerHub && !homeCityAskVisible && !splashUp
+  // The policy notice's own rule, read HERE because the content selector below needs it and
+  // policyNoticeVisible is assigned after the selector (Hermes: no TDZ, it would read undefined).
+  const policyNoticeDue = policySeen !== undefined && (!session || profile !== null) &&
+    shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
+                             current: LEGAL_VERSION, returning: returningDevice })
+  // Onboarding v2 tour chip: customer/guest Home only, never alongside another prompt.
+  const tourChipVisible = tourChip && inCustomerHub && !splashUp &&
+    !policyNoticeDue && !cityWelcomeVisible && !homeCityAskVisible
+  // Duty list opened with no GPS fix: the home city's pharmacies on top (Home, push taps, every
+  // opener). An explicit dutyRegion (city-welcome link) wins; with a fix the list sorts by distance.
+  const dutyHomeRegion = deviceRegion || (REGIONS.includes(profile?.region) ? profile.region : null)
+  const dutyInitialRegion = dutyRegion ?? (userLocation ? null : dutyHomeRegion)
 
   // Burn the city's 30-day cooldown only once the card is actually on screen.
   // Marking it at decision time would spend the cooldown on a card the user
@@ -2111,7 +2152,7 @@ export default function App() {
   // FAB and PolicyUpdateNotice off the screen — the force modal can never collide with them.
   } else if (updateTier === 'force') {
     content = showDutyList
-      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
+      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyInitialRegion} />
       : <View style={styles.center} />
   } else if (ageDeletedNotice) {
     // A sign-out that failed offline would leave a session for a deleted user; retry it here.
@@ -2210,7 +2251,7 @@ export default function App() {
     // 20261004, reviews. There is no second path to close: booking was the only write
     // that did not go through onRequireAccount, and it is gone.
     if (showDutyList) {
-      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
+      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyInitialRegion} />
     } else if (showTowing) {
       content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
     } else if (selectedFacility) {
@@ -2379,7 +2420,7 @@ export default function App() {
   // Duty list ABOVE Notifications: a notification opens it on top, and back returns to the
   // notifications at the same scroll (slice 10).
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
+    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyInitialRegion} />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -2968,15 +3009,16 @@ export default function App() {
             onShowGames={() => setShowGames(true)}
             // ─── HOME_V2 ────────────────────────────────────────────────────
             // The hero's district: where the device IS (liveRegion, re-read on cold
-            // start and every resume), then the profile's own answer, then the City
-            // Welcome home city / GPS classification (deviceRegion).
+            // start and every resume), then the home city / GPS classification
+            // (deviceRegion; follows Screen 2 and Profile's city settings live), then
+            // the profile's own answer, then Lefkoşa.
             // ⚠ LIVE FIRST, DELIBERATELY (2026-09-27). It was home-first, which pinned
             //   the hero to Lefkoşa for a user standing in Girne while the rest of Home
             //   moved — and only a storage wipe unstuck it. The home values are now just
             //   the placeholder until the first fix lands.
-            // null is a NORMAL outcome, not a failure — a guest with location denied and
-            // no profile — and the hero renders its country-level fallback.
-            region={liveRegion || profile?.region || deviceRegion || null}
+            // Onboarding v2: 'nicosia' is a READ fallback here and in the duty "until" line
+            // only — never stored, never setDeviceRegion, never the wizard's prefill.
+            region={liveRegion || deviceRegion || profile?.region || 'nicosia'}
             onOpenOli={() => oliOpenRef.current?.()}
             /* ─── Bugün ADA'da: may this user be shown paid placement? ──────
                The ANSWER is computed here and the rule lives in one function
@@ -2993,13 +3035,16 @@ export default function App() {
             dutySummary={{
               loaded: dutyToday.loaded, error: dutyToday.error, status: dutyRosterStatus,
               count: dutyToday.rows.length,
-              until: dutyUntilFor(dutyToday.rows, liveRegion || profile?.region || deviceRegion),
+              until: dutyUntilFor(dutyToday.rows, liveRegion || deviceRegion || profile?.region || 'nicosia'),
             }}
             onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
             onOpenExploreTab={() => setActiveTab('map')}
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
             liveScoresTester={liveScoresTester}
+            tourChip={tourChipVisible}
+            onStartTour={startCoachMarks}
+            onDismissTourChip={retireTourChip}
           />
         )}
 
@@ -3289,10 +3334,8 @@ export default function App() {
   // top of the tutorial or a city prompt, and only once the profile has loaded (an account
   // that already accepted this version must not see it flash).
   const policyNoticeVisible =
-    !splashUp && inTabShell && activeTab === 'home' && policySeen !== undefined && (!session || profile !== null) &&
-    !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
-    shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
-                             current: LEGAL_VERSION, returning: returningDevice })
+    !splashUp && inTabShell && activeTab === 'home' &&
+    !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible && policyNoticeDue
   // Force: from boot on, Start included (the selector renders the force block above Start). Soft: only on an
   // onboarded device, as before.
   const appUpdateVisible = !splashUp && session !== undefined && fontsLoaded && onboarded !== null &&
@@ -3512,6 +3555,7 @@ export default function App() {
         visible={showCitySettings}
         lang={lang}
         onClose={() => setShowCitySettings(false)}
+        onChange={homeCityChanged}
       />
       {/* Same component, different refusal: a signed-in user with an incomplete profile
           browsing the read-only emergency directory. Telling them to "sign up" when they

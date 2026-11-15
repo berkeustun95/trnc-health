@@ -19,7 +19,7 @@ import {
 //
 // The toggle writes @trnc_city_welcome, the same key the card's "turn these off"
 // action writes. One key, two entry points.
-export default function CityWelcomeSettings({ visible, lang, onClose }) {
+export default function CityWelcomeSettings({ visible, lang, onClose, onChange }) {
   const [enabled, setEnabled] = useState(true)
   const [home, setHome] = useState(null)
 
@@ -36,6 +36,7 @@ export default function CityWelcomeSettings({ visible, lang, onClose }) {
   const choose = value => {
     setHome(value)
     setHomeCity(value)
+    onChange?.(value)   // Home follows the new city without a relaunch
   }
 
   // Redesign (S2b): the shared BottomSheet (dim backdrop, swipe/back/backdrop close), the same

@@ -285,6 +285,7 @@ const SURFACES = [
   'components/home/redesign/RedesignHero.js',
   'components/home/redesign/Widgets.js',
   'components/home/redesign/OliBar.js',
+  'components/home/redesign/TourChip.js',   // Onboarding v2 "Tura başla"
   'components/home/redesign/ServicePanels.js',
   'constants/homeGroups.js',
   'components/OliSearchSheet.js',

@@ -50,6 +50,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
+import TourChip from '../components/home/redesign/TourChip'
 import { SectionHeader, useTabBarFootprint, RemoteImage, PageCanvas } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
@@ -284,6 +285,9 @@ export default function HomeScreen({
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
   onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
   liveScoresTester = false, // a score editor sees the tile before the flag flips (App.js asks is_score_editor)
+  tourChip = false,       // Onboarding v2 "Tura başla": App.js decides (new users, no other prompt up)
+  onStartTour,
+  onDismissTourChip,
 }) {
   const tabFootprint = useTabBarFootprint()
   const insets = useSafeAreaInsets()
@@ -1014,6 +1018,13 @@ export default function HomeScreen({
             {!hideHeaderActions && (
               <View style={{ marginTop: 16 }}>
                 <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef} />
+              </View>
+            )}
+
+            {/* Onboarding v2: under the Oli bar, above the fold, gone after one tap (either target). */}
+            {tourChip && (
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <TourChip lang={lang} onStart={onStartTour} onDismiss={onDismissTourChip} />
               </View>
             )}
 

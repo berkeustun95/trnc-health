@@ -37,6 +37,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — North Cyprus Assistant",
     startCta: "Get started",
+    tourChip: "Take the tour",
     startHaveAccount: "Already have an account?",
     dutyAlertsTitle: "Never miss the duty pharmacy",
     dutyAlertsBody: "Every day when the duty shift starts, we'll send you that day's duty pharmacies. Tap the notification and your city's pharmacies are at the top.",
@@ -2804,6 +2805,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — Kuzey Kıbrıs Asistanı",
     startCta: "Hemen başla",
+    tourChip: "Tura başla",
     startHaveAccount: "Hesabın var mı?",
     dutyAlertsTitle: "Nöbetçi eczaneyi kaçırma",
     dutyAlertsBody: "Her gün nöbet saatinde o günün nöbetçi eczanelerini sana bildirelim. Bildirime dokununca şehrinin eczaneleri en üstte.",
@@ -5542,6 +5544,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — مساعد شمال قبرص",
     startCta: "ابدأ الآن",
+    tourChip: "ابدأ الجولة",
     startHaveAccount: "لديك حساب بالفعل؟",
     dutyAlertsTitle: "لا تفوّت الصيدلية المناوبة",
     dutyAlertsBody: "كل يوم عند بدء المناوبة نرسل إليك الصيدليات المناوبة في ذلك اليوم. اضغط على الإشعار لتجد صيدليات مدينتك في الأعلى.",
@@ -8060,6 +8063,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — Помощник Северного Кипра",
     startCta: "Начать",
+    tourChip: "Пройти тур",
     startHaveAccount: "Уже есть аккаунт?",
     dutyAlertsTitle: "Не пропустите дежурную аптеку",
     dutyAlertsBody: "Каждый день к началу дежурства мы будем присылать вам дежурные аптеки на этот день. Нажмите на уведомление — аптеки вашего города будут в начале списка.",
@@ -10594,6 +10598,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — Βοηθός Βόρειας Κύπρου",
     startCta: "Ξεκινήστε",
+    tourChip: "Ξεκινήστε την περιήγηση",
     startHaveAccount: "Έχετε ήδη λογαριασμό;",
     dutyAlertsTitle: "Μη χάνετε το εφημερεύον φαρμακείο",
     dutyAlertsBody: "Κάθε μέρα, την ώρα που ξεκινά η εφημερία, θα σας στέλνουμε τα εφημερεύοντα φαρμακεία της ημέρας. Πατήστε την ειδοποίηση και τα φαρμακεία της πόλης σας εμφανίζονται πρώτα.",
@@ -13106,6 +13111,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — Assistant Chypre du Nord",
     startCta: "Commencer",
+    tourChip: "Faire la visite",
     startHaveAccount: "Vous avez déjà un compte ?",
     dutyAlertsTitle: "Ne manquez plus la pharmacie de garde",
     dutyAlertsBody: "Chaque jour, à l'heure de la garde, nous vous envoyons les pharmacies de garde du jour. Touchez la notification : les pharmacies de votre ville s'affichent en premier.",
@@ -15623,6 +15629,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — Asistente del norte de Chipre",
     startCta: "Empezar",
+    tourChip: "Hacer el recorrido",
     startHaveAccount: "¿Ya tienes una cuenta?",
     dutyAlertsTitle: "No te pierdas la farmacia de guardia",
     dutyAlertsBody: "Cada día, a la hora de la guardia, te avisamos de las farmacias de guardia de ese día. Toca la notificación y las farmacias de tu ciudad aparecen primero.",
@@ -18137,6 +18144,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — Nordzypern-Assistent",
     startCta: "Jetzt starten",
+    tourChip: "Tour starten",
     startHaveAccount: "Schon ein Konto?",
     dutyAlertsTitle: "Verpasse nie die Notdienst-Apotheke",
     dutyAlertsBody: "Jeden Tag zu Dienstbeginn schicken wir dir die Notdienst-Apotheken des Tages. Tippe auf die Benachrichtigung, und die Apotheken deiner Stadt stehen ganz oben.",
@@ -20650,6 +20658,7 @@ const translations = {
     // ─── Onboarding v2 (screens/StartScreen.js, screens/DutyAlertsScreen.js) ───
     startTagline: "ADA — دستیار قبرس شمالی",
     startCta: "شروع کنید",
+    tourChip: "شروع راهنما",
     startHaveAccount: "حساب کاربری دارید؟",
     dutyAlertsTitle: "داروخانه کشیک را از دست ندهید",
     dutyAlertsBody: "هر روز در ساعت شروع کشیک، داروخانه‌های کشیک همان روز را برایتان می‌فرستیم. با لمس اعلان، داروخانه‌های شهرتان در بالای فهرست نمایش داده می‌شوند.",
