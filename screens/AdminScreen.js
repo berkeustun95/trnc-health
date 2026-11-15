@@ -21,6 +21,8 @@ import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '
 import { MARKETPLACE } from '../constants/redesign'
 import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { ConfirmDialog } from '../components/ui'
+import DataJobsTab, { loadDataJobs } from '../components/AdminDataJobs'
+import { countAttention } from '../utils/dataJobs'
 import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoSummary, photoWait, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
@@ -103,7 +105,7 @@ const ROLES = ['customer', 'provider', 'admin']
 // Turning a partner OFF still needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
   'HomeServices',
-  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'RestaurantPins', 'Moderation']
+  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'RestaurantPins', 'DataJobs', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -421,23 +423,26 @@ function DailyBars({ daily }) {
   )
 }
 
-function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace }) {
+function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace, onOpenDataJobs }) {
   const [counts, setCounts] = useState(null)
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingCars, setPendingCars] = useState(0)
   const [pendingMkPhotos, setPendingMkPhotos] = useState(0)
   const [mkOldestAt, setMkOldestAt] = useState(null)
   const [novestLastSeen, setNovestLastSeen] = useState(null)
+  // undefined = loading, null = could not be read, number = jobs needing attention.
+  const [jobsAttention, setJobsAttention] = useState(undefined)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
-    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }, { count: carsCount, error: carsError }] = await Promise.all([
+    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }, { count: carsCount, error: carsError }, jobs] = await Promise.all([
       supabase.rpc('admin_user_counts'),
       supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('properties').select('last_seen_at')
         .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      loadDataJobs(),
     ])
     setPendingCars(carsError ? null : carsCount)
     if (MARKETPLACE) {
@@ -445,6 +450,7 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
       setPendingMkPhotos(mk ? mk.count : null)
       setMkOldestAt(mk?.oldestAt ?? null)
     }
+    setJobsAttention(jobs ? countAttention(jobs) : null)
     setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
@@ -511,6 +517,22 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
     </TouchableOpacity>
   )
 
+  // Data jobs: always shown once read. null = could not be read; that shows too, a silent zero would hide a red job.
+  const jobsRow = jobsAttention !== undefined && (
+    <TouchableOpacity style={s.urgencyCard} onPress={onOpenDataJobs} activeOpacity={0.75}>
+      <View style={[s.urgencyDot, { backgroundColor: jobsAttention === 0 ? colors.success : colors.danger }]} />
+      <Text style={s.urgencyLabel}>
+        {jobsAttention === null ? t('adminJobsUnread', lang) : jobsAttention === 0 ? t('adminJobsAllClear', lang) : t('adminJobsAttention', lang).replace('{count}', '')}
+      </Text>
+      {!!jobsAttention && (
+        <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
+          <Text style={s.urgencyCount}>{jobsAttention}</Text>
+        </View>
+      )}
+      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+
   if (!counts) {
     if (!failed) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
     return (
@@ -518,6 +540,8 @@ function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace 
         {reportsRow}
         {carsRow}
         {mkRow}
+      {jobsRow}
+        {jobsRow}
         <FeedHealthBanner lastSeenAt={novestLastSeen} />
         <View style={s.allClearBox}>
           <Text style={s.allClearText}>User counts could not be loaded.</Text>
@@ -5159,10 +5183,12 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
             </TouchableOpacity>
           </View>
           <UserCounts
+            lang={lang}
             onOpenTools={() => { setTab('Dashboard'); setToolsOpen(true) }}
             onOpenReports={() => { setTab('Reports'); setToolsOpen(true) }}
             onOpenCars={() => { setTab('Cars'); setToolsOpen(true) }}
             onOpenMarketplace={() => { setTab('Bandabuliya'); setToolsOpen(true) }}
+            onOpenDataJobs={() => { setTab('DataJobs'); setToolsOpen(true) }}
           />
         </View>
       </SafeAreaView>
@@ -5228,7 +5254,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
         >
           {TABS.map(k => (
             <TouchableOpacity key={k} style={[s.tabBtn, tab === k && s.tabBtnActive, pinBusy && tab !== k && { opacity: 0.45 }]} onPress={() => setTab(k)} disabled={pinBusy}>
-              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k}</Text>
+              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k === 'DataJobs' ? t('adminJobsTab', lang) : k}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -5260,6 +5286,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'Cars'          && <CarsTab />}
           {tab === 'Bandabuliya'   && <MarketplaceTab key={mkOpen?.at ?? 'tab'} initialView={mkOpen?.view} />}
           {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} onBusyChange={setPinBusy} />}
+          {tab === 'DataJobs'      && <DataJobsTab lang={lang} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>
