@@ -28,10 +28,15 @@
 --   • The UPDATE runs INSIDE the DO block, keyed by the primary key AND the exact old values
 --     (compare-and-set), and GET DIAGNOSTICS must report 0 or 1 rows.
 --   • The row is captured as jsonb before and after; with latitude and longitude removed the two
---     documents must be EQUAL. That holds whatever triggers exist (an updated_at toucher, a guard
---     that coerces a column) — if anything else changed, the apply aborts and names the KEYS that
---     differ (never the values: a places row can carry submitted_by / provider_id and this file's
---     output is public).
+--     documents must be EQUAL: this row's OTHER COLUMNS are checked by jsonb equality. If anything
+--     else changed, the apply aborts and names the KEYS that differ (never the values: a places
+--     row can carry submitted_by / provider_id and this file's output is public).
+--   • Side effects ELSEWHERE (other rows, other tables) are invisible to that comparison, so they
+--     are excluded another way: BEFORE the UPDATE the DO block reads the enabled, non-internal
+--     triggers on public.places that fire on UPDATE and RAISEs unless ALL of them are BEFORE ROW
+--     triggers AND there are exactly 5 (the five listed below). An AFTER trigger, or a sixth
+--     trigger of any kind, aborts the apply and the message carries the count and the trigger
+--     names (schema names, not data).
 --   • updated_at is NOT set here: "only latitude/longitude" is literal. No places updated_at
 --     trigger is defined in supabase/migrations/; the jsonb check would catch one.
 --   • First run moves the pin; a re-run finds the new values and does nothing; a row someone has
@@ -39,16 +44,23 @@
 --   • No ACCESS EXCLUSIVE lock (that was 20261045's DDL); the UPDATE takes ROW EXCLUSIVE, which
 --     blocks no reader. lock_timeout 5 s turns any wait into a clean abort (55P03): run it again.
 --
--- Triggers that fire on a places UPDATE and what each does here (role postgres, auth.uid() NULL):
---   places_guard_update          BEFORE UPDATE  returns NEW at once when auth.uid() IS NULL
+-- Triggers that fire on a places UPDATE and what each does here (role postgres, auth.uid() NULL).
+-- The 5 is derived from supabase/migrations/: places triggers are created in 20260824 (guard_place_moderation,
+-- check_place_content), 20260825 (places_guard_insert = INSERT only, so it does not count; and
+-- places_guard_update), 20261045 (places_guard_source) and 20261155 (places_guard_official_visit);
+-- supabase/verify_schema.sql lists the same functions in its D-section (trigger-function checks).
+--   places_guard_update          BEFORE UPDATE  body per 20260829_place_resubmit.sql: reads the GUCs
+--                                app.trusted_place_write and app.trusted_place_resubmit first (both
+--                                unset here, so neither escape branch runs), then returns NEW at
+--                                once when auth.uid() IS NULL
 --   places_guard_source          BEFORE I/U     returns NEW at once when auth.uid() IS NULL
 --   places_guard_official_visit  BEFORE I/U     returns NEW at once when auth.uid() IS NULL
 --   guard_place_moderation       BEFORE UPDATE  guard_moderation_columns('place'): get_my_role() is
 --                                NULL with no session, so it is not admin; hidden_at / hidden_reason
 --                                are unchanged, so it returns NEW
 --   check_place_content          BEFORE I/U     name / name_i18n / description_i18n unchanged: returns NEW
--- None touches another column or flips status. The DO block prints the live enabled UPDATE
--- triggers from pg_trigger (derived, not assumed).
+-- None touches another column or flips status. The DO block asserts the live set (above) and also
+-- prints it as a NOTICE (supabase-migrate does not surface NOTICEs; the assertion is what protects).
 --
 -- Apply: gh workflow run supabase-migrate -f file=20261206_alagadi_pin.sql  (dry), then -f apply=true
 -- after Berke approves production-db. Data only: nothing to register in verify_schema.sql.
@@ -73,22 +85,31 @@ DECLARE
   v_diff    text;
   v_trg     text;
   v_ntrg    int;
+  v_nbad    int;
 BEGIN
   SELECT * INTO r FROM public.places WHERE id = c_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'places row % not found', c_id;
   END IF;
   IF r.category IS DISTINCT FROM 'beach' OR r.name IS DISTINCT FROM 'Alagadi Turtle Beach' THEN
-    RAISE EXCEPTION 'places row % is not the Alagadi beach: category %, name %', c_id, r.category, r.name;
+    RAISE EXCEPTION 'places row % does not match the category / name this file expects for the Alagadi beach', c_id;
   END IF;
   v_before := to_jsonb(r);
 
-  SELECT count(*), string_agg(pg_get_triggerdef(t.oid), E'\n  ' ORDER BY t.tgname)
-    INTO v_ntrg, v_trg
+  -- 5 = places_guard_update, places_guard_source, places_guard_official_visit, guard_place_moderation,
+  -- check_place_content (see header: derived from supabase/migrations/ + verify_schema.sql).
+  SELECT count(*),
+         string_agg(t.tgname || CASE WHEN (t.tgtype & 3) = 3 THEN ' (before row)' ELSE ' (NOT before row)' END, ', ' ORDER BY t.tgname),
+         count(*) FILTER (WHERE (t.tgtype & 3) <> 3)
+    INTO v_ntrg, v_trg, v_nbad
     FROM pg_trigger t
    WHERE t.tgrelid = 'public.places'::regclass AND NOT t.tgisinternal AND t.tgenabled <> 'D'
      AND (t.tgtype & 16) = 16;
-  RAISE NOTICE 'enabled UPDATE triggers on places (%): %', v_ntrg, E'\n  ' || coalesce(v_trg, '(none)');
+  IF v_nbad <> 0 OR v_ntrg <> 5 THEN
+    RAISE EXCEPTION 'places has % enabled UPDATE triggers (% not before-row), expected exactly 5 before-row ones: %',
+      v_ntrg, v_nbad, coalesce(v_trg, '(none)');
+  END IF;
+  RAISE NOTICE 'enabled UPDATE triggers on places (%): %', v_ntrg, v_trg;
 
   IF r.latitude IS NOT DISTINCT FROM c_old_lat AND r.longitude IS NOT DISTINCT FROM c_old_lng THEN
     UPDATE public.places
@@ -136,7 +157,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261206_alagadi_pin.sql', '3bf8967bf5c863ea0c451eb74cf88000c7c48b77be3d3755a7572727865c2413')
+VALUES ('20261206_alagadi_pin.sql', '8fff41bc998007533c75a6000892f05c2baa618f28f3fb7ada7d11bedf5561e1')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

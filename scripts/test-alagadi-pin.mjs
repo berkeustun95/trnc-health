@@ -5,7 +5,7 @@
 // seeded VERBATIM from their migrations (extracted at run time), so "nothing else changed" is
 // measured through them. PGlite is PG 18; prod is older (see the version note at the end).
 import assert from 'node:assert/strict'
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { freshDb, applyFile, asRole } from './migration-harness.mjs'
@@ -14,16 +14,27 @@ const FILE = 'supabase/migrations/20261206_alagadi_pin.sql'
 const ID = 'fa39492b-57e6-4ebd-b22c-89a9cf20ffe2'
 const SUBMITTER = '11111111-2222-3333-4444-555555555555'
 
+const MIGS = readdirSync('supabase/migrations').filter(f => f.endsWith('.sql')).sort()
+// the NEWEST migration that defines `name` at the start of a line (comments never count)
+const newest = re => {
+  const hit = MIGS.filter(f => re.test(readFileSync(`supabase/migrations/${f}`, 'utf8'))).pop()
+  assert.ok(hit, `no migration defines ${re}`)
+  console.log(`  fixture: ${re.source.replace(/\\/g, '')} <- ${hit}`)
+  return hit
+}
 const grab = (file, start, ends) => {
   const t = readFileSync(`supabase/migrations/${file}`, 'utf8')
-  const i = t.indexOf(start)
-  assert.ok(i >= 0, `${file}: ${start} not found`)
+  const m = new RegExp(`^${start.replace(/[.()]/g, '\\$&')}`, 'm').exec(t)
+  assert.ok(m, `${file}: ${start} not found`)
+  const i = m.index
   const hits = ends.map(e => [t.indexOf(e, i + start.length), e]).filter(([j]) => j >= 0).sort((a, b) => a[0] - b[0])
   assert.ok(hits.length, `${file}: end of ${start} not found`)
   return t.slice(i, hits[0][0] + hits[0][1].length)
 }
 const FN = ['$function$;', '$$;']
 const trig = (file, start) => grab(file, start, [');'])
+const fn = name => { const s = `CREATE OR REPLACE FUNCTION public.${name}()`; return grab(newest(new RegExp(`^CREATE OR REPLACE FUNCTION public\\.${name}\\(\\)`, 'm')), s, FN) }
+const tg = name => { const f = newest(new RegExp(`^CREATE (OR REPLACE )?TRIGGER ${name}$`, 'm')); const t = readFileSync(`supabase/migrations/${f}`, 'utf8'); const m = new RegExp(`^CREATE (OR REPLACE )?TRIGGER ${name}$`, 'm').exec(t); return t.slice(m.index, t.indexOf(');', m.index) + 2) }
 
 const SEED = `
 CREATE TABLE public.profiles (id uuid PRIMARY KEY, role text);
@@ -37,19 +48,20 @@ CREATE TABLE public.places (
   status text NOT NULL DEFAULT 'pending', submitted_by uuid, provider_id uuid,
   hidden_at timestamptz, hidden_reason text, featured_until timestamptz, featured_requested_at timestamptz,
   source text, source_id text, official_visit jsonb, photos text[],
-  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  resubmit_count int NOT NULL DEFAULT 0
 );
 ${grab('20260718_capture_3_functions.sql', 'CREATE OR REPLACE FUNCTION public.get_my_role()', FN)}
 ${grab('20260718_capture_3_functions.sql', 'CREATE OR REPLACE FUNCTION public.guard_moderation_columns()', FN)}
-${grab('20260825_places_column_guards.sql', 'CREATE OR REPLACE FUNCTION public.places_guard_update()', FN)}
-${grab('20261045_places_source.sql', 'CREATE OR REPLACE FUNCTION public.places_guard_source()', FN)}
-${grab('20261155_places_official_visit.sql', 'CREATE OR REPLACE FUNCTION public.places_guard_official_visit()', FN)}
-${grab('20260824_place_moderation.sql', 'CREATE OR REPLACE FUNCTION public.check_place_content()', FN)}
-${trig('20260824_place_moderation.sql', 'CREATE TRIGGER guard_place_moderation')}
-${trig('20260824_place_moderation.sql', 'CREATE TRIGGER check_place_content')}
-${trig('20260825_places_column_guards.sql', 'CREATE TRIGGER places_guard_update')}
-${trig('20261045_places_source.sql', 'CREATE OR REPLACE TRIGGER places_guard_source')}
-${trig('20261155_places_official_visit.sql', 'CREATE OR REPLACE TRIGGER places_guard_official_visit')}
+${fn('places_guard_update')}
+${fn('places_guard_source')}
+${fn('places_guard_official_visit')}
+${fn('check_place_content')}
+${tg('guard_place_moderation')}
+${tg('check_place_content')}
+${tg('places_guard_update')}
+${tg('places_guard_source')}
+${tg('places_guard_official_visit')}
 INSERT INTO public.places (id, category, name, name_i18n, description_i18n, region, latitude, longitude, address, status,
                            submitted_by, hidden_reason, source, source_id, official_visit, photos, created_at, updated_at) VALUES
  ('${ID}', 'beach', 'Alagadi Turtle Beach', '{"en":"Alagadi Turtle Beach","tr":"Alagadı Kaplumbağa Plajı"}', '{"en":"d"}', 'kyrenia',
@@ -96,9 +108,10 @@ assert.equal(r.ok, false); assert.match(r.msg, /neither the old .* nor the new/,
 assert.match(r.msg, /35\.1 , 33\.1/, 'names what it found')
 assert.deepEqual(await snap(db), third, 'third value kept, nothing else touched')
 
-// ── RED 1: a trigger that touches another column (updated_at) → abort naming the KEY only ──
+// ── RED 1 (second layer): a trigger that touches another column (updated_at) → abort naming the KEY only ──
 db = await freshDb(SEED + `
 CREATE FUNCTION public.t_touch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at := now() + interval '1 second'; NEW.address := 'x${SUBMITTER}'; RETURN NEW; END $$;
+DROP TRIGGER check_place_content ON public.places;  -- keep the count at 5 so the jsonb layer, not the trigger-set assertion, is what fires
 CREATE TRIGGER t_touch BEFORE UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_touch();`)
 const b2 = await snap(db)
 r = await applyFile(db, FILE); await undo(db)
@@ -126,6 +139,35 @@ await db.exec(`UPDATE public.places SET latitude = 35.3303 WHERE id='${ID}'`)
 const b4 = await snap(db)
 r = await applyFile(db, FILE); await undo(db)
 console.log('RED 3 (wrong old value):', r.msg)
-assert.equal(r.ok, false); assert.deepEqual(await snap(db), b4)
+assert.equal(r.ok, false); assert.match(r.msg, /neither the old .* nor the new/, r.msg); assert.match(r.msg, /35\.3303 , 33\.4972/, 'names what it found')
+assert.deepEqual(await snap(db), b4)
 
-console.log('alagadi pin: OK (moves 1 row / 2 columns through the 5 real UPDATE triggers; re-run no-op; third value aborts; widened WHERE and a column-touching trigger both abort)')
+// ── RED 4: an extra AFTER UPDATE trigger (writes to ANOTHER row) → aborts naming it, nothing applied ──
+db = await freshDb(SEED + `
+CREATE FUNCTION public.t_after() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN UPDATE public.places SET address = 'side effect' WHERE id = '00000000-0000-0000-0000-0000000000b1'; RETURN NULL; END $$;
+CREATE TRIGGER t_after AFTER UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_after();`)
+const b5 = await snap(db)
+r = await applyFile(db, FILE); await undo(db)
+console.log('RED 4 (extra AFTER UPDATE trigger):', r.msg)
+assert.equal(r.ok, false); assert.match(r.msg, /6 enabled UPDATE triggers \(1 not before-row\).*t_after \(NOT before row\)/s, r.msg)
+assert.deepEqual(await snap(db), b5, 'aborted before the UPDATE: nothing applied')
+
+// ── RED 5: a sixth BEFORE UPDATE trigger → aborts on the count ──────────────
+db = await freshDb(SEED + `
+CREATE FUNCTION public.t_sixth() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+CREATE TRIGGER t_sixth BEFORE UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_sixth();`)
+const b6 = await snap(db)
+r = await applyFile(db, FILE); await undo(db)
+console.log('RED 5 (sixth BEFORE UPDATE trigger):', r.msg)
+assert.equal(r.ok, false); assert.match(r.msg, /6 enabled UPDATE triggers \(0 not before-row\), expected exactly 5.*t_sixth \(before row\)/s, r.msg)
+assert.deepEqual(await snap(db), b6, 'aborted before the UPDATE: nothing applied')
+
+// ── RED 6: the mismatch exception prints no row value (the id pointed at a user submission) ──
+db = await freshDb(SEED)
+await db.exec(`UPDATE public.places SET name = 'Secret Submission Name', category = 'cafe' WHERE id='${ID}'`)
+r = await applyFile(db, FILE); await undo(db)
+console.log('RED 6 (not the beach):', r.msg)
+assert.equal(r.ok, false); assert.match(r.msg, /does not match the category \/ name this file expects/)
+assert.ok(!/Secret Submission|cafe/.test(r.msg), 'no name / category in the message')
+
+console.log('alagadi pin: OK (moves 1 row / 2 columns through the 5 real UPDATE triggers; re-run no-op; third value aborts; widened WHERE, a column-touching trigger, an AFTER trigger and a sixth BEFORE trigger all abort; no row values in the mismatch message)')
