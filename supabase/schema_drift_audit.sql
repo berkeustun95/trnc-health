@@ -1579,7 +1579,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('oli_messages_role_check', 'oli|user', 'role'),
     ('oli_messages_shape_check', '1|500|oli|user', 'body|payload|role'),
     ('oli_messages_user_id_fkey', '', 'id|user_id'),
-    ('onboarding_events_event_check', 'offer_denied|offer_granted|offer_later|offer_shown|reoffer_declined|reoffer_existing_declined|reoffer_existing_granted|reoffer_existing_shown|reoffer_granted|reoffer_shown|start_shown', 'event'),
+    ('onboarding_events_event_check', 'offer_denied|offer_granted|offer_later|offer_shown|reoffer_declined|reoffer_existing_declined|reoffer_existing_granted|reoffer_existing_shown|reoffer_granted|reoffer_shown|start_choice_guest|start_choice_signin|start_choice_signup|start_shown', 'event'),
     ('onboarding_events_pkey', '', 'id'),
     ('onboarding_events_platform_check', 'android|ios', 'platform'),
     ('onboarding_events_runtime_len_check', '64', 'runtime_version'),

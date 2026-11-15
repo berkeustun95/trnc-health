@@ -1449,7 +1449,7 @@ WITH report AS (
     ('1113_connectivity_links','connectivity_links_url_check'),
     -- 1129. Its key format is an H token.
     ('1129_connectivity_logo_key','connectivity_operators_logo_key_check'),
-    -- 20261202. The event list and the policy that repeats it are the 1202 H token.
+    -- 20261202. The event list and the policy that repeats it are the 1202 H token (the three start_choice_* values: 1204).
     ('20261202_onboarding_events','onboarding_events_pkey'),
     ('20261202_onboarding_events','onboarding_events_event_check'),
     ('20261202_onboarding_events','onboarding_events_platform_check'),
@@ -2011,7 +2011,7 @@ WITH report AS (
     -- 1201-END
     -- 1202-BEGIN
     -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
-    UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the 11 events / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
+    UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the event list (11 in 20261202, 14 since 20261204) / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
       COALESCE((SELECT c.relrowsecurity
                        AND NOT has_table_privilege('anon', c.oid, 'SELECT,UPDATE,DELETE,TRUNCATE')
                        AND NOT has_table_privilege('authenticated', c.oid, 'SELECT,UPDATE,DELETE,TRUNCATE')
@@ -2048,6 +2048,16 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%v_cut timestamptz := now() - p_older_than;%'
            AND pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%DELETE FROM public.onboarding_events WHERE created_at < v_cut;%', false)
     -- 1203-END
+    -- 1204-BEGIN
+    -- 20261204: the three Start-screen choice events, in BOTH places that hold the event list. The constraint and the
+    -- policy keep their 20261202 names (so no E / Q3 row; the 1202 token keeps the rest). Red until applied, never an error.
+    UNION ALL SELECT '20261204_onboarding_events_start_choice','onboarding_events: start_choice_signup / _signin / _guest allowed by onboarding_events_event_check AND repeated in oe_insert_public',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''start_choice_signup''%' AND pg_get_constraintdef(c.oid) LIKE '%''start_choice_signin''%'
+                       AND pg_get_constraintdef(c.oid) LIKE '%''start_choice_guest''%'
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.onboarding_events') AND c.conname = 'onboarding_events_event_check'), false)
+      AND COALESCE((SELECT with_check LIKE '%''start_choice_signup''%' AND with_check LIKE '%''start_choice_signin''%' AND with_check LIKE '%''start_choice_guest''%'
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events' AND policyname = 'oe_insert_public'), false)
+    -- 1204-END
     -- 1205-BEGIN
     -- 20261205 data jobs. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
     -- (a) both tables: RLS on, ZERO policies, no anon/authenticated privilege (table or any column), service_role keeps it;
