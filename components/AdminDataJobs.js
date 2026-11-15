@@ -47,7 +47,7 @@ function timeLine(labelKey, iso, lang) {
 }
 
 function JobRow({ job, lang }) {
-  const st = STATE_STYLE[job.state] || STATE_STYLE.no_record
+  const st = job.state === 'inactive' && job.attention !== true ? STATE_STYLE.paused : STATE_STYLE[job.state] || STATE_STYLE.no_record
   const run = job.last_run
   const lastOk = job.state === 'no_record' || run?.outcome === 'ok' ? null : job.last_ok_at
   return (
@@ -114,7 +114,7 @@ export default function DataJobsTab({ lang }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
     >
       <Text style={styles.intro}>{t('adminJobsIntro', lang)}</Text>
-      <Text style={styles.count}>{t('adminJobsAttention', lang).replace('{count}', String(countAttention(jobs)))}</Text>
+      <Text style={styles.count}>{`${t('adminJobsAttention', lang)}: ${countAttention(jobs)}`}</Text>
       {sorted.map(j => <JobRow key={j.key} job={j} lang={lang} />)}
     </ScrollView>
   )

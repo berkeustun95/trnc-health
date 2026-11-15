@@ -1,14 +1,20 @@
 // Pure helpers for the admin "Data jobs" screen. `state` is computed by the server
 // (admin_data_jobs); nothing here recomputes it, it only groups and counts.
-export const ATTENTION_STATES = ['failed', 'stale', 'inactive']
-
 // Display groups, in order. Server order is kept inside a group (Array.prototype.sort is stable).
-const GROUP_OF = { failed: 0, stale: 0, inactive: 0, paused: 1, no_record: 2, ok: 3 }
-
-const groupOf = job => GROUP_OF[job?.state] ?? 2
+// `attention` is computed by the server; a deliberately-off job is inactive with attention false.
+const groupOf = job => {
+  if (job?.attention === true) return 0
+  if (job?.state === 'paused' || job?.state === 'inactive') return 1
+  if (job?.state === 'ok') return 3
+  return 2
+}
 
 export function countAttention(jobs) {
-  return (jobs || []).filter(j => ATTENTION_STATES.includes(j?.state)).length
+  return (jobs || []).filter(j => j?.attention === true).length
+}
+
+export function countNoRecord(jobs) {
+  return (jobs || []).filter(j => j?.state === 'no_record').length
 }
 
 export function sortJobs(jobs) {

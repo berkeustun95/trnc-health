@@ -22,7 +22,7 @@ import { MARKETPLACE } from '../constants/redesign'
 import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { ConfirmDialog } from '../components/ui'
 import DataJobsTab, { loadDataJobs } from '../components/AdminDataJobs'
-import { countAttention } from '../utils/dataJobs'
+import { countAttention, countNoRecord } from '../utils/dataJobs'
 import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoSummary, photoWait, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
@@ -430,7 +430,7 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
   const [pendingMkPhotos, setPendingMkPhotos] = useState(0)
   const [mkOldestAt, setMkOldestAt] = useState(null)
   const [novestLastSeen, setNovestLastSeen] = useState(null)
-  // undefined = loading, null = could not be read, number = jobs needing attention.
+  // undefined = loading, null = could not be read, { attention, noRecord } counts.
   const [jobsAttention, setJobsAttention] = useState(undefined)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -450,7 +450,7 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
       setPendingMkPhotos(mk ? mk.count : null)
       setMkOldestAt(mk?.oldestAt ?? null)
     }
-    setJobsAttention(jobs ? countAttention(jobs) : null)
+    setJobsAttention(jobs ? { attention: countAttention(jobs), noRecord: countNoRecord(jobs) } : null)
     setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
@@ -518,15 +518,17 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
   )
 
   // Data jobs: always shown once read. null = could not be read; that shows too, a silent zero would hide a red job.
+  const jobsAttn = jobsAttention?.attention ?? 0
+  const jobsNoRec = jobsAttention?.noRecord ?? 0
   const jobsRow = jobsAttention !== undefined && (
     <TouchableOpacity style={s.urgencyCard} onPress={onOpenDataJobs} activeOpacity={0.75}>
-      <View style={[s.urgencyDot, { backgroundColor: jobsAttention === 0 ? colors.success : colors.danger }]} />
+      <View style={[s.urgencyDot, { backgroundColor: jobsAttention === null || jobsAttn > 0 ? colors.danger : jobsNoRec > 0 ? colors.textSecondary : colors.success }]} />
       <Text style={s.urgencyLabel}>
-        {jobsAttention === null ? t('adminJobsUnread', lang) : jobsAttention === 0 ? t('adminJobsAllClear', lang) : t('adminJobsAttention', lang).replace('{count}', '')}
+        {jobsAttention === null ? t('adminJobsUnread', lang) : jobsAttn > 0 ? t('adminJobsAttention', lang) : jobsNoRec > 0 ? t('adminJobsNoRecordCount', lang).replace('{count}', String(jobsNoRec)) : t('adminJobsAllClear', lang)}
       </Text>
-      {!!jobsAttention && (
+      {jobsAttn > 0 && (
         <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
-          <Text style={s.urgencyCount}>{jobsAttention}</Text>
+          <Text style={s.urgencyCount}>{jobsAttn}</Text>
         </View>
       )}
       <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
@@ -540,7 +542,6 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
         {reportsRow}
         {carsRow}
         {mkRow}
-      {jobsRow}
         {jobsRow}
         <FeedHealthBanner lastSeenAt={novestLastSeen} />
         <View style={s.allClearBox}>
