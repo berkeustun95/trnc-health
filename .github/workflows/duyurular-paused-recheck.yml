@@ -29,7 +29,7 @@ jobs:
         with: { node-version: '24', cache: npm }
       - run: npm ci
       - name: Check paused sources
-        run: node scripts/check-duyurular-paused.mjs --out=back.txt && echo 'TEMP red-first test' && exit 1
+        run: node scripts/check-duyurular-paused.mjs --out=back.txt
       - name: Open an issue per source that is back (once; an open issue is not duplicated)
         env:
           GH_TOKEN: ${{ github.token }}
