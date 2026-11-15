@@ -155,11 +155,12 @@ test('Make Home yours hides while @trnc_tour_chip is armed; App passes the raw s
   expect(fnBody('retireTourChip')).toContain('setTourChip(false)')
 })
 
-test('second offer: home city read with the decision; short copy only with no home city and no fix', () => {
+test('second offer: copy fixed at decision (device city, else profile region, else short with no fix); short copy only with no home city and no fix', () => {
   const b = fnBody('maybeOfferDutyAgain')
   expect(b).toMatch(/\[, homeCity\]\] = await AsyncStorage\.multiGet\(\[KEY_DUTY_OFFER, KEY_REOFFER, KEY_ONBOARDED, KEY_CITY_HOME\]\)/)
-  expect(at(b, 'setReofferHome(homeCity ?? null)', 'home')).toBeLessThan(at(b, 'setDutyReoffer(variant)', 'show'))
-  expect(src).toMatch(/<DutyReofferSheet [^>]*noCity=\{reofferNoCity\(\{ home: reofferHome, hasFix: !!userLocation \}\)\}/)
+  expect(b).toContain('const reofferHomeRegion = homeCity ?? (REGIONS.includes(profile?.region) ? profile.region : null)')
+  expect(at(b, 'setReofferNoCityCopy(reofferNoCity({ home: reofferHomeRegion, hasFix: !!userLocation }))', 'copy')).toBeLessThan(at(b, 'setDutyReoffer(variant)', 'show'))
+  expect(src).toMatch(/<DutyReofferSheet [^>]*noCity=\{reofferNoCityCopy\}/)
   const sheet = fs.readFileSync(path.join(__dirname, '..', 'components', 'DutyReofferSheet.js'), 'utf8')
   expect(sheet).toContain("noCity ? t('dutyReofferBodyNoCity', lang) : t('dutyAlertsBody', lang)")
 })

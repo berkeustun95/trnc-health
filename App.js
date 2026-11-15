@@ -625,7 +625,7 @@ export default function App() {
   // dutyFromPushRef: the open list came from a push tap (never offered then). reofferBlockedRef: anything
   // that rules the sheet out right now, recomputed every render and read after the async checks.
   const [dutyReoffer, setDutyReoffer] = useState(null)
-  const [reofferHome, setReofferHome] = useState(null)   // @trnc_city_home when the sheet was decided
+  const [reofferNoCityCopy, setReofferNoCityCopy] = useState(false)   // fixed when the sheet is decided, so the copy never changes mid-read
   const dutyFromPushRef = useRef(false)
   const reofferBlockedRef = useRef(true)
   const reofferCheckingRef = useRef(false)
@@ -1057,7 +1057,8 @@ export default function App() {
       if (!variant) return
       await AsyncStorage.setItem(KEY_REOFFER, REOFFER_SHOWN)
       reofferResolvedRef.current = false
-      setReofferHome(homeCity ?? null)
+      const reofferHomeRegion = homeCity ?? (REGIONS.includes(profile?.region) ? profile.region : null)
+      setReofferNoCityCopy(reofferNoCity({ home: reofferHomeRegion, hasFix: !!userLocation }))
       setDutyReoffer(variant)
       logOnboardingEvent(REOFFER_EVENTS[variant].shown)
     } catch {} finally {
@@ -3639,7 +3640,7 @@ export default function App() {
         />
       )}
       <DutyReofferSheet visible={dutyReoffer !== null} lang={lang} onEnable={acceptDutyReoffer} onDecline={closeDutyReoffer}
-        noCity={reofferNoCity({ home: reofferHome, hasFix: !!userLocation })} />
+        noCity={reofferNoCityCopy} />
       {homeCityAskVisible && (
         <HomeCitySheet
           detectedRegion={detectedRegion}
