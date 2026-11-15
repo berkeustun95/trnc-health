@@ -194,7 +194,6 @@ function ChipRow({ sources, selectedKeys, onSetKeys, onToggleKey, servicesOn, on
         options={sources.map(src => ({ value: src.key, label: t(src.labelKey, lang), count: src.pins.length, color: src.color }))}
         values={layerMode ? [] : [...selectedKeys]}
         onChange={onSetKeys}
-        style={{ marginRight: 8 }}
       />
       {/* Plajlar: a quick toggle of the explore:beach source, on the same selectedKeys as the dropdown. */}
       {!layerMode && sources.some(src => src.key === 'explore:beach') && (
@@ -207,6 +206,18 @@ function ChipRow({ sources, selectedKeys, onSetKeys, onToggleKey, servicesOn, on
           onPress={() => onToggleKey('explore:beach')}
         />
       )}
+      {/* Before Rotalar: the row scrolls, and the chip must be visible without a swipe (Berke, 2026-11-01).
+          Services follow it so Müze & Ören Yeri stays on screen at 360dp in Turkish. */}
+      {canOfficial && (
+        <Chip
+          label={t('ovFilter', lang)}
+          ionicon={GROUP_META.heritage.icon}
+          active={!layerMode && officialOnly}
+          color={GROUP_META.heritage.colorToken.text}
+          colorBg={GROUP_META.heritage.colorToken.bg}
+          onPress={onOfficial}
+        />
+      )}
       {/* Services start OFF on the map (DEFAULT_OFF_KEYS, Berke 2026-11-08): this chip adds them. */}
       {!layerMode && sources.some(src => src.key === 'explore:services') && (
         <Chip
@@ -216,17 +227,6 @@ function ChipRow({ sources, selectedKeys, onSetKeys, onToggleKey, servicesOn, on
           color={GROUP_META.services.colorToken.text}
           colorBg={GROUP_META.services.colorToken.bg}
           onPress={onServices}
-        />
-      )}
-      {/* Before Rotalar: the row scrolls, and the chip must be visible without a swipe (Berke, 2026-11-01). */}
-      {canOfficial && (
-        <Chip
-          label={t('ovFilter', lang)}
-          ionicon={GROUP_META.heritage.icon}
-          active={!layerMode && officialOnly}
-          color={GROUP_META.heritage.colorToken.text}
-          colorBg={GROUP_META.heritage.colorToken.bg}
-          onPress={onOfficial}
         />
       )}
       {/* Events: a MODE like routes — venue markers replace the pins (2026-11-07). Before Yürüyüş:
@@ -326,10 +326,11 @@ function pinCardContent(pin, lang) {
     // The badge speaks the Kategori filter's vocabulary — the GROUP the pin is filtered by
     // (Kültürel Miras), not the specific category (Dini Mekan), which moves to the subtitle.
     // Health and dog-boarding badges already equal their filter label.
-    badge: GROUP_META[categoryToGroup(row.category)]?.labelKey
+    badge: row.category === 'beach' ? t('blFilterBeaches', lang)
+      : GROUP_META[categoryToGroup(row.category)]?.labelKey
       ? t(GROUP_META[categoryToGroup(row.category)].labelKey, lang)
       : (CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : row.category),
-    sub:   [CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : null,
+    sub:   [row.category !== 'beach' && CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : null,
             REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : row.region]
              .filter(Boolean).join(' · '),
   }
@@ -1081,7 +1082,11 @@ export default function ExploreMapScreen({
         onSetKeys={keys => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set(keys)) }}
         onToggleKey={key => {
           setSelected(null); leaveRoutes()
-          setSelectedKeys(prev => { const n = new Set(prev); if (!n.delete(key)) n.add(key); return n })
+          const next = new Set(selectedKeys)
+          if (!next.delete(key)) next.add(key)
+          // Mirror of onOfficial: a pick with no EEMD site under "Müze & Ören Yeri" would blank the map.
+          if (officialOnly && next.size > 0 && !officialVisitApplicable(selectedPins(sources, next, servicesOn))) setOfficialOnly(false)
+          setSelectedKeys(next)
         }}
         servicesOn={servicesOn}
         onServices={() => { setSelected(null); leaveRoutes(); setServicesOn(v => !v) }}
