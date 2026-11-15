@@ -44,3 +44,24 @@ jobs:
 
           It is still paused (\`active: false\` in \`scripts/duyurular/sources.mjs\`). To resume fetching, remove that line by PR."
           done < back.txt
+      - name: Alert on a red run (issue mentions Berke; the next green run closes it)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          # Scheduled runs are attributed to ada-claude-code[bot], so GitHub's own failure email reaches nobody.
+          title='Duyurular paused-recheck is red'
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          num=$(gh issue list --state open --limit 200 --json number,title,author \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
+          if [ "$JOB_STATUS" = "success" ]; then
+            [ -z "$num" ] || gh issue close "$num" --comment "Green again: $run"
+            exit 0
+          fi
+          if [ -z "$num" ]; then
+            gh issue create --title "$title" --body "Run $JOB_STATUS ($GITHUB_EVENT_NAME): $run"$'\n\n@berkeustun95'
+          else
+            gh issue comment "$num" --body "Still red ($GITHUB_EVENT_NAME): $run"
+          fi
