@@ -64,7 +64,7 @@ function parseLegacy(str) {
 // place: a row carrying photo_attribution and/or photo_credits.
 // url:   the photo being displayed. index: its position in place.photos.
 //
-// Returns {credit, license, licenseUrl, sourceUrl, source} or null when the photo has
+// Returns {credit, license, licenseUrl, sourceUrl, source, edited} or null when the photo has
 // no attribution at all. `credit` is the only field guaranteed non-null on a non-null
 // return — a legacy string may yield nothing else.
 export function resolveAttribution(place, url, index) {
@@ -76,19 +76,24 @@ export function resolveAttribution(place, url, index) {
     // An entry with neither is not attribution, it is an empty object. Fall through to
     // the legacy array rather than returning a shell that renders as a blank line.
     if (credit || license) {
+      const source = clean(entry.source)
       return {
         credit,
         license,
         licenseUrl: clean(entry.license_url) ?? (license ? LICENSE_URLS[license] ?? null : null),
         sourceUrl:  clean(entry.source_url),
-        source:     clean(entry.source),
+        source,
+        // CC asks us to say a work was modified, and the seed pipeline re-encodes every
+        // third-party photo: "edited" on an untouched one is harmless, omitting it on a
+        // modified one is the licence gap. An explicit `modified` always wins.
+        edited:     typeof entry.modified === 'boolean' ? entry.modified : source !== 'own',
       }
     }
   }
 
   const legacy = Number.isInteger(index) ? parseLegacy(place?.photo_credits?.[index]) : null
   if (!legacy || (!legacy.credit && !legacy.license)) return null
-  return { ...legacy, sourceUrl: null, source: null }
+  return { ...legacy, sourceUrl: null, source: null, edited: true }
 }
 
 // The legacy `photo_credits[i]` string, derived from an attribution entry so the two

@@ -49,13 +49,13 @@ is('index out of range',   resolveAttribution({ photo_credits: ['a / b'] }, U, 9
 console.log('\n— legacy photo_credits fallback (by index) —')
 is('classic format',
   resolveAttribution({ photo_credits: ['Photo: Julian Nyča / CC BY-SA 3.0'] }, U, 0),
-  { credit: 'Julian Nyča', license: 'CC BY-SA 3.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/', sourceUrl: null, source: null })
+  { credit: 'Julian Nyča', license: 'CC BY-SA 3.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/', sourceUrl: null, source: null, edited: true })
 is('full-notice, Turkish',
   resolveAttribution({ photo_credits: ['Fotoğraf: Michal Klajban / CC BY-SA 4.0 — creativecommons.org/licenses/by-sa/4.0'] }, U, 0),
-  { credit: 'Michal Klajban', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', sourceUrl: null, source: null })
+  { credit: 'Michal Klajban', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', sourceUrl: null, source: null, edited: true })
 is('bare name, no license',
   resolveAttribution({ photo_credits: ['Berke Üstün'] }, U, 0),
-  { credit: 'Berke Üstün', license: null, licenseUrl: null, sourceUrl: null, source: null })
+  { credit: 'Berke Üstün', license: null, licenseUrl: null, sourceUrl: null, source: null, edited: true })
 
 console.log('\n— photo_attribution wins, and is keyed by URL not index —')
 const P = {
@@ -68,13 +68,13 @@ const P = {
 }
 is('url key beats index',
   resolveAttribution(P, U, 0),
-  { credit: 'Mike McBey', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', sourceUrl: 'https://commons.wikimedia.org/wiki/File:X', source: 'commons' })
+  { credit: 'Mike McBey', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', sourceUrl: 'https://commons.wikimedia.org/wiki/File:X', source: 'commons', edited: true })
 is('unkeyed photo falls to index',
   resolveAttribution(P, 'https://x/2.jpg', 0),
-  { credit: 'WRONG', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', sourceUrl: null, source: null })
+  { credit: 'WRONG', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', sourceUrl: null, source: null, edited: true })
 is('missing license_url is backfilled',
   resolveAttribution({ photo_attribution: { [U]: { credit: 'A', license: 'CC BY 4.0' } } }, U, 0),
-  { credit: 'A', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', sourceUrl: null, source: null })
+  { credit: 'A', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', sourceUrl: null, source: null, edited: true })
 
 console.log('\n— legacyCreditString: creator + license + license URI, no source page —')
 is('en', legacyCreditString({ credit: 'Zairon', license: 'CC BY-SA 4.0' }, 'en'),
@@ -89,7 +89,18 @@ console.log('\n— ROUND TRIP: the two columns must never disagree —')
 const e = { credit: 'Mike McBey', license: 'CC BY 2.0' }
 is('derived string re-parses to its source entry',
   resolveAttribution({ photo_credits: [legacyCreditString(e, 'tr')] }, U, 0),
-  { credit: 'Mike McBey', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', sourceUrl: null, source: null })
+  { credit: 'Mike McBey', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', sourceUrl: null, source: null, edited: true })
+
+console.log('\n— edited: the seed pipeline re-encodes every third-party photo —')
+const ent = x => ({ photo_attribution: { [U]: { credit: 'A', license: 'CC BY 4.0', ...x } } })
+is('commons entry -> edited',      resolveAttribution(ent({ source: 'commons' }), U, 0)?.edited, true)
+is('unsplash entry -> edited',     resolveAttribution(ent({ source: 'unsplash' }), U, 0)?.edited, true)
+is('no source on entry -> edited', resolveAttribution(ent({}), U, 0)?.edited, true)
+is('own -> not edited',            resolveAttribution(ent({ source: 'own' }), U, 0)?.edited, false)
+is('own + modified:true -> edited', resolveAttribution(ent({ source: 'own', modified: true }), U, 0)?.edited, true)
+is('commons + modified:false -> not edited', resolveAttribution(ent({ source: 'commons', modified: false }), U, 0)?.edited, false)
+is('legacy string -> edited',      resolveAttribution({ photo_credits: ['Photo: A / CC BY 4.0'] }, U, 0)?.edited, true)
+is('null attribution stays null',  resolveAttribution({ photo_attribution: null, photo_credits: [] }, U, 0), null)
 
 
 // ─── The column must actually be SELECTED, or none of the above ever runs ────

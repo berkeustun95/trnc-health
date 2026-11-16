@@ -1996,6 +1996,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Photo",
+    photoCreditEdited: "(edited)",
     photoSourceOwn: "ADA original photo",
     photoLicenseA11y: "Open the license terms",
     photoSourceA11y: "Open the photo source page",
@@ -4735,6 +4736,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Fotoğraf",
+    photoCreditEdited: "(düzenlendi)",
     photoSourceOwn: "ADA özgün fotoğrafı",
     photoLicenseA11y: "Lisans koşullarını aç",
     photoSourceA11y: "Fotoğrafın kaynak sayfasını aç",
@@ -7235,6 +7237,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "صورة",
+    photoCreditEdited: "(معدّلة)",
     photoSourceOwn: "صورة أصلية من ADA",
     photoLicenseA11y: "فتح شروط الترخيص",
     photoSourceA11y: "فتح صفحة مصدر الصورة",
@@ -9757,6 +9760,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Фото",
+    photoCreditEdited: "(изменено)",
     photoSourceOwn: "Собственное фото ADA",
     photoLicenseA11y: "Открыть условия лицензии",
     photoSourceA11y: "Открыть страницу источника фото",
@@ -12273,6 +12277,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Φωτογραφία",
+    photoCreditEdited: "(επεξεργασμένη)",
     photoSourceOwn: "Πρωτότυπη φωτογραφία ADA",
     photoLicenseA11y: "Άνοιγμα των όρων της άδειας",
     photoSourceA11y: "Άνοιγμα της σελίδας προέλευσης",
@@ -14783,6 +14788,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Photo",
+    photoCreditEdited: "(modifiée)",
     photoSourceOwn: "Photo originale ADA",
     photoLicenseA11y: "Ouvrir les conditions de la licence",
     photoSourceA11y: "Ouvrir la page source de la photo",
@@ -17291,6 +17297,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Foto",
+    photoCreditEdited: "(editada)",
     photoSourceOwn: "Foto original de ADA",
     photoLicenseA11y: "Abrir los términos de la licencia",
     photoSourceA11y: "Abrir la página de origen de la foto",
@@ -19799,6 +19806,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Foto",
+    photoCreditEdited: "(bearbeitet)",
     photoSourceOwn: "ADA-Originalfoto",
     photoLicenseA11y: "Lizenzbedingungen öffnen",
     photoSourceA11y: "Quellseite des Fotos öffnen",
@@ -22302,6 +22310,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "عکس",
+    photoCreditEdited: "(ویرایش‌شده)",
     photoSourceOwn: "عکس اختصاصی ADA",
     photoLicenseA11y: "باز کردن شرایط مجوز",
     photoSourceA11y: "باز کردن صفحهٔ منبع عکس",

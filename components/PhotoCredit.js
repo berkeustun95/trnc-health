@@ -25,7 +25,7 @@ import { t } from '../constants/i18n'
 //   attribution, not a cosmetic problem — it is the one string in the app whose
 //   correctness is a licence condition rather than a preference.
 //
-// `a` is a resolved attribution: {credit, license, licenseUrl, sourceUrl, source}.
+// `a` is a resolved attribution: {credit, license, licenseUrl, sourceUrl, source, edited}.
 // Callers pass whatever their own data shape resolves to — utils/photoAttribution.js's
 // resolveAttribution() for a place row, resolveHeroCredit() for a bundled hero.
 // A null `a` renders NOTHING, never a blank line.
@@ -46,7 +46,7 @@ export default function PhotoCredit({ a, lang, style, textStyle }) {
       {!!a.credit && (
         <View style={s.creditRow}>
           <Text style={[s.photoCredit, textStyle]}>
-            {t('photoCreditPrefix', lang)}: {a.credit}
+            {t('photoCreditPrefix', lang)}: {a.credit}{a.edited ? ` ${t('photoCreditEdited', lang)}` : ''}
           </Text>
         </View>
       )}
