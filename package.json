@@ -59,6 +59,7 @@
     "ios:submit": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 submit --platform ios --profile production --latest --non-interactive",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:sync-novest-auth": "node scripts/check-sync-novest-auth.mjs",
+    "check:push-fn-auth": "node scripts/check-push-fn-auth.mjs",
     "easignore:check": "node scripts/check-easignore.mjs && node scripts/check-easignore.mjs --self",
     "conn:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-connectivity-content.mjs",
     "native:safe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs",

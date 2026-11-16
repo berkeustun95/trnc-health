@@ -28,3 +28,5 @@ jobs:
           node scripts/check-data-jobs-watchdog.mjs --selftest
       - name: sync-novest caller gate (offline guard)
         run: node scripts/check-sync-novest-auth.mjs
+      - name: push functions caller gate (offline guard)
+        run: node scripts/check-push-fn-auth.mjs

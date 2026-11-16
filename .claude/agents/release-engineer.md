@@ -78,3 +78,5 @@ Berke merges). Claude Code refuses Edit/Write and shell redirects into any `.cla
 
 ## Report
 Commit SHA(s), the Co-Authored-By line(s) used, branches pushed, Preview update IDs (Android/iOS), and the next gate waiting on Berke.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).
