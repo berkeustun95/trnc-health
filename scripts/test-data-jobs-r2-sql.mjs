@@ -271,5 +271,47 @@ t('Monday 09:14 Famagusta: the still-paused reminder (date and note)', await lin
 t('that reminder pushed once (one admin has a token), opening the Data jobs tab', (await q2(`SELECT body->'data' d FROM net.calls`)).map(r => r.d), [{ tab: 'datajobs', screen: 'admin' }])
 const m44 = await tick(`timestamptz '2030-01-07 07:44+00'`)
 t('Monday 09:44 (next tick, outside the slot): silent', m44.map(r => r.body), [])
+console.log('── supabase/verify_schema.sql QUERY 1 tokens 1205 + 1210 (H-version), evaluated as the file writes them')
+{
+  const VS = readFileSync(process.env.VERIFY_SCHEMA || rel('../supabase/verify_schema.sql'), 'utf8')
+  const slice = (from, to) => { const x = VS.indexOf(from), y = VS.indexOf(to, x + 1); assert.ok(x >= 0 && y > x, 'verify_schema anchors missing: ' + from); return VS.slice(x, y) }
+  const tokq = sl => `SELECT m, label, ok FROM (SELECT ''::text m, ''::text label, false ok WHERE false\n${sl}) z`
+  const T05 = tokq(slice('    -- 1205-BEGIN', '    -- 1205-END')), T10 = tokq(slice('    -- 1210-BEGIN', '    -- 1210-END'))
+  const tokens = async (dbh, label, sql, want) => {
+    try {
+      const r = (await dbh.query(sql)).rows
+      t(`${label}: ${JSON.stringify(r.map(x => x.ok))}`, r.map(x => x.ok), want)
+      return r
+    } catch (e) { t(`${label} does not error`, String(e.message).split('\n')[0], 'no error') }
+  }
+  const OV = grab(A, 'CREATE OR REPLACE FUNCTION public.data_jobs_overview(', ['$function$;'])
+  const OV1205 = grab(R1, 'CREATE OR REPLACE FUNCTION public.data_jobs_overview(', ['$function$;'])
+  const n05 = 4, n10 = 7
+  const rep = (n, v) => Array(n).fill(v)
+  const d1 = await build(0)
+  await tokens(d1, 'R1 only, 1205 tokens (all true)', T05, rep(n05, true))
+  await tokens(d1, 'R1 only, 1210/1211 tokens (all false, no error)', T10, rep(n10, false))
+  const d2 = await build(2)
+  await tokens(d2, 'full R1+1210+1211, 1205 tokens (all true)', T05, rep(n05, true))
+  await tokens(d2, 'full R1+1210+1211, 1210/1211 tokens (all true)', T10, rep(n10, true))
+  // mutants on the full DB: the overview body goes back to the 1205 one / loses the grace gate on the first stale arm / loses the security pin
+  const mutOv = async (label, body, want, want05 = rep(n05, true)) => {
+    const d = await build(2)
+    const r = await run(d, body)
+    assert.ok(r.ok, `${label}: mutant did not apply: ${r.msg}`)
+    await tokens(d, `MUTANT ${label}, 1210/1211 tokens`, T10, want)
+    await tokens(d, `MUTANT ${label}, 1205 tokens (true unless the mutant breaks a fact 1205 still owns)`, T05, want05)
+  }
+  const ovIdx = 1
+  const oneFalse = i => rep(n10, true).map((v, k) => k === i ? false : v)
+  await mutOv('1205-era overview body', OV1205, oneFalse(ovIdx))
+  assert.ok(OV.includes(`AND j.l_key IS NULL AND j.grace_over THEN 'stale'`), 'mutant anchor')
+  await mutOv('first stale arm without grace', OV.replace(`AND j.l_key IS NULL AND j.grace_over THEN 'stale'`, `AND j.l_key IS NULL THEN 'stale'`), oneFalse(ovIdx))
+  assert.ok(OV.includes(`SET search_path TO 'public'`), 'mutant anchor')
+  await mutOv('overview without the search_path pin', OV.replace(`SET search_path TO 'public'`, ''), oneFalse(ovIdx))
+  assert.ok(OV.includes(`WHERE dj.runner = 'cron_sql' AND`), 'mutant anchor')
+  await mutOv('overview reading cron for every runner', OV.replace(`WHERE dj.runner = 'cron_sql' AND`, `WHERE`), oneFalse(ovIdx), [true, true, false, true])
+}
+
 console.log(fail ? `FAIL (${fail})` : 'ALL PASS')
 process.exit(fail ? 1 : 0)
