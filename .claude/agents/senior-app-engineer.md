@@ -36,3 +36,5 @@ it overrides this prompt.
 ## Return
 Changed files (path + one line each), new i18n keys, anything you could not do and why, and what
 needs a device check (Turkish spot-check, iOS/Android differences).
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

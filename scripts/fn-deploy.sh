@@ -13,6 +13,7 @@ want=$(node -e '
   const c = require("./supabase/functions/deploy-config.json").functions[process.argv[1]]
   if (!c) { console.error(`${process.argv[1]} is not in deploy-config.json — add it (with verify_jwt) first`); process.exit(1) }
   process.stdout.write(String(c.verify_jwt))' "$f")
+node scripts/check-sync-novest-auth.mjs >/dev/null || { echo "REFUSED: sync-novest caller-auth guard failed (run: npm run check:sync-novest-auth)" >&2; exit 1; }
 [ -f "supabase/functions/$f/index.ts" ] || { echo "supabase/functions/$f/index.ts missing" >&2; exit 1; }
 [ -z "$(git status --porcelain -- "supabase/functions/$f" supabase/functions/_shared)" ] \
   || { echo "uncommitted changes under supabase/functions/$f or _shared — the deploy ships the working tree" >&2; exit 1; }

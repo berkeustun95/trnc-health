@@ -46,3 +46,5 @@ break first. When a check fails, first suspect the check. Print raw values besid
 `PASS` or `FAIL`. For FAIL: exact command, output, file:line, and reproduction steps.
 Always list separately: what was verified by tooling, and what is DEVICE-ONLY and not verified
 (Turkish spot-check, iOS/Android rendering, push, deep links). Never claim device behavior.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

@@ -3,6 +3,11 @@
 // Deploy:  supabase functions deploy sync-novest
 // Cron:    see schedule.sql in this directory
 //
+// CALLER: only the service key may call this (the cron sends it from Vault). The gateway's verify_jwt=true
+// proves a token is signed by the project, not whose it is, so the handler checks it again (../_shared/caller-auth.mjs):
+// byte-identical to the runtime key ('exact') or a JWT with role=service_role ('role'). The 'role' branch is sound
+// ONLY while verify_jwt stays true (deploy-config.json). The response reports which branch matched.
+//
 // WHAT THIS DOES AND DELIBERATELY DOES NOT DO
 //
 // Metadata only: price, status, title, description, delisting. NOT images.
@@ -25,6 +30,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { readAllResult } from '../_shared/read-all-rows.mjs'
+import { serviceCaller } from '../_shared/caller-auth.mjs'
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
   num, int, meta, mapPropertyType, extractDeedType, coordsInCyprus,
@@ -82,7 +88,13 @@ function assertHomogeneous(label: string, rows: Record<string, unknown>[]) {
   }
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  const caller = await serviceCaller(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (!caller) {
+    console.error('sync-novest: caller refused')
+    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } })
+  }
   const started = Date.now()
   const log: string[] = []
   const say = (s: string) => { log.push(s); console.log(s) }
@@ -271,7 +283,7 @@ Deno.serve(async () => {
 
     say(`ok in ${Date.now() - started}ms`)
     return new Response(JSON.stringify({
-      ok: true, feed: feed.length, imported: rows.length,
+      ok: true, caller, feed: feed.length, imported: rows.length,
       inserts: inserts.length, updates: updates.length, unchanged,
       relist: relist.length, delist: delist.length, skipped, flagged, log,
     }), { headers: { 'Content-Type': 'application/json' } })
@@ -281,7 +293,7 @@ Deno.serve(async () => {
     // the primary alarm though — a cron that never fires produces no failed invocation
     // to look at. The staleness banner is what catches that, and it catches this too.
     console.error('sync-novest FAILED:', (e as Error).message)
-    return new Response(JSON.stringify({ ok: false, error: (e as Error).message, log }),
+    return new Response(JSON.stringify({ ok: false, caller, error: (e as Error).message, log }),
       { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })
