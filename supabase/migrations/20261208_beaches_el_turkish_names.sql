@@ -4,7 +4,7 @@
 --
 -- Berke, 2026-11-16: in the Greek locale beaches carry the official Turkish name in Latin letters, exactly as in tr
 -- (e.g. "Lapta Belediye Plajı"), like the other languages: no traditional Greek village names, no Greek-script transliteration.
--- 20261207 inserted the 30 staged beaches with Greek names; this file replaces name_i18n->'el' of those rows, nothing else.
+-- 20261207 inserted the 30 staged beaches with Greek names; this file replaces name_i18n->'el' of those rows and description_i18n->'el' of the 2 Ministry rows, nothing else.
 -- 23 of the 30 change; 7 already equal their tr name (Long Beach, Chamada Beach Club, Lido Cyprus, Shayna, Suna's ..., Club Di Mare,
 -- Honey Beach - Balcı Plaza) and are matched and re-set to the same value so the count is a clean 30.
 -- The same file also rewrites description_i18n->'el' of the 2 Ministry rows (kervansaray-beach, long-beach): the Greek place names inside
@@ -19,9 +19,10 @@
 --   • GET DIAGNOSTICS must report exactly 30 rows, else RAISE and roll back. So if a beach was already published, or someone
 --     edited an el name since 20261207, the whole file aborts (and names the count only, never a value).
 --   • Every row outside the 30 is hashed (md5 of the whole row) before and after and must be identical; the 30 rows must
---     differ in no key but name_i18n; afterwards all 30 carry el = the expected new value.
+--     differ in no key but name_i18n / description_i18n, name_i18n minus its 'el' key must be unchanged, description_i18n minus 'el' likewise; afterwards all 30 carry el = the expected new value.
 --   • name_i18n is rewritten with jsonb_set on the 'el' key only (the other 8 languages stay as they are).
---   • Triggers that fire on a places UPDATE run as in 20261206 (role postgres, auth.uid() NULL: they return NEW);
+--   • Before the first UPDATE the enabled UPDATE triggers on places are read and the file RAISES unless they are exactly the 5 BEFORE ROW
+--     ones of 20261206 (an AFTER trigger with side effects elsewhere would otherwise run unnoticed). They run as in 20261206 (role postgres, auth.uid() NULL: they return NEW);
 --     check_place_content re-scans the new text with the word filter and would abort the whole file on a hit.
 -- Re-running after a successful apply raises (the old values are gone): this is a one-shot.
 --
@@ -52,10 +53,32 @@ DECLARE
   v_n int;
   v_bad int;
   v_diff text;
+  v_trg text;
+  v_ntrg int;
+  v_nbad int;
+  v_nm_before jsonb;
+  v_nm_after jsonb;
 BEGIN
   IF jsonb_array_length(v_rows) <> c_expected THEN
     RAISE EXCEPTION 'file lists % rows, expected %', jsonb_array_length(v_rows), c_expected;
   END IF;
+
+  -- 5 = places_guard_update, places_guard_source, places_guard_official_visit, guard_place_moderation, check_place_content (as 20261206).
+  SELECT count(*),
+         string_agg(t.tgname || CASE WHEN (t.tgtype & 3) = 3 THEN ' (before row)' ELSE ' (NOT before row)' END, ', ' ORDER BY t.tgname),
+         count(*) FILTER (WHERE (t.tgtype & 3) <> 3)
+    INTO v_ntrg, v_trg, v_nbad
+    FROM pg_trigger t
+   WHERE t.tgrelid = 'public.places'::regclass AND NOT t.tgisinternal AND t.tgenabled <> 'D'
+     AND (t.tgtype & 16) = 16;
+  IF v_nbad <> 0 OR v_ntrg <> 5 THEN
+    RAISE EXCEPTION 'places has % enabled UPDATE triggers (% not before-row), expected exactly 5 before-row ones: %',
+      v_ntrg, v_nbad, coalesce(v_trg, '(none)');
+  END IF;
+
+  v_nm_before := (SELECT jsonb_object_agg(p.id::text, p.name_i18n - 'el') FROM public.places p
+   WHERE p.category IS NOT DISTINCT FROM 'beach' AND p.status IS NOT DISTINCT FROM 'staged' AND EXISTS (
+           SELECT 1 FROM jsonb_array_elements(v_rows) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id));
 
   SELECT md5(coalesce(string_agg(to_jsonb(p)::text, '|' ORDER BY p.id), '')) INTO v_others_before
     FROM public.places p
@@ -97,6 +120,13 @@ BEGIN
            SELECT 1 FROM jsonb_array_elements(v_rows) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id));
   IF v_desc_after IS DISTINCT FROM v_desc_before THEN
     RAISE EXCEPTION 'a description language other than el changed; aborting';
+  END IF;
+
+  v_nm_after := (SELECT jsonb_object_agg(p.id::text, p.name_i18n - 'el') FROM public.places p
+   WHERE p.category IS NOT DISTINCT FROM 'beach' AND p.status IS NOT DISTINCT FROM 'staged' AND EXISTS (
+           SELECT 1 FROM jsonb_array_elements(v_rows) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id));
+  IF v_nm_after IS DISTINCT FROM v_nm_before THEN
+    RAISE EXCEPTION 'a name_i18n language other than el changed on one of the 30 rows; aborting';
   END IF;
 
   SELECT md5(coalesce(string_agg(to_jsonb(p)::text, '|' ORDER BY p.id), '')) INTO v_others_after
@@ -146,7 +176,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261208_beaches_el_turkish_names.sql', 'af73ce80b126cca7b4194a7004189d05d0bd9d30e58efe0dc611af8f2d62c4d4')
+VALUES ('20261208_beaches_el_turkish_names.sql', '985b95e58b58c2c7f9977343973771252f1469017adfbfaa2f148f65144f5054')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
