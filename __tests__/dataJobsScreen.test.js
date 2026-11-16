@@ -2,9 +2,12 @@
 // malformed payload fail closed, the no-success and no-record lines), not about layout on a phone. The RPC is not live.
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default)
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }))
+let mockKbTop = null
+jest.mock('../utils/useKeyboardTop', () => ({ __esModule: true, default: () => mockKbTop }))
 jest.mock('../lib/supabase', () => ({ supabase: { rpc: jest.fn() } }))
 
-import { render, screen, fireEvent } from '@testing-library/react-native'
+import { Platform, View } from 'react-native'
+import { render, screen, fireEvent, act } from '@testing-library/react-native'
 import { t } from '../constants/i18n'
 const { supabase } = require('../lib/supabase')
 const DataJobsTab = require('../components/AdminDataJobs').default
@@ -181,5 +184,24 @@ describe('pause / resume switches', () => {
     await flip('job_s', false)
     await screen.findByText(pauseTitle('job_s'))
     expect(screen.queryByText(t('adminJobsDutyWarn', L))).toBeNull()
+  })
+
+  test('Android keyboard open: the sheet body is measured on a View and nothing throws', async () => {
+    const orig = Platform.OS
+    const spy = jest.spyOn(View.prototype, 'measureInWindow').mockImplementation(cb => cb(0, 400, 300, 200))
+    try {
+      Platform.OS = 'android'
+      await mountWrite([sw('job_s')], () => ({ data: null, error: null }))
+      await flip('job_s', false)
+      await screen.findByText(pauseTitle('job_s'))
+      expect(spy).not.toHaveBeenCalled()
+      mockKbTop = 500   // the keyboard opens once the sheet is up; typing re-renders the sheet
+      await typeReason('vendor outage')
+      expect(spy).toHaveBeenCalled()
+    } finally {
+      Platform.OS = orig
+      mockKbTop = null
+      spy.mockRestore()
+    }
   })
 })

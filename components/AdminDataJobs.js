@@ -129,11 +129,19 @@ function PauseSheet({ job, visible, lang, onCancel, onConfirm }) {
   const [lift, setLift] = useState(0)
   useEffect(() => {
     if (Platform.OS !== 'android' || kbTop == null) { setLift(0); return }
-    bodyRef.current?.measureInWindow((_x, y, _w, h) => setLift(Math.max(0, Math.round(y + h + Math.max(insets.bottom, 16) - kbTop))))
+    const measure = () => {
+      const el = bodyRef.current
+      if (!el || typeof el.measureInWindow !== 'function') return
+      el.measureInWindow((_x, y, _w, h) => setLift(Math.max(0, Math.round(y + h + Math.max(insets.bottom, 16) - kbTop))))
+    }
+    measure()
+    const id = setTimeout(measure, 250)   // the keyboard can open during the sheet's 280 ms entrance
+    return () => clearTimeout(id)
   }, [kbTop])
   return (
     <BottomSheet visible={visible === true} onClose={onCancel} lang={lang} title={t('adminJobsPauseTitle', lang).replace('{job}', job?.key ?? '')}>
-      <KeyboardAvoidingView ref={bodyRef} style={lift > 0 && { paddingBottom: lift }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View ref={bodyRef} collapsable={false} style={lift > 0 && { paddingBottom: lift }}>
         {CAUTION_KEYS.includes(job?.key) && <Text style={styles.caution}>{t('adminJobsDutyWarn', lang)}</Text>}
         <Text style={styles.fieldLabel}>{t('adminJobsPauseReason', lang)}</Text>
         <TextInput
@@ -151,6 +159,7 @@ function PauseSheet({ job, visible, lang, onCancel, onConfirm }) {
           <Button variant="secondary" title={t('cancel', lang)} onPress={onCancel} style={styles.flex} fullWidth />
           <Button variant="danger" title={t('adminJobsPauseConfirm', lang)} onPress={() => onConfirm(trimmed)} disabled={trimmed.length === 0} style={styles.flex} fullWidth />
         </View>
+      </View>
       </KeyboardAvoidingView>
     </BottomSheet>
   )
