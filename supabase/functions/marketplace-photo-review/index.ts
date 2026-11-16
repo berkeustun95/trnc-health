@@ -81,8 +81,7 @@ function deps(jwt: string): Deps {
       if (error) throw error
     },
     async push(message) {
-      const now = Date.now()
-      await sendBatch([message], { fetchFn: fetch, sleep: ms => new Promise(r => setTimeout(r, ms)), now: Date.now, random: Math.random, deadlineAt: now + 20_000 })
+      await sendBatch([message], { fetchFn: fetch })
     },
     now: () => Date.now(),
     log: code => console.error('marketplace-photo-review:', code),

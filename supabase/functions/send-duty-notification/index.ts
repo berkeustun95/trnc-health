@@ -4,7 +4,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { profileReadKinds, readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { lastSignIns, onePerToken, pushOutcome, RUN_DEADLINE_MS, sendBatch, sharedTokenIds } from './push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -81,7 +81,6 @@ serve(async (req) => {
     console.error('send-duty-notification: caller refused')
     return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
   }
-  const runStartedAt = Date.now()
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -190,17 +189,11 @@ serve(async (req) => {
     errorKinds[key] = (errorKinds[key] ?? 0) + n
   }
 
-  let pushRetries = 0
   let batchesAccepted = 0
   let batchesFailed = 0
   for (let i = 0; i < messages.length; i += 100) {
-    const remainingBatches = Math.ceil((messages.length - i - 100) / 100)
-    const r = await sendBatch(messages.slice(i, i + 100), {
-      fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
-      now: Date.now, random: Math.random, deadlineAt: runStartedAt + RUN_DEADLINE_MS,
-    }, Math.max(0, remainingBatches))
+    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch })
     pushOk += r.ok
-    pushRetries += r.retries
     if (r.accepted) batchesAccepted++
     else batchesFailed++
     for (const [kind, n] of Object.entries(r.kinds)) bump(kind, n)
@@ -217,7 +210,7 @@ serve(async (req) => {
     push_attempted: messages.length,
     push_ok: pushOk,
     push_errors: pushErrCount,
-    push_retries: pushRetries,
+    push_retries: 0,   // batches are sent once (push.ts); the column stays for the run history
     error_kinds: errorKinds,
   })
 
