@@ -54,3 +54,5 @@ clinic review is a health disclosure. **The repo is public**, so anything commit
 `PASS` or `FAIL`. For each finding: severity (blocker / should-fix / note), file:line, the concrete
 failure path, and the fix to make. A blocker means FAIL. List what you could NOT check (live
 catalogs, prod secrets, device behaviour) — the migration file is intent, the live catalog is authority.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).
