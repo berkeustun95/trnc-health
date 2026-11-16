@@ -14,7 +14,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { readAllById } from '../send-duty-notification/page.ts'
-import { lastSignIns, onePerToken, pushOutcome, RUN_DEADLINE_MS, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
 import { weekendWindow, inWindow, weekPick, digestMessage, type DigestEvent, type DigestPlace } from './digest.ts'
 
 const MAX_ERROR_KINDS = 20
@@ -38,7 +38,6 @@ serve(async (req) => {
     console.error('send-weekend-digest: caller refused')
     return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
   }
-  const runStartedAt = Date.now()
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   let testersOnly = false
   try { testersOnly = (await req.json())?.testers_only === true } catch { /* empty body = the weekly run */ }
@@ -118,10 +117,7 @@ serve(async (req) => {
   let pushOk = 0, pushErrors = 0, batchesAccepted = 0, batchesFailed = 0
   const errorKinds: Record<string, number> = Object.create(null)
   for (let i = 0; i < messages.length; i += 100) {
-    const r = await sendBatch(messages.slice(i, i + 100), {
-      fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
-      now: Date.now, random: Math.random, deadlineAt: runStartedAt + RUN_DEADLINE_MS,
-    }, Math.max(0, Math.ceil((messages.length - i - 100) / 100)))
+    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch })
     pushOk += r.ok
     if (r.accepted) batchesAccepted++; else batchesFailed++
     for (const [kind, n] of Object.entries(r.kinds)) {
