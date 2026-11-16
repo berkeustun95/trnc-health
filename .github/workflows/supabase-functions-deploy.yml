@@ -75,6 +75,8 @@ jobs:
               console.log(`  ${ok ? "✓" : "✗"} ${f}: live verify_jwt=${l.verify_jwt} v${l.version}, file says ${c[f].verify_jwt}`)
             }
             if (bad) { console.error("::error::live verify_jwt differs from deploy-config.json — decide which is right, edit the file, re-run"); process.exit(1) }'
+      - name: sync-novest caller gate (offline guard)
+        run: node scripts/check-sync-novest-auth.mjs
       - name: Deploy
         run: |
           for f in $TARGETS; do
