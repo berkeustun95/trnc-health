@@ -1,7 +1,8 @@
-# ─── Daily content health (read-only) ────────────────────────────────────────
+# ─── Daily content health (read-only, plus one heartbeat row) ────────────────
 #
 # The checks that used to be run by hand from a Mac holding the service key. No Mac
-# holds one now, so this is where they run. Read-only: every script here only SELECTs.
+# holds one now, so this is where they run. The checks only SELECT. The one write is the last step of a
+# SCHEDULED run: one heartbeat row (job key, ok/failed, error class, run id) in data_job_runs (data jobs, slice 2).
 # Each step runs even if an earlier one failed, so one email carries every red; the
 # job fails if any did — that failure IS the alert (GitHub emails on failure).
 #
@@ -189,3 +190,13 @@ jobs:
               gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 still red for 3+ days:"$'\n\n'"$failing"
             fi
           fi
+
+      # One heartbeat row per SCHEDULED run only: a bare dispatch is not a production write. Non-fatal: a failure to record
+      # is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && github.event_name == 'schedule' }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ github.event_name == 'schedule' }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"
