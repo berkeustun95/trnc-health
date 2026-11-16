@@ -10,7 +10,7 @@
 // migrations that define them (newest definition wins), and so are the word-filter functions and their seeded term list. What this does NOT cover:
 // PGlite is PostgreSQL 18, prod is older; the live blocked_terms table is longer than the 20260712 seed (an admin edits it), so a live word-filter hit
 // is checked separately against the public term list and, if it ever happened, would abort the apply safely; PostgREST, JWT verification, and
-// is_previewer()'s real header read are stubbed (a session setting stands in for the header).
+// is_previewer()'s real header read are stubbed (auth.jwt() reads request.jwt.claims as Supabase does, and is_anonymous_session() is the real migration function over it, so a guest is a session with is_anonymous true) (a session setting stands in for the header).
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -70,7 +70,9 @@ INSERT INTO auth.users VALUES ('${USER}');
 INSERT INTO public.profiles VALUES ('${USER}', 'customer');
 CREATE TABLE public.content_reports (content_type text, content_id uuid, reporter_id uuid);
 CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT false $$;
-CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT false $$;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
+${fn('is_anonymous_session')}
 CREATE FUNCTION public.is_previewer() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('test.preview', true), '') = 'yes' $$;
 CREATE TABLE public.blocked_terms (term text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now(), hit_count integer NOT NULL DEFAULT 0, last_hit_at timestamptz);
 ${TERMS}
@@ -246,6 +248,14 @@ assert.equal((await db.query("SELECT count(*)::int n FROM public.places WHERE st
 assert.equal(await seen(db, 'anon', null, false, SHOPS), 0, 'after the beaches are published an ordinary anon still sees none of the shops')
 assert.equal(await seen(db, 'anon', null, false, FILEW), 30, 'and sees the 30 published beaches')
 assert.equal(await seen(db, 'anon', null, false, LIVE), 4)
+{
+  const ren = await db.query("UPDATE public.places SET name = 'Renamed By Admin' WHERE source = 'osm' AND source_id = 'way/225386412'")
+  assert.equal(ren.affectedRows, 1)
+  r = await applyFile(db, FILE)
+  assert.ok(r.ok, `re-run after an admin renamed a published beach: ${r.msg}`)
+  assert.equal((await db.query("SELECT name FROM public.places WHERE source_id = 'way/225386412'")).rows[0].name, 'Renamed By Admin', 'the re-run left the rename alone')
+  console.log('N1: re-run after an admin renamed a published beach passes (name compared only while staged)')
+}
 console.log('publish simulation: re-run after publish passes; anon sees 30 beaches + 4 live, 0 shops; 4 shops still staged')
 
 // ── REDS (temp copies, anchored edits; each must fail with ITS message and leave the database as it was) ──
@@ -275,14 +285,17 @@ const SQUAT = (status, name, cat = 'beach') => d => d.exec(`INSERT INTO public.p
 const LEDGER = f => d => d.exec(`INSERT INTO public.schema_migrations_applied (filename, checksum) VALUES ('${FILE.split('/').pop()}', 'x')`).then(() => f(d))
 await red('5b first apply: an ACTIVE beach squats a pair under a wrong name', FILE, /first apply found 1 of this file's pairs already taken/, SEED, SQUAT('active', 'Somebody Else'))
 await red('5c first apply: a STAGED beach squats a pair', FILE, /first apply found 1 of this file's pairs already taken/, SEED, SQUAT('staged', 'Bamboo Beach'))
-await red('5d re-run (ledger row exists): an ACTIVE beach holding a pair under a wrong name', FILE, /1 of the 1 rows that held this file's pairs before are not this file's rows/, SEED, LEDGER(SQUAT('active', 'Somebody Else')))
-await red('5e re-run (ledger row exists): a pair held by a non-beach row', FILE, /not category beach|are not this file's rows/, SEED, LEDGER(SQUAT('staged', 'Bamboo Beach', 'cafe')))
+await red('5d re-run (ledger row exists): a STAGED beach holding a pair under a wrong name', FILE, /1 of the 1 rows that held this file's pairs before are not this file's rows \(not a beach, or a staged row under another name\)/, SEED, LEDGER(SQUAT('staged', 'Somebody Else')))
+await red('5e re-run (ledger row exists): a pair held by a non-beach row', FILE, /^.*1 of 30 rows are not category beach with status staged or active$/, SEED, LEDGER(SQUAT('staged', 'Bamboo Beach', 'cafe')))
 await red('6 a policy that opens staged rows to everyone (still 9 policies, 5 + 4)', FILE, /another places policy mentions staged/, SEED, d => d.exec("DROP POLICY places_delete ON public.places; CREATE POLICY places_open_staged ON public.places FOR SELECT TO anon USING (status = 'staged')"))
 await red('6a a policy added: count is wrong', FILE, /places has 10 policies/, SEED, d => d.exec("CREATE POLICY places_open_staged ON public.places FOR SELECT TO anon USING (status = 'staged')"))
 await red('6b a tenth, unrelated policy', FILE, /places has 10 policies/, SEED, d => d.exec("CREATE POLICY places_extra ON public.places AS RESTRICTIVE FOR SELECT USING (true)"))
 await red('7 a fifth INSERT trigger', FILE, /5 enabled INSERT triggers/, SEED, d => d.exec("CREATE FUNCTION public.t_ins() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$; CREATE TRIGGER t_ins BEFORE INSERT ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_ins();"))
 await red('7b an AFTER INSERT trigger that writes elsewhere', FILE, /5 enabled INSERT triggers \(1 not BEFORE ROW\)/, SEED, d => d.exec("CREATE FUNCTION public.t_after() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO public.content_reports VALUES ('x', gen_random_uuid(), NULL); RETURN NULL; END $$; CREATE TRIGGER t_after AFTER INSERT ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_after();"))
 await red('9 places_select rewritten to status <> pending (9 policies kept, no literal staged)', FILE, /anon can read \d+ of this file's staged rows/, SEED, d => d.exec(`DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' OR status <> 'pending' OR submitted_by = auth.uid())`))
+await red('9d places_select widened: any signed-in user (auth.uid() IS NOT NULL) reads non-pending rows', FILE, /signed-in user can read \d+ of this file's staged rows/, SEED, d => d.exec(`DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' OR (auth.uid() IS NOT NULL AND status <> 'pending') OR submitted_by = auth.uid())`))
+await red('9e places_select widened: only a guest (is_anonymous_session()) reads non-pending rows', FILE, /guest can read \d+ of this file's staged rows/, SEED, d => d.exec(`DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' OR (is_anonymous_session() AND status <> 'pending') OR submitted_by = auth.uid())`))
+await red('9f places_select widened: authenticated with no claims', FILE, /authenticated without claims can read \d+ of this file's staged rows/, SEED, d => d.exec(`DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' OR (current_user = 'authenticated' AND status <> 'pending') OR submitted_by = auth.uid())`))
 await red('9b is_previewer() replaced by SELECT true', FILE, /anon can read \d+ of this file's staged rows/, SEED, d => d.exec('CREATE OR REPLACE FUNCTION public.is_previewer() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$'))
 await red('9c positive control: nobody can read active beaches', FILE, /positive control failed/, SEED, d => d.exec("DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' AND false)"))
 await red('8 a blocked term that matches a beach name (the word filter is live in the apply)', FILE, /BLOCKED_TERM/, SEED, d => d.exec("INSERT INTO public.blocked_terms (term) VALUES ('bamboo')"))

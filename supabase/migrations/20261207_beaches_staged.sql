@@ -13,7 +13,8 @@
 -- source, source_id, status. Ministry rows also: description_i18n (9 languages) and, only where the page itself states it,
 -- amenities / access_type. NOT written: blue_flag, any photo column, address, phone, website, provider_id, submitted_by.
 --
--- status 'staged' (20261178): every row is readable ONLY with the ADA Preview key, so production users see none of it. Publishing is a
+-- status 'staged' (20261178): every row is readable with the ADA Preview key and by admins (the is_admin() arm of places_select), so no
+-- ordinary production user (anon, signed in or guest) sees any of it. Publishing is a
 -- LATER migration, on Berke's go after he has checked every pin on Preview. ⚠ That migration MUST be scoped
 -- `WHERE category = 'beach' AND status = 'staged'`: the 399 staged OSM shop rows of 20261179 share source 'osm' and must not ride along.
 -- The 4 LIVE beaches are untouched here, and their extra locales are NOT in this file (data/explore/beaches-live-translations.json holds them
@@ -146,7 +147,8 @@ BEGIN
   IF v_n <> (b->>'act_n')::bigint OR v_md5 IS DISTINCT FROM b->>'act_md5' THEN RAISE EXCEPTION 'this file must publish nothing: the set of active rows changed (count % -> %, checksum equal: %)', b->>'act_n', v_n, v_md5 IS NOT DISTINCT FROM b->>'act_md5'; END IF;
 
   -- rows added now, measured as table growth, plus rows that were already there = the file's pairs; a row that held a pair before must be
-  -- THIS file's row (a beach, same source, same name as the file's) — counts only, never the foreign row's values
+  -- THIS file's row (a beach with the file's source and source_id; while still staged, also the file's name — an admin may rename a published
+  -- beach later without failing a re-run) — counts only, never the foreign row's values
   SELECT count(*) INTO v_total_after FROM public.places;
   v_added := v_total_after - (b->>'total')::bigint;
   IF v_added + (b->>'present')::int <> v_expect THEN
@@ -154,8 +156,8 @@ BEGIN
   IF (b->>'present')::int > 0 THEN
     SELECT count(*) INTO v_n FROM public.places p JOIN jsonb_array_elements(v_pairs) e
         ON e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id
-      WHERE p.category IS DISTINCT FROM 'beach' OR p.name IS DISTINCT FROM e->>2;
-    IF v_n <> 0 THEN RAISE EXCEPTION '% of the % rows that held this file''s pairs before are not this file''s rows (not a beach, or another name)', v_n, b->>'present'; END IF;
+      WHERE p.category IS DISTINCT FROM 'beach' OR (p.status = 'staged' AND p.name IS DISTINCT FROM e->>2);
+    IF v_n <> 0 THEN RAISE EXCEPTION '% of the % rows that held this file''s pairs before are not this file''s rows (not a beach, or a staged row under another name)', v_n, b->>'present'; END IF;
   END IF;
 
   -- c. content of the rows that are still staged (a later, legitimate edit of a published row must not fail a re-run)
@@ -213,30 +215,40 @@ BEGIN
   RAISE NOTICE '20261207 d/e OK: places policies (%): %; INSERT triggers (%): %', v_n, v_names, v_trg_n, v_trg_names;
 END $$;
 
--- ─── Assertion f: BEHAVIOUR, not text — what anon and authenticated (no JWT, no preview header) can actually read ───
+-- ─── Assertion f: BEHAVIOUR, not text — what anon and authenticated sessions (no preview header) can actually read ───
 -- The policy text assertions above can be fooled (a rewritten places_select, an is_previewer() that returns true); this asks the database.
+-- Four sessions: anon; authenticated with no claims; a normal signed-in user and a guest, each with a JWT claims setting shaped as in
+-- 20261068 (random sub matching no row, role authenticated; the guest also is_anonymous true, which is what is_anonymous_session() reads), so
+-- auth.uid() is not NULL and a policy that widens on a session is caught. Admins are not tested here: their is_admin() arm is intended.
 -- SET LOCAL ROLE reverts at COMMIT/ROLLBACK; the way back is SET LOCAL ROLE postgres (RESET ROLE would drop to the login role mid-transaction).
--- Counts are captured while in the role and RAISEd only after switching back. No JWT claims are set, so auth.uid() is NULL and is_previewer() is false.
+-- Counts are captured while in the role and RAISEd only after switching back; the claims setting is cleared before returning to postgres.
 DO $$
 DECLARE
   v_pairs jsonb := (current_setting('ada.beaches_before')::jsonb)->'pairs';
-  v_anon_file int; v_anon_live int; v_auth_file int; v_auth_live int;
+  v_file int[] := ARRAY[0, 0, 0, 0]; v_live int[] := ARRAY[0, 0, 0, 0];
+  v_kinds text[] := ARRAY['anon', 'authenticated without claims', 'signed-in user', 'guest'];
+  v_claims text[] := ARRAY[NULL, '', NULL, NULL];
+  v_i int; v_f int; v_l int;
 BEGIN
-  SET LOCAL ROLE anon;
-  SELECT count(*) INTO v_anon_file FROM public.places p WHERE p.status = 'staged' AND EXISTS (
-    SELECT 1 FROM jsonb_array_elements(v_pairs) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id);
-  SELECT count(*) INTO v_anon_live FROM public.places WHERE category = 'beach' AND status = 'active';
-  SET LOCAL ROLE postgres;
-  SET LOCAL ROLE authenticated;
-  SELECT count(*) INTO v_auth_file FROM public.places p WHERE p.status = 'staged' AND EXISTS (
-    SELECT 1 FROM jsonb_array_elements(v_pairs) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id);
-  SELECT count(*) INTO v_auth_live FROM public.places WHERE category = 'beach' AND status = 'active';
-  SET LOCAL ROLE postgres;
+  v_claims[3] := json_build_object('sub', gen_random_uuid(), 'role', 'authenticated')::text;
+  v_claims[4] := json_build_object('sub', gen_random_uuid(), 'role', 'authenticated', 'is_anonymous', true)::text;
+  FOR v_i IN 1..4 LOOP
+    IF v_i = 1 THEN SET LOCAL ROLE anon; ELSE SET LOCAL ROLE authenticated; PERFORM set_config('request.jwt.claims', v_claims[v_i], true); END IF;
+    SELECT count(*) INTO v_f FROM public.places p WHERE p.status = 'staged' AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(v_pairs) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id);
+    SELECT count(*) INTO v_l FROM public.places WHERE category = 'beach' AND status = 'active';
+    v_file[v_i] := v_f; v_live[v_i] := v_l;
+    PERFORM set_config('request.jwt.claims', '', true);
+    SET LOCAL ROLE postgres;
+  END LOOP;
   IF current_user IS DISTINCT FROM 'postgres' THEN RAISE EXCEPTION 'visibility check could not return to role postgres'; END IF;
-  IF v_anon_file <> 0 THEN RAISE EXCEPTION 'anon can read % of this file''s staged rows (staged rows must be invisible without the preview key)', v_anon_file; END IF;
-  IF v_auth_file <> 0 THEN RAISE EXCEPTION 'authenticated can read % of this file''s staged rows (staged rows must be invisible without the preview key)', v_auth_file; END IF;
-  IF v_anon_live <= 0 OR v_auth_live <= 0 THEN RAISE EXCEPTION 'positive control failed: anon sees % and authenticated sees % active beaches', v_anon_live, v_auth_live; END IF;
-  RAISE NOTICE '20261207 f OK: anon and authenticated read 0 of this file''s staged rows and %/% active beaches (positive control)', v_anon_live, v_auth_live;
+  FOR v_i IN 1..4 LOOP
+    IF v_file[v_i] <> 0 THEN RAISE EXCEPTION '% can read % of this file''s staged rows (staged rows must be invisible without the preview key)', v_kinds[v_i], v_file[v_i]; END IF;
+  END LOOP;
+  FOR v_i IN 1..4 LOOP
+    IF v_live[v_i] <= 0 THEN RAISE EXCEPTION 'positive control failed: % sees % active beaches', v_kinds[v_i], v_live[v_i]; END IF;
+  END LOOP;
+  RAISE NOTICE '20261207 f OK: anon, authenticated without claims, a signed-in user and a guest each read 0 of this file''s staged rows and %/%/%/% active beaches (positive control)', v_live[1], v_live[2], v_live[3], v_live[4];
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -250,7 +262,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261207_beaches_staged.sql', '4ff284fbadc68798d3356be2fc5c7e2a12add0ccfe348a0afcce747ab25c2e82')
+VALUES ('20261207_beaches_staged.sql', '92356353c6ffdea2a9af72a1e48608bafa36fa6dc4de868e03e7d5a02b669c3f')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
