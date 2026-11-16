@@ -1,0 +1,68 @@
+#!/usr/bin/env node
+// sync-novest caller gate, offline: the pure decision in _shared/caller-auth.mjs plus the position of the
+// check inside the handler. Tokens are built at runtime and unsigned (the gateway verifies signatures).
+import { readFileSync } from 'node:fs'
+import { serviceCaller } from '../supabase/functions/_shared/caller-auth.mjs'
+
+const problems = []
+const check = (ok, msg) => { if (!ok) problems.push(msg) }
+
+const b64u = o => btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const jwt = claims => `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u(claims)}.dummysig`
+const bearer = t => 'Bearer ' + t
+
+const svc = jwt({ role: 'service_role' })
+const cases = [
+  ['service_role JWT', bearer(svc), 'env-key-unrelated', 'role'],
+  ['service_role JWT, env unset', bearer(svc), undefined, 'role'],
+  ['exact JWT-form key', bearer(svc), svc, 'exact'],
+  ['exact non-JWT key', bearer('sb_secret_abc'), 'sb_secret_abc', 'exact'],
+  ['exact wins when both match', bearer(svc), svc, 'exact'],
+  ['non-JWT key that differs', bearer('sb_secret_abd'), 'sb_secret_abc', null],
+  ['anon JWT', bearer(jwt({ role: 'anon' })), 'k', null],
+  ['authenticated JWT', bearer(jwt({ role: 'authenticated' })), 'k', null],
+  ['guest JWT', bearer(jwt({ role: 'authenticated', is_anonymous: true })), 'k', null],
+  ['no header', null, 'k', null],
+  ['undefined header', undefined, 'k', null],
+  ['empty header', '', 'k', null],
+  ['empty bearer, empty env', 'Bearer ', '', null],
+  ['empty bearer, undefined env', 'Bearer ', undefined, null],
+  ['empty bearer', 'Bearer ', 'k', null],
+  ['malformed JWT', bearer('notajwt'), 'k', null],
+  ['non-JSON payload', bearer('a.' + btoa('not json') + '.c'), 'k', null],
+  ['role with trailing space', bearer(jwt({ role: 'service_role ' })), 'k', null],
+  ['role upper case', bearer(jwt({ role: 'SERVICE_ROLE' })), 'k', null],
+  ['role nested in app_metadata', bearer(jwt({ role: 'authenticated', app_metadata: { role: 'service_role' } })), 'k', null],
+  ['no Bearer scheme', svc, 'k', null],
+]
+for (const [name, header, key, want] of cases) {
+  const got = await serviceCaller(header, key)
+  check(got === want, `${name}: expected ${want}, got ${got}`)
+}
+
+const cfg = JSON.parse(readFileSync(new URL('../supabase/functions/deploy-config.json', import.meta.url), 'utf8'))
+check(cfg.functions?.['sync-novest']?.verify_jwt === true,
+  'deploy-config.json: sync-novest verify_jwt must be true; the "role" branch trusts a signature only the gateway checks')
+
+const src = readFileSync(new URL('../supabase/functions/sync-novest/index.ts', import.meta.url), 'utf8')
+const h = src.indexOf('Deno.serve(')
+check(h !== -1 && /Deno\.serve\(async \(req\b/.test(src), 'sync-novest handler must take req')
+const body = h === -1 ? '' : src.slice(h)
+const at = s => body.indexOf(s)
+const gate = at('serviceCaller(')
+const refuse = at('status: 401')
+check(gate !== -1 && refuse !== -1, 'sync-novest handler must call serviceCaller and return 401')
+for (const s of ['createClient(', 'getAll(', 'fetch(']) {
+  const i = at(s)
+  check(i === -1 || (gate !== -1 && refuse !== -1 && gate < i && refuse < i),
+    `sync-novest: the caller check and 401 must come before the first ${s}`)
+}
+check(/\bok: true, caller,/.test(body) && /\bok: false, caller,/.test(body),
+  'sync-novest responses must carry caller as the second key')
+
+if (problems.length) {
+  console.error('sync-novest auth check FAILED:')
+  for (const p of problems) console.error('  ✗ ' + p)
+  process.exit(1)
+}
+console.log(`sync-novest auth check: OK (${cases.length} caller cases, verify_jwt, gate position)`)
