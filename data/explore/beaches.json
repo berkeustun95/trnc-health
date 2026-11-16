@@ -8,8 +8,9 @@
     "ministry": "Turizm Bakanlığı (visitncy.com)"
   },
   "counts": {
-    "rows": 31,
+    "rows": 30,
     "dropped": 14,
+    "additions_rejected": 2,
     "needs_review": 0
   },
   "rows": [
@@ -17,6 +18,17 @@
       "name": "Kervansaray Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Kervansaray Beach",
+        "tr": "Kervansaray Plajı",
+        "ar": "شاطئ كرفانسراي",
+        "ru": "Пляж Кервансарай",
+        "el": "Παραλία Κερβανσαράι",
+        "fr": "Plage Kervansaray",
+        "es": "Playa Kervansaray",
+        "de": "Kervansaray-Strand",
+        "fa": "ساحل کروانسرای"
+      },
       "source": "visitncy_beaches",
       "source_id": "kervansaray-beach",
       "source_url": "https://www.visitncy.com/discover/beaches/",
@@ -36,6 +48,24 @@
         "access": "permissive"
       },
       "description_en_site": "Operated by the Municipality of Kyrenia, this is a popular leisure area to be enjoyed by the public. In the heart of Kyrenia in the Kervansaray area, this beach has a range of facilities. Sunbeds and umbrellas, dressing rooms and showers, restaurants and even an additional artificial grass sunbathing area for those who don’t like to get sand in their feet. The beach also has a car park for the disabled with easy access to the beach side. As the cove of Kervansaray is a stop for most boat tours from Kyrenia Harbour, a designated swimming area is separated by buoys to ensure safety of swimmers. The beach also has a lifeguard tower with first aid and lifeguard supplies.",
+      "description_i18n": {
+        "en": "Operated by the Municipality of Kyrenia, this is a popular public leisure area in the Kervansaray area. It has sunbeds and umbrellas, dressing rooms and showers, restaurants, a car park for the disabled with easy access to the beach, and a swimming area marked off by buoys. There is a lifeguard tower with first aid.",
+        "tr": "Girne Belediyesi tarafından işletilen, Kervansaray bölgesinde herkesin yararlanabileceği gözde bir dinlence alanıdır. Şezlong ve şemsiyeler, soyunma kabinleri ve duşlar, restoranlar, plaja kolay erişimi olan bir engelli otoparkı ve şamandıralarla ayrılmış bir yüzme alanı bulunur. Ayrıca ilk yardım olanağı bulunan bir cankurtaran kulesi vardır.",
+        "ar": "تديرها بلدية كيرينيا، وهي منطقة ترفيهية شهيرة مفتوحة للجمهور في منطقة كرفانسراي. تتوفر فيها كراسي الاستلقاء والمظلات وغرف تبديل الملابس والاستحمام والمطاعم وموقف سيارات للأشخاص ذوي الإعاقة مع وصول سهل إلى الشاطئ ومنطقة سباحة محددة بالعوامات. ويوجد برج لإنقاذ الغرقى مزوّد بالإسعافات الأولية.",
+        "ru": "Пляж находится в ведении муниципалитета Кирении. Это популярная зона отдыха, открытая для всех, в районе Кервансарай. Здесь есть шезлонги и зонты, раздевалки и душевые, рестораны, парковка для людей с ограниченными возможностями с удобным доступом к пляжу и зона для купания, огороженная буями. Есть спасательная вышка с пунктом первой помощи.",
+        "el": "Λειτουργεί από τον Δήμο Κερύνειας και είναι ένας δημοφιλής χώρος αναψυχής ανοιχτός στο κοινό, στην περιοχή Κερβανσαράι. Διαθέτει ξαπλώστρες και ομπρέλες, αποδυτήρια και ντους, εστιατόρια, χώρο στάθμευσης για άτομα με αναπηρία με εύκολη πρόσβαση στην παραλία και ζώνη κολύμβησης οριοθετημένη με σημαδούρες. Υπάρχει πύργος ναυαγοσωστών με πρώτες βοήθειες.",
+        "fr": "Gérée par la municipalité de Kyrenia, c'est une zone de loisirs populaire, ouverte au public, dans le quartier de Kervansaray. On y trouve des transats et des parasols, des cabines de change et des douches, des restaurants, un parking pour personnes handicapées avec un accès facile à la plage et une zone de baignade délimitée par des bouées. Une tour de surveillance avec premiers secours est présente.",
+        "es": "Gestionada por el municipio de Kyrenia, es una popular zona de ocio abierta al público, en la zona de Kervansaray. Cuenta con tumbonas y sombrillas, vestuarios y duchas, restaurantes, un aparcamiento para personas con discapacidad con fácil acceso a la playa y una zona de baño delimitada con boyas. Dispone de una torre de socorrismo con primeros auxilios.",
+        "de": "Der Strand wird von der Gemeinde Kyrenia betrieben und ist ein beliebtes Freizeitgelände für die Öffentlichkeit im Gebiet Kervansaray. Es gibt Liegen und Sonnenschirme, Umkleidekabinen und Duschen, Restaurants, einen Parkplatz für Menschen mit Behinderung mit leichtem Zugang zum Strand und einen durch Bojen abgetrennten Badebereich. Ein Rettungsschwimmerturm mit Erster Hilfe ist vorhanden.",
+        "fa": "این ساحل را شهرداری کیرنیا اداره می‌کند و منطقه‌ای تفریحی و محبوب برای عموم در محدوده کروانسرای است. در آن تخت‌های آفتابی و چتر، رختکن و دوش، رستوران، پارکینگ ویژه افراد دارای معلولیت با دسترسی آسان به ساحل و محدوده شنای مشخص‌شده با شناور وجود دارد. یک برج نجات‌غریق همراه با کمک‌های اولیه نیز در آن هست."
+      },
+      "amenities": [
+        "sunbeds",
+        "food_bar",
+        "lifeguard"
+      ],
+      "access_type": "public",
+      "blue_flag": null,
       "facts": [
         {
           "quote": "Sunbeds and umbrellas",
@@ -71,6 +101,17 @@
       "name": "Long Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Long Beach",
+        "tr": "Long Beach",
+        "ar": "Long Beach",
+        "ru": "Long Beach",
+        "el": "Long Beach",
+        "fr": "Long Beach",
+        "es": "Long Beach",
+        "de": "Long Beach",
+        "fa": "Long Beach"
+      },
       "source": "visitncy_beaches",
       "source_id": "long-beach",
       "source_url": "https://www.visitncy.com/discover/beaches/",
@@ -88,6 +129,20 @@
       "resort_evidence": [],
       "osm_tags_seen": {},
       "description_en_site": "Situated on the Salamis Bay, 15 kilometres north of Famagusta and near to the ruins of Salamis, this magnificent sandy beach is ideal to spend time relaxing with a range of available facilities. A shuttle service also runs from town to the beach.",
+      "description_i18n": {
+        "en": "Situated on Salamis Bay, about 15 km north of Famagusta and near the ruins of Salamis, this sandy beach offers a range of facilities. A shuttle service runs from town to the beach.",
+        "tr": "Salamis Körfezi'nde, Gazimağusa'nın yaklaşık 15 km kuzeyinde ve Salamis kalıntılarına yakın konumdaki bu kumsal plaj, çeşitli olanaklar sunar. Şehirden plaja bir servis hizmeti de işler.",
+        "ar": "يقع على خليج سلاميس، على بعد نحو 15 كم شمال فاماغوستا وبالقرب من آثار سلاميس، وهو شاطئ رملي يوفر مجموعة من المرافق. وتعمل خدمة نقل مكوكية من المدينة إلى الشاطئ.",
+        "ru": "Этот песчаный пляж находится в заливе Саламис, примерно в 15 км к северу от Фамагусты, рядом с руинами Саламина, и предлагает ряд удобств. От города до пляжа курсирует трансфер.",
+        "el": "Αυτή η αμμώδης παραλία βρίσκεται στον κόλπο της Σαλαμίνας, περίπου 15 χλμ. βόρεια της Αμμοχώστου και κοντά στα ερείπια της Σαλαμίνας, και προσφέρει μια σειρά από παροχές. Δρομολόγιο μεταφοράς εκτελείται από την πόλη προς την παραλία.",
+        "fr": "Située sur la baie de Salamine, à environ 15 km au nord de Famagouste et près des ruines de Salamine, cette plage de sable propose un éventail d'équipements. Un service de navette relie la ville à la plage.",
+        "es": "Situada en la bahía de Salamina, a unos 15 km al norte de Famagusta y cerca de las ruinas de Salamina, esta playa de arena ofrece una variedad de instalaciones. Hay un servicio de autobús lanzadera desde la ciudad hasta la playa.",
+        "de": "Der Sandstrand liegt an der Bucht von Salamis, etwa 15 km nördlich von Famagusta und in der Nähe der Ruinen von Salamis, und bietet eine Reihe von Einrichtungen. Ein Shuttleservice fährt von der Stadt zum Strand.",
+        "fa": "این ساحل ماسه‌ای در خلیج سالامیس، حدود 15 کیلومتر شمال فاماگوستا و نزدیک خرابه‌های سالامیس قرار دارد و امکانات متنوعی ارائه می‌دهد. یک سرویس شاتل نیز از شهر به ساحل رفت‌وآمد می‌کند."
+      },
+      "amenities": [],
+      "access_type": "public",
+      "blue_flag": null,
       "facts": [
         {
           "quote": "this magnificent sandy beach is ideal to spend time relaxing with a range of available facilities",
@@ -98,6 +153,12 @@
           "quote": "A shuttle service also runs from town to the beach.",
           "relates_to": null,
           "note": "no allowed slug covers a shuttle"
+        },
+        {
+          "quote": "We have compiled a unique list for visitors searching for public beaches to spend their days and even have their own picnic.",
+          "relates_to": "access_type",
+          "quote_source": "page_intro",
+          "note": "the page says this about its whole LIST of beaches, not about Long Beach alone; recorded verbatim from the page intro (Berke 2026-11-16: access_type public only with this sentence on record)"
         }
       ],
       "pin_note": "Pinned by Berke's decision 2026-11-16 on the İskele resort outline at about 35.266 N 33.916 E (the page says only \"Situated on the Salamis Bay, 15 kilometres north of Famagusta\"). OSM has no element named Long Beach. Two unnamed leisure=beach_resort ways (area=yes) sit there: way/1568098280 (35.2655-35.2670 N, about 150 m of shore, the larger, and the one that contains 35.266 N 33.916 E) and way/1568098281 (35.2670-35.2677 N, about 90 m, the next strip north). A bbox query over 35.24-35.30 N 33.89-33.94 E (2026-11-16) found no unnamed natural=beach way on that shore, so the larger beach_resort strip is the outline. The element itself is tagged leisure=beach_resort; private_resort stays false because this is a Ministry-listed public beach row (Berke to confirm)"
@@ -106,6 +167,17 @@
       "name": "Bamboo Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Bamboo Beach",
+        "tr": "Bamboo Beach",
+        "ar": "شاطئ Bamboo",
+        "ru": "Пляж Bamboo",
+        "el": "Παραλία Bamboo",
+        "fr": "Plage Bamboo",
+        "es": "Playa Bamboo",
+        "de": "Bamboo-Strand",
+        "fa": "ساحل Bamboo"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -130,49 +202,20 @@
       "access_type": null
     },
     {
-      "name": "Barış Plajı",
-      "name_tr": null,
-      "name_en": null,
-      "name_source": "external_evidence",
-      "region": "kyrenia",
-      "area": null,
-      "area_why": "the evidence does not name a village",
-      "latitude": 35.331653,
-      "longitude": 33.414067,
-      "source": "osm",
-      "source_id": "way/229043958",
-      "osm": {
-        "type": "way",
-        "id": 229043958
-      },
-      "merged_duplicate": null,
-      "merged_duplicate_tags": null,
-      "pin_method": "centroid",
-      "private_resort": false,
-      "resort_evidence": [],
-      "osm_tags_seen": {},
-      "name_evidence": [
-        {
-          "kind": "d",
-          "url": "https://www.openstreetmap.org/node/4339471206",
-          "quote_or_title": "OSM node/4339471206 name=\"barış plajı\" (tourism=attraction)",
-          "evidence_point": [
-            35.3313485,
-            33.4118723
-          ],
-          "distance_m": 102
-        }
-      ],
-      "name_note": "weakest of the three: one OSM POI, 102 m from the outline, tagged tourism=attraction; OSM spells it \"barış plajı\"",
-      "description": null,
-      "amenities": [],
-      "blue_flag": null,
-      "access_type": null
-    },
-    {
       "name": "Bella Marin Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Bella Marin Beach",
+        "tr": "Bella Marin Beach",
+        "ar": "شاطئ Bella Marin",
+        "ru": "Пляж Bella Marin",
+        "el": "Παραλία Bella Marin",
+        "fr": "Plage Bella Marin",
+        "es": "Playa Bella Marin",
+        "de": "Bella-Marin-Strand",
+        "fa": "ساحل Bella Marin"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -205,6 +248,17 @@
       "name": "Camelot Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Camelot Beach",
+        "tr": "Camelot Beach",
+        "ar": "شاطئ Camelot",
+        "ru": "Пляж Camelot",
+        "el": "Παραλία Camelot",
+        "fr": "Plage Camelot",
+        "es": "Playa Camelot",
+        "de": "Camelot-Strand",
+        "fa": "ساحل Camelot"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -232,6 +286,17 @@
       "name": "Chamada Beach Club",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Chamada Beach Club",
+        "tr": "Chamada Beach Club",
+        "ar": "Chamada Beach Club",
+        "ru": "Chamada Beach Club",
+        "el": "Chamada Beach Club",
+        "fr": "Chamada Beach Club",
+        "es": "Chamada Beach Club",
+        "de": "Chamada Beach Club",
+        "fa": "Chamada Beach Club"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -263,6 +328,17 @@
       "name": "Diana Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Diana Beach",
+        "tr": "Diana Beach",
+        "ar": "شاطئ Diana",
+        "ru": "Пляж Diana",
+        "el": "Παραλία Diana",
+        "fr": "Plage Diana",
+        "es": "Playa Diana",
+        "de": "Diana-Strand",
+        "fa": "ساحل Diana"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -292,6 +368,17 @@
       "name": "Esentepe Belediye Halk Plajı",
       "name_tr": "Esentepe Belediye Halk Plajı",
       "name_en": null,
+      "name_i18n": {
+        "en": "Esentepe Municipal Public Beach",
+        "tr": "Esentepe Belediye Halk Plajı",
+        "ar": "الشاطئ العام لبلدية إسنتبه",
+        "ru": "Муниципальный общественный пляж Эсентепе",
+        "el": "Δημοτική δημόσια παραλία Εσεντεπέ",
+        "fr": "Plage publique municipale d'Esentepe",
+        "es": "Playa pública municipal de Esentepe",
+        "de": "Öffentlicher Strand der Gemeinde Esentepe",
+        "fa": "ساحل عمومی شهرداری اسن‌تپه"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": "esentepe",
@@ -321,6 +408,17 @@
       "name": "Karaoğlanoğlu Plajı",
       "name_tr": "Karaoğlanoğlu Plajı",
       "name_en": null,
+      "name_i18n": {
+        "en": "Karaoğlanoğlu Beach",
+        "tr": "Karaoğlanoğlu Plajı",
+        "ar": "شاطئ كاراأوغلانأوغلو",
+        "ru": "Пляж Караоглануглу",
+        "el": "Παραλία Καραογλανόγλου",
+        "fr": "Plage de Karaoğlanoğlu",
+        "es": "Playa de Karaoğlanoğlu",
+        "de": "Karaoğlanoğlu-Strand",
+        "fa": "ساحل کارااوغلانوغلو"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": "karaoglanoglu",
@@ -350,6 +448,17 @@
       "name": "Korenium beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Korenium Beach",
+        "tr": "Korenium Beach",
+        "ar": "شاطئ Korenium",
+        "ru": "Пляж Korenium",
+        "el": "Παραλία Korenium",
+        "fr": "Plage Korenium",
+        "es": "Playa Korenium",
+        "de": "Korenium-Strand",
+        "fa": "ساحل Korenium"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -379,6 +488,17 @@
       "name": "Lapta Belediye Plajı",
       "name_tr": null,
       "name_en": "Lapta Municipality Public Beach",
+      "name_i18n": {
+        "en": "Lapta Municipality Public Beach",
+        "tr": "Lapta Belediye Plajı",
+        "ar": "شاطئ بلدية لابتا العام",
+        "ru": "Общественный муниципальный пляж Лапта",
+        "el": "Δημοτική δημόσια παραλία Λάπτα",
+        "fr": "Plage publique municipale de Lapta",
+        "es": "Playa pública municipal de Lapta",
+        "de": "Öffentlicher Strand der Gemeinde Lapta",
+        "fa": "ساحل عمومی شهرداری لاپتا"
+      },
       "name_source": "berke_decision",
       "region": "kyrenia",
       "area": "lapta",
@@ -425,6 +545,17 @@
       "name": "Lido Cyprus",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Lido Cyprus",
+        "tr": "Lido Cyprus",
+        "ar": "Lido Cyprus",
+        "ru": "Lido Cyprus",
+        "el": "Lido Cyprus",
+        "fr": "Lido Cyprus",
+        "es": "Lido Cyprus",
+        "de": "Lido Cyprus",
+        "fa": "Lido Cyprus"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -452,6 +583,17 @@
       "name": "Municipality of Alsancak Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Municipality of Alsancak Beach",
+        "tr": "Alsancak Belediye Plajı",
+        "ar": "شاطئ بلدية ألسنجق",
+        "ru": "Муниципальный пляж Альсанджак",
+        "el": "Δημοτική παραλία Αλσάντζακ",
+        "fr": "Plage municipale d'Alsancak",
+        "es": "Playa municipal de Alsancak",
+        "de": "Städtischer Strand Alsancak",
+        "fa": "ساحل شهرداری آلسانجاک"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": "alsancak",
@@ -479,6 +621,17 @@
       "name": "Riviera Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Riviera Beach",
+        "tr": "Riviera Beach",
+        "ar": "شاطئ Riviera",
+        "ru": "Пляж Riviera",
+        "el": "Παραλία Riviera",
+        "fr": "Plage Riviera",
+        "es": "Playa Riviera",
+        "de": "Riviera-Strand",
+        "fa": "ساحل Riviera"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -506,6 +659,17 @@
       "name": "Sandouka Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Sandouka Beach",
+        "tr": "Sandouka Beach",
+        "ar": "شاطئ Sandouka",
+        "ru": "Пляж Sandouka",
+        "el": "Παραλία Sandouka",
+        "fr": "Plage Sandouka",
+        "es": "Playa Sandouka",
+        "de": "Sandouka-Strand",
+        "fa": "ساحل Sandouka"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -533,6 +697,17 @@
       "name": "Sardunya Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Sardunya Beach",
+        "tr": "Sardunya Beach",
+        "ar": "شاطئ Sardunya",
+        "ru": "Пляж Sardunya",
+        "el": "Παραλία Sardunya",
+        "fr": "Plage Sardunya",
+        "es": "Playa Sardunya",
+        "de": "Sardunya-Strand",
+        "fa": "ساحل Sardunya"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -560,6 +735,17 @@
       "name": "Shayna",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Shayna",
+        "tr": "Shayna",
+        "ar": "Shayna",
+        "ru": "Shayna",
+        "el": "Shayna",
+        "fr": "Shayna",
+        "es": "Shayna",
+        "de": "Shayna",
+        "fa": "Shayna"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -587,6 +773,17 @@
       "name": "Suna's Beach and Restaurant",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Suna's Beach and Restaurant",
+        "tr": "Suna's Beach and Restaurant",
+        "ar": "Suna's Beach and Restaurant",
+        "ru": "Suna's Beach and Restaurant",
+        "el": "Suna's Beach and Restaurant",
+        "fr": "Suna's Beach and Restaurant",
+        "es": "Suna's Beach and Restaurant",
+        "de": "Suna's Beach and Restaurant",
+        "fa": "Suna's Beach and Restaurant"
+      },
       "name_source": "osm",
       "region": "kyrenia",
       "area": null,
@@ -616,6 +813,17 @@
       "name": "Kocareis Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Kocareis Beach",
+        "tr": "Kocareis Beach",
+        "ar": "شاطئ Kocareis",
+        "ru": "Пляж Kocareis",
+        "el": "Παραλία Kocareis",
+        "fr": "Plage Kocareis",
+        "es": "Playa Kocareis",
+        "de": "Kocareis-Strand",
+        "fa": "ساحل Kocareis"
+      },
       "name_source": "osm",
       "region": "famagusta",
       "area": null,
@@ -643,6 +851,17 @@
       "name": "Makenzi Plajı",
       "name_tr": null,
       "name_en": "Mckenzie Beach",
+      "name_i18n": {
+        "en": "Mckenzie Beach",
+        "tr": "Makenzi Plajı",
+        "ar": "شاطئ ماكنزي",
+        "ru": "Пляж Макензи",
+        "el": "Παραλία Μακένζι",
+        "fr": "Plage Mckenzie",
+        "es": "Playa Mckenzie",
+        "de": "Mckenzie-Strand",
+        "fa": "ساحل مکنزی"
+      },
       "name_source": "osm",
       "region": "famagusta",
       "area": null,
@@ -672,6 +891,17 @@
       "name": "Silver Beach",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Silver Beach",
+        "tr": "Silver Beach",
+        "ar": "شاطئ Silver",
+        "ru": "Пляж Silver",
+        "el": "Παραλία Silver",
+        "fr": "Plage Silver",
+        "es": "Playa Silver",
+        "de": "Silver-Strand",
+        "fa": "ساحل Silver"
+      },
       "name_source": "osm",
       "region": "famagusta",
       "area": null,
@@ -701,6 +931,17 @@
       "name": "Yeni Boğaziçi Halk Plajı",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Yeni Boğaziçi Public Beach",
+        "tr": "Yeni Boğaziçi Halk Plajı",
+        "ar": "شاطئ يني بوغازيتشي العام",
+        "ru": "Общественный пляж Йени Богазичи",
+        "el": "Δημόσια παραλία Γενί Μποαζιτσί",
+        "fr": "Plage publique de Yeni Boğaziçi",
+        "es": "Playa pública de Yeni Boğaziçi",
+        "de": "Öffentlicher Strand Yeni Boğaziçi",
+        "fa": "ساحل عمومی ینی بوغازیچی"
+      },
       "name_source": "external_evidence",
       "region": "famagusta",
       "area": "yeni-bogazici",
@@ -743,6 +984,17 @@
       "name": "Kaplıca Plajı",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Kaplıca Beach",
+        "tr": "Kaplıca Plajı",
+        "ar": "شاطئ كابليجا",
+        "ru": "Пляж Каплыджа",
+        "el": "Παραλία Καπλίτζα",
+        "fr": "Plage de Kaplıca",
+        "es": "Playa de Kaplıca",
+        "de": "Kaplıca-Strand",
+        "fa": "ساحل کاپلیجا"
+      },
       "name_source": "external_evidence",
       "region": "iskele",
       "area": "kaplica",
@@ -802,6 +1054,17 @@
       "name": "Lefke Belediyesi Halk Plajı",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Lefke Municipality Public Beach",
+        "tr": "Lefke Belediyesi Halk Plajı",
+        "ar": "الشاطئ العام لبلدية ليفكه",
+        "ru": "Муниципальный общественный пляж Лефке",
+        "el": "Δημοτική δημόσια παραλία Λεφκέ",
+        "fr": "Plage publique municipale de Lefke",
+        "es": "Playa pública municipal de Lefke",
+        "de": "Öffentlicher Strand der Gemeinde Lefke",
+        "fa": "ساحل عمومی شهرداری لفکه"
+      },
       "name_source": "osm",
       "region": "lefke",
       "area": null,
@@ -829,6 +1092,17 @@
       "name": "Ayfilon Plajı",
       "name_tr": "Ayfilon Plajı",
       "name_en": "Ayphilon Beach",
+      "name_i18n": {
+        "en": "Ayphilon Beach",
+        "tr": "Ayfilon Plajı",
+        "ar": "شاطئ أيفيلون",
+        "ru": "Пляж Айфилон",
+        "el": "Παραλία Αϊφίλον",
+        "fr": "Plage d'Ayphilon",
+        "es": "Playa de Ayphilon",
+        "de": "Ayphilon-Strand",
+        "fa": "ساحل آیفیلون"
+      },
       "name_source": "osm",
       "region": "karpaz",
       "area": null,
@@ -858,6 +1132,17 @@
       "name": "Club Di Mare",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Club Di Mare",
+        "tr": "Club Di Mare",
+        "ar": "Club Di Mare",
+        "ru": "Club Di Mare",
+        "el": "Club Di Mare",
+        "fr": "Club Di Mare",
+        "es": "Club Di Mare",
+        "de": "Club Di Mare",
+        "fa": "Club Di Mare"
+      },
       "name_source": "osm",
       "region": "karpaz",
       "area": null,
@@ -887,6 +1172,17 @@
       "name": "Honey Beach - Balcı Plaza",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Honey Beach - Balcı Plaza",
+        "tr": "Honey Beach - Balcı Plaza",
+        "ar": "Honey Beach - Balcı Plaza",
+        "ru": "Honey Beach - Balcı Plaza",
+        "el": "Honey Beach - Balcı Plaza",
+        "fr": "Honey Beach - Balcı Plaza",
+        "es": "Honey Beach - Balcı Plaza",
+        "de": "Honey Beach - Balcı Plaza",
+        "fa": "Honey Beach - Balcı Plaza"
+      },
       "name_source": "osm",
       "region": "karpaz",
       "area": null,
@@ -914,6 +1210,17 @@
       "name": "Issız Plaj",
       "name_tr": "Issız Plaj",
       "name_en": "Nowhere Beach",
+      "name_i18n": {
+        "en": "Nowhere Beach",
+        "tr": "Issız Plaj",
+        "ar": "شاطئ إيسيز",
+        "ru": "Пляж Ыссыз",
+        "el": "Παραλία Ισσίζ",
+        "fr": "Plage Issız",
+        "es": "Playa Issız",
+        "de": "Issız-Strand",
+        "fa": "ساحل ایسیز"
+      },
       "name_source": "osm",
       "region": "karpaz",
       "area": null,
@@ -943,6 +1250,17 @@
       "name": "Mehmetçik Belediye Bafra Plajı",
       "name_tr": null,
       "name_en": "Bafra Beach",
+      "name_i18n": {
+        "en": "Bafra Beach",
+        "tr": "Mehmetçik Belediye Bafra Plajı",
+        "ar": "شاطئ بافرا",
+        "ru": "Пляж Бафра",
+        "el": "Παραλία Μπάφρα",
+        "fr": "Plage de Bafra",
+        "es": "Playa de Bafra",
+        "de": "Bafra-Strand",
+        "fa": "ساحل بافرا"
+      },
       "name_source": "osm",
       "region": "karpaz",
       "area": "bafra",
@@ -970,6 +1288,17 @@
       "name": "Yudi Halk Plajı",
       "name_tr": null,
       "name_en": null,
+      "name_i18n": {
+        "en": "Yudi Public Beach",
+        "tr": "Yudi Halk Plajı",
+        "ar": "شاطئ يودي العام",
+        "ru": "Общественный пляж Юди",
+        "el": "Δημόσια παραλία Γιούντι",
+        "fr": "Plage publique de Yudi",
+        "es": "Playa pública de Yudi",
+        "de": "Öffentlicher Strand Yudi",
+        "fa": "ساحل عمومی یودی"
+      },
       "name_source": "osm",
       "region": "karpaz",
       "area": null,
@@ -1064,6 +1393,46 @@
       "name": "Derinya Halk Plajı",
       "osm": "way/606238634",
       "reason": "resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (tagged \"Very approximate\"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note \"Only Northern Cyprus and Turkish Citizens allowed\") about 2.3 km west"
+    }
+  ],
+  "additions_rejected": [
+    {
+      "name": "Barış Plajı",
+      "osm": "way/229043958",
+      "reason": "Too weak: the only evidence is one OSM node (name \"barış plajı\", tourism=attraction) 102 m from the unnamed outline; no second independent source.",
+      "evidence": [
+        {
+          "kind": "d",
+          "url": "https://www.openstreetmap.org/node/4339471206",
+          "quote_or_title": "OSM node/4339471206 name=\"barış plajı\" (tourism=attraction)",
+          "at": [
+            35.3313485,
+            33.4118723
+          ],
+          "distance_m": 102
+        }
+      ]
+    },
+    {
+      "name": "Yedidalga",
+      "osm": null,
+      "reason": "Probably the same beach as the kept row \"Lefke Belediyesi Halk Plajı\" (way/1395325670), but that is not proven, so no second row is added.",
+      "evidence": [
+        {
+          "kind": "area",
+          "note": "constants/areaPoints.js lists the area point of Yedidalga (Lefke region) at 35.14491 N 32.8013 E; the Lefke Belediyesi Halk Plajı pin (35.148549 N 32.803607 E) is 456 m from it"
+        },
+        {
+          "kind": "c",
+          "url": "https://commons.wikimedia.org/wiki/File:Yedidalga_%C3%A7e%C5%9Fme_1953.jpg",
+          "quote_or_title": "File:Yedidalga çeşme 1953.jpg (geotagged 35.142088 N 32.813474 E; a village fountain, not a beach; 1149 m from that pin)"
+        },
+        {
+          "kind": "d",
+          "url": "https://www.openstreetmap.org/way/1288399087",
+          "quote_or_title": "OSM way/1288399087 name=\"Yedidalga Sosyal Tesisleri\" landuse=military (bounds 35.1489-35.1503 N, 32.7982-32.8005 E): a military social facility beside the same shore, not a beach"
+        }
+      ]
     }
   ],
   "needs_review": [],

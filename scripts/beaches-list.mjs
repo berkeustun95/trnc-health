@@ -20,6 +20,9 @@
 //                                                    distance_m re-measures, no LIVE pin lies on a row's outline; with a FULL snapshot
 //                                                    also that every named element is accounted for in DROP / MERGED / KEEP / MINISTRY.
 //
+// Translations (name_i18n for every row, description_i18n for the 2 Ministry rows) live in data/explore/beaches-translations.json, keyed by source_id;
+// build() copies them onto the rows and --check proves the rows equal the file and every rule below (9 exact keys, ar/fa parentheses, amenity slugs backed by a recorded quote, ...).
+//
 // Inputs: the local OSM snapshot (Overpass `out geom`, North only) for a rebuild, data/explore/beaches-live-translations.json,
 // and the CURATION block below (every drop/keep/area decision, with its reason). Deterministic: the only timestamp is
 // the snapshot's own osm_base, which the data file carries (osm_base) so the file is self-sufficient for provenance;
@@ -38,6 +41,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SNAPSHOT = 'data/osm/beaches-20261115T1853.json'
 const OUT = 'data/explore/beaches.json'
 const TRANSLATIONS = 'data/explore/beaches-live-translations.json'
+const TRANSLATIONS_NEW = 'data/explore/beaches-translations.json'
+const LOCALES9 = ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa']   // ISO keys: what the app reader extractI18n resolves (the live name_i18n uses en/tr already)
+const AMENITY_SLUGS = ['parking', 'toilets', 'sunbeds', 'food_bar', 'lifeguard']
+const ACCESS_TYPES = ['public', 'private']
 const REGIONS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
 const NEW_LOCALES = ['ar', 'ru', 'el', 'fr', 'es', 'de', 'fa']
 const PIN_METHODS = ['node', 'open_way_middle_vertex', 'centroid', 'centroid_of_largest_outer_ring', 'pole_of_inaccessibility']
@@ -83,14 +90,17 @@ const MINISTRY = [
   {
     source_id: 'long-beach', name: 'Long Beach', osm: 'way/1568098280', area: 'Long Beach',
     pin_note: 'Pinned by Berke\'s decision 2026-11-16 on the İskele resort outline at about 35.266 N 33.916 E (the page says only "Situated on the Salamis Bay, 15 kilometres north of Famagusta"). OSM has no element named Long Beach. Two unnamed leisure=beach_resort ways (area=yes) sit there: way/1568098280 (35.2655-35.2670 N, about 150 m of shore, the larger, and the one that contains 35.266 N 33.916 E) and way/1568098281 (35.2670-35.2677 N, about 90 m, the next strip north). A bbox query over 35.24-35.30 N 33.89-33.94 E (2026-11-16) found no unnamed natural=beach way on that shore, so the larger beach_resort strip is the outline. The element itself is tagged leisure=beach_resort; private_resort stays false because this is a Ministry-listed public beach row (Berke to confirm)',
+    amenities: [], access_type: 'public',
     description_en_site: 'Situated on the Salamis Bay, 15 kilometres north of Famagusta and near to the ruins of Salamis, this magnificent sandy beach is ideal to spend time relaxing with a range of available facilities. A shuttle service also runs from town to the beach.',
     facts: [
       { quote: 'this magnificent sandy beach is ideal to spend time relaxing with a range of available facilities', relates_to: null, note: 'facilities are not itemised on the page' },
       { quote: 'A shuttle service also runs from town to the beach.', relates_to: null, note: 'no allowed slug covers a shuttle' },
+      { quote: 'We have compiled a unique list for visitors searching for public beaches to spend their days and even have their own picnic.', relates_to: 'access_type', quote_source: 'page_intro', note: 'the page says this about its whole LIST of beaches, not about Long Beach alone; recorded verbatim from the page intro (Berke 2026-11-16: access_type public only with this sentence on record)' },
     ],
   },
   {
     source_id: 'kervansaray-beach', name: 'Kervansaray Beach', osm: 'way/217651068', area: null,
+    amenities: ['sunbeds', 'food_bar', 'lifeguard'], access_type: 'public',
     description_en_site: 'Operated by the Municipality of Kyrenia, this is a popular leisure area to be enjoyed by the public. In the heart of Kyrenia in the Kervansaray area, this beach has a range of facilities. Sunbeds and umbrellas, dressing rooms and showers, restaurants and even an additional artificial grass sunbathing area for those who don’t like to get sand in their feet. The beach also has a car park for the disabled with easy access to the beach side. As the cove of Kervansaray is a stop for most boat tours from Kyrenia Harbour, a designated swimming area is separated by buoys to ensure safety of swimmers. The beach also has a lifeguard tower with first aid and lifeguard supplies.',
     facts: [
       { quote: 'Sunbeds and umbrellas', relates_to: 'sunbeds' },
@@ -153,12 +163,21 @@ const ADDED = [
       { kind: 'd', url: 'https://www.openstreetmap.org/node/5893518286', quote_or_title: 'OSM node/5893518286 name="Yeni bogazici halk plaji" name:en="bogazici beach" (amenity=restaurant)', at: [35.2010729, 33.9001119] },
     ],
   },
+]
+// ADDITIONS_REJECTED: candidates considered and NOT added (Berke / principal-engineer 2026-11-16: leave out anything uncertain). Printed in the data file.
+const ADDITIONS_REJECTED = [
   {
-    ref: 'way/229043958', name: 'Barış Plajı', area: null,
-    area_why: 'the evidence does not name a village',
-    name_note: 'weakest of the three: one OSM POI, 102 m from the outline, tagged tourism=attraction; OSM spells it "barış plajı"',
-    name_evidence: [
-      { kind: 'd', url: 'https://www.openstreetmap.org/node/4339471206', quote_or_title: 'OSM node/4339471206 name="barış plajı" (tourism=attraction)', at: [35.3313485, 33.4118723] },
+    name: 'Barış Plajı', osm: 'way/229043958',
+    reason: 'Too weak: the only evidence is one OSM node (name "barış plajı", tourism=attraction) 102 m from the unnamed outline; no second independent source.',
+    evidence: [{ kind: 'd', url: 'https://www.openstreetmap.org/node/4339471206', quote_or_title: 'OSM node/4339471206 name="barış plajı" (tourism=attraction)', at: [35.3313485, 33.4118723], distance_m: 102 }],
+  },
+  {
+    name: 'Yedidalga', osm: null,
+    reason: 'Probably the same beach as the kept row "Lefke Belediyesi Halk Plajı" (way/1395325670), but that is not proven, so no second row is added.',
+    evidence: [
+      { kind: 'area', note: 'constants/areaPoints.js lists the area point of Yedidalga (Lefke region) at 35.14491 N 32.8013 E; the Lefke Belediyesi Halk Plajı pin (35.148549 N 32.803607 E) is 456 m from it' },
+      { kind: 'c', url: 'https://commons.wikimedia.org/wiki/File:Yedidalga_%C3%A7e%C5%9Fme_1953.jpg', quote_or_title: 'File:Yedidalga çeşme 1953.jpg (geotagged 35.142088 N 32.813474 E; a village fountain, not a beach; 1149 m from that pin)' },
+      { kind: 'd', url: 'https://www.openstreetmap.org/way/1288399087', quote_or_title: 'OSM way/1288399087 name="Yedidalga Sosyal Tesisleri" landuse=military (bounds 35.1489-35.1503 N, 32.7982-32.8005 E): a military social facility beside the same shore, not a beach' },
     ],
   },
 ]
@@ -315,7 +334,13 @@ function coverage(snap) {
   return problems
 }
 
+const insertAfter = (o, after, extra) => {
+  const out = {}
+  for (const [k, v] of Object.entries(o)) { out[k] = v; if (k === after) Object.assign(out, extra) }
+  return out
+}
 export function build(snap) {
+  const tr = JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS_NEW), 'utf8'))
   const byRef = new Map(snap.elements.map(e => [refOf(e), e]))
   const problems = coverage(snap)
   const rows = []
@@ -352,14 +377,27 @@ export function build(snap) {
     rows.push(osmRow(el, a, { name: a.name, name_source: 'external_evidence', name_evidence: evidence }))
   }
   rows.sort(rowOrder)
+  const decorated = rows.map(r => {
+    const nm = tr.name_i18n?.[r.source_id]
+    if (!nm) problems.push(`${r.source_id}: no name_i18n in ${TRANSLATIONS_NEW}`)
+    let o = insertAfter(r, 'name_en', { name_i18n: nm || null })
+    if (r.source === 'visitncy_beaches') {
+      const m = MINISTRY.find(x => x.source_id === r.source_id)
+      o = insertAfter(o, 'description_en_site', { description_i18n: tr.description_i18n?.[r.source_id] || null, amenities: m.amenities, access_type: m.access_type, blue_flag: null })
+    }
+    return o
+  })
+  for (const k of Object.keys(tr.name_i18n || {})) if (!rows.some(r => r.source_id === k)) problems.push(`${TRANSLATIONS_NEW} has name_i18n for ${k}, which is not a row`)
+  for (const k of Object.keys(tr.description_i18n || {})) if (!rows.some(r => r.source_id === k && r.source === 'visitncy_beaches')) problems.push(`${TRANSLATIONS_NEW} has description_i18n for ${k}, which is not a Ministry row`)
+  rows.length = 0; rows.push(...decorated)
   const dropped = Object.entries(DROP).map(([ref, reason]) => ({ name: nameOf(byRef.get(ref)?.tags || {}), osm: ref, reason })).sort((a, b) => a.osm.localeCompare(b.osm))
   const base = snap.osm3s.timestamp_osm_base
   return {
     obj: {
       generated_at: base, osm_base: [base],
       attribution: { osm: '© OpenStreetMap contributors, ODbL 1.0', ministry: 'Turizm Bakanlığı (visitncy.com)' },
-      counts: { rows: rows.length, dropped: dropped.length, needs_review: 0 },
-      rows, dropped, needs_review: [], live_translations: JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS), 'utf8')),
+      counts: { rows: rows.length, dropped: dropped.length, additions_rejected: ADDITIONS_REJECTED.length, needs_review: 0 },
+      rows, dropped, additions_rejected: ADDITIONS_REJECTED, needs_review: [], live_translations: JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS), 'utf8')),
     },
     problems,
   }
@@ -380,8 +418,36 @@ export function validate(obj) {
     if (!r.osm || !['node', 'way', 'relation'].includes(r.osm.type) || !Number.isInteger(r.osm.id)) f.push(`${tag}: osm must be {type,id}`)
     else { const ref = `${r.osm.type}/${r.osm.id}`; if (refs.has(ref)) f.push(`${tag}: osm ${ref} used by another row`); refs.add(ref) }
     if (!PIN_METHODS.includes(r.pin_method)) f.push(`${tag}: pin_method ${r.pin_method}`)
+    {
+      // name_i18n: ALL rows, exactly the 9 ISO keys, non-empty strings; ar/fa carry no parentheses
+      const keys = Object.keys(r.name_i18n || {}).sort().join(), want = LOCALES9.slice().sort().join()
+      if (keys !== want) f.push(`${tag}: name_i18n keys [${keys}] != [${want}]`)
+      for (const code of LOCALES9) if (typeof r.name_i18n?.[code] !== 'string' || r.name_i18n[code].trim().length < 2 || r.name_i18n[code] !== r.name_i18n[code].trim()) f.push(`${tag}: name_i18n.${code} empty or untrimmed`)
+      for (const code of ['ar', 'fa']) if (/[()]/.test(r.name_i18n?.[code] || '')) f.push(`${tag}: name_i18n.${code} contains parentheses`)
+    }
+    if (r.source === 'visitncy_beaches') {
+      const dk = Object.keys(r.description_i18n || {}).sort().join(), want = LOCALES9.slice().sort().join()
+      if (dk !== want) f.push(`${tag}: description_i18n keys [${dk}] != [${want}]`)
+      for (const code of LOCALES9) if (typeof r.description_i18n?.[code] !== 'string' || r.description_i18n[code].trim().length < 40) f.push(`${tag}: description_i18n.${code} missing or too short`)
+      if (!Array.isArray(r.amenities)) f.push(`${tag}: amenities must be an array`)
+      for (const a of r.amenities || []) {
+        if (!AMENITY_SLUGS.includes(a)) f.push(`${tag}: amenity ${JSON.stringify(a)} not in ${AMENITY_SLUGS.join('/')}`)
+        if (!(r.facts || []).some(x => x.relates_to === a && x.quote)) f.push(`${tag}: amenity ${a} has no recorded quote`)
+      }
+      if (new Set(r.amenities || []).size !== (r.amenities || []).length) f.push(`${tag}: duplicate amenity`)
+      if (r.access_type != null) {
+        if (!ACCESS_TYPES.includes(r.access_type)) f.push(`${tag}: access_type ${r.access_type}`)
+        if (!(r.facts || []).some(x => x.relates_to === 'access_type' && x.quote)) f.push(`${tag}: access_type ${r.access_type} has no recorded quote`)
+      }
+      if (r.blue_flag != null) f.push(`${tag}: blue_flag set without any page stating it`)
+      // every recorded quote is a verbatim substring of the stored page text, or of the page-intro sentence (quote_source page_intro)
+      for (const x of r.facts || []) if (x.quote_source !== 'page_intro' && !String(r.description_en_site).includes(x.quote)) f.push(`${tag}: fact quote ${JSON.stringify(x.quote.slice(0, 40))} is not in description_en_site`)
+      for (const x of r.facts || []) if (x.quote_source === 'page_intro' && !/^We have compiled a unique list for visitors searching for public beaches/.test(x.quote)) f.push(`${tag}: page_intro quote is not the recorded sentence`)
+      // the 15 km of Long Beach must survive every translation (a faithful translation adds and loses no fact)
+      if (r.source_id === 'long-beach') for (const code of LOCALES9) if (!/15/.test(r.description_i18n?.[code] || '')) f.push(`${tag}: description_i18n.${code} lost "15"`)
+    }
     if (r.source === 'osm') {
-      for (const k of ['description', 'blue_flag', 'access_type']) if (r[k] != null) f.push(`${tag}: OSM row carries ${k}`)
+      for (const k of ['description', 'description_i18n', 'blue_flag', 'access_type']) if (r[k] != null) f.push(`${tag}: OSM row carries ${k}`)
       if ((r.amenities || []).length) f.push(`${tag}: OSM row carries amenities`)
       if (!/^(node|way|relation)\/\d+$/.test(r.source_id)) f.push(`${tag}: source_id is not <type>/<id>`)
       else if (r.osm && r.source_id !== `${r.osm.type}/${r.osm.id}`) f.push(`${tag}: source_id disagrees with osm ref`)
@@ -445,8 +511,22 @@ export function validate(obj) {
     for (const code of ['ar', 'fa']) if (/[()]/.test(t.name_i18n?.[code] || '')) f.push(`live ${L.name} name_i18n.${code} contains parentheses`)
     if (/Caretta caretta/.test(t.source?.description_i18n?.en || '')) for (const code of NEW_LOCALES) if (!t.description_i18n?.[code]?.includes('Caretta caretta')) f.push(`live ${L.name} description ${code} lost "Caretta caretta"`)
   }
+  const ar = obj.additions_rejected
+  if (!Array.isArray(ar) || !ar.length) f.push('additions_rejected must be a non-empty array')
+  for (const a of ar || []) {
+    if (!a.name || !a.reason || !Array.isArray(a.evidence) || !a.evidence.length) f.push(`additions_rejected ${a.name}: name, reason and evidence are required`)
+    if (obj.rows.some(r => r.name === a.name)) f.push(`additions_rejected ${a.name} is also a row`)
+  }
+  const fileNew = JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS_NEW), 'utf8'))
+  for (const r of obj.rows) {
+    if (JSON.stringify(r.name_i18n) !== JSON.stringify(fileNew.name_i18n?.[r.source_id])) f.push(`${r.source_id}: name_i18n differs from ${TRANSLATIONS_NEW}`)
+    if (r.source === 'visitncy_beaches' && JSON.stringify(r.description_i18n) !== JSON.stringify(fileNew.description_i18n?.[r.source_id])) f.push(`${r.source_id}: description_i18n differs from ${TRANSLATIONS_NEW}`)
+  }
+  if (Object.keys(fileNew.name_i18n || {}).length !== obj.rows.length) f.push(`${TRANSLATIONS_NEW}: ${Object.keys(fileNew.name_i18n || {}).length} name_i18n entries for ${obj.rows.length} rows`)
+  if (Object.keys(fileNew.description_i18n || {}).sort().join() !== obj.rows.filter(r => r.source === 'visitncy_beaches').map(r => r.source_id).sort().join()) f.push(`${TRANSLATIONS_NEW}: description_i18n keys are not exactly the Ministry rows`)
+  if (!Array.isArray(fileNew.needs_native_check) || !fileNew.needs_native_check.length) f.push(`${TRANSLATIONS_NEW}: needs_native_check missing`)
   const c = obj.counts || {}
-  if (c.rows !== obj.rows.length || c.dropped !== obj.dropped.length || c.needs_review !== obj.needs_review.length) f.push(`counts ${JSON.stringify(c)} do not match the arrays`)
+  if (c.rows !== obj.rows.length || c.dropped !== obj.dropped.length || c.needs_review !== obj.needs_review.length || c.additions_rejected !== (ar || []).length) f.push(`counts ${JSON.stringify(c)} do not match the arrays`)
   for (let i = 1; i < obj.rows.length; i++) if (rowOrder(obj.rows[i - 1], obj.rows[i]) > 0) { f.push(`rows are not in canonical order at ${obj.rows[i].source_id}`); break }
   const dr = obj.dropped.map(d => d.osm)
   if (dr.join() !== dr.slice().sort((a, b) => a.localeCompare(b)).join()) f.push('dropped is not sorted by osm ref')
