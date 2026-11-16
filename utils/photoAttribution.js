@@ -5,9 +5,9 @@
 // TWO COLUMNS, ON PURPOSE, AND THE ORDER MATTERS.
 //
 //   photo_attribution — jsonb, KEYED BY PHOTO URL. The real source of truth.
-//   photo_credits     — text[], POSITIONAL, legacy. Still the only thing the shipped
-//                       production JS renders, so it is written too until the OTA
-//                       carrying the new renderer has been out long enough.
+//   photo_credits     — text[], POSITIONAL, legacy fallback. The app renders
+//                       photo_attribution (author · licence · source, since
+//                       2026-11-08); photo_credits is still written for old clients.
 //
 // Keyed-by-URL exists because positional attribution is silently wrong after an
 // ordinary edit: delete photos[0] and every remaining credit re-points to the photo

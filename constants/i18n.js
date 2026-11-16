@@ -4736,7 +4736,7 @@ const translations = {
     //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
     //    only the surrounding words are.
     photoCreditPrefix: "Fotoğraf",
-    photoCreditEdited: "(düzenlendi)",
+    photoCreditEdited: "(düzenlenmiş)",
     photoSourceOwn: "ADA özgün fotoğrafı",
     photoLicenseA11y: "Lisans koşullarını aç",
     photoSourceA11y: "Fotoğrafın kaynak sayfasını aç",
