@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- 20261208 — staged beaches: Greek (el) names become the official Turkish names (data only, 30 rows + 2 descriptions)
+-- 20261214 — staged beaches: Greek (el) names become the official Turkish names (data only, 30 rows + 2 descriptions)
 -- ═══════════════════════════════════════════════════════════
 --
 -- Berke, 2026-11-16: in the Greek locale beaches carry the official Turkish name in Latin letters, exactly as in tr
@@ -26,7 +26,7 @@
 --     check_place_content re-scans the new text with the word filter and would abort the whole file on a hit.
 -- Re-running after a successful apply raises (the old values are gone): this is a one-shot.
 --
--- Apply: gh workflow run supabase-migrate -f file=20261208_beaches_el_turkish_names.sql (dry), then -f apply=true after
+-- Apply: gh workflow run supabase-migrate -f file=20261214_beaches_el_turkish_names.sql (dry), then -f apply=true after
 -- Berke approves production-db. Data only: no schema change, nothing to register in verify_schema.sql.
 
 SET ROLE postgres;
@@ -162,7 +162,7 @@ BEGIN
     RAISE EXCEPTION '% of the 2 Ministry rows do not carry the expected el description after the update', v_bad;
   END IF;
 
-  RAISE NOTICE '20261208 OK: % staged beach rows updated, all other rows byte-identical, only name_i18n (30) and el descriptions (%) changed', v_n, v_nd;
+  RAISE NOTICE '20261214 OK: % staged beach rows updated, all other rows byte-identical, only name_i18n (30) and el descriptions (%) changed', v_n, v_nd;
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -176,7 +176,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261208_beaches_el_turkish_names.sql', '985b95e58b58c2c7f9977343973771252f1469017adfbfaa2f148f65144f5054')
+VALUES ('20261214_beaches_el_turkish_names.sql', '4a1e71430edbac9fadeb372243d49c33a672cd10a6d42695be3ff1c4e27ba181')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
