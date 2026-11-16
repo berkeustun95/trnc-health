@@ -199,8 +199,25 @@ for (const [label, role, uid, prev, exp] of [
   console.log(`  ${label}: sees ${got[0]} of this file's 30, ${got[1]} live beaches (positive control), ${got[2]} staged shops`)
 }
 
+// ── 2b. 20261208 (el names = the official Turkish names): scope, count, and a red when a beach was published first ─────────────────────
+{
+  const EL = `${MIGDIR}/${MIGS.filter(f => /^\d+_beaches_el_turkish_names\.sql$/.test(f)).pop()}`
+  const beforeEl = await snap(db, NOT_FILE)
+  await db.exec("UPDATE public.places SET status = 'active' WHERE source_id = 'long-beach'")
+  const pub = await applyFile(db, EL); await undo(db)
+  assert.equal(pub.ok, false); assert.match(pub.msg, /expected to update exactly 30 staged beach rows, updated 29/, pub.msg)
+  await db.exec("UPDATE public.places SET status = 'staged' WHERE source_id = 'long-beach'")
+  const el = await applyFile(db, EL)
+  assert.ok(el.ok, `20261208: ${el.msg}`)
+  assert.deepEqual(await snap(db, NOT_FILE), beforeEl, '20261208 touched no row outside the 30 (staged shops, live beaches, submissions)')
+  const again = await applyFile(db, EL); await undo(db)
+  assert.equal(again.ok, false, 'a second run of 20261208 raises (compare-and-set finds no old values)')
+  out.push('20261208: 30 of 30 el names set to tr; red when a beach is already published (29 of 30); others byte-identical; re-run raises')
+}
+const mineEl = await snap(db, IN_FILE)
+
 // ── 3. round trip: the rows read back equal beaches.json ───────────────────
-const byKey = new Map(mine.map(j => [`${j.source}|${j.source_id}`, j]))
+const byKey = new Map(mineEl.map(j => [`${j.source}|${j.source_id}`, j]))
 for (const x of ROWS) {
   const j = byKey.get(`${x.source}|${x.source_id}`)
   assert.ok(j, `missing ${x.source_id}`)
