@@ -4,7 +4,7 @@
 -- Plus the state the two go-live migrations compare against: beach rows per status, staged non-beach rows,
 -- and the 4 live beaches' current name_i18n / description_i18n.
 select json_build_object(
-  'triggers', (select json_agg(json_build_object('name', t.tgname, 'enabled', t.tgenabled, 'def', pg_get_triggerdef(t.oid)) order by t.tgname)
+  'triggers', (select json_agg(json_build_object('name', t.tgname, 'enabled', t.tgenabled::text, 'def', pg_get_triggerdef(t.oid)) order by t.tgname)
                  from pg_trigger t where t.tgrelid = 'public.places'::regclass and not t.tgisinternal),
   'trigger_functions', (select json_object_agg(x.fn, x.def) from (
                  select distinct p.oid::regprocedure::text as fn, pg_get_functiondef(p.oid) as def
@@ -12,7 +12,7 @@ select json_build_object(
                   where t.tgrelid = 'public.places'::regclass and not t.tgisinternal) x),
   'rules', (select json_agg(rulename) from pg_rules where schemaname = 'public' and tablename = 'places'),
   'publications', (select json_agg(pubname) from pg_publication_tables where schemaname = 'public' and tablename = 'places'),
-  'event_triggers', (select json_agg(evtname || ' ' || evtevent || ' ' || evtenabled) from pg_event_trigger),
+  'event_triggers', (select json_agg(evtname || ' ' || evtevent || ' ' || evtenabled::text) from pg_event_trigger),
   'functions_reading_places_status', (select json_agg(n.nspname || '.' || p.proname || ' definer=' || p.prosecdef order by p.proname)
                  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.prosrc ~* '\mplaces\M' and p.prosrc ~* '\mstatus\M'),
