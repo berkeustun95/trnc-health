@@ -199,8 +199,34 @@ for (const [label, role, uid, prev, exp] of [
   console.log(`  ${label}: sees ${got[0]} of this file's 30, ${got[1]} live beaches (positive control), ${got[2]} staged shops`)
 }
 
+// ── 2b. 20261214 (el names = the official Turkish names): scope, count, and a red when a beach was published first ─────────────────────
+{
+  const EL = `${MIGDIR}/${MIGS.filter(f => /^\d+_beaches_el_turkish_names\.sql$/.test(f)).pop()}`
+  const beforeEl = await snap(db, NOT_FILE)
+  await db.exec("UPDATE public.places SET status = 'active' WHERE source_id = 'long-beach'")
+  const pub = await applyFile(db, EL); await undo(db)
+  assert.equal(pub.ok, false); assert.match(pub.msg, /expected to update exactly 30 staged beach rows, updated 29/, pub.msg)
+  await db.exec("UPDATE public.places SET status = 'staged' WHERE source_id = 'long-beach'")
+  await db.exec("CREATE FUNCTION public.t_after_fn() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN RETURN NULL; END $f$; CREATE TRIGGER t_after_upd AFTER UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_after_fn()")
+  const trg = await applyFile(db, EL); await undo(db)
+  assert.equal(trg.ok, false); assert.match(trg.msg, /expected exactly 5 before-row ones/, trg.msg)
+  await db.exec("DROP TRIGGER t_after_upd ON public.places; DROP FUNCTION public.t_after_fn()")
+  const el = await applyFile(db, EL)
+  assert.ok(el.ok, `20261214: ${el.msg}`)
+  assert.deepEqual(await snap(db, NOT_FILE), beforeEl, '20261214 touched no row outside the 30 (staged shops, live beaches, submissions)')
+  const again = await applyFile(db, EL); await undo(db)
+  assert.equal(again.ok, false, 'a second run of 20261214 raises (compare-and-set finds no old values)')
+  const eld = (await snap(db, "source_id IN ('kervansaray-beach','long-beach')")).map(j => j.description_i18n.el)
+  assert.ok(eld.every(d => !/[Α-ω]*(Κερύνει|Κερβανσαράι|Σαλαμίν|Αμμόχωστ)/.test(d) && /Girne|Gazimağusa/.test(eld.join())), 'the 2 Ministry el descriptions carry the Turkish place names')
+  const rest = (await snap(db, IN_FILE)).filter(j => j.source_id !== 'kervansaray-beach' && j.source_id !== 'long-beach').every(j => j.description_i18n === null)
+  assert.ok(rest)
+  console.log('20261214: applied; 30 of 30 el names = tr, 2 of 2 el descriptions rewritten; red at 29 of 30 when a beach is published first; red on a 6th (AFTER) UPDATE trigger; others byte-identical; re-run raises')
+  out.push('20261214: 30 of 30 el names set to tr; red when a beach is already published (29 of 30); others byte-identical; re-run raises')
+}
+const mineEl = await snap(db, IN_FILE)
+
 // ── 3. round trip: the rows read back equal beaches.json ───────────────────
-const byKey = new Map(mine.map(j => [`${j.source}|${j.source_id}`, j]))
+const byKey = new Map(mineEl.map(j => [`${j.source}|${j.source_id}`, j]))
 for (const x of ROWS) {
   const j = byKey.get(`${x.source}|${x.source_id}`)
   assert.ok(j, `missing ${x.source_id}`)
