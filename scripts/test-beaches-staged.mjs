@@ -212,6 +212,11 @@ for (const [label, role, uid, prev, exp] of [
   assert.deepEqual(await snap(db, NOT_FILE), beforeEl, '20261208 touched no row outside the 30 (staged shops, live beaches, submissions)')
   const again = await applyFile(db, EL); await undo(db)
   assert.equal(again.ok, false, 'a second run of 20261208 raises (compare-and-set finds no old values)')
+  const eld = (await snap(db, "source_id IN ('kervansaray-beach','long-beach')")).map(j => j.description_i18n.el)
+  assert.ok(eld.every(d => !/[Α-ω]*(Κερύνει|Κερβανσαράι|Σαλαμίν|Αμμόχωστ)/.test(d) && /Girne|Gazimağusa/.test(eld.join())), 'the 2 Ministry el descriptions carry the Turkish place names')
+  const rest = (await snap(db, IN_FILE)).filter(j => j.source_id !== 'kervansaray-beach' && j.source_id !== 'long-beach').every(j => j.description_i18n === null)
+  assert.ok(rest)
+  console.log('20261208: applied; 30 of 30 el names = tr, 2 of 2 el descriptions rewritten; red at 29 of 30 when a beach is published first; others byte-identical; re-run raises')
   out.push('20261208: 30 of 30 el names set to tr; red when a beach is already published (29 of 30); others byte-identical; re-run raises')
 }
 const mineEl = await snap(db, IN_FILE)
