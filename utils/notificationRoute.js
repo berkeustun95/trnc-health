@@ -25,10 +25,13 @@ export function notificationRoute(item) {
   return DUTY_KEYWORDS.some(kw => title.includes(kw)) ? 'duty' : null
 }
 
-// The admin photo-review reminder push (20261196) → AdminScreen's Bandabuliya tab, Photos view. Only AdminScreen reads
+// Admin pushes: data jobs (`tab: 'datajobs'`) → the Data jobs tab. The admin photo-review reminder push (20261196) → AdminScreen's Bandabuliya tab, Photos view. Only AdminScreen reads
 // the request, so a non-admin tap is a no-op; a dark bundle ignores it like every Bandabuliya push.
 export function adminPushRequest(data) {
-  if (!MARKETPLACE || data?.screen !== 'admin' || data.tab !== 'marketplace') return null
+  if (data?.screen !== 'admin') return null
+  // Data jobs is admin-only and has no module flag; only AdminScreen reads the request, so a non-admin tap is a no-op.
+  if (data.tab === 'datajobs') return { tab: 'DataJobs' }
+  if (!MARKETPLACE || data.tab !== 'marketplace') return null
   return { tab: 'Bandabuliya', view: 'Photos' }
 }
 
