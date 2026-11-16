@@ -18,6 +18,16 @@
 //   * duyurular-paused-recheck: the record job `needs` the working job, has environment: production,
 //     continue-on-error: true at job level and an always() job `if`; the working job has no environment and no `secrets.`;
 //   * cancel-in-progress, at workflow or job level, is literally false or absent;
+//   * the record step sets no working-directory or shell, and neither the job nor the workflow sets defaults.run (they
+//     could point `node scripts/record-data-job-run.mjs` at another file or another interpreter);
+//   * duyurular-fetch: the record step is IMMEDIATELY before the chain step (nothing slips in between);
+//   * SWITCHABLE workflows (gisekibris-feed, duyurular-fetch, novest-images; data jobs slice 3) carry a `gate` job:
+//     it has no `if`, environment production, permissions exactly contents: read, outputs.run from its gate step, a
+//     checkout with persist-credentials: false, exactly one step running `node scripts/data-job-gate.mjs` with no
+//     argument, no working-directory / shell / defaults.run, the service key only on that step and only for the runs
+//     that are gated (a pinned expression, so a dry dispatch never reads it), GATE_CHAIN only on duyurular-fetch;
+//     and the working job `needs: gate` with EXACTLY the `if` below (only the exact output `false` stops it; a failed
+//     gate job lets the feed run: fail-open);
 //   * the allowlist equals the seed's github keys, and every github key has a scheduled workflow with that name.
 // Prints what it found, so a workflow the patterns MISSED is a visible absence, not a silent one.
 // Every problem line starts with the red cross, so a blocked push shows it.
@@ -30,6 +40,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { JOBS } from './record-data-job-run.mjs'
+import { GATE_JOBS } from './data-job-gate.mjs'
 
 const require = createRequire(import.meta.url)
 let yaml
@@ -40,12 +51,16 @@ const SEED = 'supabase/migrations/20261205_data_jobs.sql'
 const CALL = 'scripts/record-data-job-run.mjs'
 const EXACT = /^node scripts\/record-data-job-run\.mjs --status="\$([A-Z][A-Z0-9_]*)" --real-run="\$([A-Z][A-Z0-9_]*)"\s*$/
 const JOB_STATUS = '${{ job.status }}'
+const GATE_CALL = 'scripts/data-job-gate.mjs'
+const GATE_IF = "${{ !cancelled() && needs.gate.outputs.run != 'false' }}"
+const KEY_SCHEDULE = "${{ github.event_name == 'schedule' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}"
+const KEY_CHAIN = "${{ (github.event_name == 'schedule' || inputs.chain == true) && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}"
 
 // Where each scheduled workflow's record step must be: the one place a table is unavoidable ("the expected job").
 export const EXPECT = Object.freeze({
-  'gisekibris-feed': { job: 'sync' },
-  'duyurular-fetch': { job: 'fetch', before: 'Chain the next run' },
-  'novest-images': { job: 'run' },
+  'gisekibris-feed': { job: 'sync', gate: { key: KEY_SCHEDULE } },
+  'duyurular-fetch': { job: 'fetch', before: 'Chain the next run', gate: { key: KEY_CHAIN, chain: true } },
+  'novest-images': { job: 'run', gate: { key: KEY_SCHEDULE } },
   'araclar-photo-cleanup': { job: 'run' },
   'daily-health': { job: 'health' },
   'duyurular-paused-recheck': { job: 'record', work: 'recheck' },
@@ -87,6 +102,54 @@ function concurrencyProblems(doc) {
   return out
 }
 
+const normIf = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v)
+
+function defaultsProblems(doc, jobNames) {
+  const out = []
+  if (doc.defaults && 'run' in doc.defaults) out.push('the workflow sets defaults.run (working-directory / shell could redirect the scripts)')
+  for (const jn of jobNames) if (doc.jobs?.[jn]?.defaults && 'run' in doc.jobs[jn].defaults) out.push(`job ${jn} sets defaults.run`)
+  return out
+}
+
+export function gateProblems(doc, ex) {
+  const out = [], jobs = doc.jobs ?? {}
+  const g = jobs.gate, w = jobs[ex.job]
+  if (!g) { out.push("no job 'gate'"); return out }
+  const steps = asArr(g.steps)
+  const calls = []
+  for (const [jn, j] of Object.entries(jobs)) asArr(j?.steps).forEach((s) => { if (typeof s?.run === 'string' && s.run.includes(GATE_CALL) && !s.run.includes('--selftest')) calls.push({ jn, s }) })
+  if (calls.length !== 1) out.push(`${calls.length} steps run the gate script, exactly 1 required`)
+  const c = calls[0]
+  if (c) {
+    if (c.jn !== 'gate') out.push(`the gate script runs in job '${c.jn}', expected 'gate'`)
+    if (c.s.run.trim() !== `node ${GATE_CALL}`) out.push(`the gate step's run must be exactly: node ${GATE_CALL} (no argument; found ${JSON.stringify(c.s.run.trim().slice(0, 120))})`)
+    if (c.s.id !== 'gate') out.push(`the gate step must have id: gate, found ${JSON.stringify(c.s.id)}`)
+    if ('working-directory' in c.s || 'shell' in c.s) out.push('the gate step must not set working-directory or shell')
+    if ('if' in c.s) out.push('the gate step must have no if (it must always answer)')
+    const env = c.s.env && typeof c.s.env === 'object' ? c.s.env : {}
+    if (env.SUPABASE_SERVICE_ROLE_KEY !== ex.gate.key) out.push(`the gate step's SUPABASE_SERVICE_ROLE_KEY must be exactly ${ex.gate.key}, found ${JSON.stringify(env.SUPABASE_SERVICE_ROLE_KEY)} (a dry or hand dispatch must not get the key)`)
+    const want = ['EXPO_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', ...(ex.gate.chain ? ['GATE_CHAIN'] : [])].sort()
+    if (JSON.stringify(Object.keys(env).sort()) !== JSON.stringify(want)) out.push(`the gate step's env must be exactly [${want}], found [${Object.keys(env).sort()}]`)
+    if (ex.gate.chain && env.GATE_CHAIN !== '${{ inputs.chain == true }}') out.push(`GATE_CHAIN must be \${{ inputs.chain == true }}, found ${JSON.stringify(env.GATE_CHAIN)}`)
+  }
+  if ('if' in g) out.push(`job gate must have no if (found ${JSON.stringify(g.if)}): it must run on every event`)
+  if (asArr(g.needs).length) out.push('job gate must not need another job')
+  const envName = typeof g.environment === 'string' ? g.environment : g.environment?.name
+  if (envName !== 'production') out.push('job gate must have environment: production (the key lives there)')
+  if (JSON.stringify(g.permissions) !== JSON.stringify({ contents: 'read' })) out.push(`job gate permissions must be exactly {contents: read}, found ${JSON.stringify(g.permissions)}`)
+  if (g.outputs?.run !== '${{ steps.gate.outputs.run }}') out.push(`job gate outputs.run must be \${{ steps.gate.outputs.run }}, found ${JSON.stringify(g.outputs?.run)}`)
+  const co = steps.filter(s => typeof s?.uses === 'string' && s.uses.startsWith('actions/checkout@'))
+  if (co.length !== 1 || co[0].with?.['persist-credentials'] !== false) out.push('job gate must check out once with persist-credentials: false')
+  if (g.env && JSON.stringify(g.env).includes('secrets.')) out.push('job gate: the secrets belong on the gate step only, not the job')
+  for (const s of steps) if (s !== c?.s && JSON.stringify(s).includes('secrets.')) out.push(`job gate: step '${s.name ?? s.uses}' mentions secrets.`)
+  if (!w) out.push(`no job '${ex.job}'`)
+  else {
+    if (!asArr(w.needs).includes('gate')) out.push(`job ${ex.job} must need gate`)
+    if (normIf(w.if) !== GATE_IF) out.push(`job ${ex.job}: if must be exactly ${GATE_IF}, found ${JSON.stringify(w.if)}`)
+  }
+  return out
+}
+
 export function inspectWorkflow(src, expect = EXPECT) {
   const problems = []
   let doc
@@ -100,6 +163,8 @@ export function inspectWorkflow(src, expect = EXPECT) {
   const jobs = doc.jobs ?? {}
   if (!ex) { problems.push(`no wiring expectation for '${name}' (add it to EXPECT in this script)`); return out }
   problems.push(...concurrencyProblems(doc))
+  if (ex.gate) problems.push(...gateProblems(doc, ex))
+  problems.push(...defaultsProblems(doc, Object.keys(jobs).filter(j => j === ex.job || j === 'gate')))
 
   const rec = []
   for (const [jn, j] of Object.entries(jobs))
@@ -126,13 +191,14 @@ export function inspectWorkflow(src, expect = EXPECT) {
   if (!('if' in st)) { if (!ex.work) problems.push('the record step has no if: always() (it would be skipped after a failure)') }
   else if (!hasAlways(st.if)) problems.push(`the record step's if must contain always() and not be constant false, found ${JSON.stringify(st.if)}`)
   if ('continue-on-error' in st) problems.push('the record step must not set continue-on-error')
+  if ('working-directory' in st || 'shell' in st) problems.push('the record step must not set working-directory or shell')
   if (!(Number(st['timeout-minutes']) > 0)) problems.push('the record step has no timeout-minutes')
 
   const steps = asArr(jobs[jn].steps)
   if (ex.before) {
     const c = steps.findIndex(s => typeof s?.name === 'string' && s.name.startsWith(ex.before))
     if (c < 0) problems.push(`no step named '${ex.before}...' found`)
-    else if (!(i < c)) problems.push(`the record step (#${i + 1}) must come before the '${ex.before}' step (#${c + 1})`)
+    else if (i !== c - 1) problems.push(`the record step (#${i + 1}) must be IMMEDIATELY before the '${ex.before}' step (#${c + 1})`)
   } else if (i !== steps.length - 1) problems.push(`the record step is #${i + 1} of ${steps.length}; it must be the last step of its job`)
 
   if (ex.work) {
@@ -178,7 +244,13 @@ if (process.argv.includes('--selftest')) {
   let bad = 0
   const t = (label, got, want) => { const ok = JSON.stringify(got) === JSON.stringify(want); if (!ok) bad++; console.log(`  ${ok ? '✓' : '✗'} ${label.padEnd(72)}  ${JSON.stringify(got)}${ok ? '' : `  wanted ${JSON.stringify(want)}`}`) }
   const sql = "  ('job-a', 'github',    'feed', '{}', 'x', interval '1 hour', 1),\n  ('job-f', 'github',    'feed', '{}', 'x', interval '1 hour', 2),\n  ('job-r', 'github',    'feed', '{}', 'x', interval '1 hour', 3),\n  ('cron-c', 'cron_http', 'feed', ARRAY['c'], NULL, interval '1 hour', 4),\n"
-  const ex = { 'job-a': { job: 'x' }, 'job-f': { job: 'x', before: 'Chain' }, 'job-r': { job: 'rec', work: 'work' } }
+  const ex = { 'job-a': { job: 'x', gate: { key: KEY_SCHEDULE } }, 'job-f': { job: 'x', before: 'Chain', gate: { key: KEY_CHAIN, chain: true } }, 'job-r': { job: 'rec', work: 'work' } }
+  const gateJob = (chain) => ({
+    environment: 'production', 'continue-on-error': true, permissions: { contents: 'read' }, outputs: { run: '${{ steps.gate.outputs.run }}' },
+    steps: [{ uses: 'actions/checkout@abc', with: { 'persist-credentials': false } }, { uses: 'actions/setup-node@abc' },
+      { name: 'Pause switch', id: 'gate', env: { SUPABASE_SERVICE_ROLE_KEY: chain ? KEY_CHAIN : KEY_SCHEDULE, EXPO_PUBLIC_SUPABASE_URL: '${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}', ...(chain ? { GATE_CHAIN: '${{ inputs.chain == true }}' } : {}) }, run: `node ${GATE_CALL}` }],
+  })
+  const gated = (o, chain) => { o.jobs.gate = gateJob(chain); o.jobs.x.needs = 'gate'; o.jobs.x.if = GATE_IF }
   const RUN = `node ${CALL} --status="$S" --real-run="$RR"`
   const SCHED_IF = "${{ always() && github.event_name == 'schedule' }}"
   const recStep = (status = JOB_STATUS) => ({ name: 'Record', if: SCHED_IF, 'timeout-minutes': 2, env: { S: status, RR: "${{ github.event_name == 'schedule' }}" }, run: RUN })
@@ -188,8 +260,8 @@ if (process.argv.includes('--selftest')) {
       work: { 'runs-on': 'u', steps: [{ run: 'echo hi' }] },
       rec: { needs: ['work'], if: SCHED_IF, 'continue-on-error': true, environment: 'production', 'runs-on': 'u', steps: [{ uses: 'a/b@1' }, recStep('${{ needs.work.result }}')] },
     }
-    else if (name === 'job-f') o.jobs = { x: { steps: [{ run: 'echo hi' }, recStep(), { name: 'Chain the next run', run: 'echo chain' }] } }
-    else o.jobs = { x: { steps: [{ run: 'echo hi' }, recStep()] }, other: { steps: [{ run: 'echo o' }] } }
+    else if (name === 'job-f') { o.jobs = { x: { steps: [{ run: 'echo hi' }, recStep(), { name: 'Chain the next run', run: 'echo chain' }] } }; gated(o, true) }
+    else { o.jobs = { x: { steps: [{ run: 'echo hi' }, recStep()] }, other: { steps: [{ run: 'echo o' }] } }; gated(o, false) }
     return o
   }
   const mk = (name, mut) => { const o = base(name); if (mut) mut(o); return yaml.dump(o, { lineWidth: -1 }) }
@@ -202,6 +274,8 @@ if (process.argv.includes('--selftest')) {
   const redR = (label, mut, needle) => red(label, { 'r.yml': mk('job-r', mut) }, needle)
   const rs = (o, job = 'x') => o.jobs[job].steps.find(s => s.name === 'Record')
 
+  t('EXPECT: exactly the three switchable workflows carry a gate', Object.entries(EXPECT).filter(([, v]) => v.gate).map(([k]) => k).sort(), ['duyurular-fetch', 'gisekibris-feed', 'novest-images'])
+  t('EXPECT: gate script allowlist equals the gated workflows', [...GATE_JOBS].sort(), Object.entries(EXPECT).filter(([, v]) => v.gate).map(([k]) => k).sort())
   t('registry parse: github rows only', registryKeys(sql), ['job-a', 'job-f', 'job-r'])
   t('a correct set is clean', run(good()), [])
   t('EXPECT covers exactly the six jobs of the allowlist', Object.keys(EXPECT).sort(), [...JOBS].sort())
@@ -227,7 +301,47 @@ if (process.argv.includes('--selftest')) {
   t('a REAL_RUN expression is fine (positive control)', run({ ...good(), 'a.yml': mk('job-a', o => { rs(o).env.RR = "${{ env.WRITE == 'true' && !inputs.limit }}" }) }), [])
   t('a constant REAL_RUN of true is fine (positive control)', run({ ...good(), 'a.yml': mk('job-a', o => { rs(o).env.RR = 'true' }) }), [])
   redA('not the last step of its job', o => { o.jobs.x.steps.push({ run: 'echo after' }) }, 'must be the last step')
-  redF('fetch: the record step after the chain step', o => { o.jobs.x.steps.push(o.jobs.x.steps.splice(1, 1)[0]) }, "must come before the 'Chain")
+  redF('fetch: the record step after the chain step', o => { o.jobs.x.steps.push(o.jobs.x.steps.splice(1, 1)[0]) }, "IMMEDIATELY before the 'Chain")
+  redF('fetch: a step between the record step and the chain step', o => { o.jobs.x.steps.splice(2, 0, { name: 'Sneak', run: 'echo sneak' }) }, "IMMEDIATELY before the 'Chain")
+  t('fetch: the record step right before the chain step is fine (positive control)', run(good()), [])
+  redA('record step with working-directory', o => { rs(o)['working-directory'] = 'evil' }, 'working-directory or shell')
+  redA('record step with shell', o => { rs(o).shell = 'python {0}' }, 'working-directory or shell')
+  redA('defaults.run at workflow level', o => { o.defaults = { run: { 'working-directory': 'evil' } } }, 'defaults.run')
+  redA('defaults.run on the working job', o => { o.jobs.x.defaults = { run: { shell: 'python {0}' } } }, 'sets defaults.run')
+  redA('defaults.run on the gate job', o => { o.jobs.gate.defaults = { run: { shell: 'python {0}' } } }, 'job gate sets defaults.run')
+  t('defaults without run is fine (positive control)', run({ ...good(), 'a.yml': mk('job-a', o => { o.defaults = { } }) }), [])
+  const gs = (o) => o.jobs.gate.steps.find(s => s.id === 'gate')
+  redA('no gate job', o => { delete o.jobs.gate }, "no job 'gate'")
+  redA('working job does not need gate', o => { delete o.jobs.x.needs }, 'must need gate')
+  redA('working job needs another job instead of gate', o => { o.jobs.x.needs = 'other' }, 'must need gate')
+  redA('working job if absent', o => { delete o.jobs.x.if }, 'if must be exactly')
+  redA('working job if is the bare == true form (fail-closed)', o => { o.jobs.x.if = "${{ needs.gate.outputs.run == 'true' }}" }, 'if must be exactly')
+  redA('working job if uses always() (cancel would not halt it)', o => { o.jobs.x.if = "${{ always() && needs.gate.outputs.run != 'false' }}" }, 'if must be exactly')
+  redA('working job if drops !cancelled()', o => { o.jobs.x.if = "${{ needs.gate.outputs.run != 'false' }}" }, 'if must be exactly')
+  redA('gate job has an if', o => { o.jobs.gate.if = "${{ github.event_name == 'schedule' }}" }, 'job gate must have no if')
+  redA('gate job without environment', o => { delete o.jobs.gate.environment }, 'environment: production')
+  redA('gate job with wider permissions', o => { o.jobs.gate.permissions = { contents: 'read', issues: 'write' } }, 'permissions must be exactly')
+  redA('gate job without permissions', o => { delete o.jobs.gate.permissions }, 'permissions must be exactly')
+  redA('gate job outputs.run missing', o => { delete o.jobs.gate.outputs }, 'outputs.run must be')
+  redA('checkout keeps credentials', o => { o.jobs.gate.steps[0].with['persist-credentials'] = true }, 'persist-credentials: false')
+  redA('checkout without persist-credentials', o => { delete o.jobs.gate.steps[0].with }, 'persist-credentials: false')
+  redA('gate script with an argument', o => { gs(o).run = `node ${GATE_CALL} --run=true` }, 'no argument')
+  redA('gate script behind an echo', o => { gs(o).run = `echo node ${GATE_CALL}` }, 'no argument')
+  redA('gate script not run at all', o => { gs(o).run = 'echo nothing' }, 'exactly 1 required')
+  redA('gate script run twice', o => { o.jobs.gate.steps.push({ run: `node ${GATE_CALL}` }) }, 'exactly 1 required')
+  redA('gate script run in the working job', o => { o.jobs.x.steps.unshift({ run: `node ${GATE_CALL}` }) }, 'exactly 1 required')
+  redA('gate step with working-directory', o => { gs(o)['working-directory'] = 'evil' }, 'working-directory or shell')
+  redA('gate step with shell', o => { gs(o).shell = 'python {0}' }, 'working-directory or shell')
+  redA('gate step with an if', o => { gs(o).if = "${{ github.event_name == 'schedule' }}" }, 'must have no if')
+  redA('gate step key always set (a dry dispatch would get it)', o => { gs(o).env.SUPABASE_SERVICE_ROLE_KEY = '${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' }, 'must be exactly')
+  redA('gate step key also for dispatches', o => { gs(o).env.SUPABASE_SERVICE_ROLE_KEY = "${{ github.event_name != 'x' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}" }, 'must be exactly')
+  redA('gate step gets an extra env var', o => { gs(o).env.EXTRA = '1' }, 'env must be exactly')
+  redA('gate step gets GATE_CHAIN where it must not', o => { gs(o).env.GATE_CHAIN = 'true' }, 'env must be exactly')
+  redA('secrets on the gate JOB env', o => { o.jobs.gate.env = { K: '${{ secrets.K }}' } }, 'secrets belong on the gate step only')
+  redA('secrets on another gate step', o => { o.jobs.gate.steps[1].env = { K: '${{ secrets.K }}' } }, 'mentions secrets.')
+  redF('fetch: GATE_CHAIN missing', o => { delete o.jobs.gate.steps.find(s => s.id === 'gate').env.GATE_CHAIN }, 'env must be exactly')
+  redF('fetch: GATE_CHAIN hard-wired true', o => { o.jobs.gate.steps.find(s => s.id === 'gate').env.GATE_CHAIN = 'true' }, 'GATE_CHAIN must be')
+  redF('fetch: key only for schedule (a chain run would not be gated)', o => { o.jobs.gate.steps.find(s => s.id === 'gate').env.SUPABASE_SERVICE_ROLE_KEY = KEY_SCHEDULE }, 'must be exactly')
   redF('fetch: no chain step', o => { o.jobs.x.steps.pop() }, "no step named 'Chain")
   t('fetch: a step after the chain is fine (positive control)', run({ ...good(), 'f.yml': mk('job-f', o => { o.jobs.x.steps.push({ run: 'echo tail' }) }) }), [])
   redR('recheck: the record job does not need the working job', o => { o.jobs.rec.needs = [] }, 'must need work')
@@ -263,12 +377,15 @@ const wfDir = resolve(ROOT, '.github/workflows')
 const workflows = Object.fromEntries(readdirSync(wfDir).filter(f => /\.ya?ml$/.test(f)).sort().map(f => [`.github/workflows/${f}`, readFileSync(resolve(wfDir, f), 'utf8')]))
 const { problems, found, reg } = check({ workflows, seedSql: readFileSync(resolve(ROOT, SEED), 'utf8'), allowlist: JOBS })
 
+const gatedNames = Object.entries(EXPECT).filter(([, v]) => v.gate).map(([k]) => k).sort()
+if (JSON.stringify(gatedNames) !== JSON.stringify([...GATE_JOBS].sort())) problems.push(`gate script allowlist [${[...GATE_JOBS]}] != workflows expected to carry a gate [${gatedNames}]`)
 console.log(`\nSeeded github jobs (${reg.length}): ${reg.join(', ')}`)
 console.log(`Record-script allowlist (${JOBS.length}): ${[...JOBS].join(', ')}`)
 console.log(`\nScheduled workflows that record (${found.length}):`)
 for (const f of found) {
   const st = f.step
   console.log(`  ${f.registered && f.nProblems === 0 ? '✓' : '✗'} ${f.file}  name=${f.name}  record lines=${f.calls}`)
+  if (EXPECT[f.name]?.gate) console.log(`      gate: job 'gate' -> job ${EXPECT[f.name].job} needs it, if ${GATE_IF}${f.nProblems === 0 ? '' : '  (see problems)'}`)
   if (st) {
     const rr = Object.entries(st.env ?? {}).find(([k]) => /REAL_RUN/.test(k))
     console.log(`      step: job=${st.job} #${st.index + 1} of ${st.of}  if=${JSON.stringify(st.if ?? null)}  timeout=${st.timeout}  ${rr ? rr[0] + '=' + JSON.stringify(rr[1]) : 'no REAL_RUN env'}`)
