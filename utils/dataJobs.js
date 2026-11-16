@@ -60,14 +60,3 @@ export function formatFamagusta(iso, locale = 'en-GB') {
     return String(iso)
   }
 }
-
-// i18n key for a failed pause/resume. The RPC raises ADMIN_ONLY / UNKNOWN_JOB / NOT_SWITCHABLE / NOTE_REQUIRED / BAD_ARGS;
-// a function that is not deployed yet is PostgREST PGRST202 / 404 ("not available yet"). Anything else is generic.
-export function switchErrorKey(error) {
-  const msg = `${error?.message ?? ''} ${error?.details ?? ''}`
-  if (error?.code === 'PGRST202' || error?.status === 404 || /PGRST202|Could not find the function/i.test(msg)) return 'adminJobsErrUnavailable'
-  if (/NOTE_REQUIRED/.test(msg)) return 'adminJobsErrNote'
-  if (/NOT_SWITCHABLE/.test(msg)) return 'adminJobsErrNotSwitchable'
-  if (/ADMIN_ONLY/.test(msg)) return 'adminJobsErrAdminOnly'
-  return 'adminJobsErrGeneric'
-}
