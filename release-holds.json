@@ -57,6 +57,14 @@
       "since": "2026-11-15",
       "cleared": false,
       "clear": "Only after Berke has tried the Data jobs screen on Preview (or seen a video) and says go in chat (Berke 2026-11-15: Preview only). Then set cleared to true in a PR."
+    },
+    {
+      "pr": 475,
+      "commit": "55801b908447bfc462f8df663d61fd30a3a888c5",
+      "what": "Admin: Data jobs pause/resume switches (slice 3 app), merged to main 2026-11-16",
+      "since": "2026-11-16",
+      "cleared": false,
+      "clear": "Only after 20261210/20261211 are applied and Berke has seen the switches on Preview and says go in chat. Then set cleared to true in a PR."
     }
   ]
 }
