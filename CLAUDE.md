@@ -18,9 +18,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   If a task seems to need a version bump, STOP and ask.
 
 ## ⚠ Standing warnings
-- ⚠ **Lanes (Berke, 2026-10-27): main = 1.4.1 OTA lane; `feat/native-splash-1.4.2` = 1.4.2 lane** (native splash:
-  expo-video / expo-splash-screen / expo-system-ui). Merge every main fix into it; 1.4.2 store builds come from it; it merges
-  into main only when 1.4.2 is live in BOTH stores; never OTA from it. `release/1.4` stays the 1.4.0 lane.
+- ⚠ **1.4.3 store lane (Berke, 2026-11-16): `feat/store-1.4.3`** = version 1.4.3 + changelogs 28 on top of main; main
+  stays the 1.4.2 OTA lane. Merge every main fix into the lane; 1.4.3 builds come from it; it merges into main only
+  when 1.4.3 is live in BOTH stores; never OTA from it.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
@@ -479,11 +479,12 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
   - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
   - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
   - **Apple App Privacy label (Berke, 2026-11-14): with the next store submission, declare expo-updates as Crash Data →
-    App Functionality** (today it is listed under Analytics only). No crash SDK goes in: Sentry is parked (Berke, 2026-11-14).
-  - **Logo v2 native assets (wired 2026-10-24, first store build after 1.4.0)**: app icon, Android adaptive
-    foreground + themed (monochrome) icon, splash, notification icon and both Preview icons (`assets/brand/v2/`).
-    Check on device (Android: launcher, themed icons on, splash, a push) and in TestFlight (iOS: home screen,
-    splash) BEFORE submission. Old logo files stay until that release is out. Vault `2026-10-24_logo-v2-compass.md`.
+    App Functionality** (today it is listed under Analytics only).
+- **Store builds (Berke, 2026-11-16):** **1.4.3** = Onboarding v2 in the embedded bundle; NO Sentry, widgets, R8,
+  map-marker fix or edge-to-edge. **1.4.4** = Sentry on its own build: EU region, crash reporting only (no IP, no user ID,
+  no session replay), **ON by default with a "Send crash reports" switch in Settings** users can turn off; ships with
+  the privacy policy update and the Apple/Play form changes. Widgets (`feat/widgets-1.4.3`) come after.
+  Vault `2026-10-25_store-release-readiness.md`, `2026-11-14_crash-analytics-options.md`.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
