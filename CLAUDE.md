@@ -400,7 +400,7 @@ DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edg
   check-ins, pins, notices, submissions; sealed, open with `node scripts/readonly-results.mjs <run-id>`). Function errors: Dashboard → Edge Functions → google-places → Logs.
 
 ## Team workflow (`.claude/agents/`)
-**Routing** (Berke, 2026-11-12): hard work goes to **principal-engineer** (Fable) first, without asking: planning
+**Routing** (Berke, 2026-11-12): hard work goes to **principal-engineer** (Opus) first, without asking: planning
 a new feature or module; a bug still unfixed after one attempt; schema, RLS or migration design; multi-file
 refactors or architecture choices; auth, payments or security-sensitive code (also **security-code-reviewer**);
 deciding whether something is ready for production. Everyday work stays in the main chat: running tests,
