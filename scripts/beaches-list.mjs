@@ -43,7 +43,7 @@ const OUT = 'data/explore/beaches.json'
 const TRANSLATIONS = 'data/explore/beaches-live-translations.json'
 const TRANSLATIONS_NEW = 'data/explore/beaches-translations.json'
 const LOCALES9 = ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa']   // ISO keys: what the app reader extractI18n resolves (the live name_i18n uses en/tr already)
-const RETIRED_EL = ['Εσεντεπέ', 'Καραογλανόγλου', 'Λάπτα', 'Αλσάντζακ', 'Λεφκέ', 'Μποαζιτσί', 'Καπλίτζα', 'Μπάφρα', 'Αϊφίλον']   // Greek-script transliterations of Turkish village names, replaced by the traditional Greek names
+const RETIRED_EL = ['Εσεντεπέ', 'Καραογλανόγλου', 'Λάπτα', 'Αλσάντζακ', 'Λεφκέ', 'Μποαζιτσί', 'Καπλίτζα', 'Μπάφρα', 'Αϊφίλον']   // Greek-script transliterations of Turkish village names, superseded: el now carries the Turkish name itself (Berke 2026-11-16)
 const AMENITY_SLUGS = ['parking', 'toilets', 'sunbeds', 'food_bar', 'lifeguard']
 const ACCESS_TYPES = ['public', 'private']
 const REGIONS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
@@ -425,7 +425,8 @@ export function validate(obj) {
       if (keys !== want) f.push(`${tag}: name_i18n keys [${keys}] != [${want}]`)
       for (const code of LOCALES9) if (typeof r.name_i18n?.[code] !== 'string' || r.name_i18n[code].trim().length < 2 || r.name_i18n[code] !== r.name_i18n[code].trim()) f.push(`${tag}: name_i18n.${code} empty or untrimmed`)
       for (const code of ['ar', 'fa']) if (/[()]/.test(r.name_i18n?.[code] || '')) f.push(`${tag}: name_i18n.${code} contains parentheses`)
-      for (const w of RETIRED_EL) if ((r.name_i18n?.el || '').includes(w)) f.push(`${tag}: name_i18n.el uses the retired Turkish-village transliteration ${w} (el policy = the traditional Greek village name)`)
+      for (const w of RETIRED_EL) if ((r.name_i18n?.el || '').includes(w)) f.push(`${tag}: name_i18n.el uses the retired Turkish-village transliteration ${w} (el policy = the official Turkish name)`)
+      if (r.name_i18n?.el !== r.name_i18n?.tr) f.push(`${tag}: name_i18n.el "${r.name_i18n?.el}" != tr "${r.name_i18n?.tr}" (el policy, Berke 2026-11-16: the official Turkish name in Latin letters, no Greek words)`)
     }
     if (r.source === 'visitncy_beaches') {
       const dk = Object.keys(r.description_i18n || {}).sort().join(), want = LOCALES9.slice().sort().join()
@@ -511,6 +512,7 @@ export function validate(obj) {
       for (const code of ['en', 'tr']) if (typeof t.source?.[k]?.[code] !== 'string' || !t.source[k][code]) f.push(`live ${L.name} source.${k}.${code} missing`)
     }
     for (const code of ['ar', 'fa']) if (/[()]/.test(t.name_i18n?.[code] || '')) f.push(`live ${L.name} name_i18n.${code} contains parentheses`)
+    if (t.name_i18n?.el !== t.source?.name_i18n?.tr) f.push(`live ${L.name} name_i18n.el "${t.name_i18n?.el}" != tr "${t.source?.name_i18n?.tr}" (el policy: the official Turkish name)`)
     if (/Caretta caretta/.test(t.source?.description_i18n?.en || '')) for (const code of NEW_LOCALES) if (!t.description_i18n?.[code]?.includes('Caretta caretta')) f.push(`live ${L.name} description ${code} lost "Caretta caretta"`)
   }
   const ar = obj.additions_rejected

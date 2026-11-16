@@ -56,3 +56,5 @@ rows, dial-check phone formats, confirm every image URL returns bytes, compare a
 ## Return
 Files changed, the validation output (counts in/out, sample rows, rejects), migration name + dry-run
 result or workflow dispatch command, and exactly what waits on Berke's go.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).
