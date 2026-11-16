@@ -431,6 +431,7 @@ export default function AccommodationScreen({
   onOpenProperty, selectedProperty, onCloseProperty,
   onOpenDorm, selectedDorm, onCloseDorm,
   onOpenRental, selectedRental, onCloseRental,
+  initialTab = null,
 }) {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
@@ -444,7 +445,8 @@ export default function AccommodationScreen({
   const [loadError, setLoadError]   = useState(false)
   const [moreError, setMoreError]   = useState(false)
 
-  const [tab, setTab]           = useState(LANDING_TAB)
+  // initialTab: ada://emlak. Only a VISIBLE tab — a dark one falls back to the landing tab.
+  const [tab, setTab]           = useState(() => TABS.some(t => t.id === initialTab) ? initialTab : LANDING_TAB)
   const [intent, setIntent]     = useState(LANDING_INTENT)
   const [district, setDistrict] = useState(null)
   const [area, setArea]         = useState(null)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { View, Text, FlatList, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -118,7 +118,7 @@ async function fetchAll() {
   }
 }
 
-export default function DuyurularScreen({ lang, onBack, backRef = null }) {
+export default function DuyurularScreen({ lang, onBack, backRef = null, initialId = null }) {
   const [items, setItems]       = useState([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(false)
@@ -127,6 +127,8 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
   const [sort, setSort]         = useState('new')
   const [query, setQuery]       = useState('')
   const [opened, setOpened]     = useState(null)
+  // ada://duyurular/<id>: opened once, after the first load. Gone since (expired) → the list.
+  const linkIdRef = useRef(initialId)
   const [creditOpen, setCreditOpen] = useState(false)
   const listMem = useScrollMemory('duy:list')
   useEffect(() => () => forgetScroll('duy:'), [])
@@ -142,7 +144,15 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
 
   const load = useCallback(async () => {
     setLoading(true); setError(false)
-    try { setItems(await fetchAll()) } catch { setError(true) }
+    try {
+      const rows = await fetchAll()
+      setItems(rows)
+      if (linkIdRef.current != null) {
+        const hit = rows.find(r => String(r.id) === String(linkIdRef.current))
+        linkIdRef.current = null
+        if (hit) setOpened(hit)
+      }
+    } catch { setError(true) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
