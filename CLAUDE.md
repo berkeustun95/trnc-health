@@ -385,6 +385,10 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     ```
     Any stamp on a never-launched module = the list was consumed. Then add the module to
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
+11. **Check getadaapp.com groups** (also after a module goes dark or is hidden): in `~/ada-web`,
+    `npm run sync:modules` (reads this repo's origin/main; FAILS if a live module has no site group:
+    place it in `SITE_GROUP`), commit `live-modules.json`, Preview with `vercel`, then `vercel --prod` on
+    Berke's go. Screenshots never update themselves: replace one if its module changed visibly.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
 ## Check-ins (LIVE 2026-10-09)
