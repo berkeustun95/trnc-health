@@ -35,7 +35,8 @@ export async function run(jwt: string, input: unknown, d: Deps): Promise<{ statu
   try { counts = await d.retention(apply) } catch { d.log('retention_failed'); await record('failed', 'retention_failed'); return { status: 500, body: { error: 'RETENTION_FAILED' } } }
 
   let found: string[] = []
-  try { found = await d.orphans(500) } catch { d.log('orphans_failed') }
+  let orphansFailed = false
+  try { found = await d.orphans(500) } catch { orphansFailed = true; d.log('orphans_failed') }
   let removed = 0, removeFailed = 0
   if (apply) {
     for (let i = 0; i < found.length; i += REMOVE_CHUNK) {
@@ -44,6 +45,7 @@ export async function run(jwt: string, input: unknown, d: Deps): Promise<{ statu
     }
   }
   if (removeFailed > 0) await record('failed', 'remove_failed')
+  else if (orphansFailed) await record('failed', 'orphans_failed')
   else await record('ok', null)
   return { status: 200, body: { applied: apply, ...counts, orphans_found: found.length, orphans_removed: removed,
                                 orphans_remove_failed: removeFailed } }
