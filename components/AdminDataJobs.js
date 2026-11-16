@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, ScrollView, ActivityIndicator, RefreshControl, StyleSheet, Switch, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, BottomSheet, ConfirmDialog } from './ui'
+import useKeyboardTop from '../utils/useKeyboardTop'
 import { t, dateLocale } from '../constants/i18n'
 import { isUsableJobs, isValidJob, groupJobs, ageParts, formatFamagusta, switchErrorKey } from '../utils/dataJobs'
 
@@ -102,7 +104,7 @@ function JobRow({ job, lang, busy, error, onSwitch }) {
             value={job.paused !== true}
             disabled={busy}
             onValueChange={on => onSwitch(job, on)}
-            trackColor={{ true: colors.primary, false: colors.border }}
+            trackColor={{ true: colors.primary, false: colors.fieldBorder }}
             thumbColor="#FFFFFF"
             accessibilityLabel={t('adminJobsSwitchLabel', lang).replace('{job}', job.key)}
           />
@@ -114,13 +116,24 @@ function JobRow({ job, lang, busy, error, onSwitch }) {
 }
 
 // The reason field lives in its own component so typing never re-renders the list behind the sheet.
-function PauseSheet({ job, lang, onCancel, onConfirm }) {
+// `job` is the last job shown (kept through the sheet's exit animation); only `visible` opens and closes it.
+function PauseSheet({ job, visible, lang, onCancel, onConfirm }) {
   const [note, setNote] = useState('')
   const trimmed = note.trim()
-  useEffect(() => { if (job) setNote('') }, [job?.key])
+  useEffect(() => { if (visible) setNote('') }, [visible])
+  // Android: KeyboardAvoidingView does nothing and the sheet is absolute-bottom in a translucent Modal, so the keyboard
+  // would cover the field and buttons. Measure where the body ends against the keyboard's top edge (as Sepetim does).
+  const insets = useSafeAreaInsets()
+  const kbTop = useKeyboardTop()
+  const bodyRef = useRef(null)
+  const [lift, setLift] = useState(0)
+  useEffect(() => {
+    if (Platform.OS !== 'android' || kbTop == null) { setLift(0); return }
+    bodyRef.current?.measureInWindow((_x, y, _w, h) => setLift(Math.max(0, Math.round(y + h + Math.max(insets.bottom, 16) - kbTop))))
+  }, [kbTop])
   return (
-    <BottomSheet visible={!!job} onClose={onCancel} lang={lang} title={t('adminJobsPauseTitle', lang).replace('{job}', job?.key ?? '')}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <BottomSheet visible={visible === true} onClose={onCancel} lang={lang} title={t('adminJobsPauseTitle', lang).replace('{job}', job?.key ?? '')}>
+      <KeyboardAvoidingView ref={bodyRef} style={lift > 0 && { paddingBottom: lift }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {CAUTION_KEYS.includes(job?.key) && <Text style={styles.caution}>{t('adminJobsDutyWarn', lang)}</Text>}
         <Text style={styles.fieldLabel}>{t('adminJobsPauseReason', lang)}</Text>
         <TextInput
@@ -133,7 +146,7 @@ function PauseSheet({ job, lang, onCancel, onConfirm }) {
           placeholderTextColor={colors.textSecondary}
           accessibilityLabel={t('adminJobsPauseReason', lang)}
         />
-        <Text style={styles.counter}>{trimmed.length}/{NOTE_MAX}</Text>
+        <Text style={styles.counter}>{note.length}/{NOTE_MAX}</Text>
         <View style={styles.sheetActions}>
           <Button variant="secondary" title={t('cancel', lang)} onPress={onCancel} style={styles.flex} fullWidth />
           <Button variant="danger" title={t('adminJobsPauseConfirm', lang)} onPress={() => onConfirm(trimmed)} disabled={trimmed.length === 0} style={styles.flex} fullWidth />
@@ -158,6 +171,11 @@ export default function DataJobsTab({ lang }) {
     await load()
     setRefreshing(false)
   }
+
+  // The sheet and dialog stay mounted for their exit animation after `pending` clears: keep what they last showed.
+  const lastPending = useRef(null)
+  if (pending) lastPending.current = pending
+  const shown = pending || lastPending.current
 
   const askSwitch = (job, on) => setPending({ job, pause: !on })
 
@@ -202,11 +220,11 @@ export default function DataJobsTab({ lang }) {
           {g.jobs.map((j, i) => <JobRow key={`${j.key}-${i}`} job={j} lang={lang} busy={saving[j.key] === true} error={errors[j.key]} onSwitch={askSwitch} />)}
         </View>
       ))}
-      <PauseSheet job={pending?.pause ? pending.job : null} lang={lang}
+      <PauseSheet job={shown?.job} visible={pending?.pause === true} lang={lang}
         onCancel={() => setPending(null)} onConfirm={note => save(pending.job, true, note)} />
       <ConfirmDialog
         visible={pending?.pause === false}
-        title={t('adminJobsResumeTitle', lang).replace('{job}', pending?.job?.key ?? '')}
+        title={t('adminJobsResumeTitle', lang).replace('{job}', shown?.job?.key ?? '')}
         confirmLabel={t('adminJobsResumeConfirm', lang)}
         onConfirm={() => save(pending.job, false, null)}
         onCancel={() => setPending(null)}
@@ -230,7 +248,7 @@ const styles = StyleSheet.create({
   switchLabel: { flex: 1, flexShrink: 1, fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   caution:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.dangerInk, lineHeight: 18, marginBottom: 10 },
   fieldLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
-  input:     { minHeight: 72, maxHeight: 140, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: 'transparent' },
+  input:     { minHeight: 72, maxHeight: 140, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: 'transparent' },
   counter:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'right', marginTop: 4 },
   sheetActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   flex:      { flex: 1 },
