@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261209 — Data jobs, release 2 part 2: the watchdog (slice 5)
+-- 20261211 — Data jobs, release 2 part 2: the watchdog (slice 5)
 -- ═══════════════════════════════════════════════════════════════════════════
 --
--- Applied in ONE supabase-migrate run after its sibling 20261208_data_jobs_switches.sql (needs its grace column).
+-- Applied in ONE supabase-migrate run after its sibling 20261210_data_jobs_switches.sql (needs its grace column).
 --
 -- WHAT IT DOES, IN PLAIN ENGLISH
 -- Every 30 minutes (pg_cron 'data-jobs-watchdog', minutes 14 and 44: free of the :00/:30 duty jobs, the */5 reminder,
@@ -23,7 +23,7 @@
 --
 -- FIRST RUN: a job that is ALREADY in attention when the watchdog first runs counts as "just entered" and IS announced,
 -- on purpose (that is the point of a watchdog: an existing problem should not stay silent). What keeps the release
--- itself quiet is 20261208's grace: every job's "stale" clock starts at that apply, so applying R2 alone makes no job
+-- itself quiet is 20261210's grace: every job's "stale" clock starts at that apply, so applying R2 alone makes no job
 -- stale, and only real failures (failed, cut off, a cron job missing) can speak on the first tick. A job whose own writer
 -- does not exist yet (the edge functions come in a later release) becomes stale, and is announced, once its
 -- expected_every has passed since the apply: about 36 h, until that release is deployed.
@@ -57,7 +57,7 @@
 --   every cron job has exactly one data_jobs row (asserted again here).
 --
 -- Public logs: no user totals and no ids are printed; job names are fine.
--- Apply: supabase-migrate (with 20261208 in ONE run). Adds functions only; it ends with NOTIFY pgrst.
+-- Apply: supabase-migrate (with 20261210 in ONE run). Adds functions only; it ends with NOTIFY pgrst.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 SET ROLE postgres;
@@ -70,7 +70,7 @@ SET LOCAL lock_timeout = '5s';
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.data_jobs') AND attname = 'records_expected_from' AND NOT attisdropped) THEN
-    RAISE EXCEPTION 'REFUSING: 20261208 (data_jobs.records_expected_from) is not applied. Nothing applied.';
+    RAISE EXCEPTION 'REFUSING: 20261210 (data_jobs.records_expected_from) is not applied. Nothing applied.';
   END IF;
   IF to_regprocedure('public.data_jobs_overview(timestamptz)') IS NULL THEN
     RAISE EXCEPTION 'REFUSING: data_jobs_overview is missing. Nothing applied.';
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS public.data_jobs_alert_state (
   CONSTRAINT data_jobs_alert_state_pkey PRIMARY KEY (job_key)
 );
 COMMENT ON TABLE public.data_jobs_alert_state IS
-  'What data_jobs_watchdog() saw last time, per job (attention, paused, when last announced, when last reminded). RLS on, zero policies, no grants: only the owner and the watchdog touch it. 20261209.';
+  'What data_jobs_watchdog() saw last time, per job (attention, paused, when last announced, when last reminded). RLS on, zero policies, no grants: only the owner and the watchdog touch it. 20261211.';
 ALTER TABLE public.data_jobs_alert_state ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.data_jobs_alert_state FROM PUBLIC, anon, authenticated, service_role;
 
@@ -547,7 +547,7 @@ BEGIN
       RAISE EXCEPTION 'probe rows leaked';
     END IF;
   END;
-  RAISE NOTICE '20261209 OK: watchdog (owner only), state table (RLS on, no policies, no grants), job at :14 / :44, coverage holds';
+  RAISE NOTICE '20261211 OK: watchdog (owner only), state table (RLS on, no policies, no grants), job at :14 / :44, coverage holds';
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -561,7 +561,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261209_data_jobs_watchdog.sql', '26b1bc581c3617a23eb622de3f30dfb52f26d99f0923577c6f4978faf1622f76')
+VALUES ('20261211_data_jobs_watchdog.sql', '373d2521389a8b779ecd310a30cbca12d03f658f4824eee64f60e7bc6d331ae9')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

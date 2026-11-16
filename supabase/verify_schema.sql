@@ -45,8 +45,8 @@ WITH report AS (
     -- Data jobs (20261205): registry + run log; registered ahead of the apply; red until it runs.
     ('20261205_data_jobs','data_jobs'),
     ('20261205_data_jobs','data_job_runs'),
-    -- Data jobs watchdog (20261209): what it saw last time. Registered ahead of the apply; red until it runs.
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state'),
+    -- Data jobs watchdog (20261211): what it saw last time. Registered ahead of the apply; red until it runs.
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state'),
     -- Araçlar car listings (20261165): registered ahead of the apply; red until it runs.
     ('20261165_vehicles','vehicle_sources'),
     ('20261165_vehicles','dealers'),
@@ -324,13 +324,13 @@ WITH report AS (
     ('20261205_data_jobs','data_job_runs','error_class'),
     ('20261205_data_jobs','data_job_runs','source'),
     ('20261205_data_jobs','data_job_runs','run_ref'),
-    -- 20261208 / 20261209: the grace start and the watchdog state; registered ahead of the apply; red until it runs.
-    ('20261208_data_jobs_switches','data_jobs','records_expected_from'),
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state','job_key'),
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state','last_attention'),
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state','last_paused'),
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state','alerted_at'),
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state','reminded_at'),
+    -- 20261210 / 20261211: the grace start and the watchdog state; registered ahead of the apply; red until it runs.
+    ('20261210_data_jobs_switches','data_jobs','records_expected_from'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','job_key'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','last_attention'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','last_paused'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','alerted_at'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','reminded_at'),
     -- 20261165: the columns the read policies, the guard and the report flow depend on (column count in H).
     ('20261165_vehicles','vehicles','status'),
     ('20261165_vehicles','vehicles','expires_at'),
@@ -850,12 +850,12 @@ WITH report AS (
     ('20261205_data_jobs','data_jobs_overview'),
     ('20261205_data_jobs','admin_data_jobs'),
     ('20261205_data_jobs','record_data_job_run'),
-    -- 20261208 / 20261209: registered ahead of the apply; red until it runs. Grants and bodies are the 1208 / 1209 H tokens'.
-    ('20261208_data_jobs_switches','admin_set_data_job_paused'),
-    ('20261208_data_jobs_switches','data_job_gate'),
-    ('20261208_data_jobs_switches','data_job_paused'),
-    ('20261209_data_jobs_watchdog','data_jobs_watchdog'),
-    ('20261209_data_jobs_watchdog','data_jobs_watchdog_age')
+    -- 20261210 / 20261211: registered ahead of the apply; red until it runs. Grants and bodies are the 1210 / 1211 H tokens'.
+    ('20261210_data_jobs_switches','admin_set_data_job_paused'),
+    ('20261210_data_jobs_switches','data_job_gate'),
+    ('20261210_data_jobs_switches','data_job_paused'),
+    ('20261211_data_jobs_watchdog','data_jobs_watchdog'),
+    ('20261211_data_jobs_watchdog','data_jobs_watchdog_age')
   ) e(m,o)
 
   UNION ALL
@@ -1041,9 +1041,9 @@ WITH report AS (
     ('20261205_data_jobs','data_job_runs_error_class_check'),
     ('20261205_data_jobs','data_job_runs_source_check'),
     ('20261205_data_jobs','data_job_runs_run_ref_check'),
-    -- 20261209: the watchdog state table; registered ahead of the apply; red until it runs.
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state_pkey'),
-    ('20261209_data_jobs_watchdog','data_jobs_alert_state_job_key_fkey'),
+    -- 20261211: the watchdog state table; registered ahead of the apply; red until it runs.
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state_pkey'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state_job_key_fkey'),
     -- 20261165: Araçlar. Who owns a listing follows its source; prices follow intent; a source goes live only checked.
     ('20261165_vehicles','vehicles_ownership_check'),
     ('20261165_vehicles','vehicles_price_check'),
@@ -1735,8 +1735,8 @@ WITH report AS (
     ('20261201_set_guest_push','set_guest_push'),
     -- 1205. Missing = the admin Data jobs section answers a permission error. record_data_job_run / data_jobs_overview are DELIBERATELY ABSENT (not client-callable; the 1205 H token asserts that).
     ('20261205_data_jobs','admin_data_jobs'),
-    -- 1208. Missing = the Data jobs switch answers a permission error. data_job_gate / data_job_paused / the watchdog are DELIBERATELY ABSENT (not client-callable; the 1208 / 1209 H tokens assert that).
-    ('20261208_data_jobs_switches','admin_set_data_job_paused')
+    -- 1210. Missing = the Data jobs switch answers a permission error. data_job_gate / data_job_paused / the watchdog are DELIBERATELY ABSENT (not client-callable; the 1210 / 1211 H tokens assert that).
+    ('20261210_data_jobs_switches','admin_set_data_job_paused')
   ) e(m,o)
 
   UNION ALL
@@ -2083,7 +2083,7 @@ WITH report AS (
     -- (a) both tables: RLS on, ZERO policies, no anon/authenticated privilege (table or any column), service_role keeps it;
     -- (b) record_data_job_run: EXECUTE for service_role, none for PUBLIC / anon / authenticated; data_jobs_overview: EXECUTE held by nobody but the owner;
     --     admin_data_jobs: authenticated yes, anon no; (c) the admin gate is the three-part shape and the overview reads cron's result ONLY for cron_sql;
-    -- (d) no row is paused (20261208 made seven rows switchable: the 1208 H token owns that set).
+    -- (d) no row is paused (20261210 made seven rows switchable: the 1210 H token owns that set).
     UNION ALL SELECT '20261205_data_jobs','data_jobs + data_job_runs: RLS on, 0 policies, no client privilege (table or column), service_role writes',
       COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c WHERE c.oid IN (to_regclass('public.data_jobs'), to_regclass('public.data_job_runs'))), false)
       AND to_regclass('public.data_jobs') IS NOT NULL AND to_regclass('public.data_job_runs') IS NOT NULL
@@ -2124,21 +2124,21 @@ WITH report AS (
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%''attention'', (j.state IN (''failed'', ''stale'') OR (j.state = ''inactive'' AND j.expected_every IS NOT NULL))%', false)
-    UNION ALL SELECT '20261205_data_jobs','data_jobs: no row is paused (a pause is an admin act; the switchable set is the 1208 H token)',
+    UNION ALL SELECT '20261205_data_jobs','data_jobs: no row is paused (a pause is an admin act; the switchable set is the 1210 H token)',
       COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM public.data_jobs WHERE paused', false, true, '')))[1]::text = '0'
                  WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
     -- 1205-END
-    -- 1208-BEGIN
-    -- 20261208 / 20261209 data jobs, release 2. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
+    -- 1210-BEGIN
+    -- 20261210 / 20261211 data jobs, release 2. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
     -- (a) EXACTLY the seven switchable jobs (derived, so an eighth or a missing one reads red); (b) function grants: the admin switch authenticated yes /
     --     anon no and DEFINER, the gate service_role only, the pause helper service_role only, the watchdog owner only, the age function service_role only
     --     and DEFINER; (c) the two due() gates carry the pause clause; (d) the watchdog state table: RLS on, ZERO policies, no privilege for anyone but the owner;
     --     (e) the watchdog speaks to admins only, with the admin_alert type and the Data jobs tab in the push data.
-    UNION ALL SELECT '20261208_data_jobs_switches','exactly seven switchable jobs: duty-push, duyurular-fetch, gisekibris-feed, google-places-refresh, novest-images, sync-novest, weekend-digest',
+    UNION ALL SELECT '20261210_data_jobs_switches','exactly seven switchable jobs: duty-push, duyurular-fetch, gisekibris-feed, google-places-refresh, novest-images, sync-novest, weekend-digest',
       COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT string_agg(key, '','' ORDER BY key) AS n FROM public.data_jobs WHERE switchable', false, true, '')))[1]::text
                          = 'duty-push,duyurular-fetch,gisekibris-feed,google-places-refresh,novest-images,sync-novest,weekend-digest'
                  WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
-    UNION ALL SELECT '20261208_data_jobs_switches','admin_set_data_job_paused: DEFINER, authenticated yes, anon no, three-part gate; gate + pause helper: service_role only, INVOKER',
+    UNION ALL SELECT '20261210_data_jobs_switches','admin_set_data_job_paused: DEFINER, authenticated yes, anon no, three-part gate; gate + pause helper: service_role only, INVOKER',
       COALESCE(has_function_privilege('authenticated', to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'), 'EXECUTE')
            AND NOT has_function_privilege('anon', to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'), 'EXECUTE')
            AND (SELECT p.prosecdef AND p.proconfig = ARRAY['search_path=public'] FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'))
@@ -2151,7 +2151,7 @@ WITH report AS (
            AND NOT has_function_privilege('authenticated', to_regprocedure('public.data_job_paused(text)'), 'EXECUTE')
            AND NOT has_function_privilege('anon', to_regprocedure('public.data_job_paused(text)'), 'EXECUTE')
            AND NOT (SELECT bool_or(p.prosecdef) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.data_job_gate(text,text,text)'), to_regprocedure('public.data_job_paused(text)'))), false)
-    UNION ALL SELECT '20261208_data_jobs_switches','duty_push_due + weekend_digest_due: pause clause present, STABLE SQL, not client-callable',
+    UNION ALL SELECT '20261210_data_jobs_switches','duty_push_due + weekend_digest_due: pause clause present, STABLE SQL, not client-callable',
       COALESCE(pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamptz)')) LIKE '%AND NOT public.data_job_paused(''duty-push'')%'
            AND pg_get_functiondef(to_regprocedure('public.weekend_digest_due(timestamptz)')) LIKE '%AND NOT public.data_job_paused(''weekend-digest'')%'
            AND (SELECT bool_and(p.provolatile = 's' AND NOT p.prosecdef) FROM pg_proc p
@@ -2160,7 +2160,7 @@ WITH report AS (
            AND NOT has_function_privilege('authenticated', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE')
            AND NOT has_function_privilege('anon', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE')
            AND NOT has_function_privilege('authenticated', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE'), false)
-    UNION ALL SELECT '20261209_data_jobs_watchdog','data_jobs_alert_state: RLS on, 0 policies, no privilege for anon / authenticated / service_role (table or column)',
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_alert_state: RLS on, 0 policies, no privilege for anon / authenticated / service_role (table or column)',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.data_jobs_alert_state')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'data_jobs_alert_state') = 0
       AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.data_jobs_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -2169,7 +2169,7 @@ WITH report AS (
                AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.data_jobs_alert_state') AND a.attnum > 0 AND NOT a.attisdropped
                                 AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
                                      OR has_column_privilege('service_role', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))), false)
-    UNION ALL SELECT '20261209_data_jobs_watchdog','data_jobs_watchdog: DEFINER, EXECUTE held by nobody but the owner; data_jobs_watchdog_age: DEFINER, service_role only',
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_watchdog: DEFINER, EXECUTE held by nobody but the owner; data_jobs_watchdog_age: DEFINER, service_role only',
       COALESCE((SELECT p.prosecdef AND p.proacl IS NOT NULL AND p.proconfig = ARRAY['search_path=public'] FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_watchdog(timestamptz)')), false)
       AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
                        WHERE p.oid = to_regprocedure('public.data_jobs_watchdog(timestamptz)') AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
@@ -2177,14 +2177,14 @@ WITH report AS (
       AND COALESCE(has_function_privilege('service_role', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE')
                AND NOT has_function_privilege('authenticated', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE')
                AND NOT has_function_privilege('anon', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE'), false)
-    UNION ALL SELECT '20261209_data_jobs_watchdog','data_jobs_watchdog: admins only (profiles.role = admin), type admin_alert, push data screen admin / tab datajobs, Turkish title, 24 h and Monday 09:00 rules as code shapes',
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_watchdog: admins only (profiles.role = admin), type admin_alert, push data screen admin / tab datajobs, Turkish title, 24 h and Monday 09:00 rules as code shapes',
       COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%FOR r IN SELECT id, push_token FROM profiles WHERE role = ''admin'' LOOP%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES (r.id, ttl, bdy, ''admin_alert'')%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''datajobs'')%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%ttl        text := ''Veri işleri'';%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%v_alerted < p_now - interval ''24 hours''%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%isodow FROM (p_now AT TIME ZONE ''Asia/Famagusta'')) = 1%', false)
-    -- 1208-END
+    -- 1210-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -5849,7 +5849,7 @@ WITH report AS (
     --     since 20261196 added marketplace_photo_review_reminder (admin push when Bandabuliya
     --     photos wait; it sets type 'admin_alert'); probe run 43428984651 printed exactly these
     --     seven. A legitimate new writer bumps the count in the same PR, saying why.
-    --     Eight since 20261209 added data_jobs_watchdog (admin push when a data job needs attention;
+    --     Eight since 20261211 added data_jobs_watchdog (admin push when a data job needs attention;
     --     it sets type 'admin_alert', 4-column INSERT, one row per admin).
     --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
     --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
@@ -6754,8 +6754,8 @@ FROM (VALUES
   ('20261203_onboarding_events_retention','purge-onboarding-events'),
   -- 90-day retention on data_job_runs (20261205), 03:43 UTC daily.
   ('20261205_data_jobs','purge-data-job-runs'),
-  -- Data jobs watchdog (20261209), minutes 14 and 44; exact schedule + command are the 20261209 row below.
-  ('20261209_data_jobs_watchdog','data-jobs-watchdog')
+  -- Data jobs watchdog (20261211), minutes 14 and 44; exact schedule + command are the 20261211 row below.
+  ('20261211_data_jobs_watchdog','data-jobs-watchdog')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -6879,7 +6879,7 @@ SELECT '20261205_data_jobs', 'purge-data-job-runs: schedule 43 3 * * * and the e
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 UNION ALL
-SELECT '20261209_data_jobs_watchdog', 'data-jobs-watchdog: schedule 14,44 * * * * and the exact call',
+SELECT '20261211_data_jobs_watchdog', 'data-jobs-watchdog: schedule 14,44 * * * * and the exact call',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'data-jobs-watchdog') THEN 'MISSING'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'data-jobs-watchdog' AND active
                     AND schedule = '14,44 * * * *'

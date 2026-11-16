@@ -313,8 +313,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261205_data_jobs.sql', '0192ca097272de0ba8b7eaf058da7e91a14cf849ac9b76b3991507a07306077a'),
   ('20261206_alagadi_pin.sql', '8fff41bc998007533c75a6000892f05c2baa618f28f3fb7ada7d11bedf5561e1'),
   ('20261207_beaches_staged.sql', '92356353c6ffdea2a9af72a1e48608bafa36fa6dc4de868e03e7d5a02b669c3f'),
-  ('20261208_data_jobs_switches.sql', 'bff22912a99439937b83aed016c793fd4a1d31c98012ef829eece826c5c3341b'),
-  ('20261209_data_jobs_watchdog.sql', '26b1bc581c3617a23eb622de3f30dfb52f26d99f0923577c6f4978faf1622f76')
+  ('20261210_data_jobs_switches.sql', '8c3564cc173ddef84e3d210b24abab7ba25ee4f3cd7762be89f30dc13563ca8d'),
+  ('20261211_data_jobs_watchdog.sql', '373d2521389a8b779ecd310a30cbca12d03f658f4824eee64f60e7bc6d331ae9')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

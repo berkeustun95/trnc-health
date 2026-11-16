@@ -1,7 +1,7 @@
-// Data jobs R2 (20261208 switches + 20261209 watchdog) against a Supabase-shaped Postgres
+// Data jobs R2 (20261210 switches + 20261211 watchdog) against a Supabase-shaped Postgres
 // (scripts/migration-harness.mjs; PGlite = PostgreSQL 18, prod is older). By hand:
 //   node scripts/test-data-jobs-r2-sql.mjs
-// Order: 20261205 (R1) -> 20261208 -> 20261209, as the one supabase-migrate run applies them.
+// Order: 20261205 (R1) -> 20261210 -> 20261211, as the one supabase-migrate run applies them.
 // Evidence of: the files' own in-transaction assertions + probes run clean, the red-first mutants are caught, and the
 // behaviour measured from outside (roles, claims, ticks). NOT evidence of: pg_cron / pg_net / Vault on the real database
 // (cron.* and net.* are stubs here), the real cron.job.username, PG 17 renderings of pg_get_functiondef.

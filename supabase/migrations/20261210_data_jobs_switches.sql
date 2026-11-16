@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261208_data_jobs_switches — Data jobs, release 2 part 1: the switches (slice 3) and the grace/no-record state fixes
+-- 20261210_data_jobs_switches — Data jobs, release 2 part 1: the switches (slice 3) and the grace/no-record state fixes
 -- ═══════════════════════════════════════════════════════════════════════════
 --
--- Applied in ONE supabase-migrate run with its sibling 20261209_data_jobs_watchdog.sql (the watchdog). This file is the part that
+-- Applied in ONE supabase-migrate run with its sibling 20261211_data_jobs_watchdog.sql (the watchdog). This file is the part that
 -- lets an admin PAUSE seven jobs and makes the "nothing has recorded anything" state honest. It does not
 -- unschedule or reschedule any pg_cron job (a new jobid reads stale), and nothing is paused by it.
 --
@@ -93,7 +93,7 @@ END $$;
 -- ─── 1. Grace start ─────────────────────────────────────────────────────────
 ALTER TABLE public.data_jobs ADD COLUMN IF NOT EXISTS records_expected_from timestamptz NOT NULL DEFAULT now();
 COMMENT ON COLUMN public.data_jobs.records_expected_from IS
-  'Start of the job''s grace: stale / no-record only count after records_expected_from + expected_every. Set at the 20261208 apply and at every resume. 20261208.';
+  'Start of the job''s grace: stale / no-record only count after records_expected_from + expected_every. Set at the 20261210 apply and at every resume. 20261210.';
 
 -- ─── 2. The seven switches ──────────────────────────────────────────────────
 UPDATE public.data_jobs SET switchable = true
@@ -685,7 +685,7 @@ BEGIN
   IF v_names IS NOT NULL THEN
     RAISE EXCEPTION 'jobs read stale at the moment of the apply, the grace did not hold: %', v_names;
   END IF;
-  RAISE NOTICE '20261208_data_jobs_switches OK: seven switches, grace, admin switch, gate, due() pause';
+  RAISE NOTICE '20261210_data_jobs_switches OK: seven switches, grace, admin switch, gate, due() pause';
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -699,7 +699,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261208_data_jobs_switches.sql', 'bff22912a99439937b83aed016c793fd4a1d31c98012ef829eece826c5c3341b')
+VALUES ('20261210_data_jobs_switches.sql', '8c3564cc173ddef84e3d210b24abab7ba25ee4f3cd7762be89f30dc13563ca8d')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
