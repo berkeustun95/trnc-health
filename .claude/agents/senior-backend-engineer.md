@@ -48,3 +48,5 @@ CHECK rejecting `'tr'`/`'en'`; new admin-seeded directories default `is_active =
 ## Return
 Files changed, migration name + dry-run run URL/result, plain-English policy summary, what is
 waiting on Berke's go.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).
