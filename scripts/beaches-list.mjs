@@ -135,7 +135,33 @@ const KEEP = {
 // public source. `at` is the evidence's own coordinate; its distance to the outline is measured at build time (0 = on/inside it).
 // kind: a = official page, b = Wikipedia/Wikidata coordinates, c = geotagged Commons file whose title/description names the beach,
 // d = named OSM POI adjacent to the outline.
-const ADDED = []
+const ADDED = [
+  {
+    ref: 'way/309623318', name: 'Kaplıca Plajı', area: 'Kaplıca',
+    area_why: 'the evidence names Kaplıca (constants/areas.js iskele)',
+    name_evidence: [
+      { kind: 'c', url: 'https://commons.wikimedia.org/wiki/File:Kaplica_beach.jpg', quote_or_title: 'File:Kaplica beach.jpg — "Davlos (Kaplıca) beach in Northern Cyprus."', at: [35.42555556, 33.89916667] },
+      { kind: 'd', url: 'https://www.openstreetmap.org/way/603957024', quote_or_title: 'OSM way/603957024 name="Kaplica Holiday Resort Beach Cafe" (amenity=cafe)', at: [35.425507, 33.8996264] },
+      { kind: 'd', url: 'https://www.openstreetmap.org/way/603957023', quote_or_title: 'OSM way/603957023 name="Kaplica Beach Resort" (tourism=hotel)', at: [35.4252397, 33.8992183] },
+    ],
+  },
+  {
+    ref: 'way/1365670207', name: 'Yeni Boğaziçi Halk Plajı', area: 'Yeni Boğaziçi',
+    area_why: 'the evidence names Yeni Boğaziçi (constants/areas.js famagusta)',
+    name_note: 'OSM spells the POI "Yeni bogazici halk plaji"; the Turkish diacritics and capitals are ours',
+    name_evidence: [
+      { kind: 'd', url: 'https://www.openstreetmap.org/node/5893518286', quote_or_title: 'OSM node/5893518286 name="Yeni bogazici halk plaji" name:en="bogazici beach" (amenity=restaurant)', at: [35.2010729, 33.9001119] },
+    ],
+  },
+  {
+    ref: 'way/229043958', name: 'Barış Plajı', area: null,
+    area_why: 'the evidence does not name a village',
+    name_note: 'weakest of the three: one OSM POI, 102 m from the outline, tagged tourism=attraction; OSM spells it "barış plajı"',
+    name_evidence: [
+      { kind: 'd', url: 'https://www.openstreetmap.org/node/4339471206', quote_or_title: 'OSM node/4339471206 name="barış plajı" (tourism=attraction)', at: [35.3313485, 33.4118723] },
+    ],
+  },
+]
 // Pairs allowed to sit closer than MIN_SEP_M (a, b are source_ids / live ids), each with its reason.
 const ALLOW_CLOSE = []
 
