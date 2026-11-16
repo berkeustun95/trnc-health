@@ -1,5 +1,6 @@
 import { View, Text, Linking, StyleSheet } from 'react-native'
 import { colors } from '../constants/theme'
+import { t } from '../constants/i18n'
 import { creditParts } from '../utils/photoCreditParts'
 
 // The photo-credit BODY: creator, licence, source — rendered once, used by every surface

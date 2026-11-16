@@ -397,5 +397,16 @@ for (const file of ['screens/ExploreScreen.js', 'screens/HomeScreen.js']) {
   }
 }
 
+// A render-time ReferenceError is not caught by the defensive parsing above: PhotoCredit once
+// called t() after its import was swapped out, which throws on every well-formed licence/source link.
+console.log('\n— PhotoCredit.js: every t( call has its import —')
+{
+  const src = _read(_resolve(_root, 'components/PhotoCredit.js'), 'utf8')
+  const calls = /(?<![\w.])t\(/.test(src)
+  const imported = /import\s*\{[^}]*\bt\b[^}]*\}\s*from\s*['"]\.\.\/constants\/i18n(\.js)?['"]/.test(src)
+  if (!calls || imported) { pass++; console.log(`  ok   PhotoCredit.js ${calls ? 'calls t( and imports it' : 'does not call t('}`) }
+  else { fail++; console.log("  FAIL components/PhotoCredit.js calls t( but does not import { t } from '../constants/i18n'") }
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`)
 process.exit(fail ? 1 : 0)
