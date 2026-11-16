@@ -217,6 +217,7 @@ const t = (name, got, want) => {
   const run = mirror[0]?.run ?? ''
   t('no other step touches the mirror script or --prune', steps.filter(s => s !== mirror[0] && /--prune|mirror-novest-images/.test(s.run ?? '')).length, 0)
   t('job env wires IN_PRUNE / IN_APPLY / IN_LIMIT from the inputs', [doc.jobs.run.env.IN_PRUNE, doc.jobs.run.env.IN_APPLY, doc.jobs.run.env.IN_LIMIT], ['${{ inputs.prune }}', '${{ inputs.apply }}', '${{ inputs.limit }}'])
+  t('job env WRITE is the one write gate (schedule, or apply=true)', doc.jobs.run.env.WRITE, "${{ github.event_name == 'schedule' || inputs.apply == true }}")
   t('on: schedule is cron-only, dispatch has the prune input', [Object.keys(doc.on).sort(), doc.on.workflow_dispatch.inputs.prune.default], [['schedule', 'workflow_dispatch'], false])
   const pruneLines = run.split('\n').filter(l => !l.trim().startsWith('#') && l.includes('--prune'))
   t('exactly one line of the Mirror step mentions --prune', pruneLines.length, 1)
@@ -230,7 +231,7 @@ const t = (name, got, want) => {
     for (const pr of ['', 'false', 'true'])
       for (const ap of ['', 'false', 'true']) {
         const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], {
-          env: { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: ev, IN_PRUNE: pr, IN_APPLY: ap, IN_LIMIT: '' }, encoding: 'utf8' })
+          env: { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: ev, IN_PRUNE: pr, IN_APPLY: ap, IN_LIMIT: '', WRITE: String(ev === 'schedule' || ap === 'true') }, encoding: 'utf8' })
         const argv = (/^ARGS:(.*)$/m.exec(r.stdout ?? '')?.[1] ?? 'NO-NODE-CALL').trim().split(/\s+/)
         const hasPrune = argv.includes('--prune'), hasDry = argv.includes('--dry')
         const wantPrune = ev === 'workflow_dispatch' && pr === 'true'
