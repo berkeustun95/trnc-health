@@ -60,12 +60,12 @@ serve(async (req) => {
     .limit(500)   // one weekend: tens of rows
   if (evErr) {
     await finishRun(supabase, runId, { outcome: 'events_query_failed' })
-    return new Response(JSON.stringify({ error: 'events read failed' }), { status: 500 })
+    return new Response(JSON.stringify({ ok: false, caller, error: 'events read failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
   const events = ((evRows ?? []) as DigestEvent[]).filter(e => inWindow(e, w))
   if (!events.length) {
     await finishRun(supabase, runId, { outcome: 'no_events' })
-    return new Response(JSON.stringify({ message: 'no events this weekend', from: w.from, to: w.to }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true, caller, message: 'no events this weekend', from: w.from, to: w.to }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
 
   const { data: placeRows } = await supabase.from('places')
@@ -83,7 +83,7 @@ serve(async (req) => {
   )
   if (profilesError) {
     await finishRun(supabase, runId, { outcome: 'profiles_query_failed', events: events.length })
-    return new Response(JSON.stringify({ error: 'profiles read failed' }), { status: 500 })
+    return new Response(JSON.stringify({ ok: false, caller, error: 'profiles read failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
   let profiles = allProfiles ?? []
   if (testersOnly) {
@@ -95,7 +95,7 @@ serve(async (req) => {
   }
   if (!profiles.length) {
     await finishRun(supabase, runId, { outcome: 'no_profiles', events: events.length })
-    return new Response(JSON.stringify({ message: 'no recipients' }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true, caller, message: 'no recipients' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
 
   const msgOf = (lang: string | null) => digestMessage(lang || 'English', events, place)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // send-duty-notification and send-weekend-digest caller gate, offline: verify_jwt true, the serviceCaller check
-// as the first statements of the handler, and (duty) no user counts in any HTTP response body.
+// as the first statements of the handler, and every HTTP response body limited to an identifier allow-list (no user counts, no spreads).
 // The pure decision (_shared/caller-auth.mjs) is tested in check-sync-novest-auth.mjs; here it only has to exist.
 import { readFileSync } from 'node:fs'
 import { serviceCaller } from '../supabase/functions/_shared/caller-auth.mjs'
@@ -14,10 +14,11 @@ const ACCEPT_RULE = 'if (!caller) {'
 
 const IMPORT = "import { serviceCaller } from '../_shared/caller-auth.mjs'"
 const NO_COUNTS = new Set(['true', 'false', 'ok', 'caller', 'date', 'today', 'outcome', 'error', 'pushFailed'])
+const DIGEST_BODY = new Set(['true', 'false', 'ok', 'caller', 'mode', 'testersOnly', 'events', 'length', 'outcome', 'message', 'error', 'from', 'to', 'w'])
 const COUNT_KEYS = ['notified', 'pushed', 'pushOk', 'pushErrorCount', 'pushRetries', 'errorKinds', 'pharmacies']
 const FNS = [
-  { name: 'send-duty-notification', finalBody: /JSON\.stringify\(\{ ok: !pushFailed, caller, date: today, outcome \}\)/, noCounts: true },
-  { name: 'send-weekend-digest', finalBody: /JSON\.stringify\(\{ ok: outcome !== 'push_failed', caller,/, noCounts: false },
+  { name: 'send-duty-notification', finalBody: /JSON\.stringify\(\{ ok: !pushFailed, caller, date: today, outcome \}\)/, allow: NO_COUNTS },
+  { name: 'send-weekend-digest', finalBody: /JSON\.stringify\(\{ ok: outcome !== 'push_failed', caller,/, allow: DIGEST_BODY },
 ]
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -72,11 +73,11 @@ for (const fn of FNS) {
   const bodies = stringifyArgs(src)
   const responses = src.split('new Response(').length - 1
   check(bodies.length === responses, `${n}: every new Response( must carry a JSON.stringify( body (${responses} responses, ${bodies.length} bodies)`)
-  if (fn.noCounts) {
+  {
     for (const b of bodies) {
       const ids = b.replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, ' ').match(/[A-Za-z_$][\w$]*/g) ?? []
-      const bad = ids.filter(x => !NO_COUNTS.has(x))
-      check(bad.length === 0, `${n}: a response body uses ${[...new Set(bad)].join(', ')}; only ${[...NO_COUNTS].join(', ')} are allowed (no user counts, ${COUNT_KEYS.join('/')} stay in duty_push_runs)`)
+      const bad = ids.filter(x => !fn.allow.has(x))
+      check(bad.length === 0, `${n}: a response body uses ${[...new Set(bad)].join(', ')}; only ${[...fn.allow].join(', ')} are allowed (no user counts, ${COUNT_KEYS.join('/')} stay in duty_push_runs)`)
       check(!/\.\.\./.test(b), `${n}: a response body must not spread an object`)
     }
   }
@@ -87,4 +88,4 @@ if (problems.length) {
   for (const p of problems) console.error('  ✗ ' + p)
   process.exit(1)
 }
-console.log(`push function auth check: OK (${FNS.length} functions: verify_jwt, gate pinned first in handler, duty bodies count-free)`)
+console.log(`push function auth check: OK (${FNS.length} functions: verify_jwt, gate pinned first in handler, response bodies on an allow-list, no counts)`)
