@@ -96,6 +96,7 @@
     "unpaged:check": "node scripts/check-unpaged-reads.mjs && node scripts/check-unpaged-reads.mjs --self-test",
     "eatery:quiz:test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-eatery-quiz.mjs",
     "eatery:order:test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-eatery-order.mjs",
+    "places:credit-guard:test": "node scripts/preview-lock.mjs --suite check && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-places-credit-guard.mjs",
     "events:visibility": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-event-visibility.mjs",
     "preview:lock": "node scripts/preview-lock.mjs",
     "test": "node scripts/preview-lock.mjs --suite check && jest --ci",

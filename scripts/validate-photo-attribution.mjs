@@ -28,6 +28,7 @@
 //   the patch step now aborts loudly if its replacement finds no match.
 
 import { resolveAttribution, legacyCreditString } from '../utils/photoAttribution.js'
+import { creditParts } from '../utils/photoCreditParts.js'
 
 const U = 'https://x/1.jpg'
 let pass = 0, fail = 0
@@ -90,6 +91,105 @@ const e = { credit: 'Mike McBey', license: 'CC BY 2.0' }
 is('derived string re-parses to its source entry',
   resolveAttribution({ photo_credits: [legacyCreditString(e, 'tr')] }, U, 0),
   { credit: 'Mike McBey', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', sourceUrl: null, source: null })
+
+
+console.log('\n— malformed data: resolver returns null or a fully typed object, never throws —')
+const SRC = ['commons', 'unsplash', 'pexels', 'own']
+const httpsOrNull = v => v === null || (typeof v === 'string' && /^https:\/\/\S/.test(v) && v.length <= 2048)
+const shapeOk = r => r === null || (
+  Object.keys(r).join() === 'credit,license,licenseUrl,sourceUrl,source' &&
+  typeof r.credit === 'string' && r.credit.length > 0 && r.credit.length <= 120 &&
+  (r.license === null || (typeof r.license === 'string' && r.license.length <= 40)) &&
+  httpsOrNull(r.licenseUrl) && httpsOrNull(r.sourceUrl) && (r.source === null || SRC.includes(r.source)))
+const partsOk = p => Object.keys(p).join() === 'line,license,licenseUrl,sourceLabel,sourceUrl' &&
+  Object.values(p).every(v => v === null || typeof v === 'string') && httpsOrNull(p.licenseUrl) && httpsOrNull(p.sourceUrl)
+const safe = fn => { try { return { r: fn() } } catch (err) { return { err: String(err) } } }
+const check = (name, place, url = U, index = 0) => {
+  const o = safe(() => resolveAttribution(place, url, index))
+  const ok = !o.err && shapeOk(o.r)
+  const p = ok && o.r ? safe(() => creditParts(o.r, 'Turkish')) : { r: {} }
+  const pOk = !p.err && (o.r === null || partsOk(p.r))
+  if (ok && pOk) { pass++; console.log(`  ok   ${name}`) }
+  else { fail++; console.log(`  FAIL ${name}\n       ${(o.err ?? JSON.stringify(o.r)).slice(0, 160)} ${(p.err ?? JSON.stringify(p.r)).slice(0, 160)}`) }
+  return o
+}
+const nullFor = (name, place, url, index) => { const o = check(name, place, url, index); is(`${name} → null`, o.err ? 'threw' : o.r, null) }
+const one = e => ({ photo_attribution: { [U]: e } })
+
+for (const [n, v] of [['array', []], ['string', 'x'], ['number', 7], ['null', null]])
+  nullFor(`attribution as ${n}`, { photo_attribution: v, photo_credits: [] })
+for (const [n, v] of [['array', ['a']], ['string', 'nope'], ['null', null]])
+  nullFor(`entry as ${n}`, one(v))
+for (const [n, v] of [['number', 5], ['object', { a: 1 }], ['empty', '  ']])
+  nullFor(`credit as ${n}`, one({ credit: v }))
+is('entry as string falls to legacy', resolveAttribution({ photo_attribution: { [U]: 'x' }, photo_credits: ['Photo: A / CC BY 4.0'] }, U, 0)?.credit, 'A')
+
+for (const k of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+  const o = check(`license names inherited member ${k}`, one({ credit: 'A', license: k }))
+  is(`  licenseUrl null for ${k}`, o.r?.licenseUrl, null)
+  const l = check(`legacy licence part names inherited member ${k}`, { photo_credits: [`Photo: A / ${k}`] })
+  is(`  legacy licenseUrl null for ${k}`, l.r?.licenseUrl, null)
+  const q = check(`source names inherited member ${k}`, one({ credit: 'A', source: k }))
+  is(`  source null for ${k}`, q.r?.source, null)
+  const sp = creditParts({ credit: 'A', license: null, licenseUrl: null, sourceUrl: null, source: k }, 'Turkish')
+  is(`  creditParts sourceLabel null for ${k}`, sp.sourceLabel, null)
+}
+for (const k of ['__proto__', 'constructor', 'toString']) {
+  const pa = JSON.parse(`{"${k}": {"credit": "A"}}`)
+  nullFor(`photo URL key ${k} not in data`, { photo_attribution: {} }, k, 0)
+  const o = check(`photo URL key ${k} present as own key`, { photo_attribution: pa }, k, 0)
+  is(`  own key ${k} resolves`, o.r?.credit, 'A')
+}
+nullFor('photo URL key __proto__ on empty plain object', { photo_attribution: {} }, '__proto__', 0)
+
+const BAD_URLS = [
+  ['http://', 'http://example.org/x'], ['other scheme', 'javascript:alert(1)'], ['other scheme 2', 'data:text/plain,x'],
+  ['relative', '/licenses/by/4.0/'], ['scheme-relative', '//example.org/x'], ['number', 5], ['newline', 'https://example.org/a\nb'],
+  ['space', 'https://example.org/a b'], ['5000 chars', 'https://example.org/' + 'a'.repeat(5000)], ['object', { a: 1 }], ['array', ['https://example.org/']],
+]
+for (const [n, v] of BAD_URLS) {
+  const o = check(`license_url ${n}`, one({ credit: 'A', license: 'X', license_url: v, source_url: v }))
+  is(`  licenseUrl null (${n})`, o.r?.licenseUrl, null)
+  is(`  sourceUrl null (${n})`, o.r?.sourceUrl, null)
+}
+is('https URL survives', resolveAttribution(one({ credit: 'A', source_url: 'https://example.org/x' }), U, 0)?.sourceUrl, 'https://example.org/x')
+is('2048 chars survives', resolveAttribution(one({ credit: 'A', source_url: 'https://e.org/' + 'a'.repeat(2048 - 14) }), U, 0)?.sourceUrl?.length, 2048)
+
+const LONG = resolveAttribution(one({ credit: 'Ü'.repeat(5000), license: 'L'.repeat(500) }), U, 0)
+check('very long credit and licence', one({ credit: 'Ü'.repeat(5000), license: 'L'.repeat(500) }))
+is('credit capped at 120 (ellipsis)', [LONG?.credit.length, LONG?.credit.endsWith('…')], [120, true])
+is('over-long licence dropped', LONG?.license, null)
+is('credit exactly 120 untouched', resolveAttribution(one({ credit: 'a'.repeat(120) }), U, 0)?.credit.length, 120)
+is('licence exactly 40 untouched', resolveAttribution(one({ credit: 'a', license: 'l'.repeat(40) }), U, 0)?.license.length, 40)
+check('legacy very long string', { photo_credits: ['Photo: ' + 'x'.repeat(100000) + ' / ' + 'y'.repeat(100000)] })
+
+for (const [n, v] of [['number', 5], ['object', { credit: 'x' }], ['array', ['a']], ['null', null], ['boolean', true]])
+  nullFor(`legacy photo_credits element as ${n}`, { photo_credits: [v] })
+nullFor('photo_credits as string', { photo_credits: 'Photo: A / B' })
+nullFor('photo_credits as object', { photo_credits: { 0: 'Photo: A / B' } })
+for (const [n, str] of [
+  ['http uri', 'Photo: A / CC BY 4.0 — http://creativecommons.org/licenses/by/4.0/'],
+  ['other scheme uri', 'Photo: A / CC BY 4.0 — ftp://creativecommons.org/licenses/by/4.0/'],
+]) {
+  const o = check(`legacy ${n}`, { photo_credits: [str] })
+  is(`  legacy licenseUrl null (${n})`, o.r?.licenseUrl, null)
+}
+is('legacy no-scheme uri still gets https', resolveAttribution({ photo_credits: ['Photo: A / CC BY 4.0 — creativecommons.org/licenses/by/4.0'] }, U, 0)?.licenseUrl, 'https://creativecommons.org/licenses/by/4.0')
+
+console.log('\n— malformed data: creditParts on unexpected input —')
+for (const [n, a] of [
+  ['extra fields', { credit: 'A', license: 'L', licenseUrl: 'https://e.org/', sourceUrl: 'https://e.org/', source: 'commons', extra: { x: 1 }, fn() {} }],
+  ['non-string fields', { credit: 5, license: {}, licenseUrl: 5, sourceUrl: [], source: {} }],
+  ['non-https links', { credit: 'A', license: 'L', licenseUrl: 'http://e.org/', sourceUrl: 'javascript:x', source: 'pexels' }],
+]) {
+  const p = safe(() => creditParts(a, 'Turkish'))
+  const ok = !p.err && partsOk(p.r)
+  if (ok) { pass++; console.log(`  ok   creditParts ${n}`) } else { fail++; console.log(`  FAIL creditParts ${n}\n       ${p.err ?? JSON.stringify(p.r)}`) }
+}
+is('creditParts well-formed (en)',
+  creditParts({ credit: 'A', license: 'CC BY 4.0', licenseUrl: 'https://e.org/l', sourceUrl: 'https://e.org/s', source: 'commons' }, 'English'),
+  { line: 'Photo: A', license: 'CC BY 4.0', licenseUrl: 'https://e.org/l', sourceLabel: 'Wikimedia Commons', sourceUrl: 'https://e.org/s' })
+is('creditParts own source (en)', creditParts({ credit: 'A', source: 'own' }, 'English').sourceLabel, 'ADA original photo')
 
 
 // ─── The column must actually be SELECTED, or none of the above ever runs ────
@@ -295,6 +395,17 @@ for (const file of ['screens/ExploreScreen.js', 'screens/HomeScreen.js']) {
     console.log(`  FAIL ${file} — ${r.why}`)
     console.log('       The detail screen never re-queries; an omitted column can never render.')
   }
+}
+
+// A render-time ReferenceError is not caught by the defensive parsing above: PhotoCredit once
+// called t() after its import was swapped out, which throws on every well-formed licence/source link.
+console.log('\n— PhotoCredit.js: every t( call has its import —')
+{
+  const src = _read(_resolve(_root, 'components/PhotoCredit.js'), 'utf8')
+  const calls = /(?<![\w.])t\(/.test(src)
+  const imported = /import\s*\{[^}]*\bt\b[^}]*\}\s*from\s*['"]\.\.\/constants\/i18n(\.js)?['"]/.test(src)
+  if (!calls || imported) { pass++; console.log(`  ok   PhotoCredit.js ${calls ? 'calls t( and imports it' : 'does not call t('}`) }
+  else { fail++; console.log("  FAIL components/PhotoCredit.js calls t( but does not import { t } from '../constants/i18n'") }
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)
