@@ -80,6 +80,7 @@ DECLARE
   v_ins_a    jsonb;  v_ins_c    text[];  v_ins_src text := 'unset';  v_ins_sid text := 'unset';
   v_upd_a    jsonb;  v_upd_c    text[];
   v_clr_a    jsonb;  v_clr_c    text[];
+  v_clrt_a   jsonb;  v_clrt_c   text[];
   v_name     text;
   v_svc_a    jsonb;  v_svc_c    text[];
   v_svcins_a jsonb;  v_svcins_c text[];
@@ -118,6 +119,9 @@ BEGIN
     VALUES ('monument', 'zz credit probe', 'kyrenia', v_attr0, v_cred0)
     RETURNING id, photo_attribution, photo_credits INTO v_id, v_svcins_a, v_svcins_c;
 
+    -- Read the seeded row back from the table (not RETURNING): what is stored, before any session acts.
+    SELECT photo_attribution, photo_credits INTO v_seed_a, v_seed_c FROM public.places WHERE id = v_id;
+
     -- Session: an INSERT carrying credits and source comes back NULL / NULL.
     PERFORM set_config('request.jwt.claims', json_build_object('sub', v_uid, 'role', 'authenticated')::text, true);
     INSERT INTO public.places (category, name, region, source, source_id, photo_attribution, photo_credits)
@@ -133,6 +137,9 @@ BEGIN
     UPDATE public.places SET photo_attribution = NULL, photo_credits = NULL WHERE id = v_id
     RETURNING photo_attribution, photo_credits INTO v_clr_a, v_clr_c;
 
+    -- Read the stored row again after the session clear attempt: the old values are in the table, not only in RETURNING.
+    SELECT photo_attribution, photo_credits INTO v_clrt_a, v_clrt_c FROM public.places WHERE id = v_id;
+
     -- Positive control: the same session's ordinary edit still lands.
     UPDATE public.places SET name = 'zz credit probe renamed' WHERE id = v_id
     RETURNING name INTO v_name;
@@ -142,8 +149,8 @@ BEGIN
     UPDATE public.places SET photo_attribution = v_attr1, photo_credits = v_cred1 WHERE id = v_id
     RETURNING photo_attribution, photo_credits INTO v_svc_a, v_svc_c;
 
-    -- The seed read, once more from the table, to prove the row held v_attr0 before any session touched it.
-    SELECT true INTO v_seed_ok;
+    -- Marks that the probe ran to its last statement before the rollback sentinel.
+    v_seed_ok := true;
 
     RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
   EXCEPTION WHEN raise_exception THEN
@@ -179,6 +186,12 @@ BEGIN
   IF v_clr_a IS DISTINCT FROM v_attr0 OR v_clr_c IS DISTINCT FROM v_cred0 THEN
     RAISE EXCEPTION 'probe: a session UPDATE cleared credits (attribution=%, credits=%, expected the seeded values) — the lock is open', v_clr_a, v_clr_c;
   END IF;
+  IF v_seed_a IS DISTINCT FROM v_attr0 OR v_seed_c IS DISTINCT FROM v_cred0 THEN
+    RAISE EXCEPTION 'probe: the seeded row read back from the table is not the seed (attribution=%, credits=%)', v_seed_a, v_seed_c;
+  END IF;
+  IF v_clrt_a IS DISTINCT FROM v_attr0 OR v_clrt_c IS DISTINCT FROM v_cred0 THEN
+    RAISE EXCEPTION 'probe: the stored row after a session clear is not the seed (attribution=%, credits=%) — the lock is open', v_clrt_a, v_clrt_c;
+  END IF;
   IF v_seed_ok IS NOT TRUE THEN
     RAISE EXCEPTION 'probe: the probe did not reach its end';
   END IF;
@@ -199,7 +212,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261209_places_credit_guard.sql', 'e3bbcd27a421f7380423c0223df75274b9bbad14204652c46830b2c1b41e13d1')
+VALUES ('20261209_places_credit_guard.sql', '27c69fc4ac2af28a60a3e3f730eef76ba5c52cb8bffdec48de333e1a65f9134b')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
