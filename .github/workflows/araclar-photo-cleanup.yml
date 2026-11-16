@@ -73,3 +73,12 @@ jobs:
           else
             gh issue comment "$num" --body "Still red ($GITHUB_EVENT_NAME): $run"
           fi
+
+      # One heartbeat row per run that deletes (schedule, or apply=true). Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && env.WRITE == 'true' }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ env.WRITE }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"

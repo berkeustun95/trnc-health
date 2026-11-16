@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const KEY = /ada-supabase-service-role|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|SUPABASE_ACCESS_TOKEN|serviceRoleKey\b/
-const WRITE = /\.(insert|upsert|update|delete|rpc|upload|remove)\(|functions\/v1\/|database\/query/
+const WRITE = /\.(insert|upsert|update|delete|rpc|upload|remove)\(|functions\/v1\/|database\/query|rest\/v1\/rpc\//
 const NOT_A_WRITE = /createHash\([^)]*\)\.update\(|\.update\(Buffer/g
 // What the guard must precede: a key read, a client, a network call, or the loadEnv()
 // CALL. `function serviceRoleKey(` is a declaration, not a read. Reading .env itself is
@@ -61,6 +61,8 @@ if (process.argv.includes('--selftest')) {
   t('hash.update is not a write', classify("const k = process.env.SUPABASE_SERVICE_ROLE_KEY\ncreateHash('sha256').update(x)").kind, 'read-only (key, no write)')
   t('Management API SQL counts as a write', classify("const k = process.env.SUPABASE_ACCESS_TOKEN\nawait fetch(`${a}/database/query`)").ok, false)
   t('edge-function call counts as a write', classify("const k = process.env.SUPABASE_SECRET_KEY\nawait fetch(`${u}/functions/v1/x`)").ok, false)
+  t('a PostgREST rpc call counts as a write', classify("const k = process.env.SUPABASE_SERVICE_ROLE_KEY\nawait fetch(`${u}/rest/v1/rpc/x`)").ok, false)
+  t('  and passes when guarded first', classify(guard + "const k = process.env.SUPABASE_SERVICE_ROLE_KEY\nawait fetch(`${u}/rest/v1/rpc/x`)").ok, true)
   console.log(bad ? `\n  ${bad} self-test failure(s).` : '\n  Self-test clean.')
   process.exit(bad ? 1 : 0)
 }

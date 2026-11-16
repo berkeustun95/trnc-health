@@ -4,7 +4,12 @@
 # side (gau-duyurular, genclik: 2026-10-26) is fetched once a week with its own parser. If one
 # answers 200 WITH items, this opens an issue "Source back up: <name>" (GitHub emails it).
 # It never reactivates anything: that stays a reviewed edit of sources.mjs.
-# No secrets, no environment: nothing here touches the database.
+# The `recheck` job has no secrets, no environment and never touches the database. The separate `record` job
+# (scheduled runs only) holds the production environment and the service key for ONE write: this run's heartbeat
+# row (job key, ok/failed, error class, run id) in data_job_runs (data jobs, slice 2). It checks out the repo,
+# installs Node, runs one script, and creates a `production` deployment record each Monday; it takes nothing
+# from `recheck` but its result. `continue-on-error: true` at job level: a runner fault in `record` (checkout,
+# setup-node, environment) must not turn a green recheck red with no alert.
 #
 #   gh workflow run duyurular-paused-recheck
 
@@ -65,3 +70,28 @@ jobs:
           else
             gh issue comment "$num" --body "Still red ($GITHUB_EVENT_NAME): $run"
           fi
+
+  # One heartbeat row per scheduled run, from its own job so `recheck` keeps no environment and no key.
+  record:
+    needs: [recheck]
+    if: ${{ always() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    environment: production
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Record the run (data_job_runs)
+        timeout-minutes: 2
+        env:
+          RECHECK_RESULT: ${{ needs.recheck.result }}
+          REAL_RUN: ${{ github.event_name == 'schedule' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+        run: node scripts/record-data-job-run.mjs --status="$RECHECK_RESULT" --real-run="$REAL_RUN"

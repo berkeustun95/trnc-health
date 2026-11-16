@@ -5,12 +5,13 @@ import { colors, type, radii, elevation } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { ListRow, Button, CategoryIcon, useTabBarFootprint, PageCanvas } from '../ui'
 import { FADE_H } from '../ui/FloatingTabBar'
+import { CAN_RESET_ONBOARDING } from '../../utils/previewTools'
 
 // ─── Profil: the ONE settings place (redesign Slice 2) ──────────────────────
 // The drawer is gone; everything it held lives here, in four groups. Every row calls an
 // App.js handler, so a setting behaves the same wherever else it might be reached.
 // `a` = actions: { onLanguage, onCityWelcome, onNotifications, onContact, onRate, onShare,
-//                  onTutorial, onLegal, onAbout, onSignOut, onDeleteAccount? }
+//                  onTutorial, onLegal, onAbout, onSignOut, onDeleteAccount?, onResetOnboarding? }
 function Group({ title, children }) {
   return (
     <View style={s.group}>
@@ -46,6 +47,9 @@ export function SettingsGroups({ lang, a, isGuest = false }) {
         {/* A guest has no account to delete — signing out IS the end of a guest account. */}
         {!isGuest && !!a.onDeleteAccount &&
           row('trash-outline', 'health', 'hrRowDelete', a.onDeleteAccount, { destructive: true, chevron: false })}
+        {/* ADA Preview installs only (utils/previewTools.js); the handler checks again. */}
+        {CAN_RESET_ONBOARDING && !!a.onResetOnboarding &&
+          row('refresh-outline', 'health', 'devResetOnboarding', a.onResetOnboarding, { destructive: true, chevron: false })}
       </Group>
     </View>
   )

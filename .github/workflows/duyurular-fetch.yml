@@ -132,6 +132,16 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # One heartbeat row per real run (a write run with no `only` filter), before the chain step sleeps ~30 min.
+      # Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && env.WRITE == 'true' && !inputs.only }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ env.WRITE == 'true' && !inputs.only }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"
+
       # Last step, and it runs after a failed fetch too: one broken site must not stop the chain.
       # A cancelled run does stop it (that is how a human halts it); cron restarts it.
       - name: Chain the next run (~30 min after this one started)
