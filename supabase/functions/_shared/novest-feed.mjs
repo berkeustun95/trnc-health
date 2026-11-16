@@ -19,7 +19,7 @@
 // READ-ONLY against coldwellbankernovest.com. GET only, never POST/PUT/DELETE.
 
 const BASE = 'https://coldwellbankernovest.com/wp-json/wp/v2'
-const UA = 'ADA-TRNC-Health/1.0 (+https://ada.cy; partner listing sync; berke.ustun95@gmail.com)'
+const UA = 'ADA-TRNC-Health/1.0 (+https://getadaapp.com; partner listing sync; getadaapp@gmail.com)'
 const REQUEST_DELAY_MS = 700   // good citizen; their box is a single LiteSpeed host
 
 export const SOURCE = 'novest'
