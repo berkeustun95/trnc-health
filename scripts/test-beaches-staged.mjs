@@ -326,5 +326,137 @@ await red('9b is_previewer() replaced by SELECT true', FILE, /anon can read \d+ 
 await red('9c positive control: nobody can read active beaches', FILE, /positive control failed/, SEED, d => d.exec("DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' AND false)"))
 await red('8 a blocked term that matches a beach name (the word filter is live in the apply)', FILE, /BLOCKED_TERM/, SEED, d => d.exec("INSERT INTO public.blocked_terms (term) VALUES ('bamboo')"))
 
+// ── 7. go-live files: 20261215 (publish the 30) and 20261216 (7 locales on the 4 live beaches), both after 20261207 + 20261214 ──
+{
+  const EL = `${MIGDIR}/${MIGS.filter(f => /^\d+_beaches_el_turkish_names\.sql$/.test(f)).pop()}`
+  const PUB = `${MIGDIR}/20261215_beaches_publish.sql`, LOC = `${MIGDIR}/20261216_beaches_live4_locales.sql`
+  const TRANS = JSON.parse(readFileSync('data/explore/beaches-live-translations.json', 'utf8'))
+  const NEWK = ['ar', 'ru', 'el', 'fr', 'es', 'de', 'fa']
+  const mk = async live => {
+    const d = await freshDb(SEED)
+    let x = await applyFile(d, `${MIGDIR}/20261178_places_staged_preview.sql`); assert.ok(x.ok, x.msg)
+    await d.exec(STAGE_SHOPS)
+    x = await applyFile(d, FILE); assert.ok(x.ok, x.msg)
+    x = await applyFile(d, EL); assert.ok(x.ok, x.msg)
+    if (live) for (const id of LIVE_IDS) await d.query('UPDATE public.places SET name_i18n = $1::jsonb, description_i18n = $2::jsonb WHERE id = $3', [JSON.stringify(TRANS[id].source.name_i18n), JSON.stringify(TRANS[id].source.description_i18n), id])
+    return d
+  }
+  const changedIds = (b, a) => a.filter((j, i) => JSON.stringify(j) !== JSON.stringify(b[i])).map(j => j.id)
+  const LIVEW = `id IN (${LIVE_IDS.map(i => `'${i}'`).join(',')})`
+  const txt = f => readFileSync(f, 'utf8')
+  const vf = (f, name, anchor, repl) => {
+    const t = txt(f); assert.equal(t.split(anchor).length, 2, `anchor unique for ${name}`)
+    const p = join(tmpDir, `${name}.sql`); writeFileSync(p, t.replace(anchor, repl)); return p
+  }
+  const redG = async (label, file, expect, prep, live = false) => {
+    reds++
+    const d = await mk(live)
+    if (prep) await prep(d)
+    const before = await snap(d)
+    const x = await applyFile(d, file); await undo(d)
+    console.log(`RED ${label}:\n     ${x.msg}`)
+    assert.equal(x.ok, false, `${label}: must abort`); assert.match(x.msg, expect, `${label}: wrong message`)
+    assert.deepEqual(await snap(d), before, `${label}: aborted, nothing applied`)
+  }
+
+  // 20261215
+  {
+    const d = await mk(false)
+    const before = await snap(d)
+    const shopsBefore = await snap(d, SHOPS), liveBefore = await snap(d, LIVE)
+    const x = await applyFile(d, PUB); assert.ok(x.ok, `20261215: ${x.msg}`)
+    const after = await snap(d)
+    assert.equal(after.length, before.length)
+    const ch = changedIds(before, after)
+    assert.equal(ch.length, 30, 'exactly 30 rows changed')
+    const mine2 = await snap(d, IN_FILE)
+    assert.equal(mine2.length, 30)
+    assert.ok(mine2.every(j => j.status === 'active'), 'all 30 are active')
+    assert.deepEqual(mine2.map(j => ({ ...j, status: 'x' })), before.filter(j => mine2.some(m => m.id === j.id)).map(j => ({ ...j, status: 'x' })), 'the 30 differ in no column but status')
+    assert.deepEqual(await snap(d, SHOPS), shopsBefore, 'staged shops byte-identical')
+    assert.deepEqual(await snap(d, LIVE), liveBefore, 'live beaches byte-identical')
+    assert.deepEqual(await snap(d, NOT_FILE), before.filter(j => !mine2.some(m => m.id === j.id)), 'every other row byte-identical')
+    assert.equal((await d.query("SELECT count(*)::int n FROM public.places WHERE category = 'beach' AND status = 'staged'")).rows[0].n, 0, 'no beach left staged')
+    assert.equal(await seen(d, 'anon', null, false, IN_FILE), 30, 'an ordinary anon now sees all 30')
+    assert.equal(await seen(d, 'anon', null, false, SHOPS), 0, 'and still none of the shops')
+    assert.equal((await d.query('SELECT count(*)::int n FROM public.schema_migrations_applied WHERE filename = $1', ['20261215_beaches_publish.sql'])).rows[0].n, 1, 'stamps itself')
+    const again = await applyFile(d, PUB); await undo(d)
+    assert.equal(again.ok, false); assert.match(again.msg, /of the 30 target pairs are missing, duplicated, or not a staged beach/, again.msg)
+    console.log('20261215: applied; exactly 30 rows changed (status only); staged shops + live beaches + every other row byte-identical; no beach staged; re-run raises:', again.msg)
+  }
+  await redG('15a a beach already published first (29 staged)', PUB, /^.*1 of the 30 target pairs are missing, duplicated, or not a staged beach$/, d => d.exec("UPDATE public.places SET status = 'active' WHERE source_id = 'long-beach'"))
+  await redG('15b a target row missing', PUB, /^.*1 of the 30 target pairs are missing, duplicated, or not a staged beach$/, d => d.exec("DELETE FROM public.places WHERE source_id = 'way/225386412'"))
+  await redG('15c a target pair held by a staged non-beach row', PUB, /^.*1 of the 30 target pairs are missing, duplicated, or not a staged beach$/, d => d.exec("UPDATE public.places SET category = 'cafe' WHERE source_id = 'way/225386412'"))
+  await redG('15d a 6th (AFTER) UPDATE trigger', PUB, /expected exactly 5 before-row ones/, d => d.exec("CREATE FUNCTION public.t_after_fn() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN RETURN NULL; END $f$; CREATE TRIGGER t_after_upd AFTER UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_after_fn()"))
+  await redG('15e a 6th BEFORE UPDATE trigger', PUB, /places has 6 enabled UPDATE triggers/, d => d.exec("CREATE FUNCTION public.t_b_fn() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN RETURN NEW; END $f$; CREATE TRIGGER t_b_upd BEFORE UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_b_fn()"))
+  await redG('15f a 31st staged beach outside the list stays staged', PUB, /1 beaches are still staged after the update/, d => d.exec("INSERT INTO public.places (category, name, region, status, source, source_id) VALUES ('beach', 'Extra', 'kyrenia', 'staged', 'osm', 'way/424242')"))
+  const AFTER_UPD = "  GET DIAGNOSTICS v_n = ROW_COUNT;"
+  await redG('15g a staged shop activated inside the file (hash)', vf(PUB, 'p_shop', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET status = 'active' WHERE category = 'cafe' AND source = 'osm' AND name = 'Staged Cafe One';`), /a places row outside the 30 changed/)
+  await redG('15h a live beach edited inside the file (hash)', vf(PUB, 'p_live', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET name = 'R' WHERE category = 'beach' AND source IS NULL;`), /a places row outside the 30 changed/)
+  await redG('15i a photo written onto one of the 30 (column check)', vf(PUB, 'p_col', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET cover_image_url = 'x.jpg' WHERE source_id = 'way/225386412';`), /a column other than status changed on one of the 30 rows/)
+  {
+    const noHash = vf(PUB, 'p_nohash', 'IF v_others_after IS DISTINCT FROM v_others_before THEN', 'IF false THEN')
+    await redG('15j staged-shop count check alone (hash disabled, a shop deleted)', vf(noHash, 'p_cnt', AFTER_UPD, `${AFTER_UPD}\n  DELETE FROM public.places WHERE category = 'cafe' AND name = 'Staged Cafe One';`), /the count of staged non-beach rows changed \(4 -> 3\)/)
+  }
+  await redG('15k the exact-30 count alone (pre-check disabled, a target deleted)', vf(PUB, 'p_diag', "IF v_bad <> 0 THEN\n    RAISE EXCEPTION '% of the % target pairs", "IF false THEN\n    RAISE EXCEPTION '% of the % target pairs"), /expected to publish exactly 30 staged beach rows, updated 29/, d => d.exec("DELETE FROM public.places WHERE source_id = 'way/225386412'"))
+
+  // 20261216
+  {
+    const d = await mk(true)
+    const before = await snap(d)
+    const x = await applyFile(d, LOC); assert.ok(x.ok, `20261216: ${x.msg}`)
+    const after = await snap(d)
+    assert.equal(after.length, before.length)
+    const ch = changedIds(before, after)
+    assert.deepEqual([...ch].sort(), [...LIVE_IDS].sort(), 'exactly the 4 live beaches changed')
+    for (const id of LIVE_IDS) {
+      const b = before.find(j => j.id === id), a = after.find(j => j.id === id)
+      assert.deepEqual({ ...a, name_i18n: 0, description_i18n: 0 }, { ...b, name_i18n: 0, description_i18n: 0 }, 'no other column changed')
+      for (const k of ['name_i18n', 'description_i18n']) {
+        assert.equal(Object.keys(a[k]).length, 9, `${k}: 9 keys`)
+        assert.deepEqual({ en: a[k].en, tr: a[k].tr }, { en: b[k].en, tr: b[k].tr }, `${k}: en/tr byte-identical`)
+        assert.deepEqual(a[k], { ...TRANS[id].source[k], ...TRANS[id][k] }, `${k} equals the file's source + new keys`)
+      }
+      assert.equal(a.name_i18n.el, a.name_i18n.tr, 'el = tr name')
+    }
+    assert.deepEqual(after.filter(j => !LIVE_IDS.includes(j.id)), before.filter(j => !LIVE_IDS.includes(j.id)), 'every other row (30 staged beaches, shops, submissions) byte-identical')
+    let scanned = 0
+    for (const id of LIVE_IDS) for (const k of ['name_i18n', 'description_i18n']) for (const l of NEWK) {
+      const q = (await d.query('SELECT contains_blocked_term($1) b, contains_payment_solicitation($1) p', [TRANS[id][k][l]])).rows[0]
+      scanned++; assert.deepEqual(q, { b: false, p: false }, `word filter hit on ${id} ${k} ${l}`)
+    }
+    assert.equal(scanned, 56)
+    const again = await applyFile(d, LOC); await undo(d)
+    assert.equal(again.ok, false); assert.match(again.msg, /of the 4 live beaches are missing, not active beaches, or no longer equal the source en\/tr values/, again.msg)
+    console.log(`20261216: applied; exactly the 4 live rows changed; 9 keys each; en/tr + every other column + every other row byte-identical; el = tr; word filter: ${scanned} new strings, 0 hits; re-run raises:`, again.msg)
+  }
+  const PRE16 = /^.*1 of the 4 live beaches are missing, not active beaches, or no longer equal the source en\/tr values$/
+  await redG('16a a live row already carries an extra key', LOC, PRE16, d => d.query(`UPDATE public.places SET name_i18n = name_i18n || '{"it":"x"}'::jsonb WHERE id = '${LIVE_IDS[0]}'`), true)
+  await redG('16b a live row with an edited en description', LOC, PRE16, d => d.query(`UPDATE public.places SET description_i18n = jsonb_set(description_i18n, '{en}', '"edited"') WHERE id = '${LIVE_IDS[1]}'`), true)
+  await redG('16c a live row not active any more', LOC, PRE16, d => d.exec(`UPDATE public.places SET status = 'hidden' WHERE id = '${LIVE_IDS[2]}'`).catch(() => d.exec(`UPDATE public.places SET status = 'rejected' WHERE id = '${LIVE_IDS[2]}'`)), true)
+  await redG('16d a live row missing', LOC, PRE16, d => d.exec(`DELETE FROM public.places WHERE id = '${LIVE_IDS[3]}'`), true)
+  await redG('16e a 6th (AFTER) UPDATE trigger', LOC, /expected exactly 5 before-row ones/, d => d.exec("CREATE FUNCTION public.t_after_fn() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN RETURN NULL; END $f$; CREATE TRIGGER t_after_upd AFTER UPDATE ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_after_fn()"), true)
+  await redG('16f a blocked term matches one of the 7 new texts (check_place_content fires in the apply)', LOC, /BLOCKED_TERM/, d => d.exec("INSERT INTO public.blocked_terms (term) VALUES ('tortues')"), true)
+  await redG('16g a shop edited inside the file (hash)', vf(LOC, 'l_shop', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET name = 'R' WHERE category = 'cafe' AND name = 'Staged Cafe One';`), /a places row outside the 4 changed/, null, true)
+  await redG('16h an address written on a live row (column check)', vf(LOC, 'l_col', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET address = 'x' WHERE id = '${LIVE_IDS[0]}';`), /a column other than name_i18n \/ description_i18n changed on one of the 4 rows/, null, true)
+  await redG('16i an en name rewritten inside the file (en/tr check)', vf(LOC, 'l_en', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET name_i18n = jsonb_set(name_i18n, '{en}', '"Z"') WHERE id = '${LIVE_IDS[0]}';`), /an en \/ tr value changed on one of the 4 rows/, null, true)
+  await redG('16j el no longer = tr (9-keys / el check)', vf(LOC, 'l_el', AFTER_UPD, `${AFTER_UPD}\n  UPDATE public.places SET name_i18n = jsonb_set(name_i18n, '{el}', '"Z"') WHERE id = '${LIVE_IDS[0]}';`), /of the 4 rows do not carry 9 keys in both columns and el = tr/, null, true)
+  await redG('16k the exact-4 count alone (pre-check disabled, one row edited)', vf(LOC, 'l_diag', "IF v_bad <> 0 THEN\n    RAISE EXCEPTION '% of the % live beaches", "IF false THEN\n    RAISE EXCEPTION '% of the % live beaches"), /expected to update exactly 4 live beach rows, updated 3/, d => d.query(`UPDATE public.places SET name_i18n = name_i18n || '{"it":"x"}'::jsonb WHERE id = '${LIVE_IDS[0]}'`), true)
+
+  // both, in order, one database
+  {
+    const d = await mk(true)
+    const before = await snap(d)
+    for (const f of [PUB, LOC]) { const x = await applyFile(d, f); assert.ok(x.ok, `${f}: ${x.msg}`) }
+    const after = await snap(d)
+    assert.equal(changedIds(before, after).length, 34, '30 published + 4 localized')
+    assert.equal((await d.query("SELECT count(*)::int n FROM public.places WHERE category = 'beach' AND status = 'active'")).rows[0].n, 34)
+    assert.equal((await d.query("SELECT count(*)::int n FROM public.places WHERE status = 'staged'")).rows[0].n, 4, 'only the 4 staged shops remain staged')
+    assert.deepEqual(await snap(d, SHOPS), before.filter(j => j.category !== 'beach' && j.status === 'staged'), 'shops byte-identical')
+    console.log('20261215 then 20261216 in one database: 34 rows changed (30 + 4), 34 active beaches, 4 shops still staged')
+  }
+  out.push('20261215: 30 of 30 published (status only); 20261216: 7 locales on 4 live rows; reds fire; re-runs raise')
+}
+
 const all = await snap(db)
 console.log(`beaches staged: OK (${ROWS.length} rows = 2 Ministry + 28 OSM; production anon/authenticated see 0 of them, Preview sees all 30; live beaches and staged shops byte-identical; second apply and a post-publish re-run pass; ${all.length} rows at the end; ${reds} reds fired)`)
