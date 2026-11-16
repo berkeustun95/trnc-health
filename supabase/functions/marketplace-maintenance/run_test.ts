@@ -6,12 +6,15 @@ const SERVICE = token('service_role')
 const COUNTS = { expired_soft_deleted: 2, purged: 1, purge_held_by_report: 1 }
 const assert = (ok: boolean, msg: string) => { if (!ok) throw new Error(msg) }
 
-function rig(o: { orphans?: number; failChunk?: number; retentionFails?: boolean } = {}) {
+function rig(o: { orphans?: number; failChunk?: number; retentionFails?: boolean; orphansFail?: boolean } = {}) {
   const calls = { applied: [] as boolean[], removed: [] as string[][], logs: [] as string[] }
   let chunk = 0
   const deps: Deps = {
     retention: async apply => { if (o.retentionFails) throw new Error('x'); calls.applied.push(apply); return COUNTS },
-    orphans: async limit => Array.from({ length: Math.min(o.orphans ?? 0, limit) }, (_, i) => `pending/u/l/${i}.jpg`),
+    orphans: async limit => {
+      if (o.orphansFail) throw new Error('x')
+      return Array.from({ length: Math.min(o.orphans ?? 0, limit) }, (_, i) => `pending/u/l/${i}.jpg`)
+    },
     remove: async paths => { if (chunk++ === o.failChunk) throw new Error('x'); calls.removed.push(paths) },
     log: c => calls.logs.push(c),
   }
@@ -60,4 +63,35 @@ Deno.test('the response carries counts only', async () => {
   const { deps } = rig({ orphans: 3 })
   const r = await run(SERVICE, { apply: true }, deps)
   assert(Object.values(r.body).every(v => typeof v === 'number' || typeof v === 'boolean'), JSON.stringify(r.body))
+})
+
+Deno.test('data-jobs record: apply runs only, ok / failed, and a failing record changes nothing', async () => {
+  const recs: Array<[string, string | null]> = []
+  const withRec = (o: Parameters<typeof rig>[0], fail = false) => {
+    const r = rig(o)
+    r.deps.record = async (outcome, cls) => { if (fail) throw new Error('x'); recs.push([outcome, cls]) }
+    return r
+  }
+  await run(SERVICE, { apply: true }, withRec({ orphans: 1 }).deps)
+  await run(SERVICE, {}, withRec({ orphans: 1 }).deps)
+  await run(SERVICE, null, withRec({}).deps)
+  assert(recs.length === 1 && recs[0][0] === 'ok' && recs[0][1] === null, `dry runs must not record: ${JSON.stringify(recs)}`)
+  await run(SERVICE, { apply: true }, withRec({ retentionFails: true }).deps)
+  assert(recs[1][0] === 'failed' && recs[1][1] === 'retention_failed', 'retention failure recorded')
+  await run(SERVICE, { apply: true }, withRec({ orphans: 3, failChunk: 0 }).deps)
+  assert(recs[2][0] === 'failed' && recs[2][1] === 'remove_failed', 'remove failure recorded')
+  await run('garbage', { apply: true }, withRec({}).deps)
+  assert(recs.length === 3, 'a refused caller records nothing')
+  const r = await run(SERVICE, { apply: true }, withRec({ orphans: 1 }, true).deps)
+  assert(r.status === 200 && r.body.applied === true, 'a record failure must not change the response')
+})
+
+Deno.test('orphan listing failure on an apply run records failed, response unchanged', async () => {
+  const recs: Array<[string, string | null]> = []
+  const { deps, calls } = rig({ orphansFail: true })
+  deps.record = async (outcome, cls) => { recs.push([outcome, cls]) }
+  const r = await run(SERVICE, { apply: true }, deps)
+  assert(recs.length === 1 && recs[0][0] === 'failed' && recs[0][1] === 'orphans_failed', `recorded: ${JSON.stringify(recs)}`)
+  assert(calls.logs.includes('orphans_failed'), 'not logged')
+  assert(r.status === 200 && r.body.orphans_found === 0 && r.body.orphans_remove_failed === 0, JSON.stringify(r.body))
 })

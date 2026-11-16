@@ -24,6 +24,7 @@
 // body), goes to Google once (nearby, rounded to 4 decimals ≈ 10 m — the policy's figure) or into check_in_google() for the
 // distance check (never stored), and is dropped. Failures log a status code only.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { dataJobGate, recordDataJobRun } from '../_shared/data-jobs.mjs'
 
 const PLACES = 'https://places.googleapis.com/v1'
 const RADIUS_M = 100
@@ -99,6 +100,20 @@ async function refresh(key: string) {
   return json(200, { refreshed, removed })
 }
 
+// The cron's refresh: asks the pause switch first (fail-open), records ok/failed after. The response is the refresh's own.
+async function gatedRefresh(key: string) {
+  const cfg = { url: Deno.env.get('SUPABASE_URL'), key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), log: (c: string) => console.error('google-places:', c) }
+  if ((await dataJobGate(cfg, 'google-places-refresh')) === 'paused') return json(200, { skipped: 'paused' })
+  const started = Date.now()
+  let res: Response
+  try { res = await refresh(key) } catch {
+    await recordDataJobRun(cfg, 'google-places-refresh', 'failed', 'refresh_threw', started)
+    throw new Error('refresh')
+  }
+  await recordDataJobRun(cfg, 'google-places-refresh', res.status === 200 ? 'ok' : 'failed', res.status === 200 ? null : 'db_read_failed', started)
+  return res
+}
+
 Deno.serve(async req => {
   if (req.method !== 'POST') return json(405, { error: 'method' })
   const key = Deno.env.get('GOOGLE_PLACES_SERVER_KEY')
@@ -111,7 +126,7 @@ Deno.serve(async req => {
   // The gateway (verify_jwt) has already checked the signature, so the role claim can be read
   // as-is: only the service_role key (the cron's Vault secret) carries 'service_role'.
   if (b?.action === 'refresh') {
-    return jwtRole(jwt) === 'service_role' ? refresh(key) : json(403, { error: 'forbidden' })
+    return jwtRole(jwt) === 'service_role' ? gatedRefresh(key) : json(403, { error: 'forbidden' })
   }
 
   const { data: { user } = { user: null }, error: authErr } = await admin.auth.getUser(jwt)
