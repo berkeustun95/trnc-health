@@ -1141,6 +1141,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('data_jobs', 'paused_at', false, NULL, 'timestamp with time zone'),
     ('data_jobs', 'expected_every', false, NULL, 'interval'),
     ('data_jobs', 'sort', true, '0', 'integer'),
+    ('data_jobs', 'records_expected_from', true, 'now()', 'timestamp with time zone'),
     ('data_job_runs', 'id', false, NULL, 'bigint'),
     ('data_job_runs', 'job_key', true, NULL, 'text'),
     ('data_job_runs', 'started_at', true, 'now()', 'timestamp with time zone'),
@@ -1149,6 +1150,11 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('data_job_runs', 'error_class', false, NULL, 'text'),
     ('data_job_runs', 'source', true, NULL, 'text'),
     ('data_job_runs', 'run_ref', false, NULL, 'text'),
+    ('data_jobs_alert_state', 'job_key', true, NULL, 'text'),
+    ('data_jobs_alert_state', 'last_attention', true, NULL, 'boolean'),
+    ('data_jobs_alert_state', 'last_paused', true, NULL, 'boolean'),
+    ('data_jobs_alert_state', 'alerted_at', false, NULL, 'timestamp with time zone'),
+    ('data_jobs_alert_state', 'reminded_at', false, NULL, 'timestamp with time zone'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1268,6 +1274,8 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('data_job_runs_pkey', '', 'id'),
     ('data_job_runs_run_ref_check', '0|1|20|9|^[0-9]{1,20}$', 'run_ref'),
     ('data_job_runs_source_check', 'edge|github', 'source'),
+    ('data_jobs_alert_state_job_key_fkey', '', ''),
+    ('data_jobs_alert_state_pkey', '', 'job_key'),
     ('data_jobs_cron_jobnames_check', '0|github', 'cron_jobnames|runner'),
     ('data_jobs_expected_every_check', '0', 'expected_every'),
     ('data_jobs_key_check', '1|64|9|^[a-z0-9-]{1,64}$', 'key'),
