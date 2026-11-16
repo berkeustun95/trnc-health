@@ -63,6 +63,10 @@ if (process.argv.includes('--selftest')) {
   t('edge-function call counts as a write', classify("const k = process.env.SUPABASE_SECRET_KEY\nawait fetch(`${u}/functions/v1/x`)").ok, false)
   t('a PostgREST rpc call counts as a write', classify("const k = process.env.SUPABASE_SERVICE_ROLE_KEY\nawait fetch(`${u}/rest/v1/rpc/x`)").ok, false)
   t('  and passes when guarded first', classify(guard + "const k = process.env.SUPABASE_SERVICE_ROLE_KEY\nawait fetch(`${u}/rest/v1/rpc/x`)").ok, true)
+  const gateShape = "const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()\nres = await fetch(base + '/rest/v1/rpc/data_job_gate', { method: 'POST' })\n"
+  t('data_job_gate-shaped caller is a writer', classify(gateShape).kind, 'writer')
+  t('  and without the guard it fails', classify(gateShape).ok, false)
+  t('  and with the guard first it passes', classify(guard + gateShape).ok, true)
   console.log(bad ? `\n  ${bad} self-test failure(s).` : '\n  Self-test clean.')
   process.exit(bad ? 1 : 0)
 }
@@ -77,6 +81,13 @@ const rows = files.map(f => ({ file: relative(ROOT, f), ...classify(readFileSync
 const writers = rows.filter(r => r.kind === 'writer')
 const readOnly = rows.filter(r => r.kind.startsWith('read-only'))
 const failing = writers.filter(r => !r.ok)
+// The data-jobs RPC callers insert rows (skipped_paused / run records) or ride the same key: they must stay writers, so a
+// future edit of the call pattern cannot quietly drop them out of this check.
+const MUST_BE_WRITERS = ['scripts/data-job-gate.mjs', 'scripts/record-data-job-run.mjs', 'scripts/check-data-jobs-watchdog.mjs']
+for (const f of MUST_BE_WRITERS) if (!writers.some(r => r.file === f)) {
+  console.error(`  ✗ ${f}  — is not classified as a production writer (expected: service key + rest/v1/rpc call)`)
+  failing.push({ file: f })
+}
 
 console.log(`\nProduction writers (${writers.length}) — each must call prodWriteGuard() first:`)
 for (const r of writers) console.log(`  ${r.ok ? '✓' : '✗'} ${r.file}${r.ok ? '' : `  — ${r.why}`}`)

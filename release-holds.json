@@ -55,8 +55,20 @@
       "commit": "55a4db1fa2b990b4e5c5d10ac1b99afb4c2c13e4",
       "what": "Admin: read-only Data jobs section (slice 1), merged to main 2026-11-15",
       "since": "2026-11-15",
-      "cleared": false,
-      "clear": "Only after Berke has tried the Data jobs screen on Preview (or seen a video) and says go in chat (Berke 2026-11-15: Preview only). Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has tried the Data jobs screen on Preview (or seen a video) and says go in chat (Berke 2026-11-15: Preview only). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-16",
+      "clearedBy": "NOT approved for production: REVERTED on main (Berke 2026-11-16, so the beaches release #448 + #454 + #471 ships from main without the data-jobs app code). The change can only return through a re-land PR (a revert of the revert), which gets its own hold until Berke has seen it on Preview."
+    },
+    {
+      "pr": 475,
+      "commit": "55801b908447bfc462f8df663d61fd30a3a888c5",
+      "what": "Admin: Data jobs pause/resume switches (slice 3 app), merged to main 2026-11-16",
+      "since": "2026-11-16",
+      "cleared": true,
+      "clear": "Only after 20261210/20261211 are applied and Berke has seen the switches on Preview and says go in chat. Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-16",
+      "clearedBy": "NOT approved for production: REVERTED on main (Berke 2026-11-16, so the beaches release #448 + #454 + #471 ships from main without the data-jobs app code). The change can only return through a re-land PR (a revert of the revert), which gets its own hold until Berke has seen it on Preview."
     }
   ]
 }

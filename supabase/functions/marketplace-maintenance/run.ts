@@ -8,6 +8,8 @@ export interface Deps {
   orphans(limit: number): Promise<string[]>
   remove(paths: string[]): Promise<void>
   log(code: string): void
+  // Apply runs only; optional so a dry run and old callers are untouched. Must never throw into the run.
+  record?(outcome: 'ok' | 'failed', errorClass: string | null): Promise<void>
 }
 
 // The gateway (verify_jwt) has already checked the signature, so the role claim can be read as-is: only the
@@ -24,11 +26,17 @@ export async function run(jwt: string, input: unknown, d: Deps): Promise<{ statu
   // Dry unless asked: the nightly job sends {"apply": true}; a hand-run without it only counts.
   const apply = (input as Record<string, unknown> | null)?.apply === true
 
+  const record = async (outcome: 'ok' | 'failed', cls: string | null) => {
+    if (!apply || !d.record) return
+    try { await d.record(outcome, cls) } catch { d.log('record_failed') }
+  }
+
   let counts
-  try { counts = await d.retention(apply) } catch { d.log('retention_failed'); return { status: 500, body: { error: 'RETENTION_FAILED' } } }
+  try { counts = await d.retention(apply) } catch { d.log('retention_failed'); await record('failed', 'retention_failed'); return { status: 500, body: { error: 'RETENTION_FAILED' } } }
 
   let found: string[] = []
-  try { found = await d.orphans(500) } catch { d.log('orphans_failed') }
+  let orphansFailed = false
+  try { found = await d.orphans(500) } catch { orphansFailed = true; d.log('orphans_failed') }
   let removed = 0, removeFailed = 0
   if (apply) {
     for (let i = 0; i < found.length; i += REMOVE_CHUNK) {
@@ -36,6 +44,9 @@ export async function run(jwt: string, input: unknown, d: Deps): Promise<{ statu
       try { await d.remove(chunk); removed += chunk.length } catch { removeFailed += chunk.length; d.log('remove_failed') }
     }
   }
+  if (removeFailed > 0) await record('failed', 'remove_failed')
+  else if (orphansFailed) await record('failed', 'orphans_failed')
+  else await record('ok', null)
   return { status: 200, body: { applied: apply, ...counts, orphans_found: found.length, orphans_removed: removed,
                                 orphans_remove_failed: removeFailed } }
 }
