@@ -78,6 +78,9 @@ REVOKE ALL ON FUNCTION public.duty_push_due(timestamptz), public.weekend_digest_
 INSERT INTO auth.users VALUES ('${ADMIN}'), ('${ADMIN2}'), ('${CUST}');
 INSERT INTO public.profiles (id, role, push_token) VALUES ('${ADMIN}', 'admin', 'ExponentPushToken[aaa]'), ('${ADMIN2}', 'admin', NULL), ('${CUST}', 'customer', 'ExponentPushToken[ccc]');
 INSERT INTO cron.job (jobname, schedule, command) SELECT n, '0 3 * * *', 'SELECT 1' FROM unnest(ARRAY[${cronNames.map(n => `'${n}'`).join(',')}]) n WHERE n NOT IN ('purge-data-job-runs');
+-- live-scores as on prod (read 2026-11-16): all six paused (active = false), the polls every minute, the dailies at 03:00 / 03:02 / 03:04
+UPDATE cron.job SET active = false, schedule = CASE jobname WHEN 'live-scores-basketball-poll' THEN '* * * * *' WHEN 'live-scores-f1-poll' THEN '* * * * *' WHEN 'live-scores-football-poll' THEN '* * * * *'
+  WHEN 'live-scores-basketball-daily' THEN '0 3 * * *' WHEN 'live-scores-f1-daily' THEN '2 3 * * *' ELSE '4 3 * * *' END WHERE jobname LIKE 'live-scores-%';
 UPDATE cron.job SET schedule = '0,30 * * * *', command = 'SELECT net.http_post() WHERE public.duty_push_due();' WHERE jobname = 'duty-push';
 UPDATE cron.job SET schedule = '0,30 * * * 5,6', command = 'SELECT net.http_post() WHERE public.weekend_digest_due();' WHERE jobname = 'weekend-digest';
 -- the live 2026-11-13 'all' run that made the old weekend probe date false on prod
@@ -94,12 +97,13 @@ const build = async (upTo) => {
   return db
 }
 // red-first: break ONE thing in a file, require the file to refuse with a message naming it
-const mutant = async (label, file, upTo, from, to, want) => {
+const mutant = async (label, file, upTo, from, to, want, pre = '') => {
   const text = read(file)
   assert.ok(text.includes(from), `${label}: anchor not in file: ${from}`)
   const db = await freshDb(SEED)
   assert.ok((await run(db, read(R1).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
   if (upTo === 2) assert.ok((await run(db, read(A).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
+  if (pre) assert.ok((await run(db, pre)).ok, `${label}: pre-SQL failed`)
   const r = await run(db, text.replace(from, to).replace(/^NOTIFY pgrst.*$/m, ''))
   t(`red-first ${label}`, !r.ok && r.msg.includes(want) ? 'caught' : `NOT caught: ${r.ok ? 'applied' : r.msg}`, 'caught')
 }
@@ -206,6 +210,22 @@ await mutant('B: customers are notified too', B, 2, `FOR r IN SELECT id, push_to
 await mutant('B: resumed line dropped', B, 2, `v_lines := v_lines || (v_key || ': yeniden başladı');`, `NULL;`, 'probe results differ')
 await mutant('B: weekly reminder every 6 hours not 6 days', B, 2, `v_rem < p_now - interval '6 days'`, `v_rem < p_now - interval '6 hours'`, 'probe results differ')
 await mutant('B: second cron job at the watchdog minutes is refused', B, 2, `SELECT cron.schedule('data-jobs-watchdog', '14,44 * * * *', 'SELECT public.data_jobs_watchdog();');`, `SELECT cron.schedule('data-jobs-watchdog', '14,44 * * * *', 'SELECT public.data_jobs_watchdog();');\nSELECT cron.schedule('zz-collide', '44 * * * *', 'SELECT 1');`, 'another cron job fires')
+await mutant('B: an ACTIVE every-minute job is still refused (the paused live-scores polls are not)', B, 2, `SELECT cron.schedule('data-jobs-watchdog', '14,44 * * * *', 'SELECT public.data_jobs_watchdog();');`, `SELECT cron.schedule('data-jobs-watchdog', '14,44 * * * *', 'SELECT public.data_jobs_watchdog();');\nSELECT cron.schedule('zz-minute', '* * * * *', 'SELECT 1');`, 'another cron job fires')
+await mutant('B: the collision check ignoring `active` refuses the paused polls (the original bug)', B, 2, `WHERE jobname <> 'data-jobs-watchdog' AND active`, `WHERE jobname <> 'data-jobs-watchdog'`, 'live-scores-football-poll (* * * * *)')
+
+console.log('── file B applied while an admin has a REAL job paused (20261210 is live): no false "probe rows leaked"')
+{
+  const PAUSE = `UPDATE data_jobs SET paused = true, paused_note = 'harness real pause', paused_by = '${ADMIN}', paused_at = now() WHERE key = 'novest-images'`
+  const d = await freshDb(SEED)
+  assert.ok((await run(d, read(R1).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
+  assert.ok((await run(d, read(A).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
+  assert.ok((await run(d, PAUSE)).ok)
+  const r = await run(d, read(B).replace(/^NOTIFY pgrst.*$/m, ''))
+  t('B applies with novest-images paused', r.ok ? 'applied' : r.msg, 'applied')
+  t('and the real pause survived the probes', (await d.query(`SELECT string_agg(key, ',' ORDER BY key) k FROM data_jobs WHERE paused`)).rows[0].k, 'novest-images')
+}
+await mutant('B: the old leak check (any paused job = leak) trips on a real pause', B, 2, `OR (SELECT coalesce(string_agg(key, ',' ORDER BY key), '') FROM public.data_jobs WHERE paused) IS DISTINCT FROM v_paused_keys`, `OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused)`, 'probe rows leaked',
+  `UPDATE data_jobs SET paused = true, paused_note = 'harness real pause', paused_by = '${ADMIN}', paused_at = now() WHERE key = 'novest-images'`)
 
 console.log('── watchdog behaviour measured from outside (own scenario: all admins, a probe-free quiet database)')
 // quiet baseline: everything the live-looking seed reads as attention is alerted once, then state is stable

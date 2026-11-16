@@ -347,7 +347,8 @@ BEGIN
     RAISE EXCEPTION 'data-jobs-watchdog is not scheduled exactly once with the exact schedule and command';
   END IF;
   SELECT string_agg(jobname || ' (' || schedule || ')', ', ' ORDER BY jobname) INTO v_names FROM cron.job
-   WHERE jobname <> 'data-jobs-watchdog'
+   WHERE jobname <> 'data-jobs-watchdog' AND active
+     -- a paused (active = false) every-minute job does not fire; resuming live-scores must re-check this collision
      AND (schedule = '14,44 * * * *' OR split_part(schedule, ' ', 1) ~ '(^|,)(14|44)(,|$)' OR split_part(schedule, ' ', 1) = '*');
   IF v_names IS NOT NULL THEN RAISE EXCEPTION 'another cron job fires at the watchdog''s minutes: %', v_names; END IF;
 
@@ -382,6 +383,8 @@ BEGIN
     v_anon_call text;
     v_auth_call text;
     v_mon_in timestamptz := timestamptz '2030-01-07 07:14+00';   -- Monday 09:14 Asia/Famagusta (winter, +02)
+    -- jobs an admin paused for real before this runs: the probes must leave exactly that set behind
+    v_paused_keys text := (SELECT coalesce(string_agg(key, ',' ORDER BY key), '') FROM public.data_jobs WHERE paused);
   BEGIN
     BEGIN
       -- quiesce: whatever the live data says is recorded as already seen, so later ticks only report what a probe changed
@@ -445,6 +448,8 @@ BEGIN
       -- the clock jumps to 2030, where every real job's grace is over: record that as already seen first, so the body
       -- only carries what the probe changes (a full body would cut the probe's line and hide it)
       PERFORM public.data_jobs_watchdog(v_mon_in - interval '1 day');
+      -- a really paused job would get its own Monday reminder line here and could crowd the probe's line out of the capped body
+      UPDATE public.data_jobs_alert_state SET reminded_at = v_mon_in WHERE job_key NOT LIKE 'probe-wd-%' AND last_paused;
       DELETE FROM public.notifications WHERE title = 'Veri işleri' AND user_id IN (SELECT id FROM public.profiles WHERE role = 'admin');
       PERFORM public.data_jobs_watchdog(v_mon_in);
       SELECT coalesce(string_agg(l, ' | ' ORDER BY l), '-') INTO v_r FROM public.notifications n, regexp_split_to_table(n.body, E'\n') l
@@ -540,7 +545,7 @@ BEGIN
 
     IF EXISTS (SELECT 1 FROM public.data_jobs WHERE key LIKE 'probe-wd-%')
        OR EXISTS (SELECT 1 FROM public.data_jobs_alert_state WHERE job_key LIKE 'probe-wd-%')
-       OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused)
+       OR (SELECT coalesce(string_agg(key, ',' ORDER BY key), '') FROM public.data_jobs WHERE paused) IS DISTINCT FROM v_paused_keys
        OR EXISTS (SELECT 1 FROM public.notifications WHERE title = 'Veri işleri')
        OR EXISTS (SELECT 1 FROM public.push_log WHERE kind = 'data_jobs_alert')
        OR (SELECT count(*) FROM public.data_jobs_alert_state) > 0 THEN
@@ -561,7 +566,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261211_data_jobs_watchdog.sql', '373d2521389a8b779ecd310a30cbca12d03f658f4824eee64f60e7bc6d331ae9')
+VALUES ('20261211_data_jobs_watchdog.sql', '294dc05411a3c0fb19c23ac3df8197213870fcf5befd84db49c9e355d2a0e64c')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
