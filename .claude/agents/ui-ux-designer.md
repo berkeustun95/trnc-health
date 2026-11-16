@@ -83,3 +83,5 @@ Locked: Mix v2 Home (`HOME_V2_LIVE` + `REDESIGN_LIVE`, page ground Base C via `P
 mode only, no navy or slate (teal in any shade is fine). A request that conflicts with the locked direction → say so and return ONE question
 for Berke. Never claim device behaviour you did not see; list what only a device check can answer and
 the Turkish spot-check Berke must do.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

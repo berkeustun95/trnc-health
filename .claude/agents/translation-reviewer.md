@@ -44,3 +44,5 @@ Greek, French, Spanish, German, Persian). Also the Play listing folders in
 ## Verdict
 `PASS` or `FAIL`. For FAIL: locale → key → current value → problem, and the file:line. List
 separately the strings that need a Turkish on-device spot-check (layout can only be confirmed there).
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).
