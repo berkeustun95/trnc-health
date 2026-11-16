@@ -14,8 +14,10 @@
 //   * runs only in Actions, on refs/heads/main, for `schedule`, or `workflow_dispatch` with a real run;
 //   * "not a real run" (a dry dispatch) exits 0 silently BEFORE the key is read (duyurular-fetch blanks it);
 //   * the only outcome input is the raw GitHub status; error_class is never caller text;
-//   * recording is NON-FATAL: a failure to record is one ::warning:: line and exit 0, never a red job.
-//     A REFUSAL (wrong ref, unknown flag, unknown workflow) exits 1: that is a wiring bug and must be loud.
+//   * recording must NEVER change the job's status (it runs after the alert steps). Exit codes:
+//       in Actions: always 0 - a failed record or a REFUSAL is exactly one ::warning:: line (a fixed reason
+//         code such as `refused: ref_not_main`, never the offending value); nothing is read or sent on a refusal;
+//       exit 1 only for the local prodWriteGuard refusal (not in CI) and a failing --selftest.
 //   * no retry: a lost response followed by a retry would insert the run twice.
 //   * p_started_at is omitted: the RPC defaults it to now(), so started_at ~= finished_at (a heartbeat,
 //     not a duration).
@@ -24,7 +26,8 @@
 // Keep the words that start a network call or a key read out of everything above main()'s guard.
 
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
 
 export const JOBS = Object.freeze([
   'gisekibris-feed', 'duyurular-fetch', 'novest-images',
@@ -40,11 +43,11 @@ async function main() {
   prodWriteGuard({ wouldWrite: !(process.argv.length === 3 && process.argv[2] === '--selftest'), workflow: 'daily-health', dryHint: 'node scripts/record-data-job-run.mjs --selftest' })
 
   const args = parseArgs(process.argv.slice(2))
-  if (!args.ok) refuse(args.why)
+  if (!args.ok) refuse('bad_args')
   if (args.selftest) process.exit(runSelftest())
 
   const d = decide({ env: process.env, args })
-  if (d.action === 'refuse') refuse(d.why)
+  if (d.action === 'refuse') refuse(d.code)
   if (d.action === 'skip') process.exit(0)
 
   const give = (why) => { console.log(`::warning::data_job_runs: run not recorded (${why})`); process.exit(0) }
@@ -80,9 +83,20 @@ async function main() {
   }
 }
 
-function refuse(why) {
-  console.error(`record-data-job-run: REFUSED: ${why}`)
-  process.exit(1)
+function refuse(code) {
+  const r = refusalOutcome(code, process.env)
+  console[r.stream](r.line)
+  process.exit(r.exit)
+}
+
+// The fixed vocabulary of refusal reasons. Only these words are ever printed.
+export const REFUSAL_CODES = Object.freeze(['not_actions', 'ref_not_main', 'event', 'job_not_allowed', 'run_id', 'bad_args'])
+
+// In Actions a refusal is a warning and exit 0 (never a red job); locally it is loud, exit 1.
+export function refusalOutcome(code, env) {
+  const c = REFUSAL_CODES.includes(code) ? code : 'bad_args'
+  if (env.GITHUB_ACTIONS === 'true') return { exit: 0, stream: 'log', line: `::warning::data_job_runs: run not recorded (refused: ${c})` }
+  return { exit: 1, stream: 'error', line: `record-data-job-run: REFUSED: ${c}` }
 }
 
 // ─── Pure decision logic ─────────────────────────────────────────────────────
@@ -127,13 +141,13 @@ export function mapStatus(raw, cancelInProgressAny = CANCEL_IN_PROGRESS_ANY) {
 }
 
 export function decide({ env, args }) {
-  if (env.GITHUB_ACTIONS !== 'true') return { action: 'refuse', why: 'not running in GitHub Actions' }
-  if (env.GITHUB_REF !== 'refs/heads/main') return { action: 'refuse', why: 'not on refs/heads/main' }
+  if (env.GITHUB_ACTIONS !== 'true') return { action: 'refuse', code: 'not_actions' }
+  if (env.GITHUB_REF !== 'refs/heads/main') return { action: 'refuse', code: 'ref_not_main' }
   const ev = env.GITHUB_EVENT_NAME
-  if (ev !== 'schedule' && ev !== 'workflow_dispatch') return { action: 'refuse', why: 'event is neither schedule nor workflow_dispatch' }
+  if (ev !== 'schedule' && ev !== 'workflow_dispatch') return { action: 'refuse', code: 'event' }
   const job = jobFromWorkflow(env.GITHUB_WORKFLOW)
-  if (!job) return { action: 'refuse', why: 'workflow is not one of the six data jobs' }
-  if (!validRunId(env.GITHUB_RUN_ID)) return { action: 'refuse', why: 'GITHUB_RUN_ID is not a run id' }
+  if (!job) return { action: 'refuse', code: 'job_not_allowed' }
+  if (!validRunId(env.GITHUB_RUN_ID)) return { action: 'refuse', code: 'run_id' }
   if (args.realRun !== true) return { action: 'skip' }
   const m = mapStatus(args.status)
   if (!m.record) return { action: 'skip' }
@@ -224,6 +238,36 @@ export function runSelftest() {
   t('url: userinfo refused', cleanUrl('https://a@abcdefgh.supabase.co'), null)
   t('url: empty refused', cleanUrl(''), null)
   t('url: undefined refused', cleanUrl(undefined), null)
+
+  t('refusal codes: the fixed vocabulary', [...REFUSAL_CODES], ['not_actions', 'ref_not_main', 'event', 'job_not_allowed', 'run_id', 'bad_args'])
+  const dec = (env, args) => { const d = decide({ env: { ...CI, ...env }, args }); return d.action === 'refuse' ? d.code : d.action }
+  t('decision: wrong ref -> refuse ref_not_main', dec({ GITHUB_REF: 'refs/heads/x' }, A('success')), 'ref_not_main')
+  t('decision: wrong event -> refuse event', dec({ GITHUB_EVENT_NAME: 'push' }, A('success')), 'event')
+  t('decision: unknown workflow -> refuse job_not_allowed', dec({ GITHUB_WORKFLOW: 'x' }, A('success')), 'job_not_allowed')
+  t('decision: bad run id -> refuse run_id', dec({ GITHUB_RUN_ID: 'x' }, A('success')), 'run_id')
+  t('decision: not in Actions -> refuse not_actions', dec({ GITHUB_ACTIONS: undefined }, A('success')), 'not_actions')
+  t('outcome: CI refusal = exit 0 + one warning', refusalOutcome('ref_not_main', { GITHUB_ACTIONS: 'true' }), { exit: 0, stream: 'log', line: '::warning::data_job_runs: run not recorded (refused: ref_not_main)' })
+  t('outcome: local refusal = exit 1', refusalOutcome('ref_not_main', {}).exit, 1)
+  t('outcome: an unknown code cannot be echoed', refusalOutcome('password=hunter2', { GITHUB_ACTIONS: 'true' }).line.includes('hunter2'), false)
+
+  // End to end as a runner would: no key, no url; fetch is replaced by a tripwire that exits 9.
+  const self = fileURLToPath(import.meta.url)
+  const trip = 'data:text/javascript,globalThis.fetch=()=>{console.error("NETWORK");process.exit(9)}'
+  const runner = (label, envOver, argv, code) => {
+    const env = { PATH: process.env.PATH, ...CI, ...envOver }
+    for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k]
+    const r = spawnSync(process.execPath, ['--import', trip, self, ...argv], { env, encoding: 'utf8' })
+    const lines = r.stdout.split('\n').filter(Boolean)
+    t(`runner: ${label}`, [r.status, lines.length, lines[0]?.startsWith(`::warning::data_job_runs: run not recorded (refused: ${code})`) && lines[0].endsWith(')'), r.stderr, lines[0]?.includes('CANARY')], [0, 1, true, '', false])
+  }
+  const OK = ['--status=success', '--real-run=true']
+  runner('wrong ref', { GITHUB_REF: 'refs/heads/CANARY' }, OK, 'ref_not_main')
+  runner('wrong event', { GITHUB_EVENT_NAME: 'CANARY' }, OK, 'event')
+  runner('workflow not allowed', { GITHUB_WORKFLOW: 'CANARY' }, OK, 'job_not_allowed')
+  runner('bad run id', { GITHUB_RUN_ID: 'CANARY' }, OK, 'run_id')
+  runner('unknown flag', {}, [...OK, '--CANARY=1'], 'bad_args')
+  runner('duplicate flag', {}, [...OK, '--status=CANARY'], 'bad_args')
+  runner('missing flag', {}, ['--status=success'], 'bad_args')
 
   t('safeToken: a PostgREST code passes', safeToken('P0001'), 'P0001')
   t('safeToken: free text becomes unknown', safeToken('password=hunter2 failed'), 'unknown')
