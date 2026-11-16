@@ -4597,6 +4597,18 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := null%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := old.source_id%', false)
+    -- ── 1209: photo credits are provenance too ──────────────────────────────────
+    -- Same function, extended: a session's INSERT gets photo_attribution / photo_credits NULL, a
+    -- session's UPDATE keeps the old values (admins included); only a no-session writer (the
+    -- seed-explore-photos script, migrations) sets them. Anchored to the code shapes, paired
+    -- with the no-session positive the 1045 token also reads. Not a new trigger: the 1045
+    -- trigger token above still proves it fires on INSERT and UPDATE.
+    UNION ALL SELECT '1209_places_credit_guard','places_guard_source: photo credits — no-session passes, session insert nulled, update keeps old',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_attribution := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_credits := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_attribution := old.photo_attribution%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_credits := old.photo_credits%', false)
     -- ── 1155: EEMD official_visit lock + data ───────────────────────────────────
     -- Same shape as 1045: D cannot see that the trigger fires on UPDATE too, and an
     -- INSERT-only trigger would let a claimed café write itself into "Müze & Ören Yeri".
