@@ -61,6 +61,8 @@ jobs:
       IN_APPLY: ${{ inputs.apply }}
       IN_LIMIT: ${{ inputs.limit }}
       IN_PRUNE: ${{ inputs.prune }}
+      # ONE write gate, read by the Mirror step and the record step: a scheduled run applies, a dispatch only with apply=true.
+      WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -77,8 +79,20 @@ jobs:
         run: node scripts/check-novest-prune.mjs
       - name: Mirror
         run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$WRITE" != "true" ]; then
+            echo "::error::a scheduled run resolved to a dry run; the WRITE gate is broken"; exit 1
+          fi
           args=()
           [ "$IN_PRUNE" = "true" ] && [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && args+=(--prune)
-          [ "$IN_APPLY" = "true" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ] || args+=(--dry)
+          [ "$WRITE" = "true" ] || args+=(--dry)
           [ -z "$IN_LIMIT" ] || args+=(--limit "$IN_LIMIT")
           node scripts/mirror-novest-images.mjs "${args[@]}"
+
+      # One heartbeat row per real run (applies, no --limit). Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && env.WRITE == 'true' && !inputs.limit }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ env.WRITE == 'true' && !inputs.limit }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"

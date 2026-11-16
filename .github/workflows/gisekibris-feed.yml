@@ -290,6 +290,16 @@ jobs:
             echo "decision and the evidence it was made on."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # One heartbeat row per sync run (schedule and dispatch are both real syncs). Never the
+      # weekly-heartbeat job below. Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: always()
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: 'true'
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"
+
   # ─── The weekly "it ran and it was boring" line ───────────────────────────
   #
   # NOT optional, and not decoration. CLAUDE.md records why: the duty roster

@@ -69,7 +69,7 @@ function AuthError({ message }) {
   return <Text style={legacy.error} accessibilityRole="alert">{message}</Text>
 }
 
-export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login', onBack }) {
+export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login', onBack, onModeChange }) {
   const insets = useSafeAreaInsets()
   const [lang, setLang] = useState(initialLang)
   const [mode, setMode] = useState(initialMode)
@@ -289,7 +289,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
               <TouchableOpacity
                 key={m}
                 style={[styles.tab, mode === m && styles.tabActive]}
-                onPress={() => { setMode(m); setError(null) }}
+                onPress={() => { setMode(m); setError(null); if (m !== mode) onModeChange?.(m) }}
               >
                 <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
                   {m === 'login' ? t('login', lang) : t('signup', lang)}
