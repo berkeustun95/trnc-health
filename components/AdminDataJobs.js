@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, StyleSheet, Switch, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
-import { Button } from './ui'
+import { Button, BottomSheet, ConfirmDialog } from './ui'
 import { t, dateLocale } from '../constants/i18n'
-import { isUsableJobs, isValidJob, groupJobs, ageParts, formatFamagusta } from '../utils/dataJobs'
+import { isUsableJobs, isValidJob, groupJobs, ageParts, formatFamagusta, switchErrorKey } from '../utils/dataJobs'
 
 // One read for both the admin-home row and the tab. null = could not be read (RPC error, or an
 // empty/odd result: the registry cannot legitimately be empty), never a silent zero.
@@ -39,6 +39,10 @@ const STATE_STYLE = {
   ok:        { bg: colors.successLight, fg: colors.successInk },
 }
 
+const NOTE_MAX = 200
+// Pausing this one stops a push that reaches every user, so its sheet carries one extra line.
+const CAUTION_KEYS = ['duty-push']
+
 const GROUP_KEY = {
   attention: 'adminJobsGroupAttention', paused: 'adminJobsGroupPaused',
   noRecord: 'adminJobsGroupNoRecord', ok: 'adminJobsGroupOk',
@@ -56,7 +60,7 @@ function timeLine(labelKey, iso, lang) {
   return t(labelKey, lang).replace('{time}', time).replace('{age}', ageText(iso, lang))
 }
 
-function JobRow({ job, lang }) {
+function JobRow({ job, lang, busy, error, onSwitch }) {
   const known = !!STATE_KEY[job.state]
   const st = job.state === 'inactive' && job.attention === true ? STATE_STYLE.failed : STATE_STYLE[job.state] || OUTLINED
   const run = job.last_run
@@ -85,16 +89,66 @@ function JobRow({ job, lang }) {
       {job.state === 'failed' && !!run?.error_class && (
         <Text style={[styles.sub, { color: colors.dangerInk }]}>{t('adminJobsError', lang).replace('{error}', () => run.error_class)}</Text>
       )}
-      {job.state === 'paused' && !!job.paused_note && (
+      {(job.state === 'paused' || job.paused === true) && !!job.paused_note && (
         <Text style={styles.sub}>{t('adminJobsPaused', lang).replace('{note}', () => job.paused_note)}</Text>
       )}
+      {job.paused === true && !!formatFamagusta(job.paused_at, dateLocale(lang)) && (
+        <Text style={styles.sub}>{t('adminJobsPausedSince', lang).replace('{time}', formatFamagusta(job.paused_at, dateLocale(lang)))}</Text>
+      )}
+      {job.switchable === true && (
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>{t('adminJobsSwitchRow', lang)}</Text>
+          <Switch
+            value={job.paused !== true}
+            disabled={busy}
+            onValueChange={on => onSwitch(job, on)}
+            trackColor={{ true: colors.primary, false: colors.border }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel={t('adminJobsSwitchLabel', lang).replace('{job}', job.key)}
+          />
+        </View>
+      )}
+      {!!error && <Text style={[styles.sub, { color: colors.dangerInk }]} accessibilityRole="alert">{t(error, lang)}</Text>}
     </View>
+  )
+}
+
+// The reason field lives in its own component so typing never re-renders the list behind the sheet.
+function PauseSheet({ job, lang, onCancel, onConfirm }) {
+  const [note, setNote] = useState('')
+  const trimmed = note.trim()
+  useEffect(() => { if (job) setNote('') }, [job?.key])
+  return (
+    <BottomSheet visible={!!job} onClose={onCancel} lang={lang} title={t('adminJobsPauseTitle', lang).replace('{job}', job?.key ?? '')}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {CAUTION_KEYS.includes(job?.key) && <Text style={styles.caution}>{t('adminJobsDutyWarn', lang)}</Text>}
+        <Text style={styles.fieldLabel}>{t('adminJobsPauseReason', lang)}</Text>
+        <TextInput
+          style={styles.input}
+          value={note}
+          onChangeText={setNote}
+          maxLength={NOTE_MAX}
+          multiline
+          placeholder={t('adminJobsPausePlaceholder', lang)}
+          placeholderTextColor={colors.textSecondary}
+          accessibilityLabel={t('adminJobsPauseReason', lang)}
+        />
+        <Text style={styles.counter}>{trimmed.length}/{NOTE_MAX}</Text>
+        <View style={styles.sheetActions}>
+          <Button variant="secondary" title={t('cancel', lang)} onPress={onCancel} style={styles.flex} fullWidth />
+          <Button variant="danger" title={t('adminJobsPauseConfirm', lang)} onPress={() => onConfirm(trimmed)} disabled={trimmed.length === 0} style={styles.flex} fullWidth />
+        </View>
+      </KeyboardAvoidingView>
+    </BottomSheet>
   )
 }
 
 export default function DataJobsTab({ lang }) {
   const [jobs, setJobs] = useState(undefined)
   const [refreshing, setRefreshing] = useState(false)
+  const [pending, setPending] = useState(null)      // { job, pause } while a confirm is open
+  const [saving, setSaving] = useState({})          // key -> true while its write is in flight
+  const [errors, setErrors] = useState({})          // key -> i18n key of the last failed write
 
   const load = useCallback(async () => { setJobs(await loadDataJobs()) }, [])
   useEffect(() => { load() }, [load])
@@ -103,6 +157,24 @@ export default function DataJobsTab({ lang }) {
     setRefreshing(true)
     await load()
     setRefreshing(false)
+  }
+
+  const askSwitch = (job, on) => setPending({ job, pause: !on })
+
+  const save = async (job, pause, note) => {
+    setPending(null)
+    setErrors(e => ({ ...e, [job.key]: null }))
+    setSaving(x => ({ ...x, [job.key]: true }))
+    try {
+      const { data, error } = await supabase.rpc('admin_set_data_job_paused', { p_job: job.key, p_paused: pause, p_note: pause ? note : null })
+      if (error) throw error
+      if (isValidJob(data) && data.key === job.key) setJobs(js => (Array.isArray(js) ? js.map(j => (j.key === job.key ? data : j)) : js))
+      else load()
+    } catch (e) {
+      setErrors(x => ({ ...x, [job.key]: switchErrorKey(e) }))
+    } finally {
+      setSaving(x => ({ ...x, [job.key]: false }))
+    }
   }
 
   if (jobs === undefined) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
@@ -127,9 +199,19 @@ export default function DataJobsTab({ lang }) {
       {groups.map(g => (
         <View key={g.id}>
           <Text style={styles.groupHead} accessibilityRole="header">{t(GROUP_KEY[g.id], lang).replace('{count}', String(g.jobs.length))}</Text>
-          {g.jobs.map((j, i) => <JobRow key={`${j.key}-${i}`} job={j} lang={lang} />)}
+          {g.jobs.map((j, i) => <JobRow key={`${j.key}-${i}`} job={j} lang={lang} busy={saving[j.key] === true} error={errors[j.key]} onSwitch={askSwitch} />)}
         </View>
       ))}
+      <PauseSheet job={pending?.pause ? pending.job : null} lang={lang}
+        onCancel={() => setPending(null)} onConfirm={note => save(pending.job, true, note)} />
+      <ConfirmDialog
+        visible={pending?.pause === false}
+        title={t('adminJobsResumeTitle', lang).replace('{job}', pending?.job?.key ?? '')}
+        confirmLabel={t('adminJobsResumeConfirm', lang)}
+        onConfirm={() => save(pending.job, false, null)}
+        onCancel={() => setPending(null)}
+        lang={lang}
+      />
     </ScrollView>
   )
 }
@@ -144,6 +226,14 @@ const styles = StyleSheet.create({
   key:       { flex: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   pill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexShrink: 1, maxWidth: '55%' },
   pillText:  { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8, minHeight: 44 },
+  switchLabel: { flex: 1, flexShrink: 1, fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  caution:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.dangerInk, lineHeight: 18, marginBottom: 10 },
+  fieldLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
+  input:     { minHeight: 72, maxHeight: 140, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: 'transparent' },
+  counter:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'right', marginTop: 4 },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  flex:      { flex: 1 },
   sub:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2, lineHeight: 17 },
   errorBox:  { alignItems: 'center', gap: 10, marginTop: 40, paddingHorizontal: 20 },
   errorText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.dangerInk, textAlign: 'center' },
