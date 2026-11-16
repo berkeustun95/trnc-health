@@ -18,7 +18,7 @@
 //       in Actions: always 0 - a failed record or a REFUSAL is exactly one ::warning:: line whose reason comes
 //         from a FIXED vocabulary (reasonNetwork / reasonHttp below; `refused: ref_not_main`), never text from a
 //         response, an error message or the environment; nothing is read or sent on a refusal;
-//       exit 1 only for the local prodWriteGuard refusal (not in CI) and a failing --selftest.
+//       exit 1 only for the script's own local refusal (not in CI) and a failing --selftest.
 //   * no retry: a lost response followed by a retry would insert the run twice.
 //   * p_started_at is omitted: the RPC defaults it to now(), so started_at ~= finished_at (a heartbeat,
 //     not a duration).
@@ -43,7 +43,7 @@ export const RPC_PATH = '/rest/v1/rpc/record_data_job_run'
 async function main() {
   const selftestOnly = process.argv.length === 3 && process.argv[2] === '--selftest'
   if (!selftestOnly && process.env.GITHUB_ACTIONS !== 'true') {
-    console.error('record-data-job-run: REFUSED: a run is recorded only by the scheduled workflows themselves (a dispatch records nothing, and nothing is written from this machine).\n  Offline check:  node scripts/record-data-job-run.mjs --selftest')
+    console.error('record-data-job-run: REFUSED: a run is recorded only by the scheduled workflows themselves  (nothing is written from this machine).\n  Offline check:  node scripts/record-data-job-run.mjs --selftest')
     process.exit(1)
   }
   prodWriteGuard({ wouldWrite: !selftestOnly, dryHint: 'node scripts/record-data-job-run.mjs --selftest' })

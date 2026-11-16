@@ -196,7 +196,7 @@ if (process.argv.includes('--selftest')) {
   const good = () => ({ 'a.yml': mk('job-a'), 'f.yml': mk('job-f'), 'r.yml': mk('job-r') })
   const run = (w) => check({ workflows: w, seedSql: sql, allowlist: ['job-a', 'job-f', 'job-r'], expect: ex }).problems
   // A red case: one broken workflow must produce a problem that names its rule.
-  const red = (label, replace, needle) => t(`red: ${label}`, run({ ...good(), ...replace }).some(x => x.includes(needle)), true)
+  const red = (label, replace, needle) => { const hit = run({ ...good(), ...replace }).find(x => x.includes(needle)); t(`red: ${label}`, hit ? hit.slice(0, 110) : null, hit ? hit.slice(0, 110) : '(a problem containing ' + JSON.stringify(needle) + ')') }
   const redA = (label, mut, needle) => red(label, { 'a.yml': mk('job-a', mut) }, needle)
   const redF = (label, mut, needle) => red(label, { 'f.yml': mk('job-f', mut) }, needle)
   const redR = (label, mut, needle) => red(label, { 'r.yml': mk('job-r', mut) }, needle)
@@ -212,7 +212,7 @@ if (process.argv.includes('--selftest')) {
   redA('the record step in another job', o => { o.jobs.other.steps.push(o.jobs.x.steps.pop()) }, "expected 'x'")
   redA('an echo line instead of the call', o => { rs(o).run = `echo node ${CALL} --status="$S" --real-run="$RR"` }, 'must be exactly')
   redA('an echo line besides the real step', o => { o.jobs.x.steps.unshift({ run: `echo ${CALL}` }) }, 'exactly 1')
-  redA('a ${{ }} inside run', o => { rs(o).run = `node ${CALL} --status="$S" --real-run="` + '${{ github.event_name }}' + '"' }, 'must be exactly')
+  redA('a ${{ }} inside run', o => { rs(o).run = `node ${CALL} --status="$S" --real-run="` + '${{ github.event_name }}' + '"' }, '${{ }} expression')
   redA('--real-run missing from the call', o => { rs(o).run = `node ${CALL} --status="$S"` }, 'must be exactly')
   redA('status env is not job.status', o => { rs(o).env.S = 'success' }, 'must be ${{ job.status }}')
   redA('step if without always()', o => { rs(o).if = "${{ github.event_name == 'schedule' }}" }, 'always()')
