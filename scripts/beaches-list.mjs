@@ -43,6 +43,7 @@ const OUT = 'data/explore/beaches.json'
 const TRANSLATIONS = 'data/explore/beaches-live-translations.json'
 const TRANSLATIONS_NEW = 'data/explore/beaches-translations.json'
 const LOCALES9 = ['en', 'tr', 'ar', 'ru', 'el', 'fr', 'es', 'de', 'fa']   // ISO keys: what the app reader extractI18n resolves (the live name_i18n uses en/tr already)
+const RETIRED_EL = ['Εσεντεπέ', 'Καραογλανόγλου', 'Λάπτα', 'Αλσάντζακ', 'Λεφκέ', 'Μποαζιτσί', 'Καπλίτζα', 'Μπάφρα', 'Αϊφίλον']   // Greek-script transliterations of Turkish village names, replaced by the traditional Greek names
 const AMENITY_SLUGS = ['parking', 'toilets', 'sunbeds', 'food_bar', 'lifeguard']
 const ACCESS_TYPES = ['public', 'private']
 const REGIONS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
@@ -424,6 +425,7 @@ export function validate(obj) {
       if (keys !== want) f.push(`${tag}: name_i18n keys [${keys}] != [${want}]`)
       for (const code of LOCALES9) if (typeof r.name_i18n?.[code] !== 'string' || r.name_i18n[code].trim().length < 2 || r.name_i18n[code] !== r.name_i18n[code].trim()) f.push(`${tag}: name_i18n.${code} empty or untrimmed`)
       for (const code of ['ar', 'fa']) if (/[()]/.test(r.name_i18n?.[code] || '')) f.push(`${tag}: name_i18n.${code} contains parentheses`)
+      for (const w of RETIRED_EL) if ((r.name_i18n?.el || '').includes(w)) f.push(`${tag}: name_i18n.el uses the retired Turkish-village transliteration ${w} (el policy = the traditional Greek village name)`)
     }
     if (r.source === 'visitncy_beaches') {
       const dk = Object.keys(r.description_i18n || {}).sort().join(), want = LOCALES9.slice().sort().join()

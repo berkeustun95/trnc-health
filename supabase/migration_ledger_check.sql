@@ -312,7 +312,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261204_onboarding_events_start_choice.sql', '0338f3daee79b884fbd6f6aab339651ac17b9415c1657c0360abfb08b187d437'),
   ('20261205_data_jobs.sql', '0192ca097272de0ba8b7eaf058da7e91a14cf849ac9b76b3991507a07306077a'),
   ('20261206_alagadi_pin.sql', '8fff41bc998007533c75a6000892f05c2baa618f28f3fb7ada7d11bedf5561e1'),
-  ('20261207_beaches_staged.sql', 'ff13f53c06802f04acb722aa1de10948a106d8c826e8ba358505d7cd9212aaf6')
+  ('20261207_beaches_staged.sql', '4ff284fbadc68798d3356be2fc5c7e2a12add0ccfe348a0afcce747ab25c2e82')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

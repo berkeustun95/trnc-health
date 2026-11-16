@@ -15,7 +15,9 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { freshDb, applyFile, asRole as asRole0 } from './migration-harness.mjs'
+import { freshDb, applyFile as applyFile0, asRole as asRole0 } from './migration-harness.mjs'
+// a real migration session carries no preview header: clear the stub's session setting (left on by a `seen` question) before every apply
+const applyFile = async (db, ...a) => { await db.exec("SELECT set_config('test.preview', '', false)"); return applyFile0(db, ...a) }
 // asRole leaves request.jwt.claims set for the session; a migration runs as postgres with NO session (auth.uid() NULL), so clear it after every question
 const asRole = async (db, ...a) => { const x = await asRole0(db, ...a); await db.exec("SELECT set_config('request.jwt.claims', '', false)"); return x }
 
@@ -268,12 +270,21 @@ await red('3 a café\'s status changed inside the transaction', variant('cafe', 
 await red('3b a live beach edited inside the transaction', variant('live', ANCHOR_INSERT_END, `${ANCHOR_INSERT_END}\nUPDATE public.places SET name = 'Renamed' WHERE category = 'beach' AND source IS NULL;`), /scope: other beaches changed/)
 await red('4 a photo written onto a row of this file', variant('photo', ANCHOR_INSERT_END, `${ANCHOR_INSERT_END}\nUPDATE public.places SET cover_image_url = 'x.jpg' WHERE source_id = 'way/225386412';`), /carry a field this file never writes/)
 await red('4b an OSM row given an access_type (the private_resort leak)', variant('access', ANCHOR_INSERT_END, `${ANCHOR_INSERT_END}\nUPDATE public.places SET access_type = 'private' WHERE source = 'osm' AND source_id = 'way/1484271058';`), /carry a field this file never writes/)
-await red('5 a pair already taken by a non-beach row', FILE, /expected 30 rows for this file|not category beach/, SEED, d => d.exec("INSERT INTO public.places (category, name, region, status, source, source_id) VALUES ('cafe', 'Squatter', 'kyrenia', 'staged', 'osm', 'way/225386412')"))
+await red('5 a pair already taken by a non-beach row', FILE, /first apply found 1 of this file's pairs already taken/, SEED, d => d.exec("INSERT INTO public.places (category, name, region, status, source, source_id) VALUES ('cafe', 'Squatter', 'kyrenia', 'staged', 'osm', 'way/225386412')"))
+const SQUAT = (status, name, cat = 'beach') => d => d.exec(`INSERT INTO public.places (category, name, region, status, source, source_id) VALUES ('${cat}', '${name}', 'kyrenia', '${status}', 'osm', 'way/225386412')`)
+const LEDGER = f => d => d.exec(`INSERT INTO public.schema_migrations_applied (filename, checksum) VALUES ('${FILE.split('/').pop()}', 'x')`).then(() => f(d))
+await red('5b first apply: an ACTIVE beach squats a pair under a wrong name', FILE, /first apply found 1 of this file's pairs already taken/, SEED, SQUAT('active', 'Somebody Else'))
+await red('5c first apply: a STAGED beach squats a pair', FILE, /first apply found 1 of this file's pairs already taken/, SEED, SQUAT('staged', 'Bamboo Beach'))
+await red('5d re-run (ledger row exists): an ACTIVE beach holding a pair under a wrong name', FILE, /1 of the 1 rows that held this file's pairs before are not this file's rows/, SEED, LEDGER(SQUAT('active', 'Somebody Else')))
+await red('5e re-run (ledger row exists): a pair held by a non-beach row', FILE, /not category beach|are not this file's rows/, SEED, LEDGER(SQUAT('staged', 'Bamboo Beach', 'cafe')))
 await red('6 a policy that opens staged rows to everyone (still 9 policies, 5 + 4)', FILE, /another places policy mentions staged/, SEED, d => d.exec("DROP POLICY places_delete ON public.places; CREATE POLICY places_open_staged ON public.places FOR SELECT TO anon USING (status = 'staged')"))
 await red('6a a policy added: count is wrong', FILE, /places has 10 policies/, SEED, d => d.exec("CREATE POLICY places_open_staged ON public.places FOR SELECT TO anon USING (status = 'staged')"))
 await red('6b a tenth, unrelated policy', FILE, /places has 10 policies/, SEED, d => d.exec("CREATE POLICY places_extra ON public.places AS RESTRICTIVE FOR SELECT USING (true)"))
 await red('7 a fifth INSERT trigger', FILE, /5 enabled INSERT triggers/, SEED, d => d.exec("CREATE FUNCTION public.t_ins() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$; CREATE TRIGGER t_ins BEFORE INSERT ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_ins();"))
 await red('7b an AFTER INSERT trigger that writes elsewhere', FILE, /5 enabled INSERT triggers \(1 not BEFORE ROW\)/, SEED, d => d.exec("CREATE FUNCTION public.t_after() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO public.content_reports VALUES ('x', gen_random_uuid(), NULL); RETURN NULL; END $$; CREATE TRIGGER t_after AFTER INSERT ON public.places FOR EACH ROW EXECUTE FUNCTION public.t_after();"))
+await red('9 places_select rewritten to status <> pending (9 policies kept, no literal staged)', FILE, /anon can read \d+ of this file's staged rows/, SEED, d => d.exec(`DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' OR status <> 'pending' OR submitted_by = auth.uid())`))
+await red('9b is_previewer() replaced by SELECT true', FILE, /anon can read \d+ of this file's staged rows/, SEED, d => d.exec('CREATE OR REPLACE FUNCTION public.is_previewer() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$'))
+await red('9c positive control: nobody can read active beaches', FILE, /positive control failed/, SEED, d => d.exec("DROP POLICY places_select ON public.places; CREATE POLICY places_select ON public.places FOR SELECT USING (status = 'active' AND false)"))
 await red('8 a blocked term that matches a beach name (the word filter is live in the apply)', FILE, /BLOCKED_TERM/, SEED, d => d.exec("INSERT INTO public.blocked_terms (term) VALUES ('bamboo')"))
 
 const all = await snap(db)

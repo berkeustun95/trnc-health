@@ -48,7 +48,7 @@ const tuple = r => {
   return `  (${q(r.name)}, ${jsonb(r.name_i18n)}, ${ministry ? jsonb(r.description_i18n) : 'NULL'}, 'beach', ${q(r.region)}, ${q(r.area)}, ${r.latitude}, ${r.longitude}, ${ministry ? q(r.access_type) : 'NULL'}, ${ministry ? textArr(r.amenities) : 'NULL'}, ${q(r.source)}, ${q(r.source_id)}, 'staged')`
 }
 const values = rows.map(tuple).join(',\n')
-const pairs = JSON.stringify(rows.map(r => [r.source, r.source_id]))
+const pairs = JSON.stringify(rows.map(r => [r.source, r.source_id, r.name]))
 const base = data.osm_base[0].slice(0, 10)
 const byRegion = rows.reduce((m, r) => ((m[r.region] = (m[r.region] || 0) + 1), m), {})
 const regionLine = Object.entries(byRegion).map(([k, v]) => `${k} ${v}`).join(', ')
@@ -139,6 +139,10 @@ BEGIN
     'act_md5', (SELECT md5(coalesce(string_agg(to_jsonb(p)::text, '|' ORDER BY p.id), '')) FROM public.places p WHERE p.status IS NOT DISTINCT FROM 'active')
   ) INTO v_before;
   PERFORM set_config('ada.beaches_before', v_before::text, true);
+  -- a FIRST apply (no ledger row for this file yet) must find none of its pairs taken: a squatter is never adopted silently
+  IF (v_before->>'present')::int > 0 AND NOT EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '${file}') THEN
+    RAISE EXCEPTION 'first apply found % of this file''s pairs already taken', v_before->>'present';
+  END IF;
 END $$;
 
 INSERT INTO public.places (name, name_i18n, description_i18n, category, region, area, latitude, longitude, access_type, amenities, source, source_id, status)
@@ -164,7 +168,6 @@ BEGIN
   IF jsonb_array_length(v_pairs) <> v_expect THEN RAISE EXCEPTION 'pair list holds % pairs, expected %', jsonb_array_length(v_pairs), v_expect; END IF;
   IF v_present_after <> v_expect THEN RAISE EXCEPTION 'expected % rows for this file, found % (a pair is missing or its row is not a beach)', v_expect, v_present_after; END IF;
   IF v_found <> v_expect THEN RAISE EXCEPTION '% of % rows are not category beach with status staged or active', v_expect - v_found, v_expect; END IF;
-  v_added := v_expect - (b->>'present')::int;
 
   -- b. scope: nothing but this file's rows changed, and nothing was published
   SELECT count(*), md5(coalesce(string_agg(to_jsonb(p)::text, '|' ORDER BY p.id), '')) INTO v_n, v_md5
@@ -178,9 +181,18 @@ BEGIN
     FROM public.places p WHERE p.status IS NOT DISTINCT FROM 'active';
   IF v_n <> (b->>'act_n')::bigint OR v_md5 IS DISTINCT FROM b->>'act_md5' THEN RAISE EXCEPTION 'this file must publish nothing: the set of active rows changed (count % -> %, checksum equal: %)', b->>'act_n', v_n, v_md5 IS NOT DISTINCT FROM b->>'act_md5'; END IF;
 
+  -- rows added now, measured as table growth, plus rows that were already there = the file's pairs; a row that held a pair before must be
+  -- THIS file's row (a beach, same source, same name as the file's) — counts only, never the foreign row's values
   SELECT count(*) INTO v_total_after FROM public.places;
-  IF v_total_after <> (b->>'total')::bigint + v_added THEN
-    RAISE EXCEPTION 'places grew by % rows, this file added %', v_total_after - (b->>'total')::bigint, v_added; END IF;
+  v_added := v_total_after - (b->>'total')::bigint;
+  IF v_added + (b->>'present')::int <> v_expect THEN
+    RAISE EXCEPTION 'rows added now (%) + rows present before (%) <> % pairs in this file', v_added, b->>'present', v_expect; END IF;
+  IF (b->>'present')::int > 0 THEN
+    SELECT count(*) INTO v_n FROM public.places p JOIN jsonb_array_elements(v_pairs) e
+        ON e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id
+      WHERE p.category IS DISTINCT FROM 'beach' OR p.name IS DISTINCT FROM e->>2;
+    IF v_n <> 0 THEN RAISE EXCEPTION '% of the % rows that held this file''s pairs before are not this file''s rows (not a beach, or another name)', v_n, b->>'present'; END IF;
+  END IF;
 
   -- c. content of the rows that are still staged (a later, legitimate edit of a published row must not fail a re-run)
   SELECT count(*) INTO v_n FROM public.places p WHERE p.category IS NOT DISTINCT FROM 'beach' AND p.status = 'staged' AND EXISTS (
@@ -235,6 +247,32 @@ BEGIN
   IF v_trg_n <> 4 OR v_trg_bad <> 0 THEN
     RAISE EXCEPTION 'places has % enabled INSERT triggers (% not BEFORE ROW), expected 4 BEFORE ROW: %', v_trg_n, v_trg_bad, v_trg_names; END IF;
   RAISE NOTICE '${N} d/e OK: places policies (%): %; INSERT triggers (%): %', v_n, v_names, v_trg_n, v_trg_names;
+END $$;
+
+-- ─── Assertion f: BEHAVIOUR, not text — what anon and authenticated (no JWT, no preview header) can actually read ───
+-- The policy text assertions above can be fooled (a rewritten places_select, an is_previewer() that returns true); this asks the database.
+-- SET LOCAL ROLE reverts at COMMIT/ROLLBACK; the way back is SET LOCAL ROLE postgres (RESET ROLE would drop to the login role mid-transaction).
+-- Counts are captured while in the role and RAISEd only after switching back. No JWT claims are set, so auth.uid() is NULL and is_previewer() is false.
+DO $$
+DECLARE
+  v_pairs jsonb := (current_setting('ada.beaches_before')::jsonb)->'pairs';
+  v_anon_file int; v_anon_live int; v_auth_file int; v_auth_live int;
+BEGIN
+  SET LOCAL ROLE anon;
+  SELECT count(*) INTO v_anon_file FROM public.places p WHERE p.status = 'staged' AND EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_pairs) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id);
+  SELECT count(*) INTO v_anon_live FROM public.places WHERE category = 'beach' AND status = 'active';
+  SET LOCAL ROLE postgres;
+  SET LOCAL ROLE authenticated;
+  SELECT count(*) INTO v_auth_file FROM public.places p WHERE p.status = 'staged' AND EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_pairs) e WHERE e->>0 IS NOT DISTINCT FROM p.source AND e->>1 IS NOT DISTINCT FROM p.source_id);
+  SELECT count(*) INTO v_auth_live FROM public.places WHERE category = 'beach' AND status = 'active';
+  SET LOCAL ROLE postgres;
+  IF current_user IS DISTINCT FROM 'postgres' THEN RAISE EXCEPTION 'visibility check could not return to role postgres'; END IF;
+  IF v_anon_file <> 0 THEN RAISE EXCEPTION 'anon can read % of this file''s staged rows (staged rows must be invisible without the preview key)', v_anon_file; END IF;
+  IF v_auth_file <> 0 THEN RAISE EXCEPTION 'authenticated can read % of this file''s staged rows (staged rows must be invisible without the preview key)', v_auth_file; END IF;
+  IF v_anon_live <= 0 OR v_auth_live <= 0 THEN RAISE EXCEPTION 'positive control failed: anon sees % and authenticated sees % active beaches', v_anon_live, v_auth_live; END IF;
+  RAISE NOTICE '${N} f OK: anon and authenticated read 0 of this file''s staged rows and %/% active beaches (positive control)', v_anon_live, v_auth_live;
 END $$;
 
 COMMIT;

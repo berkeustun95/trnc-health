@@ -1,5 +1,5 @@
 {
-  "_note": "name_i18n for the 30 beach rows (keys are ISO codes en,tr,ar,ru,el,fr,es,de,fa, as extractI18n reads) and description_i18n for the 2 Ministry rows, keyed by source_id. Principle (translation-reviewer approved for the live 4): localise only the generic word, keep toponyms and brands, transliterate toponyms in ar/fa/ru/el, no parentheses in ar/fa.",
+  "_note": "name_i18n for the 30 beach rows (keys are ISO codes en,tr,ar,ru,el,fr,es,de,fa, as extractI18n reads) and description_i18n for the 2 Ministry rows, keyed by source_id. Principle (translation-reviewer approved for the live 4): localise only the generic word, keep toponyms and brands, transliterate toponyms in ar/fa/ru, and use the traditional Greek village name in el where one exists, no parentheses in ar/fa.",
   "name_i18n": {
     "kervansaray-beach": {
       "en": "Kervansaray Beach",
@@ -7,10 +7,10 @@
       "ar": "شاطئ كرفانسراي",
       "ru": "Пляж Кервансарай",
       "el": "Παραλία Κερβανσαράι",
-      "fr": "Plage Kervansaray",
-      "es": "Playa Kervansaray",
+      "fr": "Plage de Kervansaray",
+      "es": "Playa de Kervansaray",
       "de": "Kervansaray-Strand",
-      "fa": "ساحل کروانسرای"
+      "fa": "ساحل کاروانسرای"
     },
     "long-beach": {
       "en": "Long Beach",
@@ -29,9 +29,9 @@
       "ar": "شاطئ Bamboo",
       "ru": "Пляж Bamboo",
       "el": "Παραλία Bamboo",
-      "fr": "Plage Bamboo",
-      "es": "Playa Bamboo",
-      "de": "Bamboo-Strand",
+      "fr": "Bamboo Beach",
+      "es": "Bamboo Beach",
+      "de": "Bamboo Beach",
       "fa": "ساحل Bamboo"
     },
     "way/608212204": {
@@ -40,9 +40,9 @@
       "ar": "شاطئ Bella Marin",
       "ru": "Пляж Bella Marin",
       "el": "Παραλία Bella Marin",
-      "fr": "Plage Bella Marin",
-      "es": "Playa Bella Marin",
-      "de": "Bella-Marin-Strand",
+      "fr": "Bella Marin Beach",
+      "es": "Bella Marin Beach",
+      "de": "Bella Marin Beach",
       "fa": "ساحل Bella Marin"
     },
     "way/225382750": {
@@ -51,9 +51,9 @@
       "ar": "شاطئ Camelot",
       "ru": "Пляж Camelot",
       "el": "Παραλία Camelot",
-      "fr": "Plage Camelot",
-      "es": "Playa Camelot",
-      "de": "Camelot-Strand",
+      "fr": "Camelot Beach",
+      "es": "Camelot Beach",
+      "de": "Camelot Beach",
       "fa": "ساحل Camelot"
     },
     "way/1484271058": {
@@ -73,28 +73,28 @@
       "ar": "شاطئ Diana",
       "ru": "Пляж Diana",
       "el": "Παραλία Diana",
-      "fr": "Plage Diana",
-      "es": "Playa Diana",
-      "de": "Diana-Strand",
+      "fr": "Diana Beach",
+      "es": "Diana Beach",
+      "de": "Diana Beach",
       "fa": "ساحل Diana"
     },
     "way/603986283": {
       "en": "Esentepe Municipal Public Beach",
       "tr": "Esentepe Belediye Halk Plajı",
-      "ar": "الشاطئ العام لبلدية إسنتبه",
-      "ru": "Муниципальный общественный пляж Эсентепе",
-      "el": "Δημοτική δημόσια παραλία Εσεντεπέ",
-      "fr": "Plage publique municipale d'Esentepe",
-      "es": "Playa pública municipal de Esentepe",
-      "de": "Öffentlicher Strand der Gemeinde Esentepe",
+      "ar": "شاطئ بلدية إسنتبه العام",
+      "ru": "Муниципальный пляж Эсентепе",
+      "el": "Δημοτική παραλία Τράπεζα",
+      "fr": "Plage municipale d'Esentepe",
+      "es": "Playa municipal de Esentepe",
+      "de": "Gemeindestrand Esentepe",
       "fa": "ساحل عمومی شهرداری اسن‌تپه"
     },
     "way/208150337": {
       "en": "Karaoğlanoğlu Beach",
       "tr": "Karaoğlanoğlu Plajı",
       "ar": "شاطئ كاراأوغلانأوغلو",
-      "ru": "Пляж Караоглануглу",
-      "el": "Παραλία Καραογλανόγλου",
+      "ru": "Пляж Караогланоглу",
+      "el": "Παραλία Αγίου Γεωργίου",
       "fr": "Plage de Karaoğlanoğlu",
       "es": "Playa de Karaoğlanoğlu",
       "de": "Karaoğlanoğlu-Strand",
@@ -106,20 +106,20 @@
       "ar": "شاطئ Korenium",
       "ru": "Пляж Korenium",
       "el": "Παραλία Korenium",
-      "fr": "Plage Korenium",
-      "es": "Playa Korenium",
-      "de": "Korenium-Strand",
+      "fr": "Korenium Beach",
+      "es": "Korenium Beach",
+      "de": "Korenium Beach",
       "fa": "ساحل Korenium"
     },
     "way/208111924": {
-      "en": "Lapta Municipality Public Beach",
+      "en": "Lapta Municipal Public Beach",
       "tr": "Lapta Belediye Plajı",
       "ar": "شاطئ بلدية لابتا العام",
-      "ru": "Общественный муниципальный пляж Лапта",
-      "el": "Δημοτική δημόσια παραλία Λάπτα",
-      "fr": "Plage publique municipale de Lapta",
-      "es": "Playa pública municipal de Lapta",
-      "de": "Öffentlicher Strand der Gemeinde Lapta",
+      "ru": "Муниципальный пляж Лапта",
+      "el": "Δημοτική παραλία Λάπηθος",
+      "fr": "Plage municipale de Lapta",
+      "es": "Playa municipal de Lapta",
+      "de": "Gemeindestrand Lapta",
       "fa": "ساحل عمومی شهرداری لاپتا"
     },
     "way/229043037": {
@@ -134,14 +134,14 @@
       "fa": "Lido Cyprus"
     },
     "way/225383964": {
-      "en": "Municipality of Alsancak Beach",
+      "en": "Alsancak Municipal Beach",
       "tr": "Alsancak Belediye Plajı",
-      "ar": "شاطئ بلدية ألسنجق",
-      "ru": "Муниципальный пляж Альсанджак",
-      "el": "Δημοτική παραλία Αλσάντζακ",
+      "ar": "شاطئ بلدية ألسانجاك",
+      "ru": "Муниципальный пляж Алсанджак",
+      "el": "Δημοτική παραλία Καραβάς",
       "fr": "Plage municipale d'Alsancak",
       "es": "Playa municipal de Alsancak",
-      "de": "Städtischer Strand Alsancak",
+      "de": "Gemeindestrand Alsancak",
       "fa": "ساحل شهرداری آلسانجاک"
     },
     "way/244561269": {
@@ -150,9 +150,9 @@
       "ar": "شاطئ Riviera",
       "ru": "Пляж Riviera",
       "el": "Παραλία Riviera",
-      "fr": "Plage Riviera",
-      "es": "Playa Riviera",
-      "de": "Riviera-Strand",
+      "fr": "Riviera Beach",
+      "es": "Riviera Beach",
+      "de": "Riviera Beach",
       "fa": "ساحل Riviera"
     },
     "node/11994931556": {
@@ -161,9 +161,9 @@
       "ar": "شاطئ Sandouka",
       "ru": "Пляж Sandouka",
       "el": "Παραλία Sandouka",
-      "fr": "Plage Sandouka",
-      "es": "Playa Sandouka",
-      "de": "Sandouka-Strand",
+      "fr": "Sandouka Beach",
+      "es": "Sandouka Beach",
+      "de": "Sandouka Beach",
       "fa": "ساحل Sandouka"
     },
     "way/208241783": {
@@ -172,9 +172,9 @@
       "ar": "شاطئ Sardunya",
       "ru": "Пляж Sardunya",
       "el": "Παραλία Sardunya",
-      "fr": "Plage Sardunya",
-      "es": "Playa Sardunya",
-      "de": "Sardunya-Strand",
+      "fr": "Sardunya Beach",
+      "es": "Sardunya Beach",
+      "de": "Sardunya Beach",
       "fa": "ساحل Sardunya"
     },
     "way/666114116": {
@@ -205,20 +205,20 @@
       "ar": "شاطئ Kocareis",
       "ru": "Пляж Kocareis",
       "el": "Παραλία Kocareis",
-      "fr": "Plage Kocareis",
-      "es": "Playa Kocareis",
-      "de": "Kocareis-Strand",
+      "fr": "Kocareis Beach",
+      "es": "Kocareis Beach",
+      "de": "Kocareis Beach",
       "fa": "ساحل Kocareis"
     },
     "relation/15456405": {
-      "en": "Mckenzie Beach",
+      "en": "McKenzie Beach",
       "tr": "Makenzi Plajı",
       "ar": "شاطئ ماكنزي",
       "ru": "Пляж Макензи",
       "el": "Παραλία Μακένζι",
-      "fr": "Plage Mckenzie",
-      "es": "Playa Mckenzie",
-      "de": "Mckenzie-Strand",
+      "fr": "Plage McKenzie",
+      "es": "Playa McKenzie",
+      "de": "McKenzie-Strand",
       "fa": "ساحل مکنزی"
     },
     "way/606238631": {
@@ -227,9 +227,9 @@
       "ar": "شاطئ Silver",
       "ru": "Пляж Silver",
       "el": "Παραλία Silver",
-      "fr": "Plage Silver",
-      "es": "Playa Silver",
-      "de": "Silver-Strand",
+      "fr": "Silver Beach",
+      "es": "Silver Beach",
+      "de": "Silver Beach",
       "fa": "ساحل Silver"
     },
     "way/1365670207": {
@@ -237,7 +237,7 @@
       "tr": "Yeni Boğaziçi Halk Plajı",
       "ar": "شاطئ يني بوغازيتشي العام",
       "ru": "Общественный пляж Йени Богазичи",
-      "el": "Δημόσια παραλία Γενί Μποαζιτσί",
+      "el": "Δημόσια παραλία Αγίου Σεργίου",
       "fr": "Plage publique de Yeni Boğaziçi",
       "es": "Playa pública de Yeni Boğaziçi",
       "de": "Öffentlicher Strand Yeni Boğaziçi",
@@ -248,21 +248,21 @@
       "tr": "Kaplıca Plajı",
       "ar": "شاطئ كابليجا",
       "ru": "Пляж Каплыджа",
-      "el": "Παραλία Καπλίτζα",
+      "el": "Παραλία Δαυλός",
       "fr": "Plage de Kaplıca",
       "es": "Playa de Kaplıca",
       "de": "Kaplıca-Strand",
       "fa": "ساحل کاپلیجا"
     },
     "way/1395325670": {
-      "en": "Lefke Municipality Public Beach",
+      "en": "Lefke Municipal Public Beach",
       "tr": "Lefke Belediyesi Halk Plajı",
-      "ar": "الشاطئ العام لبلدية ليفكه",
-      "ru": "Муниципальный общественный пляж Лефке",
-      "el": "Δημοτική δημόσια παραλία Λεφκέ",
-      "fr": "Plage publique municipale de Lefke",
-      "es": "Playa pública municipal de Lefke",
-      "de": "Öffentlicher Strand der Gemeinde Lefke",
+      "ar": "شاطئ بلدية ليفكي العام",
+      "ru": "Муниципальный пляж Лефке",
+      "el": "Δημοτική παραλία Λεύκα",
+      "fr": "Plage municipale de Lefke",
+      "es": "Playa municipal de Lefke",
+      "de": "Gemeindestrand Lefke",
       "fa": "ساحل عمومی شهرداری لفکه"
     },
     "way/952236170": {
@@ -270,7 +270,7 @@
       "tr": "Ayfilon Plajı",
       "ar": "شاطئ أيفيلون",
       "ru": "Пляж Айфилон",
-      "el": "Παραλία Αϊφίλον",
+      "el": "Παραλία Αγίου Φίλωνα",
       "fr": "Plage d'Ayphilon",
       "es": "Playa de Ayphilon",
       "de": "Ayphilon-Strand",
@@ -314,7 +314,7 @@
       "tr": "Mehmetçik Belediye Bafra Plajı",
       "ar": "شاطئ بافرا",
       "ru": "Пляж Бафра",
-      "el": "Παραλία Μπάφρα",
+      "el": "Παραλία Βοκολίδα",
       "fr": "Plage de Bafra",
       "es": "Playa de Bafra",
       "de": "Bafra-Strand",
@@ -339,36 +339,37 @@
       "ar": "تديرها بلدية كيرينيا، وهي منطقة ترفيهية شهيرة مفتوحة للجمهور في منطقة كرفانسراي. تتوفر فيها كراسي الاستلقاء والمظلات وغرف تبديل الملابس والاستحمام والمطاعم وموقف سيارات للأشخاص ذوي الإعاقة مع وصول سهل إلى الشاطئ ومنطقة سباحة محددة بالعوامات. ويوجد برج لإنقاذ الغرقى مزوّد بالإسعافات الأولية.",
       "ru": "Пляж находится в ведении муниципалитета Кирении. Это популярная зона отдыха, открытая для всех, в районе Кервансарай. Здесь есть шезлонги и зонты, раздевалки и душевые, рестораны, парковка для людей с ограниченными возможностями с удобным доступом к пляжу и зона для купания, огороженная буями. Есть спасательная вышка с пунктом первой помощи.",
       "el": "Λειτουργεί από τον Δήμο Κερύνειας και είναι ένας δημοφιλής χώρος αναψυχής ανοιχτός στο κοινό, στην περιοχή Κερβανσαράι. Διαθέτει ξαπλώστρες και ομπρέλες, αποδυτήρια και ντους, εστιατόρια, χώρο στάθμευσης για άτομα με αναπηρία με εύκολη πρόσβαση στην παραλία και ζώνη κολύμβησης οριοθετημένη με σημαδούρες. Υπάρχει πύργος ναυαγοσωστών με πρώτες βοήθειες.",
-      "fr": "Gérée par la municipalité de Kyrenia, c'est une zone de loisirs populaire, ouverte au public, dans le quartier de Kervansaray. On y trouve des transats et des parasols, des cabines de change et des douches, des restaurants, un parking pour personnes handicapées avec un accès facile à la plage et une zone de baignade délimitée par des bouées. Une tour de surveillance avec premiers secours est présente.",
+      "fr": "Gérée par la municipalité de Kyrenia, c'est une zone de loisirs populaire, ouverte au public, dans le quartier de Kervansaray. On y trouve des transats et des parasols, des cabines de change et des douches, des restaurants, un parking pour personnes handicapées avec un accès facile à la plage et une zone de baignade délimitée par des bouées. Elle dispose d'une tour de surveillance avec poste de premiers secours.",
       "es": "Gestionada por el municipio de Kyrenia, es una popular zona de ocio abierta al público, en la zona de Kervansaray. Cuenta con tumbonas y sombrillas, vestuarios y duchas, restaurantes, un aparcamiento para personas con discapacidad con fácil acceso a la playa y una zona de baño delimitada con boyas. Dispone de una torre de socorrismo con primeros auxilios.",
-      "de": "Der Strand wird von der Gemeinde Kyrenia betrieben und ist ein beliebtes Freizeitgelände für die Öffentlichkeit im Gebiet Kervansaray. Es gibt Liegen und Sonnenschirme, Umkleidekabinen und Duschen, Restaurants, einen Parkplatz für Menschen mit Behinderung mit leichtem Zugang zum Strand und einen durch Bojen abgetrennten Badebereich. Ein Rettungsschwimmerturm mit Erster Hilfe ist vorhanden.",
-      "fa": "این ساحل را شهرداری کیرنیا اداره می‌کند و منطقه‌ای تفریحی و محبوب برای عموم در محدوده کروانسرای است. در آن تخت‌های آفتابی و چتر، رختکن و دوش، رستوران، پارکینگ ویژه افراد دارای معلولیت با دسترسی آسان به ساحل و محدوده شنای مشخص‌شده با شناور وجود دارد. یک برج نجات‌غریق همراه با کمک‌های اولیه نیز در آن هست."
+      "de": "Der Strand wird von der Gemeinde Kyrenia betrieben und ist ein beliebtes Freizeitgelände für die Öffentlichkeit im Gebiet Kervansaray. Es gibt Liegen und Sonnenschirme, Umkleidekabinen und Duschen, Restaurants, einen Parkplatz für Menschen mit Behinderung mit leichtem Zugang zum Strand und einen durch Bojen abgetrennten Badebereich. Ein Rettungsturm mit Erste-Hilfe-Station ist vorhanden.",
+      "fa": "این ساحل را شهرداری کیرنیا اداره می‌کند و منطقه‌ای تفریحی و محبوب برای عموم در محدوده کاروانسرای است. در آن تخت‌های آفتابی و چتر، رختکن و دوش، رستوران، پارکینگ ویژه افراد دارای معلولیت با دسترسی آسان به ساحل و محدوده شنای مشخص‌شده با شناور وجود دارد. یک برج نجات‌غریق همراه با کمک‌های اولیه نیز در آن هست."
     },
     "long-beach": {
-      "en": "Situated on Salamis Bay, about 15 km north of Famagusta and near the ruins of Salamis, this sandy beach offers a range of facilities. A shuttle service runs from town to the beach.",
-      "tr": "Salamis Körfezi'nde, Gazimağusa'nın yaklaşık 15 km kuzeyinde ve Salamis kalıntılarına yakın konumdaki bu kumsal plaj, çeşitli olanaklar sunar. Şehirden plaja bir servis hizmeti de işler.",
-      "ar": "يقع على خليج سلاميس، على بعد نحو 15 كم شمال فاماغوستا وبالقرب من آثار سلاميس، وهو شاطئ رملي يوفر مجموعة من المرافق. وتعمل خدمة نقل مكوكية من المدينة إلى الشاطئ.",
-      "ru": "Этот песчаный пляж находится в заливе Саламис, примерно в 15 км к северу от Фамагусты, рядом с руинами Саламина, и предлагает ряд удобств. От города до пляжа курсирует трансфер.",
-      "el": "Αυτή η αμμώδης παραλία βρίσκεται στον κόλπο της Σαλαμίνας, περίπου 15 χλμ. βόρεια της Αμμοχώστου και κοντά στα ερείπια της Σαλαμίνας, και προσφέρει μια σειρά από παροχές. Δρομολόγιο μεταφοράς εκτελείται από την πόλη προς την παραλία.",
-      "fr": "Située sur la baie de Salamine, à environ 15 km au nord de Famagouste et près des ruines de Salamine, cette plage de sable propose un éventail d'équipements. Un service de navette relie la ville à la plage.",
-      "es": "Situada en la bahía de Salamina, a unos 15 km al norte de Famagusta y cerca de las ruinas de Salamina, esta playa de arena ofrece una variedad de instalaciones. Hay un servicio de autobús lanzadera desde la ciudad hasta la playa.",
-      "de": "Der Sandstrand liegt an der Bucht von Salamis, etwa 15 km nördlich von Famagusta und in der Nähe der Ruinen von Salamis, und bietet eine Reihe von Einrichtungen. Ein Shuttleservice fährt von der Stadt zum Strand.",
-      "fa": "این ساحل ماسه‌ای در خلیج سالامیس، حدود 15 کیلومتر شمال فاماگوستا و نزدیک خرابه‌های سالامیس قرار دارد و امکانات متنوعی ارائه می‌دهد. یک سرویس شاتل نیز از شهر به ساحل رفت‌وآمد می‌کند."
+      "en": "Situated on Salamis Bay, 15 km north of Famagusta and near the ruins of Salamis, this sandy beach offers a range of facilities. A shuttle service runs from town to the beach.",
+      "tr": "Salamis Körfezi'nde, Gazimağusa'nın 15 km kuzeyinde ve Salamis kalıntılarına yakın konumdaki bu kumsal plaj, çeşitli olanaklar sunar. Şehirden plaja bir servis hizmeti de işler.",
+      "ar": "يقع على خليج سلاميس، على بعد 15 كم شمال فاماغوستا وبالقرب من آثار سلاميس، وهو شاطئ رملي يوفر مجموعة من المرافق. وتعمل خدمة نقل مكوكية من المدينة إلى الشاطئ.",
+      "ru": "Этот песчаный пляж находится в Саламинском заливе, в 15 км к северу от Фамагусты, рядом с руинами Саламина, и предлагает ряд удобств. От города до пляжа курсирует трансфер.",
+      "el": "Αυτή η αμμώδης παραλία βρίσκεται στον κόλπο της Σαλαμίνας, 15 χλμ. βόρεια της Αμμοχώστου και κοντά στα ερείπια της Σαλαμίνας, και προσφέρει μια σειρά από παροχές. Λειτουργεί υπηρεσία μεταφοράς από την πόλη προς την παραλία.",
+      "fr": "Située sur la baie de Salamine, à 15 km au nord de Famagouste et près des ruines de Salamine, cette plage de sable propose un éventail d'équipements. Un service de navette relie la ville à la plage.",
+      "es": "Situada en la bahía de Salamina, a 15 km al norte de Famagusta y cerca de las ruinas de Salamina, esta playa de arena ofrece una variedad de instalaciones. Hay un servicio de autobús lanzadera desde la ciudad hasta la playa.",
+      "de": "Der Sandstrand liegt an der Bucht von Salamis, 15 km nördlich von Famagusta und in der Nähe der Ruinen von Salamis, und bietet eine Reihe von Einrichtungen. Ein Shuttleservice fährt von der Stadt zum Strand.",
+      "fa": "این ساحل ماسه‌ای در خلیج سالامیس، 15 کیلومتر شمال فاماگوستا و نزدیک خرابه‌های سالامیس قرار دارد و امکانات متنوعی ارائه می‌دهد. یک سرویس شاتل نیز از شهر به ساحل رفت‌وآمد می‌کند."
     }
   },
   "needs_native_check": [
-    "Kervansaray Beach: ar كرفانسراي, fa کروانسرای, ru Кервансарай, el Κερβανσαράι are transliterations of the Turkish place name (the page spells it Kervansaray); confirm spellings.",
+    "Kervansaray Beach: ar كرفانسراي, fa کاروانسرای, ru Кервансарай, el Κερβανσαράι are transliterations of the Turkish place name (the page spells it Kervansaray); confirm spellings.",
     "Long Beach is kept in Latin in all 9 locales (a proper name used by the area list in constants/areas.js and by the page); confirm no locale wants a localised form.",
-    "Toponym transliterations in ar/fa/ru/el are derived from the Turkish spelling, not from an established local form: Esentepe, Karaoğlanoğlu, Lapta, Alsancak, Lefke, Bafra, Kaplıca, Yeni Boğaziçi, Yudi, Ayphilon, Issız, Mckenzie. For el the app uses exonyms for the big towns (Κερύνεια, Αμμόχωστος) but the live beaches transliterate village names (Αλακάτι): kept to that rule. el naming is sensitive: confirm with a Greek-Cypriot reader, especially Λάπτα (Lapithos is Λάπηθος in Greek) and Λεφκέ (Λεύκα in Greek).",
-    "Brand or toponym? Bamboo, Bella Marin, Camelot, Diana, Riviera, Sandouka, Sardunya, Silver, Korenium (also a village name, Greek Κορίνεον), Kocareis, Shayna, Lido Cyprus. All kept in Latin everywhere; only the word Beach is localised where the row name ends in Beach.",
+    "Toponym transliterations in ar/fa/ru are derived from the Turkish spelling, not from an established local form: Esentepe, Karaoğlanoğlu, Lapta, Alsancak, Lefke, Bafra, Kaplıca, Yeni Boğaziçi, Yudi, Ayphilon, Issız, McKenzie. The live beaches' el names (Αλακάτι, Γλαψίδες) are the traditional Greek village names, not transliterations of the Turkish names.",
+    "el naming policy = traditional Greek village names, consistent with the app's existing el text; Berke to confirm; Greek-Cypriot reader to check before publish. el village-name choices: Esentepe = Τράπεζα, Karaoğlanoğlu = Άγιος Γεώργιος, Lapta = Λάπηθος, Alsancak = Καραβάς, Lefke = Λεύκα, Yeni Boğaziçi = Άγιος Σέργιος, Kaplıca = Δαυλός, Bafra = Βοκολίδα, Ayphilon = Άγιος Φίλων; kept as transliteration (no traditional form assumed): Κερβανσαράι, Μακένζι, Ισσίζ, Γιούντι.",
+    "Brand or toponym? Bamboo, Bella Marin, Camelot, Diana, Riviera, Sandouka, Sardunya, Silver, Korenium (also a village name, Greek Κορίνεον), Kocareis, Shayna, Lido Cyprus. The whole English name is kept in every Latin-script locale (en, tr, fr, es, de: '<Name> Beach'); ar/fa/ru/el localise only the generic word.",
     "Yudi Halk Plajı: Yudi is treated as a toponym and transliterated; if it is a personal name or brand, keep Latin.",
     "Issız Plaj: en is OSM's name:en 'Nowhere Beach' (a translation of Issız = 'deserted'), but the other 7 locales keep the proper name Issız and do not translate it to 'Nowhere'. Confirm which is wanted.",
     "Ayfilon Plajı / Ayphilon Beach: tr uses the OSM Turkish spelling, en/fr/es/de use OSM's name:en spelling Ayphilon.",
-    "Makenzi Plajı / Mckenzie Beach: tr spelling Makenzi is the row name, en/fr/es/de use OSM name:en spelling Mckenzie.",
-    "Municipality of Alsancak Beach: en keeps OSM's own English name (word order 'Municipality of Alsancak Beach'); tr is the natural Turkish form Alsancak Belediye Plajı.",
+    "Makenzi Plajı / McKenzie Beach: tr spelling Makenzi is the row name, en/fr/es/de use OSM name:en spelling McKenzie.",
+    "Municipal rows (Esentepe, Lapta, Lefke, Alsancak): one construction per locale (de Gemeindestrand X, ru Муниципальный пляж X, fr Plage municipale de X, es Playa municipal de X, en 'X Municipal (Public) Beach', tr Belediye Plajı); the OSM English names ('Municipality of Alsancak Beach', 'Lapta Municipality Public Beach') are not used. Confirm.",
     "Mehmetçik Belediye Bafra Plajı: en and the other 7 locales use OSM name:en 'Bafra Beach' (Mehmetçik dropped); tr keeps the full OSM name.",
-    "English-named OSM rows keep the English name in tr (Bamboo Beach, Bella Marin Beach, ...), unlike the live Escape Beach row whose tr is 'Escape Plajı'; Korenium beach is written 'Korenium Beach' (capital B) in every locale.",
+    "English-named OSM rows keep the English name in tr (Bamboo Beach, Bella Marin Beach, ...), unlike the live Escape Beach row whose tr is 'Escape Plajı'; Korenium Beach is written with a capital B in every locale.",
     "Kyrenia / Famagusta / Salamis in the two descriptions follow the app's own spellings (constants/i18n.js hsDistrict* keys); fa spells Kyrenia کیرنیا and Famagusta فاماگوستا as the app does.",
-    "German 'Städtischer Strand Alsancak' and 'Öffentlicher Strand der Gemeinde X', and the lifeguard-tower line of the Kervansaray description (Rettungsschwimmerturm, tour de surveillance, torre de socorrismo): confirm natural wording."
+    "German 'Öffentlicher Strand X', 'Gemeindestrand X', and the lifeguard-tower line of the Kervansaray description (Rettungsturm mit Erste-Hilfe-Station, tour de surveillance avec poste de premiers secours, torre de socorrismo): confirm natural wording."
   ]
 }
