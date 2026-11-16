@@ -1,14 +1,29 @@
 #!/usr/bin/env node
 // Explore beaches — the curated LIST (step one; no migration exists yet, Berke approves this first).
 //
-//   node scripts/beaches-list.mjs                 rebuild data/explore/beaches.json from the committed OSM snapshot, validate
-//   node scripts/beaches-list.mjs --check [file]  validate a committed (or any) beaches.json; without a file also
-//                                                 asserts that a fresh rebuild is byte-identical to the committed one
+//   node scripts/beaches-list.mjs                    REBUILD data/explore/beaches.json from the LOCAL OSM snapshot (SNAPSHOT below;
+//                                                    data/osm/ is gitignored on purpose, so a fresh clone has none), then run the checks
+//   node scripts/beaches-list.mjs --check [file]     OFFLINE, no snapshot, no network. Proves, from the data file alone: ids unique,
+//                                                    source/source_id shape, region = resolveRegion(pin) and one of the 7, area valid for
+//                                                    its region, pin inside the TRNC frame, >= 300 m between rows and from every LIVE
+//                                                    beach, no row already in 20261179, OSM rows carry no description/amenities/
+//                                                    blue_flag/access_type, name_evidence well-formed, the 4 live translation blocks
+//                                                    complete (and equal to beaches-live-translations.json), counts match the arrays,
+//                                                    rows in canonical order, file byte-stable (parse + re-serialise == file).
+//                                                    It does NOT prove a pin lies on its OSM outline.
+//   node scripts/beaches-list.mjs --verify-geometry [snapshot.json]
+//                                                    NEEDS OSM GEOMETRY: re-fetches exactly the rows' elements by id through
+//                                                    scripts/lib/osm-snapshot.mjs (main Overpass, <= 72 h), or reuses a local snapshot
+//                                                    (the original, or any file that contains them). Proves: every row's element exists,
+//                                                    pin lies inside/on its outline (<= 1 m), private_resort == (the element itself is
+//                                                    tagged leisure=beach_resort), the OSM name matches the row, each name_evidence
+//                                                    distance_m re-measures, no LIVE pin lies on a row's outline; with a FULL snapshot
+//                                                    also that every named element is accounted for in DROP / MERGED / KEEP / MINISTRY.
 //
-// Inputs (all committed): data/osm/beaches-<base>.json  (Overpass `out geom`, North only, via scripts/lib/osm-snapshot.mjs)
-//                         data/explore/beaches-live-translations.json (the 4 live rows, 7 missing locales)
-//                         the CURATION block below (every drop/keep/area decision, with its reason).
-// Deterministic: generated_at is the snapshot's own osm_base, nothing reads the clock or the network.
+// Inputs: the local OSM snapshot (Overpass `out geom`, North only) for a rebuild, data/explore/beaches-live-translations.json,
+// and the CURATION block below (every drop/keep/area decision, with its reason). Deterministic: the only timestamp is
+// the snapshot's own osm_base, which the data file carries (osm_base) so the file is self-sufficient for provenance;
+// nothing reads the clock or the network except --verify-geometry's re-fetch.
 // Data © OpenStreetMap contributors, ODbL 1.0. OSM rows carry NAME + PIN only (+ the resort tag evidence).
 // Exit 1 on any validation failure.
 import fs from 'node:fs'
@@ -17,6 +32,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolveRegion, pointInPolygon } from '../utils/resolveRegion.js'
 import { inTrncFrame } from '../constants/mapSources.js'
 import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
+import { osmSnapshot } from './lib/osm-snapshot.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SNAPSHOT = 'data/osm/beaches-20261115T1853.json'
@@ -24,20 +40,25 @@ const OUT = 'data/explore/beaches.json'
 const TRANSLATIONS = 'data/explore/beaches-live-translations.json'
 const REGIONS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
 const NEW_LOCALES = ['ar', 'ru', 'el', 'fr', 'es', 'de', 'fa']
+const PIN_METHODS = ['node', 'open_way_middle_vertex', 'centroid', 'centroid_of_largest_outer_ring', 'pole_of_inaccessibility']
+const EVIDENCE_KINDS = ['a', 'b', 'c', 'd']
 const MIN_SEP_M = 300
+const MAX_EVIDENCE_M = 200
 const VISITNCY = 'https://www.visitncy.com/discover/beaches/'
 
 // The 4 LIVE beaches (places, category 'beach', read with the anon key 2026-11-15, count exact = 4).
+// Alagadi's pin was moved in production 2026-11-16 (Berke); it was 35.3302, 33.4972.
 const LIVE = [
-  { id: 'fa39492b-57e6-4ebd-b22c-89a9cf20ffe2', name: 'Alagadi Turtle Beach', lat: 35.3302, lng: 33.4972 },
+  { id: 'fa39492b-57e6-4ebd-b22c-89a9cf20ffe2', name: 'Alagadi Turtle Beach', lat: 35.332504, lng: 33.48512 },
   { id: '4a29cce8-8c3a-4541-8a07-fc7ceda6a4ff', name: 'Escape Beach', lat: 35.3471, lng: 33.2343 },
   { id: 'b52cdf3a-ce3f-4e6f-88b8-57afb95f2e67', name: 'Glapsides Beach', lat: 35.1541, lng: 33.9129 },
   { id: '95b6d924-e3c0-40e4-a2bd-b55ca1a105ef', name: 'Golden Beach (Altın Kumsal)', lat: 35.6412, lng: 34.5423 },
 ]
 
-// ─── CURATION: every NAMED snapshot element must appear in exactly one of DROP / REVIEW / MERGED / MINISTRY / KEEP ───
+// ─── CURATION: every NAMED snapshot element must appear in exactly one of DROP / MERGED(sibling) / MINISTRY / KEEP ───
 const LIVE_DUP = 'Duplicate of a LIVE beach'
 const GENERIC = 'Generic name, not a proper name'
+const BERKE_MARASH = 'beside closed Maraş / army base; left out by Berke 2026-11-16'
 const DROP = {
   'way/208118413': `${LIVE_DUP}: Escape Beach`,
   'way/226555170': `${LIVE_DUP}: Alagadi Turtle Beach (OSM "Alagadi 2")`,
@@ -49,28 +70,24 @@ const DROP = {
   'way/225385316': `${GENERIC}: "Beach" (35.3515 N 33.1696 E, beside Suna's Beach and Restaurant)`,
   'way/606238633': `${GENERIC}: "Beach Club" (35.167 N 33.910 E, between Glapsides and Silver Beach)`,
   'way/606238634': 'resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the "Kapalı Maraş" restricted-area relation r12196193 (tagged "Very approximate"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note "Only Northern Cyprus and Turkish Citizens allowed") about 2.3 km west',
-  'node/5860707914': 'Probable duplicate of way/608212204 (Bella Marin Beach): the node "Bella Marin" (leisure=beach_resort, fee=yes) is 452 m from the way and NOT on its outline, so same-beach is a guess by name; the way is kept (pin on the outline), and the node\'s tags are NOT applied to the row — question for Berke',
+  'node/5860707914': 'Duplicate of way/608212204 (Bella Marin Beach): the node "Bella Marin" (leisure=beach_resort, fee=yes) is 452 m from the way and not on its outline; Berke 2026-11-16: Bella Marin Beach stays as the way row, access empty, private_resort false; the node\'s tags are not applied to the row',
+  'node/6595054185': 'Sibling of way/208111924, merged into the Lapta Belediye Plajı row (Berke 2026-11-16): the node is the beach_resort point on that outline; its names and tags are recorded on the row',
+  'way/396559851': `Palm beach: ${BERKE_MARASH}. OSM test result: 9 of its 47 outline vertices fall inside the "Kapalı Maraş" relation r12196193 (tagged "Very approximate"); the OSM node "Varosha Entrance" (barrier=gate, access=no) is 355 m from the pin`,
+  'relation/12567504': `Glossa Beach: ${BERKE_MARASH}. OSM test result: 47 of its 93 outline vertices fall inside r12196193, 20 inside the military-landuse relation r12567503 "Gazimağusa Orduevi" (name:en "Turkish Army Base"); military checkpoints at 35.1014 N 33.9646 E and 35.1057 N 33.9615 E`,
 }
-// Kept as ONE row from two OSM elements: the dropped element's resort tags are carried onto the kept row.
-const MERGED = { 'way/608212204': 'node/5860707914' }
-
-const REVIEW = {
-  'way/396559851': 'Palm beach — OSM test result: 9 of its 47 outline vertices fall inside the "Kapalı Maraş" restricted-area relation r12196193 (OSM tags that relation "Very approximate"; its stitched rings did not contain the pin itself); 0 inside the UN buffer zone r3263735. The OSM node "Varosha Entrance" (barrier=gate, access=no, fee=no, foot:conditional=permissive in daily opening hours, motor_vehicle=no) is 355 m from the pin. OSM cannot establish whether this stretch is open to the public',
-  'relation/12567504': 'Glossa Beach — OSM test result: 47 of its 93 outline vertices fall inside the "Kapalı Maraş" relation r12196193 ("Very approximate"), 20 inside the military-landuse relation r12567503 "Gazimağusa Orduevi" (name:en "Turkish Army Base"), 0 inside the UN buffer zone; OSM carries military checkpoints at 35.1014 N 33.9646 E (access=no) and 35.1057 N 33.9615 E. A 2.7 km shore strip; OSM cannot establish that it is open to the public',
-  'relation/15456405': 'Makenzi Plajı (OSM name:en "Mckenzie Beach") — 1.5 km multipolygon near Salamis Bay at about 35.251 N 33.905 E; possible Long Beach candidate (Salamis Bay), not confident',
-  'node/6595054185': 'Lapta Belediye Plajı (name:en Lapta Municipality Public Beach) — a beach_resort point tagged fee=no that sits on the way/208111924 "Güzelyalı Beach" outline: one beach with two names or two neighbours; also the resort rule would call a free municipal beach private_resort=true',
-}
+// Kept as ONE row from two OSM elements: the sibling's tags are recorded on the kept row (merged_duplicate_tags), never applied.
+const MERGED = { 'way/608212204': 'node/5860707914', 'way/208111924': 'node/6595054185' }
 
 // Ministry beaches (visitncy.com/discover/beaches/, credit "Turizm Bakanlığı"). Text verbatim from the page.
 const MINISTRY = [
   {
-    source_id: 'long-beach', name: 'Long Beach', osm: null, area: null,
+    source_id: 'long-beach', name: 'Long Beach', osm: 'way/1568098280', area: 'Long Beach',
+    pin_note: 'Pinned by Berke\'s decision 2026-11-16 on the İskele resort outline at about 35.266 N 33.916 E (the page says only "Situated on the Salamis Bay, 15 kilometres north of Famagusta"). OSM has no element named Long Beach. Two unnamed leisure=beach_resort ways (area=yes) sit there: way/1568098280 (35.2655-35.2670 N, about 150 m of shore, the larger, and the one that contains 35.266 N 33.916 E) and way/1568098281 (35.2670-35.2677 N, about 90 m, the next strip north). A bbox query over 35.24-35.30 N 33.89-33.94 E (2026-11-16) found no unnamed natural=beach way on that shore, so the larger beach_resort strip is the outline. The element itself is tagged leisure=beach_resort; private_resort stays false because this is a Ministry-listed public beach row (Berke to confirm)',
     description_en_site: 'Situated on the Salamis Bay, 15 kilometres north of Famagusta and near to the ruins of Salamis, this magnificent sandy beach is ideal to spend time relaxing with a range of available facilities. A shuttle service also runs from town to the beach.',
     facts: [
       { quote: 'this magnificent sandy beach is ideal to spend time relaxing with a range of available facilities', relates_to: null, note: 'facilities are not itemised on the page' },
       { quote: 'A shuttle service also runs from town to the beach.', relates_to: null, note: 'no allowed slug covers a shuttle' },
     ],
-    pending: 'No OSM element is named "Long Beach"; coordinates, region and area wait for Berke (see needs_review)',
   },
   {
     source_id: 'kervansaray-beach', name: 'Kervansaray Beach', osm: 'way/217651068', area: null,
@@ -83,17 +100,27 @@ const MINISTRY = [
       { quote: 'dressing rooms and showers', relates_to: null, note: 'no allowed slug; toilets are not mentioned' },
       { quote: 'Operated by the Municipality of Kyrenia, this is a popular leisure area to be enjoyed by the public.', relates_to: 'access_type', note: 'municipal, "enjoyed by the public"; the page never says free or paid' },
     ],
-    area_note: 'The page says "in the Kervansaray area"; constants/areas.js has no Kervansaray area, so area stays null. 20261179 files two Kervansaray Mevkii addresses under "Karaoğlanoğlu Caddesi": Karaoğlanoğlu is a possible pick if Berke wants one.',
+    area_note: 'The page says "in the Kervansaray area"; constants/areas.js has no Kervansaray area, so area stays null (Berke 2026-11-16).',
   },
 ]
 
-// KEEP: element ref -> area NAME (constants/areas.js) or null. area only where the NAME or an OSM tag says the locality.
+// KEEP: element ref -> { area: constants/areas.js NAME or null, why }. area only where the NAME, an OSM tag or Berke says the locality.
+// name / name_en override the OSM name; provenance records what OSM calls the element(s); private_resort_note explains a false despite a resort tag on a sibling.
 const KEEP = {
   'way/225383964': { area: 'Alsancak', why: 'name contains "Alsancak"' },
   'way/208150337': { area: 'Karaoğlanoğlu', why: 'name contains "Karaoğlanoğlu"' },
   'way/603986283': { area: 'Esentepe', why: 'name contains "Esentepe"' },
   'way/435772839': { area: 'Bafra', why: 'name contains "Bafra" (name:en "Bafra Beach"); the name also says "Mehmetçik", a second karpaz area: Bafra chosen' },
-  'way/208111924': { area: null }, 'way/208241783': { area: null }, 'way/225382750': { area: null },
+  'way/208111924': {
+    area: 'Lapta', why: 'Berke 2026-11-16: one row, area Lapta',
+    name: 'Lapta Belediye Plajı', name_en: 'Lapta Municipality Public Beach',
+    provenance: { osm_names: [
+      { element: 'way/208111924', name: 'Güzelyalı Beach', role: 'outline the pin lies on; source_id' },
+      { element: 'node/6595054185', name: 'Lapta Belediye Plajı', name_en: 'Lapta Municipality Public Beach', role: 'beach_resort point on that outline; name of the row' },
+    ] },
+    private_resort_note: 'the sibling node carries leisure=beach_resort but also fee=no: a free municipal beach, so private_resort is false (Berke 2026-11-16)',
+  },
+  'way/208241783': { area: null }, 'way/225382750': { area: null },
   'way/225386412': { area: null }, 'way/229043037': { area: null }, 'way/244561269': { area: null },
   'way/286275732': { area: null }, 'way/286276160': { area: null }, 'way/435771323': { area: null },
   'way/510986434': { area: null }, 'way/603896219': { area: null }, 'way/606238631': { area: null },
@@ -101,7 +128,14 @@ const KEEP = {
   'way/1395325670': { area: null }, 'way/1484271058': { area: null },
   'node/1951274050': { area: null }, 'node/11231014679': { area: null }, 'node/11994931556': { area: null },
   'relation/13040159': { area: null },
+  'relation/15456405': { area: null, why: 'Berke 2026-11-16: a named beach in Famagusta, nothing flagged' },
 }
+
+// ADDED (Part B): beaches OSM left UNNAMED. The PIN is OSM-derived (on the unnamed outline); the NAME comes from an independent
+// public source. `at` is the evidence's own coordinate; its distance to the outline is measured at build time (0 = on/inside it).
+// kind: a = official page, b = Wikipedia/Wikidata coordinates, c = geotagged Commons file whose title/description names the beach,
+// d = named OSM POI adjacent to the outline.
+const ADDED = []
 // Pairs allowed to sit closer than MIN_SEP_M (a, b are source_ids / live ids), each with its reason.
 const ALLOW_CLOSE = []
 
@@ -134,7 +168,7 @@ function segDistM(pLat, pLng, aLat, aLng, bLat, bLng) {
   const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 }
-const edgeDistM = (lat, lng, ring) => {
+export const edgeDistM = (lat, lng, ring) => {
   let best = Infinity
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) best = Math.min(best, segDistM(lat, lng, ring[j][0], ring[j][1], ring[i][0], ring[i][1]))
   return best
@@ -211,118 +245,146 @@ export function onElement(el, lat, lng) {
   return s.outers.some(o => (insideShape(lat, lng, o, s.inners.filter(r => pointInPolygon(r[0][0], r[0][1], o))) || edgeDistM(lat, lng, o) <= 1))
 }
 
-// ─── build ──────────────────────────────────────────────────────────────────
+
+const insideRing = (el, lat, lng) => {
+  const s = shapeOf(el)
+  return s.kind === 'ring' && s.outers.some(o => insideShape(lat, lng, o, s.inners.filter(r => pointInPolygon(r[0][0], r[0][1], o))))
+}
+// Metres from (lat,lng) to an element: 0 inside an area, else to the nearest edge / line / node.
+export function distToElement(el, lat, lng) {
+  const s = shapeOf(el)
+  if (s.kind === 'node') return metres(lat, lng, s.point[0], s.point[1])
+  if (s.kind === 'line') return edgeDistM(lat, lng, s.line)
+  if (insideRing(el, lat, lng)) return 0
+  return Math.min(...s.outers.map(o => edgeDistM(lat, lng, o)))
+}
+
+// ─── build (needs the local snapshot) ───────────────────────────────────────
 const refOf = e => `${e.type}/${e.id}`
 const nameOf = t => t.name || t['name:tr'] || t['name:en'] || null
 const seen = t => { const o = {}; for (const k of ['surface', 'access', 'fee', 'operator']) if (t[k] != null) o[k] = t[k]; return o }
-const resortEvidence = t => {
-  const ev = []
-  if (t.leisure === 'beach_resort') ev.push('leisure=beach_resort')
-  if (t.access === 'private') ev.push('access=private')
-  return ev
-}
+// Decision 5 (Berke 2026-11-16): the ELEMENT ITSELF tagged leisure=beach_resort, nothing else.
+const resortEvidence = t => (t.leisure === 'beach_resort' ? ['leisure=beach_resort'] : [])
 const resortTagsOf = t => { const o = {}; for (const k of ['leisure', 'fee', 'access', 'operator']) if (t[k] != null) o[k] = t[k]; return o }
 const areaFor = (region, name) => {
   if (name == null) return null
   const hit = (AREAS_BY_REGION[region] || []).find(n => n === name)
   return hit ? areaSlug(hit) : { invalid: name }
 }
+const regionIdx = r => (r ? REGIONS.indexOf(r) : 99)
+const rowOrder = (a, b) => (a.source === 'osm') - (b.source === 'osm') || regionIdx(a.region) - regionIdx(b.region) || a.name.localeCompare(b.name, 'tr') || a.source_id.localeCompare(b.source_id)
+const idsOf = refs => {
+  const by = { node: [], way: [], relation: [] }
+  for (const r of refs) { const [t, i] = r.split('/'); by[t].push(i) }
+  return by
+}
 
-export function build() {
-  const snap = JSON.parse(fs.readFileSync(path.join(ROOT, SNAPSHOT), 'utf8'))
+function coverage(snap) {
   const byRef = new Map(snap.elements.map(e => [refOf(e), e]))
-  const named = snap.elements.filter(e => nameOf(e.tags || {}))
-  const accounted = new Set([...Object.keys(DROP), ...Object.keys(REVIEW), ...Object.keys(MERGED), ...Object.keys(KEEP), ...MINISTRY.map(m => m.osm).filter(Boolean)])
+  const accounted = new Set([...Object.keys(DROP), ...Object.keys(MERGED), ...Object.values(MERGED), ...Object.keys(KEEP), ...MINISTRY.map(m => m.osm), ...ADDED.map(a => a.ref)])
   const problems = []
-  for (const e of named) if (!accounted.has(refOf(e))) problems.push(`named element ${refOf(e)} is in no curation list`)
+  for (const e of snap.elements) if (nameOf(e.tags || {}) && !accounted.has(refOf(e))) problems.push(`named element ${refOf(e)} is in no curation list`)
   for (const r of accounted) if (!byRef.has(r)) problems.push(`curation names ${r}, not in the snapshot`)
+  for (const a of ADDED) if (byRef.has(a.ref) && nameOf(byRef.get(a.ref).tags || {})) problems.push(`ADDED ${a.ref} is already named in OSM`)
+  return problems
+}
 
+export function build(snap) {
+  const byRef = new Map(snap.elements.map(e => [refOf(e), e]))
+  const problems = coverage(snap)
   const rows = []
-  const rowFor = (el, extra) => {
-    const t = el.tags, pin = pinOf(el), region = resolveRegion(pin.lat, pin.lng)
-    return { el, t, pin, region, extra }
-  }
   for (const m of MINISTRY) {
+    const el = byRef.get(m.osm)
     const base = { name: m.name, name_tr: null, name_en: null, source: 'visitncy_beaches', source_id: m.source_id, source_url: VISITNCY, credit: 'Turizm Bakanlığı' }
-    if (!m.osm) {
-      rows.push({ ...base, region: null, area: null, latitude: null, longitude: null, osm: null, pin_method: null, private_resort: false, resort_evidence: [], osm_tags_seen: {}, description_en_site: m.description_en_site, facts: m.facts, pending: m.pending })
-      continue
+    if (!el) { problems.push(`MINISTRY ${m.source_id}: ${m.osm} not in the snapshot`); continue }
+    const t = el.tags, pin = pinOf(el), region = resolveRegion(pin.lat, pin.lng)
+    rows.push({ ...base, name_tr: t['name:tr'] || null, name_en: t['name:en'] || null, region, area: areaFor(region, m.area), latitude: pin.lat, longitude: pin.lng, osm: { type: el.type, id: el.id }, pin_method: pin.pin_method, private_resort: false, resort_evidence: [], osm_tags_seen: seen(t), description_en_site: m.description_en_site, facts: m.facts, ...(m.pin_note ? { pin_note: m.pin_note } : {}), ...(m.area_note ? { area_note: m.area_note } : {}) })
+  }
+  const osmRow = (el, cfg, over) => {
+    const t = el.tags, pin = pinOf(el), region = resolveRegion(pin.lat, pin.lng)
+    const merged = MERGED[refOf(el)] || null
+    const sib = merged && byRef.get(merged) ? resortTagsOf(byRef.get(merged).tags) : null
+    const ev = resortEvidence(t)
+    return {
+      name: over.name, name_tr: t['name:tr'] || null, name_en: over.name_en !== undefined ? over.name_en : t['name:en'] || null, name_source: over.name_source,
+      region, area: areaFor(region, cfg.area), area_why: cfg.why || cfg.area_why || null, latitude: pin.lat, longitude: pin.lng,
+      source: 'osm', source_id: refOf(el), osm: { type: el.type, id: el.id }, merged_duplicate: merged, merged_duplicate_tags: sib, pin_method: pin.pin_method,
+      private_resort: ev.length > 0, resort_evidence: ev, ...(cfg.private_resort_note ? { private_resort_note: cfg.private_resort_note } : {}), osm_tags_seen: seen(t),
+      ...(cfg.provenance ? { provenance: cfg.provenance } : {}), ...(over.name_evidence ? { name_evidence: over.name_evidence, ...(cfg.name_note ? { name_note: cfg.name_note } : {}) } : {}),
+      description: null, amenities: [], blue_flag: null, access_type: null,
     }
-    const { el, t, pin, region } = rowFor(byRef.get(m.osm))
-    const area = areaFor(region, m.area)
-    rows.push({ ...base, name_tr: t['name:tr'] || null, name_en: t['name:en'] || null, region, area, latitude: pin.lat, longitude: pin.lng, osm: { type: el.type, id: el.id }, pin_method: pin.pin_method, private_resort: false, resort_evidence: [], osm_tags_seen: seen(t), description_en_site: m.description_en_site, facts: m.facts, area_note: m.area_note })
   }
   for (const [ref, cfg] of Object.entries(KEEP)) {
     const el = byRef.get(ref)
     if (!el) continue
-    const { t, pin, region } = rowFor(el)
-    const ev = resortEvidence(t), tags = seen(t)
-    const merged = MERGED[ref] || null
-    const sibTags = merged ? resortTagsOf(byRef.get(merged).tags) : null
-    rows.push({
-      name: nameOf(t), name_tr: t['name:tr'] || null, name_en: t['name:en'] || null,
-      region, area: areaFor(region, cfg.area), area_why: cfg.why || null, latitude: pin.lat, longitude: pin.lng,
-      source: 'osm', source_id: ref, osm: { type: el.type, id: el.id }, merged_duplicate: merged, merged_duplicate_tags_for_berke: sibTags, pin_method: pin.pin_method,
-      private_resort: ev.length > 0, resort_evidence: ev, osm_tags_seen: tags,
-      description: null, amenities: [], blue_flag: null, access_type: null,
-    })
+    rows.push(osmRow(el, cfg, { name: cfg.name || nameOf(el.tags), name_en: cfg.name_en, name_source: cfg.name ? 'berke_decision' : 'osm' }))
   }
-  const regionIdx = r => (r ? REGIONS.indexOf(r) : 99)
-  rows.sort((a, b) => (a.source === 'osm') - (b.source === 'osm') || regionIdx(a.region) - regionIdx(b.region) || a.name.localeCompare(b.name, 'tr'))
+  for (const a of ADDED) {
+    const el = byRef.get(a.ref)
+    if (!el) continue
+    const evidence = a.name_evidence.map(x => ({ kind: x.kind, url: x.url, quote_or_title: x.quote_or_title, evidence_point: x.at, distance_m: Math.round(distToElement(el, x.at[0], x.at[1])) }))
+    rows.push(osmRow(el, a, { name: a.name, name_source: 'external_evidence', name_evidence: evidence }))
+  }
+  rows.sort(rowOrder)
   const dropped = Object.entries(DROP).map(([ref, reason]) => ({ name: nameOf(byRef.get(ref)?.tags || {}), osm: ref, reason })).sort((a, b) => a.osm.localeCompare(b.osm))
-  const needs_review = Object.entries(REVIEW).map(([ref, note]) => {
-    const el = byRef.get(ref), p = el ? pinOf(el) : null
-    return { name: nameOf(el?.tags || {}), osm: ref, at: p ? [p.lat, p.lng] : null, resolveRegion: p ? resolveRegion(p.lat, p.lng) : null, note }
-  })
-  const LB = ['way/1568098280', 'way/1568098281', 'way/1365670207', 'way/309630489', 'way/435771324', 'relation/15456405']
-  needs_review.push({ name: 'Long Beach (Ministry)', osm: null, at: null, resolveRegion: null,
-    note: 'No OSM element is named Long Beach; the row exists with null coordinates/region/area until Berke picks a pin. Candidates (all unnamed except Makenzi) with what resolveRegion says at each pin:',
-    candidates: LB.filter(r => byRef.has(r)).map(r => { const p = pinOf(byRef.get(r)); const t = byRef.get(r).tags; return { osm: r, name: nameOf(t), tags: { natural: t.natural, leisure: t.leisure, surface: t.surface }, at: [p.lat, p.lng], resolveRegion: resolveRegion(p.lat, p.lng) } }) })
-  const unnamed = snap.elements.length - named.length
+  const base = snap.osm3s.timestamp_osm_base
   return {
     obj: {
-      generated_at: snap.osm3s.timestamp_osm_base, osm_snapshot: SNAPSHOT, osm_base: snap.osm3s.timestamp_osm_base,
+      generated_at: base, osm_base: [base],
       attribution: { osm: '© OpenStreetMap contributors, ODbL 1.0', ministry: 'Turizm Bakanlığı (visitncy.com)' },
-      counts: { snapshot_elements: snap.elements.length, named: named.length, unnamed_not_candidates: unnamed, rows: rows.length, dropped: dropped.length, needs_review: needs_review.length },
-      rows, dropped, needs_review, live_translations: JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS), 'utf8')),
+      counts: { rows: rows.length, dropped: dropped.length, needs_review: 0 },
+      rows, dropped, needs_review: [], live_translations: JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS), 'utf8')),
     },
-    snap, byRef, problems,
+    problems,
   }
 }
 
-// ─── validate ───────────────────────────────────────────────────────────────
-export function validate(obj, snap, byRef) {
+// ─── validate: OFFLINE (no geometry) ────────────────────────────────────────
+export function validate(obj) {
   const f = []
-  const ids = new Set()
-  const geo = []
+  const ids = new Set(), refs = new Set(), geo = []
+  if (!Array.isArray(obj.osm_base) || !obj.osm_base.length || obj.osm_base.some(x => !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x))) f.push('osm_base must be a non-empty array of ISO timestamps')
   for (const r of obj.rows) {
     const tag = `${r.source_id}`
     if (ids.has(r.source_id)) f.push(`duplicate source_id ${tag}`)
     ids.add(r.source_id)
     if (!['osm', 'visitncy_beaches'].includes(r.source)) f.push(`${tag}: bad source ${r.source}`)
+    if ('pending' in r) f.push(`${tag}: carries a pending note (no row may lack a pin any more)`)
+    if (typeof r.name !== 'string' || !r.name.trim()) f.push(`${tag}: empty name`)
+    if (!r.osm || !['node', 'way', 'relation'].includes(r.osm.type) || !Number.isInteger(r.osm.id)) f.push(`${tag}: osm must be {type,id}`)
+    else { const ref = `${r.osm.type}/${r.osm.id}`; if (refs.has(ref)) f.push(`${tag}: osm ${ref} used by another row`); refs.add(ref) }
+    if (!PIN_METHODS.includes(r.pin_method)) f.push(`${tag}: pin_method ${r.pin_method}`)
     if (r.source === 'osm') {
       for (const k of ['description', 'blue_flag', 'access_type']) if (r[k] != null) f.push(`${tag}: OSM row carries ${k}`)
       if ((r.amenities || []).length) f.push(`${tag}: OSM row carries amenities`)
       if (!/^(node|way|relation)\/\d+$/.test(r.source_id)) f.push(`${tag}: source_id is not <type>/<id>`)
+      else if (r.osm && r.source_id !== `${r.osm.type}/${r.osm.id}`) f.push(`${tag}: source_id disagrees with osm ref`)
+      if (!['osm', 'berke_decision', 'external_evidence'].includes(r.name_source)) f.push(`${tag}: name_source ${r.name_source}`)
+      if (r.private_resort !== (r.resort_evidence || []).length > 0) f.push(`${tag}: private_resort disagrees with resort_evidence`)
+      if (r.name_source === 'external_evidence') {
+        const ev = r.name_evidence
+        if (!Array.isArray(ev) || !ev.length) f.push(`${tag}: external_evidence name without name_evidence`)
+        for (const x of ev || []) {
+          if (!EVIDENCE_KINDS.includes(x.kind)) f.push(`${tag}: evidence kind ${x.kind}`)
+          if (!/^https:\/\//.test(x.url || '')) f.push(`${tag}: evidence url ${x.url}`)
+          if (typeof x.quote_or_title !== 'string' || x.quote_or_title.trim().length < 5) f.push(`${tag}: evidence quote_or_title missing`)
+          if (x.kind === 'a' && x.distance_m == null) continue
+          if (!Number.isFinite(x.distance_m) || x.distance_m > MAX_EVIDENCE_M) f.push(`${tag}: evidence ${x.kind} distance_m ${x.distance_m} (max ${MAX_EVIDENCE_M})`)
+          if (!Array.isArray(x.evidence_point) || x.evidence_point.length !== 2 || !inTrncFrame(x.evidence_point[0], x.evidence_point[1])) f.push(`${tag}: evidence_point outside the frame`)
+        }
+      } else if (r.name_evidence) f.push(`${tag}: name_evidence on a ${r.name_source} name`)
+      if (r.name_source === 'berke_decision' && !r.provenance?.osm_names?.length) f.push(`${tag}: berke_decision name without provenance.osm_names`)
     }
-    if (r.latitude == null || r.longitude == null) {
-      if (!r.pending) f.push(`${tag}: null coordinates without a pending note`)
-      if (r.region != null || r.area != null) f.push(`${tag}: region/area set without a pin`)
-      continue
-    }
+    if (typeof r.latitude !== 'number' || typeof r.longitude !== 'number') { f.push(`${tag}: coordinates missing`); continue }
     if (!inTrncFrame(r.latitude, r.longitude)) f.push(`${tag}: outside inTrncFrame`)
     const rr = resolveRegion(r.latitude, r.longitude)
     if (!REGIONS.includes(r.region)) f.push(`${tag}: region ${r.region} not one of the 7`)
     else if (rr !== r.region) f.push(`${tag}: region ${r.region} but resolveRegion gives ${rr}`)
     if (r.area != null) {
       const names = AREAS_BY_REGION[r.region] || []
-      if (!names.some(n => areaSlug(n) === r.area)) f.push(`${tag}: area ${r.area} not valid for ${r.region}`)
+      if (!names.some(n => areaSlug(n) === r.area)) f.push(`${tag}: area ${JSON.stringify(r.area)} not valid for ${r.region}`)
     }
-    const el = byRef.get(`${r.osm?.type}/${r.osm?.id}`)
-    if (!el) f.push(`${tag}: osm element ${JSON.stringify(r.osm)} not in the snapshot`)
-    else if (!onElement(el, r.latitude, r.longitude)) f.push(`${tag}: pin ${r.latitude},${r.longitude} is NOT on/inside OSM ${r.osm.type}/${r.osm.id}`)
-    if (r.source === 'osm' && r.source_id !== `${r.osm?.type}/${r.osm?.id}`) f.push(`${tag}: source_id disagrees with osm ref`)
-    geo.push({ id: r.source_id, lat: r.latitude, lng: r.longitude, el })
+    geo.push({ id: r.source_id, lat: r.latitude, lng: r.longitude })
   }
   const allowed = (a, b) => ALLOW_CLOSE.some(p => (p.a === a && p.b === b) || (p.a === b && p.b === a))
   for (let i = 0; i < geo.length; i++) {
@@ -333,7 +395,6 @@ export function validate(obj, snap, byRef) {
     for (const L of LIVE) {
       const d = metres(geo[i].lat, geo[i].lng, L.lat, L.lng)
       if (d < MIN_SEP_M && !allowed(geo[i].id, L.id)) f.push(`${geo[i].id} is ${Math.round(d)} m from LIVE ${L.name}`)
-      if (geo[i].el && onElement(geo[i].el, L.lat, L.lng) && !allowed(geo[i].id, L.id)) f.push(`LIVE ${L.name} pin lies on the outline of ${geo[i].id}`)
     }
   }
   const mig = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20261179_osm_free_listings.sql'), 'utf8')
@@ -341,6 +402,8 @@ export function validate(obj, snap, byRef) {
   if (used.size < 100) f.push(`20261179 ids parsed: only ${used.size} (parser broken?)`)
   for (const r of obj.rows) if (used.has(r.source_id)) f.push(`${r.source_id} already exists in 20261179`)
   const lt = obj.live_translations || {}
+  const fileLt = JSON.parse(fs.readFileSync(path.join(ROOT, TRANSLATIONS), 'utf8'))
+  if (JSON.stringify(lt) !== JSON.stringify(fileLt)) f.push(`live_translations differ from ${TRANSLATIONS}`)
   const META = ['needs_native_check', 'source_discrepancies_live_today', '_source_discrepancies_note']
   if (Object.keys(lt).filter(k => !META.includes(k)).sort().join() !== LIVE.map(l => l.id).sort().join()) f.push('live_translations keys are not exactly the 4 live ids')
   for (const L of LIVE) {
@@ -356,26 +419,92 @@ export function validate(obj, snap, byRef) {
     for (const code of ['ar', 'fa']) if (/[()]/.test(t.name_i18n?.[code] || '')) f.push(`live ${L.name} name_i18n.${code} contains parentheses`)
     if (/Caretta caretta/.test(t.source?.description_i18n?.en || '')) for (const code of NEW_LOCALES) if (!t.description_i18n?.[code]?.includes('Caretta caretta')) f.push(`live ${L.name} description ${code} lost "Caretta caretta"`)
   }
+  const c = obj.counts || {}
+  if (c.rows !== obj.rows.length || c.dropped !== obj.dropped.length || c.needs_review !== obj.needs_review.length) f.push(`counts ${JSON.stringify(c)} do not match the arrays`)
+  for (let i = 1; i < obj.rows.length; i++) if (rowOrder(obj.rows[i - 1], obj.rows[i]) > 0) { f.push(`rows are not in canonical order at ${obj.rows[i].source_id}`); break }
+  const dr = obj.dropped.map(d => d.osm)
+  if (dr.join() !== dr.slice().sort((a, b) => a.localeCompare(b)).join()) f.push('dropped is not sorted by osm ref')
   return f
 }
 
-function main() {
-  const args = process.argv.slice(2)
-  const check = args.includes('--check')
-  const file = args.find(a => !a.startsWith('--'))
-  const { obj, snap, byRef, problems } = build()
-  const text = JSON.stringify(obj, null, 2) + '\n'
-  let target = obj
-  if (check && file) target = JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'))
-  const fails = [...problems, ...validate(target, snap, byRef)]
-  if (check && !file) {
-    const committed = fs.existsSync(path.join(ROOT, OUT)) ? fs.readFileSync(path.join(ROOT, OUT), 'utf8') : ''
-    if (committed !== text) fails.push(`${OUT} is not byte-identical to a fresh rebuild`)
+// ─── validate: GEOMETRY (needs OSM elements) ────────────────────────────────
+export function validateGeometry(obj, byRef) {
+  const f = []
+  for (const r of obj.rows) {
+    const tag = r.source_id, ref = `${r.osm?.type}/${r.osm?.id}`
+    const el = byRef.get(ref)
+    if (!el) { f.push(`${tag}: osm element ${ref} not found`); continue }
+    if (!onElement(el, r.latitude, r.longitude)) f.push(`${tag}: pin ${r.latitude},${r.longitude} is NOT on/inside OSM ${ref}`)
+    const t = el.tags || {}
+    if (r.source === 'osm') {
+      if (r.private_resort !== (t.leisure === 'beach_resort')) f.push(`${tag}: private_resort ${r.private_resort} but the element's leisure tag is ${t.leisure}`)
+      if (r.name_source === 'osm' && nameOf(t) !== r.name) f.push(`${tag}: OSM name is now ${JSON.stringify(nameOf(t))}, row says ${JSON.stringify(r.name)}`)
+      if (r.name_source === 'external_evidence' && nameOf(t)) f.push(`${tag}: the outline is named in OSM now (${JSON.stringify(nameOf(t))})`)
+      for (const x of r.name_evidence || []) {
+        if (x.evidence_point) { const d = Math.round(distToElement(el, x.evidence_point[0], x.evidence_point[1])); if (d !== x.distance_m) f.push(`${tag}: evidence ${x.kind} distance_m ${x.distance_m} but re-measured ${d}`) }
+      }
+    }
+    for (const L of LIVE) if (onElement(el, L.lat, L.lng)) f.push(`LIVE ${L.name} pin lies on the outline of ${tag}`)
   }
-  if (!check) { fs.mkdirSync(path.join(ROOT, 'data/explore'), { recursive: true }); fs.writeFileSync(path.join(ROOT, OUT), text) }
-  const c = target.counts
-  console.log(`beaches-list: snapshot ${c.snapshot_elements} elements (${c.named} named, ${c.unnamed_not_candidates} unnamed) -> rows ${target.rows.length} (kept ${target.rows.length}) + dropped ${target.dropped.length} + needs_review ${target.needs_review.length} + merged/ministry accounted`)
+  return f
+}
+
+function loadLocal(file) {
+  const p = path.resolve(file)
+  if (!fs.existsSync(p)) { console.log(`RED: snapshot ${file} not found (data/osm/ is gitignored; a rebuild or --verify-geometry without a file needs a local snapshot or a re-fetch)`); process.exit(1) }
+  return JSON.parse(fs.readFileSync(p, 'utf8'))
+}
+
+function summary(target) {
+  const by = {}
+  for (const r of target.rows) by[r.region] = (by[r.region] || 0) + 1
+  return `rows ${target.rows.length} (${REGIONS.map(g => `${g} ${by[g] || 0}`).join(', ')}) + dropped ${target.dropped.length} + needs_review ${target.needs_review.length}`
+}
+
+async function main() {
+  const args = process.argv.slice(2)
+  const check = args.includes('--check'), verify = args.includes('--verify-geometry')
+  const file = args.find(a => !a.startsWith('--'))
+  if (verify) {
+    const obj = JSON.parse(fs.readFileSync(path.join(ROOT, OUT), 'utf8'))
+    const refs = [...new Set(obj.rows.map(r => `${r.osm.type}/${r.osm.id}`))]
+    let snap, mode
+    if (file) { snap = loadLocal(file); mode = `reused ${file}` } else {
+      const by = idsOf(refs)
+      const q = '[out:json][timeout:120];(' + ['node', 'way', 'relation'].filter(t => by[t].length).map(t => `${t}(id:${by[t].join(',')});`).join('') + ');out geom;'
+      snap = await osmSnapshot(ROOT, 'beaches-verify', q)
+      mode = 're-fetched by id'
+    }
+    const f = []
+    if (snap.remark) f.push(`Overpass remark: ${snap.remark}`)
+    const byRef = new Map(snap.elements.map(e => [refOf(e), e]))
+    if (!file && snap.elements.length !== refs.length) f.push(`asked for ${refs.length} elements, got ${snap.elements.length}`)
+    const full = snap.elements.length > refs.length + 20
+    if (full) f.push(...coverage(snap))
+    f.push(...validateGeometry(obj, byRef))
+    console.log(`beaches-list --verify-geometry (${mode}; osm_base of the data ${obj.osm_base.join(',')}, of this geometry ${snap.osm3s?.timestamp_osm_base}): ${refs.length} elements requested, ${snap.elements.length} received${full ? ' (full snapshot: curation coverage checked)' : ''}`)
+    if (f.length) { console.log(`RED: ${f.length} failure(s)`); for (const x of f) console.log('  - ' + x); process.exit(1) }
+    console.log(`GREEN: ${obj.rows.length} rows: every pin on/inside its outline, private_resort = element's own leisure tag, names and evidence distances re-measured`)
+    return
+  }
+  if (check) {
+    const p = path.resolve(file || path.join(ROOT, OUT))
+    const text = fs.readFileSync(p, 'utf8')
+    const obj = JSON.parse(text)
+    const fails = validate(obj)
+    if (JSON.stringify(obj, null, 2) + '\n' !== text) fails.push(`${path.basename(p)} is not byte-stable (parse + re-serialise differs from the file)`)
+    console.log(`beaches-list --check (offline, no geometry): ${summary(obj)}`)
+    if (fails.length) { console.log(`RED: ${fails.length} failure(s)`); for (const x of fails) console.log('  - ' + x); process.exit(1) }
+    console.log(`GREEN: ${obj.rows.length} rows validated offline`)
+    return
+  }
+  const snap = loadLocal(SNAPSHOT)
+  const { obj, problems } = build(snap)
+  const fails = [...problems, ...validate(obj), ...validateGeometry(obj, new Map(snap.elements.map(e => [refOf(e), e])))]
+  console.log(`beaches-list: snapshot ${snap.elements.length} elements -> ${summary(obj)}`)
   if (fails.length) { console.log(`RED: ${fails.length} failure(s)`); for (const x of fails) console.log('  - ' + x); process.exit(1) }
-  console.log(`GREEN: ${target.rows.length} rows validated${check ? '' : `, wrote ${OUT}`}`)
+  fs.mkdirSync(path.join(ROOT, 'data/explore'), { recursive: true })
+  fs.writeFileSync(path.join(ROOT, OUT), JSON.stringify(obj, null, 2) + '\n')
+  console.log(`GREEN: ${obj.rows.length} rows validated, wrote ${OUT}`)
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) main()

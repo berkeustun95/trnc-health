@@ -1,18 +1,16 @@
 {
   "generated_at": "2026-11-15T18:53:13Z",
-  "osm_snapshot": "data/osm/beaches-20261115T1853.json",
-  "osm_base": "2026-11-15T18:53:13Z",
+  "osm_base": [
+    "2026-11-15T18:53:13Z"
+  ],
   "attribution": {
     "osm": "© OpenStreetMap contributors, ODbL 1.0",
     "ministry": "Turizm Bakanlığı (visitncy.com)"
   },
   "counts": {
-    "snapshot_elements": 89,
-    "named": 41,
-    "unnamed_not_candidates": 48,
-    "rows": 27,
-    "dropped": 11,
-    "needs_review": 5
+    "rows": 28,
+    "dropped": 14,
+    "needs_review": 0
   },
   "rows": [
     {
@@ -67,7 +65,7 @@
           "note": "municipal, \"enjoyed by the public\"; the page never says free or paid"
         }
       ],
-      "area_note": "The page says \"in the Kervansaray area\"; constants/areas.js has no Kervansaray area, so area stays null. 20261179 files two Kervansaray Mevkii addresses under \"Karaoğlanoğlu Caddesi\": Karaoğlanoğlu is a possible pick if Berke wants one."
+      "area_note": "The page says \"in the Kervansaray area\"; constants/areas.js has no Kervansaray area, so area stays null (Berke 2026-11-16)."
     },
     {
       "name": "Long Beach",
@@ -77,12 +75,15 @@
       "source_id": "long-beach",
       "source_url": "https://www.visitncy.com/discover/beaches/",
       "credit": "Turizm Bakanlığı",
-      "region": null,
-      "area": null,
-      "latitude": null,
-      "longitude": null,
-      "osm": null,
-      "pin_method": null,
+      "region": "iskele",
+      "area": "long-beach",
+      "latitude": 35.266136,
+      "longitude": 33.915938,
+      "osm": {
+        "type": "way",
+        "id": 1568098280
+      },
+      "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
       "osm_tags_seen": {},
@@ -99,12 +100,13 @@
           "note": "no allowed slug covers a shuttle"
         }
       ],
-      "pending": "No OSM element is named \"Long Beach\"; coordinates, region and area wait for Berke (see needs_review)"
+      "pin_note": "Pinned by Berke's decision 2026-11-16 on the İskele resort outline at about 35.266 N 33.916 E (the page says only \"Situated on the Salamis Bay, 15 kilometres north of Famagusta\"). OSM has no element named Long Beach. Two unnamed leisure=beach_resort ways (area=yes) sit there: way/1568098280 (35.2655-35.2670 N, about 150 m of shore, the larger, and the one that contains 35.266 N 33.916 E) and way/1568098281 (35.2670-35.2677 N, about 90 m, the next strip north). A bbox query over 35.24-35.30 N 33.89-33.94 E (2026-11-16) found no unnamed natural=beach way on that shore, so the larger beach_resort strip is the outline. The element itself is tagged leisure=beach_resort; private_resort stays false because this is a Ministry-listed public beach row (Berke to confirm)"
     },
     {
       "name": "Bamboo Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -117,7 +119,7 @@
         "id": 225386412
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -131,6 +133,7 @@
       "name": "Bella Marin Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -143,7 +146,7 @@
         "id": 608212204
       },
       "merged_duplicate": "node/5860707914",
-      "merged_duplicate_tags_for_berke": {
+      "merged_duplicate_tags": {
         "leisure": "beach_resort",
         "fee": "yes"
       },
@@ -162,6 +165,7 @@
       "name": "Camelot Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -174,7 +178,7 @@
         "id": 225382750
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -188,6 +192,7 @@
       "name": "Chamada Beach Club",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -200,7 +205,7 @@
         "id": 1484271058
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": true,
       "resort_evidence": [
@@ -218,6 +223,7 @@
       "name": "Diana Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -230,7 +236,7 @@
         "id": 286275732
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -246,6 +252,7 @@
       "name": "Esentepe Belediye Halk Plajı",
       "name_tr": "Esentepe Belediye Halk Plajı",
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": "esentepe",
       "area_why": "name contains \"Esentepe\"",
@@ -258,7 +265,7 @@
         "id": 603986283
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -271,35 +278,10 @@
       "access_type": null
     },
     {
-      "name": "Güzelyalı Beach",
-      "name_tr": null,
-      "name_en": null,
-      "region": "kyrenia",
-      "area": null,
-      "area_why": null,
-      "latitude": 35.353154,
-      "longitude": 33.089523,
-      "source": "osm",
-      "source_id": "way/208111924",
-      "osm": {
-        "type": "way",
-        "id": 208111924
-      },
-      "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
-      "pin_method": "centroid",
-      "private_resort": false,
-      "resort_evidence": [],
-      "osm_tags_seen": {},
-      "description": null,
-      "amenities": [],
-      "blue_flag": null,
-      "access_type": null
-    },
-    {
       "name": "Karaoğlanoğlu Plajı",
       "name_tr": "Karaoğlanoğlu Plajı",
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": "karaoglanoglu",
       "area_why": "name contains \"Karaoğlanoğlu\"",
@@ -312,7 +294,7 @@
         "id": 208150337
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -328,6 +310,7 @@
       "name": "Korenium beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -340,7 +323,7 @@
         "id": 286276160
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -353,9 +336,56 @@
       "access_type": null
     },
     {
+      "name": "Lapta Belediye Plajı",
+      "name_tr": null,
+      "name_en": "Lapta Municipality Public Beach",
+      "name_source": "berke_decision",
+      "region": "kyrenia",
+      "area": "lapta",
+      "area_why": "Berke 2026-11-16: one row, area Lapta",
+      "latitude": 35.353154,
+      "longitude": 33.089523,
+      "source": "osm",
+      "source_id": "way/208111924",
+      "osm": {
+        "type": "way",
+        "id": 208111924
+      },
+      "merged_duplicate": "node/6595054185",
+      "merged_duplicate_tags": {
+        "leisure": "beach_resort",
+        "fee": "no"
+      },
+      "pin_method": "centroid",
+      "private_resort": false,
+      "resort_evidence": [],
+      "private_resort_note": "the sibling node carries leisure=beach_resort but also fee=no: a free municipal beach, so private_resort is false (Berke 2026-11-16)",
+      "osm_tags_seen": {},
+      "provenance": {
+        "osm_names": [
+          {
+            "element": "way/208111924",
+            "name": "Güzelyalı Beach",
+            "role": "outline the pin lies on; source_id"
+          },
+          {
+            "element": "node/6595054185",
+            "name": "Lapta Belediye Plajı",
+            "name_en": "Lapta Municipality Public Beach",
+            "role": "beach_resort point on that outline; name of the row"
+          }
+        ]
+      },
+      "description": null,
+      "amenities": [],
+      "blue_flag": null,
+      "access_type": null
+    },
+    {
       "name": "Lido Cyprus",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -368,7 +398,7 @@
         "id": 229043037
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -382,6 +412,7 @@
       "name": "Municipality of Alsancak Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": "alsancak",
       "area_why": "name contains \"Alsancak\"",
@@ -394,7 +425,7 @@
         "id": 225383964
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": false,
       "resort_evidence": [],
@@ -408,6 +439,7 @@
       "name": "Riviera Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -420,7 +452,7 @@
         "id": 244561269
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -434,6 +466,7 @@
       "name": "Sandouka Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -446,7 +479,7 @@
         "id": 11994931556
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "node",
       "private_resort": false,
       "resort_evidence": [],
@@ -460,6 +493,7 @@
       "name": "Sardunya Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -472,7 +506,7 @@
         "id": 208241783
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -486,6 +520,7 @@
       "name": "Shayna",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -498,7 +533,7 @@
         "id": 666114116
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": false,
       "resort_evidence": [],
@@ -512,6 +547,7 @@
       "name": "Suna's Beach and Restaurant",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "kyrenia",
       "area": null,
       "area_why": null,
@@ -524,7 +560,7 @@
         "id": 11231014679
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "node",
       "private_resort": true,
       "resort_evidence": [
@@ -540,6 +576,7 @@
       "name": "Kocareis Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "famagusta",
       "area": null,
       "area_why": null,
@@ -552,7 +589,7 @@
         "id": 435771323
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -563,9 +600,39 @@
       "access_type": null
     },
     {
+      "name": "Makenzi Plajı",
+      "name_tr": null,
+      "name_en": "Mckenzie Beach",
+      "name_source": "osm",
+      "region": "famagusta",
+      "area": null,
+      "area_why": "Berke 2026-11-16: a named beach in Famagusta, nothing flagged",
+      "latitude": 35.249506,
+      "longitude": 33.903753,
+      "source": "osm",
+      "source_id": "relation/15456405",
+      "osm": {
+        "type": "relation",
+        "id": 15456405
+      },
+      "merged_duplicate": null,
+      "merged_duplicate_tags": null,
+      "pin_method": "pole_of_inaccessibility",
+      "private_resort": false,
+      "resort_evidence": [],
+      "osm_tags_seen": {
+        "surface": "sand"
+      },
+      "description": null,
+      "amenities": [],
+      "blue_flag": null,
+      "access_type": null
+    },
+    {
       "name": "Silver Beach",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "famagusta",
       "area": null,
       "area_why": null,
@@ -578,7 +645,7 @@
         "id": 606238631
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -594,6 +661,7 @@
       "name": "Lefke Belediyesi Halk Plajı",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "lefke",
       "area": null,
       "area_why": null,
@@ -606,7 +674,7 @@
         "id": 1395325670
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -620,6 +688,7 @@
       "name": "Ayfilon Plajı",
       "name_tr": "Ayfilon Plajı",
       "name_en": "Ayphilon Beach",
+      "name_source": "osm",
       "region": "karpaz",
       "area": null,
       "area_why": null,
@@ -632,7 +701,7 @@
         "id": 952236170
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "pole_of_inaccessibility",
       "private_resort": false,
       "resort_evidence": [],
@@ -648,6 +717,7 @@
       "name": "Club Di Mare",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "karpaz",
       "area": null,
       "area_why": null,
@@ -660,7 +730,7 @@
         "id": 13040159
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": true,
       "resort_evidence": [
@@ -676,6 +746,7 @@
       "name": "Honey Beach - Balcı Plaza",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "karpaz",
       "area": null,
       "area_why": null,
@@ -688,7 +759,7 @@
         "id": 1951274050
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "node",
       "private_resort": false,
       "resort_evidence": [],
@@ -702,6 +773,7 @@
       "name": "Issız Plaj",
       "name_tr": "Issız Plaj",
       "name_en": "Nowhere Beach",
+      "name_source": "osm",
       "region": "karpaz",
       "area": null,
       "area_why": null,
@@ -714,7 +786,7 @@
         "id": 510986434
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -730,6 +802,7 @@
       "name": "Mehmetçik Belediye Bafra Plajı",
       "name_tr": null,
       "name_en": "Bafra Beach",
+      "name_source": "osm",
       "region": "karpaz",
       "area": "bafra",
       "area_why": "name contains \"Bafra\" (name:en \"Bafra Beach\"); the name also says \"Mehmetçik\", a second karpaz area: Bafra chosen",
@@ -742,7 +815,7 @@
         "id": 435772839
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -756,6 +829,7 @@
       "name": "Yudi Halk Plajı",
       "name_tr": null,
       "name_en": null,
+      "name_source": "osm",
       "region": "karpaz",
       "area": null,
       "area_why": null,
@@ -768,7 +842,7 @@
         "id": 603896219
       },
       "merged_duplicate": null,
-      "merged_duplicate_tags_for_berke": null,
+      "merged_duplicate_tags": null,
       "pin_method": "centroid",
       "private_resort": false,
       "resort_evidence": [],
@@ -783,7 +857,17 @@
     {
       "name": "Bella Marin",
       "osm": "node/5860707914",
-      "reason": "Probable duplicate of way/608212204 (Bella Marin Beach): the node \"Bella Marin\" (leisure=beach_resort, fee=yes) is 452 m from the way and NOT on its outline, so same-beach is a guess by name; the way is kept (pin on the outline), and the node's tags are NOT applied to the row — question for Berke"
+      "reason": "Duplicate of way/608212204 (Bella Marin Beach): the node \"Bella Marin\" (leisure=beach_resort, fee=yes) is 452 m from the way and not on its outline; Berke 2026-11-16: Bella Marin Beach stays as the way row, access empty, private_resort false; the node's tags are not applied to the row"
+    },
+    {
+      "name": "Lapta Belediye Plajı",
+      "osm": "node/6595054185",
+      "reason": "Sibling of way/208111924, merged into the Lapta Belediye Plajı row (Berke 2026-11-16): the node is the beach_resort point on that outline; its names and tags are recorded on the row"
+    },
+    {
+      "name": "Glossa Beach",
+      "osm": "relation/12567504",
+      "reason": "Glossa Beach: beside closed Maraş / army base; left out by Berke 2026-11-16. OSM test result: 47 of its 93 outline vertices fall inside r12196193, 20 inside the military-landuse relation r12567503 \"Gazimağusa Orduevi\" (name:en \"Turkish Army Base\"); military checkpoints at 35.1014 N 33.9646 E and 35.1057 N 33.9615 E"
     },
     {
       "name": "Golden Beach",
@@ -821,6 +905,11 @@
       "reason": "Duplicate of a LIVE beach: Glapsides Beach"
     },
     {
+      "name": "Palm beach",
+      "osm": "way/396559851",
+      "reason": "Palm beach: beside closed Maraş / army base; left out by Berke 2026-11-16. OSM test result: 9 of its 47 outline vertices fall inside the \"Kapalı Maraş\" relation r12196193 (tagged \"Very approximate\"); the OSM node \"Varosha Entrance\" (barrier=gate, access=no) is 355 m from the pin"
+    },
+    {
       "name": "Alagadi Beach 1",
       "osm": "way/487959702",
       "reason": "Duplicate of a LIVE beach: Alagadi Turtle Beach (OSM \"Alagadi Beach 1\")"
@@ -836,131 +925,7 @@
       "reason": "resolveRegion(35.083471, 33.98153) is null: the point lies outside constants/regions.js TRNC_OUTLINE. Context from OSM: it is the beach at the Derinya (Deryneia) coast; 2 of its 5 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (tagged \"Very approximate\"), none inside the UN buffer-zone relation r3263735; OSM has an access=no military landuse checkpoint at 35.0834 N 33.9565 E (note \"Only Northern Cyprus and Turkish Citizens allowed\") about 2.3 km west"
     }
   ],
-  "needs_review": [
-    {
-      "name": "Palm beach",
-      "osm": "way/396559851",
-      "at": [
-        35.118003,
-        33.958293
-      ],
-      "resolveRegion": "famagusta",
-      "note": "Palm beach — OSM test result: 9 of its 47 outline vertices fall inside the \"Kapalı Maraş\" restricted-area relation r12196193 (OSM tags that relation \"Very approximate\"; its stitched rings did not contain the pin itself); 0 inside the UN buffer zone r3263735. The OSM node \"Varosha Entrance\" (barrier=gate, access=no, fee=no, foot:conditional=permissive in daily opening hours, motor_vehicle=no) is 355 m from the pin. OSM cannot establish whether this stretch is open to the public"
-    },
-    {
-      "name": "Glossa Beach",
-      "osm": "relation/12567504",
-      "at": [
-        35.097134,
-        33.969657
-      ],
-      "resolveRegion": "famagusta",
-      "note": "Glossa Beach — OSM test result: 47 of its 93 outline vertices fall inside the \"Kapalı Maraş\" relation r12196193 (\"Very approximate\"), 20 inside the military-landuse relation r12567503 \"Gazimağusa Orduevi\" (name:en \"Turkish Army Base\"), 0 inside the UN buffer zone; OSM carries military checkpoints at 35.1014 N 33.9646 E (access=no) and 35.1057 N 33.9615 E. A 2.7 km shore strip; OSM cannot establish that it is open to the public"
-    },
-    {
-      "name": "Makenzi Plajı",
-      "osm": "relation/15456405",
-      "at": [
-        35.249506,
-        33.903753
-      ],
-      "resolveRegion": "famagusta",
-      "note": "Makenzi Plajı (OSM name:en \"Mckenzie Beach\") — 1.5 km multipolygon near Salamis Bay at about 35.251 N 33.905 E; possible Long Beach candidate (Salamis Bay), not confident"
-    },
-    {
-      "name": "Lapta Belediye Plajı",
-      "osm": "node/6595054185",
-      "at": [
-        35.3530537,
-        33.0902721
-      ],
-      "resolveRegion": "kyrenia",
-      "note": "Lapta Belediye Plajı (name:en Lapta Municipality Public Beach) — a beach_resort point tagged fee=no that sits on the way/208111924 \"Güzelyalı Beach\" outline: one beach with two names or two neighbours; also the resort rule would call a free municipal beach private_resort=true"
-    },
-    {
-      "name": "Long Beach (Ministry)",
-      "osm": null,
-      "at": null,
-      "resolveRegion": null,
-      "note": "No OSM element is named Long Beach; the row exists with null coordinates/region/area until Berke picks a pin. Candidates (all unnamed except Makenzi) with what resolveRegion says at each pin:",
-      "candidates": [
-        {
-          "osm": "way/1568098280",
-          "name": null,
-          "tags": {
-            "leisure": "beach_resort"
-          },
-          "at": [
-            35.266136,
-            33.915938
-          ],
-          "resolveRegion": "iskele"
-        },
-        {
-          "osm": "way/1568098281",
-          "name": null,
-          "tags": {
-            "leisure": "beach_resort"
-          },
-          "at": [
-            35.267364,
-            33.91661
-          ],
-          "resolveRegion": "iskele"
-        },
-        {
-          "osm": "way/1365670207",
-          "name": null,
-          "tags": {
-            "natural": "beach",
-            "surface": "sand"
-          },
-          "at": [
-            35.198425,
-            33.900524
-          ],
-          "resolveRegion": "famagusta"
-        },
-        {
-          "osm": "way/309630489",
-          "name": null,
-          "tags": {
-            "natural": "beach"
-          },
-          "at": [
-            35.187587,
-            33.903676
-          ],
-          "resolveRegion": "famagusta"
-        },
-        {
-          "osm": "way/435771324",
-          "name": null,
-          "tags": {
-            "natural": "beach"
-          },
-          "at": [
-            35.192476,
-            33.901879
-          ],
-          "resolveRegion": "famagusta"
-        },
-        {
-          "osm": "relation/15456405",
-          "name": "Makenzi Plajı",
-          "tags": {
-            "natural": "beach",
-            "surface": "sand"
-          },
-          "at": [
-            35.249506,
-            33.903753
-          ],
-          "resolveRegion": "famagusta"
-        }
-      ]
-    }
-  ],
+  "needs_review": [],
   "live_translations": {
     "fa39492b-57e6-4ebd-b22c-89a9cf20ffe2": {
       "live_name": "Alagadi Turtle Beach",
