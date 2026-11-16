@@ -26,7 +26,7 @@ import { creditParts } from '../utils/photoCreditParts'
 //   attribution, not a cosmetic problem — it is the one string in the app whose
 //   correctness is a licence condition rather than a preference.
 //
-// `a` is a resolved attribution: {credit, license, licenseUrl, sourceUrl, source}.
+// `a` is a resolved attribution: {credit, license, licenseUrl, sourceUrl, source, edited}.
 // Callers pass whatever their own data shape resolves to — utils/photoAttribution.js's
 // resolveAttribution() for a place row, resolveHeroCredit() for a bundled hero.
 // A null `a` renders NOTHING, never a blank line.

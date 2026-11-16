@@ -15,7 +15,7 @@ export function creditParts(a, lang) {
   const credit = text(a?.credit)
   const label  = a?.source === 'own' ? t('photoSourceOwn', lang) : hasOwn(SOURCE_LABEL, a?.source) ? SOURCE_LABEL[a.source] : null
   return {
-    line:        credit ? `${t('photoCreditPrefix', lang)}: ${credit}` : null,
+    line:        credit ? `${t('photoCreditPrefix', lang)}: ${credit}${a?.edited === true ? ` ${t('photoCreditEdited', lang)}` : ''}` : null,
     license:     text(a?.license),
     licenseUrl:  httpsUrl(a?.licenseUrl),
     sourceLabel: text(label),

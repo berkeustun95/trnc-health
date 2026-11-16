@@ -5,9 +5,9 @@
 // TWO COLUMNS, ON PURPOSE, AND THE ORDER MATTERS.
 //
 //   photo_attribution — jsonb, KEYED BY PHOTO URL. The real source of truth.
-//   photo_credits     — text[], POSITIONAL, legacy. Still the only thing the shipped
-//                       production JS renders, so it is written too until the OTA
-//                       carrying the new renderer has been out long enough.
+//   photo_credits     — text[], POSITIONAL, legacy fallback. The app renders
+//                       photo_attribution (author · licence · source, since
+//                       2026-11-08); photo_credits is still written for old clients.
 //
 // Keyed-by-URL exists because positional attribution is silently wrong after an
 // ordinary edit: delete photos[0] and every remaining credit re-points to the photo
@@ -87,7 +87,7 @@ function parseLegacy(str) {
 // place: a row carrying photo_attribution and/or photo_credits.
 // url:   the photo being displayed. index: its position in place.photos.
 //
-// Returns {credit, license, licenseUrl, sourceUrl, source} or null when the photo has
+// Returns {credit, license, licenseUrl, sourceUrl, source, edited} or null when the photo has
 // no attribution at all. `credit` is the only field guaranteed non-null on a non-null
 // return — a legacy string may yield nothing else.
 export function resolveAttribution(place, url, index) {
@@ -106,6 +106,10 @@ export function resolveAttribution(place, url, index) {
         licenseUrl: present(entry.license_url) ? httpsUrl(entry.license_url) : licenseDeed(license),
         sourceUrl:  httpsUrl(entry.source_url),
         source:     SOURCES.includes(entry.source) ? entry.source : null,
+        // CC asks us to say a work was modified, and the seed pipeline re-encodes every
+        // third-party photo: "edited" on an untouched one is harmless, omitting it on a
+        // modified one is the licence gap. An explicit `modified` always wins.
+        edited:     typeof entry.modified === 'boolean' ? entry.modified : entry.source !== 'own',
       }
     }
   }
@@ -113,7 +117,7 @@ export function resolveAttribution(place, url, index) {
   const credits = isPlain(place) && Array.isArray(place.photo_credits) ? place.photo_credits : null
   const legacy = credits && Number.isInteger(index) && index >= 0 ? parseLegacy(credits[index]) : null
   if (!legacy || (!legacy.credit && !legacy.license)) return null
-  return { ...legacy, sourceUrl: null, source: null }
+  return { ...legacy, sourceUrl: null, source: null, edited: true }
 }
 
 // The legacy `photo_credits[i]` string, derived from an attribution entry so the two

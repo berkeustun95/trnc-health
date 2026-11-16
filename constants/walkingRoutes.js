@@ -21,6 +21,9 @@ export const ROUTE_COLOR = '#0E7C7B'
 export const DETOUR_FACTOR = 1.3
 export const WALK_KMH = 4.5
 export const VISITNCY_SOURCE = 'visitncy'
+export const VISITNCY_BEACHES_SOURCE = 'visitncy_beaches'
+// Ministry of Tourism text: walking-map places and the beach rows share one credit line.
+export const isMinistrySource = source => source === VISITNCY_SOURCE || source === VISITNCY_BEACHES_SOURCE
 
 export function routesLayerVisible({ routesLive, review = false, isAdmin = false }) {
   return !!routesLive || (!!review && !!isAdmin)

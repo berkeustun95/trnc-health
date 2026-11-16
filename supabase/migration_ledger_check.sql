@@ -315,7 +315,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261207_beaches_staged.sql', '92356353c6ffdea2a9af72a1e48608bafa36fa6dc4de868e03e7d5a02b669c3f'),
   ('20261209_places_credit_guard.sql', '27c69fc4ac2af28a60a3e3f730eef76ba5c52cb8bffdec48de333e1a65f9134b'),
   ('20261210_data_jobs_switches.sql', '8c3564cc173ddef84e3d210b24abab7ba25ee4f3cd7762be89f30dc13563ca8d'),
-  ('20261211_data_jobs_watchdog.sql', '373d2521389a8b779ecd310a30cbca12d03f658f4824eee64f60e7bc6d331ae9'),
+  ('20261211_data_jobs_watchdog.sql', '294dc05411a3c0fb19c23ac3df8197213870fcf5befd84db49c9e355d2a0e64c'),
   ('20261214_beaches_el_turkish_names.sql', '4a1e71430edbac9fadeb372243d49c33a672cd10a6d42695be3ff1c4e27ba181'),
   ('20261215_beaches_publish.sql', '2231bd13f97c4b03d54f5ad0b73d08ba1311b691635af59de7db910bb52bb815'),
   ('20261216_beaches_live4_locales.sql', 'f4d9fad2527d24fecf22dafd3a92570d6eecab000c0a59a1153537791bcd3044')
