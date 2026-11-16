@@ -152,9 +152,6 @@ jobs:
           node scripts/sweep-gisekibris-cancellations.mjs --selftest
           node scripts/check-prod-write-guard.mjs --selftest
           node scripts/check-prod-write-guard.mjs
-          node scripts/record-data-job-run.mjs --selftest
-          node scripts/check-data-job-heartbeats.mjs --selftest
-          node scripts/check-data-job-heartbeats.mjs
 
       - name: Fetch the live feed
         run: node scripts/fetch-gisekibris-feed.mjs

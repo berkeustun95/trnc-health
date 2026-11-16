@@ -19,3 +19,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run test:oli
+      - name: Data-job heartbeat guards (offline, no secrets)
+        run: |
+          node scripts/record-data-job-run.mjs --selftest
+          node scripts/check-data-job-heartbeats.mjs --selftest
+          node scripts/check-data-job-heartbeats.mjs

@@ -245,6 +245,17 @@ const t = (name, got, want) => {
         if (problems.length) wrong.push(`${ev}/prune=${pr || '-'}/apply=${ap || '-'}: ${problems.join('; ')} [${argv.join(' ')}]`)
       }
   t('all 27 event x prune x apply combinations behave', wrong, [])
+  // Tripwire: a scheduled run whose WRITE gate did not resolve to 'true' must stop red before any node call.
+  const trip = (w) => {
+    const env = { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: 'schedule', IN_PRUNE: '', IN_APPLY: '', IN_LIMIT: '' }
+    if (w !== undefined) env.WRITE = w
+    const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], { env, encoding: 'utf8' })
+    return [r.status, /^ARGS:/m.test(r.stdout ?? ''), (r.stdout ?? '').includes('::error::a scheduled run resolved to a dry run; the WRITE gate is broken')]
+  }
+  t('tripwire: schedule + WRITE=false -> exit 1, no node call, ::error::', trip('false'), [1, false, true])
+  t('tripwire: schedule + WRITE empty -> exit 1', trip('')[0], 1)
+  t('tripwire: schedule + WRITE unset -> exit 1', trip(undefined)[0], 1)
+  t('tripwire: schedule + WRITE=true runs the mirror (positive control)', trip('true'), [0, true, false])
 }
 
 console.log(bad ? `\n${bad} check(s) FAILED` : '\nall checks passed')

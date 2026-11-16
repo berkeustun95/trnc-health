@@ -79,6 +79,9 @@ jobs:
         run: node scripts/check-novest-prune.mjs
       - name: Mirror
         run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$WRITE" != "true" ]; then
+            echo "::error::a scheduled run resolved to a dry run; the WRITE gate is broken"; exit 1
+          fi
           args=()
           [ "$IN_PRUNE" = "true" ] && [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && args+=(--prune)
           [ "$WRITE" = "true" ] || args+=(--dry)

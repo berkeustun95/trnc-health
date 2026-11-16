@@ -6,8 +6,10 @@
 # It never reactivates anything: that stays a reviewed edit of sources.mjs.
 # The `recheck` job has no secrets, no environment and never touches the database. The separate `record` job
 # (scheduled runs only) holds the production environment and the service key for ONE write: this run's heartbeat
-# row (job key, ok/failed, error class, run id) in data_job_runs (data jobs, slice 2). It checks out the repo
-# and runs one script; it installs nothing and takes nothing from `recheck` but its result.
+# row (job key, ok/failed, error class, run id) in data_job_runs (data jobs, slice 2). It checks out the repo,
+# installs Node, runs one script, and creates a `production` deployment record each Monday; it takes nothing
+# from `recheck` but its result. `continue-on-error: true` at job level: a runner fault in `record` (checkout,
+# setup-node, environment) must not turn a green recheck red with no alert.
 #
 #   gh workflow run duyurular-paused-recheck
 
@@ -74,6 +76,7 @@ jobs:
     needs: [recheck]
     if: ${{ always() && github.event_name == 'schedule' }}
     runs-on: ubuntu-24.04
+    continue-on-error: true
     environment: production
     timeout-minutes: 3
     permissions:

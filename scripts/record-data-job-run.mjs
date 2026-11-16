@@ -4,7 +4,7 @@
 // Data jobs, slice 2 (RPC: 20261205_data_jobs.sql, record_data_job_run, service_role only).
 // Each of the six scheduled workflows calls this as its LAST step and writes one "heartbeat" row:
 // job key, ok | failed, an error CLASS from a fixed vocabulary, the GitHub run id. No message,
-// no user data, no counts.
+// no user data. It prints the new row's id (a run sequence number), no other count.
 //
 //   node scripts/record-data-job-run.mjs --status=<job.status | needs.<job>.result> --real-run=true|false
 //   node scripts/record-data-job-run.mjs --selftest        (offline: no network, no key)
@@ -15,8 +15,9 @@
 //   * "not a real run" (a dry dispatch) exits 0 silently BEFORE the key is read (duyurular-fetch blanks it);
 //   * the only outcome input is the raw GitHub status; error_class is never caller text;
 //   * recording must NEVER change the job's status (it runs after the alert steps). Exit codes:
-//       in Actions: always 0 - a failed record or a REFUSAL is exactly one ::warning:: line (a fixed reason
-//         code such as `refused: ref_not_main`, never the offending value); nothing is read or sent on a refusal;
+//       in Actions: always 0 - a failed record or a REFUSAL is exactly one ::warning:: line whose reason comes
+//         from a FIXED vocabulary (reasonNetwork / reasonHttp below; `refused: ref_not_main`), never text from a
+//         response, an error message or the environment; nothing is read or sent on a refusal;
 //       exit 1 only for the local prodWriteGuard refusal (not in CI) and a failing --selftest.
 //   * no retry: a lost response followed by a retry would insert the run twice.
 //   * p_started_at is omitted: the RPC defaults it to now(), so started_at ~= finished_at (a heartbeat,
@@ -40,7 +41,12 @@ export const CANCEL_IN_PROGRESS_ANY = false
 export const RPC_PATH = '/rest/v1/rpc/record_data_job_run'
 
 async function main() {
-  prodWriteGuard({ wouldWrite: !(process.argv.length === 3 && process.argv[2] === '--selftest'), workflow: 'daily-health', dryHint: 'node scripts/record-data-job-run.mjs --selftest' })
+  const selftestOnly = process.argv.length === 3 && process.argv[2] === '--selftest'
+  if (!selftestOnly && process.env.GITHUB_ACTIONS !== 'true') {
+    console.error('record-data-job-run: REFUSED: a run is recorded only by the scheduled workflows themselves (a dispatch records nothing, and nothing is written from this machine).\n  Offline check:  node scripts/record-data-job-run.mjs --selftest')
+    process.exit(1)
+  }
+  prodWriteGuard({ wouldWrite: !selftestOnly, dryHint: 'node scripts/record-data-job-run.mjs --selftest' })
 
   const args = parseArgs(process.argv.slice(2))
   if (!args.ok) refuse('bad_args')
@@ -67,19 +73,17 @@ async function main() {
         body: JSON.stringify(rpcBody(d)),
       })
     } catch (e) {
-      give(`network ${safeToken(e?.name)}${e?.cause?.code ? ' ' + safeToken(e.cause.code) : ''}`)
+      give(reasonNetwork(e))
     }
     const text = await res.text().catch(() => '')
     if (!res.ok) {
-      let code = ''
-      try { code = safeToken(JSON.parse(text)?.code) } catch { /* not JSON */ }
-      give(`HTTP ${res.status}${code ? ' code ' + code : ''}`)
+      give(reasonHttp(res.status, text))
     }
     const id = text.trim()
     if (!/^[0-9]{1,20}$/.test(id)) give(`HTTP ${res.status}, unexpected response`)
     console.log(`data_job_runs: ${d.job} ${d.outcome} row ${id}`)
   } catch (e) {
-    give(`error ${safeToken(e?.name)}`)
+    give('error unexpected')
   }
 }
 
@@ -101,8 +105,29 @@ export function refusalOutcome(code, env) {
 
 // ─── Pure decision logic ─────────────────────────────────────────────────────
 
-// Only a name that is plain ASCII word characters is ever echoed or sent.
-export const safeToken = (v) => (typeof v === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(v) ? v : 'unknown')
+// Warning reasons come from a FIXED vocabulary: nothing a server, an exception or the environment says is echoed
+// unless it matches a closed shape below.
+export const ERROR_NAMES = Object.freeze(['TimeoutError', 'AbortError', 'TypeError'])
+export const NET_CODES = Object.freeze([
+  'ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET',
+  'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+])
+// PostgREST (PGRST123) or a 5-character SQLSTATE; anything else is dropped.
+export const BODY_CODE = /^(PGRST[0-9]{3}|[0-9A-Z]{5})$/
+
+export function reasonNetwork(e) {
+  const name = ERROR_NAMES.includes(e?.name) ? e.name : 'unknown'
+  const code = NET_CODES.includes(e?.cause?.code) ? ' ' + e.cause.code : ''
+  return `network ${name}${code}`
+}
+
+export function reasonHttp(status, text) {
+  const st = Number.isInteger(status) && status >= 100 && status <= 599 ? status : 0
+  let code = ''
+  try { const c = JSON.parse(text)?.code; if (typeof c === 'string' && BODY_CODE.test(c)) code = c } catch { /* not JSON */ }
+  return `HTTP ${st || 'unknown'}${code ? ' code ' + code : ''}`
+}
 
 export function parseArgs(argv) {
   const out = { ok: true, selftest: false, status: undefined, realRun: undefined }
@@ -269,9 +294,26 @@ export function runSelftest() {
   runner('duplicate flag', {}, [...OK, '--status=CANARY'], 'bad_args')
   runner('missing flag', {}, ['--status=success'], 'bad_args')
 
-  t('safeToken: a PostgREST code passes', safeToken('P0001'), 'P0001')
-  t('safeToken: free text becomes unknown', safeToken('password=hunter2 failed'), 'unknown')
-  t('safeToken: a non-string becomes unknown', safeToken({ toString: () => 'P0001' }), 'unknown')
+  // End to end: fetch answers 403 with a hostile body code; the one warning line must carry the status only.
+  {
+    const stub = 'data:text/javascript,globalThis.fetch=async()=>new Response(JSON.stringify({code:"dummy-secret-looking_token.123",message:"dummy-secret-looking_token.123"}),{status:403})'
+    const env = { PATH: process.env.PATH, ...CI, GITHUB_WORKFLOW: 'daily-health', SUPABASE_SERVICE_ROLE_KEY: 'dummy-key', EXPO_PUBLIC_SUPABASE_URL: 'https://abcdefgh.supabase.co' }
+    const r = spawnSync(process.execPath, ['--import', stub, self, ...OK], { env, encoding: 'utf8' })
+    t('runner: a 403 with a hostile body code -> HTTP 403 only', [r.status, r.stdout.trim(), r.stderr], [0, '::warning::data_job_runs: run not recorded (HTTP 403)', ''])
+  }
+  t('http: a 403 with a hostile body code prints the status only', reasonHttp(403, '{"code":"dummy-secret-looking_token.123"}'), 'HTTP 403')
+  t('http: a 5-char SQLSTATE passes', reasonHttp(400, '{"code":"P0001"}'), 'HTTP 400 code P0001')
+  t('http: a PGRST code passes', reasonHttp(404, '{"code":"PGRST202","message":"secret"}'), 'HTTP 404 code PGRST202')
+  t('http: lowercase 5-char is dropped', reasonHttp(400, '{"code":"p0001"}'), 'HTTP 400')
+  t('http: a long code is dropped', reasonHttp(400, '{"code":"PGRST1234"}'), 'HTTP 400')
+  t('http: a non-string code is dropped', reasonHttp(400, '{"code":12345}'), 'HTTP 400')
+  t('http: not JSON', reasonHttp(502, '<html>secret</html>'), 'HTTP 502')
+  t('http: an array body', reasonHttp(500, '[1]'), 'HTTP 500')
+  t('http: a non-integer status cannot be echoed', reasonHttp('1 secret', ''), 'HTTP unknown')
+  t('network: a hostile error name and cause code are not echoed', reasonNetwork({ name: 'secret-name', cause: { code: 'secret-code' } }), 'network unknown')
+  t('network: a timeout', reasonNetwork({ name: 'TimeoutError' }), 'network TimeoutError')
+  t('network: fetch failed with a DNS cause', reasonNetwork({ name: 'TypeError', cause: { code: 'ENOTFOUND' } }), 'network TypeError ENOTFOUND')
+  t('network: undefined error', reasonNetwork(undefined), 'network unknown')
 
   console.log(bad ? `\n  ${bad} self-test failure(s).` : '\n  Self-test clean.')
   return bad ? 1 : 0
