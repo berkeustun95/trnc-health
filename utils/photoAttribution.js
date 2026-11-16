@@ -37,27 +37,50 @@ const LICENSE_URLS = {
 
 const clean = v => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
+// Defensive handling of malformed / unexpected attribution data: both columns are read as
+// untrusted input. Table lookups are OWN-property only, only plain objects are walked,
+// links must be https, and lengths are capped so one odd string cannot stretch a layout.
+export const hasOwn = (obj, key) =>
+  obj !== null && typeof obj === 'object' && typeof key === 'string' && Object.prototype.hasOwnProperty.call(obj, key)
+const isPlain = v => v !== null && typeof v === 'object' && !Array.isArray(v)
+const field = (obj, key) => (hasOwn(obj, key) ? obj[key] : undefined)
+
+const SOURCES = ['commons', 'unsplash', 'pexels', 'own']
+const MAX_CREDIT = 120, MAX_LICENSE = 40, MAX_URL = 2048, MAX_LEGACY = 2400
+
+// Links open https only: no other scheme, no relative path, no whitespace or control characters.
+export const httpsUrl = v =>
+  typeof v === 'string' && v.length <= MAX_URL && /^https:\/\/[^\s\u0000-\u001f\u007f-\u009f]+$/.test(v) ? v : null
+// A value that is present must itself be a valid https link; only an ABSENT one is backfilled.
+const present = v => v !== undefined && v !== null && v !== ''
+
+// A credit longer than the cap is clipped with an ellipsis (the creator stays visible). A
+// licence longer than the cap is dropped: a clipped licence name would name a different licence.
+const creditText  = v => { const c = clean(v); return c && c.length > MAX_CREDIT ? `${c.slice(0, MAX_CREDIT - 1)}…` : c }
+const licenseText = v => { const l = clean(v); return l && l.length <= MAX_LICENSE ? l : null }
+const licenseDeed = l => (l && hasOwn(LICENSE_URLS, l) ? LICENSE_URLS[l] : null)
+
 // Legacy strings were written as "Photo: {credit} / {license}" (and, after the
 // full-notice pass, "Fotoğraf: {credit} / {license} — {license uri}"). Parse what is
 // recoverable and leave the rest null — a guess here becomes a false licensing claim,
 // so anything not clearly delimited is returned whole as the credit.
 function parseLegacy(str) {
-  const s = clean(str)
+  const s = clean(typeof str === 'string' ? str.slice(0, MAX_LEGACY) : null)
   if (!s) return null
 
   const body = s.replace(/^\s*(Photo|Fotoğraf|Foto)\s*:\s*/i, '')
   const [beforeUri, uri] = body.split(/\s+[—–-]\s+(?=(?:https?:\/\/)?creativecommons\.org)/)
   const slash = (beforeUri ?? body).lastIndexOf(' / ')
 
-  if (slash === -1) return { credit: (beforeUri ?? body).trim(), license: null, licenseUrl: null }
+  if (slash === -1) return { credit: creditText(beforeUri ?? body), license: null, licenseUrl: null }
 
-  const credit  = beforeUri.slice(0, slash).trim()
-  const license = beforeUri.slice(slash + 3).trim()
+  const credit  = creditText(beforeUri.slice(0, slash))
+  const license = licenseText(beforeUri.slice(slash + 3))
   const url     = clean(uri)
   return {
-    credit:  credit || null,
-    license: license || null,
-    licenseUrl: url ? (url.startsWith('http') ? url : `https://${url}`) : (LICENSE_URLS[license] ?? null),
+    credit,
+    license,
+    licenseUrl: url ? httpsUrl(/^https?:\/\//i.test(url) ? url : `https://${url}`) : licenseDeed(license),
   }
 }
 
@@ -68,25 +91,27 @@ function parseLegacy(str) {
 // no attribution at all. `credit` is the only field guaranteed non-null on a non-null
 // return — a legacy string may yield nothing else.
 export function resolveAttribution(place, url, index) {
-  const entry = url ? place?.photo_attribution?.[url] : null
+  const attribution = isPlain(place) ? field(place, 'photo_attribution') : null
+  const entry = url && isPlain(attribution) ? field(attribution, url) : null
 
-  if (entry && typeof entry === 'object') {
-    const credit  = clean(entry.credit)
-    const license = clean(entry.license)
+  if (isPlain(entry)) {
+    const credit  = creditText(entry.credit)
+    const license = licenseText(entry.license)
     // An entry with neither is not attribution, it is an empty object. Fall through to
     // the legacy array rather than returning a shell that renders as a blank line.
     if (credit || license) {
       return {
         credit,
         license,
-        licenseUrl: clean(entry.license_url) ?? (license ? LICENSE_URLS[license] ?? null : null),
-        sourceUrl:  clean(entry.source_url),
-        source:     clean(entry.source),
+        licenseUrl: present(entry.license_url) ? httpsUrl(entry.license_url) : licenseDeed(license),
+        sourceUrl:  httpsUrl(entry.source_url),
+        source:     SOURCES.includes(entry.source) ? entry.source : null,
       }
     }
   }
 
-  const legacy = Number.isInteger(index) ? parseLegacy(place?.photo_credits?.[index]) : null
+  const credits = isPlain(place) && Array.isArray(place.photo_credits) ? place.photo_credits : null
+  const legacy = credits && Number.isInteger(index) && index >= 0 ? parseLegacy(credits[index]) : null
   if (!legacy || (!legacy.credit && !legacy.license)) return null
   return { ...legacy, sourceUrl: null, source: null }
 }
