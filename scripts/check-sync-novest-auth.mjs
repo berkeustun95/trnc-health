@@ -34,6 +34,15 @@ const cases = [
   ['role upper case', bearer(jwt({ role: 'SERVICE_ROLE' })), 'k', null],
   ['role nested in app_metadata', bearer(jwt({ role: 'authenticated', app_metadata: { role: 'service_role' } })), 'k', null],
   ['no Bearer scheme', svc, 'k', null],
+  ['two Authorization values joined', bearer(svc) + ', ' + bearer(jwt({ role: 'anon' })), 'k', null],
+  ['two values, forged first', bearer(jwt({ role: 'anon' })) + ', ' + bearer(svc), 'k', null],
+  ['2-segment token', bearer('x.' + svc.split('.')[1]), 'k', null],
+  ['5-segment token', bearer(svc + '.x.y'), 'k', null],
+  ['space inside payload', bearer(svc.split('.')[0] + '.' + svc.split('.')[1].slice(0, 5) + ' ' + svc.split('.')[1].slice(5) + '.sig'), 'k', null],
+  ['trailing space', bearer(svc) + ' ', 'k', null],
+  ['double space after Bearer', 'Bearer  ' + svc, 'k', null],
+  ['padded base64 payload', bearer(svc.split('.')[0] + '.' + btoa(JSON.stringify({ role: 'service_role' })) + '.sig'), 'k', null],
+  ['standard-base64 payload with +/', bearer(svc.split('.')[0] + '.' + btoa('{"role":"service_role","x":"\u00fb\u00ff\u00fe"}') + '.sig'), 'k', null],
 ]
 for (const [name, header, key, want] of cases) {
   const got = await serviceCaller(header, key)
@@ -44,19 +53,20 @@ const cfg = JSON.parse(readFileSync(new URL('../supabase/functions/deploy-config
 check(cfg.functions?.['sync-novest']?.verify_jwt === true,
   'deploy-config.json: sync-novest verify_jwt must be true; the "role" branch trusts a signature only the gateway checks')
 
-const src = readFileSync(new URL('../supabase/functions/sync-novest/index.ts', import.meta.url), 'utf8')
-const h = src.indexOf('Deno.serve(')
-check(h !== -1 && /Deno\.serve\(async \(req\b/.test(src), 'sync-novest handler must take req')
-const body = h === -1 ? '' : src.slice(h)
-const at = s => body.indexOf(s)
-const gate = at('serviceCaller(')
-const refuse = at('status: 401')
-check(gate !== -1 && refuse !== -1, 'sync-novest handler must call serviceCaller and return 401')
-for (const s of ['createClient(', 'getAll(', 'fetch(']) {
-  const i = at(s)
-  check(i === -1 || (gate !== -1 && refuse !== -1 && gate < i && refuse < i),
-    `sync-novest: the caller check and 401 must come before the first ${s}`)
-}
+const raw = readFileSync(new URL('../supabase/functions/sync-novest/index.ts', import.meta.url), 'utf8')
+const src = raw.replace(/('(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, s) => s ?? ' ')
+const serves = src.split('Deno.serve(').length - 1
+check(serves === 1, `sync-novest must contain exactly one Deno.serve (found ${serves})`)
+const open = /Deno\.serve\(\s*async\s*\(req\)\s*=>\s*\{/.exec(src)
+check(open !== null, 'sync-novest handler must be Deno.serve(async (req) => {')
+const body = open ? src.slice(open.index + open[0].length) : ''
+const GATE = new RegExp([
+  /^\s*const caller = await serviceCaller\(\s*req\.headers\.get\('Authorization'\),\s*Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)\s*\)\s*;?/,
+  /\s*if \(!caller\) \{\s*(?:console\.error\('sync-novest: caller refused'\)\s*;?\s*)?/,
+  /return new Response\(\s*JSON\.stringify\(\{ ok: false, error: 'unauthorized' \}\),\s*/,
+  /\{ status: 401, headers: \{ 'Content-Type': 'application\/json' \} \}\s*\)\s*;?\s*\}/,
+].map(r => r.source).join(''))
+check(GATE.test(body), 'sync-novest: the first statements of the handler must be the serviceCaller gate returning 401, exactly as pinned in scripts/check-sync-novest-auth.mjs')
 check(/\bok: true, caller,/.test(body) && /\bok: false, caller,/.test(body),
   'sync-novest responses must carry caller as the second key')
 
@@ -65,4 +75,4 @@ if (problems.length) {
   for (const p of problems) console.error('  ✗ ' + p)
   process.exit(1)
 }
-console.log(`sync-novest auth check: OK (${cases.length} caller cases, verify_jwt, gate position)`)
+console.log(`sync-novest auth check: OK (${cases.length} caller cases, verify_jwt, gate pinned first in handler)`)

@@ -11,8 +11,11 @@ function jwtRole(jwt) {
   } catch { return null }
 }
 
+const ONE_JWT = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/
+
 export async function serviceCaller(authorizationHeader, serviceKey) {
-  const m = /^Bearer (.+)$/.exec(authorizationHeader ?? '')
+  const header = authorizationHeader ?? ''
+  const m = /^Bearer (.+)$/.exec(header)
   if (!m) return null
   const token = m[1]
   if (typeof serviceKey === 'string' && serviceKey.length > 0) {
@@ -21,5 +24,6 @@ export async function serviceCaller(authorizationHeader, serviceKey) {
     for (let i = 0; i < 32; i++) diff |= a[i] ^ b[i]
     if (diff === 0) return 'exact'
   }
-  return jwtRole(token) === 'service_role' ? 'role' : null
+  const one = ONE_JWT.exec(header)
+  return one && jwtRole(one[1]) === 'service_role' ? 'role' : null
 }

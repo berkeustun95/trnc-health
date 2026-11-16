@@ -24,3 +24,5 @@ jobs:
           node scripts/record-data-job-run.mjs --selftest
           node scripts/check-data-job-heartbeats.mjs --selftest
           node scripts/check-data-job-heartbeats.mjs
+      - name: sync-novest caller gate (offline guard)
+        run: node scripts/check-sync-novest-auth.mjs
