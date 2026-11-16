@@ -478,8 +478,6 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
   - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
   - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
-  - **Apple App Privacy label (Berke, 2026-11-14): with the next store submission, declare expo-updates as Crash Data →
-    App Functionality** (today it is listed under Analytics only).
 - **Store builds (Berke, 2026-11-16):** **1.4.3** = Onboarding v2 in the embedded bundle; NO Sentry, widgets, R8,
   map-marker fix or edge-to-edge. **1.4.4** = Sentry on its own build: EU region, crash reporting only (no IP, no user ID,
   no session replay), **ON by default with a "Send crash reports" switch in Settings** users can turn off; ships with
