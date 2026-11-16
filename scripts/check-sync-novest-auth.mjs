@@ -55,6 +55,10 @@ check(cfg.functions?.['sync-novest']?.verify_jwt === true,
 
 const raw = readFileSync(new URL('../supabase/functions/sync-novest/index.ts', import.meta.url), 'utf8')
 const src = raw.replace(/('(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, s) => s ?? ' ')
+const IMPORT = "import { serviceCaller } from '../_shared/caller-auth.mjs'"
+check(src.includes(IMPORT), `sync-novest must contain exactly: ${IMPORT}`)
+const idents = src.match(/\bserviceCaller\b/g)?.length ?? 0
+check(idents === 2, `sync-novest: serviceCaller must occur exactly twice (the import and the call), found ${idents}`)
 const serves = src.split('Deno.serve(').length - 1
 check(serves === 1, `sync-novest must contain exactly one Deno.serve (found ${serves})`)
 const open = /Deno\.serve\(\s*async\s*\(req\)\s*=>\s*\{/.exec(src)
