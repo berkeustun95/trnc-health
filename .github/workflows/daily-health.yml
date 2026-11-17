@@ -70,6 +70,12 @@ jobs:
       - name: duty push sent recently
         if: success() || failure()
         run: node scripts/check-duty-push-staleness.mjs
+      # Round 5 (2026-11-16): duty push sends each batch once (#479). Pass/fail only; passes itself after 2026-11-23.
+      - name: duty push send-once watch (until 2026-11-23)
+        if: success() || failure()
+        run: |
+          node scripts/check-duty-push-send-once.mjs --self
+          node scripts/check-duty-push-send-once.mjs
       - name: notify:health
         if: success() || failure()
         run: npm run -s notify:health
@@ -152,6 +158,16 @@ jobs:
         run: |
           node scripts/check-feed-freshness.mjs --self
           node scripts/check-feed-freshness.mjs
+
+      # Who watches the watchdog (data jobs, slice 3): the pg_cron job `data-jobs-watchdog` alerts admins when a
+      # data job goes wrong. Red when it has not succeeded for 3 h (or never). SCHEDULED runs only. A missing RPC
+      # (not applied yet) and an unreadable answer are warnings, not red. Output has no data, ages only.
+      - name: data-jobs watchdog ran in the last 3 h
+        if: ${{ (success() || failure()) && github.event_name == 'schedule' }}
+        timeout-minutes: 2
+        run: |
+          node scripts/check-data-jobs-watchdog.mjs --selftest
+          node scripts/check-data-jobs-watchdog.mjs
 
       # GitHub emails a scheduled job's failure to whoever last edited the schedule, which is a bot, so a red run told
       # nobody: Novest and the duty push were down for days. One issue stays open while anything is red, and Berke is

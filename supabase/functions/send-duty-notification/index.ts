@@ -1,7 +1,10 @@
+// CALLER: only the cron's service key (Vault novest_sync_key). 'role' is sound only while verify_jwt stays true (deploy-config.json).
+// The response carries no user counts (they go to duty_push_runs); scripts/check-push-fn-auth.mjs pins that.
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { profileReadKinds, readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { lastSignIns, onePerToken, pushOutcome, RUN_DEADLINE_MS, sendBatch, sharedTokenIds } from './push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -72,8 +75,12 @@ async function finishRun(supabase: any, id: number | null, patch: Record<string,
   }
 }
 
-serve(async () => {
-  const runStartedAt = Date.now()
+serve(async (req) => {
+  const caller = await serviceCaller(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (!caller) {
+    console.error('send-duty-notification: caller refused')
+    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+  }
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -83,7 +90,8 @@ serve(async () => {
   // (and not Europe/Istanbul, which stays UTC+3). en-CA formats as YYYY-MM-DD.
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Famagusta' }).format(new Date())
   if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) {
-    return new Response(JSON.stringify({ error: `unexpected TRNC date format: ${today}` }), { status: 500 })
+    console.error('unexpected TRNC date format:', today)
+    return new Response(JSON.stringify({ ok: false, caller, error: 'unexpected date format' }), { status: 500 })
   }
 
   const runId = await startRun(supabase, today)
@@ -97,12 +105,13 @@ serve(async () => {
 
   if (dutyError) {
     await finishRun(supabase, runId, { outcome: 'duty_query_failed' })
-    return new Response(JSON.stringify({ error: dutyError.message }), { status: 500 })
+    console.error('duty_list read failed', dutyError.message)
+    return new Response(JSON.stringify({ ok: false, caller, error: 'duty read failed' }), { status: 500 })
   }
 
   if (!duties?.length) {
     await finishRun(supabase, runId, { outcome: 'no_duties' })
-    return new Response(JSON.stringify({ message: 'No duty pharmacies for today', date: today }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true, caller, date: today, outcome: 'no_duties' }), { status: 200 })
   }
 
   // Paged + count-verified (page.ts): a plain select stops silently at PostgREST max-rows (1000).
@@ -117,12 +126,12 @@ serve(async () => {
   if (profilesError) {
     console.error('profiles read failed:', profilesError)
     await finishRun(supabase, runId, { outcome: 'profiles_query_failed', pharmacies: duties.length })
-    return new Response(JSON.stringify({ error: 'profiles read failed' }), { status: 500 })
+    return new Response(JSON.stringify({ ok: false, caller, error: 'profiles read failed' }), { status: 500 })
   }
 
   if (!profiles?.length) {
     await finishRun(supabase, runId, { outcome: 'no_profiles', pharmacies: duties.length })
-    return new Response(JSON.stringify({ message: 'No profiles found' }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true, caller, date: today, outcome: 'no_profiles' }), { status: 200 })
   }
 
   // Insert in-app notifications per user in their language
@@ -180,17 +189,11 @@ serve(async () => {
     errorKinds[key] = (errorKinds[key] ?? 0) + n
   }
 
-  let pushRetries = 0
   let batchesAccepted = 0
   let batchesFailed = 0
   for (let i = 0; i < messages.length; i += 100) {
-    const remainingBatches = Math.ceil((messages.length - i - 100) / 100)
-    const r = await sendBatch(messages.slice(i, i + 100), {
-      fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
-      now: Date.now, random: Math.random, deadlineAt: runStartedAt + RUN_DEADLINE_MS,
-    }, Math.max(0, remainingBatches))
+    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch })
     pushOk += r.ok
-    pushRetries += r.retries
     if (r.accepted) batchesAccepted++
     else batchesFailed++
     for (const [kind, n] of Object.entries(r.kinds)) bump(kind, n)
@@ -207,22 +210,12 @@ serve(async () => {
     push_attempted: messages.length,
     push_ok: pushOk,
     push_errors: pushErrCount,
-    push_retries: pushRetries,
+    push_retries: 0,   // batches are sent once (push.ts); the column stays for the run history
     error_kinds: errorKinds,
   })
 
   return new Response(
-    JSON.stringify({
-      ok: !pushFailed,
-      date: today,
-      pharmacies: duties.map(d => d.name),
-      notified: profiles.length,
-      pushed: messages.length,
-      pushOk,
-      pushErrorCount: pushErrCount,
-      pushRetries,
-      errorKinds,
-    }),
+    JSON.stringify({ ok: !pushFailed, caller, date: today, outcome }),
     { status: pushFailed ? 502 : 200, headers: { 'Content-Type': 'application/json' } }
   )
 })

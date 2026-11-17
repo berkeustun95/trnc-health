@@ -184,6 +184,7 @@ export function resolveHero(region) {
       licenseUrl: entry.credit.licenseUrl,
       sourceUrl:  entry.credit.sourceUrl,
       source:     entry.credit.source ?? 'commons',
+      edited:     true, // bundled heroes are cropped to the hero frame
     } : null,
   }
 }

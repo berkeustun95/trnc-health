@@ -8,10 +8,13 @@
 // Nothing listed this weekend → nothing is sent ('no_events'): a digest that says "nothing on" is spam.
 // Writes the in-app Bildirimler row (type 'weekend') and the push (data.screen 'weekend' → Keşfet,
 // events mode, Bu hafta sonu). Run log: weekend_digest_runs, counts only.
+// CALLER: only the cron's service key (Vault novest_sync_key). 'role' is sound only while verify_jwt stays true (deploy-config.json).
+// The gate comes before the body is read and before the weekend_digest_runs insert: a refused call must leave no run row.
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { readAllById } from '../send-duty-notification/page.ts'
-import { lastSignIns, onePerToken, pushOutcome, RUN_DEADLINE_MS, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
 import { weekendWindow, inWindow, weekPick, digestMessage, type DigestEvent, type DigestPlace } from './digest.ts'
 
 const MAX_ERROR_KINDS = 20
@@ -30,7 +33,11 @@ async function finishRun(supabase: any, id: number | null, fields: Record<string
 }
 
 serve(async (req) => {
-  const runStartedAt = Date.now()
+  const caller = await serviceCaller(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (!caller) {
+    console.error('send-weekend-digest: caller refused')
+    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+  }
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   let testersOnly = false
   try { testersOnly = (await req.json())?.testers_only === true } catch { /* empty body = the weekly run */ }
@@ -52,12 +59,12 @@ serve(async (req) => {
     .limit(500)   // one weekend: tens of rows
   if (evErr) {
     await finishRun(supabase, runId, { outcome: 'events_query_failed' })
-    return new Response(JSON.stringify({ error: 'events read failed' }), { status: 500 })
+    return new Response(JSON.stringify({ ok: false, caller, error: 'events read failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
   const events = ((evRows ?? []) as DigestEvent[]).filter(e => inWindow(e, w))
   if (!events.length) {
     await finishRun(supabase, runId, { outcome: 'no_events' })
-    return new Response(JSON.stringify({ message: 'no events this weekend', from: w.from, to: w.to }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true, caller, message: 'no events this weekend', from: w.from, to: w.to }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
 
   const { data: placeRows } = await supabase.from('places')
@@ -75,7 +82,7 @@ serve(async (req) => {
   )
   if (profilesError) {
     await finishRun(supabase, runId, { outcome: 'profiles_query_failed', events: events.length })
-    return new Response(JSON.stringify({ error: 'profiles read failed' }), { status: 500 })
+    return new Response(JSON.stringify({ ok: false, caller, error: 'profiles read failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
   let profiles = allProfiles ?? []
   if (testersOnly) {
@@ -87,7 +94,7 @@ serve(async (req) => {
   }
   if (!profiles.length) {
     await finishRun(supabase, runId, { outcome: 'no_profiles', events: events.length })
-    return new Response(JSON.stringify({ message: 'no recipients' }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true, caller, message: 'no recipients' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
 
   const msgOf = (lang: string | null) => digestMessage(lang || 'English', events, place)
@@ -110,10 +117,7 @@ serve(async (req) => {
   let pushOk = 0, pushErrors = 0, batchesAccepted = 0, batchesFailed = 0
   const errorKinds: Record<string, number> = Object.create(null)
   for (let i = 0; i < messages.length; i += 100) {
-    const r = await sendBatch(messages.slice(i, i + 100), {
-      fetchFn: fetch, sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
-      now: Date.now, random: Math.random, deadlineAt: runStartedAt + RUN_DEADLINE_MS,
-    }, Math.max(0, Math.ceil((messages.length - i - 100) / 100)))
+    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch })
     pushOk += r.ok
     if (r.accepted) batchesAccepted++; else batchesFailed++
     for (const [kind, n] of Object.entries(r.kinds)) {
@@ -128,6 +132,6 @@ serve(async (req) => {
     outcome, events: events.length, notified, notif_batches_failed: notifBatchesFailed,
     push_attempted: messages.length, push_ok: pushOk, push_errors: pushErrors, error_kinds: errorKinds,
   })
-  return new Response(JSON.stringify({ ok: outcome !== 'push_failed', mode: testersOnly ? 'testers' : 'all', events: events.length }),
+  return new Response(JSON.stringify({ ok: outcome !== 'push_failed', caller, mode: testersOnly ? 'testers' : 'all', events: events.length }),
     { status: outcome === 'push_failed' ? 502 : 200, headers: { 'Content-Type': 'application/json' } })
 })

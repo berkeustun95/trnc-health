@@ -36,7 +36,7 @@ import { PET_PARTNERS } from './petPartners.js'
 import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, LIVE_TILE_GROUPS,
   categoryToGroup, groupVisible,
- ICON_PIN } from './exploreCategories.js'
+ pinIcon } from './exploreCategories.js'
 
 // Default map framing: the WHOLE island, used by both map surfaces whenever there is no
 // userLocation to centre on.
@@ -126,12 +126,14 @@ function placePins(places) {
     .filter(p => p.latitude != null && p.longitude != null)
     .map(p => {
       const group = categoryToGroup(p.category)
+      const icon  = pinIcon(p.category, group)
       return {
         id:    `place:${p.id}`,
         kind:  'place',
         row:   p,
         group,
-        iconPin: !!ICON_PIN[group],
+        icon,
+        iconPin: icon != null,
         lat:   p.latitude,
         lng:   p.longitude,
         color:   (GROUP_META[group]?.colorToken || placeColors.landmark).text,
@@ -249,11 +251,22 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
     // the chip dot is the group colour.
     const partnerPins = g === 'eat_drink' && eateryLive ? eateryPins(eateryPartners, eateryGates) : []
     if (!visible && partnerPins.length === 0) continue
+    const base = {
+      color:    (GROUP_META[g]?.colorToken || placeColors.landmark).text,
+      colorBg:  (GROUP_META[g]?.colorToken || placeColors.landmark).bg,
+    }
+    // Beaches are their own "Plajlar" source, carved out of nature (the Gezilecek Yerler tile still
+    // owns them). Same `visible` as nature; a nature with no pins left is dropped by the empty-source filter below.
+    if (g === 'nature') {
+      const shown = visible ? pins : []
+      sources.push({ key: 'explore:beach', labelKey: 'blFilterBeaches', ...base, pins: shown.filter(p => p.row.category === 'beach') })
+      sources.push({ key: 'explore:nature', labelKey: GROUP_META[g]?.labelKey, ...base, pins: shown.filter(p => p.row.category !== 'beach') })
+      continue
+    }
     sources.push({
       key:      `explore:${g}`,
       labelKey: GROUP_META[g]?.labelKey,
-      color:    (GROUP_META[g]?.colorToken || placeColors.landmark).text,
-      colorBg:  (GROUP_META[g]?.colorToken || placeColors.landmark).bg,
+      ...base,
       pins:     [...(visible ? pins : []), ...partnerPins],
     })
   }

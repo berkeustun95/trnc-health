@@ -16,7 +16,7 @@ import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
 import OsmAttribution from '../components/OsmAttribution'
-import { VISITNCY_SOURCE, creditUrl, creditBrand } from '../constants/walkingRoutes'
+import { VISITNCY_BEACHES_SOURCE, isMinistrySource, creditUrl, creditBrand } from '../constants/walkingRoutes'
 import { logCreditTap } from '../components/WalkingRoutes'
 import { officialVisitView, officialFeeText } from '../utils/officialVisit'
 import { monthNames } from '../constants/months'
@@ -51,6 +51,9 @@ function extractI18n(obj, lang) {
   }
   return result != null ? String(result) : ''
 }
+// OSM (ODbL) credit: free OSM listings, and ministry beach rows whose pin is derived from OSM beach geometry.
+const hasOsmPin = place => place.source === 'osm'
+  || (place.source === VISITNCY_BEACHES_SOURCE && place.latitude != null && place.longitude != null)
 function placeName(place, lang) { return extractI18n(place.name_i18n, lang) || place.name || '' }
 function placeDesc(place, lang) { return extractI18n(place.description_i18n, lang) }
 
@@ -360,7 +363,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
           <OfficialVisitCard data={place.official_visit} lang={lang} />
 
           {/* Visit NCY partner credit: handler, URL and strings unchanged from the legacy layout. */}
-          {place.source === VISITNCY_SOURCE && (
+          {isMinistrySource(place.source) && (
             <TouchableOpacity style={r.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
               onPress={() => {
                 logCreditTap(place.id, place.region)
@@ -373,7 +376,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
           )}
 
           {/* Free OSM listing (20261179): basic info from OpenStreetMap, ODbL credit on the page. */}
-          {place.source === 'osm' && <OsmAttribution lang={lang} style={r.osmCredit} />}
+          {hasOsmPin(place) && <OsmAttribution lang={lang} style={r.osmCredit} />}
 
           {place.amenities?.length > 0 && (
             <View style={r.section}>
@@ -538,7 +541,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
           {/* Partner credit for places imported from Visit NCY's city walking maps. Reads
               `source`, which reaches this screen only because BROWSE_COLS / PLACE_COLS
               select it — there is no re-fetch here. */}
-          {place.source === VISITNCY_SOURCE && (
+          {isMinistrySource(place.source) && (
             <TouchableOpacity style={s.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
               onPress={() => {
                 logCreditTap(place.id, place.region)
@@ -550,7 +553,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </TouchableOpacity>
           )}
 
-          {place.source === 'osm' && <OsmAttribution lang={lang} style={s.osmCredit} />}
+          {hasOsmPin(place) && <OsmAttribution lang={lang} style={s.osmCredit} />}
 
           {/* Amenities (any category, when non-empty) — was beach "facilities" */}
           {place.amenities?.length > 0 && (
