@@ -60,6 +60,8 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:sync-novest-auth": "node scripts/check-sync-novest-auth.mjs",
     "check:push-fn-auth": "node scripts/check-push-fn-auth.mjs",
+    "check:admin-push-auth": "node scripts/check-admin-push-auth.mjs",
+    "check:admin-push-strings": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-admin-push-strings.mjs",
     "easignore:check": "node scripts/check-easignore.mjs && node scripts/check-easignore.mjs --self",
     "conn:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-connectivity-content.mjs",
     "native:safe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs",

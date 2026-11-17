@@ -69,6 +69,14 @@
       "clear": "Only after 20261210/20261211 are applied and Berke has seen the switches on Preview and says go in chat. Then set cleared to true in a PR.",
       "clearedOn": "2026-11-16",
       "clearedBy": "NOT approved for production: REVERTED on main (Berke 2026-11-16, so the beaches release #448 + #454 + #471 ships from main without the data-jobs app code). The change can only return through a re-land PR (a revert of the revert), which gets its own hold until Berke has seen it on Preview."
+    },
+    {
+      "pr": 487,
+      "commit": "d7d35a009638032077f21a81890f6db6678594d6",
+      "what": "Admin duty swap + Broadcast pushes moved to the admin-push edge function (app side), PR #487",
+      "since": "2026-11-17",
+      "cleared": false,
+      "clear": "Only after 20261217 is applied, admin-push is deployed with ADMIN_PUSH_TEST_USER_IDS set, Berke has seen a QA-only test send on Preview and says go in chat. Then set cleared to true in a PR."
     }
   ]
 }
