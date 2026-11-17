@@ -47,6 +47,8 @@ WITH report AS (
     ('20261205_data_jobs','data_job_runs'),
     -- Data jobs watchdog (20261211): what it saw last time. Registered ahead of the apply; red until it runs.
     ('20261211_data_jobs_watchdog','data_jobs_alert_state'),
+    -- admin-push send-once ledger (20261217): registered ahead of the apply; red until it runs.
+    ('20261217_admin_push_sends','admin_push_sends'),
     -- Araçlar car listings (20261165): registered ahead of the apply; red until it runs.
     ('20261165_vehicles','vehicle_sources'),
     ('20261165_vehicles','dealers'),
@@ -331,6 +333,20 @@ WITH report AS (
     ('20261211_data_jobs_watchdog','data_jobs_alert_state','last_paused'),
     ('20261211_data_jobs_watchdog','data_jobs_alert_state','alerted_at'),
     ('20261211_data_jobs_watchdog','data_jobs_alert_state','reminded_at'),
+    -- 20261217: the admin-push ledger's 13 columns; registered ahead of the apply; red until it runs.
+    ('20261217_admin_push_sends','admin_push_sends','request_id'),
+    ('20261217_admin_push_sends','admin_push_sends','kind'),
+    ('20261217_admin_push_sends','admin_push_sends','test'),
+    ('20261217_admin_push_sends','admin_push_sends','admin_id'),
+    ('20261217_admin_push_sends','admin_push_sends','created_at'),
+    ('20261217_admin_push_sends','admin_push_sends','finished_at'),
+    ('20261217_admin_push_sends','admin_push_sends','outcome'),
+    ('20261217_admin_push_sends','admin_push_sends','recipients'),
+    ('20261217_admin_push_sends','admin_push_sends','notified'),
+    ('20261217_admin_push_sends','admin_push_sends','push_attempted'),
+    ('20261217_admin_push_sends','admin_push_sends','push_ok'),
+    ('20261217_admin_push_sends','admin_push_sends','push_errors'),
+    ('20261217_admin_push_sends','admin_push_sends','error_kinds'),
     -- 20261165: the columns the read policies, the guard and the report flow depend on (column count in H).
     ('20261165_vehicles','vehicles','status'),
     ('20261165_vehicles','vehicles','expires_at'),
@@ -1044,6 +1060,10 @@ WITH report AS (
     -- 20261211: the watchdog state table; registered ahead of the apply; red until it runs.
     ('20261211_data_jobs_watchdog','data_jobs_alert_state_pkey'),
     ('20261211_data_jobs_watchdog','data_jobs_alert_state_job_key_fkey'),
+    -- 20261217: the admin-push ledger; no FK on admin_id on purpose (account deletion). Registered ahead of the apply; red until it runs.
+    ('20261217_admin_push_sends','admin_push_sends_pkey'),
+    ('20261217_admin_push_sends','admin_push_sends_kind_check'),
+    ('20261217_admin_push_sends','admin_push_sends_error_kinds_check'),
     -- 20261165: Araçlar. Who owns a listing follows its source; prices follow intent; a source goes live only checked.
     ('20261165_vehicles','vehicles_ownership_check'),
     ('20261165_vehicles','vehicles_price_check'),
@@ -2185,6 +2205,21 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%v_alerted < p_now - interval ''24 hours''%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%isodow FROM (p_now AT TIME ZONE ''Asia/Famagusta'')) = 1%', false)
     -- 1210-END
+    -- 20261217: the admin-push send-once ledger. Registered ahead of the apply; red until it runs. Own facts: RLS on, zero policies,
+    --   no privilege for anon / authenticated on the table or any column, service_role keeps its access, 13 columns, the request id
+    --   is the primary key, and NO foreign key (an FK on auth.users / profiles breaks account deletion). The edge function writes
+    --   notifications through the service client, so the 1066_notification_type writer count is NOT changed by this file.
+    UNION ALL SELECT '20261217_admin_push_sends','admin_push_sends: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes, 13 columns, request_id primary key, no foreign key',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.admin_push_sends')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'admin_push_sends') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.admin_push_sends'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.admin_push_sends'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.admin_push_sends') AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
+               AND has_table_privilege('service_role', to_regclass('public.admin_push_sends'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND COALESCE((SELECT count(*) = 13 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.admin_push_sends') AND a.attnum > 0 AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE 'PRIMARY KEY (request_id)%' FROM pg_constraint WHERE conrelid = to_regclass('public.admin_push_sends') AND conname = 'admin_push_sends_pkey'), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.admin_push_sends') AND contype = 'f')
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
