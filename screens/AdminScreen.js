@@ -1499,6 +1499,7 @@ function DutyTab({ lang }) {
 
   function openSwap(entry) {
     swapReqId.current = newUuid()
+    setSwapNote(null)
     setSwapTarget(entry)
     setSwapSearch('')
     setSwapSelectedPharmacy(null)
