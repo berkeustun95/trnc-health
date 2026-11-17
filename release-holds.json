@@ -89,6 +89,14 @@
       "clearedOn": "2026-11-17",
       "clearedBy": "Berke, in chat: Go for both #487 + #489; he tested the Data jobs switches and the alert push tap on Preview and it passed",
       "clear": "Only after Berke has tried the Data jobs switches on Preview (test with weekend-digest, not duty-push) and says go in chat. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 494,
+      "commit": "9e77752c217588189452b10c722cc84c885fb5ae",
+      "what": "Admin area: English only, whatever the app language, merged to main 2026-11-17",
+      "since": "2026-11-17",
+      "cleared": false,
+      "clear": "Only after Berke has tried it on Preview and says it passed in chat (Berke 2026-11-17). Then set cleared to true in a PR."
     }
   ]
 }
