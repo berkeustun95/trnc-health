@@ -151,20 +151,36 @@ async function invokeAdminPush(payload) {
   } catch { return { code: 'network' } }
 }
 
+// { text, ok }: ok is true only for outcome 'sent' (test mode included).
 function pushResultLine(data, lang) {
-  if (data.outcome === 'duplicate') return t('adminPushDuplicate', lang)
-  if (data.outcome === 'no_recipients') return t('adminPushNoRecipients', lang)
+  if (data.outcome === 'duplicate') return { text: t('adminPushDuplicate', lang), ok: false }
+  if (data.outcome === 'no_recipients') return { text: t('adminPushNoRecipients', lang), ok: false }
   let line = t('adminPushResult', lang).replace('{recipients}', data.recipients ?? 0).replace('{pushed}', data.pushed ?? 0)
   if (data.outcome === 'partial') line += ' · ' + t('adminPushPartial', lang)
   if (data.test) line += ' · ' + t('adminPushTestUsed', lang)
-  return line
+  return { text: line, ok: data.outcome === 'sent' }
 }
 
-function TestSendSwitch({ value, onChange, lang }) {
+function TestSendSwitch({ value, onChange, lang, disabled }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-      <Text style={[s.fieldLabel, { flex: 1, marginBottom: 0, marginRight: 12 }]}>{t('adminPushTestSwitch', lang)}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} thumbColor="#fff" />
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, marginBottom: 16 }}>
+      <View style={{ flex: 1, marginRight: 12 }}>
+        <Text style={[typeScale.rowTitle, { color: colors.textPrimary }]}>{t('adminPushTestSwitch', lang)}</Text>
+        <Text style={value
+          ? [typeScale.small, { color: colors.textSecondary, marginTop: 2 }]
+          : [typeScale.small, { color: colors.dangerInk, fontFamily: 'Inter_600SemiBold', marginTop: 2 }]}>
+          {t(value ? 'adminPushTestOnHint' : 'adminPushTestOffHint', lang)}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        trackColor={{ false: colors.fieldBorder, true: colors.primary }}
+        thumbColor={colors.card}
+        accessibilityRole="switch"
+        accessibilityLabel={t('adminPushTestSwitch', lang)}
+      />
     </View>
   )
 }
@@ -1447,6 +1463,7 @@ function DutyTab({ lang }) {
   const [swapNote, setSwapNote] = useState(null)
   const [swapTest, setSwapTest] = useState(defaultTestSend)
   const swapReqId = useRef(null)
+  const swapFailed = useRef(null)
 
   useEffect(() => {
     supabase.from('facilities').select('id, name').eq('type', 'pharmacy').order('name')
@@ -1498,7 +1515,8 @@ function DutyTab({ lang }) {
   }
 
   function openSwap(entry) {
-    swapReqId.current = newUuid()
+    if (swapFailed.current?.entryId !== entry.id) swapFailed.current = null
+    swapReqId.current = swapFailed.current?.requestId ?? newUuid()
     setSwapNote(null)
     setSwapTarget(entry)
     setSwapSearch('')
@@ -1520,9 +1538,10 @@ function DutyTab({ lang }) {
       .eq('id', swapTarget.id)
     if (!error) {
       const res = await invokeAdminPush({ kind: 'duty_swap', request_id: swapReqId.current, duty_list_id: swapTarget.id, test: swapTest })
+      swapFailed.current = res.code ? { entryId: swapTarget.id, requestId: swapReqId.current } : null
       setSwapNote(res.code
         ? { error: true, text: t('adminPushSwapError', lang).replace('{error}', res.code) }
-        : { error: false, text: pushResultLine(res.data, lang) })
+        : { error: false, ...pushResultLine(res.data, lang) })
       setSwapModalVisible(false)
       setSwapDone(true)
       setTimeout(() => setSwapDone(false), 3000)
@@ -1552,8 +1571,8 @@ function DutyTab({ lang }) {
           </View>
         )}
         {swapNote && (swapNote.error
-          ? <Text style={s.errorText}>{swapNote.text}</Text>
-          : <Text style={s.broadcastNote}>{swapNote.text}</Text>)}
+          ? <Text style={[s.errorText, { color: colors.dangerInk, textAlign: 'left' }]}>{swapNote.text}</Text>
+          : <Text style={[s.broadcastNote, !swapNote.ok && { color: colors.dangerInk }]}>{swapNote.text}</Text>)}
 
         {loadingEntries
           ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
@@ -1648,6 +1667,10 @@ function DutyTab({ lang }) {
               </View>
             )}
 
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, flexShrink: 0 }}>
+              <TestSendSwitch value={swapTest} onChange={setSwapTest} lang={lang} disabled={swapping} />
+            </View>
+
             <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <TextInput
                 style={[s.input, { marginBottom: 10 }]}
@@ -1681,7 +1704,6 @@ function DutyTab({ lang }) {
                   />
                 </Field>
               )}
-              <TestSendSwitch value={swapTest} onChange={setSwapTest} lang={lang} />
             </ScrollView>
           </SafeAreaView>
         </KeyboardAwareForm>
@@ -2463,15 +2485,15 @@ function BroadcastTab({ lang }) {
         ))}
       </View>
 
-      <TestSendSwitch value={test} onChange={v => { setTest(v); setResult(null); reqId.current = null }} lang={lang} />
+      <TestSendSwitch value={test} onChange={v => { setTest(v); setResult(null); reqId.current = null }} lang={lang} disabled={sending} />
 
-      {error ? <Text style={s.errorText}>{error}</Text> : null}
+      {error ? <Text style={[s.errorText, { color: colors.dangerInk, textAlign: 'left' }]}>{error}</Text> : null}
 
       {result ? (
-        <View style={s.broadcastResult}>
-          <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-          <Text style={s.broadcastResultText}>
-            {result}
+        <View style={[s.broadcastResult, !result.ok && { backgroundColor: colors.accentLight }]}>
+          <Ionicons name={result.ok ? 'checkmark-circle' : 'alert-circle'} size={20} color={result.ok ? colors.success : colors.accent} />
+          <Text style={[s.broadcastResultText, !result.ok && { color: colors.textPrimary }]}>
+            {result.text}
           </Text>
         </View>
       ) : null}
@@ -2487,9 +2509,11 @@ function BroadcastTab({ lang }) {
         }
       </TouchableOpacity>
 
-      <Text style={s.broadcastNote}>
-        Sends an in-app notification to all matching users, plus a push notification to those with push enabled.
-      </Text>
+      {!test && (
+        <Text style={s.broadcastNote}>
+          Sends an in-app notification to all matching users, plus a push notification to those with push enabled.
+        </Text>
+      )}
     </ScrollView>
   )
 }
