@@ -1,6 +1,6 @@
 import { TouchableOpacity, Text, View, ActivityIndicator, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, type, radii, press, TAP } from '../../constants/theme'
+import { colors, type, radii, press, space, TAP } from '../../constants/theme'
 import { haptic } from './haptics'
 
 // primary · secondary · text · danger · inverse / onDark / onDarkText (on the teal Oli ground). Min 44pt tall whatever the label size, so a short
@@ -11,6 +11,8 @@ import { haptic } from './haptics'
 const VARIANTS = {
   primary:   { bg: colors.primary,  fg: colors.onPrimary, border: null },
   secondary: { bg: colors.card,     fg: colors.primaryDark, border: colors.border },
+  // On the page ground, where secondary's #E8EDF2 edge vanishes (1.1:1): primary edge 4.3:1+.
+  outline:   { bg: colors.card,     fg: colors.primaryDark, border: colors.primary },
   text:      { bg: 'transparent',   fg: colors.primaryDark, border: null },
   danger:    { bg: colors.dangerInk, fg: colors.onPrimary, border: null },
   // On the teal Oli ground (welcome, auth): primaryDark on white 7.58:1; white on #084B4A 9.93:1.
@@ -23,6 +25,7 @@ export default function Button({
   title, onPress, variant = 'primary', icon, loading = false, loadingTitle, disabled = false,
   disabledHint, fullWidth = false, accessibilityLabel, style,
   size,   // 'lg' = the 52pt pill used on the photo-led Welcome / onboarding
+  wrap = false,   // opt-in: the label may take two centred lines instead of truncating
 }) {
   const v = VARIANTS[variant] || VARIANTS.primary
   const off = disabled || loading
@@ -43,6 +46,7 @@ export default function Button({
           s.btn,
           (variant === 'text' || variant === 'onDarkText') && s.textBtn,
           size === 'lg' && s.lg,
+          wrap && s.wrapBtn,
           { backgroundColor: v.bg },
           v.border && { borderWidth: 1, borderColor: v.border },
           off && s.off,
@@ -58,7 +62,7 @@ export default function Button({
           : (
             <>
               {!!icon && <Ionicons name={icon} size={18} color={v.fg} />}
-              <Text style={[s.label, { color: v.fg }]} numberOfLines={1}>{title}</Text>
+              <Text style={[s.label, wrap && s.wrapLabel, { color: v.fg }]} numberOfLines={wrap ? 2 : 1}>{title}</Text>
             </>
           )}
       </TouchableOpacity>
@@ -77,5 +81,7 @@ const s = StyleSheet.create({
   // ratio relative to its own fill.
   off:     { opacity: 0.45 },
   label:   { ...type.rowTitle },
+  wrapBtn: { paddingVertical: space[8] },
+  wrapLabel: { flexShrink: 1, textAlign: 'center' },
   hint:    { ...type.meta, color: colors.textSecondaryOnPage, marginTop: 6, textAlign: 'center' },
 })

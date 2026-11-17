@@ -47,7 +47,7 @@ import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
-import { REGIONS } from './constants/regions'
+import { REGIONS, weatherPointFor } from './constants/regions'
 import { LEGAL_VERSION, needsStudentHubTerms } from './constants/legal'
 import StudentHubTermsGate from './screens/StudentHubTermsGate'
 import { shouldShowPolicyNotice } from './utils/policyNoticeRules'
@@ -73,7 +73,6 @@ import HotelsScreen from './screens/HotelsScreen'
 import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
-import OnboardingScreen from './screens/OnboardingScreen'
 import Avatar from './components/Avatar'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import JobPostingsScreen from './screens/JobPostingsScreen'
@@ -114,9 +113,19 @@ import AppUpdateNotice from './components/AppUpdateNotice'
 import { evaluateAppUpdate, snoozeSoftUpdate, openStore, FOREGROUND_RECHECK_MS } from './utils/appUpdate'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
-import WelcomeScreen from './screens/WelcomeScreen'
+import StartScreen from './screens/StartScreen'
+import DutyAlertsScreen from './screens/DutyAlertsScreen'
+import DutyReofferSheet from './components/DutyReofferSheet'
+import {
+  KEY_ONBOARDED, KEY_LANG, KEY_POLICY_SEEN, KEY_PENDING, KEY_DUTY_OFFER, KEY_REOFFER, KEY_TOUR_CHIP,
+  PENDING_SIGNUP, PENDING_DUTY, PENDING_SIGNIN, TOUR_CHIP_ON, OFFER_GRANTED, OFFER_LATER, REOFFER_SHOWN, REOFFER_EVENTS,
+  decideOnboardingStep, shouldArmPending, pendingAfterWizard, launchMayRegisterPush, decideReoffer, reofferNoCity,
+} from './utils/onboardingState'
+import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
+import { logOnboardingEvent } from './utils/onboardingEvents'
+import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
-import { signOutThisDevice, signOutEverywhere, savePushToken } from './utils/signOut'
+import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
 import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
@@ -133,7 +142,7 @@ import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { dutyStatus, localDateKey, DUTY_FRESH } from './utils/dutyStatus'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
-  loadCityWelcomeState, shouldAskHomeCity, markAskShown, setHomeCity,
+  loadCityWelcomeState, setHomeCity,
 } from './utils/cityWelcome'
 import CityWelcomeCard from './components/CityWelcomeCard'
 import HomeCitySheet from './components/HomeCitySheet'
@@ -150,10 +159,16 @@ import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
 import SplashStatusBar, { SplashUpContext } from './components/SplashStatusBar'
 import { withReadableTitle } from './utils/readableTitle'
-import { otaApplyBlocker, OTA_APPLIED_KEY, LAUNCH_TAP_MS } from './utils/otaLaunchApply'
+import { otaApplyBlocker, openedByPush, OTA_APPLIED_KEY } from './utils/otaLaunchApply'
 import { BOOT_SPLASH_KEY, localDay, splashRecord } from './utils/bootSplashDay'
 
 const LAUNCHED_AT = Date.now()
+const PUSH_PROJECT_ID = '704d192a-1a80-41f8-ab98-cb3c8f078d7c'
+// Screen 2 "Bildirimleri aç": how long Home waits for the token + save after the OS grant.
+const DUTY_PUSH_WAIT_MS = 4000
+// The second duty-alert offer waits this long after the list closes: the screen beneath renders first,
+// and anything it raises (policy notice, city welcome) is then seen and wins.
+const REOFFER_SETTLE_MS = 700
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -607,10 +622,39 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
   const [showDutyList, setShowDutyList] = useState(false)
+  // Onboarding v2 S4, the one-time second offer: 'later' | 'existing' while the sheet is up, else null.
+  // dutyFromPushRef: the open list came from a push tap (never offered then). reofferBlockedRef: anything
+  // that rules the sheet out right now, recomputed every render and read after the async checks.
+  const [dutyReoffer, setDutyReoffer] = useState(null)
+  const [reofferNoCityCopy, setReofferNoCityCopy] = useState(false)   // fixed when the sheet is decided, so the copy never changes mid-read
+  const dutyFromPushRef = useRef(false)
+  const reofferBlockedRef = useRef(true)
+  const reofferCheckingRef = useRef(false)
+  const reofferBusyRef = useRef(false)
+  const reofferResolvedRef = useRef(false)
+  // Closers that bypass closeDutyList (Oli, city links) must not leave a push mark for the next visit.
+  useEffect(() => { if (!showDutyList) dutyFromPushRef.current = false }, [showDutyList])
   // One-shot: Oli's clinic card asks Home to open its facility list (Home-local state). Home
   // opens it and clears this, so a later return to the Home tab does not reopen the list.
   const [openFacilityList, setOpenFacilityList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
+  // Onboarding v2 (utils/onboardingState.js): KEY_PENDING as read at mount, then kept in step with storage.
+  // undefined = not read yet (boot waits for it); null = none.
+  const [onbPending, setOnbPending] = useState(undefined)
+  // This device's notification permission, read once per session while 'signin' is pending (null = not yet).
+  // Never refreshed while Screen 2 is up: its own OS prompt would flip the decision under it.
+  const [signinPerm, setSigninPerm] = useState(null)
+  // profiles.region when it is a region: the weather fallback reads it from inside load()'s closure.
+  const profileRegionRef = useRef(null)
+  // Screen 2's stored outcome (KEY_DUTY_OFFER), read with KEY_PENDING and kept in step on every write: the
+  // launch push registration reads it, and only ever after onbPending is set.
+  const dutyOfferRef = useRef(null)
+  // The same value as state, for the inbox's "Bildirimleri aç" row (OS granted but 'later' still stored).
+  const [dutyOffer, setDutyOffer] = useState(null)
+  function rememberDutyOffer(value) { dutyOfferRef.current = value; setDutyOffer(value) }
+  // Whose row `profile` is: on a session switch without a sign-out the previous row is still held until the
+  // new one loads, and Screen 2's routing must not decide on it.
+  const [profileUid, setProfileUid] = useState(null)
   const [bootSplashDone, setBootSplashDone] = useState(false)
   // While the boot splash is up, nothing may open over it: an RN Modal is its own native
   // window and draws above any View, so each launch-time sheet/notice below waits for this.
@@ -817,6 +861,7 @@ export default function App() {
   // Tab-shell back hooks (see the hardware-back chain): Home's directory/search, Profile's
   // Legal view + unsaved-changes guard. Set by the screens, null while they are unmounted.
   const homeBackRef = useRef(null)
+  const homeTabResetRef = useRef(null)
   // Explore module + place profile back steps (slice 2), asked by the chain like homeBackRef.
   const exploreBackRef = useRef(null)
   const checkinFeedBackRef = useRef(null)
@@ -847,6 +892,15 @@ export default function App() {
   const oliOpenRef = useRef(null)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
+  // Onboarding v2: the "Tura başla" chip on Home, armed by Screen 2 (@trnc_tour_chip); read at mount.
+  const [tourChip, setTourChip] = useState(false)
+  useEffect(() => {
+    AsyncStorage.getItem(KEY_TOUR_CHIP).then(v => { if (v === TOUR_CHIP_ON) setTourChip(true) }).catch(() => {})
+  }, [])
+  function retireTourChip() {
+    setTourChip(false)
+    AsyncStorage.removeItem(KEY_TOUR_CHIP).catch(() => {})
+  }
   const hamburgerRef       = useRef(null)
   const searchRef          = useRef(null)
   const filterBarRef       = useRef(null)
@@ -858,7 +912,14 @@ export default function App() {
   const menuAnim = useRef(new Animated.Value(260)).current
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
+  // The onboarding step as last rendered (the back chain reads it; it is derived below that hook), and the
+  // DEVICE language for guest push saves: the device copy, not the server-first `lang`, so a failed
+  // language re-save heals on the next registration instead of re-sending the old server value.
+  const onbStepRef = useRef(null)
+  const deviceLangRef = useRef('English')
   const handledColdStartRef = useRef(false)
+  // A push tap navigated in this runtime: the launch-time OTA reload must not throw that screen away.
+  const pushRoutedRef = useRef(false)
   const prevUidRef = useRef(undefined)
 
   function openMenu() {
@@ -879,6 +940,9 @@ export default function App() {
   }
 
   async function startCoachMarks() {
+    // Any tour start (the chip, Profile, the menu) retires the chip, before the 400 ms wait so the
+    // marks measure Home without it.
+    if (tourChip) retireTourChip()
     setActiveTab('home')
     setShowNotifs(false)
     await new Promise(r => setTimeout(r, 400))
@@ -983,7 +1047,58 @@ export default function App() {
     supabase.from('notifications').update({ read: true }).eq('user_id', uid)
       .then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))))
   }
-  function closeDutyList()     { setShowDutyList(false); setDutyRegion(null) }
+  function closeDutyList() {
+    const fromPush = dutyFromPushRef.current
+    dutyFromPushRef.current = false
+    setShowDutyList(false); setDutyRegion(null)
+    maybeOfferDutyAgain(fromPush)
+  }
+  // Onboarding v2 S4 (rules: decideReoffer). Eligibility is decided in full, then KEY_REOFFER is written,
+  // then the sheet shows: a failed write shows nothing, so the offer can never repeat.
+  async function maybeOfferDutyAgain(fromPush) {
+    if (fromPush || reofferCheckingRef.current) return
+    reofferCheckingRef.current = true
+    try {
+      const [[, offer], [, reoffer], [, onboardedVal], [, homeCity]] = await AsyncStorage.multiGet([KEY_DUTY_OFFER, KEY_REOFFER, KEY_ONBOARDED, KEY_CITY_HOME])
+      if (reoffer === REOFFER_SHOWN) return
+      const perm = await Notifications.getPermissionsAsync()
+      await new Promise(r => setTimeout(r, REOFFER_SETTLE_MS))
+      const canRender = !reofferBlockedRef.current && AppState.currentState === 'active'
+      const variant = decideReoffer({ offer, reoffer, onboarded: onboardedVal, fromPush, canRender, perm })
+      if (!variant) return
+      await AsyncStorage.setItem(KEY_REOFFER, REOFFER_SHOWN)
+      reofferResolvedRef.current = false
+      const reofferHomeRegion = homeCity ?? (REGIONS.includes(profile?.region) ? profile.region : null)
+      setReofferNoCityCopy(reofferNoCity({ home: reofferHomeRegion, hasFix: !!userLocation }))
+      setDutyReoffer(variant)
+      logOnboardingEvent(REOFFER_EVENTS[variant].shown)
+    } catch {} finally {
+      reofferCheckingRef.current = false
+    }
+  }
+  // "Bildirimleri aç": straight to the OS (the sheet is the explanation), through Screen 2's own path.
+  async function acceptDutyReoffer() {
+    const variant = dutyReoffer
+    if (!variant || reofferResolvedRef.current || reofferBusyRef.current) return
+    reofferBusyRef.current = true
+    let granted = false
+    try { granted = (await enableDutyPush()) === true } catch {}
+    reofferBusyRef.current = false
+    reofferResolvedRef.current = true
+    if (granted) {
+      rememberDutyOffer(OFFER_GRANTED)
+      AsyncStorage.setItem(KEY_DUTY_OFFER, OFFER_GRANTED).catch(() => {})
+    }
+    logOnboardingEvent(REOFFER_EVENTS[variant][granted ? 'granted' : 'declined'])
+    setDutyReoffer(null)
+  }
+  // "Şimdi değil", backdrop, drag, Android back. Once per sheet; ignored while the OS ask is running.
+  function closeDutyReoffer() {
+    if (!dutyReoffer || reofferResolvedRef.current || reofferBusyRef.current) return
+    reofferResolvedRef.current = true
+    logOnboardingEvent(REOFFER_EVENTS[dutyReoffer].declined)
+    setDutyReoffer(null)
+  }
   function closeEvents()       { setShowEvents(false); setEventsDistrict(null); setOpenedEvent(null); setEventFromHome(false) }
   // Same columns as EventsScreen's list query, so EventDetailScreen gets the row it expects.
   // Not found (unapproved since, offline) → the list, which is where the generic card goes.
@@ -1046,9 +1161,10 @@ export default function App() {
     setProfile(prev => ({ ...prev, preferred_language: langKey }))
     setPendingLang(langKey)
     setShowLangModal(false)
-    AsyncStorage.setItem('@trnc_lang', langKey)
-    // Guests have no writable profile row, so the device copy above is their only store.
-    if (isGuest(session)) return
+    AsyncStorage.setItem('@trnc_lang', langKey).catch(() => {})
+    // Guests cannot update their row; the device copy above is their store, and a registered push token is
+    // re-sent with the new language (set_guest_push also sets preferred_language, which the duty push reads).
+    if (isGuest(session)) { await saveGuestPushLang(session.user.id, langKey).catch(() => {}); return }
     await supabase.from('profiles').update({ preferred_language: langKey }).eq('id', session.user.id)
   }
   // The first 8 characters of the OTA this launch is running, so "did the phone take the
@@ -1094,11 +1210,10 @@ export default function App() {
           Linking.getInitialURL().catch(() => null),
           AsyncStorage.getItem(OTA_APPLIED_KEY).catch(() => null),
         ])
-        const tapAt = tap?.notification?.date
         const blocker = otaApplyBlocker({
           fetchedId, runningId: Updates.updateId, emergency: Updates.isEmergencyLaunch,
           elapsedMs: Date.now() - LAUNCHED_AT, touched: touchedRef.current || sheetUpRef.current, appState: AppState.currentState,
-          launchedByTap: !!tap && (!tapAt || Date.now() - tapAt < LAUNCH_TAP_MS), launchedByLink: !!url, lastAppliedId,
+          launchedByTap: openedByPush(tap, pushRoutedRef.current), launchedByLink: !!url, lastAppliedId,
         })
         console.log(`[ota-apply] ${blocker ?? 'reloading'} ${fetchedId.slice(0, 8)} after ${Date.now() - LAUNCHED_AT} ms`)
         if (blocker) return
@@ -1108,7 +1223,7 @@ export default function App() {
         if (splashPlayRef.current === true && !splashUpRef.current) {
           await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(localDay(), fetchedId)).catch(() => {})
         }
-        if (touchedRef.current || sheetUpRef.current || AppState.currentState !== 'active') return
+        if (touchedRef.current || sheetUpRef.current || pushRoutedRef.current || AppState.currentState !== 'active') return
         await Updates.reloadAsync()
       }).catch(() => {})
   }, [])
@@ -1124,6 +1239,10 @@ export default function App() {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
         setAdminOpen(null)
+        // A sign-out ends any onboarding hand-off: Screen 2 belongs to the session that armed it.
+        setOnbPending(null)
+        setSigninPerm(null)
+        AsyncStorage.removeItem(KEY_PENDING).catch(() => {})
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
@@ -1158,13 +1277,14 @@ export default function App() {
         const accessToken  = qp.get('access_token')  || hp.get('access_token')
         const refreshToken = qp.get('refresh_token') || hp.get('refresh_token')
         if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          // A link opened while a guest replaces that session without a sign-out: clear its push token first.
+          await endGuestSessionThen(() => supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }))
           if (type === 'recovery') setShowPasswordReset(true)
         } else if (tokenHash && type) {
-          await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+          await endGuestSessionThen(() => supabase.auth.verifyOtp({ token_hash: tokenHash, type }))
           if (type === 'recovery') setShowPasswordReset(true)
         } else if (code) {
-          await supabase.auth.exchangeCodeForSession(url)
+          await endGuestSessionThen(() => supabase.auth.exchangeCodeForSession(url))
           if (url.includes('recovery')) setShowPasswordReset(true)
         }
       } catch {}
@@ -1186,6 +1306,9 @@ export default function App() {
         if (showDutyList) { closeDutyList(); return true }
         return true
       }
+      // The second duty-alert offer (Onboarding v2 S4). A Modal, whose onRequestClose takes Android back
+      // first; this covers any dispatch that still reaches the chain. Topmost, so above the root overlays.
+      if (dutyReoffer) { closeDutyReoffer(); return true }
       // These are root overlays, not <Modal>s, so there is no onRequestClose to catch
       // the hardware back button. They are topmost, so they go first — Oli's sheet above
       // the other two. OliGuide registers its own handler while open (which wins, being
@@ -1196,6 +1319,12 @@ export default function App() {
       if (showEmergencyModal) { setShowEmergencyModal(false); return true }
       if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
+      // Onboarding v2 roots. With no session only Start or Auth is on screen (nothing behind them renders):
+      // back from Auth returns to Start, back on Start exits as Welcome did. Screen 2 never decides on back
+      // (that would be a silent "Şimdi değil"): it exits, the pending key survives, and Screen 2 is back next
+      // launch, as the wizard does.
+      if (!sessionRef.current) { if (!showWelcome) { setShowWelcome(true); return true } return false }
+      if (onbStepRef.current === 'duty') return false
       // Duty first: a notification opens the duty list ON TOP of Notifications (slice 10).
       if (showDutyList) { closeDutyList(); return true }
       if (showNotifs) { closeNotifs(); return true }
@@ -1270,22 +1399,25 @@ export default function App() {
       if (activeTab === 'home' && homeBackRef.current?.()) return true
       if (activeTab === 'profile' && profileGuardRef.current?.back()) return true
       if (activeTab !== 'home') { setActiveTab('home'); return true }
-      if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
 
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem('@trnc_onboarded'),
       AsyncStorage.getItem('@trnc_lang'),
       AsyncStorage.getItem('@trnc_policy_seen'),
-    ]).then(([onboardedVal, langVal, policySeenVal]) => {
+      AsyncStorage.getItem(KEY_PENDING),
+      AsyncStorage.getItem(KEY_DUTY_OFFER),
+    ]).then(([onboardedVal, langVal, policySeenVal, pendingVal, dutyOfferVal]) => {
+      rememberDutyOffer(dutyOfferVal)
       if (langVal) setPendingLang(langVal)
       setOnboarded(onboardedVal === 'true')
       setReturningDevice(onboardedVal === 'true')
       setPolicySeen(policySeenVal ?? null)
+      setOnbPending(pendingVal ?? null)
     })
   }, [])
 
@@ -1314,30 +1446,104 @@ export default function App() {
     setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n))
   }
 
-  async function completeOnboarding(selectedLang) {
-    // A new install meets the CURRENT policy at signup — it must never be told it "changed".
-    await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang], ['@trnc_policy_seen', LEGAL_VERSION]])
+  // ─── Onboarding v2: Start -> (guest | Auth) -> [wizard] -> Screen 2 -> Home ────────────────
+  // The rules are utils/onboardingState.js; these are only the storage writes, in the spec's order.
+
+  // The first Start action on a device not yet onboarded: a new install meets the CURRENT policy at
+  // signup and must never be told it "changed" (what completeOnboarding did).
+  async function startFirstAction() {
+    if (onboarded === true) return
     setPolicySeen(LEGAL_VERSION)
-    setPendingLang(selectedLang)
-    setOnboarded(true)
-    if (REDESIGN) askLocationAfterOnboarding()
+    try { await AsyncStorage.multiSet([[KEY_LANG, lang], [KEY_POLICY_SEEN, LEGAL_VERSION]]) } catch {}
+  }
+  async function setPending(value) {
+    setOnbPending(value)
+    try {
+      if (value) await AsyncStorage.setItem(KEY_PENDING, value)
+      else await AsyncStorage.removeItem(KEY_PENDING)
+    } catch {}
+  }
+  const armPending = () => shouldArmPending({ onboarded: onboarded === true ? 'true' : null })
+
+  // "Hemen başla": pending is on disk BEFORE the sign-in, so a kill in between still lands on Screen 2.
+  async function startAsGuest() {
+    await startFirstAction()
+    if (armPending()) await setPending(PENDING_DUTY)
+    return supabase.auth.signInAnonymously()
+  }
+  // "Giriş yap": 'signin' replaces whatever an abandoned Hemen başla / Kayıt ol left behind; after the sign-in
+  // (and the wizard, if it runs) this device's notification permission decides Screen 2 or Home.
+  async function startLogin() {
+    await startFirstAction()
+    setAuthMode('login'); setShowWelcome(false)
+    await setPending(armPending() ? PENDING_SIGNIN : null)
+  }
+  async function startSignUp() {
+    await startFirstAction()
+    setAuthMode('signup'); setShowWelcome(false)
+    if (armPending()) await setPending(PENDING_SIGNUP)
+  }
+  // AuthScreen's login/signup tabs (a user toggle only; the post-signup "log in" step keeps 'signup').
+  function authModeChanged(mode) {
+    if (mode === 'login') setPending(armPending() ? PENDING_SIGNIN : null)
+    else if (mode === 'signup' && armPending()) setPending(PENDING_SIGNUP)
   }
 
-  // Redesign: the location explanation comes RIGHT AFTER the onboarding slides on a new install
-  // (startup skipped it, see load()). Same handling as the startup ask from here on.
-  async function askLocationAfterOnboarding() {
-    try {
-      const r = await requestWithPrimer('location', { auto: true })
-      setLocationCanAsk(r.canAskAgain)
-      if (r.status !== 'granted') { setLocationDenied(true); return }
-      const loc = await passiveFix(Location.Accuracy.Balanced)
-      if (!loc) { setLocationDenied(true); return }
-      setUserLocation(loc.coords)
-      setLocationDenied(false)
-      fetchWeather(loc.coords)
-    } catch {
-      setLocationDenied(true)
+  // Screen 2 and the second offer's "Bildirimleri aç": the screen IS the explanation, so straight to the OS
+  // (no primer); already granted (Android <= 12 by default) skips the ask. Android channel first (Android
+  // 13 shows the prompt only once a channel exists). Resolves true when granted; a token or save failure
+  // never blocks Home (the next launch's silent registration retries).
+  async function enableDutyPush() {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+      }).catch(() => {})
     }
+    const current = await Notifications.getPermissionsAsync().catch(() => null)
+    const { status } = current?.status === 'granted' ? current : await Notifications.requestPermissionsAsync()
+    if (status !== 'granted') return false
+    // Time-boxed: on a poor connection the token fetch can hang, and Home must not wait on it. Whatever
+    // does not finish here is redone by the registration effect once pending clears.
+    const register = (async () => {
+      const sess = sessionRef.current
+      if (!Device.isDevice || !sess) return
+      const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: PUSH_PROJECT_ID })
+      if (token && isGuest(sess)) await saveGuestPushToken(token, sess.user.id, deviceLangRef.current)
+      else if (token) await savePushToken(token, sess.user.id)
+    })().catch(e => { if (__DEV__) console.log('Push registration skipped:', e.message) })
+    let timer
+    await Promise.race([register, new Promise(r => { timer = setTimeout(r, DUTY_PUSH_WAIT_MS) })])
+    clearTimeout(timer)
+    return true
+  }
+  // A fix from Screen 2's "Konumumu kullan": Home picks it up without a relaunch.
+  function dutyLocation({ canAskAgain, coords }) {
+    setLocationCanAsk(canAskAgain)
+    if (!coords) return
+    setUserLocation(coords)
+    setLocationDenied(false)
+    fetchWeather(coords)
+  }
+  // The home city just changed (Screen 2, Profile's city settings): Home follows without a relaunch.
+  // `home` is the value just chosen (the storage write may still be in flight). Not a region
+  // ('visiting', removed) → back to the GPS district, or none: Lefkoşa is a read fallback only.
+  function homeCityChanged(home) {
+    const isRegion = REGIONS.includes(home)
+    const gps = userLocation ? resolveRegion(userLocation.latitude, userLocation.longitude) : null
+    setDeviceRegion(isRegion ? home : gps)
+    if (!userLocation) fetchWeather(weatherPointFor(isRegion ? home : profileRegionRef.current))
+  }
+  // Screen 2 resolves: city, outcome, tour chip, pending removed, THEN onboarded (so a kill in between
+  // re-shows Screen 2 rather than skipping it), then Home.
+  async function resolveDutyOffer({ outcome, city }) {
+    if (city) { await setHomeCity(city); homeCityChanged(city) }
+    rememberDutyOffer(outcome)   // before setPending(null) re-runs the registration effect
+    try { await AsyncStorage.multiSet([[KEY_DUTY_OFFER, outcome], [KEY_TOUR_CHIP, TOUR_CHIP_ON]]) } catch {}
+    setTourChip(true)
+    await setPending(null)
+    try { await AsyncStorage.setItem(KEY_ONBOARDED, 'true') } catch {}
+    setOnboarded(true)
   }
 
   async function reloadFacilities() {
@@ -1377,11 +1583,12 @@ export default function App() {
       setShowNotifs(false)
     }
     if (!session) {
-      setProfile(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
+      setProfile(null); setProfileUid(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
     supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data ?? null)
+        setProfileUid(session.user.id)
 
         // Language self-heal (SERVER column only — in-app already resolves a NULL
         // column via pendingLang since the L1 migration). A pre-auth/onboarding
@@ -1411,24 +1618,10 @@ export default function App() {
           if (consent) setProfile(prev => (prev ? { ...prev, ...consent } : prev))
         }
 
+        // Onboarding v2: no automatic tour and no home-city question here any more. Screen 2 asks the
+        // city; the tour is offered from Home (S3) and stays in Profile / the menu.
         if (data?.role === 'provider') {
           loadProviderFacility()
-        } else if (!data?.role || data?.role === 'customer') {
-          AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
-            // First run is already spending its attention on the carousel, the
-            // entry screen and the coach marks. The home-city question waits for
-            // the NEXT cold start, where it is the only thing on screen.
-            const coachMarksRunning = !shown
-            if (coachMarksRunning) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
-
-            // This effect runs once per session mount, so this is a cold-start-only
-            // path by construction — a foreground can never surface the question.
-            const st = await loadCityWelcomeState()
-            if (shouldAskHomeCity({ ...st, coachMarksRunning, now: Date.now() }).ask) {
-              markAskShown()
-              setShowHomeCityAsk(true)
-            }
-          })
         }
       })
     setNotifsLoading(true)
@@ -1464,9 +1657,11 @@ export default function App() {
     weatherKeyRef.current = key
     try {
       const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
+      // Latest request wins: a home-city change can overtake a slower earlier fetch.
+      if (weatherKeyRef.current !== key) return
       if (weatherJson?.current) setWeatherData(weatherJson)
       else weatherKeyRef.current = null
-    } catch { weatherKeyRef.current = null }
+    } catch { if (weatherKeyRef.current === key) weatherKeyRef.current = null }
   }
 
   // Which district is this device in, as far as the DEVICE knows.
@@ -1500,6 +1695,30 @@ export default function App() {
     return () => { cancelled = true }
   }, [userLocation])
 
+  // Onboarding v2 "Giriş yap": the permission read that decides Screen 2 or Home (decideOnboardingStep).
+  // A failed read must not hold the spinner: it counts as "the OS cannot ask", i.e. Home.
+  useEffect(() => {
+    if (!session || onbPending !== PENDING_SIGNIN || signinPerm) return
+    let cancelled = false
+    Notifications.getPermissionsAsync()
+      .then(p => { if (!cancelled) setSigninPerm(p) })
+      .catch(() => { if (!cancelled) setSigninPerm({ status: 'unavailable', canAskAgain: false }) })
+    return () => { cancelled = true }
+  }, [session?.user?.id, onbPending, signinPerm])
+
+  // The profile's city is the weather fallback before Lefkoşa (load() reads the ref). It usually arrives
+  // after load() has fetched, so with no fix and no device home city the weather follows it here.
+  useEffect(() => {
+    const region = REGIONS.includes(profile?.region) ? profile.region : null
+    profileRegionRef.current = region
+    if (!region || userLocation) return
+    let cancelled = false
+    loadCityWelcomeState().then(st => {
+      if (!cancelled && !REGIONS.includes(st?.home)) fetchWeather(weatherPointFor(region))
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [profile?.region, userLocation])
+
   // Route medals earned as a guest (or whose award failed offline) land on the account at
   // the first signed-in session. Keyed on the user id: the session object churns on refresh.
   useEffect(() => {
@@ -1508,24 +1727,39 @@ export default function App() {
   }, [session?.user?.id])
 
   useEffect(() => {
-    // Guests can't hold a push token (the profiles write is refused by RLS), so don't
-    // raise an OS permission prompt we can't honour.
-    if (!session || isGuest(session)) return
+    // Guests hold a token too since Onboarding v2 (set_guest_push, utils/signOut.js). A launch (pushRetry 0)
+    // never prompts: it only picks up a permission already granted, and waits while an onboarding hand-off is
+    // pending (unread, or Screen 2 still ahead: that screen asks). A tap (pushRetry > 0, the inbox's
+    // "Bildirimleri aç") keeps its primer.
+    if (!session) return
+    if (pushRetry === 0 && onbPending !== null) return
+    // "Şimdi değil" on Screen 2: a launch never registers (Android <= 12 reports granted by default); the way
+    // back is a tap (the second offer, the inbox row). 'denied' + granted = allowed later in Settings: registers.
+    if (pushRetry === 0 && !launchMayRegisterPush(dutyOfferRef.current)) return
     async function registerPushToken() {
       try {
         if (!Device.isDevice) return
-        const { status } = REDESIGN
-          ? await requestWithPrimer('notifications', { auto: pushRetry === 0 })
-          : await Notifications.requestPermissionsAsync()
+        const { status } = pushRetry === 0
+          ? await Notifications.getPermissionsAsync()
+          : REDESIGN
+            ? await requestWithPrimer('notifications')
+            : await Notifications.requestPermissionsAsync()
         if (status !== 'granted') return
+        if (pushRetry > 0 && dutyOfferRef.current !== OFFER_GRANTED) {
+          // A tap that ends granted lifts a Screen 2 "later"/"denied", so later launches register again.
+          rememberDutyOffer(OFFER_GRANTED)
+          AsyncStorage.setItem(KEY_DUTY_OFFER, OFFER_GRANTED).catch(() => {})
+        }
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
             name: 'default',
             importance: Notifications.AndroidImportance.MAX,
           })
         }
-        const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c' })
-        if (token) {
+        const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: PUSH_PROJECT_ID })
+        if (token && isGuest(session)) {
+          await saveGuestPushToken(token, session.user.id, deviceLangRef.current)
+        } else if (token) {
           await savePushToken(token, session.user.id)
         }
       } catch (e) {
@@ -1533,7 +1767,7 @@ export default function App() {
       }
     }
     registerPushToken()
-  }, [session, pushRetry])
+  }, [session, pushRetry, onbPending])
 
   // Bandabuliya pushes: a listing chat (20261184) opens the thread; a photo decision (marketplace-photo-review) opens
   // the listing. Gated like Student Hub: on a bundle where the module is dark the tap does nothing.
@@ -1570,9 +1804,11 @@ export default function App() {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       if (!sessionRef.current) return
+      pushRoutedRef.current = true
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') {
+        dutyFromPushRef.current = true
         setShowDutyList(true)
       } else if (screen === 'weekend') {
         openWeekendOnMap()
@@ -1601,9 +1837,10 @@ export default function App() {
     handledColdStartRef.current = true
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return
+      pushRoutedRef.current = true
       const data = response.notification.request.content.data ?? {}
       const screen = data.screen
-      if (screen === 'duty') setShowDutyList(true)
+      if (screen === 'duty') { dutyFromPushRef.current = true; setShowDutyList(true) }
       else if (screen === 'weekend') openWeekendOnMap()
       // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
       //   case for a message notification — the app is not usually already open when one
@@ -1618,6 +1855,8 @@ export default function App() {
       else if (screen === 'notifications') setShowNotifs(true)
       else if (screen === 'eatery_order') openEateryOrderPush(data)
       else if (!openAdminPush(data)) openMarketplacePush(data)
+      // Handled once: cleared, so nothing in this runtime reads the same tap again.
+      try { Notifications.clearLastNotificationResponse() } catch {}
     })
   }, [session])
 
@@ -1658,21 +1897,14 @@ export default function App() {
         setFacilityRatings(ratings)
       }
 
-      let resolvedCoords = { latitude: 35.1856, longitude: 33.3823 }
-      // Redesign, new install: the location ask waits until the onboarding slides are done
-      // (completeOnboarding → askLocationAfterOnboarding). Read from storage, not `onboarded`:
-      // this runs at mount, before that state has loaded. Existing users: unchanged.
-      const firstRun = REDESIGN && (await AsyncStorage.getItem('@trnc_onboarded').catch(() => null)) !== 'true'
-      if (!firstRun) try {
-        let status
-        if (REDESIGN) {
-          const r = await requestWithPrimer('location', { auto: true })
-          status = r.status
-          setLocationCanAsk(r.canAskAgain)
-        } else {
-          ;({ status } = await Location.requestForegroundPermissionsAsync())
-        }
-        if (status !== 'granted') {
+      let resolvedCoords = null
+      // Onboarding v2: launch never asks. Location is asked in context only (Screen 2's "Konumumu kullan",
+      // "near me", the map); a permission already granted is still read silently. locationDenied /
+      // locationCanAsk are set as before, so distance sort and the "turn on location" offers still work.
+      try {
+        const perm = await Location.getForegroundPermissionsAsync()
+        setLocationCanAsk(perm.canAskAgain !== false)
+        if (perm.status !== 'granted') {
           setLocationDenied(true)
         } else {
           // Startup is not a tap: never the "turn on location" dialog (utils/locationServices.js).
@@ -1685,6 +1917,11 @@ export default function App() {
         setLocationDenied(true)
       }
 
+      // No fix: the home city's weather point, else the profile's city, else Lefkoşa's (a read fallback, never stored).
+      if (!resolvedCoords) {
+        const st = await loadCityWelcomeState().catch(() => null)
+        resolvedCoords = weatherPointFor(REGIONS.includes(st?.home) ? st.home : profileRegionRef.current)
+      }
       await fetchWeather(resolvedCoords)
 
       setLoading(false)
@@ -1842,6 +2079,18 @@ export default function App() {
   // this makes the precedence explicit rather than incidental.)
   const homeCityAskVisible = showHomeCityAsk && inCustomerHub && !splashUp
   const cityWelcomeVisible = !!cityWelcome && inCustomerHub && !homeCityAskVisible && !splashUp
+  // The policy notice's own rule, read HERE because the content selector below needs it and
+  // policyNoticeVisible is assigned after the selector (Hermes: no TDZ, it would read undefined).
+  const policyNoticeDue = policySeen !== undefined && (!session || profile !== null) &&
+    shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
+                             current: LEGAL_VERSION, returning: returningDevice })
+  // Onboarding v2 tour chip: customer/guest Home only, never alongside another prompt.
+  const tourChipVisible = tourChip && inCustomerHub && !splashUp &&
+    !policyNoticeDue && !cityWelcomeVisible && !homeCityAskVisible
+  // Duty list opened with no GPS fix: the home city's pharmacies on top (Home, push taps, every
+  // opener). An explicit dutyRegion (city-welcome link) wins; with a fix the list sorts by distance.
+  const dutyHomeRegion = deviceRegion || (REGIONS.includes(profile?.region) ? profile.region : null)
+  const dutyInitialRegion = dutyRegion ?? (userLocation ? null : dutyHomeRegion)
 
   // Burn the city's 30-day cooldown only once the card is actually on screen.
   // Marking it at decision time would spend the cooldown on a card the user
@@ -1851,6 +2100,64 @@ export default function App() {
   }, [cityWelcomeVisible, cityWelcome?.region])
 
   const lang = profile?.preferred_language || pendingLang
+  deviceLangRef.current = pendingLang
+
+  // ─── AGE INELIGIBILITY IS TERMINAL, AND IS READ FROM THE ROW ──────────────
+  //
+  // Until 2026-09-13 this was session state inside the wizard, and the flag therefore
+  // gated NOTHING: an account that declared an under-13 date of birth got the block
+  // until it force-quit, then came back with age_ineligible = true — which made
+  // gateActive read FALSE, because gateActive REQUIRED !age_ineligible — and fell
+  // through to the customer tab shell. On an app that declares 13-15 / 16-17 / 18+ to
+  // Google Play. Deriving it from the row is what makes relaunching not an escape.
+  //
+  // ⚠ DELIBERATELY NOT GATED ON PROFILE_GATE_LIVE. That flag is the emergency lever for
+  //   the WIZARD — flipping it false unblocks every customer stuck at the door — and it
+  //   must not also re-admit under-13 accounts as a side effect. A compliance control
+  //   and a product kill-switch are different things and are not wired to each other.
+  //
+  // Scoped to `customer` for the same reason the wizard is: this flag has exactly one
+  // writer in the app (ProfileSetupScreen's under-13 branch) and it only ever runs on a
+  // customer. An admin is never locked out of the console by it.
+  const ageIneligible =
+    !!session && !isGuest(session) && !!profile &&
+    profile.role === 'customer' && !!profile.age_ineligible
+
+  // The `!profile.age_ineligible` clause below is now REDUNDANT — the branch above
+  // short-circuits first — and it stays on purpose. It is the second of two independent
+  // reasons the wizard cannot render for an ineligible account, so reordering the
+  // content chain cannot quietly undo this fix.
+  const gateActive =
+    PROFILE_GATE_LIVE &&
+    !!session && !isGuest(session) && !!profile &&
+    profile.role === 'customer' &&
+    !profile.age_ineligible &&
+    (profile.profile_completed_at == null ||
+     (profile.profile_schema_version ?? 0) < CURRENT_PROFILE_SCHEMA_VERSION)
+
+  // ─── Onboarding v2 routing (utils/onboardingState.js) ──────────────────────
+  // Above the password-reset return because the effect applying its writes is a hook. 'duty' renders
+  // Screen 2 (after the wizard in the flow), 'wait' holds a spinner until the profile says whether it applies.
+  const onbDecision = decideOnboardingStep({
+    onboarded: onboarded === true ? 'true' : null,
+    pending: onbPending,
+    hasSession: !!session,
+    isGuest: isGuest(session),
+    role: profile?.role,
+    ageIneligible,
+    gateActive,
+    profileLoaded: !!session && !!profile && profileUid === session.user.id,
+    perm: signinPerm,
+  })
+  const onbReady = session !== undefined && onboarded !== null && onbPending !== undefined
+  const onbStep = onbReady ? onbDecision.step : null
+  onbStepRef.current = onbStep
+  const onbWriteOnboarded = onbReady && onbDecision.writeOnboarded
+  const onbClearPending = onbReady && onbDecision.clearPending
+  useEffect(() => {
+    if (onbWriteOnboarded) { setOnboarded(true); AsyncStorage.setItem(KEY_ONBOARDED, 'true').catch(() => {}) }
+    if (onbClearPending) { setOnbPending(null); AsyncStorage.removeItem(KEY_PENDING).catch(() => {}) }
+  }, [onbWriteOnboarded, onbClearPending])
 
   if (showPasswordReset) {
     return (
@@ -1942,31 +2249,6 @@ export default function App() {
     }
   }
 
-  // ─── AGE INELIGIBILITY IS TERMINAL, AND IS READ FROM THE ROW ──────────────
-  //
-  // Until 2026-09-13 this was session state inside the wizard, and the flag therefore
-  // gated NOTHING: an account that declared an under-13 date of birth got the block
-  // until it force-quit, then came back with age_ineligible = true — which made
-  // gateActive read FALSE, because gateActive REQUIRED !age_ineligible — and fell
-  // through to the customer tab shell. On an app that declares 13-15 / 16-17 / 18+ to
-  // Google Play. Deriving it from the row is what makes relaunching not an escape.
-  //
-  // ⚠ DELIBERATELY NOT GATED ON PROFILE_GATE_LIVE. That flag is the emergency lever for
-  //   the WIZARD — flipping it false unblocks every customer stuck at the door — and it
-  //   must not also re-admit under-13 accounts as a side effect. A compliance control
-  //   and a product kill-switch are different things and are not wired to each other.
-  //
-  // Scoped to `customer` for the same reason the wizard is: this flag has exactly one
-  // writer in the app (ProfileSetupScreen's under-13 branch) and it only ever runs on a
-  // customer. An admin is never locked out of the console by it.
-  const ageIneligible =
-    !!session && !isGuest(session) && !!profile &&
-    profile.role === 'customer' && !!profile.age_ineligible
-
-  // The `!profile.age_ineligible` clause below is now REDUNDANT — the branch above
-  // short-circuits first — and it stays on purpose. It is the second of two independent
-  // reasons the wizard cannot render for an ineligible account, so reordering the
-  // content chain cannot quietly undo this fix.
   // ─── The store-update force block ──────────────────────────────────────────
   //
   // DERIVED from the two flags that already exist, NOT stored. A third `updateEscape` state
@@ -1982,25 +2264,15 @@ export default function App() {
   // than falling through to the rest of the app. This gates only the MODAL.
   const forceBlocking = updateTier === 'force' && !showEmergencyModal && !showDutyList
 
-  const gateActive =
-    PROFILE_GATE_LIVE &&
-    !!session && !isGuest(session) && !!profile &&
-    profile.role === 'customer' &&
-    !profile.age_ineligible &&
-    (profile.profile_completed_at == null ||
-     (profile.profile_schema_version ?? 0) < CURRENT_PROFILE_SCHEMA_VERSION)
-
-  const bootReady = !(session === undefined || !fontsLoaded || onboarded === null)
+  const bootReady = !(session === undefined || !fontsLoaded || onboarded === null || onbPending === undefined)
   if (!bootReady) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
-  } else if (onboarded === false) {
-    content = <OnboardingScreen onComplete={completeOnboarding} />
-  // ─── FORCE UPDATE: position 3, and the position is the design ──────────────
+  // ─── FORCE UPDATE: position 2, and the position is the design ──────────────
   //
-  // Below the splash and the carousel (so a genuinely new install still sees the carousel,
-  // and nothing renders before fonts are ready), and ABOVE EVERYTHING ELSE — including the
-  // welcome and auth branches. That last part is not a preference: a signed-out user tapping
-  // the emergency escape would otherwise land on WelcomeScreen behind a hidden modal.
+  // Below the splash (nothing renders before fonts are ready), and ABOVE EVERYTHING ELSE —
+  // including Start (Onboarding v2: a new install on a blocked binary meets the block, not
+  // Start) and the auth branches. That last part is not a preference: a signed-out user tapping
+  // the emergency escape would otherwise land on StartScreen behind a hidden modal.
   //
   // ONE READABLE ALLOW-LIST, exactly like the gateActive block below, for the reason its
   // comment gives: if this fell through to the ~25-branch chain, "what is reachable while
@@ -2019,7 +2291,7 @@ export default function App() {
   // FAB and PolicyUpdateNotice off the screen — the force modal can never collide with them.
   } else if (updateTier === 'force') {
     content = showDutyList
-      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
+      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyInitialRegion} />
       : <View style={styles.center} />
   } else if (ageDeletedNotice) {
     // A sign-out that failed offline would leave a session for a deleted user; retry it here.
@@ -2029,16 +2301,22 @@ export default function App() {
       if (sessionRef.current) signOutEverywhere({ clearToken: false })
     }} />
   } else if (!session && showWelcome) {
+    // Onboarding v2: Start replaces Welcome (and the 4-page intro) and is where sign-out lands.
     content = (
-      <WelcomeScreen
+      <StartScreen
         lang={lang}
-        onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }}
-        onLogin={() => { setAuthMode('login'); setShowWelcome(false) }}
-        onSignUp={() => { setAuthMode('signup'); setShowWelcome(false) }}
+        onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }}
+        onStart={startAsGuest}
+        onLogin={startLogin}
+        onSignUp={startSignUp}
       />
     )
   } else if (!session) {
-    content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
+    content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
+  } else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {
+    // Onboarding v2: Screen 2 comes next (or may, after Giriş yap), so a Home-shaped skeleton here would flash
+    // a screen the user is not going to.
+    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (loading || !profile) {
     content = (
       <PageCanvas>
@@ -2090,6 +2368,16 @@ export default function App() {
     // a phone number for an ambulance. The exception is scoped to the force-blocked case
     // only — nothing about the ordinary ineligible path changed.
     content = <AgeIneligibleScreen lang={lang} />
+  } else if (onbStep === 'wait') {
+    // Onboarding v2: the held profile is not this session's yet; Screen 2 or Home is decided once it is.
+    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+  } else if (onbStep === 'duty') {
+    // Onboarding v2 Screen 2. After the wizard in the FLOW although above it here: decideOnboardingStep never
+    // returns 'duty' while gateActive or ageIneligible holds (the wizard runs first and hands 'signup' on as
+    // 'duty'), nor for any role but customer / guest. It sits above the gate block because check-profile-gate
+    // pins that block's end to the admin branch.
+    content = <DutyAlertsScreen lang={lang} onEnableNotifications={enableDutyPush} onResolve={resolveDutyOffer} onLocation={dutyLocation}
+      initialCity={REGIONS.includes(profile?.region) ? profile.region : null} />
   } else if (gateActive) {
     // ONE READABLE ALLOW-LIST of what a gated user may reach. This block renders the
     // exempt screens ITSELF rather than falling through to the ~25-branch chain below:
@@ -2107,7 +2395,7 @@ export default function App() {
     // 20261004, reviews. There is no second path to close: booking was the only write
     // that did not go through onRequireAccount, and it is gone.
     if (showDutyList) {
-      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
+      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyInitialRegion} />
     } else if (showTowing) {
       content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
     } else if (selectedFacility) {
@@ -2149,7 +2437,14 @@ export default function App() {
         lang={lang}
         profile={profile}
         prefillRegion={deviceRegion}
-        onDone={() => { setGateHealthList(false); reloadProfile() }}
+        onDone={() => {
+          setGateHealthList(false)
+          // Onboarding v2: a signup's wizard hands on to Screen 2. Set BEFORE the reload, synchronously: the
+          // decision after it would otherwise see 'signup' on a complete profile and clear it.
+          const next = pendingAfterWizard(onbPending)
+          if (next !== onbPending) { setOnbPending(next); AsyncStorage.setItem(KEY_PENDING, next).catch(() => {}) }
+          reloadProfile()
+        }}
         /* The under-13 branch writes the flag and then hands over HERE rather than
            rendering its own screen. Updating the row we already hold is enough — the
            write has already succeeded by this point, and the branch above re-derives
@@ -2269,7 +2564,7 @@ export default function App() {
   // Duty list ABOVE Notifications: a notification opens it on top, and back returns to the
   // notifications at the same scroll (slice 10).
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
+    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyInitialRegion} />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -2289,6 +2584,7 @@ export default function App() {
         else setShowDutyList(true)
       }}
       onEnablePush={() => setPushRetry(n => n + 1)}
+      offerLater={dutyOffer === OFFER_LATER}
     />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
@@ -2793,6 +3089,7 @@ export default function App() {
       onLegal:         () => setShowLegal(true),
       onAbout:         () => setShowAboutSheet(true),
       onSignOut:       () => setSignOutAsk(isGuest(session) ? 'guest' : 'user'),
+      onResetOnboarding: CAN_RESET_ONBOARDING ? () => confirmResetOnboarding(lang) : null,
     }
     content = (
       <View style={{ flex: 1 }}>
@@ -2801,6 +3098,7 @@ export default function App() {
           <HomeScreen
             dutyWindows={dutyWindows}
             backRef={homeBackRef}
+            tabResetRef={homeTabResetRef}
             lang={lang}
             facilities={facilities}
             dutyFacilityId={dutyFacilityId}
@@ -2858,15 +3156,16 @@ export default function App() {
             onShowGames={() => setShowGames(true)}
             // ─── HOME_V2 ────────────────────────────────────────────────────
             // The hero's district: where the device IS (liveRegion, re-read on cold
-            // start and every resume), then the profile's own answer, then the City
-            // Welcome home city / GPS classification (deviceRegion).
+            // start and every resume), then the home city / GPS classification
+            // (deviceRegion; follows Screen 2 and Profile's city settings live), then
+            // the profile's own answer, then Lefkoşa.
             // ⚠ LIVE FIRST, DELIBERATELY (2026-09-27). It was home-first, which pinned
             //   the hero to Lefkoşa for a user standing in Girne while the rest of Home
             //   moved — and only a storage wipe unstuck it. The home values are now just
             //   the placeholder until the first fix lands.
-            // null is a NORMAL outcome, not a failure — a guest with location denied and
-            // no profile — and the hero renders its country-level fallback.
-            region={liveRegion || profile?.region || deviceRegion || null}
+            // Onboarding v2: 'nicosia' is a READ fallback here and in the duty "until" line
+            // only — never stored, never setDeviceRegion, never the wizard's prefill.
+            region={liveRegion || deviceRegion || profile?.region || 'nicosia'}
             onOpenOli={() => oliOpenRef.current?.()}
             /* ─── Bugün ADA'da: may this user be shown paid placement? ──────
                The ANSWER is computed here and the rule lives in one function
@@ -2883,13 +3182,17 @@ export default function App() {
             dutySummary={{
               loaded: dutyToday.loaded, error: dutyToday.error, status: dutyRosterStatus,
               count: dutyToday.rows.length,
-              until: dutyUntilFor(dutyToday.rows, liveRegion || profile?.region || deviceRegion),
+              until: dutyUntilFor(dutyToday.rows, liveRegion || deviceRegion || profile?.region || 'nicosia'),
             }}
             onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
             onOpenExploreTab={() => setActiveTab('map')}
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
             liveScoresTester={liveScoresTester}
+            tourChip={tourChipVisible}
+            tourChipArmed={tourChip}
+            onStartTour={startCoachMarks}
+            onDismissTourChip={retireTourChip}
           />
         )}
 
@@ -2993,6 +3296,7 @@ export default function App() {
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
               profileGuardRef.current.leave(() => { setMapRoutesMode(false); setMapEventsMode(false); setMapEventRange(null); setActiveTab(tab) }); return
             }
+            if (tab === 'home' && activeTab === 'home') homeTabResetRef.current?.()
             setMapRoutesMode(false)
             setMapEventsMode(false)
             setMapEventRange(null)
@@ -3180,14 +3484,23 @@ export default function App() {
   // top of the tutorial or a city prompt, and only once the profile has loaded (an account
   // that already accepted this version must not see it flash).
   const policyNoticeVisible =
-    !splashUp && inTabShell && activeTab === 'home' && policySeen !== undefined && (!session || profile !== null) &&
-    !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
-    shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
-                             current: LEGAL_VERSION, returning: returningDevice })
-  const appUpdateVisible = !splashUp && session !== undefined && fontsLoaded && onboarded === true &&
-    (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))
+    !splashUp && inTabShell && activeTab === 'home' &&
+    !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible && policyNoticeDue
+  // Force: from boot on, Start included (the selector renders the force block above Start). Soft: only on an
+  // onboarded device, as before.
+  const appUpdateVisible = !splashUp && session !== undefined && fontsLoaded && onboarded !== null &&
+    (forceBlocking || (updateTier === 'soft' && onboarded === true && !policyNoticeVisible && !showCoachMarks))
   // A launch sheet may be a Modal, whose touches the root never sees: one on screen counts as in use.
-  sheetUpRef.current = policyNoticeVisible || appUpdateVisible || homeCityAskVisible || cityWelcomeVisible || showCoachMarks || oliSheetOpen
+  sheetUpRef.current = policyNoticeVisible || appUpdateVisible || homeCityAskVisible || cityWelcomeVisible || showCoachMarks || oliSheetOpen || dutyReoffer !== null
+  // Onboarding v2 S4: the second offer opens only for a guest or a customer, past every gate, with
+  // nothing else up (sheetUpRef: policy notice, app update, city ask/welcome, coach marks, Oli).
+  reofferBlockedRef.current = !(
+    !!session && (isGuest(session) || (profileUid === session.user.id && profile?.role === 'customer')) &&
+    updateTier !== 'force' && !gateActive && !ageIneligible && !ageDeletedNotice && onbPending === null &&
+    !splashUp && !showDutyList && !sheetUpRef.current &&
+    !showEmergencyModal && !showMunicipalModal && !showMenu && !showPasswordReset && !showCitySettings &&
+    !showLangModal && !showAboutSheet && !signOutAsk && !notifClearAsk && !gateKey && !profileGateKey
+  )
   // Seen, NOT accepted: nothing is written to profiles.
   // The notice closes on the STATE change, before and regardless of the storage write — a
   // failed write can never keep it on screen. The write is retried so it also stays closed
@@ -3389,6 +3702,8 @@ export default function App() {
           onTurnOff={() => { setCityWelcomeEnabled(false); setCityWelcome(null) }}
         />
       )}
+      <DutyReofferSheet visible={dutyReoffer !== null} lang={lang} onEnable={acceptDutyReoffer} onDecline={closeDutyReoffer}
+        noCity={reofferNoCityCopy} />
       {homeCityAskVisible && (
         <HomeCitySheet
           detectedRegion={detectedRegion}
@@ -3401,6 +3716,7 @@ export default function App() {
         visible={showCitySettings}
         lang={lang}
         onClose={() => setShowCitySettings(false)}
+        onChange={homeCityChanged}
       />
       {/* Same component, different refusal: a signed-in user with an incomplete profile
           browsing the read-only emergency directory. Telling them to "sign up" when they

@@ -62,8 +62,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ─── The pause switch (data jobs, slice 3) ─────────────────────────────────
+  # Asks public.data_job_gate whether duyurular-fetch is paused (admin screen "Data jobs"). A paused answer skips
+  # the working job below: nothing writes, no heartbeat row (the gate records one skipped_paused row), no alert step runs.
+  # FAIL-OPEN: any error here (key, network, RPC not applied yet, even a failing step) lets the working job run: every step here has
+  # continue-on-error: true and the job has none (a job-level one is forbidden by scripts/check-dispatcher-actor.mjs);
+  # only the exact output `false` stops it. See scripts/data-job-gate.mjs.
+  gate:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+        continue-on-error: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+        continue-on-error: true
+      - name: Pause switch (data_job_gate)
+        id: gate
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ (github.event_name == 'schedule' || inputs.chain == true) && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          GATE_CHAIN: ${{ inputs.chain == true }}
+        run: node scripts/data-job-gate.mjs
+        continue-on-error: true
+
   fetch:
     runs-on: ubuntu-24.04
+    needs: gate
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (!cancelled() && needs.gate.outputs.run != 'false') }}
     environment: production
     permissions:
       contents: read
@@ -131,6 +166,16 @@ jobs:
           path: duyurular-report.json
           retention-days: 7
           if-no-files-found: ignore
+
+      # One heartbeat row per real run (a write run with no `only` filter), before the chain step sleeps ~30 min.
+      # Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && env.WRITE == 'true' && !inputs.only }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ env.WRITE == 'true' && !inputs.only }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"
 
       # Last step, and it runs after a failed fetch too: one broken site must not stop the chain.
       # A cancelled run does stop it (that is how a human halts it); cron restarts it.

@@ -11,6 +11,12 @@ or not it looks like it touches text. Read `CLAUDE.md` first; it overrides this 
 ## Boundary
 Read-only. You never edit `constants/i18n.js` or any file, and never commit or push. You report;
 the senior fixes.
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards. You read code; QA runs the suite. Light checks your steps name (e.g. `i18n:validate`,
+  `home:check`, `hero:check`, `labels:check`, `refs:check`, `check:secrets`) are free. Heavy ones (`ads:check`,
+  `ads:selftest`, `release-lane:test`, `check:migration-numbers`) refuse without the suite lock: take it
+  (`node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`), run with `ADA_SUITE_HOLDER=<you>-<slug>`,
+  release right after; held by someone else = wait, or leave it to QA and say so.
 
 ## Scope
 The diff against its base (`git diff <base>...HEAD`), plus every key it adds, removes or renames.
@@ -38,3 +44,5 @@ Greek, French, Spanish, German, Persian). Also the Play listing folders in
 ## Verdict
 `PASS` or `FAIL`. For FAIL: locale → key → current value → problem, and the file:line. List
 separately the strings that need a Turkish on-device spot-check (layout can only be confirmed there).
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

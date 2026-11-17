@@ -19,6 +19,8 @@ function requireMarker(html, re, what) {
 
 // ─── the generic card engine ────────────────────────────────────────────────
 // cfg.href    RegExp tested on the absolute URL: which links are items
+// cfg.host    RegExp tested on the link's parsed HOSTNAME only (never the whole URL, where a path such
+//             as evil.example/x.gov.ct.tr/ would match): which sites an item may live on
 // cfg.marker  RegExp that must be present (structure check); cfg.from / cfg.to: listing region
 // cfg.title   'heading' (h1-h6 inside the link) | 'text' (default) | 'attr' (title=)
 // cfg.date    'inner' | 'after' (default: card segment after the link) | 'before' | 'none'
@@ -33,6 +35,7 @@ function cards(res, cfg) {
   for (const m of html.matchAll(/<a\s[^>]*?href\s*=\s*["']?([^"'\s>]+)["']?[^>]*>([\s\S]*?)<\/a>/gi)) {
     const url = abs(m[1], res.url)
     if (!url || !cfg.href.test(url)) continue
+    if (cfg.host && !cfg.host.test(new URL(url).hostname)) continue
     const attr = (m[0].match(/\stitle\s*=\s*["']([^"']{6,})["']/i) || [])[1]
     const heading = (m[2].match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i) || [])[1]
     let title = cfg.title === 'heading' ? textOf(heading || '') : cfg.title === 'attr' ? oneLine(decodeEntities(attr || '')) : ''
@@ -60,12 +63,16 @@ function cards(res, cfg) {
 }
 
 // ─── EasyDNN News (*.gov.ct.tr DNN sites without a usable feed) ─────────────
+export const GOV_CT_TR_HOST = /^(?:[a-z0-9-]+\.)*gov\.ct\.tr$/i
 function easydnn(res) {
   return cards(res, {
     marker: /article_list_wrapper/i, markerName: 'EasyDNN article_list_wrapper',
     from: /article_list_wrapper/i,
     to: /<footer[\s>]|edn_pagination|class=["'][^"']*\bpagination/i,
-    href: /\.gov\.ct\.tr\/[^?#]+\/(?!rss|tag|category|author|archive)[^/?#]*[a-z0-9%-]{12,}$/i,
+    // 2026-11-14: the host is checked on the hostname (real *.gov.ct.tr sites only, http or https);
+    // the old pattern matched ".gov.ct.tr/" anywhere in the URL, so a planted link to another site passed.
+    host: GOV_CT_TR_HOST,
+    href: /^https?:\/\/[^/?#]+\/[^?#]+\/(?!rss|tag|category|author|archive)[^/?#]*[a-z0-9%-]{12,}$/i,
     title: 'heading',
   })
 }

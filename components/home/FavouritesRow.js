@@ -14,11 +14,10 @@ import ModuleTile from './ModuleTile'
 // ─── THE ROW CANNOT COME UP EMPTY ───────────────────────────────────────────
 // There is no empty branch here and no early return, which matters because the section
 // heading sits in HomeScreen (so all three headings share one token) and would otherwise
-// be left standing over nothing. The guarantee is upstream and structural:
-// UNGATED_MODULES holds seven ids no flag can switch off, so the auto-fill pool is never
-// smaller than seven whatever is stored, whatever the flags say and whatever the network
-// is doing — and `npm run home:check` recomputes that against an all-false flag set on
-// every run rather than trusting this paragraph.
+// be left standing over nothing. The guarantee is upstream: the auto-fill pool is every
+// visible tile (visibleServiceIds), and `npm run home:check` exercises the resolver rather
+// than trusting this paragraph. (This V1 row is a dead path; HomeScreen's redesign uses
+// FavouritePanel.)
 //
 // ─── ORDER IS FIXED FOR THE LIFE OF THE MOUNT ───────────────────────────────
 // `ids` is resolved once by HomeScreen and passed down. Tapping a tile records a count and

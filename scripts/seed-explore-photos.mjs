@@ -110,7 +110,7 @@ const JPEG_QUALITY = 80
 // Override with --max-kb <n> if a genuinely detailed photo needs headroom, deliberately.
 const kbIdx = process.argv.indexOf('--max-kb')
 const MAX_BYTES = (kbIdx !== -1 ? Number(process.argv[kbIdx + 1]) : 600) * 1024
-const UA = 'ADA-TRNC-Health/1.0 (berke.ustun95@gmail.com) explore-photo-mirror'
+const UA = 'ADA-TRNC-Health/1.0 (+https://getadaapp.com; getadaapp@gmail.com) explore-photo-mirror'
 
 const APPLY = process.argv.includes('--apply')
 // No workflow: its manifest (data/explore-photo-manifest.json) is not in the repo.

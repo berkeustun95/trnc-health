@@ -105,6 +105,12 @@ export function liveGroups(unlocked) {
     .filter(g => g.modules.length > 0)
 }
 
+// The ONE visibility source: Home's favourites, the count of services, the "Tüm hizmetler"
+// screen and the picker all read this. Group order, ids only, "Yakında" tiles excluded.
+export function visibleServiceIds(unlocked) {
+  return liveGroups(unlocked).flatMap(g => g.modules.filter(m => !m.soon).map(m => m.id))
+}
+
 // Live modules no panel places. Logged once in __DEV__ and read at the gate.
 export function unplacedLiveModules() {
   const placed = new Set(HOME_GROUPS.flatMap(g => g.ids))

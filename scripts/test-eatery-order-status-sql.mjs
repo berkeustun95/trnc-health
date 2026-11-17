@@ -1,4 +1,4 @@
-// 20261193_eatery_order_status.sql + 20261194_eatery_order_status_partner.sql (+ 20261195 / 20261197) against the PGlite harness (PostgreSQL 18; prod is older).
+// 20261193_eatery_order_status.sql + 20261194_eatery_order_status_partner.sql (+ 20261195 / 20261197 / 20261198) against the PGlite harness (PostgreSQL 18; prod is older).
 // Fixture: the SAME fixture text as scripts/test-eatery-orders-sql.mjs (sliced out of that file, not retyped) + the Crunchy seed row +
 // the 20261120 preview-key policies + stubs for what the real files only reference (profiles.role / push_token / preferred_language,
 // is_admin(), push_log, pg_net's net.http_post), then the REAL 20261125, 20261132, 20261134 and 20261144 files.
@@ -830,6 +830,230 @@ else {
     table.push([m.n, shapeHit && hit && hit[1] === false ? 'RED' : 'GREEN (BAD)', `in-file: ${shapeHit ? 'refused' : 'MISSED'}; harness: ${m.red}`])
   }
   console.log('\nMUTANT TABLE'); for (const r of table) console.log(`  ${r[1].padEnd(18)} ${r[0]}  ${r[2] ? '→ ' + r[2] : ''}`)
+}
+// ── 20261198 (slice 3 DB): (a) a managing restaurant phone's verify is not a view, (b) eatery_partner_device_revoke frees a slot,
+// (c) create_eatery_order's 18+ "today" in Europe/Nicosia. checks98 returns named booleans; the real file turns every one true,
+// each 1198 mutant must turn its named one false (or be refused by the in-file post-state, then neutralised and seen red here).
+// HARNESS-ONLY: now() cannot be moved in Postgres, so the age-gate checks run on a copy of the LIVE create body (read with
+// pg_get_functiondef) whose ONE age-gate "(now() AT TIME ZONE" is replaced by "(current_setting('zz.now')::timestamptz AT TIME ZONE"
+// (anchor asserted exactly once). The zone name is not touched, so a zone mutant passes through to the check.
+{
+  const F98 = M('20261198_eatery_order_status_slice3.sql'), S98 = readFileSync(F98, 'utf8')
+  const T98 = tokq(slice('    -- 1198-BEGIN', '    -- 1198-END'))
+  const PC = '33333333-3333-4333-8333-333333333333'
+  const VC = async (d, code) => { await d.exec('RESET ROLE;'); return (await q(d, `SELECT view_count, first_viewed_at FROM public.eatery_orders WHERE code = '${code}'`))[0] }
+  const ver = async (d, who, code, dev, key) => (await as(d, who, `SELECT public.verify_eatery_order('${code}', ${dev ? `'${dev}'` : 'NULL'}) AS r`, { key })).rows?.[0]?.r
+  const revoke = async (d, who, dev, key = true) => { const r = await as(d, who, `SELECT public.eatery_partner_device_revoke(${dev == null ? 'NULL' : `'${dev}'`}) AS r`, { key }); return r.ok ? r.rows[0].r : `ERR ${r.code} ${r.msg}` }
+  const devRows = async (d) => { await d.exec('RESET ROLE;'); return q(d, `SELECT id, scope, partner_id, token_sha256, created_at, last_used_at, revoked_at FROM private.eatery_partner_devices ORDER BY id`) }
+  const live = async (d, tok) => { await d.exec('RESET ROLE;'); return (await q(d, `SELECT revoked_at IS NULL AS l, revoked_at::text AS revoked_at FROM private.eatery_partner_devices WHERE token_sha256 = encode(sha256(convert_to('${tok}', 'UTF8')), 'hex')`))[0] }
+  const canM = async (d, code, tok) => (await ver(d, 'anon', code, tok, true))?.can_manage
+  const createDef = async (d) => (await q(d, `SELECT pg_get_functiondef('public.create_eatery_order(uuid,jsonb,text,text)'::regprocedure) d`))[0].d
+  const verifyDef = async (d) => (await q(d, `SELECT pg_get_functiondef('public.verify_eatery_order(text,text)'::regprocedure) d`))[0].d
+
+  const checks98 = async (d, before) => {
+    const res = []
+    const ck = (name, ok, detail) => { res.push([name, ok === true]); if (ok !== true) console.log(`      (${name}) ${String(JSON.stringify(detail) ?? '').replace(/[0-9a-f]{32,}/g, '<hex>').slice(0, 220)}`) }
+    // "identical except": create differs from the 1194 state by the zone line only; verify by the view rule only.
+    const dc = lineDiff(before.create, await createDef(d))
+    ck('create lineDiff vs the 1194 state: only the age-gate line, Istanbul -> Nicosia', JSON.stringify(dc) === JSON.stringify({
+      removed: ["v_gate := public.eatery_order_age_gate(v_dob, (now() AT TIME ZONE 'Europe/Istanbul')::date);"],
+      added: ["v_gate := public.eatery_order_age_gate(v_dob, (now() AT TIME ZONE 'Europe/Nicosia')::date);"] }), dc)
+    const dv = lineDiff(before.verify, await verifyDef(d))
+    ck('verify lineDiff vs the 1194 state: can_manage moved above a wrapped view UPDATE, nothing else', JSON.stringify(dv) === JSON.stringify({
+      removed: ['UPDATE public.eatery_orders', 'SET first_viewed_at = COALESCE(first_viewed_at, now()), view_count = view_count + 1', 'WHERE id = v_o.id;',
+        'v_can  := public.eatery_order_can_manage(v_o.partner_id, v_o.is_test, p_device);'],
+      added: ['-- 20261198: a phone that can manage this order (Worker key + its enrolled device) re-reading the page is not a view.',
+        'v_can  := public.eatery_order_can_manage(v_o.partner_id, v_o.is_test, p_device);', 'IF NOT COALESCE(v_can, false) THEN',
+        'UPDATE public.eatery_orders', 'SET first_viewed_at = COALESCE(first_viewed_at, now()), view_count = view_count + 1', 'WHERE id = v_o.id;', 'END IF;'] }), dv)
+
+    await seed(d)
+    // One PIN per bucket, issued ONCE (a re-issue revokes the bucket). Devices: A1..A5 (partner A), B1 (partner B), T1 (test scope).
+    const pinA = (await issue(d, PA)).pin, pinB = (await issue(d, PB)).pin, pinT = (await issue(d, null, 'test')).pin
+    const enA = async () => enrol(d, await order(d, { partner: PA }), pinA)
+    const A = []
+    for (let i = 0; i < 5; i++) A.push(await enA())
+    const B1 = (await enrol(d, await order(d, { partner: PB }), pinB)).device_token
+    const T1 = (await enrol(d, await order(d, { partner: PA, test: true }), pinT)).device_token
+    ck('setup: five partner-A phones, one B phone, one test phone enrolled', A.every(x => x?.status === 'ok') && /^[0-9a-f]{96}$/.test(B1 ?? '') && /^[0-9a-f]{96}$/.test(T1 ?? ''), A.map(x => x?.status))
+    const [A1, A2, A3, A4, A5] = A.map(x => x.device_token)
+
+    // (a) view counting. Each case starts from a fresh, never-viewed order and reads the two columns as postgres.
+    const viewCase = async (label, o, who, dev, key, wantCounted, wantCan) => {
+      const code = await order(d, o)
+      const before = await VC(d, code)
+      const r = await ver(d, who, code, dev, key)
+      const after = await VC(d, code)
+      const counted = after.view_count === before.view_count + 1 && after.first_viewed_at !== null
+      const untouched = after.view_count === before.view_count && after.first_viewed_at === null
+      ck(label, r?.status === 'ok' && (wantCounted ? counted : untouched) && r?.can_manage === wantCan && r?.view_count_before === 0 && r?.first_viewed_at_before === null, { r: r && { can: r.can_manage, vcb: r.view_count_before }, before, after })
+      return r
+    }
+    const rMan = await viewCase('managing device call (key + partner-A phone on an A order) not counted', { partner: PA }, 'anon', A1, true, false, true)
+    const rCust = await viewCase('anonymous customer call (no key, no device) counted', { partner: PA }, 'anon', null, false, true, false)
+    await viewCase('signed-in customer call counted', { partner: PA }, 'customer:1', null, false, true, false)
+    await viewCase('the Worker\'s customer call (key, no device) counted', { partner: PA }, 'anon', null, true, true, false)
+    await viewCase('device token without the Worker key counted', { partner: PA }, 'anon', A1, false, true, false)
+    await viewCase('partner-B phone on an A order counted', { partner: PA }, 'anon', B1, true, true, false)
+    await viewCase('test-scope phone on a REAL order counted', { partner: PA }, 'anon', T1, true, true, false)
+    await viewCase('test-scope phone on a TEST order not counted', { partner: PA, test: true }, 'anon', T1, true, false, true)
+    ck('managing and customer calls return the same keys', JSON.stringify(Object.keys(rMan ?? {}).sort()) === JSON.stringify(Object.keys(rCust ?? {}).sort()), [Object.keys(rMan ?? {}).length, Object.keys(rCust ?? {}).length])
+    {
+      const code = await order(d, { partner: PA })
+      await ver(d, 'anon', code, null, false); await ver(d, 'anon', code, null, false)
+      const v0 = await VC(d, code)
+      const r = await ver(d, 'anon', code, A2, true)
+      const v1 = await VC(d, code)
+      ck('a managing call on a viewed order: view_count_before / first_viewed_at_before report the customer views, and stay put', r?.view_count_before === 2 && r?.first_viewed_at_before !== null && v1.view_count === 2 && String(v1.first_viewed_at) === String(v0.first_viewed_at), { r: r && r.view_count_before, v0, v1 })
+    }
+
+    // (b) revoke. At the cap: the 6th A enrol is refused (control) ...
+    const six0 = await enA()
+    ck('cap control: a 6th partner-A phone is refused (device_limit) before any revoke', six0?.status === 'device_limit', six0?.status)
+    // wrong key: forbidden, nothing changed; then the same call with the key (positive control).
+    const snap0 = JSON.stringify(await devRows(d))
+    const rNoKey = await revoke(d, 'anon', A1, false)
+    ck('revoke without the Worker key: {status forbidden}, every device row unchanged', JSON.stringify(rNoKey) === '{"status":"forbidden"}' && JSON.stringify(await devRows(d)) === snap0, rNoKey)
+    const rWrong = await (async () => { await d.exec('RESET ROLE;'); await d.query(`SELECT set_config('request.jwt.claims', '', false), set_config('request.headers', $1, false)`, [JSON.stringify({ 'x-ada-worker-key': 'zz-wrong-key' })]); await d.exec('SET ROLE anon;'); try { return (await d.query(`SELECT public.eatery_partner_device_revoke('${A1}') AS r`)).rows[0].r } finally { await d.exec('RESET ROLE;') } })()
+    ck('revoke with a WRONG Worker key: {status forbidden}, every device row unchanged', JSON.stringify(rWrong) === '{"status":"forbidden"}' && JSON.stringify(await devRows(d)) === snap0, rWrong)
+    // unknown / malformed tokens: ok, nothing changed.
+    const unknown = 'ab'.repeat(48)
+    const rUnk = await revoke(d, 'anon', unknown)
+    ck('unknown (well-formed) token: {status ok}, every device row unchanged', JSON.stringify(rUnk) === '{"status":"ok"}' && JSON.stringify(await devRows(d)) === snap0, rUnk)
+    const mal = [A1.toUpperCase(), A1.slice(0, 95), A1 + '0', '', null]
+    const rMal = []
+    for (const m of mal) rMal.push(await revoke(d, 'anon', m))
+    ck('malformed tokens (upper case, 95 / 97 chars, empty, NULL): {status ok}, every device row unchanged', rMal.every(x => JSON.stringify(x) === '{"status":"ok"}') && JSON.stringify(await devRows(d)) === snap0, rMal)
+    // ... the real revoke (anon with the key, as the Worker calls it).
+    const rOk = await revoke(d, 'anon', A1)
+    const rowsAfter = await devRows(d)
+    const a1 = await live(d, A1)
+    ck('revoke with the key: {status ok}, the A1 row revoked', JSON.stringify(rOk) === '{"status":"ok"}' && a1?.l === false, { rOk, a1: a1 && a1.l })
+    const snap0rows = JSON.parse(snap0)
+    const a1hash = await sha(d, A1)
+    const changed = rowsAfter.filter((r, i) => JSON.stringify(r) !== JSON.stringify(snap0rows[i]))
+    ck('revoke changed exactly ONE row (A1); the other A phones, the B phone and the test phone are untouched', changed.length === 1 && changed[0].token_sha256 === a1hash && rowsAfter.length === snap0rows.length, changed.length)
+    ck('the revoked A1 can no longer manage; A2 still can (positive control)', (await canM(d, await order(d, { partner: PA }), A1)) === false && (await canM(d, await order(d, { partner: PA }), A2)) === true, null)
+    const six1 = await enA()
+    ck('revoke frees a slot: the 6th partner-A phone now enrols (ok)', six1?.status === 'ok' && /^[0-9a-f]{96}$/.test(six1?.device_token ?? ''), six1?.status)
+    const seven = await enA()
+    ck('... and the cap holds again at five live phones (device_limit)', seven?.status === 'device_limit', seven?.status)
+    // double revoke keeps the first revoked_at.
+    const t1 = (await live(d, A1))?.revoked_at
+    const rAgain = await revoke(d, 'anon', A1)
+    const t2 = (await live(d, A1))?.revoked_at
+    ck('a second revoke of A1: {status ok}, revoked_at keeps its first value', JSON.stringify(rAgain) === '{"status":"ok"}' && t1 != null && t2 === t1, { t1, t2 })
+    // authenticated (with the key) may call it too; another partner's / the test phone revoke only themselves.
+    const rB = await revoke(d, 'customer:1', B1)
+    ck('authenticated caller with the key revokes the B phone; partner-A phones unaffected', JSON.stringify(rB) === '{"status":"ok"}' && (await live(d, B1))?.l === false && (await live(d, A2))?.l === true && (await live(d, T1))?.l === true, rB)
+    ck('grants: anon + authenticated EXECUTE, no PUBLIC', JSON.stringify((await q(d, `SELECT has_function_privilege('anon', 'public.eatery_partner_device_revoke(text)', 'EXECUTE') an,
+        has_function_privilege('authenticated', 'public.eatery_partner_device_revoke(text)', 'EXECUTE') au,
+        EXISTS (SELECT 1 FROM aclexplode((SELECT proacl FROM pg_proc WHERE oid = 'public.eatery_partner_device_revoke(text)'::regprocedure)) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') pu`))[0]) === '{"an":true,"au":true,"pu":false}', null)
+
+    // (c) the 18+ gate on Nicosia date boundaries (see the block header for the now() substitution).
+    await d.exec(`INSERT INTO public.eatery_partners (id, slug, name, category, lat, lng, geocode_source, logo_path, menu_verified_on, is_active, order_method, adult_only)
+      VALUES ('${PC}', 'zz-h-c', 'Harness C', 'cafe', 35.1, 33.3, 'partner', 'zz-h-c/logo.png', current_date, true, 'whatsapp', true) ON CONFLICT DO NOTHING;
+      INSERT INTO public.eatery_menu_items (partner_id, section, name, price, currency) VALUES ('${PC}', 'zz', 'zz adult dish', 10, 'TRY');
+      INSERT INTO auth.users (id) VALUES ('${UID(6)}'), ('${UID(7)}') ON CONFLICT DO NOTHING;
+      INSERT INTO public.profiles (id, role, date_of_birth) VALUES ('${UID(6)}', 'customer', '2008-01-16'), ('${UID(7)}', 'customer', '2008-07-16') ON CONFLICT DO NOTHING;`)
+    const item = (await q(d, `SELECT id FROM public.eatery_menu_items WHERE partner_id = '${PC}' LIMIT 1`))[0].id
+    const def = await createDef(d)
+    const ANCH = '(now() AT TIME ZONE'
+    const gateLine = def.split('\n').filter(l => l.includes('v_gate := public.eatery_order_age_gate(v_dob, ' + ANCH))
+    ck('age-gate anchor "(now() AT TIME ZONE" found exactly once in the live create body', gateLine.length === 1 && def.split(ANCH).length === 2, gateLine.length)
+    if (gateLine.length === 1 && def.split(ANCH).length === 2) {
+      await d.exec('RESET ROLE;')
+      await d.exec(def.replace(ANCH, `(current_setting('zz.now')::timestamptz AT TIME ZONE`))
+      const at = async (uid, ts) => {
+        await d.query(`SELECT set_config('zz.now', $1, false)`, [ts])
+        const r = await as(d, `user:${uid}`, `SELECT public.create_eatery_order('${PC}', '[{"item_id":${item},"qty":1}]'::jsonb) AS r`, { key: false })
+        return r.ok ? 'ok' : `${r.code} ${r.msg}`
+      }
+      // Winter (Cyprus UTC+2, Istanbul UTC+3): 18th birthday 2026-01-16.
+      const w1 = await at(6, '2026-01-15 21:30:00+00'), w2 = await at(6, '2026-01-15 22:30:00+00')
+      ck('winter: 21:30 UTC = 23:30 Cyprus on the day BEFORE the 18th birthday -> refused (Istanbul would already say the 16th)', w1 === 'P0001 adult_only', w1)
+      ck('winter: 22:30 UTC = 00:30 Cyprus on the birthday -> accepted (positive control)', w2 === 'ok', w2)
+      // Summer (Cyprus UTC+3 = Istanbul): 18th birthday 2026-07-16. Here Istanbul agrees; this pair catches a FIXED UTC+2 zone.
+      const s1 = await at(7, '2026-07-15 20:30:00+00'), s2 = await at(7, '2026-07-15 21:30:00+00')
+      ck('summer: 20:30 UTC = 23:30 Cyprus on the day before -> refused', s1 === 'P0001 adult_only', s1)
+      ck('summer: 21:30 UTC = 00:30 Cyprus on the birthday -> accepted (a fixed UTC+2 would still refuse)', s2 === 'ok', s2)
+      await d.exec(def)
+    }
+    return res
+  }
+
+  // Tokens, apply, re-run.
+  { const z = await after1144(); await tokens(z, '1198 tokens on the 1144 state (red, no error)', T98, false, 3) }
+  { const z = await after1144(); await stamped(z, FA)
+    const r0 = await applyFile(z, F98); await z.exec('ROLLBACK;').catch(() => {})
+    t('20261198 REFUSES before 20261194 (nothing applied)', [r0.ok, (r0.msg || '').includes('20261193 / 20261194 are not both in the ledger'),
+      (await q(z, `SELECT to_regprocedure('public.eatery_partner_device_revoke(text)') IS NULL AS x`))[0].x], [false, true, true]) }
+  const d = await after1194()
+  await stamped(d, F97)
+  const before = { create: await createDef(d), verify: await verifyDef(d) }
+  await tokens(d, '1198 tokens AFTER 1197, BEFORE 1198 (red, no error)', T98, false, 3)
+  t('20261198 applies on the 1197 state (in-file pre/post-state green)', await applyFile(d, F98), { ok: true, msg: null })
+  t('20261198 applies a SECOND time (re-runnable)', await applyFile(d, F98), { ok: true, msg: null })
+  await tokens(d, '1198 tokens AFTER 1198', T98, true, 3)
+  for (const [n, s] of [['1193', T93], ['1194', T94], ['1144', T44], ['1134', T34], ['1132', T32], ['1197', tokq(slice('    -- 1197-BEGIN', '    -- 1197-END'))]]) await tokens(d, `older ${n} block AFTER 1198`, s, true)
+  {
+    const rows25 = T25.split('\n    UNION ALL SELECT ').slice(1).map(x => 'UNION ALL SELECT ' + x).filter(x => /create_eatery_order|verify_eatery_order/.test(x))
+    let n25 = 0, ok25 = 0
+    for (const r of rows25) { try { const rr = (await d.query(tokq('    ' + r))).rows; n25 += rr.length; ok25 += rr.filter(x => x.ok).length } catch (e) { console.log('      1125 row error:', String(e.message).split('\n')[0]) } }
+    t('verify_schema older 1125 rows naming create / verify AFTER 1198: all true', [n25 > 0, ok25 === n25], [true, true])
+  }
+  t('verify_schema registers 20261198 (C and G rows)', VS.split("('20261198_eatery_order_status_slice3','eatery_partner_device_revoke')").length - 1, 2)
+  t('ledger rows end with 20261197, 20261198', (await q(d, `SELECT filename FROM public.schema_migrations_applied ORDER BY 1`)).map(r => r.filename).slice(-2), ['20261197_eatery_pin_attempts_reset.sql', '20261198_eatery_order_status_slice3.sql'])
+  const res = await checks98(d, before)
+  t(`20261198 behaviour: ${res.length} named checks, all true`, [res.length, res.filter(r => !r[1]).map(r => r[0])], [31, []])
+
+  // RED-FIRST mutants of 20261198.
+  const table98 = []
+  const IFNOT = 'IF NOT COALESCE(v_can, false) THEN'
+  const NEUT = [['RAISE EXCEPTION \'verify_eatery_order body', 'RAISE NOTICE \'verify_eatery_order body'], ['RAISE EXCEPTION \'eatery_partner_device_revoke body', 'RAISE NOTICE \'eatery_partner_device_revoke body'],
+    ['RAISE EXCEPTION \'create_eatery_order body', 'RAISE NOTICE \'create_eatery_order body']]
+  const GATE98 = `  IF NOT public.eatery_worker_key_ok() THEN\n    RETURN jsonb_build_object('status', 'forbidden');\n  END IF;\n  IF p_device IS NULL OR p_device !~`
+  const MUT98 = [
+    { n: 'D1 every call counts again (IF true)', pairs: [[`  ${IFNOT}\n    UPDATE`, '  IF true THEN\n    UPDATE']], red: 'managing device call (key + partner-A phone on an A order) not counted' },
+    { n: 'D2 no call counts (IF false)', pairs: [[`  ${IFNOT}\n    UPDATE`, '  IF false THEN\n    UPDATE']], red: 'anonymous customer call (no key, no device) counted' },
+    { n: 'D3 any p_device skips the count', pairs: [[`  ${IFNOT}\n    UPDATE`, '  IF p_device IS NULL THEN\n    UPDATE']], red: 'device token without the Worker key counted' },
+    { n: 'D4 any live device of ANY partner skips the count', pairs: [[`  ${IFNOT}\n    UPDATE`, `  IF NOT EXISTS (SELECT 1 FROM private.eatery_partner_devices x WHERE x.token_sha256 = encode(sha256(convert_to(COALESCE(p_device, ''), 'UTF8')), 'hex') AND x.revoked_at IS NULL) THEN\n    UPDATE`]], red: 'partner-B phone on an A order counted' },
+    { n: 'D5 the Worker key gate is dropped from revoke', pairs: [[GATE98, '  IF p_device IS NULL OR p_device !~']], red: 'revoke without the Worker key' },
+    { n: 'D6 revoke hits every live device', pairs: [[`   WHERE d.token_sha256 = encode(sha256(convert_to(p_device, 'UTF8')), 'hex')\n     AND d.revoked_at IS NULL;`, `   WHERE d.revoked_at IS NULL AND (d.token_sha256 = encode(sha256(convert_to(p_device, 'UTF8')), 'hex') OR true);`]], red: 'revoke changed exactly ONE row' },
+    { n: 'D7 revoke answers an oracle (not_found when nothing matched)', pairs: [[`     AND d.revoked_at IS NULL;\n  RETURN jsonb_build_object('status', 'ok');`, `     AND d.revoked_at IS NULL;\n  RETURN jsonb_build_object('status', CASE WHEN FOUND THEN 'ok' ELSE 'not_found' END);`]], red: 'unknown (well-formed) token' },
+    { n: 'D8 a second revoke overwrites revoked_at', pairs: [[`\n     AND d.revoked_at IS NULL;`, ';']], red: 'a second revoke of A1' },
+    { n: 'D9 revoke deletes the row instead (slot freed, history lost)', pairs: [[`  UPDATE private.eatery_partner_devices d\n     SET revoked_at = now()\n   WHERE`, `  DELETE FROM private.eatery_partner_devices d\n   WHERE`]], red: 'revoke with the key: {status ok}, the A1 row revoked' },
+    { n: 'D10 age gate back on Europe/Istanbul', pairs: [[`(now() AT TIME ZONE 'Europe/Nicosia')::date);`, `(now() AT TIME ZONE 'Europe/Istanbul')::date);`]], red: 'winter: 21:30 UTC' },
+    { n: 'D11 age gate on a FIXED UTC+2 (Etc/GMT-2)', pairs: [[`(now() AT TIME ZONE 'Europe/Nicosia')::date);`, `(now() AT TIME ZONE 'Etc/GMT-2')::date);`]], red: 'summer: 21:30 UTC' },
+    { n: 'D12 another line of create changes (user cap 5 -> 6)', pairs: [['IF v_user_n >= 5 THEN', 'IF v_user_n >= 6 THEN']], red: 'create lineDiff' },
+    { n: 'D13 revoke granted to PUBLIC [catalog fact]', pairs: [['GRANT  EXECUTE ON FUNCTION public.eatery_partner_device_revoke(text) TO anon, authenticated;', 'GRANT  EXECUTE ON FUNCTION public.eatery_partner_device_revoke(text) TO PUBLIC;']], fail: 'post-state grants' },
+  ]
+  for (const m of MUT98) {
+    const p1 = mutant('98 ' + m.n, S98, m.pairs)
+    if (!p1) { table98.push([m.n, 'ANCHOR MISSING', '']); continue }
+    const fresh = async () => { const z = await after1194(); await stamped(z, F97); return z }
+    const d1 = await fresh(); const b1 = { create: await createDef(d1), verify: await verifyDef(d1) }
+    const r1 = await applyFile(d1, p1)
+    if (m.fail) {
+      await d1.exec('ROLLBACK;').catch(() => {})
+      const hit = !r1.ok && r1.msg.includes(m.fail)
+      t(`${m.n}: apply FAILS with "${m.fail}"`, [r1.ok, hit], [false, true]); if (!hit) console.log(`      ${r1.ok ? '(applied!)' : r1.msg}`)
+      table98.push([m.n, hit ? 'RED' : r1.ok ? 'GREEN (BAD)' : 'RED, wrong message', 'in-file: ' + (r1.ok ? 'applied' : r1.msg.slice(0, 90))]); continue
+    }
+    let dd = d1, bb = b1, inFile = 'applied'
+    if (!r1.ok) {
+      await d1.exec('ROLLBACK;').catch(() => {})
+      inFile = /body/.test(r1.msg) ? 'refused' : 'FAILED: ' + r1.msg.slice(0, 80)
+      const p2 = mutant('98 ' + m.n + ' neut', S98, [...m.pairs, ...NEUT.map(([a, b]) => [a, b, true])])
+      dd = await fresh(); bb = { create: await createDef(dd), verify: await verifyDef(dd) }
+      const r2 = await applyFile(dd, p2)
+      if (!r2.ok) { bad++; console.log(`  ✗ ${m.n}: neutralised mutant did not apply: ${r2.msg}`); table98.push([m.n, 'NEUT FAILED', r2.msg.slice(0, 100)]); continue }
+    }
+    const rr = await checks98(dd, bb)
+    const hit = rr.find(([n]) => n.includes(m.red))
+    t(`${m.n}: the check "${m.red}" goes red`, [hit !== undefined, hit?.[1]], [true, false])
+    table98.push([m.n, hit && hit[1] === false ? 'RED' : 'GREEN (BAD)', `in-file: ${inFile}; harness: ${m.red}`])
+  }
+  console.log('\nMUTANT TABLE 20261198'); for (const r of table98) console.log(`  ${r[1].padEnd(18)} ${r[0]}  ${r[2] ? '→ ' + r[2] : ''}`)
 }
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

@@ -49,19 +49,27 @@
 //   verify reachability and silently skip the cancellation question on every page it
 //   satisfied. Correctness beats the saved bytes at 48 URLs.
 //
-// A cancelled event makes this script EXIT NON-ZERO. It does not edit the seed for
-// one: which rows are cancelled and what to do about them is an owner's call, and the
-// non-zero exit is what stops an import running behind it in a chain.
+// A cancelled event no longer stops the run (Berke, 2026-11-14: one bad item must skip
+// only that item). With --apply it is REMOVED from the seed and recorded in
+// meta.feed_cancelled, so the import does not touch it, the sweep leaves it alone (no
+// automatic cancel), and the workflow lists it in the "Gise Kibris: needs a decision"
+// issue, which says whether the event is already live in the app. Without --apply
+// (a human reading a report) a cancelled event still exits 1.
 //
 //   node scripts/check-gisekibris-urls.mjs --selftest   # prove the parser still reads
 //                                                       # a known-cancelled page as true
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { resolve, dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { execFile } from 'node:child_process'
+import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SEED_PATH = resolve(ROOT, 'supabase/seed/gisekibris-events-clean.json')
+const seedArg = process.argv.indexOf('--seed')
+const SEED_PATH = seedArg !== -1 ? resolve(process.argv[seedArg + 1])
+  : resolve(ROOT, 'supabase/seed/gisekibris-events-clean.json')
 
 const CONCURRENCY = 6          // polite: their box, not ours
 const TIMEOUT_MS = 20000
@@ -190,6 +198,37 @@ if (selftest) {
     console.log(`    ${pass ? '✓' : '✗'} ${name.padEnd(26)} got ${String(got)}, want ${String(want)}`)
   }
 
+  // --apply takes a cancelled row OUT and keeps going; report mode still exits 1.
+  // Child runs against a localhost server, so this half needs no partner network.
+  console.log('\n  --apply drops a cancelled row and continues (localhost)')
+  {
+    const srv = createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end(req.url.startsWith('/cancelled') ? '{"isCancelled":true}' : '{"isCancelled":false}')
+    })
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+    const base = `http://127.0.0.1:${srv.address().port}`
+    const dir = mkdtempSync(join(tmpdir(), 'gk-urls-'))
+    const file = join(dir, 'seed.json')
+    const mk = () => writeFileSync(file, JSON.stringify({ meta: { notes: [] }, events: [
+      { external_id: 'gk-Live1', title: 'LIVE', start_date: '2026-12-01', ticket_url: `${base}/live` },
+      { external_id: 'gk-Gone1', title: 'GONE', start_date: '2026-12-02', ticket_url: `${base}/cancelled` },
+    ] }))
+    const exec = args => new Promise(done =>
+      execFile(process.execPath, [fileURLToPath(import.meta.url), ...args, '--seed', file],
+        (err, stdout) => done({ code: err ? err.code : 0, stdout })))
+    mk(); const rep = await exec([])
+    const t2 = (label, got, want) => { const ok = got === want; if (!ok) bad++
+      console.log(`    ${ok ? '✓' : '✗'} ${label.padEnd(36)} got ${JSON.stringify(got)}${ok ? '' : `, want ${JSON.stringify(want)}`}`) }
+    t2('report mode: cancelled → exit 1', rep.code, 1)
+    mk(); const ap = await exec(['--apply'])
+    const after = JSON.parse(readFileSync(file, 'utf8'))
+    t2('--apply: exit 0', ap.code, 0)
+    t2('--apply: only the live row stays', after.events.map(e => e.external_id).join(','), 'gk-Live1')
+    t2('--apply: recorded in feed_cancelled', after.meta.feed_cancelled?.map(e => e.external_id).join(','), 'gk-Gone1')
+    srv.close(); rmSync(dir, { recursive: true, force: true })
+  }
+
   console.log(`\n  Live control — ${CANCELLED_CONTROL.label}`)
   const r = await probe({ title: CANCELLED_CONTROL.label, external_id: 'control',
                           ticket_url: CANCELLED_CONTROL.url })
@@ -266,12 +305,26 @@ if (cancelled.length) {
     console.log(`      ${c.ev.external_id}  ${c.ev.start_date}`)
     console.log(`      ${c.ev.ticket_url}`)
   }
-  console.log('\n    DO NOT IMPORT. A cancelled event still serves 200, so nothing else in')
-  console.log('    this pipeline would notice. Decide what to do with these first —')
-  console.log("    the seed has NOT been edited for them; that is the owner's call.")
+  console.log(apply
+    ? '\n    Removed from the seed below and recorded in meta.feed_cancelled: not imported,\n' +
+      '    never cancelled automatically, listed in the issue for Berke to decide.'
+    : '\n    DO NOT IMPORT. Re-run with --apply to take them out of the seed.')
 }
 
 // ─── Apply ───────────────────────────────────────────────────────────────────
+
+if (apply && cancelled.length) {
+  const out = new Set(cancelled.map(c => c.ev.external_id))
+  if (seed.events.every(e => out.has(e.external_id))) {
+    fail('Every event in the feed is cancelled — refusing to hand an empty seed to the import. Seed left untouched.')
+  }
+  seed.events = seed.events.filter(e => !out.has(e.external_id))
+  seed.meta.feed_cancelled = cancelled.map(c => ({
+    external_id: c.ev.external_id, title: c.ev.title, start_date: c.ev.start_date, ticket_url: c.ev.ticket_url }))
+  seed.meta.event_count = seed.events.length
+  writeFileSync(SEED_PATH, JSON.stringify(seed, null, 2) + '\n')
+  console.log(`\n  ✓ ${out.size} cancelled event(s) taken out of the seed (meta.feed_cancelled)\n`)
+}
 
 if (apply) {
   if (!failures.length) {
@@ -295,7 +348,6 @@ if (apply) {
   console.log('')
 }
 
-// Non-zero on a cancelled event, so an import chained behind this one does not run.
-// Dead-URL nulling above still happened: it is idempotent and orthogonal, and leaving
-// the seed half-corrected would be the confusing outcome.
-process.exit(cancelled.length ? 1 : 0)
+// --apply: cancelled rows are already out of the seed, so the chain continues.
+// Report mode: non-zero on a cancelled event, as before.
+process.exit(cancelled.length && !apply ? 1 : 0)

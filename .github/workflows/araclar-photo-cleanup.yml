@@ -27,11 +27,13 @@ concurrency: { group: prod-araclar-photo-cleanup, cancel-in-progress: false }
 
 jobs:
   run:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15
     permissions:
       contents: read
+      issues: write       # the alert step below
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
@@ -51,3 +53,33 @@ jobs:
         run: |
           if [ "$WRITE" = "true" ]; then node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cleanup-vehicle-photos.mjs --apply
           else node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cleanup-vehicle-photos.mjs --dry; fi
+      - name: Alert on a red run (issue mentions Berke; the next green run closes it)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          # Scheduled runs are attributed to ada-claude-code[bot], so GitHub's own failure email reaches nobody.
+          title='Araçlar photo cleanup is red'
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          num=$(gh issue list --state open --limit 200 --json number,title,author \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
+          if [ "$JOB_STATUS" = "success" ]; then
+            [ -z "$num" ] || gh issue close "$num" --comment "Green again: $run"
+            exit 0
+          fi
+          if [ -z "$num" ]; then
+            gh issue create --title "$title" --body "Run $JOB_STATUS ($GITHUB_EVENT_NAME): $run"$'\n\n@berkeustun95'
+          else
+            gh issue comment "$num" --body "Still red ($GITHUB_EVENT_NAME): $run"
+          fi
+
+      # One heartbeat row per run that deletes (schedule, or apply=true). Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && env.WRITE == 'true' }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ env.WRITE }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"

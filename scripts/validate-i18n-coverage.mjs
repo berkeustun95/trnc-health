@@ -92,6 +92,10 @@ const SURFACES = [
   //   than assumed — with the Arabic value set to the raw English string, i18n:validate
   //   still reported OK.
   'screens/OnboardingScreen.js',
+  // Onboarding v2 (2026-11-14): Start replaced Welcome + the intro as the first screen of a fresh install,
+  // and Screen 2 follows it for every new user. Guarded from the commit that renders them.
+  'screens/StartScreen.js',
+  'screens/DutyAlertsScreen.js',
   'screens/ExploreMapScreen.js',
   // The walking-routes layer drawn on that map (Visit NCY). Added with the component, while
   // EXPLORE_ROUTES_LIVE is still false — guarded before the flip, not after.
@@ -281,7 +285,9 @@ const SURFACES = [
   'components/home/redesign/RedesignHero.js',
   'components/home/redesign/Widgets.js',
   'components/home/redesign/OliBar.js',
+  'components/home/redesign/TourChip.js',   // Onboarding v2 "Tura başla"
   'components/home/redesign/ServicePanels.js',
+  'components/home/redesign/HomeServices.js',
   'constants/homeGroups.js',
   'components/OliSearchSheet.js',
   'components/ui/Button.js',
@@ -372,6 +378,7 @@ const SAME_AS_ENGLISH = {
   'menuMarketplace': Object.fromEntries(['Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
     .map(l => [l, 'Bandabuliya is the brand name in every language (Berke, 2026-11-09); mkTagline says what it is'])),
   // ─── Araçlar (cars), 2026-11-07: the same word in these languages ──────────────────
+  'homeServicesTitle': { French: 'Services is the French word' },
   'carsFilterDistrict': { French: 'District is French (as ddDistrict)' },
   'carsDescription': { French: 'Description is French' },
   'carsFuelDiesel': { French: 'Diesel is the French word', German: 'Diesel is the German word' },
@@ -737,9 +744,15 @@ const PETS_REGULATORY_REASON =
   'pets regulatory copy: legal requirements, kept in ' + REGULATORY_LOCALES.join('+')
   + ' so a translation cannot introduce an error a reader would only discover at a border'
 
+// The admin area is English-only whatever the app language (constants/adminLang.js), so admin* keys need only
+// an English value. Derived from the scanned keys by prefix, never listed. English is still required below.
+const ADMIN_EXEMPT = new Set(KEYS.filter(k => k.startsWith('admin')))
+const ADMIN_REASON = 'admin screens render in English only (ADMIN_LANG); the other locales keep their old values unused'
+
 const problems = []
 const usedAllowances = new Set()
 let regulatoryExempted = 0
+let adminExempted = 0
 
 for (const key of KEYS) {
   const en = t(key, 'English')
@@ -749,6 +762,7 @@ for (const key of KEYS) {
     // t() uses ??, so "" is returned as-is and is never "identical to English": check it first.
     if (!String(t(key, lang)).trim()) { problems.push(`${key} / ${lang} is an EMPTY string — it renders as a blank label`); continue }
     if (t(key, lang) !== en) continue
+    if (ADMIN_EXEMPT.has(key)) { adminExempted++; continue }
     if (PETS_REGULATORY_EXEMPT.has(key)) { regulatoryExempted++; continue }
     const reason = SAME_AS_ENGLISH[key]?.[lang]
     if (reason) { usedAllowances.add(`${key}/${lang}`); continue }
@@ -808,3 +822,4 @@ console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} loca
 console.log(`  scope: ${SURFACES.length} surface(s) — ${scopeNames}`)
 console.log(`  ${KEYS.length} of the ${enTotal} keys in the table`)
 console.log(regulatoryLine)
+console.log(`  ${ADMIN_EXEMPT.size} admin key(s) exempt from the locale comparison (${adminExempted} key x locale pair(s) matched)\n    reason: ${ADMIN_REASON}`)

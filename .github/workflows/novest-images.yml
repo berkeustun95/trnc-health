@@ -49,8 +49,42 @@ on:
 concurrency: { group: prod-novest, cancel-in-progress: false }
 
 jobs:
+  # ─── The pause switch (data jobs, slice 3) ─────────────────────────────────
+  # Asks public.data_job_gate whether novest-images is paused (admin screen "Data jobs"). A paused answer skips
+  # the working job below: nothing writes, no heartbeat row (the gate records one skipped_paused row), no alert step runs.
+  # FAIL-OPEN: any error here (key, network, RPC not applied yet, even a failing step) lets the working job run: every step here has
+  # continue-on-error: true and the job has none (a job-level one is forbidden by scripts/check-dispatcher-actor.mjs);
+  # only the exact output `false` stops it. See scripts/data-job-gate.mjs.
+  gate:
+    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main' && inputs.apply == false && inputs.limit == '' && inputs.prune == false)) }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+        continue-on-error: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+        continue-on-error: true
+      - name: Pause switch (data_job_gate)
+        id: gate
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ github.event_name == 'schedule' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+        run: node scripts/data-job-gate.mjs
+        continue-on-error: true
+
   run:
     runs-on: ubuntu-24.04
+    needs: gate
+    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main' && inputs.apply == false && inputs.limit == '' && inputs.prune == false)) && (!cancelled() && needs.gate.outputs.run != 'false') }}
     environment: production
     timeout-minutes: 45
     permissions:
@@ -61,6 +95,8 @@ jobs:
       IN_APPLY: ${{ inputs.apply }}
       IN_LIMIT: ${{ inputs.limit }}
       IN_PRUNE: ${{ inputs.prune }}
+      # ONE write gate, read by the Mirror step and the record step: a scheduled run applies, a dispatch only with apply=true.
+      WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -77,8 +113,20 @@ jobs:
         run: node scripts/check-novest-prune.mjs
       - name: Mirror
         run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$WRITE" != "true" ]; then
+            echo "::error::a scheduled run resolved to a dry run; the WRITE gate is broken"; exit 1
+          fi
           args=()
           [ "$IN_PRUNE" = "true" ] && [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && args+=(--prune)
-          [ "$IN_APPLY" = "true" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ] || args+=(--dry)
+          [ "$WRITE" = "true" ] || args+=(--dry)
           [ -z "$IN_LIMIT" ] || args+=(--limit "$IN_LIMIT")
           node scripts/mirror-novest-images.mjs "${args[@]}"
+
+      # One heartbeat row per real run (applies, no --limit). Non-fatal: a failure to record is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && env.WRITE == 'true' && !inputs.limit }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ env.WRITE == 'true' && !inputs.limit }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"

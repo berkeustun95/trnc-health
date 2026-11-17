@@ -1,6 +1,6 @@
 -- ─── Dummy accommodation listing for testing ────────────────────────────────
 -- Run in Supabase SQL editor.
--- Uses the admin account (berke.ustun95@gmail.com) as the agent owner.
+-- Uses the admin account (getadaapp@gmail.com) as the agent owner.
 
 DO $$
 DECLARE
@@ -11,7 +11,7 @@ DECLARE
   v_prop2_id  UUID;
 BEGIN
   -- Get admin user id
-  SELECT id INTO v_user_id FROM auth.users WHERE email = 'berke.ustun95@gmail.com' LIMIT 1;
+  SELECT id INTO v_user_id FROM auth.users WHERE email = 'getadaapp@gmail.com' LIMIT 1;
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Admin user not found';
   END IF;
@@ -36,7 +36,7 @@ BEGIN
     v_user_id,
     'Berke Üstün',
     '+90 548 000 0002',
-    'berke.ustun95@gmail.com',
+    'getadaapp@gmail.com',
     v_agency_id,
     'active'
   )

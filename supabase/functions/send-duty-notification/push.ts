@@ -1,31 +1,14 @@
-// Expo push sending with a bounded retry, kept free of remote imports so `deno test` runs it offline.
+// Expo push sending, kept free of remote imports so `deno test` runs it offline.
 //
-// RETRY RULE (the whole point): retry a batch ONLY when Expo explicitly did not process it:
-//   - HTTP 503 or 429.
-// NEVER retry (Berke: "only retry batches Expo didn't accept, so nobody gets a double push"):
-//   - HTTP 200, even when some tickets are errors (DeviceNotRegistered...): accepted, a retry would double-push.
-//     A 200 whose body cannot be parsed is likewise not retried.
-//   - HTTP 500 / 502 / 504 and other 5xx/4xx: a gateway or server error can come AFTER Expo accepted the batch.
-//     Counted `http_<code>`.
-//   - a timeout / abort: the request was sent, Expo may have accepted it. Counted `timeout`.
-//   - ANY other thrown fetch: Deno gives no stable way to tell "DNS failure / refused before anything was sent"
-//     from "reset mid-request" (only free-text TypeError messages). Counted `fetch_failed`.
-//
-// TIME: a batch's FIRST attempt is always sent, with the full 10 s timeout, even past the deadline (Berke: never skip a
-// batch's first attempt; the deadline only limits RETRIES). One soft run deadline (deadlineAt) gates retries: a retry is
-// allowed only if its sleep + its own attempt timeout (min(10 s, deadline - now - reserve)) still fit, and still leave room
-// for one full first attempt per REMAINING batch. 60 s is pg_net's wait for the HTTP reply (20261139), not a platform
-// limit: a run that exceeds it loses only the saved response body, never the pushes.
+// SEND ONCE (Round 5, 2026-11-16): every batch gets exactly ONE request, whatever the answer. Until then a batch was
+// re-sent on HTTP 503/429; duty_push_runs showed push_retries = 1 on 11, 12, 13 and 16 Nov, and real users (no shared
+// token, no second app) got the duty push twice on 16 Nov: Expo can deliver a batch it answered 503/429 for. A batch
+// that is not accepted is counted (`http_<code>`, `timeout`, `fetch_failed`, `bad_response`) and that day's push is
+// missed for its phones; the in-app row still lands. A missed push is recoverable, a double push to everyone is not.
 // Nothing here logs or returns Expo's body or messages (for DeviceNotRegistered they embed the push token).
 
 export const PUSH_URL = 'https://exp.host/--/api/v2/push/send'
-export const RETRY_BASE_DELAYS_MS = [1000, 2000, 4000]
 export const ATTEMPT_TIMEOUT_MS = 10_000
-// Soft run deadline (index.ts passes runStart + RUN_DEADLINE_MS): it only gates RETRIES. RESERVE_MS is kept free for
-// finishRun and the response; a retry with under MIN_ATTEMPT_MS left is not worth sending.
-export const RUN_DEADLINE_MS = 55_000
-export const RESERVE_MS = 2_000
-export const MIN_ATTEMPT_MS = 1_000
 
 const KIND_RE = /^[A-Za-z0-9_]{1,64}$/
 export function errorKind(k: unknown): string {
@@ -37,7 +20,6 @@ export interface BatchResult {
   accepted: boolean
   ok: number
   errors: number
-  retries: number
   kinds: Record<string, number>
 }
 
@@ -50,86 +32,93 @@ export function pushOutcome(messages: number, batchesAccepted: number, batchesFa
   return 'sent'
 }
 
+// ONE PUSH PER TOKEN (2026-11-13: one phone holding the same Expo token on two accounts got every broadcast twice).
+// The in-app row still goes to every account; only the push is collapsed. For a shared token the account that signed
+// in most recently wins (its language is the one on the phone now); an unknown sign-in loses, and a full tie keeps the
+// first in input order. Order of the result = first appearance of each token, so batching stays deterministic.
+export function onePerToken<T extends { id: string; push_token: string | null }>(
+  profiles: T[], lastSignIn: Map<string, number> = new Map(),
+): T[] {
+  const best = new Map<string, T>()
+  for (const p of profiles) {
+    if (!p.push_token) continue
+    const cur = best.get(p.push_token)
+    if (!cur || (lastSignIn.get(p.id) ?? -Infinity) > (lastSignIn.get(cur.id) ?? -Infinity)) best.set(p.push_token, p)
+  }
+  return [...best.values()]
+}
+
+// Ids of the profiles whose token is on more than one profile: the only ones whose sign-in time is looked up.
+export function sharedTokenIds(profiles: { id: string; push_token: string | null }[]): string[] {
+  const n = new Map<string, number>()
+  for (const p of profiles) if (p.push_token) n.set(p.push_token, (n.get(p.push_token) ?? 0) + 1)
+  return profiles.filter((p) => p.push_token && (n.get(p.push_token) ?? 0) > 1).map((p) => p.id)
+}
+
+// Best effort and bounded in COUNT and TIME: the lookups run in parallel under one budget, and whatever has not answered
+// by then simply cannot win the tie (security review #405: auth admin calls have no timeout, and before this the
+// broadcasts never depended on the Auth service). Never throws, never waits longer than budgetMs.
+export const MAX_SIGNIN_LOOKUPS = 50
+export const SIGNIN_LOOKUP_BUDGET_MS = 3_000
+export async function lastSignIns(
+  ids: string[], getLastSignIn: (id: string) => Promise<string | null | undefined>,
+  budgetMs = SIGNIN_LOOKUP_BUDGET_MS,
+): Promise<Map<string, number>> {
+  const found = new Map<string, number>()
+  const all = Promise.allSettled(ids.slice(0, MAX_SIGNIN_LOOKUPS).map(async (id) => {
+    const ms = Date.parse((await getLastSignIn(id)) ?? '')
+    if (Number.isFinite(ms)) found.set(id, ms)
+  }))
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([all, new Promise<void>((res) => { timer = setTimeout(res, budgetMs) })])
+  clearTimeout(timer)
+  return new Map(found)   // a snapshot: an answer arriving after the budget changes nothing
+}
+
 export interface SendDeps {
   fetchFn: (url: string, init: RequestInit) => Promise<Response>
-  sleep: (ms: number) => Promise<void>
-  now: () => number
-  random: () => number
-  deadlineAt: number
   makeSignal?: (ms: number) => AbortSignal
 }
 
-function retryAfterMs(res: Response): number {
-  const h = res.headers?.get?.('retry-after')
-  if (!h) return 0
-  const secs = Number(h)
-  return Number.isFinite(secs) && secs > 0 ? secs * 1000 : 0
-}
-
-export async function sendBatch(batch: unknown[], d: SendDeps, remainingBatches = 0): Promise<BatchResult> {
-  const out: BatchResult = { accepted: false, ok: 0, errors: 0, retries: 0, kinds: Object.create(null) }
+export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchResult> {
+  const out: BatchResult = { accepted: false, ok: 0, errors: 0, kinds: Object.create(null) }
   const fail = (kind: string, n: number) => {
     out.errors += n
     out.kinds[kind] = (out.kinds[kind] ?? 0) + n
   }
   const makeSignal = d.makeSignal ?? ((ms: number) => AbortSignal.timeout(ms))
 
-  let timeout = ATTEMPT_TIMEOUT_MS
-  for (let attempt = 0; ; attempt++) {
-    let kind: string
-    let wait = 0
-    try {
-      const res = await d.fetchFn(PUSH_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Accept-Encoding': 'gzip, deflate' },
-        body: JSON.stringify(batch),
-        signal: makeSignal(timeout),
-      })
-      if (res.ok) {
-        try {
-          const json = await res.json()
-          const tickets: any[] = Array.isArray(json.data) ? json.data : []
-          for (const r of tickets) {
-            if (r.status === 'ok') out.ok++
-            else fail(errorKind(r.details?.error ?? 'unknown'), 1)
-          }
-          if (tickets.length < batch.length) fail('no_ticket', batch.length - tickets.length)
-          out.accepted = true
-        } catch {
-          fail('bad_response', batch.length)
-        }
-        return out
-      }
-      try { await res.body?.cancel() } catch { /* body not needed */ }
-      kind = `http_${res.status}`
-      if (res.status !== 503 && res.status !== 429) {
-        console.error('Expo push batch failed: HTTP', res.status)
-        fail(kind, batch.length)
-        return out
-      }
-      wait = retryAfterMs(res)
-    } catch (e) {
-      const name = e instanceof Error ? e.name : 'unknown'
-      console.error('Expo push batch threw:', name)
-      fail(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'fetch_failed', batch.length)
-      return out
-    }
-
-    if (attempt >= RETRY_BASE_DELAYS_MS.length) {
-      fail(kind, batch.length)
-      return out
-    }
-    const delay = Math.max(RETRY_BASE_DELAYS_MS[attempt] * (1 + 0.25 * d.random()), wait)
-    // after sleeping: this retry's own timeout, plus one full first attempt for every batch still to come
-    const nextTimeout = Math.min(ATTEMPT_TIMEOUT_MS, d.deadlineAt - (d.now() + delay) - RESERVE_MS)
-    if (nextTimeout < MIN_ATTEMPT_MS || (d.now() + delay) + nextTimeout + remainingBatches * ATTEMPT_TIMEOUT_MS > d.deadlineAt - RESERVE_MS) {
-      console.error('Expo push retry skipped: run deadline')
-      fail(kind, batch.length)
-      return out
-    }
-    console.error('Expo push batch will retry:', kind, 'attempt', attempt + 1)
-    timeout = nextTimeout
-    await d.sleep(delay)
-    out.retries++
+  let res: Response
+  try {
+    res = await d.fetchFn(PUSH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Accept-Encoding': 'gzip, deflate' },
+      body: JSON.stringify(batch),
+      signal: makeSignal(ATTEMPT_TIMEOUT_MS),
+    })
+  } catch (e) {
+    const name = e instanceof Error ? e.name : 'unknown'
+    console.error('Expo push batch threw:', name)
+    fail(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'fetch_failed', batch.length)
+    return out
   }
+  if (!res.ok) {
+    try { await res.body?.cancel() } catch { /* body not needed */ }
+    console.error('Expo push batch failed: HTTP', res.status)
+    fail(`http_${res.status}`, batch.length)
+    return out
+  }
+  try {
+    const json = await res.json()
+    const tickets: any[] = Array.isArray(json.data) ? json.data : []
+    for (const r of tickets) {
+      if (r.status === 'ok') out.ok++
+      else fail(errorKind(r.details?.error ?? 'unknown'), 1)
+    }
+    if (tickets.length < batch.length) fail('no_ticket', batch.length - tickets.length)
+    out.accepted = true
+  } catch {
+    fail('bad_response', batch.length)
+  }
+  return out
 }

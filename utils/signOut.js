@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase, isGuest } from '../lib/supabase'
 
 const TOKEN_KEY = 'ada_registered_push_token'
+const LANG_KEY = '@trnc_lang'
 const CLEAR_TIMEOUT_MS = 3000
 
 let rememberedToken = null
@@ -15,10 +16,12 @@ let signingOut = false
 // The token THIS device registered, kept in AsyncStorage too so a launch where registration could
 // not run (offline, permission prompt pending) can still clear it. Local sign-out only clears a row
 // that still holds this exact token, so another phone's newer token on the same account survives.
-// The ONLY writer of profiles.push_token. Returns without writing while a sign-out is under way, and unless
-// the live session is still the non-guest user the effect captured (an admin signing in on this phone while
-// A's registration waited on the permission primer must not write onto A's row). Order: flag, session check,
-// remember (only for the right user), flag again, write; nothing but the flag check sits right before the write.
+// This file holds every client writer of profiles.push_token: savePushToken (signed-in, a direct update) and
+// the guest functions below (the set_guest_push RPC, which is guest-only on the server). Each returns without
+// writing while a sign-out is under way, and unless the live session is still the user the effect captured (an
+// admin signing in on this phone while A's registration waited on the permission primer must not write onto
+// A's row). Order: flag, session check, remember (only for the right user), flag again, write; nothing but the
+// flag check sits right before the write.
 export async function savePushToken(token, userId) {
   if (signingOut) return
   const { data: { session } } = await supabase.auth.getSession()
@@ -35,6 +38,31 @@ export async function savePushToken(token, userId) {
 export async function registeredPushToken() {
   if (rememberedToken) return rememberedToken
   try { return await AsyncStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+
+// Guest: the RPC also sets preferred_language, which the duty push reads. RPC errors are silent; the next
+// launch's silent registration (permission already granted) retries.
+export async function saveGuestPushToken(token, userId, lang) {
+  if (signingOut) return
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!isGuest(session) || session?.user?.id !== userId) return
+  if (signingOut) return
+  rememberedToken = token
+  try { await AsyncStorage.setItem(TOKEN_KEY, token) } catch {}
+  if (signingOut) return
+  await supabase.rpc('set_guest_push', { p_token: token, p_lang: lang })
+}
+
+// Guest language change: re-send the token this device registered with the new language. Nothing registered,
+// nothing to send (the next registration carries the language).
+export async function saveGuestPushLang(userId, lang) {
+  if (signingOut) return
+  const token = rememberedToken ?? await AsyncStorage.getItem(TOKEN_KEY).catch(() => null)
+  if (!token) return
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!isGuest(session) || session?.user?.id !== userId) return
+  if (signingOut) return
+  await supabase.rpc('set_guest_push', { p_token: token, p_lang: lang })
 }
 
 async function forgetPushToken() {
@@ -54,7 +82,14 @@ function boxed(work) {
 
 async function clearPushToken({ onlyThisDevice }) {
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session || isGuest(session)) return
+  if (!session) return
+  // A guest row belongs to this device alone, so its token goes unconditionally. The RPC needs a language and
+  // the helpers take none: the device copy, else English (an abandoned row's language matters to nobody).
+  if (isGuest(session)) {
+    const lang = (await AsyncStorage.getItem(LANG_KEY).catch(() => null)) || 'English'
+    await supabase.rpc('set_guest_push', { p_token: null, p_lang: lang })
+    return
+  }
   let query = supabase.from('profiles').update({ push_token: null }).eq('id', session.user.id)
   if (onlyThisDevice) {
     const token = rememberedToken ?? await AsyncStorage.getItem(TOKEN_KEY)
@@ -83,6 +118,16 @@ export async function signOutThisDevice() {
   signingOut = true
   await boxed(() => clearPushToken({ onlyThisDevice: true }))
   return finish(supabase.auth.signOut({ scope: 'local' }))
+}
+
+// A guest session replaced WITHOUT a sign-out (an email-confirmation or recovery link opened while a guest):
+// clear the guest row's token first, under the same flag, then run the switch. Anything else runs as is.
+export async function endGuestSessionThen(work) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!isGuest(session)) return work()
+  signingOut = true
+  await boxed(() => clearPushToken({ onlyThisDevice: true }))
+  return finish(Promise.resolve().then(work))
 }
 
 // Safety sign-outs: every device. clearToken true where the profiles row survives (under-13 email

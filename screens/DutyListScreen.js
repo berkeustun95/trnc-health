@@ -261,7 +261,8 @@ function RegionSheet({ visible, selected, onPick, onClose, lang }) {
   )
 }
 
-// `initialRegion` is a canonical region slug (from city welcome). We hoist that
+// `initialRegion` is a canonical region slug (a city-welcome link, or the home city when
+// App.js has no GPS fix). We hoist that
 // region's sections to the top rather than scrolling to them: the list is short,
 // and SectionList.scrollToLocation throws when the index is out of range — which
 // it would be on any day that region has no duty pharmacy.
@@ -287,10 +288,15 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   // is showing used to swap it for the nearest-first list under the user's thumb, throwing
   // their scroll away. Reopening the list picks up the fix (slice 4, 2026-09-28).
   const [lockedSort, setLockedSort] = useState(null)
+  // The hoisted region freezes with the sort: App.js's home-city default goes null once a fix
+  // lands, and the city on top must not drop back under the user's thumb. undefined = not yet
+  // frozen (null is a real value: nothing hoisted).
+  const [lockedHoist, setLockedHoist] = useState(undefined)
   useEffect(() => {
-    if (!loading && lockedSort === null) setLockedSort(liveSortByDistance)
+    if (!loading && lockedSort === null) { setLockedSort(liveSortByDistance); setLockedHoist(initialRegion) }
   }, [loading])
   const sortByDistance = lockedSort ?? liveSortByDistance
+  const hoistRegion = lockedHoist === undefined ? initialRegion : lockedHoist
 
   async function load() {
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
@@ -386,11 +392,11 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
     // Arrived from a city-welcome card: float that city's sections to the top,
     // keeping DISTRICT_ORDER within each group so the rest of the list is
     // untouched.
-    const hoist = new Set(REGION_TO_DUTY[initialRegion] ?? [])
+    const hoist = new Set(REGION_TO_DUTY[hoistRegion] ?? [])
     return hoist.size
       ? [...sorted.filter(x => hoist.has(x.title)), ...sorted.filter(x => !hoist.has(x.title))]
       : sorted
-  }, [shown, region, initialRegion])
+  }, [shown, region, hoistRegion])
 
   // Flat nearest-first — ee28b42's shape, including its null-last tiebreak. Rows with no
   // matched coordinate keep their place at the END rather than being dropped: an unmatched
