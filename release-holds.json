@@ -77,6 +77,14 @@
       "since": "2026-11-17",
       "cleared": false,
       "clear": "Only after 20261217 is applied, admin-push is deployed with ADMIN_PUSH_TEST_USER_IDS set, Berke has seen a QA-only test send on Preview and says go in chat. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 489,
+      "commit": "3d4b8f055f0c9451ba12ecf92a21e420493db18e",
+      "what": "Admin: Data jobs section + pause/resume switches, RE-LANDED on main (reverts of #478 d3d12fcc/3a623ca9), PR #489",
+      "since": "2026-11-17",
+      "cleared": false,
+      "clear": "Only after Berke has tried the Data jobs switches on Preview (test with weekend-digest, not duty-push) and says go in chat. Then set cleared to true in a PR."
     }
   ]
 }
