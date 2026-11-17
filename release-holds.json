@@ -75,7 +75,9 @@
       "commit": "d7d35a009638032077f21a81890f6db6678594d6",
       "what": "Admin duty swap + Broadcast pushes moved to the admin-push edge function (app side), PR #487",
       "since": "2026-11-17",
-      "cleared": false,
+      "cleared": true,
+      "clearedOn": "2026-11-17",
+      "clearedBy": "Berke, in chat: Go for both #487 + #489, after the QA-only Broadcast double test on Preview 1fb04f98 (Qa test 3 / Qa test 4 each once on the test phone)",
       "clear": "Only after 20261217 is applied, admin-push is deployed with ADMIN_PUSH_TEST_USER_IDS set, Berke has seen a QA-only test send on Preview and says go in chat. Then set cleared to true in a PR."
     },
     {
@@ -83,7 +85,9 @@
       "commit": "3d4b8f055f0c9451ba12ecf92a21e420493db18e",
       "what": "Admin: Data jobs section + pause/resume switches, RE-LANDED on main (reverts of #478 d3d12fcc/3a623ca9), PR #489",
       "since": "2026-11-17",
-      "cleared": false,
+      "cleared": true,
+      "clearedOn": "2026-11-17",
+      "clearedBy": "Berke, in chat: Go for both #487 + #489; he tested the Data jobs switches and the alert push tap on Preview and it passed",
       "clear": "Only after Berke has tried the Data jobs switches on Preview (test with weekend-digest, not duty-push) and says go in chat. Then set cleared to true in a PR."
     }
   ]
