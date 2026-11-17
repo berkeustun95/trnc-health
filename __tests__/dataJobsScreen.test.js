@@ -2,9 +2,12 @@
 // malformed payload fail closed, the no-success and no-record lines), not about layout on a phone. The RPC is not live.
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default)
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }))
+let mockKbTop = null
+jest.mock('../utils/useKeyboardTop', () => ({ __esModule: true, default: () => mockKbTop }))
 jest.mock('../lib/supabase', () => ({ supabase: { rpc: jest.fn() } }))
 
-import { render, screen, fireEvent } from '@testing-library/react-native'
+import { Platform, View } from 'react-native'
+import { render, screen, fireEvent, act } from '@testing-library/react-native'
 import { t } from '../constants/i18n'
 const { supabase } = require('../lib/supabase')
 const DataJobsTab = require('../components/AdminDataJobs').default
@@ -96,5 +99,109 @@ describe('row lines', () => {
   test('an unknown state shows the Unknown pill rather than crashing', async () => {
     await mount({ data: [row('job_u', 'brand_new')], error: null })
     expect(await screen.findByText(t('adminJobsStateUnknown', L))).toBeTruthy()
+  })
+})
+
+describe('pause / resume switches', () => {
+  const sw = (key, extra = {}) => row(key, 'ok', { switchable: true, last_run: okRun, last_ok_at: okRun.started_at, ...extra })
+  const pausedRow = key => sw(key, { state: 'paused', paused: true, paused_note: 'vendor outage', paused_at: iso(7200e3) })
+  const pauseTitle = k => t('adminJobsPauseTitle', L).replace('{job}', k)
+  const resumeTitle = k => t('adminJobsResumeTitle', L).replace('{job}', k)
+  const switches = () => screen.queryAllByRole('switch')
+  const mountWrite = async (rows, write) => {
+    supabase.rpc.mockImplementation(async (name, args) => (name === 'admin_data_jobs' ? { data: rows, error: null } : write(args)))
+    await render(<DataJobsTab lang={L} />)
+    await screen.findByText(rows[0].key)
+  }
+  const confirmBtn = () => screen.getByText(t('adminJobsPauseConfirm', L))
+  const typeReason = txt => fireEvent.changeText(screen.getByLabelText(t('adminJobsPauseReason', L)), txt)
+  const flip = (key, on) => fireEvent(screen.getByLabelText(t('adminJobsSwitchLabel', L).replace('{job}', key)), 'valueChange', on)
+
+  test('a switch only on switchable rows', async () => {
+    await mountWrite([sw('job_s'), row('job_x', 'ok', { last_run: okRun, last_ok_at: okRun.started_at })], () => ({ data: null, error: null }))
+    expect(switches()).toHaveLength(1)
+    expect(screen.getByText(t('adminJobsSwitchRow', L))).toBeTruthy()
+  })
+
+  test('pause needs a non-blank reason; success replaces the row and sends the trimmed note', async () => {
+    const calls = []
+    await mountWrite([sw('job_s'), sw('job_t')], args => { calls.push(args); return { data: { ...pausedRow('job_s'), paused_note: 'vendor outage' }, error: null } })
+    await flip('job_s', false)
+    expect(await screen.findByText(pauseTitle('job_s'))).toBeTruthy()
+    expect(screen.getByLabelText(t('adminJobsPauseConfirm', L)) ?? confirmBtn()).toBeTruthy()
+    await typeReason('   ')
+    await fireEvent.press(confirmBtn())
+    expect(calls).toHaveLength(0)
+    await typeReason('  vendor outage  ')
+    expect(screen.getByText('17/200')).toBeTruthy()
+    await fireEvent.press(confirmBtn())
+    expect(screen.getByText(pauseTitle('job_s'))).toBeTruthy()
+    expect(await screen.findByText(/Paused: vendor outage/)).toBeTruthy()
+    expect(calls).toEqual([{ p_job: 'job_s', p_paused: true, p_note: 'vendor outage' }])
+    expect(screen.getByText(/^Paused since /)).toBeTruthy()
+    expect(screen.getByText('job_t')).toBeTruthy()
+  })
+
+  test('NOTE_REQUIRED keeps the switch on and shows the localized message', async () => {
+    await mountWrite([sw('job_s')], () => ({ data: null, error: { message: 'NOTE_REQUIRED' } }))
+    await flip('job_s', false)
+    await typeReason('why')
+    await fireEvent.press(confirmBtn())
+    expect(await screen.findByText(t('adminJobsErrNote', L))).toBeTruthy()
+    expect(switches()[0].props.value).toBe(true)
+  })
+
+  test('a missing function (PGRST202) reads "not available yet" and leaves the switch', async () => {
+    await mountWrite([sw('job_s')], () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }))
+    await flip('job_s', false)
+    await typeReason('why')
+    await fireEvent.press(confirmBtn())
+    expect(await screen.findByText(t('adminJobsErrUnavailable', L))).toBeTruthy()
+    expect(switches()[0].props.value).toBe(true)
+  })
+
+  test('resume: one-line confirm, then the row is replaced and sends no note', async () => {
+    const calls = []
+    await mountWrite([pausedRow('job_s')], args => { calls.push(args); return { data: sw('job_s'), error: null } })
+    expect(switches()[0].props.value).toBe(false)
+    await flip('job_s', true)
+    expect(await screen.findByText(resumeTitle('job_s'))).toBeTruthy()
+    await fireEvent.press(screen.getByText(t('adminJobsResumeConfirm', L)))
+    await screen.findByText(/^Last run:/)
+    expect(calls).toEqual([{ p_job: 'job_s', p_paused: false, p_note: null }])
+    expect(screen.queryByText(/Paused: vendor outage/)).toBeNull()
+    expect(switches()[0].props.value).toBe(true)
+  })
+
+  test('the duty warning shows for duty-push', async () => {
+    await mountWrite([sw('duty-push')], () => ({ data: null, error: null }))
+    await flip('duty-push', false)
+    expect(await screen.findByText(t('adminJobsDutyWarn', L))).toBeTruthy()
+  })
+
+  test('control: no duty warning for another job', async () => {
+    await mountWrite([sw('job_s')], () => ({ data: null, error: null }))
+    await flip('job_s', false)
+    await screen.findByText(pauseTitle('job_s'))
+    expect(screen.queryByText(t('adminJobsDutyWarn', L))).toBeNull()
+  })
+
+  test('Android keyboard open: the sheet body is measured on a View and nothing throws', async () => {
+    const orig = Platform.OS
+    const spy = jest.spyOn(View.prototype, 'measureInWindow').mockImplementation(cb => cb(0, 400, 300, 200))
+    try {
+      Platform.OS = 'android'
+      await mountWrite([sw('job_s')], () => ({ data: null, error: null }))
+      await flip('job_s', false)
+      await screen.findByText(pauseTitle('job_s'))
+      expect(spy).not.toHaveBeenCalled()
+      mockKbTop = 500   // the keyboard opens once the sheet is up; typing re-renders the sheet
+      await typeReason('vendor outage')
+      expect(spy).toHaveBeenCalled()
+    } finally {
+      Platform.OS = orig
+      mockKbTop = null
+      spy.mockRestore()
+    }
   })
 })

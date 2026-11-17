@@ -102,3 +102,15 @@ describe('App.js / AdminScreen.js wiring', () => {
     expect(bail).toBeLessThan(eff.indexOf('onOpenRequestHandled?.()'))
   })
 })
+
+describe('adminPushRequest: Data jobs', () => {
+  test('opens the Data jobs tab, with or without the Bandabuliya flag', () => {
+    expect(load()({ screen: 'admin', tab: 'datajobs' })).toEqual({ tab: 'DataJobs' })
+    expect(load({ flagOff: true })({ screen: 'admin', tab: 'datajobs' })).toEqual({ tab: 'DataJobs' })
+  })
+  test('other tabs and screens are not this route', () => {
+    const req = load()
+    expect(req({ screen: 'marketplace', tab: 'datajobs' })).toBeNull()
+    expect(req({ screen: 'admin', tab: 'datajob' })).toBeNull()
+  })
+})
