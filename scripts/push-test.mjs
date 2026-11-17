@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─── Send ONE test push to one account's device, from GitHub Actions only ────
 //
-//   gh workflow run push-test -f email=<account email> [-f kind=plain|messages]
+//   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty|datajobs]
 //
 // Proves the chain the app depends on: profiles.push_token → Expo push service → FCM (Android)
 // or APNs (iOS) → device. The token is looked up through the Management API's READ-ONLY
@@ -15,6 +15,8 @@
 // type:'message'}): tapping it must open Student Hub → Messages (the "old push" path).
 // kind=duty sends the duty push's own data ({screen:'duty', date}, as send-duty-notification): tapping it must open
 // Nöbetçi Eczane from a killed, a backgrounded and a foreground app.
+// kind=datajobs sends the data-jobs watchdog's data ({screen:'admin', tab:'datajobs'}, as 20261211): tapping it must open
+// AdminScreen's Data jobs tab. Admin accounts only (AdminScreen is the only reader; a non-admin tap is a no-op).
 import { readFileSync } from 'node:fs'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 import { seal } from './lib/readonly-seal.mjs'
@@ -34,7 +36,7 @@ const dedupe = process.argv[5] || 'on'
 const text = (process.argv[6] || '').trim()
 if (text && !/^[A-Za-z0-9 ]{1,24}$/.test(text)) fail('Refused: text must be 1-24 letters, digits or spaces.')
 if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
-if (!['plain', 'messages', 'duty'].includes(kind)) fail(`Refused: kind must be plain, messages or duty, got ${kind}.`)
+if (!['plain', 'messages', 'duty', 'datajobs'].includes(kind)) fail(`Refused: kind must be plain, messages, duty or datajobs, got ${kind}.`)
 const mailbox = e => { const [l, d] = e.split('@'); return `${l.split('+')[0]}@${d}` }
 if (email2) {
   if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email2)) fail('Refused: the second e-mail is not an email.')
@@ -64,14 +66,17 @@ async function lookup(e) {
 const accounts = [await lookup(email), ...(email2 ? [await lookup(email2)] : [])]
 const recipients = email2 && dedupe === 'on' ? onePerToken(accounts) : accounts
 const { id, role, push_token: pt, preferred_language: lang } = recipients[0]
+if (kind === 'datajobs' && recipients.some(r => r.role !== 'admin')) fail('Refused: kind=datajobs goes to admin accounts only.')
 
 const tr = lang === 'Turkish'
 const trncToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Famagusta' }).format(new Date())
 const data = kind === 'messages' ? { screen: 'conversation', type: 'message' }
-  : kind === 'duty' ? { screen: 'duty', date: trncToday } : {}
+  : kind === 'duty' ? { screen: 'duty', date: trncToday }
+  : kind === 'datajobs' ? { screen: 'admin', tab: 'datajobs' } : {}
 const BODY = {
   messages: tr ? 'Dokun: Mesajlar açılmalı' : 'Tap: Messages should open',
   duty: tr ? 'Test: dokun, Nöbetçi Eczane açılmalı' : 'Test: tap, Duty Pharmacies should open',
+  datajobs: tr ? 'Test: dokun, Veri görevleri açılmalı' : 'Test: tap, Data jobs should open',
   plain: tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.',
 }
 const TITLE = kind === 'duty' ? (tr ? '💊 Bugünkü Nöbetçi Eczane' : "💊 Today's Duty Pharmacy") : (tr ? 'ADA test bildirimi' : 'ADA test notification')
