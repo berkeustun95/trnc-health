@@ -20,6 +20,18 @@ const CHAIN = ['20261183_marketplace_listings.sql', '20261184_marketplace_messag
   '20261190_marketplace_terms.sql', '20261192_notifications_listing_id.sql'].map(MIG)
 const F196 = MIG('20261196_marketplace_photo_review_reminder.sql')
 const SRC = readFileSync(F196, 'utf8')
+// 20261218 also replaces data_jobs_watchdog (not part of this harness: tests/test-data-jobs-r2-sql.mjs runs the whole file). Here only its reminder
+// section (function + REVOKE/GRANT) is applied, as the text of that very file, in its own transaction.
+const SRC218_FULL = readFileSync(MIG('20261218_admin_alerts_english.sql'), 'utf8')
+const slice218 = src => {
+  const a = src.indexOf('-- ─── 2. The photo reminder, English'), b = src.indexOf('-- ─── Assertions + probes')
+  if (a < 0 || b < a) throw new Error('20261218: the reminder section markers are missing')
+  return `SET ROLE postgres;\nBEGIN;\n${src.slice(a, b)}\nCOMMIT;\nRESET ROLE;\n`
+}
+const SRC218 = slice218(SRC218_FULL)
+const TMPDIR = mkdtempSync(join(tmpdir(), 'mk-reminder-218-'))
+const F218 = join(TMPDIR, 'f218-reminder-section.sql'); writeFileSync(F218, SRC218)
+process.on('exit', () => rmSync(TMPDIR, { recursive: true, force: true }))
 
 const CRON_STUB = `
 CREATE SCHEMA IF NOT EXISTS cron;
@@ -65,12 +77,16 @@ INSERT INTO profiles (id, display_name, date_of_birth, role, terms_version, push
 INSERT INTO storage.buckets (id, name) VALUES ('marketplace-photos', 'marketplace-photos') ON CONFLICT DO NOTHING;`
 }
 
-async function build({ file = F196, admins = true } = {}) {
+// 20261218's reminder section follows 20261196 (English text); `pre` runs between them (drift to repair)
+async function build({ file = F196, file218 = F218, admins = true, pre = '' } = {}) {
   const db = await freshDb(BASE + CRON_STUB + STUBS + seedSql({ admins }))
   for (const f of [...CHAIN, file]) {
     const r = await applyFile(db, f)
     if (!r.ok) throw new Error(`apply ${f.split('/').pop()} failed: ${r.msg}`)
   }
+  if (pre) await db.exec(pre)
+  const r218 = await applyFile(db, file218)
+  if (!r218.ok) throw new Error(`apply ${file218.split('/').pop()} failed: ${r218.msg}`)
   return db
 }
 
@@ -125,7 +141,7 @@ async function sentTo(db, count) {
   const notifs = await q(db, `SELECT user_id::text u, title, body, type, listing_id FROM notifications`)
   const logs = await q(db, `SELECT user_id::text u, kind, request_id FROM push_log`)
   const calls = await q(db, `SELECT url, body, headers FROM net.calls`)
-  const body = `${count} fotoğraf onay bekliyor`
+  const body = `${count} ${count === 1 ? 'photo' : 'photos'} waiting for review`
   const why = []
   if (!sameSet(notifs.map(r => r.u), ADMINS)) why.push(['notice recipients', notifs.map(r => r.u)])
   if (!notifs.every(r => r.title === 'Bandabuliya' && r.body === body && r.type === 'admin_alert' && r.listing_id === null)) why.push(['notice text', notifs])
@@ -266,7 +282,8 @@ const CASES = [
   ['a re-apply keeps the stamp and leaves one job', async db => {
     const lid = await listing(db); await photo(db, lid)
     await remind(db); const s1 = await lastStamp(db)
-    const again = await applyFile(db, CURRENT_FILE)
+    const again0 = await applyFile(db, CURRENT_FILE); const again1 = await applyFile(db, CURRENT_218)
+    const again = { ok: again0.ok && again1.ok, again0, again1 }
     const s2 = await lastStamp(db)
     const jobs = await n(db, `SELECT count(*)::int n FROM cron.job WHERE jobname = 'marketplace-photo-review-reminder'`)
     const rows = await n(db, `SELECT count(*)::int n FROM marketplace_photo_reminder_state`)
@@ -277,9 +294,9 @@ const CASES = [
 let failed = 0
 const check = (name, ok, got) => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  got: ' + JSON.stringify(got)}`) }
 
-let CURRENT_FILE = F196  // the file under test: the real one, or a mutant copy (a re-apply must re-apply the SAME text)
+let CURRENT_FILE = F196, CURRENT_218 = F218  // the file under test: the real one, or a mutant copy (a re-apply must re-apply the SAME text)
 async function runCase(fn, opts) {
-  pos = {}; CURRENT_FILE = opts?.file ?? F196
+  pos = {}; CURRENT_FILE = opts?.file ?? F196; CURRENT_218 = opts?.file218 ?? F218
   try { const db = await build(opts); const [ok, got] = await fn(db); await db.close(); return { ok, got } }
   catch (e) { return { ok: false, got: e.message } }
 }
@@ -337,6 +354,7 @@ for (const [name, fn] of CASES) {
 
 // ── RED-FIRST mutants: break the function on a COPY (anchor asserted present exactly once), the named case must go red ──
 // `neut` turns one in-migration catalog assertion into a NOTICE, so what goes red is the BEHAVIOUR case, not the shape check.
+const DRIFT = `GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO authenticated, anon;`
 const MUTANTS = [
   { n: 'M1 the 30-minute window removed', pairs: [[`IF v_last IS NOT NULL AND v_last > now() - interval '30 minutes' THEN`, `IF false THEN`]],
     red: 'a new photo inside the 30 minutes' },
@@ -362,32 +380,42 @@ const MUTANTS = [
     red: 'waiting photos → every admin' },
   { n: 'M7 EXECUTE granted to authenticated', pairs: [[`GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;`,
       `GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role, authenticated;`]],
-    neut: [`% can execute marketplace_photo_review_reminder()`], red: 'anon and authenticated cannot execute' },
-  { n: 'M8 the function REVOKE dropped (Supabase default privileges keep anon/authenticated)', pairs: [[`REVOKE ALL ON FUNCTION public.marketplace_photo_review_reminder() FROM PUBLIC, anon, authenticated;\n`, '']],
-    neut: [`% can execute marketplace_photo_review_reminder()`], red: 'anon and authenticated cannot execute' },
+    red: 'anon and authenticated cannot execute' },
+  // CREATE OR REPLACE keeps the ACL it finds, so the REVOKE in 20261218 only matters on a function whose ACL drifted open between the two
+  // files: the mutant runs on exactly that database (the drift is `pre`), and the real file must repair it (checked after the mutants).
+  { n: 'M8 the function REVOKE dropped from 20261218, on a function whose ACL drifted open', pre: DRIFT, pairs: [[`REVOKE ALL ON FUNCTION public.marketplace_photo_review_reminder() FROM PUBLIC, anon, authenticated;\n`, '']],
+    red: 'anon and authenticated cannot execute' },
   { n: 'M9 stamped even when no admin was notified', pairs: [[`IF n > 0 THEN\n    INSERT INTO marketplace_photo_reminder_state`, `IF true THEN\n    INSERT INTO marketplace_photo_reminder_state`]],
     red: 'zero admins' },
-  { n: 'M10 the text counts only the NEW photos', pairs: [[`bdy := v_count || ' fotoğraf onay bekliyor';`, `bdy := v_new || ' fotoğraf onay bekliyor';`]],
+  { n: 'M10 the text counts only the NEW photos', pairs: [[`bdy := v_count || CASE WHEN v_count = 1`, `bdy := v_new || CASE WHEN v_count = 1`]],
     red: 'a new photo 31 minutes later' },
+  { n: 'M21 the singular branch dropped (always "photos")', pairs: [[`CASE WHEN v_count = 1 THEN`, `CASE WHEN false THEN`]],
+    red: 'photos on a deleted listing are not counted' },
+  { n: 'M22 the plural branch says "photo"', pairs: [[`ELSE ' photos waiting for review' END`, `ELSE ' photo waiting for review' END`]],
+    red: 'a new photo inside the 30 minutes' },
+  { n: 'M23 the body left Turkish', pairs: [[`CASE WHEN v_count = 1 THEN ' photo waiting for review' ELSE ' photos waiting for review' END`, `' fotoğraf onay bekliyor'`]],
+    red: 'waiting photos → every admin' },
+  { n: 'M24 the title is not the module name', pairs: [[`ttl := 'Bandabuliya';`, `ttl := 'Admin';`]],
+    red: 'waiting photos → every admin' },
   { n: 'M11 the type is general, not admin_alert', pairs: [[`VALUES (r.id, ttl, bdy, 'admin_alert');`, `VALUES (r.id, ttl, bdy, 'general');`]],
     red: 'waiting photos → every admin' },
-  { n: 'M12 the job runs every 30 minutes', pairs: [[`'marketplace-photo-review-reminder', '*/5 * * * *'`, `'marketplace-photo-review-reminder', '*/30 * * * *'`]],
+  { n: 'M12 the job runs every 30 minutes', on: '196', pairs: [[`'marketplace-photo-review-reminder', '*/5 * * * *'`, `'marketplace-photo-review-reminder', '*/30 * * * *'`]],
     neut: [`marketplace-photo-review-reminder has the wrong schedule or command`], red: 'the job: one row' },
-  { n: 'M13 the state table REVOKE dropped', pairs: [[`REVOKE ALL ON public.marketplace_photo_reminder_state FROM PUBLIC, anon, authenticated;\n`, '']],
+  { n: 'M13 the state table REVOKE dropped', on: '196', pairs: [[`REVOKE ALL ON public.marketplace_photo_reminder_state FROM PUBLIC, anon, authenticated;\n`, '']],
     neut: [`% holds a privilege on marketplace_photo_reminder_state`], red: 'the state table' },
-  { n: 'M14 [catalog] the state table loses RLS → apply refused', pairs: [[`ALTER TABLE public.marketplace_photo_reminder_state ENABLE ROW LEVEL SECURITY;\n`, '']],
+  { n: 'M14 [catalog] the state table loses RLS → apply refused', on: '196', pairs: [[`ALTER TABLE public.marketplace_photo_reminder_state ENABLE ROW LEVEL SECURITY;\n`, '']],
     applyFails: 'marketplace_photo_reminder_state has RLS off' },
   { n: 'M18 the stamp is an UPDATE (a missing row is never re-created)', pairs: [[`    INSERT INTO marketplace_photo_reminder_state (id, last_sent_at) VALUES (true, now())\n    ON CONFLICT (id) DO UPDATE SET last_sent_at = excluded.last_sent_at;`,
       `    UPDATE marketplace_photo_reminder_state SET last_sent_at = now() WHERE id;`]],
     red: 'a missing state row heals' },
-  { n: 'M15 a re-apply resets the stamp', pairs: [[`ON CONFLICT (id) DO NOTHING;`, `ON CONFLICT (id) DO UPDATE SET last_sent_at = NULL;`]],
+  { n: 'M15 a re-apply resets the stamp', on: '196', pairs: [[`ON CONFLICT (id) DO NOTHING;`, `ON CONFLICT (id) DO UPDATE SET last_sent_at = NULL;`]],
     red: 'a re-apply keeps the stamp' },
-  { n: 'M16 [catalog] authenticated granted, assertion live → apply refused', pairs: [[`GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;`,
+  { n: 'M16 [catalog] authenticated granted, assertion live → apply refused', on: '196', pairs: [[`GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;`,
       `GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role, authenticated;`]],
     applyFails: 'authenticated can execute marketplace_photo_review_reminder()' },
   // Removing the GRANT alone changes nothing: Supabase's default privileges (modelled by the harness) already give service_role
   // EXECUTE, so the explicit GRANT is belt-and-braces. The break that can happen is a revoke.
-  { n: 'M17 [catalog] service_role EXECUTE revoked → apply refused (positive control)', pairs: [[`GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;`,
+  { n: 'M17 [catalog] service_role EXECUTE revoked → apply refused (positive control)', on: '196', pairs: [[`GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;`,
       `REVOKE EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() FROM service_role;`]],
     applyFails: 'service_role cannot execute marketplace_photo_review_reminder()' },
 ]
@@ -397,7 +425,8 @@ else {
   const dir = mkdtempSync(join(tmpdir(), 'mk-reminder-mutants-'))
   try {
     for (const m of MUTANTS) {
-      let text = SRC, missing = null
+      const on196 = m.on === '196'
+      let text = on196 ? SRC : SRC218, missing = null
       const pairs = [...m.pairs, ...(m.neut ?? []).map(x => [`RAISE EXCEPTION '${x}`, `RAISE NOTICE '${x}`])]
       for (const [from, to] of pairs) {
         const k = text.split(from).length - 1
@@ -406,19 +435,44 @@ else {
       }
       if (missing) { check(`${m.n}: anchor present once`, false, missing); continue }
       const p = join(dir, m.n.replace(/\W+/g, '_') + '.sql'); writeFileSync(p, text)
+      const bopts = on196 ? { file: p } : { file218: p, pre: m.pre ?? '' }
       if (m.applyFails) {
         let msg = null
-        try { await build({ file: p }) } catch (e) { msg = e.message }
+        try { await build(bopts) } catch (e) { msg = e.message }
         check(`${m.n}: RED (apply refused with "${m.applyFails}")`, msg !== null && msg.includes(m.applyFails), msg ?? 'applied!')
         continue
       }
       const target = CASES.filter(([name]) => name.startsWith(m.red))
       if (target.length !== 1) { check(`${m.n}: names exactly one case`, false, target.map(t => t[0])); continue }
-      const { ok, got } = await runCase(target[0][1], { file: p })
+      const { ok, got } = await runCase(target[0][1], bopts)
       check(`${m.n}: RED on "${target[0][0].slice(0, 60)}…"`, !ok, ok ? 'stayed GREEN' : got)
       if (!ok) console.log(`      red evidence: ${JSON.stringify(got).slice(0, 220)}`)
     }
   } finally { rmSync(dir, { recursive: true, force: true }) }
+}
+
+// The real 20261218 repairs an ACL that drifted open (positive control for M8), and changes nothing but the function body.
+{
+  const db = await build({ pre: DRIFT })
+  const can = r => db.query(`SELECT has_function_privilege('${r}', 'public.marketplace_photo_review_reminder()', 'EXECUTE') AS b`).then(x => x.rows[0].b)
+  check('20261218 repairs a drifted ACL: anon / authenticated denied, service_role kept (positive control)',
+    (await can('anon')) === false && (await can('authenticated')) === false && (await can('service_role')) === true, { anon: await can('anon'), authenticated: await can('authenticated'), service_role: await can('service_role') })
+  await db.close()
+}
+{
+  const SNAP2 = `SELECT 'fn ' || p.oid::regprocedure::text AS k, md5(pg_get_functiondef(p.oid)) AS v, md5(coalesce(p.proacl::text, '')) AS a
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('public', 'private', 'storage', 'auth', 'net', 'cron') AND p.prokind = 'f'`
+  const db = await freshDb(BASE + CRON_STUB + STUBS + seedSql())
+  for (const f of [...CHAIN, F196]) { const r = await applyFile(db, f); if (!r.ok) throw new Error(f + ': ' + r.msg) }
+  const before = new Map((await q(db, SNAP2)).map(r => [r.k, r]))
+  const r = await applyFile(db, F218)
+  const after = new Map((await q(db, SNAP2)).map(r => [r.k, r]))
+  const bodyChanged = [...before].filter(([k, v]) => after.get(k)?.v !== v.v).map(([k]) => k)
+  const aclChanged = [...before].filter(([k, v]) => after.get(k)?.a !== v.a).map(([k]) => k)
+  console.log(`  20261218 section: ${before.size} functions; body changed: ${JSON.stringify(bodyChanged)}; ACL changed: ${JSON.stringify(aclChanged)}; added: ${JSON.stringify([...after.keys()].filter(k => !before.has(k)))}`)
+  check('20261218: only marketplace_photo_review_reminder() changes (body), no ACL changes, nothing added', r.ok && JSON.stringify(bodyChanged) === JSON.stringify(['fn marketplace_photo_review_reminder()'])
+    && aclChanged.length === 0 && after.size === before.size, { r, bodyChanged, aclChanged })
+  await db.close()
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed')
