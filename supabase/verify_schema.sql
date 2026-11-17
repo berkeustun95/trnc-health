@@ -2102,7 +2102,8 @@ WITH report AS (
     -- 20261205 data jobs. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
     -- (a) both tables: RLS on, ZERO policies, no anon/authenticated privilege (table or any column), service_role keeps it;
     -- (b) record_data_job_run: EXECUTE for service_role, none for PUBLIC / anon / authenticated; data_jobs_overview: EXECUTE held by nobody but the owner;
-    --     admin_data_jobs: authenticated yes, anon no; (c) the admin gate is the three-part shape and the overview reads cron's result ONLY for cron_sql;
+    --     admin_data_jobs: authenticated yes, anon no; (c) the admin gate is the three-part shape and the overview reads cron's result ONLY for cron_sql
+    --     (the stale / no_record arm order is the 1210 token's: 20261210 replaced the overview body);
     -- (d) no row is paused (20261210 made seven rows switchable: the 1210 H token owns that set).
     UNION ALL SELECT '20261205_data_jobs','data_jobs + data_job_runs: RLS on, 0 policies, no client privilege (table or column), service_role writes',
       COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c WHERE c.oid IN (to_regclass('public.data_jobs'), to_regclass('public.data_job_runs'))), false)
@@ -2137,9 +2138,6 @@ WITH report AS (
                AND pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%RAISE EXCEPTION ''ADMIN_ONLY'';%', false)
       AND COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%JOIN cron.job_run_details d ON d.jobid = j.jobid%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND coalesce(d.start_time, d.end_time) >%'
-               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.runner = ''cron_sql'' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN ''stale''') > 0
-               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.runner = ''cron_sql'' AND j.expected_every IS NOT NULL AND j.l_key IS NULL THEN ''stale''')
-                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
                AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
@@ -2153,11 +2151,30 @@ WITH report AS (
     -- (a) EXACTLY the seven switchable jobs (derived, so an eighth or a missing one reads red); (b) function grants: the admin switch authenticated yes /
     --     anon no and DEFINER, the gate service_role only, the pause helper service_role only, the watchdog owner only, the age function service_role only
     --     and DEFINER; (c) the two due() gates carry the pause clause; (d) the watchdog state table: RLS on, ZERO policies, no privilege for anyone but the owner;
-    --     (e) the watchdog speaks to admins only, with the admin_alert type and the Data jobs tab in the push data.
+    --     (e) the watchdog speaks to admins only, with the admin_alert type and the Data jobs tab in the push data;
+    --     (f) data_jobs_overview's 20261210 body: INVOKER, search_path pinned, grace_over, the grace-gated stale arms in their order after paused,
+    --     cron.job_run_details read only in the cron_sql arm, never return_message / command / net._http_response.
     UNION ALL SELECT '20261210_data_jobs_switches','exactly seven switchable jobs: duty-push, duyurular-fetch, gisekibris-feed, google-places-refresh, novest-images, sync-novest, weekend-digest',
       COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT string_agg(key, '','' ORDER BY key) AS n FROM public.data_jobs WHERE switchable', false, true, '')))[1]::text
                          = 'duty-push,duyurular-fetch,gisekibris-feed,google-places-refresh,novest-images,sync-novest,weekend-digest'
                  WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
+    UNION ALL SELECT '20261210_data_jobs_switches','data_jobs_overview (1210 body): INVOKER, search_path=public, grace_over; stale arms grace-gated, order inactive < paused < stale < no_record < second stale; cron.job_run_details only in the cron_sql arm, never return_message / command / net._http_response',
+      COALESCE((SELECT NOT p.prosecdef AND p.proconfig = ARRAY['search_path=public'] FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_overview(timestamptz)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%(p_now > d.records_expected_from + d.expected_every) AS grace_over%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%JOIN cron.job_run_details d ON d.jobid = j.jobid%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND coalesce(d.start_time, d.end_time) >%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.cron_active IS NOT DISTINCT FROM false THEN ''inactive''') > 0
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.cron_active IS NOT DISTINCT FROM false THEN ''inactive''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.paused THEN ''paused''')
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.paused THEN ''paused''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.expected_every IS NOT NULL AND j.l_key IS NULL AND j.grace_over THEN ''stale''')
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.expected_every IS NOT NULL AND j.l_key IS NULL AND j.grace_over THEN ''stale''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.expected_every IS NOT NULL AND j.grace_over AND (j.last_ok_at IS NULL OR j.last_ok_at < p_now - j.expected_every) THEN ''stale'''), false)
     UNION ALL SELECT '20261210_data_jobs_switches','admin_set_data_job_paused: DEFINER, authenticated yes, anon no, three-part gate; gate + pause helper: service_role only, INVOKER',
       COALESCE(has_function_privilege('authenticated', to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'), 'EXECUTE')
            AND NOT has_function_privilege('anon', to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'), 'EXECUTE')
