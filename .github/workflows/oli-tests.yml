@@ -26,6 +26,10 @@ jobs:
           node scripts/check-data-job-heartbeats.mjs
           node scripts/data-job-gate.mjs --selftest
           node scripts/check-data-jobs-watchdog.mjs --selftest
+      - name: Dispatcher actor guard (offline)
+        run: |
+          node scripts/check-dispatcher-actor.mjs --selftest
+          node scripts/check-dispatcher-actor.mjs
       - name: sync-novest caller gate (offline guard)
         run: node scripts/check-sync-novest-auth.mjs
       - name: push functions caller gate (offline guard)
