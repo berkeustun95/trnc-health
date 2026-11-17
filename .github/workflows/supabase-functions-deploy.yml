@@ -21,12 +21,13 @@ on:
       function:
         description: 'Function to deploy'
         type: choice
-        options: ['weather', 'walk-leg', 'apple-token', 'sync-novest', 'send-duty-notification', 'send-weekend-digest', 'live-scores-football', 'live-scores-basketball', 'live-scores-f1', 'google-places', 'vehicle-photo', 'all']
+        options: ['weather', 'walk-leg', 'apple-token', 'sync-novest', 'send-duty-notification', 'send-weekend-digest', 'live-scores-football', 'live-scores-basketball', 'live-scores-f1', 'google-places', 'vehicle-photo', 'admin-push', 'all']
 
 concurrency: { group: supabase-functions, cancel-in-progress: false }
 
 jobs:
   deploy:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 20
@@ -75,6 +76,12 @@ jobs:
               console.log(`  ${ok ? "✓" : "✗"} ${f}: live verify_jwt=${l.verify_jwt} v${l.version}, file says ${c[f].verify_jwt}`)
             }
             if (bad) { console.error("::error::live verify_jwt differs from deploy-config.json — decide which is right, edit the file, re-run"); process.exit(1) }'
+      - name: sync-novest caller gate (offline guard)
+        run: node scripts/check-sync-novest-auth.mjs
+      - name: push functions caller gate (offline guard)
+        run: node scripts/check-push-fn-auth.mjs
+      - name: admin-push admin gate (offline guard)
+        run: node scripts/check-admin-push-auth.mjs
       - name: Deploy
         run: |
           for f in $TARGETS; do

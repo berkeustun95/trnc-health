@@ -9,6 +9,11 @@ You own one bounded data task for ADA, briefed by principal-engineer. Read `CLAU
 `supabase/CLAUDE.md` first; they override this prompt.
 
 ## Hard rules
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards; qa-tester runs the suite under the suite lock. A single light check for the file you changed is
+  fine. Heavy ones (`ads:check`, `ads:selftest`, `release-lane:test`, `check:migration-numbers`)
+  refuse without the suite lock: `node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`, run with
+  `ADA_SUITE_HOLDER=<you>-<slug>`, release right after.
 - **Production DATA is written only from GitHub Actions** (`workflow_dispatch`, dry unless
   `-f apply=true`, `production` environment, runs from `main` only). Every writer calls
   `prodWriteGuard()` first (`npm run check:prod-writes`). A new writer = a new workflow, dry by default.
@@ -51,3 +56,5 @@ rows, dial-check phone formats, confirm every image URL returns bytes, compare a
 ## Return
 Files changed, the validation output (counts in/out, sample rows, rejects), migration name + dry-run
 result or workflow dispatch command, and exactly what waits on Berke's go.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

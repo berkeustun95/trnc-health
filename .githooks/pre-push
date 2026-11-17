@@ -65,6 +65,23 @@ node scripts/check-prod-write-guard.mjs >/dev/null || {
   exit 1
 }
 
+# Data jobs (slice 2): every scheduled workflow records its run, derived from the workflows, the 20261205 seed and
+# the record script's allowlist (scripts/check-data-job-heartbeats.mjs). Offline.
+hb_out=$(node scripts/check-data-job-heartbeats.mjs 2>&1) || {
+  printf '%s\n' "$hb_out" >&2
+  echo "✗ push blocked: a scheduled workflow has no (or a wrong) data_job_runs record step." >&2
+  exit 1
+}
+
+# Dispatcher actor rule (data jobs, slice 6): every guarded GitHub Actions job (environment, secrets, write permission)
+# carries the canonical actor rule in its own if, so the future ada-dispatcher App can only run three workflows with
+# default inputs (scripts/check-dispatcher-actor.mjs). Offline; its 30-day clock line is informational.
+da_out=$(node scripts/check-dispatcher-actor.mjs 2>&1) || {
+  printf '%s\n' "$da_out" >&2
+  echo "✗ push blocked: a guarded workflow job lacks (or has a wrong) dispatcher actor rule; see scripts/check-dispatcher-actor.mjs." >&2
+  exit 1
+}
+
 node scripts/check-migration-numbers.mjs || {
   echo "  push blocked: renumber the unapplied file — npm run migration:next"
   exit 1
@@ -88,6 +105,30 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-policy-notice.
 # Neither is visible on a device until the weather happens to be that weather.
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normalize.mjs || {
   echo "pre-push: weather normaliser check failed — see above." >&2
+  exit 1
+}
+
+# sync-novest only answers the service-role caller; the check must stay first in the handler and verify_jwt true.
+node scripts/check-sync-novest-auth.mjs || {
+  echo "pre-push: sync-novest caller check failed — see above." >&2
+  exit 1
+}
+
+# send-duty-notification / send-weekend-digest: same gate, first in the handler, verify_jwt true; duty responses carry no user counts.
+node scripts/check-push-fn-auth.mjs || {
+  echo "pre-push: push function caller check failed — see above." >&2
+  exit 1
+}
+
+# admin-push: the admin gate (signed-in non-guest with profiles.role admin) first in the handler, verify_jwt true, no id/token in logs or responses.
+node scripts/check-admin-push-auth.mjs || {
+  echo "pre-push: admin-push caller check failed — see above." >&2
+  exit 1
+}
+
+# admin-push duty-swap text: the server copy of notifDutySwapTitle/Body in the 9 languages must equal constants/i18n.js.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-admin-push-strings.mjs || {
+  echo "pre-push: admin-push strings check failed — see above." >&2
   exit 1
 }
 

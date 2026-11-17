@@ -15,3 +15,4 @@
 -- Seasonal switch = a migration that CREATE OR REPLACEs duty_thursday_closing_local() with the
 -- new time, plus the 1103 H token in verify_schema.sql.
 -- Key: Vault 'novest_sync_key', never inline in cron.job.
+-- The function answers only that key (serviceCaller gate, scripts/check-push-fn-auth.mjs); its HTTP response carries no user counts.

@@ -18,9 +18,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   If a task seems to need a version bump, STOP and ask.
 
 ## ⚠ Standing warnings
-- ⚠ **Lanes (Berke, 2026-10-27): main = 1.4.1 OTA lane; `feat/native-splash-1.4.2` = 1.4.2 lane** (native splash:
-  expo-video / expo-splash-screen / expo-system-ui). Merge every main fix into it; 1.4.2 store builds come from it; it merges
-  into main only when 1.4.2 is live in BOTH stores; never OTA from it. `release/1.4` stays the 1.4.0 lane.
+- ⚠ **1.4.3 store lane (Berke, 2026-11-16): `feat/store-1.4.3`** = version 1.4.3 + changelogs 28 on top of main; main
+  stays the 1.4.2 OTA lane. Merge every main fix into the lane; 1.4.3 builds come from it; it merges into main only
+  when 1.4.3 is live in BOTH stores; never OTA from it.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
@@ -46,14 +46,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod — migrations only via
   `supabase-migrate`. Fallback without this Mac: `supabase-function-secrets` + `supabase-functions-deploy`.
   Lost Mac → revoke the token (Supabase → Account → Access Tokens).
-- ⚠ **GCP API-key work runs via `gcloud` on this Mac as service account `ada-apikeys-ops@trnc-health-58b47`** (Berke,
-  2026-10-30; Berke's own gcloud login REVOKED). Roles: API Keys Admin + Logging Viewer + Monitoring Viewer on
-  `trnc-health-58b47`, `project-958a71e2-…` and (2026-10-31) `ada-app-499617`, + Service Usage Consumer on the last two; no
-  other project. API Keys Admin includes `getKeyString`, so the SA CAN read the Places server key: the ban below is the guard.
-  Key file `~/.config/ada-gcp/ada-apikeys-ops.json` (600, outside every repo and the vault): never commit/print/copy it;
-  lost Mac → delete the SA key in IAM. Monitoring: send `x-goog-user-project: ada-app-499617` (billed; 58b47 is not). Read with
-  `gcloud services api-keys describe/list`; NEVER `get-key-string`. Before any `update`, save `describe --format=json` to the vault; `--no-check-existing-usage`
-  only when the blocking traffic is proven 4xx (Monitoring `request_count` by credential). Vault `2026-10-30_gcp-keys-gcloud.md`.
+- ⚠ **GCP / Maps / Places keys:** before ANY `gcloud`, API-key, Maps-key or EAS-env key work, read
+  `.claude/reference/gcp-and-maps-keys.md`. Never `gcloud … get-key-string`.
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **`production-db` keeps its required reviewer (Berke) — never remove it** (Berke, 2026-10-14; removal
@@ -119,7 +113,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
 - **Release holds** (`release-holds.json`, `scripts/check-release-holds.mjs`, Berke 2026-11-08): a merge on main
   that is NOT cleared for production. `npm run ota` refuses while HEAD contains an uncleared hold; no env override.
-  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. Held now: none (#349 Explore combined cleared 2026-11-10).
+  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. Held now: none (#404 re-landed as #417 and #392 re-landed as #432, both cleared after Berke's Preview check).
 - **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
   refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
@@ -147,21 +141,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Permission strings:** ONE source each, its plugin option (`ios.infoPlist` is inert). Mic off, camera
   kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
-- **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
-  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key"), **restricted
-  2026-10-06**: Android apps `com.berkeustun95.ada` + upload SHA-1 + Play App Signing SHA-1 (a Places call gets 403
-  `API_KEY_ANDROID_APP_BLOCKED`; nothing else may use this key, iOS uses Apple Maps). API = Maps SDK for Android
-  (`maps-android-backend`) only since 2026-10-31 06:43Z (was the 35-API default; rollback script in vault `attachments/`). A new signing key needs its SHA-1 added FIRST; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
-  **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` + preview
-  SHA-1 and `com.berkeustun95.ada` + this Mac's debug-keystore SHA-1 (local dev builds); API = Maps SDK for Android
-  (`maps-android-backend`) only since 2026-10-30 (rollback script in vault `attachments/`). Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
-  build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
-- **Google keys for check-ins (2026-10-07, both in ada-app-499617 "ADA App", billing country Cyprus →
-  Maps Platform EEA terms):** iOS map `AIzaSyCa…w3Ic` "ADA Maps – iOS" (Maps SDK for iOS, bundle ids
-  `com.berkeustun95.ada` + `.preview`) = EAS env `GOOGLE_MAPS_IOS_API_KEY` (production + preview,
-  sensitive) — from now on EVERY iOS build carries the Google Maps SDK (`app.config.js` adds it when
-  set). Places `AIzaSyAK…azbM` "ADA Places – server" (Places API (New) only) = Edge Function secret
-  `GOOGLE_PLACES_SERVER_KEY`, used only by `google-places`.
+- **Maps / Google keys per build and per project:** `.claude/reference/gcp-and-maps-keys.md`.
 - **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
   `wrangler.jsonc`); both URLs are registered with the stores. `npm run web:deploy`, never
   `npx wrangler deploy`: it runs `check-web-assets.mjs`, and wrangler REPLACES the asset manifest, so
@@ -199,35 +179,11 @@ adds `environment: production`. Check a secret's identity with `key-fingerprint`
   prod has no CLI ledger and 13 prefixes repeat. Details: supabase/CLAUDE.md.
 
 ## Store-update popup
-`app_versions` (20261051): `latest_version` = dismissible, `min_supported_version` BLOCKS. Raising it
-above `'1.0.0'` on either platform needs a force-tier device pass on BOTH Android and iOS first (never
-run on either; iOS alone tests the native Modal vs the emergency root overlay, no hardware back, and
-`itms-apps://`). iOS test = new build from **main**, never `release/1.1`. `verify_schema.sql` QUERY 5
-goes red when raised; that is the review moment. Pass criteria: vault "Store-update popup force tier".
+Before touching `app_versions` or `min_supported_version`: read `.claude/reference/store-update-popup.md`.
 
 ## Play listing
-- Text lives in `fastlane/metadata/android/<lang>/` (tr-TR, en-GB default, ru-RU, ar, el-GR, fr-FR,
-  es-ES, de-DE, fa). Play is downstream: Console hand edits are overwritten. No images/binaries there.
-- Titles match the ad: `ADA – North Cyprus Assistant` / `ADA – Kuzey Kıbrıs Asistanı`, "ADA" first
-  in all; es-ES uses `ADA: …` (length). Never "Guide". Paragraph 2 says "assistant" once.
-- Limits: title ≤ 30, short ≤ 80, full ≤ 4000 code points. Title files have NO trailing newline.
-- No health, pharmacy, duty, clinic or doctor wording in any language; no "eSIM" while
-  `CONNECTIVITY_LIVE` is false (remove that guard pattern the day Connectivity goes live).
-- Paragraph 1 = independence disclaimer; description carries official source links. The guard reads
-  URLs from `fastlane/metadata-backup/android/en-GB`. el-GR names no state. Bullets name LIVE modules only.
-- `npm run store:check` enforces all of the above on every folder. `npm run store:listing` = check +
-  text-only `fastlane supply`; dry run `-- --validate_only true`. Needs
-  `./google-play-service-account.json` (gitignored, mode 600, never committed or printed).
-- ⚠ A real push joins whatever Play is reviewing: wait for pending reviews; if refused, use
-  `--changes_not_sent_for_review true` and send from Console.
-- ⚠ `fastlane supply init` overwrites the folder: snapshot into `fastlane/metadata-backup/android`.
-- Ruby 2.6, gems in `vendor/bundle` (`bundle install` once); compare files as UTF-8 (`LC_ALL=en_US.UTF-8`).
-- **Play developer account ID `7054171312151082560`.** Reports bucket = `gs://pubsite_prod_7054171312151082560`
-  (CONFIRMED 2026-10-27: 200 for `ada-fastlane@ada-app-499617` after Berke granted "View app information and download
-  bulk reports (read-only)"; `pubsite_prod_rev_<id>` is 404, does not exist). `stats/ratings/` and `reviews/` stay empty
-  until Play generates its first monthly report.
-  Reviews API = last 7 days, text reviews only. iOS reviews: ASC `customerReviews` (app `6783996527`). Vault
-  `2026-10-20_store-reviews-pull.md`.
+Before editing `fastlane/metadata/`, running `store:listing` or reading Play reports: read
+`.claude/reference/play-listing.md`. `npm run store:check` enforces the listing rules.
 
 ## Compliance (Google Play, declared mixed-audience app)
 - ⚠ **Category Travel & Local, Health declaration "no health features" — do not re-tick it,** even
@@ -247,6 +203,8 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
 ## How I want you to work
 - Make MINIMAL changes; no unrelated refactors. Say it's done, explain shortly — don't ask to proceed.
 - One bounded task at a time. If scope is unclear, ask.
+- **One task per session** (Berke, 2026-11-16). When a task is done, or context passes ~200k, end the reply with
+  the line "✅ Task done, run /clear now" so Berke clears before the next task.
 - **Provider accounts are out of scope** (provider, home_service_provider and every other non-customer provider
   role): never change how they look or behave without Berke's explicit ask (Berke, 2026-10-26).
 - Match the data-fetch pattern: query Supabase → useState → render.
@@ -350,18 +308,9 @@ name joined to a clinic review is a health disclosure about an identified person
   hotel that fails gets NO pin; its Harita button searches "<name>, <town>, North Cyprus".
 - `geocode-pharmacies-tier2.mjs` is retired. OSM hand placement (`npm run place`) is SHELVED: no OSM editing.
 
-## Social sign-in (Google + Apple, native, from 1.2.0)
-Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
-- Runtime 1.2.0 is the fence (`runtimeVersion` = `appVersion`). 1.1.0 fixes ship from `release/1.1`.
-- Every social branch keys on `app_metadata.provider` (`socialProvider()` in `utils/socialAuth.js`, first identity only).
-- `revokeGoogle()` runs BEFORE anything signs out of Supabase (after, `revokeAccess()` no-ops).
-- Under 13: Google/Apple accounts are DELETED, email accounts are FLAGGED.
-- A name the provider gave is never asked for again (App Store 4.0); Apple sends it once.
-- `display_name` is labelled "Username" in all nine locales, never "name".
-- The three native modules are `require()`d inside functions (`check-native-import-safety.mjs`).
-- Deleting an Apple user outside the app: `gh workflow run revoke-apple-token -f user_id=<id>` FIRST,
-  confirm revoked, THEN delete (`apple_refresh_tokens` cascades with `auth.users`).
-- `handle_new_user` reads no metadata; names reach `profiles` from the client only.
+## Social sign-in (Google + Apple)
+Before touching sign-in, `utils/socialAuth.js`, account deletion or Apple tokens: read
+`.claude/reference/social-sign-in.md`.
 
 ## Module go-live SOP (ordered — the order is the point)
 1. **Seed inactive** (`is_active = false`). Nothing visible or searchable.
@@ -400,14 +349,16 @@ DB `20261092` + `20261093` (+ `20261094` test-data cleanup); `google-places` Edg
   check-ins, pins, notices, submissions; sealed, open with `node scripts/readonly-results.mjs <run-id>`). Function errors: Dashboard → Edge Functions → google-places → Logs.
 
 ## Team workflow (`.claude/agents/`)
-**Routing** (Berke, 2026-11-12): hard work goes to **principal-engineer** (Fable) first, without asking: planning
+**Routing** (Berke, 2026-11-12): hard work goes to **principal-engineer** (Opus) first, without asking: planning
 a new feature or module; a bug still unfixed after one attempt; schema, RLS or migration design; multi-file
 refactors or architecture choices; auth, payments or security-sensitive code (also **security-code-reviewer**);
 deciding whether something is ready for production. Everyday work stays in the main chat: running tests,
 on-device screenshots, small fixes, i18n edits, commits, OTAs.
-Main-chat work still gets a check before it ships: before any commit that goes to Preview or production, run
-**qa-tester**; if i18n files changed, also **translation-reviewer**; if auth, RLS, payments or secrets are
-touched, also **security-code-reviewer**. Fix every FAIL before committing.
+Main-chat work still gets a check before it ships: **once per branch, on its finished head, before merge** (not
+once per slice or per commit), run **qa-tester**; if i18n files changed, also **translation-reviewer**; if auth,
+RLS, payments or secrets are touched, also **security-code-reviewer**. Fix every FAIL, then re-run only the check
+that failed (Berke, 2026-11-16: 53 security reviews and 31 QA runs in 3 days).
+**Never pass `model: opus` (or any `model`) to a subagent. Use the model in its agent file** (Berke, 2026-11-16).
 Flow for the work principal-engineer owns: Principal → senior-app-engineer /
 senior-backend-engineer / data-content-engineer → security-code-reviewer + translation-reviewer (every branch)
 + ui-ux-designer (any UI change) → qa-tester → (FAIL: back to the senior, repeat until PASS) → release-engineer.
@@ -417,6 +368,17 @@ ui-ux-designer preloads `.claude/skills/` ada-style + frontend-design + ada-*-au
 no emulator on this Mac, no device on Hermes. One screen per polish PR. Parked
 backlog: `~/trnc-health/.designer/backlog.md` (local, git-excluded).
 Principal never ships its own unreviewed code; release-engineer never runs without a QA PASS.
+**Test runs on this Mac (Berke, 2026-11-15; load average 293 and 8 jest timeouts when a review fan-out and a
+pre-merge suite ran at once on 4 cores).** (1) Only **qa-tester** runs jest and the full guard suite; reviewers
+(security, translation, design) only read code, and seniors leave the suite to QA. The main chat runs it only for
+its own pre-merge check. (2) jest is capped at 2 workers (`"maxWorkers": 2` in package.json); never pass a higher
+`--maxWorkers`. (3) One full suite at a time across sessions: `node scripts/preview-lock.mjs --suite take <holder>
+"<what for>"`, run `ADA_SUITE_HOLDER=<holder> npm test` (refused without the lock) plus the guards, then
+`--suite release <holder>` right away. Held by someone else: wait. **Heavy single checks take the same lock**
+(Berke, 2026-11-15; the npm scripts refuse without it): `ads:selftest` (~86 s CPU),
+`release-lane:test` (~31 s), `check:migration-numbers` (~21 s), `ads:check` (~6 s). Measured 2026-11-15; heavy =
+5 s CPU or more. Every other check is light (under 2 s, `labels:check` included) and free to run, reviewers included. The small jest files in `ota`/`ota:preview` run
+under the publish locks instead. Hermes has no vault, so the check passes there and says so.
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
 
@@ -428,26 +390,18 @@ violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal re
 0-approval PR rule already lets it). `ada-hermes-bot` PRs are merged by Berke only. A live migration still needs
 Berke's `production-db` approval.
 Sync PRs from `main` into a release branch (`release/**`) count as Mac Code's own PRs.
+**Never merge a PR whose title contains DRAFT or WIP** (any case, any brackets), even when GitHub does not mark it
+draft (Berke, 2026-11-14; #401 merged as "[DRAFT] …"). Retitle it first, and only once it is really ready.
 **Draft → ready is Code's job** (Berke, 2026-10-31): when a PR is ready (reviews/QA passed, checks green), Code
 runs `gh pr ready <n>` itself and tells Berke "ready to merge" with the PR link; he never has to undraft it.
 
-**Hermes server** (Hetzner `<HERMES_HOST>`, address + SSH route in vault `2026-10-18_claude-code-github-identity.md`; Telegram @ada_dev_team_bot, Berke only; setup in `ops/hermes/`). The
-team runs there as user `adateam` (since 2026-10-13; the gateway is user `hermes`, which the team cannot read or
-write; `ops/hermes/team-user-setup.sh`) as GitHub `ada-hermes-bot` (Write): it pushes only `agent/*` branches, cannot
-read any production credential, and acts through three root-owned wrappers (`sudo -n /usr/local/sbin/…`; sudoers
-allows the team only `ada-publish preview|preview-check`, `ada-migrate dry` and `ada-pr`):
-`ada-publish preview agent/<slug>-14 "<msg>"` (1.4.0 Preview; refuses agent commits touching config,
-`package*.json`, `scripts/`, `.githooks/`, `.github/`), `ada-migrate dry <file>`, `ada-pr agent/<slug> <base> "<title>"` (also
-`ada-pr comment|close <n>`, agent/* PRs only, never merge). `ada-team` (root-owned, `/usr/local/bin`) re-runs itself as
-`adateam` with the root-owned `/usr/local/bin/claude` (auto-update off; upgrading = a root install) and resets `~/ada/.claude/agents` to origin/main before every run: agent-definition
-changes go through an `agent/*` PR and apply after Berke merges. Managed-policy paths need `//` for absolute
-(`Read(/etc/…)` is relative to the settings file and matched nothing until 2026-10-13); `Edit(path)` covers Write.
-Production OTA (`ada-publish production`) and migration apply are outside the team's sudoers (and managed policy);
-Berke asks Hermes for them, and production then waits for his `GO <code>` reply to the separate gate bot.
+**Hermes server** (`ada-hermes-bot`, Telegram team): before any Hermes, `ops/hermes/` or `agent/*` work, read
+`.claude/reference/hermes-server.md`.
 
 ## Advisor
-Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
-Some sessions have no advisor tool; when absent, skip this step.
+Main chat only. Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and
+before declaring a task done. Some sessions have no advisor tool; when absent, skip this step. **Subagents never
+call the advisor** (each call sends the whole transcript uncached; 130 of 145 calls came from subagents, 2026-11-16).
 
 ## Don't
 - Don't add analytics, tracking, or third-party SDKs without asking.
@@ -465,10 +419,11 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
   - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
   - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
-  - **Logo v2 native assets (wired 2026-10-24, first store build after 1.4.0)**: app icon, Android adaptive
-    foreground + themed (monochrome) icon, splash, notification icon and both Preview icons (`assets/brand/v2/`).
-    Check on device (Android: launcher, themed icons on, splash, a push) and in TestFlight (iOS: home screen,
-    splash) BEFORE submission. Old logo files stay until that release is out. Vault `2026-10-24_logo-v2-compass.md`.
+- **Store builds (Berke, 2026-11-16):** **1.4.3** = Onboarding v2 in the embedded bundle; NO Sentry, widgets, R8,
+  map-marker fix or edge-to-edge. **1.4.4** = Sentry on its own build: EU region, crash reporting only (no IP, no user ID,
+  no session replay), **ON by default with a "Send crash reports" switch in Settings** users can turn off; ships with
+  the privacy policy update and the Apple/Play form changes. Widgets (`feat/widgets-1.4.3`) come after.
+  Vault `2026-10-25_store-release-readiness.md`, `2026-11-14_crash-analytics-options.md`.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.

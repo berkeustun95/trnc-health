@@ -42,6 +42,13 @@ WITH report AS (
   FROM (VALUES
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages'),
+    -- Data jobs (20261205): registry + run log; registered ahead of the apply; red until it runs.
+    ('20261205_data_jobs','data_jobs'),
+    ('20261205_data_jobs','data_job_runs'),
+    -- Data jobs watchdog (20261211): what it saw last time. Registered ahead of the apply; red until it runs.
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state'),
+    -- admin-push send-once ledger (20261217): registered ahead of the apply; red until it runs.
+    ('20261217_admin_push_sends','admin_push_sends'),
     -- Araçlar car listings (20261165): registered ahead of the apply; red until it runs.
     ('20261165_vehicles','vehicle_sources'),
     ('20261165_vehicles','dealers'),
@@ -152,7 +159,9 @@ WITH report AS (
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
     ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents'),
     -- Bağlantı & eSIM landing link targets (1113).
-    ('1113_connectivity_links','connectivity_links')
+    ('1113_connectivity_links','connectivity_links'),
+    -- Onboarding v2 offer counter (20261202): registered ahead of the apply; red until it runs.
+    ('20261202_onboarding_events','onboarding_events')
   ) e(m,o)
 
   UNION ALL
@@ -296,6 +305,48 @@ WITH report AS (
     ('20261163_oli_messages','oli_messages','body'),
     ('20261163_oli_messages','oli_messages','payload'),
     ('20261163_oli_messages','oli_messages','created_at'),
+    -- 20261205: data jobs; registered ahead of the apply; red until it runs.
+    ('20261205_data_jobs','data_jobs','key'),
+    ('20261205_data_jobs','data_jobs','runner'),
+    ('20261205_data_jobs','data_jobs','kind'),
+    ('20261205_data_jobs','data_jobs','cron_jobnames'),
+    ('20261205_data_jobs','data_jobs','schedule_note'),
+    ('20261205_data_jobs','data_jobs','switchable'),
+    ('20261205_data_jobs','data_jobs','paused'),
+    ('20261205_data_jobs','data_jobs','paused_note'),
+    ('20261205_data_jobs','data_jobs','paused_by'),
+    ('20261205_data_jobs','data_jobs','paused_at'),
+    ('20261205_data_jobs','data_jobs','expected_every'),
+    ('20261205_data_jobs','data_jobs','sort'),
+    ('20261205_data_jobs','data_job_runs','id'),
+    ('20261205_data_jobs','data_job_runs','job_key'),
+    ('20261205_data_jobs','data_job_runs','started_at'),
+    ('20261205_data_jobs','data_job_runs','finished_at'),
+    ('20261205_data_jobs','data_job_runs','outcome'),
+    ('20261205_data_jobs','data_job_runs','error_class'),
+    ('20261205_data_jobs','data_job_runs','source'),
+    ('20261205_data_jobs','data_job_runs','run_ref'),
+    -- 20261210 / 20261211: the grace start and the watchdog state; registered ahead of the apply; red until it runs.
+    ('20261210_data_jobs_switches','data_jobs','records_expected_from'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','job_key'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','last_attention'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','last_paused'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','alerted_at'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state','reminded_at'),
+    -- 20261217: the admin-push ledger's 13 columns; registered ahead of the apply; red until it runs.
+    ('20261217_admin_push_sends','admin_push_sends','request_id'),
+    ('20261217_admin_push_sends','admin_push_sends','kind'),
+    ('20261217_admin_push_sends','admin_push_sends','test'),
+    ('20261217_admin_push_sends','admin_push_sends','admin_id'),
+    ('20261217_admin_push_sends','admin_push_sends','created_at'),
+    ('20261217_admin_push_sends','admin_push_sends','finished_at'),
+    ('20261217_admin_push_sends','admin_push_sends','outcome'),
+    ('20261217_admin_push_sends','admin_push_sends','recipients'),
+    ('20261217_admin_push_sends','admin_push_sends','notified'),
+    ('20261217_admin_push_sends','admin_push_sends','push_attempted'),
+    ('20261217_admin_push_sends','admin_push_sends','push_ok'),
+    ('20261217_admin_push_sends','admin_push_sends','push_errors'),
+    ('20261217_admin_push_sends','admin_push_sends','error_kinds'),
     -- 20261165: the columns the read policies, the guard and the report flow depend on (column count in H).
     ('20261165_vehicles','vehicles','status'),
     ('20261165_vehicles','vehicles','expires_at'),
@@ -573,7 +624,13 @@ WITH report AS (
     ('1113_connectivity_links','connectivity_links','is_active'),
     ('1113_connectivity_links','connectivity_links','created_at'),
     -- 1129. The landing's logo square resolves it through constants/partnerAssets.js.
-    ('1129_connectivity_logo_key','connectivity_operators','logo_key')
+    ('1129_connectivity_logo_key','connectivity_operators','logo_key'),
+    -- 20261202. The app inserts event, platform, runtime_version; id and created_at are the server's.
+    ('20261202_onboarding_events','onboarding_events','id'),
+    ('20261202_onboarding_events','onboarding_events','event'),
+    ('20261202_onboarding_events','onboarding_events','platform'),
+    ('20261202_onboarding_events','onboarding_events','runtime_version'),
+    ('20261202_onboarding_events','onboarding_events','created_at')
 
   ) e(m,t,c)
 
@@ -798,7 +855,23 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
     ('20261194_eatery_order_status_partner','eatery_order_set_status'),
     -- 20261197: registered ahead of the apply; red until it runs.
-    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts'),
+    -- 20261198: registered ahead of the apply; red until it runs.
+    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke'),
+    -- 20261201: registered ahead of the apply; red until it runs.
+    ('20261201_set_guest_push','set_guest_push'),
+    -- 20261203: registered ahead of the apply; red until it runs. Its no-client-EXECUTE half is the 1203 H token.
+    ('20261203_onboarding_events_retention','purge_onboarding_events'),
+    -- 20261205: registered ahead of the apply; red until it runs. Grants and bodies are the 1205 H token's.
+    ('20261205_data_jobs','data_jobs_overview'),
+    ('20261205_data_jobs','admin_data_jobs'),
+    ('20261205_data_jobs','record_data_job_run'),
+    -- 20261210 / 20261211: registered ahead of the apply; red until it runs. Grants and bodies are the 1210 / 1211 H tokens'.
+    ('20261210_data_jobs_switches','admin_set_data_job_paused'),
+    ('20261210_data_jobs_switches','data_job_gate'),
+    ('20261210_data_jobs_switches','data_job_paused'),
+    ('20261211_data_jobs_watchdog','data_jobs_watchdog'),
+    ('20261211_data_jobs_watchdog','data_jobs_watchdog_age')
   ) e(m,o)
 
   UNION ALL
@@ -967,6 +1040,30 @@ WITH report AS (
     ('20261163_oli_messages','oli_messages_role_check'),
     ('20261163_oli_messages','oli_messages_shape_check'),
     ('20261163_oli_messages','oli_messages_payload_check'),
+    -- 20261205: data jobs; registered ahead of the apply; red until it runs.
+    ('20261205_data_jobs','data_jobs_pkey'),
+    ('20261205_data_jobs','data_jobs_key_check'),
+    ('20261205_data_jobs','data_jobs_runner_check'),
+    ('20261205_data_jobs','data_jobs_kind_check'),
+    ('20261205_data_jobs','data_jobs_cron_jobnames_check'),
+    ('20261205_data_jobs','data_jobs_schedule_note_check'),
+    ('20261205_data_jobs','data_jobs_paused_switchable_check'),
+    ('20261205_data_jobs','data_jobs_no_switch_retention_check'),
+    ('20261205_data_jobs','data_jobs_expected_every_check'),
+    ('20261205_data_jobs','data_job_runs_pkey'),
+    ('20261205_data_jobs','data_job_runs_job_key_fkey'),
+    ('20261205_data_jobs','data_job_runs_finished_check'),
+    ('20261205_data_jobs','data_job_runs_outcome_check'),
+    ('20261205_data_jobs','data_job_runs_error_class_check'),
+    ('20261205_data_jobs','data_job_runs_source_check'),
+    ('20261205_data_jobs','data_job_runs_run_ref_check'),
+    -- 20261211: the watchdog state table; registered ahead of the apply; red until it runs.
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state_pkey'),
+    ('20261211_data_jobs_watchdog','data_jobs_alert_state_job_key_fkey'),
+    -- 20261217: the admin-push ledger; no FK on admin_id on purpose (account deletion). Registered ahead of the apply; red until it runs.
+    ('20261217_admin_push_sends','admin_push_sends_pkey'),
+    ('20261217_admin_push_sends','admin_push_sends_kind_check'),
+    ('20261217_admin_push_sends','admin_push_sends_error_kinds_check'),
     -- 20261165: Araçlar. Who owns a listing follows its source; prices follow intent; a source goes live only checked.
     ('20261165_vehicles','vehicles_ownership_check'),
     ('20261165_vehicles','vehicles_price_check'),
@@ -1389,7 +1486,12 @@ WITH report AS (
     ('1113_connectivity_links','connectivity_links_slug_check'),
     ('1113_connectivity_links','connectivity_links_url_check'),
     -- 1129. Its key format is an H token.
-    ('1129_connectivity_logo_key','connectivity_operators_logo_key_check')
+    ('1129_connectivity_logo_key','connectivity_operators_logo_key_check'),
+    -- 20261202. The event list and the policy that repeats it are the 1202 H token (the three start_choice_* values: 1204).
+    ('20261202_onboarding_events','onboarding_events_pkey'),
+    ('20261202_onboarding_events','onboarding_events_event_check'),
+    ('20261202_onboarding_events','onboarding_events_platform_check'),
+    ('20261202_onboarding_events','onboarding_events_runtime_len_check')
 
   ) e(m,o)
 
@@ -1531,7 +1633,11 @@ WITH report AS (
     ('1070_live_scores','api_request_log_at_idx'),
     ('1071_live_scores_followup','f1_races_race_at_idx'),
     -- 1087: partial (conversation_id IS NOT NULL); serves the FK's lookup on a conversation delete.
-    ('1087_notifications_conversation_id','notifications_conversation_id_idx')
+    ('1087_notifications_conversation_id','notifications_conversation_id_idx'),
+    -- 20261203: serves the 90-day purge of onboarding_events (the 1051 shape). Registered ahead of the apply.
+    ('20261203_onboarding_events_retention','idx_onboarding_events_created_at'),
+    -- 20261205: serves 'last run of a job' and the 90-day purge. Registered ahead of the apply.
+    ('20261205_data_jobs','idx_data_job_runs_job_started')
 
   ) e(m,o)
 
@@ -1642,7 +1748,15 @@ WITH report AS (
     ('20261194_eatery_order_status_partner','eatery_partner_enrol'),
     ('20261194_eatery_order_status_partner','eatery_order_set_status'),
     -- 1197. Missing = the admin "clear lock" button answers a permission error.
-    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts')
+    ('20261197_eatery_pin_attempts_reset','admin_reset_eatery_pin_attempts'),
+    -- 1198. Missing = "Bu cihazı unut" still clears the cookie but the phone keeps its slot of the 5-device cap.
+    ('20261198_eatery_order_status_slice3','eatery_partner_device_revoke'),
+    -- 1201. Missing = a guest's "Allow notifications" saves nothing (the role includes every guest; the body refuses non-guests).
+    ('20261201_set_guest_push','set_guest_push'),
+    -- 1205. Missing = the admin Data jobs section answers a permission error. record_data_job_run / data_jobs_overview are DELIBERATELY ABSENT (not client-callable; the 1205 H token asserts that).
+    ('20261205_data_jobs','admin_data_jobs'),
+    -- 1210. Missing = the Data jobs switch answers a permission error. data_job_gate / data_job_paused / the watchdog are DELIBERATELY ABSENT (not client-callable; the 1210 / 1211 H tokens assert that).
+    ('20261210_data_jobs_switches','admin_set_data_job_paused')
   ) e(m,o)
 
   UNION ALL
@@ -1732,8 +1846,8 @@ WITH report AS (
       AND COALESCE((SELECT p.proargnames = ARRAY['p_code','p_device']::text[] AND p.pronargdefaults = 1 FROM pg_proc p WHERE p.oid = to_regprocedure('public.verify_eatery_order(text,text)')), false)
       AND to_regprocedure('public.verify_eatery_order(text)') IS NULL
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'verify_eatery_order') = 1
-      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%can_manage%'
-           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%20261193.', false)
+      -- RETIRED half: the comment ending '20261193.' (20261198 rewrote the comment for its view rule; the 1198 token owns it).
+      AND COALESCE(obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%can_manage%', false)
     UNION ALL SELECT '20261193_eatery_order_status','my_eatery_orders() / eatery_order_subscribe(): DEFINER, search_path pinned, authenticated EXECUTE only (not anon, not PUBLIC); own-orders filter; no view counting; no token returned',
       COALESCE((SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp'] AND pg_get_userbyid(p.proowner) = 'postgres'
                        AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE a.privilege_type = 'EXECUTE' AND r.rolname = 'authenticated')
@@ -1883,6 +1997,269 @@ WITH report AS (
       AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('private.eatery_pin_resets') AND a.attname = 'admin_id' AND a.attnotnull)
       AND (SELECT count(*) FROM pg_indexes WHERE schemaname = 'private' AND indexname = 'eatery_pin_resets_bucket_idx' AND indexdef LIKE '%(scope, partner_id, at)%') = 1
     -- 1197-END
+    -- 1198-BEGIN
+    -- 20261198 (order status slice 3): red until applied, never an error (to_regprocedure / aclexplode / COALESCE).
+    UNION ALL SELECT '20261198_eatery_order_status_slice3','eatery_partner_device_revoke(text): one overload, DEFINER, VOLATILE, owner postgres, search_path public, pg_temp; EXECUTE exactly anon + authenticated (no PUBLIC); Worker-key gate first, 96-hex token check, revokes one live device by token sha256; no DELETE, never raises',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 'v' AND pg_get_userbyid(p.proowner) = 'postgres'
+                       AND p.proconfig @> ARRAY['search_path=public, pg_temp']
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.eatery_partner_device_revoke(text)')), false)
+      AND COALESCE((SELECT string_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE r.rolname END, ',')
+                      FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                     WHERE p.oid = to_regprocedure('public.eatery_partner_device_revoke(text)') AND a.privilege_type = 'EXECUTE'
+                       AND a.grantee <> p.proowner AND r.rolname IS DISTINCT FROM 'service_role') = 'anon,authenticated', false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'eatery_partner_device_revoke') = 1
+      AND COALESCE(position('IF NOT public.eatery_worker_key_ok() THEN' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)'))) > 0
+           AND position('IF NOT public.eatery_worker_key_ok() THEN' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)'))) < position('UPDATE private.eatery_partner_devices' IN pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')))
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) LIKE '%p_device !~ ''^[0-9a-f]{96}$''%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) LIKE '%WHERE d.token_sha256 = encode(sha256(convert_to(p_device, ''UTF8'')), ''hex'')%AND d.revoked_at IS NULL;%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) NOT LIKE '%DELETE FROM%'
+           AND pg_get_functiondef(to_regprocedure('public.eatery_partner_device_revoke(text)')) NOT LIKE '%RAISE EXCEPTION%', false)
+    UNION ALL SELECT '20261198_eatery_order_status_slice3','verify_eatery_order(text,text): can_manage computed before the view UPDATE, which runs only IF NOT COALESCE(v_can, false) (a managing restaurant phone is not a view); comment states the rule',
+      COALESCE(position('IF NOT COALESCE(v_can, false) THEN' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)'))) > 0
+           AND position('eatery_order_can_manage(v_o.partner_id, v_o.is_test, p_device)' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)'))) < position('IF NOT COALESCE(v_can, false) THEN' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')))
+           AND position('IF NOT COALESCE(v_can, false) THEN' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)'))) < position('view_count = view_count + 1' IN pg_get_functiondef(to_regprocedure('public.verify_eatery_order(text,text)')))
+           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%UNLESS can_manage is true%'
+           AND obj_description(to_regprocedure('public.verify_eatery_order(text,text)'), 'pg_proc') LIKE '%view rule 20261198.', false)
+    UNION ALL SELECT '20261198_eatery_order_status_slice3','create_eatery_order(uuid,jsonb,text,text): the 18+ gate''s today is (now() AT TIME ZONE ''Europe/Nicosia'')::date; no Europe/Istanbul left',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) LIKE '%eatery_order_age_gate(v_dob, (now() AT TIME ZONE ''Europe/Nicosia'')::date)%'
+           AND pg_get_functiondef(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)')) NOT LIKE '%Europe/Istanbul%', false)
+    -- 1198-END
+    -- 1201-BEGIN
+    -- 20261201 set_guest_push: red until applied, never an error (to_regprocedure / aclexplode / COALESCE). Negatives are
+    --     anchored to code shape and paired with positives.
+    UNION ALL SELECT '20261201_set_guest_push','set_guest_push(text,text): one overload, DEFINER, owner postgres, search_path empty; EXECUTE exactly authenticated (no PUBLIC / anon / service_role); guest-only gate (IS NOT TRUE) first; Expo token regex (10-64 inner chars); the nine full language names; updates only the caller''s row; exactly-one-row check',
+      COALESCE((SELECT p.prosecdef AND p.proconfig = ARRAY['search_path=""'] AND p.proacl IS NOT NULL AND pg_get_userbyid(p.proowner) = 'postgres'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.set_guest_push(text,text)')), false)
+      AND COALESCE((SELECT string_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE r.rolname END, ',')
+                      FROM pg_proc p, LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee
+                     WHERE p.oid = to_regprocedure('public.set_guest_push(text,text)') AND a.privilege_type = 'EXECUTE'
+                       AND a.grantee <> p.proowner) = 'authenticated', false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'set_guest_push') = 1
+      AND COALESCE(position('IF public.is_anonymous_session() IS NOT TRUE THEN' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
+           AND position('IF public.is_anonymous_session() IS NOT TRUE THEN' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) < position('UPDATE public.profiles' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')))
+           AND position('p_token !~ ''^Expo(nent)?PushToken\[[A-Za-z0-9_-]{10,64}\]$''' IN pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)'))) > 0
+           AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%ARRAY[''English'',''Turkish'',''Arabic'',''Russian'',''Greek'',''French'',''Spanish'',''German'',''Persian'']%'
+           AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%UPDATE public.profiles SET push_token = p_token, preferred_language = p_lang WHERE id = auth.uid();%'
+           AND pg_get_functiondef(to_regprocedure('public.set_guest_push(text,text)')) LIKE '%IF v_rows IS DISTINCT FROM 1 THEN%', false)
+    -- Berke: guest tokens must not outlive the guest. The token sits on profiles, which goes with the auth user.
+    UNION ALL SELECT '20261201_set_guest_push','profiles(id) -> auth.users(id): exactly one foreign key, ON DELETE CASCADE',
+      COALESCE((SELECT count(*) = 1 AND bool_and(c.confdeltype = 'c')
+                  FROM pg_constraint c
+                 WHERE c.contype = 'f' AND c.conrelid = to_regclass('public.profiles') AND c.confrelid = to_regclass('auth.users')
+                   AND c.conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('public.profiles') AND a.attname = 'id')]::smallint[]
+                   AND c.confkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('auth.users') AND a.attname = 'id')]::smallint[]), false)
+    -- 1201-END
+    -- 1202-BEGIN
+    -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
+    UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the event list (11 in 20261202, 14 since 20261204) / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
+      COALESCE((SELECT c.relrowsecurity
+                       AND NOT has_table_privilege('anon', c.oid, 'SELECT,UPDATE,DELETE,TRUNCATE')
+                       AND NOT has_table_privilege('authenticated', c.oid, 'SELECT,UPDATE,DELETE,TRUNCATE')
+                       AND NOT has_any_column_privilege('anon', c.oid, 'SELECT,UPDATE')
+                       AND NOT has_any_column_privilege('authenticated', c.oid, 'SELECT,UPDATE')
+                       AND has_column_privilege('anon', c.oid, 'event', 'INSERT') AND has_column_privilege('authenticated', c.oid, 'event', 'INSERT')
+                       AND has_column_privilege('anon', c.oid, 'platform', 'INSERT') AND has_column_privilege('authenticated', c.oid, 'platform', 'INSERT')
+                       AND has_column_privilege('anon', c.oid, 'runtime_version', 'INSERT') AND has_column_privilege('authenticated', c.oid, 'runtime_version', 'INSERT')
+                       AND NOT has_column_privilege('anon', c.oid, 'id', 'INSERT') AND NOT has_column_privilege('authenticated', c.oid, 'id', 'INSERT')
+                       AND NOT has_column_privilege('anon', c.oid, 'created_at', 'INSERT') AND NOT has_column_privilege('authenticated', c.oid, 'created_at', 'INSERT')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0)
+                  FROM pg_class c WHERE c.oid = to_regclass('public.onboarding_events')), false)
+      AND COALESCE((SELECT string_agg(policyname || ':' || cmd || ':' || permissive, ',' ORDER BY policyname)
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events')
+                   = 'oe_insert_public:INSERT:PERMISSIVE,oe_no_delete:DELETE:PERMISSIVE,oe_no_update:UPDATE:PERMISSIVE', false)
+      AND COALESCE((SELECT with_check LIKE '%reoffer_existing_declined%' AND with_check LIKE '%''android''%' AND with_check LIKE '%length(runtime_version) <= 64%'
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events' AND policyname = 'oe_insert_public'), false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''start_shown''%' AND pg_get_constraintdef(c.oid) LIKE '%''reoffer_existing_declined''%'
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.onboarding_events') AND c.conname = 'onboarding_events_event_check'), false)
+    -- 1202-END
+    -- 1203-BEGIN
+    -- 20261203 purge_onboarding_events: red until applied, never an error (to_regprocedure / aclexplode / COALESCE).
+    --     NOT in section G on purpose: G asserts authenticated CAN execute; this purge must be executable by nobody but
+    --     its owner (the cron job). Derived from proacl, so a grant to ANY role (PUBLIC, anon, authenticated,
+    --     service_role or another) turns it red. The JOB is QUERY 2's (this query stays free of cron).
+    UNION ALL SELECT '20261203_onboarding_events_retention','purge_onboarding_events(interval): one overload, INVOKER, search_path public, owner postgres; EXECUTE held by no role but the owner (no PUBLIC / anon / authenticated / service_role); default 90 days; deletes created_at < cutoff',
+      COALESCE((SELECT NOT p.prosecdef AND p.proconfig = ARRAY['search_path=public'] AND p.proacl IS NOT NULL AND pg_get_userbyid(p.proowner) = 'postgres'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.purge_onboarding_events(interval)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
+                       WHERE p.oid = to_regprocedure('public.purge_onboarding_events(interval)')
+                         AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'purge_onboarding_events') = 1
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%p_older_than interval DEFAULT ''90 days''::interval%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%v_cut timestamptz := now() - p_older_than;%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_onboarding_events(interval)')) LIKE '%DELETE FROM public.onboarding_events WHERE created_at < v_cut;%', false)
+    -- 1203-END
+    -- 1204-BEGIN
+    -- 20261204: the three Start-screen choice events, in BOTH places that hold the event list. The constraint and the
+    -- policy keep their 20261202 names (so no E / Q3 row; the 1202 token keeps the rest). Red until applied, never an error.
+    UNION ALL SELECT '20261204_onboarding_events_start_choice','onboarding_events: start_choice_signup / _signin / _guest allowed by onboarding_events_event_check AND repeated in oe_insert_public',
+      COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''start_choice_signup''%' AND pg_get_constraintdef(c.oid) LIKE '%''start_choice_signin''%'
+                       AND pg_get_constraintdef(c.oid) LIKE '%''start_choice_guest''%'
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.onboarding_events') AND c.conname = 'onboarding_events_event_check'), false)
+      AND COALESCE((SELECT with_check LIKE '%''start_choice_signup''%' AND with_check LIKE '%''start_choice_signin''%' AND with_check LIKE '%''start_choice_guest''%'
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'onboarding_events' AND policyname = 'oe_insert_public'), false)
+    -- 1204-END
+    -- 1205-BEGIN
+    -- 20261205 data jobs. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
+    -- (a) both tables: RLS on, ZERO policies, no anon/authenticated privilege (table or any column), service_role keeps it;
+    -- (b) record_data_job_run: EXECUTE for service_role, none for PUBLIC / anon / authenticated; data_jobs_overview: EXECUTE held by nobody but the owner;
+    --     admin_data_jobs: authenticated yes, anon no; (c) the admin gate is the three-part shape and the overview reads cron's result ONLY for cron_sql
+    --     (the stale / no_record arm order is the 1210 token's: 20261210 replaced the overview body);
+    -- (d) no row is paused (20261210 made seven rows switchable: the 1210 H token owns that set).
+    UNION ALL SELECT '20261205_data_jobs','data_jobs + data_job_runs: RLS on, 0 policies, no client privilege (table or column), service_role writes',
+      COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c WHERE c.oid IN (to_regclass('public.data_jobs'), to_regclass('public.data_job_runs'))), false)
+      AND to_regclass('public.data_jobs') IS NOT NULL AND to_regclass('public.data_job_runs') IS NOT NULL
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('data_jobs', 'data_job_runs')) = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.data_jobs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.data_jobs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('anon', to_regclass('public.data_job_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.data_job_runs'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid IN (to_regclass('public.data_jobs'), to_regclass('public.data_job_runs')) AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
+               AND has_table_privilege('service_role', to_regclass('public.data_jobs'), 'SELECT,INSERT,UPDATE,DELETE')
+               AND has_table_privilege('service_role', to_regclass('public.data_job_runs'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    UNION ALL SELECT '20261205_data_jobs','record_data_job_run: service_role only; data_jobs_overview: owner only; admin_data_jobs: authenticated yes, anon no; all owned by postgres',
+      COALESCE(has_function_privilege('service_role', to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'), 'EXECUTE')
+           AND has_function_privilege('authenticated', to_regprocedure('public.admin_data_jobs()'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.admin_data_jobs()'), 'EXECUTE'), false)
+      AND COALESCE((SELECT p.proacl IS NOT NULL AND NOT p.prosecdef FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_overview(timestamptz)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
+                       WHERE p.oid = to_regprocedure('public.data_jobs_overview(timestamptz)') AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+      AND COALESCE((SELECT bool_and(pg_get_userbyid(p.proowner) = 'postgres') FROM pg_proc p
+                     WHERE p.oid IN (to_regprocedure('public.data_jobs_overview(timestamptz)'), to_regprocedure('public.admin_data_jobs()'),
+                                     to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'))), false)
+    UNION ALL SELECT '20261205_data_jobs','admin_data_jobs: DEFINER, all three functions pinned to search_path=public, three-part gate (uid null / anonymous session / not admin); overview reads cron.job_run_details only in the cron_sql arm, never return_message or command, and carries the attention key',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proconfig IS NOT NULL FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_data_jobs()')), false)
+      AND COALESCE((SELECT bool_and(p.proconfig = ARRAY['search_path=public']) FROM pg_proc p
+                     WHERE p.oid IN (to_regprocedure('public.data_jobs_overview(timestamptz)'), to_regprocedure('public.admin_data_jobs()'),
+                                     to_regprocedure('public.record_data_job_run(text,text,text,text,text,timestamptz)'))), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN%'
+               AND pg_get_functiondef(to_regprocedure('public.admin_data_jobs()')) LIKE '%RAISE EXCEPTION ''ADMIN_ONLY'';%', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%JOIN cron.job_run_details d ON d.jobid = j.jobid%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND coalesce(d.start_time, d.end_time) >%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%''attention'', (j.state IN (''failed'', ''stale'') OR (j.state = ''inactive'' AND j.expected_every IS NOT NULL))%', false)
+    UNION ALL SELECT '20261205_data_jobs','data_jobs: no row is paused (a pause is an admin act; the switchable set is the 1210 H token)',
+      COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT count(*) AS n FROM public.data_jobs WHERE paused', false, true, '')))[1]::text = '0'
+                 WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
+    -- 1205-END
+    -- 1210-BEGIN
+    -- 20261210 / 20261211 data jobs, release 2. Red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE). Own facts only:
+    -- (a) EXACTLY the seven switchable jobs (derived, so an eighth or a missing one reads red); (b) function grants: the admin switch authenticated yes /
+    --     anon no and DEFINER, the gate service_role only, the pause helper service_role only, the watchdog owner only, the age function service_role only
+    --     and DEFINER; (c) the two due() gates carry the pause clause; (d) the watchdog state table: RLS on, ZERO policies, no privilege for anyone but the owner;
+    --     (e) the watchdog speaks to admins only, with the admin_alert type and the Data jobs tab in the push data;
+    --     (f) data_jobs_overview's 20261210 body: INVOKER, search_path pinned, grace_over, the grace-gated stale arms in their order after paused,
+    --     cron.job_run_details read only in the cron_sql arm, never return_message / command / net._http_response.
+    UNION ALL SELECT '20261210_data_jobs_switches','exactly seven switchable jobs: duty-push, duyurular-fetch, gisekibris-feed, google-places-refresh, novest-images, sync-novest, weekend-digest',
+      COALESCE((SELECT (xpath('/row/n/text()', query_to_xml('SELECT string_agg(key, '','' ORDER BY key) AS n FROM public.data_jobs WHERE switchable', false, true, '')))[1]::text
+                         = 'duty-push,duyurular-fetch,gisekibris-feed,google-places-refresh,novest-images,sync-novest,weekend-digest'
+                 WHERE to_regclass('public.data_jobs') IS NOT NULL), false)
+    UNION ALL SELECT '20261210_data_jobs_switches','data_jobs_overview (1210 body): INVOKER, search_path=public, grace_over; stale arms grace-gated, order inactive < paused < stale < no_record < second stale; cron.job_run_details only in the cron_sql arm, never return_message / command / net._http_response',
+      COALESCE((SELECT NOT p.prosecdef AND p.proconfig = ARRAY['search_path=public'] FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_overview(timestamptz)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%(p_now > d.records_expected_from + d.expected_every) AS grace_over%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%JOIN cron.job_run_details d ON d.jobid = j.jobid%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) LIKE '%WHERE dj.runner = ''cron_sql'' AND coalesce(d.start_time, d.end_time) >%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%d.return_message%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%j.command%'
+               AND pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')) NOT LIKE '%net._http_response%'
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.cron_active IS NOT DISTINCT FROM false THEN ''inactive''') > 0
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.cron_active IS NOT DISTINCT FROM false THEN ''inactive''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.paused THEN ''paused''')
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.paused THEN ''paused''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.expected_every IS NOT NULL AND j.l_key IS NULL AND j.grace_over THEN ''stale''')
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.expected_every IS NOT NULL AND j.l_key IS NULL AND j.grace_over THEN ''stale''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
+               AND strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.l_key IS NULL THEN ''no_record''')
+                   < strpos(pg_get_functiondef(to_regprocedure('public.data_jobs_overview(timestamptz)')), 'WHEN j.expected_every IS NOT NULL AND j.grace_over AND (j.last_ok_at IS NULL OR j.last_ok_at < p_now - j.expected_every) THEN ''stale'''), false)
+    UNION ALL SELECT '20261210_data_jobs_switches','admin_set_data_job_paused: DEFINER, authenticated yes, anon no, three-part gate; gate + pause helper: service_role only, INVOKER',
+      COALESCE(has_function_privilege('authenticated', to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'), 'EXECUTE')
+           AND (SELECT p.prosecdef AND p.proconfig = ARRAY['search_path=public'] FROM pg_proc p WHERE p.oid = to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)'))
+           AND pg_get_functiondef(to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)')) LIKE '%IF auth.uid() IS NULL OR public.is_anonymous_session() OR NOT public.is_admin() THEN%'
+           AND pg_get_functiondef(to_regprocedure('public.admin_set_data_job_paused(text,boolean,text)')) LIKE '%RAISE EXCEPTION ''ADMIN_ONLY'';%'
+           AND has_function_privilege('service_role', to_regprocedure('public.data_job_gate(text,text,text)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.data_job_gate(text,text,text)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.data_job_gate(text,text,text)'), 'EXECUTE')
+           AND has_function_privilege('service_role', to_regprocedure('public.data_job_paused(text)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.data_job_paused(text)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.data_job_paused(text)'), 'EXECUTE')
+           AND NOT (SELECT bool_or(p.prosecdef) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.data_job_gate(text,text,text)'), to_regprocedure('public.data_job_paused(text)'))), false)
+    UNION ALL SELECT '20261210_data_jobs_switches','duty_push_due + weekend_digest_due: pause clause present, STABLE SQL, not client-callable',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamptz)')) LIKE '%AND NOT public.data_job_paused(''duty-push'')%'
+           AND pg_get_functiondef(to_regprocedure('public.weekend_digest_due(timestamptz)')) LIKE '%AND NOT public.data_job_paused(''weekend-digest'')%'
+           AND (SELECT bool_and(p.provolatile = 's' AND NOT p.prosecdef) FROM pg_proc p
+                 WHERE p.oid IN (to_regprocedure('public.duty_push_due(timestamptz)'), to_regprocedure('public.weekend_digest_due(timestamptz)')))
+           AND NOT has_function_privilege('anon', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE'), false)
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_alert_state: RLS on, 0 policies, no privilege for anon / authenticated / service_role (table or column)',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.data_jobs_alert_state')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'data_jobs_alert_state') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.data_jobs_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.data_jobs_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('service_role', to_regclass('public.data_jobs_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.data_jobs_alert_state') AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
+                                     OR has_column_privilege('service_role', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))), false)
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_watchdog: DEFINER, EXECUTE held by nobody but the owner; data_jobs_watchdog_age: DEFINER, service_role only',
+      COALESCE((SELECT p.prosecdef AND p.proacl IS NOT NULL AND p.proconfig = ARRAY['search_path=public'] FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_watchdog(timestamptz)')), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
+                       WHERE p.oid = to_regprocedure('public.data_jobs_watchdog(timestamptz)') AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+      AND COALESCE((SELECT p.prosecdef FROM pg_proc p WHERE p.oid = to_regprocedure('public.data_jobs_watchdog_age()')), false)
+      AND COALESCE(has_function_privilege('service_role', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE')
+               AND NOT has_function_privilege('authenticated', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE')
+               AND NOT has_function_privilege('anon', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE'), false)
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_watchdog: admins only (profiles.role = admin), type admin_alert, push data screen admin / tab datajobs, 24 h and Monday 09:00 rules as code shapes (the text is owned by 20261218)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%FOR r IN SELECT id, push_token FROM profiles WHERE role = ''admin'' LOOP%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES (r.id, ttl, bdy, ''admin_alert'')%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''datajobs'')%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%v_alerted < p_now - interval ''24 hours''%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%isodow FROM (p_now AT TIME ZONE ''Asia/Famagusta'')) = 1%', false)
+    -- 1210-END
+    -- 20261217: the admin-push send-once ledger. Registered ahead of the apply; red until it runs. Own facts: RLS on, zero policies,
+    --   no privilege for anon / authenticated on the table or any column, service_role keeps its access, 13 columns, the request id
+    --   is the primary key, and NO foreign key (an FK on auth.users / profiles breaks account deletion). The edge function writes
+    --   notifications through the service client, so the 1066_notification_type writer count is NOT changed by this file.
+    UNION ALL SELECT '20261217_admin_push_sends','admin_push_sends: RLS on, 0 policies, no anon/authenticated privilege (table or column), service_role writes, 13 columns, request_id primary key, no foreign key',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.admin_push_sends')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'admin_push_sends') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.admin_push_sends'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.admin_push_sends'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.admin_push_sends') AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')))
+               AND has_table_privilege('service_role', to_regclass('public.admin_push_sends'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+      AND COALESCE((SELECT count(*) = 13 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.admin_push_sends') AND a.attnum > 0 AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE 'PRIMARY KEY (request_id)%' FROM pg_constraint WHERE conrelid = to_regclass('public.admin_push_sends') AND conname = 'admin_push_sends_pkey'), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.admin_push_sends') AND contype = 'f')
+    -- 1218-BEGIN
+    -- 20261218: the two admin alert pushes are English. Registered ahead of the apply; red until it runs (the accepted
+    --   "registered ahead of the apply" pattern). It OWNS the text half that the 20261211 and 20261196 tokens used to assert
+    --   in Turkish (retired there: one fact, one owner). The text is anchored to code shapes, the Turkish negative is paired
+    --   with the English positives and with a control that the pattern matches Turkish at all. These are CREATE OR REPLACE of
+    --   existing writers, so the 1066_notification_type writer count is NOT changed by this file (it stays 8).
+    UNION ALL SELECT '20261218_admin_alerts_english','data_jobs_watchdog: English title Data jobs, words failed / stale / off, lines still / recovered / paused / resumed / still paused, no Turkish text left',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%ttl        text := ''Data jobs'';%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%WHEN ''failed'' THEN ''failed'' WHEN ''stale'' THEN ''stale'' WHEN ''inactive'' THEN ''off'' ELSE v_state END;%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': still '' || v_word)%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': recovered'')%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': paused ('' || left(coalesce(v_note, ''''), 60)%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': resumed'')%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': still paused ('' || coalesce(to_char(v_pat AT TIME ZONE ''Asia/Famagusta'', ''DD.MM''), ''?'')%'
+           AND 'hâlâ başarısız' ~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) !~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) !~ '[çğışöüâÇĞİŞÖÜ]', false)
+    UNION ALL SELECT '20261218_admin_alerts_english','marketplace_photo_review_reminder: title Bandabuliya, body "<n> photo waiting for review" (n = 1) / "<n> photos waiting for review", no Turkish text left',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%ttl := ''Bandabuliya'';%'
+           AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%bdy := v_count || CASE WHEN v_count = 1 THEN '' photo waiting for review'' ELSE '' photos waiting for review'' END;%'
+           AND '5 fotoğraf onay bekliyor' ~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
+           AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) !~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
+           AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) !~ '[çğışöüâÇĞİŞÖÜ]', false)
+    -- 1218-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -4295,6 +4672,18 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := null%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := old.source_id%', false)
+    -- ── 1209: photo credits are provenance too ──────────────────────────────────
+    -- Same function, extended: a session's INSERT gets photo_attribution / photo_credits NULL, a
+    -- session's UPDATE keeps the old values (admins included); only a no-session writer (the
+    -- seed-explore-photos script, migrations) sets them. Anchored to the code shapes, paired
+    -- with the no-session positive the 1045 token also reads. Not a new trigger: the 1045
+    -- trigger token above still proves it fires on INSERT and UPDATE.
+    UNION ALL SELECT '1209_places_credit_guard','places_guard_source: photo credits — no-session passes, session insert nulled, update keeps old',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_attribution := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_credits := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_attribution := old.photo_attribution%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.photo_credits := old.photo_credits%', false)
     -- ── 1155: EEMD official_visit lock + data ───────────────────────────────────
     -- Same shape as 1045: D cannot see that the trigger fires on UPDATE too, and an
     -- INSERT-only trigger would let a claimed café write itself into "Müze & Ören Yeri".
@@ -5081,7 +5470,7 @@ WITH report AS (
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%v_partner.adult_only%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%eatery_order_age_gate(v_dob%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%MESSAGE = ''adult_only''%'
-           AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%Europe/Istanbul%'
+           -- RETIRED half: the age gate's time zone (Europe/Istanbul until 20261198, Europe/Nicosia since; the 1198 token owns it).
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%public.is_previewer()%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) LIKE '%public.is_anonymous_session()%'
            AND pg_get_functiondef(COALESCE(to_regprocedure('public.create_eatery_order(uuid,jsonb,text,text)'), to_regprocedure('public.create_eatery_order(uuid,jsonb,text)'))) NOT LIKE '%p_items -> %price%', false)
@@ -5547,10 +5936,12 @@ WITH report AS (
     --     since 20261196 added marketplace_photo_review_reminder (admin push when Bandabuliya
     --     photos wait; it sets type 'admin_alert'); probe run 43428984651 printed exactly these
     --     seven. A legitimate new writer bumps the count in the same PR, saying why.
+    --     Eight since 20261211 added data_jobs_watchdog (admin push when a data job needs attention;
+    --     it sets type 'admin_alert', 4-column INSERT, one row per admin).
     --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
     --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
-    UNION ALL SELECT '1066_notification_type','7 notification writers, all seven set type, none uses the 3-column INSERT',
-      COALESCE((SELECT count(*) = 7
+    UNION ALL SELECT '1066_notification_type','8 notification writers, all eight set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 8
                    AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%')
                    AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
                   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -6302,10 +6693,9 @@ WITH report AS (
   -- 20261196 (c) the push data. The tap must open the admin screen; the module's own screen key would send production
   -- bundles to a listing with a null id. Negative anchored to the tuple shape ('tab', 'marketplace' is legitimate), paired
   -- with the positive.
-  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): push data screen admin / tab marketplace / view photos, never screen marketplace; Turkish text',
+  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): push data screen admin / tab marketplace / view photos, never screen marketplace (the text is owned by 20261218)',
     COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''marketplace'', ''view'', ''photos'')%'
-         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) NOT LIKE '%''screen'', ''marketplace''%'
-         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%bdy := v_count || '' fotoğraf onay bekliyor'';%', false)
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) NOT LIKE '%''screen'', ''marketplace''%', false)
   -- 20261196 (d) the state table: RLS on, NO policies (only the DEFINER function writes it), no privilege for anon /
   -- authenticated, exactly one row. Section I sees RLS too; this token owns the zero-policy and no-grant halves.
   UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_reminder_state: RLS on, 0 policies, no anon / authenticated privilege, one row',
@@ -6445,7 +6835,13 @@ FROM (VALUES
   -- Bandabuliya retention (20261185), 01:23 UTC daily; exact schedule + command are the 20261185 row below.
   ('20261185_marketplace_maintenance','marketplace-maintenance'),
   -- Bandabuliya photo review reminder (20261196), every 5 minutes; exact schedule + command are the 20261196 row below.
-  ('20261196_marketplace_photo_review_reminder','marketplace-photo-review-reminder')
+  ('20261196_marketplace_photo_review_reminder','marketplace-photo-review-reminder'),
+  -- 90-day retention on onboarding_events (20261203), 03:37 UTC daily; exact schedule + command are the 20261203 row below.
+  ('20261203_onboarding_events_retention','purge-onboarding-events'),
+  -- 90-day retention on data_job_runs (20261205), 03:43 UTC daily.
+  ('20261205_data_jobs','purge-data-job-runs'),
+  -- Data jobs watchdog (20261211), minutes 14 and 44; exact schedule + command are the 20261211 row below.
+  ('20261211_data_jobs_watchdog','data-jobs-watchdog')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
@@ -6503,6 +6899,18 @@ SELECT '20261163_oli_messages', 'purge-oli-messages: schedule 57 3 * * * and the
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
 UNION ALL
+-- ─── 20261203: purge-onboarding-events runs daily at 03:37 and calls the purge function (default 90 days) ───
+-- 1203-Q2-BEGIN
+SELECT '20261203_onboarding_events_retention', 'purge-onboarding-events: schedule 37 3 * * * and the exact purge call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-onboarding-events') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-onboarding-events' AND active
+                    AND schedule = '37 3 * * *'
+                    AND btrim(command) = 'SELECT public.purge_onboarding_events()') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+-- 1203-Q2-END
+
+UNION ALL
 -- ─── 20261185: marketplace-maintenance runs daily at 01:23 UTC and POSTs {"apply": true} with the Vault key ───
 SELECT '20261185_marketplace_maintenance', 'marketplace-maintenance: schedule 23 1 * * *, Vault key, apply body',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'marketplace-maintenance') THEN 'MISSING'
@@ -6523,6 +6931,48 @@ SELECT '20261196_marketplace_photo_review_reminder', 'marketplace-photo-review-r
                     AND btrim(command) = 'SELECT public.marketplace_photo_review_reminder();') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261205: EVERY cron job has exactly one data_jobs row, and every listed name exists ───
+-- DERIVED from cron.job and data_jobs, never from a list: a new cron job nobody registered turns this red and names itself.
+-- (The 27 pre-existing jobs + purge-data-job-runs are covered at apply; this keeps it true.) The tables are reached through
+-- query_to_xml so a missing data_jobs reads MISSING instead of killing QUERY 2.
+-- 1205-Q2-BEGIN
+SELECT '20261205_data_jobs',
+       CASE WHEN to_regclass('public.data_jobs') IS NULL THEN 'every cron job has a data_jobs row'
+            ELSE coalesce('uncovered: ' || (xpath('/row/n/text()', query_to_xml(
+                   'SELECT string_agg(j.jobname, '', '' ORDER BY j.jobname) AS n FROM cron.job j WHERE (SELECT count(*) FROM public.data_jobs d WHERE j.jobname = ANY (d.cron_jobnames)) IS DISTINCT FROM 1',
+                   false, true, '')))[1]::text,
+                 'listed but absent: ' || (xpath('/row/n/text()', query_to_xml(
+                   'SELECT string_agg(DISTINCT n, '', '' ORDER BY n) AS n FROM public.data_jobs d, unnest(d.cron_jobnames) AS n WHERE NOT EXISTS (SELECT 1 FROM cron.job j WHERE j.jobname = n)',
+                   false, true, '')))[1]::text,
+                 'every cron job has a data_jobs row') END,
+       CASE WHEN to_regclass('public.data_jobs') IS NULL THEN 'MISSING'
+            WHEN (xpath('/row/n/text()', query_to_xml(
+                   'SELECT count(*) AS n FROM cron.job j WHERE (SELECT count(*) FROM public.data_jobs d WHERE j.jobname = ANY (d.cron_jobnames)) IS DISTINCT FROM 1',
+                   false, true, '')))[1]::text IS DISTINCT FROM '0'
+              OR (xpath('/row/n/text()', query_to_xml(
+                   'SELECT count(*) AS n FROM public.data_jobs d, unnest(d.cron_jobnames) AS n WHERE NOT EXISTS (SELECT 1 FROM cron.job j WHERE j.jobname = n)',
+                   false, true, '')))[1]::text IS DISTINCT FROM '0'
+              THEN 'UNREGISTERED CRON JOB ← FIX'
+            ELSE 'OK' END
+UNION ALL
+SELECT '20261205_data_jobs', 'purge-data-job-runs: schedule 43 3 * * * and the exact 90-day delete',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-data-job-runs') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'purge-data-job-runs' AND active
+                    AND schedule = '43 3 * * *'
+                    AND btrim(command) = 'DELETE FROM public.data_job_runs WHERE started_at < now() - interval ''90 days''') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+UNION ALL
+SELECT '20261211_data_jobs_watchdog', 'data-jobs-watchdog: schedule 14,44 * * * * and the exact call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'data-jobs-watchdog') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'data-jobs-watchdog' AND active
+                    AND schedule = '14,44 * * * *'
+                    AND btrim(command) = 'SELECT public.data_jobs_watchdog();') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+-- 1205-Q2-END
 
 UNION ALL
 -- ─── 1139: duty-push and google-places-refresh wait 60 s for pg_net's reply (the 5 s default logged a timeout 2026-10-26 15:00Z) ───

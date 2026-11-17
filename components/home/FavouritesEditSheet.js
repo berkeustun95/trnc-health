@@ -3,12 +3,13 @@ import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet, useWindowD
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { HOME_MODULES, tileLabel } from '../../constants/homeModules'
-import { FAVOURITE_SLOTS, eligibleModules, resolveFavourites, SLOT_LABEL_PX, SLOT_LABEL_FIT } from '../../constants/homeFavourites'
+import { tileLabel } from '../../constants/homeModules'
+import { moduleById } from '../../constants/homeGroups'
+import { FAVOURITE_SLOTS, resolveFavourites, SLOT_LABEL_PX, SLOT_LABEL_FIT } from '../../constants/homeFavourites'
 import ModuleTile from './ModuleTile'
 import { PAGE_INSET, PANEL_GUTTER, TILE_PAD, TILE_WIDTH, labelCap } from './redesign/ServicePanels'
 
-// Düzenle — pin or replace the four favourite slots.
+// Düzenle — pin or replace the eight favourite slots.
 //
 // ─── THE INTERACTION, AND WHY IT IS PICK-SLOT-THEN-PICK-MODULE ──────────────
 //
@@ -19,14 +20,14 @@ import { PAGE_INSET, PANEL_GUTTER, TILE_PAD, TILE_WIDTH, labelCap } from './rede
 // VoiceOver, and need no library.
 //
 // A slot is selected (highlighted); tapping any module in the list below assigns it there
-// and advances the selection to the next slot, so pinning all four is eight taps in a
+// and advances the selection to the next slot, so pinning all eight is sixteen taps in a
 // straight line with no mode to understand.
 //
 // ─── A PIN IS AN OVERRIDE, NOT A SNAPSHOT ───────────────────────────────────
 //
 // Slots the user never touches stay `null` and keep auto-filling by usage forever. That
 // is why the sheet opens showing the RESOLVED row (what they see on Home) while storing
-// only what they explicitly chose: taking a snapshot of the current four and calling them
+// only what they explicitly chose: taking a snapshot of the current eight and calling them
 // pins would silently freeze the whole row the first time somebody edited one box.
 //
 // "Otomatik sırala" clears every pin and hands the row back to usage.
@@ -63,7 +64,7 @@ function SlotBox({ mod, index, selected, lang, onPress }) {
   )
 }
 
-export default function FavouritesEditSheet({ visible, pins, usage, overrides, lang, onSave, onClose }) {
+export default function FavouritesEditSheet({ visible, pins, usage, visibleIds, lang, onSave, onClose }) {
   const [draft, setDraft]       = useState(pins)
   const [selected, setSelected] = useState(0)
 
@@ -75,15 +76,14 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
   }, [visible])
 
   // What Home would show given the current draft — so the slot boxes preview the real
-  // outcome, auto-filled entries included, rather than showing four holes.
-  const resolved = resolveFavourites({ pins: draft, usage, overrides })
-  const byId     = new Map(HOME_MODULES.map(m => [m.id, m]))
-  const options  = eligibleModules({ overrides }).map(id => byId.get(id)).filter(Boolean)
+  // outcome, auto-filled entries included, rather than showing eight holes.
+  const resolved = resolveFavourites({ pins: draft, usage, visible: visibleIds })
+  const options  = visibleIds.map(moduleById).filter(Boolean)
 
   function assign(mod) {
     const next = [...draft]
     // No duplicates: a module already pinned elsewhere MOVES rather than appearing twice.
-    // Four boxes showing three modules is a bug the user cannot undo without guessing
+    // Eight boxes showing seven modules is a bug the user cannot undo without guessing
     // which box to clear.
     for (let i = 0; i < FAVOURITE_SLOTS; i++) if (next[i] === mod.id) next[i] = null
     next[selected] = mod.id
@@ -122,7 +122,7 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
               <SlotBox
                 key={i}
                 index={i}
-                mod={byId.get(resolved[i])}
+                mod={moduleById(resolved[i])}
                 selected={selected === i}
                 lang={lang}
                 onPress={setSelected}
@@ -145,7 +145,7 @@ export default function FavouritesEditSheet({ visible, pins, usage, overrides, l
             </TouchableOpacity>
           </View>
 
-          {/* Only ELIGIBLE modules are offered. A sheet that let you pin a dark module
+          {/* Only VISIBLE modules are offered (the same list Home uses). A sheet that let you pin a dark module
               would be a way to put a Coming Soon tile on Home by hand — the one thing the
               resolver refuses to do on its own, so the editor must refuse it too. */}
           <ScrollView style={s.list} contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
@@ -177,14 +177,14 @@ const s = StyleSheet.create({
   // maxHeight rather than a fixed one: the module list scrolls, and on a short screen the
   // sheet must not push its own Bitti button off the bottom.
   sheet:       { backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-                 padding: 20, paddingHorizontal: PAGE_INSET, paddingBottom: 30, maxHeight: '78%' },
+                 padding: 20, paddingHorizontal: PAGE_INSET, paddingBottom: 24, maxHeight: '78%' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title:       { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   done:        { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   hint:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
-  slots:       { flexDirection: 'row', marginTop: 16, paddingHorizontal: PANEL_GUTTER },
+  slots:       { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, marginTop: 12, paddingHorizontal: PANEL_GUTTER },
   slotCell:    { width: TILE_WIDTH, paddingHorizontal: TILE_PAD },
-  slot:        { alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 0,
+  slot:        { alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 0,
                  borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
                  backgroundColor: 'transparent' },
   // Selection is carried by BORDER + BACKGROUND + label colour, not by colour alone —
@@ -195,7 +195,7 @@ const s = StyleSheet.create({
   // reason twice over: a quarter-width box at 10pt fits ~14 characters, so "Nöbetçi
   // Eczaneler" and "Yeni Gelenler Rehberi" would both ellipse to near-identical stubs on
   // one line — and a preview whose whole job is to say WHICH module is in the slot must
-  // not render two different modules as the same string. Fixed height so all four boxes
+  // not render two different modules as the same string. Fixed height so all eight boxes
   // stay the same size whatever the locale does. Size and height are set inline: SlotBox
   // reads the per-label size (SLOT_LABEL_FIT) and the font-scale cap.
   slotLabel:   { lineHeight: SLOT_LINE_H, fontFamily: 'Inter_500Medium',

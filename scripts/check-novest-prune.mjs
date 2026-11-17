@@ -217,6 +217,7 @@ const t = (name, got, want) => {
   const run = mirror[0]?.run ?? ''
   t('no other step touches the mirror script or --prune', steps.filter(s => s !== mirror[0] && /--prune|mirror-novest-images/.test(s.run ?? '')).length, 0)
   t('job env wires IN_PRUNE / IN_APPLY / IN_LIMIT from the inputs', [doc.jobs.run.env.IN_PRUNE, doc.jobs.run.env.IN_APPLY, doc.jobs.run.env.IN_LIMIT], ['${{ inputs.prune }}', '${{ inputs.apply }}', '${{ inputs.limit }}'])
+  t('job env WRITE is the one write gate (schedule, or apply=true)', doc.jobs.run.env.WRITE, "${{ github.event_name == 'schedule' || inputs.apply == true }}")
   t('on: schedule is cron-only, dispatch has the prune input', [Object.keys(doc.on).sort(), doc.on.workflow_dispatch.inputs.prune.default], [['schedule', 'workflow_dispatch'], false])
   const pruneLines = run.split('\n').filter(l => !l.trim().startsWith('#') && l.includes('--prune'))
   t('exactly one line of the Mirror step mentions --prune', pruneLines.length, 1)
@@ -230,7 +231,7 @@ const t = (name, got, want) => {
     for (const pr of ['', 'false', 'true'])
       for (const ap of ['', 'false', 'true']) {
         const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], {
-          env: { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: ev, IN_PRUNE: pr, IN_APPLY: ap, IN_LIMIT: '' }, encoding: 'utf8' })
+          env: { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: ev, IN_PRUNE: pr, IN_APPLY: ap, IN_LIMIT: '', WRITE: String(ev === 'schedule' || ap === 'true') }, encoding: 'utf8' })
         const argv = (/^ARGS:(.*)$/m.exec(r.stdout ?? '')?.[1] ?? 'NO-NODE-CALL').trim().split(/\s+/)
         const hasPrune = argv.includes('--prune'), hasDry = argv.includes('--dry')
         const wantPrune = ev === 'workflow_dispatch' && pr === 'true'
@@ -244,6 +245,17 @@ const t = (name, got, want) => {
         if (problems.length) wrong.push(`${ev}/prune=${pr || '-'}/apply=${ap || '-'}: ${problems.join('; ')} [${argv.join(' ')}]`)
       }
   t('all 27 event x prune x apply combinations behave', wrong, [])
+  // Tripwire: a scheduled run whose WRITE gate did not resolve to 'true' must stop red before any node call.
+  const trip = (w) => {
+    const env = { PATH: `${dir}:${process.env.PATH}`, GITHUB_EVENT_NAME: 'schedule', IN_PRUNE: '', IN_APPLY: '', IN_LIMIT: '' }
+    if (w !== undefined) env.WRITE = w
+    const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], { env, encoding: 'utf8' })
+    return [r.status, /^ARGS:/m.test(r.stdout ?? ''), (r.stdout ?? '').includes('::error::a scheduled run resolved to a dry run; the WRITE gate is broken')]
+  }
+  t('tripwire: schedule + WRITE=false -> exit 1, no node call, ::error::', trip('false'), [1, false, true])
+  t('tripwire: schedule + WRITE empty -> exit 1', trip('')[0], 1)
+  t('tripwire: schedule + WRITE unset -> exit 1', trip(undefined)[0], 1)
+  t('tripwire: schedule + WRITE=true runs the mirror (positive control)', trip('true'), [0, true, false])
 }
 
 console.log(bad ? `\n${bad} check(s) FAILED` : '\nall checks passed')

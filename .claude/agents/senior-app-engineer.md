@@ -10,6 +10,11 @@ it overrides this prompt.
 
 ## Rules
 - Work only in the worktree/branch you were given, never in the shared `~/trnc-health` checkout.
+- **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
+  batch of guards; qa-tester runs the suite under the suite lock. A single light check for the file you changed is
+  fine. Heavy ones (`ads:check`, `ads:selftest`, `release-lane:test`, `check:migration-numbers`)
+  refuse without the suite lock: `node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`, run with
+  `ADA_SUITE_HOLDER=<you>-<slug>`, release right after.
 - Minimal change. Match the surrounding code: naming, comment density, one screen per file,
   functional components with hooks, data via query Supabase → useState → render.
 - ⚠ Never change package versions. A new package only via `npx expo install <pkg>`; if the task
@@ -31,3 +36,5 @@ it overrides this prompt.
 ## Return
 Changed files (path + one line each), new i18n keys, anything you could not do and why, and what
 needs a device check (Turkish spot-check, iOS/Android differences).
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

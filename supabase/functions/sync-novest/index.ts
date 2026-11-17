@@ -3,6 +3,11 @@
 // Deploy:  supabase functions deploy sync-novest
 // Cron:    see schedule.sql in this directory
 //
+// CALLER: only the service key may call this (the cron sends it from Vault). The gateway's verify_jwt=true
+// proves a token is signed by the project, not whose it is, so the handler checks it again (../_shared/caller-auth.mjs):
+// byte-identical to the runtime key ('exact') or a JWT with role=service_role ('role'). The 'role' branch is sound
+// ONLY while verify_jwt stays true (deploy-config.json). The response reports which branch matched.
+//
 // WHAT THIS DOES AND DELIBERATELY DOES NOT DO
 //
 // Metadata only: price, status, title, description, delisting. NOT images.
@@ -25,6 +30,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { readAllResult } from '../_shared/read-all-rows.mjs'
+import { serviceCaller } from '../_shared/caller-auth.mjs'
+import { dataJobGate, recordDataJobRun } from '../_shared/data-jobs.mjs'
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, contactCutReport, assertNoContact,
   num, int, meta, mapPropertyType, extractDeedType, coordsInCyprus,
@@ -82,8 +89,34 @@ function assertHomogeneous(label: string, rows: Record<string, unknown>[]) {
   }
 }
 
-Deno.serve(async () => {
+const JOB = 'sync-novest'
+const jobCfg = () => ({ url: Deno.env.get('SUPABASE_URL'), key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), log: (c: string) => console.error('sync-novest:', c) })
+
+// Fixed vocabulary only: never the exception text (it can carry ids, URLs or counts).
+function errorClass(msg: string): string {
+  if (/^Novest agency row/.test(msg)) return 'preflight_failed'
+  if (/^feed returned ZERO/.test(msg)) return 'empty_feed'
+  if (/^ABORT:/.test(msg)) return 'delist_floor'
+  if (/^ragged /.test(msg)) return 'ragged_payload'
+  if (/^read failed/.test(msg)) return 'read_failed'
+  if (/^(insert|update) upsert|^relist|^delist|^last_seen_at stamp/.test(msg)) return 'write_failed'
+  return 'unknown'
+}
+
+Deno.serve(async (req) => {
+  const caller = await serviceCaller(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (!caller) {
+    console.error('sync-novest: caller refused')
+    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } })
+  }
   const started = Date.now()
+  // The scheduled path asks the pause switch; a hand run says {"manual": true} and is never gated (still recorded).
+  let manual = false
+  try { manual = (await req.json())?.manual === true } catch { /* cron sends {} */ }
+  if (!manual && (await dataJobGate(jobCfg(), JOB)) === 'paused') {
+    return new Response(JSON.stringify({ skipped: 'paused' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
   const log: string[] = []
   const say = (s: string) => { log.push(s); console.log(s) }
 
@@ -270,8 +303,9 @@ Deno.serve(async () => {
     if (stampErr) throw new Error(`last_seen_at stamp: ${stampErr.message}`)
 
     say(`ok in ${Date.now() - started}ms`)
+    await recordDataJobRun(jobCfg(), JOB, 'ok', null, started)
     return new Response(JSON.stringify({
-      ok: true, feed: feed.length, imported: rows.length,
+      ok: true, caller, feed: feed.length, imported: rows.length,
       inserts: inserts.length, updates: updates.length, unchanged,
       relist: relist.length, delist: delist.length, skipped, flagged, log,
     }), { headers: { 'Content-Type': 'application/json' } })
@@ -281,7 +315,8 @@ Deno.serve(async () => {
     // the primary alarm though — a cron that never fires produces no failed invocation
     // to look at. The staleness banner is what catches that, and it catches this too.
     console.error('sync-novest FAILED:', (e as Error).message)
-    return new Response(JSON.stringify({ ok: false, error: (e as Error).message, log }),
+    await recordDataJobRun(jobCfg(), JOB, 'failed', errorClass((e as Error).message), started)
+    return new Response(JSON.stringify({ ok: false, caller, error: (e as Error).message, log }),
       { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })

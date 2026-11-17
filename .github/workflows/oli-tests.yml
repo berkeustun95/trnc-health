@@ -1,4 +1,4 @@
-# Ask Oli render test + routing audit on every PR and push to main. The same `npm run test:oli` also runs first in
+# Ask Oli render test + routing audit, then the offline data-job heartbeat guards, on every PR and push to main. The same `npm run test:oli` also runs first in
 # `npm run ota` and `npm run ota:preview`, so nothing ships without it. No secrets: the test mocks Supabase.
 name: oli-tests
 on:
@@ -19,3 +19,18 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run test:oli
+      - name: Data-job heartbeat guards (offline)
+        run: |
+          node scripts/record-data-job-run.mjs --selftest
+          node scripts/check-data-job-heartbeats.mjs --selftest
+          node scripts/check-data-job-heartbeats.mjs
+          node scripts/data-job-gate.mjs --selftest
+          node scripts/check-data-jobs-watchdog.mjs --selftest
+      - name: Dispatcher actor guard (offline)
+        run: |
+          node scripts/check-dispatcher-actor.mjs --selftest
+          node scripts/check-dispatcher-actor.mjs
+      - name: sync-novest caller gate (offline guard)
+        run: node scripts/check-sync-novest-auth.mjs
+      - name: push functions caller gate (offline guard)
+        run: node scripts/check-push-fn-auth.mjs

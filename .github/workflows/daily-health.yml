@@ -1,11 +1,17 @@
-# ─── Daily content health (read-only) ────────────────────────────────────────
+# ─── Daily content health (read-only, plus one heartbeat row) ────────────────
 #
 # The checks that used to be run by hand from a Mac holding the service key. No Mac
-# holds one now, so this is where they run. Read-only: every script here only SELECTs.
+# holds one now, so this is where they run. The checks only SELECT. The one write is the last step of a
+# SCHEDULED run: one heartbeat row (job key, ok/failed, error class, run id) in data_job_runs (data jobs, slice 2).
 # Each step runs even if an earlier one failed, so one email carries every red; the
 # job fails if any did — that failure IS the alert (GitHub emails on failure).
 #
-# Gişe Kıbrıs health is not here: gisekibris-feed runs it daily as its last step.
+# Gişe Kıbrıs content health is not here: gisekibris-feed runs it as its last step. Whether
+# the Gişe sync (and every other feed) RAN is here: feeds:freshness, 48 h (Berke 2026-11-14).
+#
+# Red vs warning (2026-11-14): one Duyurular source down is THEIR site, so it is a warning
+# with its own issue ("Duyurular sources down") and the job stays green. Three dead sites
+# kept this job red for 16 days, and a red job that is always red hides the next real red.
 #
 #   gh workflow run daily-health
 
@@ -19,6 +25,7 @@ on:
 
 jobs:
   health:
+    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15
@@ -64,6 +71,12 @@ jobs:
       - name: duty push sent recently
         if: success() || failure()
         run: node scripts/check-duty-push-staleness.mjs
+      # Round 5 (2026-11-16): duty push sends each batch once (#479). Pass/fail only; passes itself after 2026-11-23.
+      - name: duty push send-once watch (until 2026-11-23)
+        if: success() || failure()
+        run: |
+          node scripts/check-duty-push-send-once.mjs --self
+          node scripts/check-duty-push-send-once.mjs
       - name: notify:health
         if: success() || failure()
         run: npm run -s notify:health
@@ -85,7 +98,39 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duyurular-health.mjs --self
-          npm run -s duyurular:health
+          npm run -s duyurular:health -- --down-out "$RUNNER_TEMP/duyurular-down.txt"
+      # A few sources failing = a warning (above). One issue lists them; Berke is mentioned
+      # when the set changes; it closes when none are down. Source keys and counts only.
+      - name: Duyurular sources down (warning, not red)
+        if: success() || failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f="$RUNNER_TEMP/duyurular-down.txt"
+          [ -f "$f" ] || { echo "duyurular:health wrote no list (it failed before the end); nothing to report."; exit 0; }
+          list=$(sed 's/^/- /' "$f")
+          keys() { sed -E 's/\([0-9]+\)$//'; }   # failure counts grow every fetch; compare source keys only
+          title='Duyurular sources down'
+          # Exact title AND opened by this workflow's bot: anyone can open an issue on a public repo.
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title,author \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
+          if [ -z "$list" ]; then
+            [ -z "$num" ] || gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment 'No source is failing 3+ runs in a row.'
+            exit 0
+          fi
+          body=$(printf '%s\n\n%s\n\n%s\n\nLatest run: %s/%s/actions/runs/%s' \
+            'These sources failed 3+ fetches in a row (count in brackets). A few is a warning and daily-health stays green; 5+ or 20%+ at once is red.' \
+            "$list" \
+            'Fix: pause with `active: false` in scripts/duyurular/sources.mjs; duyurular-paused-recheck says when one is back.' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [ -z "$num" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"$'\n\n@berkeustun95'
+          else
+            old=$(gh issue view "$num" --repo "$GITHUB_REPOSITORY" --json body --jq .body | sed -n '/^- /p')
+            gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+            [ "$(keys <<<"$old")" = "$(keys <<<"$list")" ] || gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the sources down changed:"$'\n\n'"$list"
+          fi
       - name: duyurular:staleness
         if: success() || failure()
         run: |
@@ -105,9 +150,30 @@ jobs:
         if: success() || failure()
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-eatery-partner-ids.mjs
 
+      # Every feed synced in the last 48 h (Gişe Kıbrıs, Duyurular, Novest photos), measured from
+      # each workflow's last SUCCESSFUL run. The Mac launchd job runs the same script every 6 h.
+      - name: feeds:freshness (every feed synced in 48 h)
+        if: success() || failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/check-feed-freshness.mjs --self
+          node scripts/check-feed-freshness.mjs
+
+      # Who watches the watchdog (data jobs, slice 3): the pg_cron job `data-jobs-watchdog` alerts admins when a
+      # data job goes wrong. Red when it has not succeeded for 3 h (or never). SCHEDULED runs only. A missing RPC
+      # (not applied yet) and an unreadable answer are warnings, not red. Output has no data, ages only.
+      - name: data-jobs watchdog ran in the last 3 h
+        if: ${{ (success() || failure()) && github.event_name == 'schedule' }}
+        timeout-minutes: 2
+        run: |
+          node scripts/check-data-jobs-watchdog.mjs --selftest
+          node scripts/check-data-jobs-watchdog.mjs
+
       # GitHub emails a scheduled job's failure to whoever last edited the schedule, which is a bot, so a red run told
       # nobody: Novest and the duty push were down for days. One issue stays open while anything is red, and Berke is
-      # mentioned only when the set of failing checks changes. Step names only: this repo and its issues are public.
+      # mentioned when the set of failing checks changes, and again every 3 days while it stays red (2026-11-14: the
+      # same set from 11-07 on meant no mention for a week). Step names only: this repo and its issues are public.
       - name: Alert Berke
         if: always()
         env:
@@ -116,8 +182,8 @@ jobs:
           failing=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
             --jq '[.jobs[].steps[] | select(.conclusion == "failure") | "- " + .name] | sort | join("\n")')
           title='Daily health is red'
-          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number,body \
-            --jq '.[0] // empty')
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title,body,author \
+            | jq -c --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0] // empty')
           num=$(jq -r '.number // empty' <<<"$issue")
           if [ -z "$failing" ]; then
             [ -z "$num" ] || gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment 'All checks are green again.'
@@ -129,4 +195,25 @@ jobs:
           elif [ "$(jq -r '.body' <<<"$issue" | sed -n '/^- /p')" != "$failing" ]; then
             gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 the failing checks changed:"$'\n\n'"$failing"
+          else
+            # Same set still red: re-mention unless THIS bot mentioned Berke in the last 70 h (about
+            # 3 daily runs; cron start drift would make a strict 72 h land on day 4). Only the bot's own
+            # comments count (public repo), and `since` keeps the read to the last few comments.
+            since=$(date -u -d '70 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+            recent=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$num/comments?since=$since&per_page=100" \
+              --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("@berkeustun95")) and .created_at >= "'"$since"'") | .id] | first // empty')
+            created=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num" --jq .created_at)
+            if [ -z "$recent" ] && [[ "$created" < "$since" ]]; then
+              gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "@berkeustun95 still red for 3+ days:"$'\n\n'"$failing"
+            fi
           fi
+
+      # One heartbeat row per SCHEDULED run only: a bare dispatch is not a production write. Non-fatal: a failure to record
+      # is one warning (data jobs, slice 2).
+      - name: Record the run (data_job_runs)
+        if: ${{ always() && github.event_name == 'schedule' }}
+        timeout-minutes: 2
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REAL_RUN: ${{ github.event_name == 'schedule' }}
+        run: node scripts/record-data-job-run.mjs --status="$JOB_STATUS" --real-run="$REAL_RUN"

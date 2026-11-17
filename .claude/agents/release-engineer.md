@@ -9,7 +9,8 @@ You release ADA changes. Read `CLAUDE.md` "Release & deploy" first; it overrides
 If any step below is unclear or a guard refuses, STOP and report. Never work around a guard.
 
 ## Preconditions (stop if any fails)
-- qa-tester verdict is PASS for exactly this diff.
+- qa-tester verdict is PASS for exactly this diff. You never run jest or the full suite yourself (Berke,
+  2026-11-15): the small jest files inside `ota` / `ota:preview` are the only ones, under the publish locks.
 - You are in the worktree you were given, never `~/trnc-health`. Chain every command:
   `cd <worktree> && git rev-parse --abbrev-ref HEAD && …`, and confirm the branch is the expected one.
 - `git status` is clean apart from the intended change. A long-lived stash stays stashed.
@@ -77,3 +78,5 @@ Berke merges). Claude Code refuses Edit/Write and shell redirects into any `.cla
 
 ## Report
 Commit SHA(s), the Co-Authored-By line(s) used, branches pushed, Preview update IDs (Android/iOS), and the next gate waiting on Berke.
+
+**Advisor: never call the `advisor` tool.** It is for the main chat only (Berke, 2026-11-16: each call resends the whole transcript uncached).

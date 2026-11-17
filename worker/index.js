@@ -1,7 +1,7 @@
 // getadaapp.com/o/<code> — WhatsApp order verification page, plus the order status (customer timeline, restaurant buttons).
 // GET/HEAD never call the RPC (link previews must not count as views); a visible browser's inline script POSTs /o/<code>/check.
 // Restaurant side (20261194): POST /pin enrols this phone (device token in an HttpOnly cookie only), POST /status changes
-// the status, POST /forget clears the cookie, POST /token renews the action token. The Worker key (env.ADA_WORKER_KEY) is
+// the status, POST /forget revokes this phone (eatery_partner_device_revoke) and clears the cookie, POST /token renews the action token. The Worker key (env.ADA_WORKER_KEY) is
 // sent to Supabase from here only, never taken from a client header; unset = customer-only page, every write refused.
 // Every other request is handed to the static-assets binding untouched (privacy/support/delete-account).
 
@@ -435,6 +435,8 @@ async function restaurantAction(action, request, url, env, code) {
   if (!(await actionTokenOk(env, code, device, g.body.token))) return respondJson({ status: 'retry' }, 403)
 
   if (action === 'forget') {
+    // Free this phone's device slot first (20261198; the key is set, writeGuard checked it). Its answer is ignored: the cookie goes either way.
+    if (device) await rpc(env, 'eatery_partner_device_revoke', { p_device: device }, true)
     return respondJson({ status: 'ok', token: await newActionToken(env, code, null) }, 200, { 'Set-Cookie': CLEAR_COOKIE })
   }
 

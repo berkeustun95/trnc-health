@@ -1,6 +1,7 @@
 import { View, Text, Linking, StyleSheet } from 'react-native'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { creditParts } from '../utils/photoCreditParts'
 
 // The photo-credit BODY: creator, licence, source — rendered once, used by every surface
 // that shows a third-party photo.
@@ -25,53 +26,54 @@ import { t } from '../constants/i18n'
 //   attribution, not a cosmetic problem — it is the one string in the app whose
 //   correctness is a licence condition rather than a preference.
 //
-// `a` is a resolved attribution: {credit, license, licenseUrl, sourceUrl, source}.
+// `a` is a resolved attribution: {credit, license, licenseUrl, sourceUrl, source, edited}.
 // Callers pass whatever their own data shape resolves to — utils/photoAttribution.js's
 // resolveAttribution() for a place row, resolveHeroCredit() for a bundled hero.
 // A null `a` renders NOTHING, never a blank line.
-export const SOURCE_LABEL = {
-  commons:  'Wikimedia Commons',
-  unsplash: 'Unsplash',
-  pexels:   'Pexels',
+//
+// What is rendered comes from creditParts() (utils/photoCreditParts.js): strings or null only,
+// links https only. A link opens through openLink(), which never throws or rejects.
+const openLink = url => {
+  try { Promise.resolve(Linking.openURL(url)).catch(() => {}) } catch {}
 }
 
 export default function PhotoCredit({ a, lang, style, textStyle }) {
   if (!a) return null
 
-  const sourceLabel = a.source === 'own' ? t('photoSourceOwn', lang) : SOURCE_LABEL[a.source]
-  const hasMeta     = !!a.license || !!sourceLabel
+  const { line, license, licenseUrl, sourceLabel, sourceUrl } = creditParts(a, lang)
+  const hasMeta = !!license || !!sourceLabel
 
   return (
     <View style={style}>
-      {!!a.credit && (
+      {!!line && (
         <View style={s.creditRow}>
           <Text style={[s.photoCredit, textStyle]}>
-            {t('photoCreditPrefix', lang)}: {a.credit}
+            {line}
           </Text>
         </View>
       )}
 
       {hasMeta && (
         <View style={s.creditMetaRow}>
-          {!!a.license && (a.licenseUrl ? (
+          {!!license && (licenseUrl ? (
             <Text
               style={[s.photoCreditMeta, s.creditLink, textStyle]}
               accessibilityRole="link"
               accessibilityLabel={t('photoLicenseA11y', lang)}
-              onPress={() => Linking.openURL(a.licenseUrl)}
-            >{a.license}</Text>
+              onPress={() => openLink(licenseUrl)}
+            >{license}</Text>
           ) : (
-            <Text style={[s.photoCreditMeta, textStyle]}>{a.license}</Text>
+            <Text style={[s.photoCreditMeta, textStyle]}>{license}</Text>
           ))}
 
-          {!!a.license && !!sourceLabel && <Text style={[s.creditDot, textStyle]}>·</Text>}
+          {!!license && !!sourceLabel && <Text style={[s.creditDot, textStyle]}>·</Text>}
 
-          {!!sourceLabel && (a.sourceUrl ? (
+          {!!sourceLabel && (sourceUrl ? (
             <Text
               style={[s.photoCreditMeta, s.creditLink, textStyle]}
               accessibilityRole="link"
               accessibilityLabel={t('photoSourceA11y', lang)}
-              onPress={() => Linking.openURL(a.sourceUrl)}
+              onPress={() => openLink(sourceUrl)}
             >{sourceLabel}</Text>
           ) : (
             <Text style={[s.photoCreditMeta, textStyle]}>{sourceLabel}</Text>

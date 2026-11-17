@@ -154,11 +154,11 @@ export const HOME_MODULES = [
   // separator. Hotels left this module for their own tile on 2026-10-09 (below); the 'hotels'
   // state is unused and unmeasured — spread it here again and labels:check measures it.
   { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', ...ACCOM_TILE_STATES.base },
-  // Gated by HOTELS_LIVE, which is not a MODULE_FLAGS key (constants/homeGroups.js GATES,
-  // constants/homeFavourites.js FAVOURITE_FLAGS). Placed in the Keşfet ve Eğlence panel.
+  // Gated by HOTELS_LIVE, which is not a MODULE_FLAGS key (constants/homeGroups.js GATES).
+  // Placed in the Keşfet ve Eğlence panel.
   { id: 'hotels',             icon: 'bed-outline',              tint: 'standard', labelKey: 'accomTabHotels' },
   // Yeme-İçme (eatery partners). Gated by EATERY (constants/redesign.js: EATERY_LIVE, dev, ADA Preview) in
-  // constants/homeGroups.js GATES, and by EATERY_LIVE in FAVOURITE_FLAGS. Placed in the Keşfet ve Eğlence panel.
+  // constants/homeGroups.js GATES. Placed in the Keşfet ve Eğlence panel.
   { id: 'eatery',             icon: 'restaurant-outline',       tint: 'standard', labelKey: 'menuEatery' },
   { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },   // V2 vocabulary — screens/HomeScreen.js's V1 copy says 'lifestyle'; both are correct
   { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
