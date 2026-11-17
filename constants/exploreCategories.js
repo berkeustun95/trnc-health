@@ -50,6 +50,15 @@ export const ICON_PIN = {
   services: { icon: 'construct' },
 }
 
+// A single category that draws an icon disc while its group stays default pins: beaches (the shore
+// is its own "Plajlar" map source), nature_scenic keeps the default pin. ONE resolver: placePins.
+export const CATEGORY_ICON_PIN = {
+  beach: { icon: 'umbrella' },
+}
+export function pinIcon(category, group) {
+  return (CATEGORY_ICON_PIN[category] || ICON_PIN[group])?.icon ?? null
+}
+
 // category -> i18n key. Legacy heritage/beach categories keep their bl* keys; the Slice-5
 // categories use exploreCat* keys. Every category in EXPLORE_GROUPS has a label here.
 export const CATEGORY_LABEL_KEY = {

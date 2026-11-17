@@ -35,7 +35,7 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   officialVisitApplicable, applyOfficialVisit, TRNC_CENTER, inTrncFrame, NEAR_ME_DELTA,
 } from '../constants/mapSources'
-import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup, ICON_PIN } from '../constants/exploreCategories'
+import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup, ICON_PIN, CATEGORY_ICON_PIN } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import { PlaceIconMarker, PartnerMarker } from '../components/MapIconPins'
@@ -175,7 +175,7 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onSetKeys, servicesOn, onServices, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
+function ChipRow({ sources, selectedKeys, onSetKeys, onToggleKey, servicesOn, onServices, openNow, canOpenNow, onOpenNow, officialOnly, canOfficial, onOfficial, showRoutes, routesMode, onRoutes, showEvents, eventsMode, eventsCount, onEvents, showHotels, hotelsMode, onHotels, lang }) {
   const layerMode = routesMode || eventsMode || hotelsMode
   return (
     <ScrollView
@@ -194,8 +194,30 @@ function ChipRow({ sources, selectedKeys, onSetKeys, servicesOn, onServices, ope
         options={sources.map(src => ({ value: src.key, label: t(src.labelKey, lang), count: src.pins.length, color: src.color }))}
         values={layerMode ? [] : [...selectedKeys]}
         onChange={onSetKeys}
-        style={{ marginRight: 8 }}
       />
+      {/* Plajlar: a quick toggle of the explore:beach source, on the same selectedKeys as the dropdown. */}
+      {!layerMode && sources.some(src => src.key === 'explore:beach') && (
+        <Chip
+          label={t('blFilterBeaches', lang)}
+          ionicon={CATEGORY_ICON_PIN.beach.icon}
+          active={selectedKeys.has('explore:beach')}
+          color={GROUP_META.nature.colorToken.text}
+          colorBg={GROUP_META.nature.colorToken.bg}
+          onPress={() => onToggleKey('explore:beach')}
+        />
+      )}
+      {/* Before Rotalar: the row scrolls, and the chip must be visible without a swipe (Berke, 2026-11-01).
+          Services follow it so Müze & Ören Yeri stays on screen at 360dp in Turkish. */}
+      {canOfficial && (
+        <Chip
+          label={t('ovFilter', lang)}
+          ionicon={GROUP_META.heritage.icon}
+          active={!layerMode && officialOnly}
+          color={GROUP_META.heritage.colorToken.text}
+          colorBg={GROUP_META.heritage.colorToken.bg}
+          onPress={onOfficial}
+        />
+      )}
       {/* Services start OFF on the map (DEFAULT_OFF_KEYS, Berke 2026-11-08): this chip adds them. */}
       {!layerMode && sources.some(src => src.key === 'explore:services') && (
         <Chip
@@ -205,17 +227,6 @@ function ChipRow({ sources, selectedKeys, onSetKeys, servicesOn, onServices, ope
           color={GROUP_META.services.colorToken.text}
           colorBg={GROUP_META.services.colorToken.bg}
           onPress={onServices}
-        />
-      )}
-      {/* Before Rotalar: the row scrolls, and the chip must be visible without a swipe (Berke, 2026-11-01). */}
-      {canOfficial && (
-        <Chip
-          label={t('ovFilter', lang)}
-          ionicon={GROUP_META.heritage.icon}
-          active={!layerMode && officialOnly}
-          color={GROUP_META.heritage.colorToken.text}
-          colorBg={GROUP_META.heritage.colorToken.bg}
-          onPress={onOfficial}
         />
       )}
       {/* Events: a MODE like routes — venue markers replace the pins (2026-11-07). Before Yürüyüş:
@@ -315,10 +326,11 @@ function pinCardContent(pin, lang) {
     // The badge speaks the Kategori filter's vocabulary — the GROUP the pin is filtered by
     // (Kültürel Miras), not the specific category (Dini Mekan), which moves to the subtitle.
     // Health and dog-boarding badges already equal their filter label.
-    badge: GROUP_META[categoryToGroup(row.category)]?.labelKey
+    badge: row.category === 'beach' ? t('blFilterBeaches', lang)
+      : GROUP_META[categoryToGroup(row.category)]?.labelKey
       ? t(GROUP_META[categoryToGroup(row.category)].labelKey, lang)
       : (CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : row.category),
-    sub:   [CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : null,
+    sub:   [row.category !== 'beach' && CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : null,
             REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : row.region]
              .filter(Boolean).join(' · '),
   }
@@ -945,6 +957,13 @@ export default function ExploreMapScreen({
     }, 350)
   }, [index, width, height])
 
+  const pickKeys = next => {
+    setSelected(null); leaveRoutes()
+    // Mirror of onOfficial: a pick with no EEMD site under "Müze & Ören Yeri" would blank the map.
+    if (officialOnly && next.size > 0 && !officialVisitApplicable(selectedPins(sources, next, servicesOn))) setOfficialOnly(false)
+    setSelectedKeys(next)
+  }
+
   return (
     <View style={s.container}>
       {REDESIGN && <StatusBar style="dark" />}
@@ -1044,7 +1063,7 @@ export default function ExploreMapScreen({
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} drawAt={c.drawAt} onPress={expandCluster} />
           }
           const pin = c.properties.pin
-          if (pin.kind === 'place' && ICON_PIN[pin.group]) {
+          if (pin.kind === 'place' && pin.iconPin) {
             return <PlaceIconMarker key={pin.id} pin={pin} onPress={() => setSelected(pin)} />
           }
           return (
@@ -1067,7 +1086,12 @@ export default function ExploreMapScreen({
       <ChipRow
         sources={sources}
         selectedKeys={selectedKeys}
-        onSetKeys={keys => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set(keys)) }}
+        onSetKeys={keys => pickKeys(new Set(keys))}
+        onToggleKey={key => {
+          const next = new Set(selectedKeys)
+          if (!next.delete(key)) next.add(key)
+          pickKeys(next)
+        }}
         servicesOn={servicesOn}
         onServices={() => { setSelected(null); leaveRoutes(); setServicesOn(v => !v) }}
         openNow={openNow}

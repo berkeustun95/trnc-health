@@ -58,7 +58,7 @@ t('chip on: only places with official_visit (open, closed, link-only)', ids(appl
   ['place:bellapais', 'place:othello', 'place:salamis'])
 t('chip on: drops beaches, plain heritage and health pins',
   applyOfficialVisit(all, true).some(p => p.kind !== 'place' || p.row.category === 'beach' || p.row.category === 'monument'), false)
-t('chip on + a Kategori pick: intersects, never widens', ids(applyOfficialVisit(selectedPins(live, new Set(['explore:nature'])), true)), [])
+t('chip on + a Kategori pick: intersects, never widens', ids(applyOfficialVisit(selectedPins(live, new Set(['explore:beach'])), true)), [])
 t('chip renders when a visible pin has EEMD data', officialVisitApplicable(all), true)
 t('no EEMD data anywhere → no chip (never a dead chip)', officialVisitApplicable(selectedPins(buildMapSources({ ...opts, exploreLive: true,
   places: PLACES.map(p => ({ ...p, official_visit: null })) }), new Set())), false)

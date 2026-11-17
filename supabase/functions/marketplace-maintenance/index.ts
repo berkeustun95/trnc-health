@@ -11,6 +11,7 @@
 // service_role callers only (jwtRole, as google-places). verify_jwt = true. Logs carry codes only.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { run } from './run.ts'
+import { recordDataJobRun } from '../_shared/data-jobs.mjs'
 
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -23,6 +24,8 @@ Deno.serve(async req => {
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
   let body: unknown = null
   try { body = await req.json() } catch { /* empty body = a dry run */ }
+  const started = Date.now()
+  const cfg = { url: Deno.env.get('SUPABASE_URL'), key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), log: (c: string) => console.error('marketplace-maintenance:', c) }
   const r = await run(jwt, body, {
     async retention(apply) {
       const { data, error } = await admin.rpc('marketplace_maintenance', { p_apply: apply })
@@ -38,6 +41,7 @@ Deno.serve(async req => {
       const { error } = await admin.storage.from('marketplace-photos').remove(paths)
       if (error) throw error
     },
+    record: (outcome, cls) => recordDataJobRun(cfg, 'marketplace-maintenance', outcome, cls, started),
     log: code => console.error('marketplace-maintenance:', code),
   })
   return json(r.status, r.body)

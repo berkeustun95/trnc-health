@@ -105,6 +105,24 @@ node scripts/check-sync-novest-auth.mjs || {
   exit 1
 }
 
+# send-duty-notification / send-weekend-digest: same gate, first in the handler, verify_jwt true; duty responses carry no user counts.
+node scripts/check-push-fn-auth.mjs || {
+  echo "pre-push: push function caller check failed — see above." >&2
+  exit 1
+}
+
+# admin-push: the admin gate (signed-in non-guest with profiles.role admin) first in the handler, verify_jwt true, no id/token in logs or responses.
+node scripts/check-admin-push-auth.mjs || {
+  echo "pre-push: admin-push caller check failed — see above." >&2
+  exit 1
+}
+
+# admin-push duty-swap text: the server copy of notifDutySwapTitle/Body in the 9 languages must equal constants/i18n.js.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-admin-push-strings.mjs || {
+  echo "pre-push: admin-push strings check failed — see above." >&2
+  exit 1
+}
+
 # Duty roster name aliases: each respelled name reaches its pharmacy in its own region and
 # nowhere else. A wrong-region match puts a distance to the wrong town on a duty card.
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-aliases.mjs || {

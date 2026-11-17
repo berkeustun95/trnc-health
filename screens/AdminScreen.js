@@ -21,8 +21,6 @@ import { VEHICLE_BUCKET, REJECT_REASON_KEY, rejectionText, sortedImages } from '
 import { MARKETPLACE } from '../constants/redesign'
 import { loadEateryPartners } from '../utils/loadEateryPartners'
 import { ConfirmDialog } from '../components/ui'
-import DataJobsTab, { loadDataJobs } from '../components/AdminDataJobs'
-import { countAttention, countNoRecord } from '../utils/dataJobs'
 import { MK_REJECT_REASONS, adminPhotoQueue, adminReviewPhoto, adminListings, adminSetHidden, adminPendingPhotoSummary, photoWait, signedUrls } from '../utils/marketplaceApi'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
@@ -105,7 +103,7 @@ const ROLES = ['customer', 'provider', 'admin']
 // Turning a partner OFF still needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
   'HomeServices',
-  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'RestaurantPins', 'DataJobs', 'Moderation']
+  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Cars', ...(MARKETPLACE ? ['Bandabuliya'] : []), 'RestaurantPins', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -116,18 +114,75 @@ async function sendPushNotification(token, title, body, data = {}) {
   } catch {}
 }
 
-// Broadcast push to many tokens. Expo's push API caps a single request at 100
-// messages, so we chunk. Each chunk is one fetch carrying an array payload.
-async function sendPushBatch(tokens, title, body, data = {}) {
-  for (let i = 0; i < tokens.length; i += 100) {
-    const chunk = tokens.slice(i, i + 100)
-    try {
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(chunk.map(to => ({ to, title, body, sound: 'default', data }))),
-      })
-    } catch {}
+function newUuid() {
+  try {
+    const Crypto = require('expo-crypto')
+    if (typeof Crypto?.randomUUID === 'function') return Crypto.randomUUID().toLowerCase()
+  } catch { /* fall through */ }
+  const h = '0123456789abcdef'
+  let s = ''
+  for (let i = 0; i < 36; i++) {
+    if (i === 8 || i === 13 || i === 18 || i === 23) s += '-'
+    else if (i === 14) s += '4'
+    else if (i === 19) s += h[8 + Math.floor(Math.random() * 4)]
+    else s += h[Math.floor(Math.random() * 16)]
   }
+  return s
+}
+
+// Test sends default ON everywhere except the production channel.
+function defaultTestSend() {
+  try {
+    const Updates = require('expo-updates')
+    return Updates.channel !== 'production'
+  } catch { return true }
+}
+
+// The many-recipient sends run server-side (admin-push). Returns { data } on a 200,
+// { code } with the server's error code otherwise; never throws, never swallows.
+async function invokeAdminPush(payload) {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-push', { body: payload })
+    if (!error) return data?.ok === false ? { code: data.error || 'server_error' } : { data }
+    if (error.name === 'FunctionsHttpError') {
+      try { return { code: (await error.context.json())?.error || 'server_error' } } catch { return { code: 'server_error' } }
+    }
+    return { code: 'network' }
+  } catch { return { code: 'network' } }
+}
+
+// { text, ok }: ok is true only for outcome 'sent' (test mode included).
+function pushResultLine(data, lang) {
+  if (data.outcome === 'duplicate') return { text: t('adminPushDuplicate', lang), ok: false }
+  if (data.outcome === 'no_recipients') return { text: t('adminPushNoRecipients', lang), ok: false }
+  let line = t('adminPushResult', lang).replace('{recipients}', data.recipients ?? 0).replace('{pushed}', data.pushed ?? 0)
+  if (data.outcome === 'partial') line += ' · ' + t('adminPushPartial', lang)
+  if (data.test) line += ' · ' + t('adminPushTestUsed', lang)
+  return { text: line, ok: data.outcome === 'sent' }
+}
+
+function TestSendSwitch({ value, onChange, lang, disabled }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, marginBottom: 16 }}>
+      <View style={{ flex: 1, marginRight: 12 }}>
+        <Text style={[typeScale.rowTitle, { color: colors.textPrimary }]}>{t('adminPushTestSwitch', lang)}</Text>
+        <Text style={value
+          ? [typeScale.small, { color: colors.textSecondary, marginTop: 2 }]
+          : [typeScale.small, { color: colors.dangerInk, fontFamily: 'Inter_600SemiBold', marginTop: 2 }]}>
+          {t(value ? 'adminPushTestOnHint' : 'adminPushTestOffHint', lang)}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        trackColor={{ false: colors.fieldBorder, true: colors.primary }}
+        thumbColor={colors.card}
+        accessibilityRole="switch"
+        accessibilityLabel={t('adminPushTestSwitch', lang)}
+      />
+    </View>
+  )
 }
 
 // Writes via the insert_notification RPC (SECURITY DEFINER) — a direct insert is
@@ -423,26 +478,23 @@ function DailyBars({ daily }) {
   )
 }
 
-function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace, onOpenDataJobs }) {
+function UserCounts({ onOpenTools, onOpenReports, onOpenCars, onOpenMarketplace }) {
   const [counts, setCounts] = useState(null)
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingCars, setPendingCars] = useState(0)
   const [pendingMkPhotos, setPendingMkPhotos] = useState(0)
   const [mkOldestAt, setMkOldestAt] = useState(null)
   const [novestLastSeen, setNovestLastSeen] = useState(null)
-  // undefined = loading, null = could not be read, { attention, noRecord } counts.
-  const [jobsAttention, setJobsAttention] = useState(undefined)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
-    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }, { count: carsCount, error: carsError }, jobs] = await Promise.all([
+    const [{ data, error }, { count, error: reportsError }, { data: novestSeen }, { count: carsCount, error: carsError }] = await Promise.all([
       supabase.rpc('admin_user_counts'),
       supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('properties').select('last_seen_at')
         .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      loadDataJobs(),
     ])
     setPendingCars(carsError ? null : carsCount)
     if (MARKETPLACE) {
@@ -450,7 +502,6 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
       setPendingMkPhotos(mk ? mk.count : null)
       setMkOldestAt(mk?.oldestAt ?? null)
     }
-    setJobsAttention(jobs ? { attention: countAttention(jobs), noRecord: countNoRecord(jobs) } : null)
     setNovestLastSeen(novestSeen?.[0]?.last_seen_at ?? null)
     setFailed(!!error)
     if (!error) setCounts(data)
@@ -517,25 +568,6 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
     </TouchableOpacity>
   )
 
-  // Data jobs: always shown once read. null = could not be read; that shows too, a silent zero would hide a red job.
-  const jobsAttn = jobsAttention?.attention ?? 0
-  const jobsNoRec = jobsAttention?.noRecord ?? 0
-  const jobsLabel = jobsAttention === null ? t('adminJobsUnread', lang) : jobsAttn > 0 ? t('adminJobsAttention', lang) : jobsNoRec > 0 ? t('adminJobsNoRecordCount', lang).replace('{count}', String(jobsNoRec)) : t('adminJobsAllClear', lang)
-  const jobsRow = jobsAttention !== undefined && (
-    <TouchableOpacity style={s.urgencyCard} onPress={onOpenDataJobs} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={jobsLabel + (jobsAttn > 0 ? `, ${jobsAttn}` : '')}>
-      <View style={[s.urgencyDot, { backgroundColor: jobsAttention === null || jobsAttn > 0 ? colors.danger : jobsNoRec > 0 ? colors.textSecondary : colors.success }]} />
-      <Text style={s.urgencyLabel}>
-        {jobsLabel}
-      </Text>
-      {jobsAttn > 0 && (
-        <View style={[s.urgencyBadge, { backgroundColor: colors.danger }]}>
-          <Text style={s.urgencyCount}>{jobsAttn}</Text>
-        </View>
-      )}
-      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-    </TouchableOpacity>
-  )
-
   if (!counts) {
     if (!failed) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
     return (
@@ -543,7 +575,6 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
         {reportsRow}
         {carsRow}
         {mkRow}
-        {jobsRow}
         <FeedHealthBanner lastSeenAt={novestLastSeen} />
         <View style={s.allClearBox}>
           <Text style={s.allClearText}>User counts could not be loaded.</Text>
@@ -565,7 +596,6 @@ function UserCounts({ lang, onOpenTools, onOpenReports, onOpenCars, onOpenMarket
       {reportsRow}
       {carsRow}
       {mkRow}
-      {jobsRow}
       <FeedHealthBanner lastSeenAt={novestLastSeen} />
       <View style={s.totalCard}>
         <Text style={s.totalValue}>{formatCount(counts.total - TEST_ACCOUNTS)}</Text>
@@ -1405,7 +1435,7 @@ function FacilitiesTab() {
 
 // ─── Duty Schedule Tab ──────────────────────────────────────────────────────
 
-function DutyTab() {
+function DutyTab({ lang }) {
   const [pharmacies, setPharmacies] = useState([])
   const [date, setDate] = useState(() => {
     const d = new Date()
@@ -1430,6 +1460,10 @@ function DutyTab() {
   const [swapPhone, setSwapPhone] = useState('')
   const [swapping, setSwapping] = useState(false)
   const [swapDone, setSwapDone] = useState(false)
+  const [swapNote, setSwapNote] = useState(null)
+  const [swapTest, setSwapTest] = useState(defaultTestSend)
+  const swapReqId = useRef(null)
+  const swapFailed = useRef(null)
 
   useEffect(() => {
     supabase.from('facilities').select('id, name').eq('type', 'pharmacy').order('name')
@@ -1481,6 +1515,9 @@ function DutyTab() {
   }
 
   function openSwap(entry) {
+    if (swapFailed.current?.entryId !== entry.id) swapFailed.current = null
+    swapReqId.current = swapFailed.current?.requestId ?? newUuid()
+    setSwapNote(null)
     setSwapTarget(entry)
     setSwapSearch('')
     setSwapSelectedPharmacy(null)
@@ -1500,14 +1537,11 @@ function DutyTab() {
       })
       .eq('id', swapTarget.id)
     if (!error) {
-      const { data: customers } = await supabase.from('profiles').select('id, push_token, preferred_language').eq('role', 'customer')
-      for (const c of customers ?? []) {
-        const lang = c.preferred_language || 'English'
-        const title = t('notifDutySwapTitle', lang)
-        const body = t('notifDutySwapBody', lang).replace('{name}', swapSelectedPharmacy.name).replace('{date}', swapDate)
-        await recordNotification(c.id, title, body)
-        if (c.push_token) await sendPushNotification(c.push_token, title, body, { screen: 'duty' })
-      }
+      const res = await invokeAdminPush({ kind: 'duty_swap', request_id: swapReqId.current, duty_list_id: swapTarget.id, test: swapTest })
+      swapFailed.current = res.code ? { entryId: swapTarget.id, requestId: swapReqId.current } : null
+      setSwapNote(res.code
+        ? { error: true, text: t('adminPushSwapError', lang).replace('{error}', res.code) }
+        : { error: false, ...pushResultLine(res.data, lang) })
       setSwapModalVisible(false)
       setSwapDone(true)
       setTimeout(() => setSwapDone(false), 3000)
@@ -1527,7 +1561,7 @@ function DutyTab() {
       <Text style={s.sectionTitle}>Swap duty list entry</Text>
 
         <Field label="Date (YYYY-MM-DD)">
-          <TextInput style={s.input} value={swapDate} onChangeText={v => { setSwapDate(v); setSwapDone(false) }} keyboardType="numbers-and-punctuation" />
+          <TextInput style={s.input} value={swapDate} onChangeText={v => { setSwapDate(v); setSwapDone(false); setSwapNote(null) }} keyboardType="numbers-and-punctuation" />
         </Field>
 
         {swapDone && (
@@ -1536,6 +1570,9 @@ function DutyTab() {
             <Text style={s.broadcastResultText}>Swap saved successfully!</Text>
           </View>
         )}
+        {swapNote && (swapNote.error
+          ? <Text style={[s.errorText, { color: colors.dangerInk, textAlign: 'left' }]}>{swapNote.text}</Text>
+          : <Text style={[s.broadcastNote, !swapNote.ok && { color: colors.dangerInk }]}>{swapNote.text}</Text>)}
 
         {loadingEntries
           ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
@@ -1629,6 +1666,10 @@ function DutyTab() {
                 <Text style={s.swapFromName} numberOfLines={1}>{swapTarget.name}</Text>
               </View>
             )}
+
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, flexShrink: 0 }}>
+              <TestSendSwitch value={swapTest} onChange={setSwapTest} lang={lang} disabled={swapping} />
+            </View>
 
             <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <TextInput
@@ -2376,13 +2417,15 @@ function CredentialsTab() {
 
 // ─── Broadcast Tab ──────────────────────────────────────────────────────────
 
-function BroadcastTab() {
+function BroadcastTab({ lang }) {
   const [title, setTitle]   = useState('')
   const [body, setBody]     = useState('')
   const [target, setTarget] = useState('all')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError]   = useState(null)
+  const [test, setTest]     = useState(defaultTestSend)
+  const reqId = useRef(null)
 
   async function send() {
     if (!title.trim() || !body.trim()) { setError('Title and message are required.'); return }
@@ -2390,33 +2433,12 @@ function BroadcastTab() {
     setError(null)
     setResult(null)
 
-    let query = supabase.from('profiles').select('id, push_token')
-    if (target === 'customers') query = query.eq('role', 'customer')
-    else if (target === 'providers') query = query.eq('role', 'provider')
-
-    const { data: profiles, error: fetchErr } = await query
-    if (fetchErr) { setError(fetchErr.message); setSending(false); return }
-
-    const trimmedTitle = title.trim()
-    const b = body.trim()
-    const recipients = profiles ?? []
-
-    // DB inserts: the insert_notification RPC is one-row-per-call, so we can't do
-    // a single multi-row insert without a new RPC. Fire them in parallel chunks
-    // of 25 instead of awaiting each serially. recordNotification swallows its
-    // own errors, so one failure won't abort the batch.
-    for (let i = 0; i < recipients.length; i += 25) {
-      await Promise.all(
-        recipients.slice(i, i + 25).map(p => recordNotification(p.id, trimmedTitle, b))
-      )
-    }
-
-    // Pushes: one array-payload fetch per 100 tokens (Expo's per-request cap).
-    const tokens = recipients.filter(p => p.push_token).map(p => p.push_token)
-    await sendPushBatch(tokens, trimmedTitle, b)
-
-    setResult({ total: recipients.length, pushCount: tokens.length })
+    if (!reqId.current) reqId.current = newUuid()
+    const res = await invokeAdminPush({ kind: 'broadcast', request_id: reqId.current, target, title: title.trim(), body: body.trim(), test })
     setSending(false)
+    if (res.code) { setError(t('adminPushError', lang).replace('{error}', res.code)); return }
+    reqId.current = null
+    setResult(pushResultLine(res.data, lang))
   }
 
   return (
@@ -2427,7 +2449,7 @@ function BroadcastTab() {
         <TextInput
           style={s.input}
           value={title}
-          onChangeText={v => { setTitle(v); setResult(null) }}
+          onChangeText={v => { setTitle(v); setResult(null); reqId.current = null }}
           placeholder="e.g. Duty pharmacy update"
           placeholderTextColor={colors.textSecondary}
           maxLength={100}
@@ -2438,7 +2460,7 @@ function BroadcastTab() {
         <TextInput
           style={[s.input, { minHeight: 90, textAlignVertical: 'top' }]}
           value={body}
-          onChangeText={v => { setBody(v); setResult(null) }}
+          onChangeText={v => { setBody(v); setResult(null); reqId.current = null }}
           placeholder="Enter your message…"
           placeholderTextColor={colors.textSecondary}
           multiline
@@ -2456,20 +2478,22 @@ function BroadcastTab() {
           <TouchableOpacity
             key={opt.key}
             style={[s.chip, target === opt.key && s.chipActive]}
-            onPress={() => { setTarget(opt.key); setResult(null) }}
+            onPress={() => { setTarget(opt.key); setResult(null); reqId.current = null }}
           >
             <Text style={[s.chipText, target === opt.key && s.chipTextActive]}>{opt.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {error ? <Text style={s.errorText}>{error}</Text> : null}
+      <TestSendSwitch value={test} onChange={v => { setTest(v); setResult(null); reqId.current = null }} lang={lang} disabled={sending} />
+
+      {error ? <Text style={[s.errorText, { color: colors.dangerInk, textAlign: 'left' }]}>{error}</Text> : null}
 
       {result ? (
-        <View style={s.broadcastResult}>
-          <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-          <Text style={s.broadcastResultText}>
-            Delivered to {result.total} users · {result.pushCount} push sent
+        <View style={[s.broadcastResult, !result.ok && { backgroundColor: colors.accentLight }]}>
+          <Ionicons name={result.ok ? 'checkmark-circle' : 'alert-circle'} size={20} color={result.ok ? colors.success : colors.accent} />
+          <Text style={[s.broadcastResultText, !result.ok && { color: colors.textPrimary }]}>
+            {result.text}
           </Text>
         </View>
       ) : null}
@@ -2485,9 +2509,11 @@ function BroadcastTab() {
         }
       </TouchableOpacity>
 
-      <Text style={s.broadcastNote}>
-        Sends an in-app notification to all matching users, plus a push notification to those with push enabled.
-      </Text>
+      {!test && (
+        <Text style={s.broadcastNote}>
+          Sends an in-app notification to all matching users, plus a push notification to those with push enabled.
+        </Text>
+      )}
     </ScrollView>
   )
 }
@@ -5186,12 +5212,10 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
             </TouchableOpacity>
           </View>
           <UserCounts
-            lang={lang}
             onOpenTools={() => { setTab('Dashboard'); setToolsOpen(true) }}
             onOpenReports={() => { setTab('Reports'); setToolsOpen(true) }}
             onOpenCars={() => { setTab('Cars'); setToolsOpen(true) }}
             onOpenMarketplace={() => { setTab('Bandabuliya'); setToolsOpen(true) }}
-            onOpenDataJobs={() => { setTab('DataJobs'); setToolsOpen(true) }}
           />
         </View>
       </SafeAreaView>
@@ -5257,7 +5281,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
         >
           {TABS.map(k => (
             <TouchableOpacity key={k} style={[s.tabBtn, tab === k && s.tabBtnActive, pinBusy && tab !== k && { opacity: 0.45 }]} onPress={() => setTab(k)} disabled={pinBusy}>
-              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k === 'DataJobs' ? t('adminJobsTab', lang) : k}</Text>
+              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -5270,9 +5294,9 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'Providers'   && <ProvidersTab />}
           {tab === 'Credentials' && <CredentialsTab />}
           {tab === 'Facilities'  && <FacilitiesTab />}
-          {tab === 'Duty'        && <DutyTab />}
+          {tab === 'Duty'        && <DutyTab lang={lang} />}
           {tab === 'Users'       && <UsersTab />}
-          {tab === 'Broadcast'   && <BroadcastTab />}
+          {tab === 'Broadcast'   && <BroadcastTab lang={lang} />}
           {tab === 'Events'      && <EventsTab />}
           {tab === 'Properties'    && <PropertiesTab />}
           {tab === 'Agents'        && <AgentsTab />}
@@ -5289,7 +5313,6 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'Cars'          && <CarsTab />}
           {tab === 'Bandabuliya'   && <MarketplaceTab key={mkOpen?.at ?? 'tab'} initialView={mkOpen?.view} />}
           {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} onBusyChange={setPinBusy} />}
-          {tab === 'DataJobs'      && <DataJobsTab lang={lang} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>
