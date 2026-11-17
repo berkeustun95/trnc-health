@@ -16,7 +16,7 @@
 //
 // WHAT IS GUARDED (derived from the parsed workflows, never a list). A job is guarded if ANY holds:
 //   * it has `environment:` in any form (string, `${{ }}` expression, `{name:}`);
-//   * its JSON, or the workflow-level `env`, matches /\bsecrets\b/ (secrets.X, secrets[...], toJSON(secrets), ...);
+//   * its JSON, or the workflow-level `env`, matches /\bsecrets\b/i (case-insensitive, like GitHub's context names) (secrets.X, secrets[...], toJSON(secrets), ...);
 //   * its effective permissions (job level, else workflow level) grant any `write`, or are `write-all`;
 //   * there is NO permissions block at either level (the repo default is not known from here).
 // FAIL CLOSED on: a job with `uses:` (reusable workflow), `secrets: inherit`, an `on: workflow_call` trigger.
@@ -64,15 +64,14 @@ export function loadWorkflow(src) {
 
 // ─── Guarded set ─────────────────────────────────────────────────────────────
 function grantsWrite(p) {
-  if (p === 'write-all') return true
-  if (typeof p === 'string') return false
-  return Object.values(asObj(p)).some((v) => v === 'write')
+  if (typeof p === 'string') return p.toLowerCase() === 'write-all'
+  return Object.values(asObj(p)).some((v) => typeof v === 'string' && v.toLowerCase() === 'write')
 }
 
 export function guardedReasons(doc, job) {
   const r = []
   if (job && Object.prototype.hasOwnProperty.call(job, 'environment') && job.environment !== undefined && job.environment !== null) r.push('environment')
-  if (/\bsecrets\b/.test(JSON.stringify(job ?? {})) || /\bsecrets\b/.test(JSON.stringify(doc?.env ?? {}))) r.push('secrets')
+  if (/\bsecrets\b/i.test(JSON.stringify(job ?? {})) || /\bsecrets\b/i.test(JSON.stringify(doc?.env ?? {}))) r.push('secrets')
   const eff = job && job.permissions !== undefined ? job.permissions : doc?.permissions
   if (eff === undefined || eff === null) r.push('no permissions block (repo default unknown)')
   else if (grantsWrite(eff)) r.push('write permission')
@@ -200,6 +199,26 @@ export function clockStart(list) {
   return { state: 'started', commit: list[k - 1] }
 }
 
+// Pure. `commit` = { sha, date } (committer date); `lookup(sha)` returns an ISO merged_at string, or null/throws when
+// unavailable. Start = the LATER of merged_at and the committer date (a direct admin push keeps an old committer date).
+export function resolveStart(commit, lookup) {
+  const commitMs = new Date(commit.date).getTime()
+  let merged = null
+  if (lookup) { try { merged = lookup(commit.sha) } catch { merged = null } }
+  const mergedMs = merged ? new Date(merged).getTime() : NaN
+  if (Number.isNaN(mergedMs)) return { start: new Date(commitMs), source: 'commit date only', note: '(push time UNCONFIRMED: commit date only, may be early)' }
+  if (mergedMs > commitMs) return { start: new Date(mergedMs), source: 'PR merged_at (later than the commit date)', note: '' }
+  return { start: new Date(commitMs), source: 'committer date (PR merged_at is not later)', note: '' }
+}
+
+export function ghMergedAt(sha) {
+  if (!/^[0-9a-f]{40}$/.test(sha)) return null
+  const out = execFileSync('gh', ['api', `repos/berkeustun95/trnc-health/commits/${sha}/pulls`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000 })
+  const prs = JSON.parse(out)
+  const hits = prs.filter((pr) => pr.merged_at && pr.base?.ref === 'main' && pr.merge_commit_sha === sha)
+  return hits.length ? hits.map((pr) => pr.merged_at).sort().pop() : null
+}
+
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })
 
 function treeAt(sha) {
@@ -211,7 +230,7 @@ function passesAt(sha) {
   try { return check({ workflows: treeAt(sha) }).problems.length === 0 } catch { return false }
 }
 
-function printClock(guardedFiles) {
+function printClock(guardedFiles, online) {
   console.log('\n30-day clock (informational, never fails the check):')
   try {
     let shallow = 'false'
@@ -230,9 +249,11 @@ function printClock(guardedFiles) {
     const c = clockStart(list)
     if (c.state === 'not-started' || c.state === 'empty') console.log('  30-day clock: NOT STARTED (origin/main still has unguarded jobs)')
     else {
-      const start = new Date(c.commit.date)
+      const r = resolveStart(c.commit, online ? ghMergedAt : null)
+      const start = r.start
       const end = new Date(start.getTime() + 30 * 86400000)
-      console.log(`  clock start: ${start.toISOString()}  (commit ${c.commit.sha}${c.allPass ? ', the oldest commit in the list: every commit passes' : ', the commit that made main pass'})`)
+      console.log(`  clock start source: ${online ? r.source : `${r.source}; lookup not requested (offline, pass --clock-online)`}`)
+      console.log(`  clock start: ${start.toISOString()}${r.note ? ` ${r.note}` : ''}  (commit ${c.commit.sha}${c.allPass ? ', the oldest commit in the list: every commit passes' : ', the commit that made main pass'})`)
       console.log(`  earliest App key / install: ${end.toISOString()}`)
     }
     const last = guardedFiles.length ? git('log', '--first-parent', '-1', '--format=%cI %H', tip, '--', ...guardedFiles.map((f) => `${WF_DIR}/${f}`)).trim() : ''
@@ -335,6 +356,17 @@ function selftest() {
   t('a read-only job with no env and no secrets is NOT guarded (positive control)', guardedReasons({ permissions: { contents: 'read' } }, { 'runs-on': 'u', steps: [{ run: 'echo x' }] }), [])
   t('a job-level permissions {} overriding workflow write is NOT guarded by permissions', guardedReasons({ permissions: 'write-all' }, { permissions: {}, steps: [] }), [])
   t('the unguarded fixture job is listed as exempt', run({}).exempt.map((e) => `${e.file}:${e.job}`), ['oli.yml:test'])
+  for (const [label, val] of [['SECRETS.K (upper case context)', '${{ SECRETS.K }}'], ["Secrets['K'] (mixed case)", "${{ Secrets['K'] }}"]]) {
+    const src = wf('plain', { a: { 'runs-on': 'u', permissions: { contents: 'read' }, steps: [{ run: 'echo x', env: { K: val } }] } })
+    if (!/secrets/i.test(src) || /\bsecrets\b/.test(src)) { bad++; console.log(`  ✗ red: ${label}: the break did not land`) }
+    red(`${label} counts as guarded`, { 'plain.yml': src }, 'no if (every guarded job')
+  }
+  {
+    const src = wf('plain', { a: { 'runs-on': 'u', permissions: { contents: 'WRITE' }, steps: [{ run: 'echo x' }] } })
+    if (!src.includes('WRITE')) { bad++; console.log('  ✗ red: contents: WRITE: the break did not land') }
+    red('contents: WRITE (upper case) is guarded', { 'plain.yml': src }, 'no if (every guarded job')
+    t('permissions: Write-All is a write grant', guardedReasons({}, { permissions: 'Write-All', steps: [] }), ['write permission'])
+  }
   // 12. gisekibris weekly-heartbeat stays schedule-only.
   const gk = goodAllow('gisekibris-feed.yml')
   const gkWf = (old) => mut(base()['gisekibris-feed.yml'], (o) => { o.jobs['weekly-heartbeat'] = job({ if: buildIf(gk.ok, old) }) })
@@ -352,6 +384,18 @@ function selftest() {
   t('clock: the newest commit failing means NOT STARTED', clockStart([c('F2', false), c('p1', true)]).state, 'not-started')
   t('clock: pass, fail, pass: the older pass is irrelevant', clockStart([c('p2', true), c('F', false), c('p0', true)]).commit.sha, 'p2')
   t('clock: all commits pass starts at the oldest', clockStart([c('p2', true), c('p1', true)]).commit.sha, 'p1')
+
+  const cd = '2026-11-01T00:00:00+00:00'
+  const lk = (v) => () => v
+  const a = resolveStart({ sha: 's', date: cd }, lk('2026-11-05T00:00:00Z'))
+  t('clock start: merged_at later than the commit date -> merged_at', [a.start.toISOString(), a.note], ['2026-11-05T00:00:00.000Z', ''])
+  const b = resolveStart({ sha: 's', date: cd }, lk(null))
+  t('clock start: lookup unavailable -> commit date + UNCONFIRMED marker', [b.start.toISOString(), b.note], ['2026-11-01T00:00:00.000Z', '(push time UNCONFIRMED: commit date only, may be early)'])
+  const b2 = resolveStart({ sha: 's', date: cd }, () => { throw new Error('offline') })
+  t('clock start: lookup throws -> same marker, never fails', b2.note, b.note)
+  const d = resolveStart({ sha: 's', date: cd }, lk('2026-10-20T00:00:00Z'))
+  t('clock start: merged_at earlier -> the commit date', [d.start.toISOString(), d.note], ['2026-11-01T00:00:00.000Z', ''])
+  t('clock start: no lookup injected -> marker', resolveStart({ sha: 's', date: cd }, null).note, b.note)
 
   console.log(bad ? `\n  ${bad} self-test failure(s).` : '\n  Self-test clean.')
   process.exit(bad ? 1 : 0)
@@ -384,7 +428,7 @@ function main() {
   }
   console.log(`\nNot guarded (${exempt.length}):`)
   for (const e of exempt) console.log(`  ${e.file} job ${e.job}: exempt, ${e.why}`)
-  printClock(files)
+  printClock(files, argv.includes('--clock-online'))
   if (problems.length) {
     console.error(`\n✗ ${problems.length} problem(s):`)
     for (const p of problems) console.error(`  ✗ ${p}`)
