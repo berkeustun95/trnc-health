@@ -138,6 +138,17 @@ Deno.test('byte limit: a long body is cut, a cut token is redacted', async () =>
   if (lines[0].includes('ABCDE') || !lines[0].includes('[token]')) throw new Error(lines[0])
 })
 
+Deno.test('byte limit stops the read itself: a fast endless body is not pulled past the limit', async () => {
+  let pulls = 0
+  const mk = () => new Response(new ReadableStream({ pull(c) { pulls++; c.enqueue(new TextEncoder().encode('0123456789')) } }, { highWaterMark: 0 }), { status: 503 })
+  const lines: string[] = []
+  const t0 = Date.now()
+  const out = await sendBatch(batch, { ...rig(mk).deps, diag: diagFor(lines, { bodyMaxBytes: 30, bodyTimeoutMs: 1500 }) })
+  eq(out.accepted, false, 'not accepted')
+  if (Date.now() - t0 > 700) throw new Error('read ran to the timeout instead of the byte limit')
+  if (pulls > 10) throw new Error('pulled ' + pulls + ' chunks for a 30-byte limit')
+})
+
 Deno.test('accepted group: status and timings only, never the body, size or counts', async () => {
   const lines: string[] = []
   let readCalled = false
@@ -197,7 +208,7 @@ Deno.test('with diag the existing console.error lines are unchanged', async () =
 Deno.test('wiring: only send-duty-notification passes diag; push.ts has no header allow-list', async () => {
   const rd = (p: string) => Deno.readTextFile(new URL(p, import.meta.url))
   if (!(await rd('./index.ts')).includes('diag: { group: i / 100, runStartMs }')) throw new Error('index.ts does not pass diag')
-  for (const p of ['../send-weekend-digest/index.ts', '../marketplace-photo-review/index.ts']) {
+  for (const p of ['../send-weekend-digest/index.ts', '../marketplace-photo-review/index.ts', '../admin-push/send.ts']) {
     if ((await rd(p)).includes('diag')) throw new Error(p + ' must not pass diag')
   }
 })
