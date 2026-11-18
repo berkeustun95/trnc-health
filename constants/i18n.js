@@ -4872,7 +4872,7 @@ const translations = {
     ovSundayFree: "Pazar günleri KKTC vatandaşlarına ücretsiz.",
     ovSource: "Resmi sayfa",
     policyUpdatedTitle: "Gizlilik Politikamızı güncelledik",
-    policyUpdatedBody: "Gizlilik Politikamızı ve Kullanım Koşullarımızı güncelledik. Dilediğiniz zaman okuyabilirsiniz.",
+    policyUpdatedBody: "Gizlilik Politikamızı ve Kullanım Koşullarımızı güncelledik. Dilediğin zaman okuyabilirsin.",
     policyUpdatedRead: "Politikayı oku",
     policyUpdatedOk: "Anladım",
     updateTitle: "Yeni sürüm mevcut",
