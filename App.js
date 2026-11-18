@@ -223,7 +223,7 @@ function TypeSVGIcon({ type, size, color }) {
 //   student_listing_opt_in found no reader outside the wizard's own seed, which now reads
 //   the enrolment instead. student_level STAYS — it is not one of the five, 20261027 does
 //   not drop it, and the profile gate still asks for it.
-const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, age_confirmed_at, region, resident_status, student_level, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
 
 
 // ─── The signup tick, written now that there is a session to write it with ──
