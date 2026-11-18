@@ -59,21 +59,32 @@ function timeText(iso, lang) {
 // Permission (with the ADA explanation first where the redesign is on), then the token, then the order-scoped subscribe.
 // -> 'on' | 'off' (the OS will not ask again: settings) | 'later' ("Şimdi değil" or a first OS "No": back to the button, no message)
 //    | 'closed' (the order became final meanwhile) | 'fail'
+// Every 'fail' logs its step and error (logcat ReactNativeJS), never the token or the order code.
+function notifyFail(step, e) {
+  console.warn(`[order-notify] fail step=${step} code=${e?.code ?? '-'} msg=${String(e?.message ?? e ?? '-').slice(0, 200)}`)
+  return 'fail'
+}
+
 async function subscribeOrder(code, lang) {
+  let step = 'device'
   try {
-    if (!Device.isDevice) return 'fail'
+    if (!Device.isDevice) return notifyFail(step, 'not a device')
+    step = 'permission'
     const perm = REDESIGN ? await requestWithPrimer('notifications', { auto: false }) : await Notifications.requestPermissionsAsync()
     if (perm.status !== 'granted') return perm.canAskAgain === false ? 'off' : 'later'
     if (Platform.OS === 'android') {
+      step = 'channel'
       await Notifications.setNotificationChannelAsync('default', { name: 'default', importance: Notifications.AndroidImportance.MAX })
     }
+    step = 'token'
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: EXPO_PROJECT_ID })
-    if (!token) return 'fail'
+    if (!token) return notifyFail(step, 'empty token')
+    step = 'server'
     const { error } = await supabase.rpc('eatery_order_subscribe', { p_code: code, p_token: token, p_lang: lang })
-    if (error) return error.message === 'closed' ? 'closed' : 'fail'
+    if (error) return error.message === 'closed' ? 'closed' : notifyFail(step, error)
     return 'on'
-  } catch {
-    return 'fail'
+  } catch (e) {
+    return notifyFail(step, e)
   }
 }
 
