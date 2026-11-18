@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, TextInput, AccessibilityInfo, Animated, Easing, PixelRatio, Platform, Modal, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { t } from '../constants/i18n'
+import { t, tCount } from '../constants/i18n'
 import { ORDER_NOTE_MAX, deliveryReady, cardState, shortAddress, deliveryFromEntry, eateryItemOptions, sheetFadeVisible, eateryOptionLabel, resolveLineOptions, isFreeExtra, optionDetail, formatPrice, eaterySiteHost } from '../constants/eatery'
 import MapView from 'react-native-maps'
 import { MAP_PROVIDER } from '../utils/googleMap'
@@ -57,7 +57,7 @@ export function OrderBar({ count, totalText, lang, onOpen, partnerName, mode = '
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const stacked = width < 380 || PixelRatio.getFontScale() > 1.15
-  const summary = t('eateryOrderCount', lang).replace('{n}', () => String(count)).replace('{total}', () => totalText)
+  const summary = tCount('eateryOrderCount', count, lang).replace('{total}', () => totalText)
   const go = t(mode === 'phone' ? 'eateryListGo' : 'eateryBasketGo', lang)
   return (
     <View style={[st.bar, { paddingBottom: insets.bottom + space[12] }]}>
