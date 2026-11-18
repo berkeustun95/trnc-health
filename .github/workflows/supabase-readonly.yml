@@ -25,7 +25,6 @@ concurrency: { group: supabase-readonly, cancel-in-progress: false }
 
 jobs:
   read:
-    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 5

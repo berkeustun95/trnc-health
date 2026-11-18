@@ -2214,10 +2214,11 @@ WITH report AS (
       AND COALESCE(has_function_privilege('service_role', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE')
                AND NOT has_function_privilege('authenticated', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE')
                AND NOT has_function_privilege('anon', to_regprocedure('public.data_jobs_watchdog_age()'), 'EXECUTE'), false)
-    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_watchdog: admins only (profiles.role = admin), type admin_alert, push data screen admin / tab datajobs, 24 h and Monday 09:00 rules as code shapes (the text is owned by 20261218)',
+    UNION ALL SELECT '20261211_data_jobs_watchdog','data_jobs_watchdog: admins only (profiles.role = admin), type admin_alert, push data screen admin / tab datajobs, Turkish title, 24 h and Monday 09:00 rules as code shapes',
       COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%FOR r IN SELECT id, push_token FROM profiles WHERE role = ''admin'' LOOP%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES (r.id, ttl, bdy, ''admin_alert'')%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''datajobs'')%'
+           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%ttl        text := ''Veri işleri'';%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%v_alerted < p_now - interval ''24 hours''%'
            AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%isodow FROM (p_now AT TIME ZONE ''Asia/Famagusta'')) = 1%', false)
     -- 1210-END
@@ -2236,30 +2237,6 @@ WITH report AS (
       AND COALESCE((SELECT count(*) = 13 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.admin_push_sends') AND a.attnum > 0 AND NOT a.attisdropped), false)
       AND COALESCE((SELECT pg_get_constraintdef(oid) LIKE 'PRIMARY KEY (request_id)%' FROM pg_constraint WHERE conrelid = to_regclass('public.admin_push_sends') AND conname = 'admin_push_sends_pkey'), false)
       AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.admin_push_sends') AND contype = 'f')
-    -- 1218-BEGIN
-    -- 20261218: the two admin alert pushes are English. Registered ahead of the apply; red until it runs (the accepted
-    --   "registered ahead of the apply" pattern). It OWNS the text half that the 20261211 and 20261196 tokens used to assert
-    --   in Turkish (retired there: one fact, one owner). The text is anchored to code shapes, the Turkish negative is paired
-    --   with the English positives and with a control that the pattern matches Turkish at all. These are CREATE OR REPLACE of
-    --   existing writers, so the 1066_notification_type writer count is NOT changed by this file (it stays 8).
-    UNION ALL SELECT '20261218_admin_alerts_english','data_jobs_watchdog: English title Data jobs, words failed / stale / off, lines still / recovered / paused / resumed / still paused, no Turkish text left',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%ttl        text := ''Data jobs'';%'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%WHEN ''failed'' THEN ''failed'' WHEN ''stale'' THEN ''stale'' WHEN ''inactive'' THEN ''off'' ELSE v_state END;%'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': still '' || v_word)%'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': recovered'')%'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': paused ('' || left(coalesce(v_note, ''''), 60)%'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': resumed'')%'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) LIKE '%(v_key || '': still paused ('' || coalesce(to_char(v_pat AT TIME ZONE ''Asia/Famagusta'', ''DD.MM''), ''?'')%'
-           AND 'hâlâ başarısız' ~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) !~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
-           AND pg_get_functiondef(to_regprocedure('public.data_jobs_watchdog(timestamptz)')) !~ '[çğışöüâÇĞİŞÖÜ]', false)
-    UNION ALL SELECT '20261218_admin_alerts_english','marketplace_photo_review_reminder: title Bandabuliya, body "<n> photo waiting for review" (n = 1) / "<n> photos waiting for review", no Turkish text left',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%ttl := ''Bandabuliya'';%'
-           AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%bdy := v_count || CASE WHEN v_count = 1 THEN '' photo waiting for review'' ELSE '' photos waiting for review'' END;%'
-           AND '5 fotoğraf onay bekliyor' ~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
-           AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) !~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
-           AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) !~ '[çğışöüâÇĞİŞÖÜ]', false)
-    -- 1218-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -6693,9 +6670,10 @@ WITH report AS (
   -- 20261196 (c) the push data. The tap must open the admin screen; the module's own screen key would send production
   -- bundles to a listing with a null id. Negative anchored to the tuple shape ('tab', 'marketplace' is legitimate), paired
   -- with the positive.
-  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): push data screen admin / tab marketplace / view photos, never screen marketplace (the text is owned by 20261218)',
+  UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_review_reminder(): push data screen admin / tab marketplace / view photos, never screen marketplace; Turkish text',
     COALESCE(pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''marketplace'', ''view'', ''photos'')%'
-         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) NOT LIKE '%''screen'', ''marketplace''%', false)
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) NOT LIKE '%''screen'', ''marketplace''%'
+         AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) LIKE '%bdy := v_count || '' fotoğraf onay bekliyor'';%', false)
   -- 20261196 (d) the state table: RLS on, NO policies (only the DEFINER function writes it), no privilege for anon /
   -- authenticated, exactly one row. Section I sees RLS too; this token owns the zero-policy and no-grant halves.
   UNION ALL SELECT '20261196_marketplace_photo_review_reminder','marketplace_photo_reminder_state: RLS on, 0 policies, no anon / authenticated privilege, one row',

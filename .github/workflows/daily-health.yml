@@ -25,7 +25,6 @@ on:
 
 jobs:
   health:
-    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15

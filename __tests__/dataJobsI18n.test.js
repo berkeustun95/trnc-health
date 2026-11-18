@@ -1,5 +1,4 @@
-// The admin area is English-only (constants/adminLang.js): every adminJobs* key needs a non-empty English value.
-// A locale that still has the key (kept, unused) must keep the same {placeholder} set as English.
+// Every adminJobs* key exists in all 9 languages (no English fallback) with the same {placeholder} set as English.
 // The key list is read from the English block of constants/i18n.js, not remembered.
 import fs from 'fs'
 import path from 'path'
@@ -17,14 +16,12 @@ test('the English block defines the adminJobs keys the screen uses', () => {
   expect(new Set(KEYS).size).toBe(KEYS.length)
 })
 
-test('English has every key, non-empty', () => {
-  expect(KEYS.filter(k => !hasOwnTranslation(k, 'English') || !t(k, 'English').trim())).toEqual([])
-})
-
 describe.each(Object.keys(LANG_CODES))('%s', lang => {
-  test('keeps English placeholders on the keys it has', () => {
-    const own = KEYS.filter(k => hasOwnTranslation(k, lang))
-    const phDiff = own.filter(k => ph(t(k, lang)) !== ph(t(k, 'English'))).map(k => `${k}: en=[${ph(t(k, 'English'))}] ${lang}=[${ph(t(k, lang))}]`)
-    expect(phDiff).toEqual([])
+  test('has every key itself, non-empty, with English placeholders', () => {
+    const missing = KEYS.filter(k => !hasOwnTranslation(k, lang))
+    const empty = KEYS.filter(k => !t(k, lang).trim())
+    const phDiff = KEYS.filter(k => ph(t(k, lang)) !== ph(t(k, 'English'))).map(k => `${k}: en=[${ph(t(k, 'English'))}] ${lang}=[${ph(t(k, lang))}]`)
+    console.log(`${lang}: ${KEYS.filter(k => hasOwnTranslation(k, lang)).length}/${KEYS.length} adminJobs keys`)
+    expect({ missing, empty, phDiff }).toEqual({ missing: [], empty: [], phDiff: [] })
   })
 })

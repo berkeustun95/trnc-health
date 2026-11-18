@@ -15,20 +15,18 @@
 //   * its `if` contains always() and is not a constant false (absent is red too, except on the recheck's
 //     record step, whose JOB carries the always() `if`); no continue-on-error on the step; timeout-minutes set;
 //   * it is the LAST step of its job (duyurular-fetch: before the chain step);
-//   * duyurular-paused-recheck: the record job `needs` the working job, has environment: production, no job-level
-//     continue-on-error and an `if` of the canonical actor rule wrapping an always() condition; the working job has no
-//     environment and no `secrets.`;
+//   * duyurular-paused-recheck: the record job `needs` the working job, has environment: production,
+//     continue-on-error: true at job level and an always() job `if`; the working job has no environment and no `secrets.`;
 //   * cancel-in-progress, at workflow or job level, is literally false or absent;
 //   * the record step sets no working-directory or shell, and neither the job nor the workflow sets defaults.run (they
 //     could point `node scripts/record-data-job-run.mjs` at another file or another interpreter);
 //   * duyurular-fetch: the record step is IMMEDIATELY before the chain step (nothing slips in between);
 //   * SWITCHABLE workflows (gisekibris-feed, duyurular-fetch, novest-images; data jobs slice 3) carry a `gate` job:
-//     its `if` is exactly the canonical actor rule (scripts/check-dispatcher-actor.mjs), no job-level continue-on-error
-//     but continue-on-error: true on EVERY step (so a failing step still leaves the job green and the feed runs), environment production, permissions exactly contents: read, outputs.run from its gate step, a
+//     it has no `if`, environment production, permissions exactly contents: read, outputs.run from its gate step, a
 //     checkout with persist-credentials: false, exactly one step running `node scripts/data-job-gate.mjs` with no
 //     argument, no working-directory / shell / defaults.run, the service key only on that step and only for the runs
 //     that are gated (a pinned expression, so a dry dispatch never reads it), GATE_CHAIN only on duyurular-fetch;
-//     and the working job `needs: gate` with EXACTLY the `if` below, inside the actor rule (only the exact output `false` stops it; a failed
+//     and the working job `needs: gate` with EXACTLY the `if` below (only the exact output `false` stops it; a failed
 //     gate job lets the feed run: fail-open);
 //   * the allowlist equals the seed's github keys, and every github key has a scheduled workflow with that name.
 // Prints what it found, so a workflow the patterns MISSED is a visible absence, not a silent one.
@@ -38,12 +36,11 @@
 //   node scripts/check-data-job-heartbeats.mjs --selftest
 
 import { readFileSync, readdirSync } from 'node:fs'
-import { resolve, dirname, basename } from 'node:path'
+import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { JOBS } from './record-data-job-run.mjs'
 import { GATE_JOBS } from './data-job-gate.mjs'
-import { actorOk, buildIf, splitIf, DENY } from './check-dispatcher-actor.mjs'
 
 const require = createRequire(import.meta.url)
 let yaml
@@ -55,8 +52,7 @@ const CALL = 'scripts/record-data-job-run.mjs'
 const EXACT = /^node scripts\/record-data-job-run\.mjs --status="\$([A-Z][A-Z0-9_]*)" --real-run="\$([A-Z][A-Z0-9_]*)"\s*$/
 const JOB_STATUS = '${{ job.status }}'
 const GATE_CALL = 'scripts/data-job-gate.mjs'
-const GATE_OLD = "!cancelled() && needs.gate.outputs.run != 'false'"
-const GATE_IF = `\${{ ACTOR_OK && (${GATE_OLD}) }}`
+const GATE_IF = "${{ !cancelled() && needs.gate.outputs.run != 'false' }}"
 const KEY_SCHEDULE = "${{ github.event_name == 'schedule' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}"
 const KEY_CHAIN = "${{ (github.event_name == 'schedule' || inputs.chain == true) && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}"
 
@@ -115,7 +111,7 @@ function defaultsProblems(doc, jobNames) {
   return out
 }
 
-export function gateProblems(doc, ex, ok) {
+export function gateProblems(doc, ex) {
   const out = [], jobs = doc.jobs ?? {}
   const g = jobs.gate, w = jobs[ex.job]
   if (!g) { out.push("no job 'gate'"); return out }
@@ -136,9 +132,7 @@ export function gateProblems(doc, ex, ok) {
     if (JSON.stringify(Object.keys(env).sort()) !== JSON.stringify(want)) out.push(`the gate step's env must be exactly [${want}], found [${Object.keys(env).sort()}]`)
     if (ex.gate.chain && env.GATE_CHAIN !== '${{ inputs.chain == true }}') out.push(`GATE_CHAIN must be \${{ inputs.chain == true }}, found ${JSON.stringify(env.GATE_CHAIN)}`)
   }
-  if (normIf(g.if) !== buildIf(ok)) out.push(`job gate: if must be exactly ${buildIf(ok)} (the actor rule alone: it must run on every other event), found ${JSON.stringify(g.if)}`)
-  if (g['continue-on-error'] !== undefined && g['continue-on-error'] !== false) out.push('job gate must not set job-level continue-on-error (put it on every step instead)')
-  for (const s of steps) if (s?.['continue-on-error'] !== true) out.push(`job gate: step '${s?.name ?? s?.uses ?? s?.id}' must set continue-on-error: true (a failing gate step must leave the job green so the feed runs)`)
+  if ('if' in g) out.push(`job gate must have no if (found ${JSON.stringify(g.if)}): it must run on every event`)
   if (asArr(g.needs).length) out.push('job gate must not need another job')
   const envName = typeof g.environment === 'string' ? g.environment : g.environment?.name
   if (envName !== 'production') out.push('job gate must have environment: production (the key lives there)')
@@ -151,12 +145,12 @@ export function gateProblems(doc, ex, ok) {
   if (!w) out.push(`no job '${ex.job}'`)
   else {
     if (!asArr(w.needs).includes('gate')) out.push(`job ${ex.job} must need gate`)
-    if (normIf(w.if) !== buildIf(ok, GATE_OLD)) out.push(`job ${ex.job}: if must be exactly ${buildIf(ok, GATE_OLD)}, found ${JSON.stringify(w.if)}`)
+    if (normIf(w.if) !== GATE_IF) out.push(`job ${ex.job}: if must be exactly ${GATE_IF}, found ${JSON.stringify(w.if)}`)
   }
   return out
 }
 
-export function inspectWorkflow(src, expect = EXPECT, file = '') {
+export function inspectWorkflow(src, expect = EXPECT) {
   const problems = []
   let doc
   try { doc = yaml.load(src) } catch (e) { return { name: null, scheduled: false, parseError: true, problems: [`yaml does not parse (${e.reason ?? 'error'})`] } }
@@ -169,10 +163,7 @@ export function inspectWorkflow(src, expect = EXPECT, file = '') {
   const jobs = doc.jobs ?? {}
   if (!ex) { problems.push(`no wiring expectation for '${name}' (add it to EXPECT in this script)`); return out }
   problems.push(...concurrencyProblems(doc))
-  const a = actorOk(basename(file), doc)
-  if (!a.expr) { problems.push(...a.problems); return out }
-  const ok = a.expr
-  if (ex.gate) problems.push(...gateProblems(doc, ex, ok))
+  if (ex.gate) problems.push(...gateProblems(doc, ex))
   problems.push(...defaultsProblems(doc, Object.keys(jobs).filter(j => j === ex.job || j === 'gate')))
 
   const rec = []
@@ -215,10 +206,8 @@ export function inspectWorkflow(src, expect = EXPECT, file = '') {
     if (!asArr(rj.needs).includes(ex.work)) problems.push(`job ${jn} must need ${ex.work}`)
     const envName = typeof rj.environment === 'string' ? rj.environment : rj.environment?.name
     if (envName !== 'production') problems.push(`job ${jn} must have environment: production`)
-    if (rj['continue-on-error'] !== undefined && rj['continue-on-error'] !== false) problems.push(`job ${jn} must not set job-level continue-on-error (a failed record turns the run red; the actor rule forbids it)`)
-    const si = splitIf(rj.if, ok)
-    if (si.problems.length) problems.push(...si.problems.map(x => `job ${jn}: ${x}`))
-    else if (si.bare || !hasAlways(si.old)) problems.push(`job ${jn}: if must be the actor rule wrapping an always() condition (not constant false), found ${JSON.stringify(rj.if)}`)
+    if (rj['continue-on-error'] !== true) problems.push(`job ${jn} must have continue-on-error: true (a runner fault there must not turn a green run red)`)
+    if (!hasAlways(rj.if)) problems.push(`job ${jn}: if must contain always() and not be constant false, found ${JSON.stringify(rj.if)}`)
     if (!wj) problems.push(`no job '${ex.work}'`)
     else {
       if ('environment' in wj) problems.push(`job ${ex.work} must have no environment`)
@@ -234,7 +223,7 @@ export function check({ workflows, seedSql, allowlist, expect = EXPECT }) {
   if (reg.length === 0) problems.push(`no github rows parsed from ${SEED}`)
   const scheduledNames = []
   for (const [file, src] of Object.entries(workflows)) {
-    const w = inspectWorkflow(src, expect, file)
+    const w = inspectWorkflow(src, expect)
     if (w.parseError) { problems.push(`${file}: ${w.problems[0]}`); continue }
     if (!w.scheduled) {
       if (w.calls) problems.push(`${file}: calls the record script but has no schedule:`)
@@ -256,22 +245,20 @@ if (process.argv.includes('--selftest')) {
   const t = (label, got, want) => { const ok = JSON.stringify(got) === JSON.stringify(want); if (!ok) bad++; console.log(`  ${ok ? '✓' : '✗'} ${label.padEnd(72)}  ${JSON.stringify(got)}${ok ? '' : `  wanted ${JSON.stringify(want)}`}`) }
   const sql = "  ('job-a', 'github',    'feed', '{}', 'x', interval '1 hour', 1),\n  ('job-f', 'github',    'feed', '{}', 'x', interval '1 hour', 2),\n  ('job-r', 'github',    'feed', '{}', 'x', interval '1 hour', 3),\n  ('cron-c', 'cron_http', 'feed', ARRAY['c'], NULL, interval '1 hour', 4),\n"
   const ex = { 'job-a': { job: 'x', gate: { key: KEY_SCHEDULE } }, 'job-f': { job: 'x', before: 'Chain', gate: { key: KEY_CHAIN, chain: true } }, 'job-r': { job: 'rec', work: 'work' } }
-  const OK = `!${DENY}`
   const gateJob = (chain) => ({
-    if: buildIf(OK), environment: 'production', permissions: { contents: 'read' }, outputs: { run: '${{ steps.gate.outputs.run }}' },
-    steps: [{ uses: 'actions/checkout@abc', with: { 'persist-credentials': false }, 'continue-on-error': true }, { uses: 'actions/setup-node@abc', 'continue-on-error': true },
-      { name: 'Pause switch', id: 'gate', 'continue-on-error': true, env: { SUPABASE_SERVICE_ROLE_KEY: chain ? KEY_CHAIN : KEY_SCHEDULE, EXPO_PUBLIC_SUPABASE_URL: '${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}', ...(chain ? { GATE_CHAIN: '${{ inputs.chain == true }}' } : {}) }, run: `node ${GATE_CALL}` }],
+    environment: 'production', 'continue-on-error': true, permissions: { contents: 'read' }, outputs: { run: '${{ steps.gate.outputs.run }}' },
+    steps: [{ uses: 'actions/checkout@abc', with: { 'persist-credentials': false } }, { uses: 'actions/setup-node@abc' },
+      { name: 'Pause switch', id: 'gate', env: { SUPABASE_SERVICE_ROLE_KEY: chain ? KEY_CHAIN : KEY_SCHEDULE, EXPO_PUBLIC_SUPABASE_URL: '${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}', ...(chain ? { GATE_CHAIN: '${{ inputs.chain == true }}' } : {}) }, run: `node ${GATE_CALL}` }],
   })
-  const gated = (o, chain) => { o.jobs.gate = gateJob(chain); o.jobs.x.needs = 'gate'; o.jobs.x.if = buildIf(OK, GATE_OLD) }
+  const gated = (o, chain) => { o.jobs.gate = gateJob(chain); o.jobs.x.needs = 'gate'; o.jobs.x.if = GATE_IF }
   const RUN = `node ${CALL} --status="$S" --real-run="$RR"`
-  const SCHED_OLD = "always() && github.event_name == 'schedule'"
-  const SCHED_IF = buildIf(OK, SCHED_OLD)
-  const recStep = (status = JOB_STATUS) => ({ name: 'Record', if: `\${{ ${SCHED_OLD} }}`, 'timeout-minutes': 2, env: { S: status, RR: "${{ github.event_name == 'schedule' }}" }, run: RUN })
+  const SCHED_IF = "${{ always() && github.event_name == 'schedule' }}"
+  const recStep = (status = JOB_STATUS) => ({ name: 'Record', if: SCHED_IF, 'timeout-minutes': 2, env: { S: status, RR: "${{ github.event_name == 'schedule' }}" }, run: RUN })
   const base = (name) => {
     const o = { name, on: { schedule: [{ cron: '1 * * * *' }], workflow_dispatch: {} }, concurrency: { group: 'g', 'cancel-in-progress': false } }
     if (name === 'job-r') o.jobs = {
       work: { 'runs-on': 'u', steps: [{ run: 'echo hi' }] },
-      rec: { needs: ['work'], if: SCHED_IF, environment: 'production', 'runs-on': 'u', steps: [{ uses: 'a/b@1' }, recStep('${{ needs.work.result }}')] },
+      rec: { needs: ['work'], if: SCHED_IF, 'continue-on-error': true, environment: 'production', 'runs-on': 'u', steps: [{ uses: 'a/b@1' }, recStep('${{ needs.work.result }}')] },
     }
     else if (name === 'job-f') { o.jobs = { x: { steps: [{ run: 'echo hi' }, recStep(), { name: 'Chain the next run', run: 'echo chain' }] } }; gated(o, true) }
     else { o.jobs = { x: { steps: [{ run: 'echo hi' }, recStep()] }, other: { steps: [{ run: 'echo o' }] } }; gated(o, false) }
@@ -331,15 +318,7 @@ if (process.argv.includes('--selftest')) {
   redA('working job if is the bare == true form (fail-closed)', o => { o.jobs.x.if = "${{ needs.gate.outputs.run == 'true' }}" }, 'if must be exactly')
   redA('working job if uses always() (cancel would not halt it)', o => { o.jobs.x.if = "${{ always() && needs.gate.outputs.run != 'false' }}" }, 'if must be exactly')
   redA('working job if drops !cancelled()', o => { o.jobs.x.if = "${{ needs.gate.outputs.run != 'false' }}" }, 'if must be exactly')
-  redA('gate job has an extra condition besides the actor rule', o => { o.jobs.gate.if = buildIf(OK, "github.event_name == 'schedule'") }, 'job gate: if must be exactly')
-  redA('gate job has no if (no actor rule)', o => { delete o.jobs.gate.if }, 'job gate: if must be exactly')
-  redA('gate job with a job-level continue-on-error', o => { o.jobs.gate['continue-on-error'] = true }, 'must not set job-level continue-on-error')
-  redA('gate checkout step without continue-on-error', o => { delete o.jobs.gate.steps[0]['continue-on-error'] }, "must set continue-on-error: true")
-  redA('gate setup-node step without continue-on-error', o => { delete o.jobs.gate.steps[1]['continue-on-error'] }, "must set continue-on-error: true")
-  redA('gate script step without continue-on-error', o => { delete gs(o)['continue-on-error'] }, "must set continue-on-error: true")
-  redA('gate step with continue-on-error false', o => { gs(o)['continue-on-error'] = false }, "must set continue-on-error: true")
-  redA('working job if without the actor rule (the old exact condition)', o => { o.jobs.x.if = '${{ ' + GATE_OLD + ' }}' }, 'if must be exactly')
-  redA('working job if with the paren escape', o => { o.jobs.x.if = buildIf(OK, GATE_OLD + ') || (true') }, 'if must be exactly')
+  redA('gate job has an if', o => { o.jobs.gate.if = "${{ github.event_name == 'schedule' }}" }, 'job gate must have no if')
   redA('gate job without environment', o => { delete o.jobs.gate.environment }, 'environment: production')
   redA('gate job with wider permissions', o => { o.jobs.gate.permissions = { contents: 'read', issues: 'write' } }, 'permissions must be exactly')
   redA('gate job without permissions', o => { delete o.jobs.gate.permissions }, 'permissions must be exactly')
@@ -367,11 +346,8 @@ if (process.argv.includes('--selftest')) {
   t('fetch: a step after the chain is fine (positive control)', run({ ...good(), 'f.yml': mk('job-f', o => { o.jobs.x.steps.push({ run: 'echo tail' }) }) }), [])
   redR('recheck: the record job does not need the working job', o => { o.jobs.rec.needs = [] }, 'must need work')
   redR('recheck: the record job has no environment production', o => { delete o.jobs.rec.environment }, 'environment: production')
-  redR('recheck: the record job has a job-level continue-on-error', o => { o.jobs.rec['continue-on-error'] = true }, 'must not set job-level continue-on-error')
-  redR('recheck: the record job if has no always()', o => { o.jobs.rec.if = buildIf(OK, "github.event_name == 'schedule'") }, 'always()')
-  redR('recheck: the record job if has no actor rule', o => { o.jobs.rec.if = '${{ ' + SCHED_OLD + ' }}' }, 'job rec: if is not the canonical')
-  redR('recheck: the record job if is the bare actor rule (no always())', o => { o.jobs.rec.if = buildIf(OK) }, 'always()')
-  redR('recheck: the record job if has the paren escape', o => { o.jobs.rec.if = buildIf(OK, SCHED_OLD + ') || (true') }, 'closes the wrapper early')
+  redR('recheck: the record job has no continue-on-error', o => { delete o.jobs.rec['continue-on-error'] }, 'continue-on-error: true')
+  redR('recheck: the record job if has no always()', o => { o.jobs.rec.if = "${{ github.event_name == 'schedule' }}" }, 'always()')
   redR('recheck: the working job has an environment', o => { o.jobs.work.environment = 'production' }, 'must have no environment')
   redR('recheck: the working job mentions secrets.', o => { o.jobs.work.steps[0].env = { K: '${{ secrets.K }}' } }, 'must not mention secrets.')
   redR('recheck: status is not needs.<work>.result', o => { rs(o, 'rec').env.S = JOB_STATUS }, 'needs.work.result')
@@ -409,7 +385,7 @@ console.log(`\nScheduled workflows that record (${found.length}):`)
 for (const f of found) {
   const st = f.step
   console.log(`  ${f.registered && f.nProblems === 0 ? '✓' : '✗'} ${f.file}  name=${f.name}  record lines=${f.calls}`)
-  if (EXPECT[f.name]?.gate) console.log(`      gate: job 'gate' (if = the actor rule, every step continue-on-error) -> job ${EXPECT[f.name].job} needs it, if ${GATE_IF}${f.nProblems === 0 ? '' : '  (see problems)'}`)
+  if (EXPECT[f.name]?.gate) console.log(`      gate: job 'gate' -> job ${EXPECT[f.name].job} needs it, if ${GATE_IF}${f.nProblems === 0 ? '' : '  (see problems)'}`)
   if (st) {
     const rr = Object.entries(st.env ?? {}).find(([k]) => /REAL_RUN/.test(k))
     console.log(`      step: job=${st.job} #${st.index + 1} of ${st.of}  if=${JSON.stringify(st.if ?? null)}  timeout=${st.timeout}  ${rr ? rr[0] + '=' + JSON.stringify(rr[1]) : 'no REAL_RUN env'}`)

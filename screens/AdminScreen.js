@@ -12,7 +12,6 @@ import { supabase } from '../lib/supabase'
 import { signOutThisDevice } from '../utils/signOut'
 import { colors, placeColors, shadow, type as typeScale, radii, elevation } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { ADMIN_LANG } from '../constants/adminLang'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { addBackListener } from '../utils/backHandler'
 import { invalidateBlockedTerms } from '../utils/profanity'
@@ -5201,7 +5200,6 @@ function ModerationTab() {
 }
 
 export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, openRequest, onOpenRequestHandled }) {
-  const adminLang = ADMIN_LANG
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
   // The photo-review push (App.js openAdminPush). The nonce keys MarketplaceTab, so every tap remounts it on the requested
@@ -5241,7 +5239,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
             </TouchableOpacity>
           </View>
           <UserCounts
-            lang={adminLang}
+            lang={lang}
             onOpenTools={() => { setTab('Dashboard'); setToolsOpen(true) }}
             onOpenReports={() => { setTab('Reports'); setToolsOpen(true) }}
             onOpenCars={() => { setTab('Cars'); setToolsOpen(true) }}
@@ -5312,7 +5310,7 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
         >
           {TABS.map(k => (
             <TouchableOpacity key={k} style={[s.tabBtn, tab === k && s.tabBtnActive, pinBusy && tab !== k && { opacity: 0.45 }]} onPress={() => setTab(k)} disabled={pinBusy}>
-              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', adminLang) : k === 'DataJobs' ? t('adminJobsTab', adminLang) : k}</Text>
+              <Text style={[s.tabBtnText, tab === k && s.tabBtnTextActive]}>{k === 'RestaurantPins' ? t('adminPinsTab', lang) : k === 'DataJobs' ? t('adminJobsTab', lang) : k}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -5325,9 +5323,9 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'Providers'   && <ProvidersTab />}
           {tab === 'Credentials' && <CredentialsTab />}
           {tab === 'Facilities'  && <FacilitiesTab />}
-          {tab === 'Duty'        && <DutyTab lang={adminLang} />}
+          {tab === 'Duty'        && <DutyTab lang={lang} />}
           {tab === 'Users'       && <UsersTab />}
-          {tab === 'Broadcast'   && <BroadcastTab lang={adminLang} />}
+          {tab === 'Broadcast'   && <BroadcastTab lang={lang} />}
           {tab === 'Events'      && <EventsTab />}
           {tab === 'Properties'    && <PropertiesTab />}
           {tab === 'Agents'        && <AgentsTab />}
@@ -5343,8 +5341,8 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           {tab === 'JobPostings'   && <JobPostingsTab />}
           {tab === 'Cars'          && <CarsTab />}
           {tab === 'Bandabuliya'   && <MarketplaceTab key={mkOpen?.at ?? 'tab'} initialView={mkOpen?.view} />}
-          {tab === 'RestaurantPins' && <RestaurantPinsTab lang={adminLang} onBusyChange={setPinBusy} />}
-          {tab === 'DataJobs'      && <DataJobsTab lang={adminLang} />}
+          {tab === 'RestaurantPins' && <RestaurantPinsTab lang={lang} onBusyChange={setPinBusy} />}
+          {tab === 'DataJobs'      && <DataJobsTab lang={lang} />}
           {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>
