@@ -896,7 +896,9 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
   eq('push tap: closes every screen the selector draws above Yeme-İçme', [above.length > 20, above.filter(v => !(oli + opener).includes(setterOf(v)))], [true, []])
   eq('push tap: oliNavigate read through a ref (a cold-start tap never hits an unset binding)', [opener.includes("oliNavigateRef.current"), /oliNavigateRef\.current = oliNavigate\b/.test(app), !/\boliNavigate\('eatery'\)/.test(opener)], [true, true, true])
   const holds = JSON.parse(fs.readFileSync(new URL('../release-holds.json', import.meta.url), 'utf8')).holds
-  eq('release hold: this work is held from production until privacy F1-F6 is live', holds.filter(h => h.pr === 399 && h.cleared === false && /F1.F6/.test(h.what)).length, 1)
+  // Cleared 2026-11-18 once F1-F6 went live; the entry stays, anchored on the first commit, and a clearance must quote Berke.
+  const h399 = holds.filter(h => h.pr === 399 && /F1.F6/.test(h.what))
+  eq('release hold: one #399 entry, anchored on its first commit, held or cleared by Berke', [h399.length, h399[0]?.commit, h399[0]?.cleared === false || /^Berke, in chat/.test(h399[0]?.clearedBy || '')], [1, '474c06518071dea0b199948cb352451a4c9168ca', true])
   eq("oliNavigate('eatery') still opens Yeme-İçme with no partner page", [oli.includes('setEateryPartner(null)'), /case 'eatery':\s*setShowEatery\(true\)/.test(app)], [true, true])
   const st = fs.readFileSync(new URL('../components/EateryOrderStatus.js', import.meta.url), 'utf8')
   // i18n: i18n:validate scans named surfaces only (not this card), so its keys are checked here.
