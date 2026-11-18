@@ -1703,7 +1703,7 @@ const s = StyleSheet.create({
   sectionHint:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 18, marginBottom: 14 },
   fieldHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 17, marginTop: 6 },
   dobRow:           { flexDirection: 'row', gap: 8 },
-  termsRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 10, paddingVertical: 6 },
+  termsRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 10, paddingVertical: 6, minHeight: TAP },
   checkbox:         { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.textSecondary,
                       backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   checkboxOn:       { backgroundColor: colors.primary, borderColor: colors.primary },
