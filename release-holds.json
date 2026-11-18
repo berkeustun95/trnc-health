@@ -95,8 +95,10 @@
       "commit": "9e77752c217588189452b10c722cc84c885fb5ae",
       "what": "Admin area: English only, whatever the app language, merged to main 2026-11-17",
       "since": "2026-11-17",
-      "cleared": false,
-      "clear": "Only after Berke has tried it on Preview and says it passed in chat (Berke 2026-11-17). Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has tried it on Preview and says it passed in chat (Berke 2026-11-17). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-18",
+      "clearedBy": "Berke, in chat 2026-11-18: #494 passed his Preview check (admin English with the app in Turkish; paused + resumed alerts arrived in English on the S20+). Preview 1524b337 @ 31dd6a7b."
     }
   ]
 }
