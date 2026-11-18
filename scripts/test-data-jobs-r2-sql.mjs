@@ -1,7 +1,7 @@
 // Data jobs R2 (20261210 switches + 20261211 watchdog) against a Supabase-shaped Postgres
 // (scripts/migration-harness.mjs; PGlite = PostgreSQL 18, prod is older). By hand:
 //   node scripts/test-data-jobs-r2-sql.mjs
-// Order: 20261205 (R1) -> 20261210 -> 20261211, as the one supabase-migrate run applies them.
+// Order: 20261205 (R1) -> 20261210 -> 20261211 -> 20261218 (the English text of the watchdog), as supabase-migrate applies them.
 // Evidence of: the files' own in-transaction assertions + probes run clean, the red-first mutants are caught, and the
 // behaviour measured from outside (roles, claims, ticks). NOT evidence of: pg_cron / pg_net / Vault on the real database
 // (cron.* and net.* are stubs here), the real cron.job.username, PG 17 renderings of pg_get_functiondef.
@@ -15,7 +15,8 @@ const MIG = rel('../supabase/migrations/')
 const FILES = readdirSync(MIG)
 const A = FILES.find(f => /^\d+_data_jobs_switches\.sql$/.test(f))
 const B = FILES.find(f => /^\d+_data_jobs_watchdog\.sql$/.test(f))
-assert.ok(A && B, 'R2 files not found')
+const C = FILES.find(f => /^\d+_admin_alerts_english\.sql$/.test(f))
+assert.ok(A && B && C, 'R2 files (or the English-text file) not found')
 const read = f => readFileSync(MIG + f, 'utf8')
 
 let fail = 0
@@ -38,6 +39,7 @@ const cap = FILES.find(f => f.startsWith('20260718_capture_3_functions'))
 const DUTY = FILES.find(f => f.startsWith('20261103_duty_push_famagusta'))
 const WEEK = FILES.find(f => f.startsWith('20261177_weekend_digest_schedule'))
 const R1 = '20261205_data_jobs.sql'
+const F196 = '20261196_marketplace_photo_review_reminder.sql'
 
 // every cron job name 20261205 knows, so the coverage assertion is real
 const r1src = read(R1)
@@ -75,6 +77,11 @@ ${grab(DUTY, '\nCREATE OR REPLACE FUNCTION public.duty_thursday_closing_local()\
 ${grab(DUTY, 'CREATE OR REPLACE FUNCTION public.duty_push_due(', ['$$;'])}
 ${grab(WEEK, 'CREATE OR REPLACE FUNCTION public.weekend_digest_due(', ['$fn$;'])}
 REVOKE ALL ON FUNCTION public.duty_push_due(timestamptz), public.weekend_digest_due(timestamptz) FROM PUBLIC, anon, authenticated;
+-- 20261196's reminder (Turkish text, live today) and its state row: file C replaces the function, and its pre-flight needs both
+CREATE TABLE public.marketplace_photo_reminder_state (id boolean NOT NULL DEFAULT true PRIMARY KEY, last_sent_at timestamptz);
+${grab(F196, 'CREATE OR REPLACE FUNCTION public.marketplace_photo_review_reminder()', ['$function$;'])}
+REVOKE ALL ON FUNCTION public.marketplace_photo_review_reminder() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;
 INSERT INTO auth.users VALUES ('${ADMIN}'), ('${ADMIN2}'), ('${CUST}');
 INSERT INTO public.profiles (id, role, push_token) VALUES ('${ADMIN}', 'admin', 'ExponentPushToken[aaa]'), ('${ADMIN2}', 'admin', NULL), ('${CUST}', 'customer', 'ExponentPushToken[ccc]');
 INSERT INTO cron.job (jobname, schedule, command) SELECT n, '0 3 * * *', 'SELECT 1' FROM unnest(ARRAY[${cronNames.map(n => `'${n}'`).join(',')}]) n WHERE n NOT IN ('purge-data-job-runs');
@@ -94,6 +101,7 @@ const build = async (upTo) => {
   assert.ok(r1r.ok, 'R1 must apply: ' + r1r.msg)
   if (upTo >= 1) { const r = await run(db, read(A).replace(/^NOTIFY pgrst.*$/m, '')); if (!r.ok) throw new Error('A: ' + r.msg) }
   if (upTo >= 2) { const r = await run(db, read(B).replace(/^NOTIFY pgrst.*$/m, '')); if (!r.ok) throw new Error('B: ' + r.msg) }
+  if (upTo >= 3) { const r = await run(db, read(C).replace(/^NOTIFY pgrst.*$/m, '')); if (!r.ok) throw new Error('C: ' + r.msg) }
   return db
 }
 // red-first: break ONE thing in a file, require the file to refuse with a message naming it
@@ -102,7 +110,8 @@ const mutant = async (label, file, upTo, from, to, want, pre = '') => {
   assert.ok(text.includes(from), `${label}: anchor not in file: ${from}`)
   const db = await freshDb(SEED)
   assert.ok((await run(db, read(R1).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
-  if (upTo === 2) assert.ok((await run(db, read(A).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
+  if (upTo >= 2) assert.ok((await run(db, read(A).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
+  if (upTo >= 3) assert.ok((await run(db, read(B).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
   if (pre) assert.ok((await run(db, pre)).ok, `${label}: pre-SQL failed`)
   const r = await run(db, text.replace(from, to).replace(/^NOTIFY pgrst.*$/m, ''))
   t(`red-first ${label}`, !r.ok && r.msg.includes(want) ? 'caught' : `NOT caught: ${r.ok ? 'applied' : r.msg}`, 'caught')
@@ -213,6 +222,32 @@ await mutant('B: second cron job at the watchdog minutes is refused', B, 2, `SEL
 await mutant('B: an ACTIVE every-minute job is still refused (the paused live-scores polls are not)', B, 2, `SELECT cron.schedule('data-jobs-watchdog', '14,44 * * * *', 'SELECT public.data_jobs_watchdog();');`, `SELECT cron.schedule('data-jobs-watchdog', '14,44 * * * *', 'SELECT public.data_jobs_watchdog();');\nSELECT cron.schedule('zz-minute', '* * * * *', 'SELECT 1');`, 'another cron job fires')
 await mutant('B: the collision check ignoring `active` refuses the paused polls (the original bug)', B, 2, `WHERE jobname <> 'data-jobs-watchdog' AND active`, `WHERE jobname <> 'data-jobs-watchdog'`, 'live-scores-football-poll (* * * * *)')
 
+console.log('── red-first mutants of file C (the English text; each must be refused by the file itself)')
+await mutant('C: title left Turkish', C, 3, `ttl        text := 'Data jobs';`, `ttl        text := 'Veri işleri';`, 'does not have the expected English code shapes')
+await mutant('C: recovery line left Turkish', C, 3, `v_lines := v_lines || (v_key || ': recovered');`, `v_lines := v_lines || (v_key || ': düzeldi');`, 'does not have the expected English code shapes')
+await mutant('C: resumed line left Turkish', C, 3, `v_lines := v_lines || (v_key || ': resumed');`, `v_lines := v_lines || (v_key || ': yeniden başladı');`, 'does not have the expected English code shapes')
+await mutant('C: the "still" line left Turkish', C, 3, `(v_key || ': still ' || v_word)`, `(v_key || ': hâlâ ' || v_word)`, 'does not have the expected English code shapes')
+await mutant('C: word map left Turkish', C, 3, `WHEN 'failed' THEN 'failed' WHEN 'stale' THEN 'stale' WHEN 'inactive' THEN 'off'`, `WHEN 'failed' THEN 'başarısız' WHEN 'stale' THEN 'sessiz' WHEN 'inactive' THEN 'kapalı'`, 'does not have the expected English code shapes')
+await mutant('C: reminder body left Turkish', C, 3, `' photo waiting for review' ELSE ' photos waiting for review'`, `' fotoğraf onay bekliyor' ELSE ' fotoğraf onay bekliyor'`, 'does not have the expected English code shapes')
+await mutant('C: a Turkish word only in the paused line (the shape check passes, the negative must catch it)', C, 3, `(v_key || ': still paused ('`, `(v_key || ': still paused sessiz ('`, 'does not have the expected English code shapes')
+await mutant('C: alerts every tick (not on change only)', C, 3, `IF v_att AND NOT v_last_att THEN`, `IF v_att THEN`, 'probe results differ')
+await mutant('C: 24 h re-alert becomes 240 h', C, 3, `v_alerted < p_now - interval '24 hours'`, `v_alerted < p_now - interval '240 hours'`, 'does not have the expected English code shapes')
+await mutant('C: customers are notified too', C, 3, `FOR r IN SELECT id, push_token FROM profiles WHERE role = 'admin' LOOP\n    INSERT INTO notifications (user_id, title, body, type) VALUES (r.id, ttl, bdy, 'admin_alert');\n    req := NULL;\n    IF r.push_token IS NOT NULL THEN\n      SELECT net.http_post(\n        url     := 'https://exp.host/--/api/v2/push/send',\n        body    := jsonb_build_object('to', r.push_token, 'title', ttl, 'body', bdy, 'sound', 'default',\n                     'data', jsonb_build_object('screen', 'admin', 'tab', 'datajobs')),`, `FOR r IN SELECT id, push_token FROM profiles LOOP\n    INSERT INTO notifications (user_id, title, body, type) VALUES (r.id, ttl, bdy, 'admin_alert');\n    req := NULL;\n    IF r.push_token IS NOT NULL THEN\n      SELECT net.http_post(\n        url     := 'https://exp.host/--/api/v2/push/send',\n        body    := jsonb_build_object('to', r.push_token, 'title', ttl, 'body', bdy, 'sound', 'default',\n                     'data', jsonb_build_object('screen', 'admin', 'tab', 'datajobs')),`, 'does not have the expected English code shapes')
+await mutant('C: the weekly reminder every 6 hours not 6 days', C, 3, `v_rem < p_now - interval '6 days'`, `v_rem < p_now - interval '6 hours'`, 'probe results differ')
+await mutant('C: the Monday slot moved to Tuesday', C, 3, `extract(isodow FROM (p_now AT TIME ZONE 'Asia/Famagusta')) = 1`, `extract(isodow FROM (p_now AT TIME ZONE 'Asia/Famagusta')) = 2`, 'probe results differ')
+// CREATE OR REPLACE keeps the ACL it finds, so C's REVOKE only matters when the ACL drifted open between B and C: that is the `pre`
+await mutant('C: REVOKE dropped, watchdog ACL drifted open to service_role', C, 3, `REVOKE ALL ON FUNCTION public.data_jobs_watchdog(timestamptz) FROM PUBLIC, anon, authenticated, service_role;`, `SELECT 1;`, 'EXECUTE-able by a role other than its owner',
+  `GRANT EXECUTE ON FUNCTION public.data_jobs_watchdog(timestamptz) TO service_role, authenticated;`)
+{
+  const d = await freshDb(SEED)
+  for (const f of [R1, A, B]) assert.ok((await run(d, read(f).replace(/^NOTIFY pgrst.*$/m, ''))).ok)
+  assert.ok((await run(d, `GRANT EXECUTE ON FUNCTION public.data_jobs_watchdog(timestamptz) TO service_role, authenticated;`)).ok)
+  const drifted = (await d.query(`SELECT has_function_privilege('service_role', 'public.data_jobs_watchdog(timestamptz)', 'EXECUTE') a, has_function_privilege('authenticated', 'public.data_jobs_watchdog(timestamptz)', 'EXECUTE') b`)).rows[0]
+  const r = await run(d, read(C).replace(/^NOTIFY pgrst.*$/m, ''))
+  const fixed = (await d.query(`SELECT has_function_privilege('service_role', 'public.data_jobs_watchdog(timestamptz)', 'EXECUTE') a, has_function_privilege('authenticated', 'public.data_jobs_watchdog(timestamptz)', 'EXECUTE') b`)).rows[0]
+  t('C repairs a drifted watchdog ACL (positive control: the drift was real first)', [drifted, r.ok, fixed], [{ a: true, b: true }, true, { a: false, b: false }])
+}
+
 console.log('── file B applied while an admin has a REAL job paused (20261210 is live): no false "probe rows leaked"')
 {
   const PAUSE = `UPDATE data_jobs SET paused = true, paused_note = 'harness real pause', paused_by = '${ADMIN}', paused_at = now() WHERE key = 'novest-images'`
@@ -227,14 +262,16 @@ console.log('── file B applied while an admin has a REAL job paused (2026121
 await mutant('B: the old leak check (any paused job = leak) trips on a real pause', B, 2, `OR (SELECT coalesce(string_agg(key, ',' ORDER BY key), '') FROM public.data_jobs WHERE paused) IS DISTINCT FROM v_paused_keys`, `OR EXISTS (SELECT 1 FROM public.data_jobs WHERE paused)`, 'probe rows leaked',
   `UPDATE data_jobs SET paused = true, paused_note = 'harness real pause', paused_by = '${ADMIN}', paused_at = now() WHERE key = 'novest-images'`)
 
-console.log('── watchdog behaviour measured from outside (own scenario: all admins, a probe-free quiet database)')
+console.log('── file C (English text) applied after B')
+db = await build(3)
+console.log('── watchdog behaviour measured from outside, English text (own scenario: all admins, a probe-free quiet database)')
 // quiet baseline: everything the live-looking seed reads as attention is alerted once, then state is stable
 const tick = async (now = 'now()') => { await db.exec(`DELETE FROM notifications; DELETE FROM push_log; DELETE FROM net.calls`); await db.exec(`SELECT public.data_jobs_watchdog(${now})`); return (await q2(`SELECT user_id, title, body, type FROM notifications ORDER BY user_id`)) }
 await tick()
 t('second tick with no change sends nothing', (await tick()).length, 0)
 await db.exec(`UPDATE data_jobs SET paused = true, paused_note = 'harness pause', paused_by = '${ADMIN}', paused_at = now() WHERE key = 'novest-images'`)
 const pz = await tick()
-t('a pause makes one notice per admin, none to the customer', [pz.length, pz.map(r => r.user_id).sort(), pz[0]?.type, pz[0]?.title], [2, [ADMIN, ADMIN2], 'admin_alert', 'Veri işleri'])
+t('a pause makes one notice per admin, none to the customer', [pz.length, pz.map(r => r.user_id).sort(), pz[0]?.type, pz[0]?.title], [2, [ADMIN, ADMIN2], 'admin_alert', 'Data jobs'])
 t('the pause line names the job and says why', pz[0]?.body.includes('novest-images') && pz[0]?.body.includes('harness pause'), true)
 t('push only for the admin with a token; log has both', [(await q2(`SELECT count(*)::int n FROM net.calls`))[0].n, (await q2(`SELECT user_id, request_id IS NULL AS nulltok FROM push_log ORDER BY user_id`))], [1, [{ user_id: ADMIN, nulltok: false }, { user_id: ADMIN2, nulltok: true }]])
 t('push data opens the Data jobs tab', (await q2(`SELECT body->'data' d FROM net.calls`))[0].d, { tab: 'datajobs', screen: 'admin' })
@@ -245,29 +282,29 @@ await tick()
 const lines = async (key) => (await q2(`SELECT l FROM notifications n, regexp_split_to_table(n.body, E'\\n') l WHERE n.user_id = '${ADMIN}' AND l LIKE '${key}%' ORDER BY l`)).map(r => r.l)
 await db.exec(`INSERT INTO data_job_runs (job_key, started_at, finished_at, outcome, error_class, source) VALUES ('duyurular-fetch', now() - interval '2 minutes', now() - interval '1 minute', 'failed', 'http_500', 'github')`)
 await tick()
-t('enters attention: one line', await lines('duyurular-fetch'), ['duyurular-fetch: başarısız'])
+t('enters attention: one line', await lines('duyurular-fetch'), ['duyurular-fetch: failed'])
 t('same red state next tick: silent', (await tick()).length, 0)
 await db.exec(`UPDATE data_jobs_alert_state SET alerted_at = now() - interval '23 hours' WHERE job_key = 'duyurular-fetch'`)
 t('still red after 23 h: silent', (await tick()).length, 0)
 await db.exec(`UPDATE data_jobs_alert_state SET alerted_at = now() - interval '25 hours' WHERE job_key = 'duyurular-fetch'`)
 await tick()
-t('still red after 25 h: daily re-alert', await lines('duyurular-fetch'), ['duyurular-fetch: hâlâ başarısız'])
+t('still red after 25 h: daily re-alert', await lines('duyurular-fetch'), ['duyurular-fetch: still failed'])
 t('and then silent again (alerted_at restamped)', (await tick()).length, 0)
 await db.exec(`INSERT INTO data_job_runs (job_key, started_at, finished_at, outcome, source) VALUES ('duyurular-fetch', now(), now(), 'ok', 'github')`)
 await tick()
-t('recovery: one line', await lines('duyurular-fetch'), ['duyurular-fetch: düzeldi'])
+t('recovery: one line', await lines('duyurular-fetch'), ['duyurular-fetch: recovered'])
 await db.exec(`UPDATE data_jobs SET paused = true, paused_note = 'harness pause', paused_by = '${ADMIN}', paused_at = '2029-12-31 22:30+00' WHERE key = 'novest-images'`)
 await tick()
 await db.exec(`UPDATE data_jobs SET paused = false, paused_note = NULL, paused_by = NULL, paused_at = NULL WHERE key = 'novest-images'`)
 await tick()
-t('resume line', await lines('novest-images'), ['novest-images: yeniden başladı'])
+t('resume line', await lines('novest-images'), ['novest-images: resumed'])
 await db.exec(`UPDATE data_jobs SET paused = true, paused_note = 'harness pause', paused_by = '${ADMIN}', paused_at = '2029-12-31 22:30+00' WHERE key = 'novest-images'`)
 await tick()
 await tick(`timestamptz '2030-01-06 12:00+00'`)   // Sunday: the clock jump itself is recorded as already seen (under 24 h before the Monday ticks)
 t('Sunday: no reminder', await lines('novest-images'), [])
 t('Monday 08:59 local: no reminder', (await tick(`timestamptz '2030-01-07 06:59+00'`)).length, 0)
 await tick(`timestamptz '2030-01-07 07:14+00'`)
-t('Monday 09:14 Famagusta: the still-paused reminder (date and note)', await lines('novest-images'), ['novest-images: hâlâ durdurulmuş (01.01, harness pause)'])
+t('Monday 09:14 Famagusta: the still-paused reminder (date and note)', await lines('novest-images'), ['novest-images: still paused (01.01, harness pause)'])
 t('that reminder pushed once (one admin has a token), opening the Data jobs tab', (await q2(`SELECT body->'data' d FROM net.calls`)).map(r => r.d), [{ tab: 'datajobs', screen: 'admin' }])
 const m44 = await tick(`timestamptz '2030-01-07 07:44+00'`)
 t('Monday 09:44 (next tick, outside the slot): silent', m44.map(r => r.body), [])
@@ -276,7 +313,7 @@ console.log('── supabase/verify_schema.sql QUERY 1 tokens 1205 + 1210 (H-ver
   const VS = readFileSync(process.env.VERIFY_SCHEMA || rel('../supabase/verify_schema.sql'), 'utf8')
   const slice = (from, to) => { const x = VS.indexOf(from), y = VS.indexOf(to, x + 1); assert.ok(x >= 0 && y > x, 'verify_schema anchors missing: ' + from); return VS.slice(x, y) }
   const tokq = sl => `SELECT m, label, ok FROM (SELECT ''::text m, ''::text label, false ok WHERE false\n${sl}) z`
-  const T05 = tokq(slice('    -- 1205-BEGIN', '    -- 1205-END')), T10 = tokq(slice('    -- 1210-BEGIN', '    -- 1210-END'))
+  const T05 = tokq(slice('    -- 1205-BEGIN', '    -- 1205-END')), T10 = tokq(slice('    -- 1210-BEGIN', '    -- 1210-END')), T18 = tokq(slice('    -- 1218-BEGIN', '    -- 1218-END'))
   const tokens = async (dbh, label, sql, want) => {
     try {
       const r = (await dbh.query(sql)).rows
@@ -292,8 +329,22 @@ console.log('── supabase/verify_schema.sql QUERY 1 tokens 1205 + 1210 (H-ver
   await tokens(d1, 'R1 only, 1205 tokens (all true)', T05, rep(n05, true))
   await tokens(d1, 'R1 only, 1210/1211 tokens (all false, no error)', T10, rep(n10, false))
   const d2 = await build(2)
+  const d3 = await build(3)
   await tokens(d2, 'full R1+1210+1211, 1205 tokens (all true)', T05, rep(n05, true))
   await tokens(d2, 'full R1+1210+1211, 1210/1211 tokens (all true)', T10, rep(n10, true))
+  await tokens(d2, 'before file C (Turkish text live), 1218 tokens (both false: registered ahead of the apply)', T18, rep(2, false))
+  await tokens(d3, 'after file C, 1210/1211 tokens (all true: the retired text halves leave the rest intact)', T10, rep(n10, true))
+  await tokens(d3, 'after file C, 1218 tokens (both true)', T18, rep(2, true))
+  {
+    const WDC = grab(C, 'CREATE OR REPLACE FUNCTION public.data_jobs_watchdog(', ['$function$;'])
+    const RMC = grab(C, 'CREATE OR REPLACE FUNCTION public.marketplace_photo_review_reminder()', ['$function$;'])
+    const tk = async (label, body, want) => { const d = await build(3); const r = await run(d, body); assert.ok(r.ok, `${label}: mutant did not apply: ${r.msg}`); await tokens(d, `MUTANT ${label}, 1218 tokens`, T18, want) }
+    assert.ok(WDC.includes(`'Data jobs'`) && RMC.includes(`' photo waiting for review'`), 'mutant anchors')
+    await tk('watchdog title Turkish again', WDC.replace(`'Data jobs'`, `'Veri işleri'`), [false, true])
+    await tk('watchdog: one Turkish word in a comment-free line', WDC.replace(`': recovered'`, `': düzeldi'`), [false, true])
+    await tk('reminder body Turkish again', RMC.replace(`' photo waiting for review' ELSE ' photos waiting for review'`, `' fotoğraf onay bekliyor' ELSE ' fotoğraf onay bekliyor'`), [true, false])
+    await tk('reminder: singular branch lost', RMC.replace(`CASE WHEN v_count = 1 THEN ' photo waiting for review' ELSE`, `CASE WHEN false THEN ' photo waiting for review' ELSE`), [true, false])
+  }
   // mutants on the full DB: the overview body goes back to the 1205 one / loses the grace gate on the first stale arm / loses the security pin
   const mutOv = async (label, body, want, want05 = rep(n05, true)) => {
     const d = await build(2)

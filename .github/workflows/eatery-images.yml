@@ -57,6 +57,7 @@ concurrency: { group: prod-eatery-images, cancel-in-progress: false }
 
 jobs:
   dry:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
     runs-on: ubuntu-24.04
     outputs:
       clean: ${{ steps.clean.outputs.clean }}
@@ -124,7 +125,7 @@ jobs:
           retention-days: 7
 
   approve:
-    if: ${{ inputs.apply && inputs.prune }}
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply && inputs.prune) }}
     needs: dry
     runs-on: ubuntu-24.04
     environment: production-db
@@ -145,7 +146,7 @@ jobs:
 
   apply:
     # !cancelled(): approve is SKIPPED on the upload lane, which would otherwise skip apply too.
-    if: ${{ !cancelled() && inputs.apply && needs.dry.result == 'success' && ((inputs.prune && needs.approve.result == 'success') || (!inputs.prune && needs.dry.outputs.clean == 'true')) }}
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (!cancelled() && inputs.apply && needs.dry.result == 'success' && ((inputs.prune && needs.approve.result == 'success') || (!inputs.prune && needs.dry.outputs.clean == 'true'))) }}
     needs: [dry, approve]
     runs-on: ubuntu-24.04
     environment: production-storage

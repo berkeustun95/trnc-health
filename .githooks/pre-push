@@ -73,6 +73,15 @@ hb_out=$(node scripts/check-data-job-heartbeats.mjs 2>&1) || {
   exit 1
 }
 
+# Dispatcher actor rule (data jobs, slice 6): every guarded GitHub Actions job (environment, secrets, write permission)
+# carries the canonical actor rule in its own if, so the future ada-dispatcher App can only run three workflows with
+# default inputs (scripts/check-dispatcher-actor.mjs). Offline; its 30-day clock line is informational.
+da_out=$(node scripts/check-dispatcher-actor.mjs 2>&1) || {
+  printf '%s\n' "$da_out" >&2
+  echo "✗ push blocked: a guarded workflow job lacks (or has a wrong) dispatcher actor rule; see scripts/check-dispatcher-actor.mjs." >&2
+  exit 1
+}
+
 node scripts/check-migration-numbers.mjs || {
   echo "  push blocked: renumber the unapplied file — npm run migration:next"
   exit 1

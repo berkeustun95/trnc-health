@@ -44,6 +44,7 @@ concurrency: { group: supabase-migrate, cancel-in-progress: false }
 
 jobs:
   dry:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15
@@ -77,7 +78,7 @@ jobs:
           node scripts/supabase-migrate.mjs --dry "${list[@]}"
 
   approve:
-    if: ${{ inputs.apply }}
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply) }}
     needs: dry
     runs-on: ubuntu-24.04
     environment: production-db
@@ -94,7 +95,7 @@ jobs:
           printf '  %s\n' "${list[@]}"
 
   apply:
-    if: ${{ inputs.apply }}
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply) }}
     needs: approve
     runs-on: ubuntu-24.04
     environment: production
