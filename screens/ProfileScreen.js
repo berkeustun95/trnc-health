@@ -191,6 +191,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   // no Save button between the decision and the record. Withdrawing a consent must be at
   // least as easy as giving it, and a withdrawal that waits for a second tap is not.
   const [marketingOn, setMarketingOn]           = useState(false)
+  // The "13 or older" tick, asked only when a completed customer clears the date of birth
+  // and has no recorded confirmation (see needsAgeTick). Never pre-ticked.
+  const [ageOk, setAgeOk]                       = useState(false)
   const [marketingBusy, setMarketingBusy]       = useState(false)
   // The Friday digest switch (20261175). Its own read: null (hidden) until the column answers, so this
   // screen works in either order with the migration.
@@ -226,7 +229,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       try {
         // full_name is READ (for the legacy-row fallback below) but never written back.
         const { data, error } = await supabase.from('profiles')
-          .select('first_name, last_name, display_name, date_of_birth, region, resident_status, ' +
+          .select('first_name, last_name, display_name, date_of_birth, age_confirmed_at, region, resident_status, ' +
                   'student_level, full_name, phone, nationality, nationality_code, ' +
                   'preferred_language, role, avatar_url, profile_completed_at, ' +
                   // Hand-written list, NOT App.js's PROFILE_COLUMNS — this screen has
@@ -598,6 +601,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     // COMPLETED row is rejected by the database, and a raw constraint error names the
     // constraint and nothing a user can act on — so it is caught here, by name.
     if (isComplete && missingRequired) { setError(t('pgRequired', lang)); return }
+    if (needsAgeTick && !ageOk) { setError(t('pgRequired', lang)); return }
     // ⚠ ONLY WHEN THE NAME ACTUALLY CHANGED, and that condition is the whole point.
     // useDisplayNameCheck runs on mount against the STORED name, and containsBlockedTerm
     // reads blocked_terms live — a table admins edit at runtime. Gate this unconditionally
@@ -643,6 +647,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         last_name: form.last_name.trim() || null,
         display_name: form.display_name.trim() || null,
         date_of_birth: dobParts === 3 ? `${form.dobY}-${pad(form.dobM)}-${pad(form.dobD)}` : null,
+        // Any non-null value means "ticked"; the server stamps now(). Never send null.
+        ...(needsAgeTick && ageOk ? { age_confirmed_at: new Date().toISOString() } : {}),
         phone: form.phone.trim() ? (selectedCC + form.phone.trim()) : null,
         nationality: form.nationality.trim() || null,
         nationality_code: NATIONALITY_CODES[form.nationality] ?? null,
@@ -704,6 +710,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       // the user typed, and only in the one direction the coupling CHECK forces.
       const written = { ...form, student_level: form.resident_status === 'student' ? form.student_level : null }
       setForm(written)
+      if (needsAgeTick && ageOk) setProfile(p => ({ ...p, age_confirmed_at: new Date().toISOString() }))
       setSaved(true)
       setSavedForm(written)
       setSavedCC(selectedCC)
@@ -778,6 +785,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   })
 
   const isComplete = profile?.profile_completed_at != null
+  // The server's completion CHECK wants a date of birth OR age_confirmed_at. A completed
+  // customer with neither stored value who clears the date must tick before Save.
+  const needsAgeTick = (profile?.role ?? 'customer') === 'customer' && isComplete &&
+    !profile?.age_confirmed_at && !form.dobY && !form.dobM && !form.dobD
   const studentLevel = form.resident_status === 'student' ? form.student_level : null
   // ⚠ THIS LIST IS THE CLIENT'S COPY OF profiles_completion_requires_fields_check AND
   //   MUST MATCH IT EXACTLY. Require more than the constraint and the Save button is dead
@@ -789,10 +800,15 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   //   in the same change. Line 295 already persisted NULL for an empty phone, so rows
   //   written by this screen were ALREADY legal under the loosened constraint — it was
   //   only this check that kept the button disabled.
+  //
+  //   2026-11-18 (Apple 5.1.1(v)): for a CUSTOMER the date of birth and nationality are
+  //   optional — the server accepts a date of birth OR the age tick. Provider roles keep
+  //   the old, stricter set unchanged.
+  const isCustomer = (profile?.role ?? 'customer') === 'customer'
   const missingRequired =
     !form.first_name.trim() || !form.last_name.trim() || !form.display_name.trim() ||
-    !form.dobY || !form.dobM || !form.dobD || !form.region || !form.resident_status ||
-    !form.nationality.trim() ||
+    (!isCustomer && (!form.dobY || !form.dobM || !form.dobD || !form.nationality.trim())) ||
+    !form.region || !form.resident_status ||
     (form.resident_status === 'student' && !form.student_level)
   // ► THE INSTITUTION CLAUSE IS GONE, and it had to go in the same change as the editor.
   //   It read `INSTITUTION_REQUIRED_LEVELS.includes(studentLevel) && !form.institution_id`
@@ -1088,7 +1104,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               </View>
 
               <View style={s.fieldGroup}>
-                <Text style={s.fieldLabel}>{t('pgDob', lang)}</Text>
+                <Text style={s.fieldLabel}>{isCustomer ? t('pgDobOptional', lang) : t('pgDob', lang)}</Text>
                 <View style={s.dobRow}>
                   <TouchableOpacity style={[s.pickerBtn, { flex: 1 }]} onPress={() => setPicker('day')} activeOpacity={0.7}>
                     <Text style={[s.pickerBtnText, !form.dobD && s.pickerBtnPlaceholder]} numberOfLines={1}>
@@ -1109,10 +1125,19 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                     <Feather name="chevron-down" size={14} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
+                {needsAgeTick && (
+                  <TouchableOpacity style={s.termsRow} onPress={() => setAgeOk(v => !v)} activeOpacity={0.7}
+                    accessibilityRole="checkbox" accessibilityState={{ checked: ageOk }}>
+                    <View style={[s.checkbox, ageOk && s.checkboxOn]}>
+                      {ageOk && <Feather name="check" size={14} color="#fff" />}
+                    </View>
+                    <Text style={s.termsText}>{t('pgAgeConfirm', lang).replace('{age}', MIN_SIGNUP_AGE)}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={s.fieldGroup}>
-                <Text style={s.fieldLabel}>{t('pgNationality', lang)}</Text>
+                <Text style={s.fieldLabel}>{isCustomer ? t('pgNationalityOptional', lang) : t('pgNationality', lang)}</Text>
                 <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('nat')} activeOpacity={0.7}>
                   <Text style={[s.pickerBtnText, !form.nationality && s.pickerBtnPlaceholder]}>
                     {form.nationality ? getNatLabel(form.nationality, lang) : t('selectNationality', lang)}
@@ -1678,6 +1703,11 @@ const s = StyleSheet.create({
   sectionHint:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 18, marginBottom: 14 },
   fieldHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage, lineHeight: 17, marginTop: 6 },
   dobRow:           { flexDirection: 'row', gap: 8 },
+  termsRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 10, paddingVertical: 6 },
+  checkbox:         { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.textSecondary,
+                      backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  checkboxOn:       { backgroundColor: colors.primary, borderColor: colors.primary },
+  termsText:        { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondaryOnPage },
 
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 20 },
   title:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

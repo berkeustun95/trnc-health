@@ -64,7 +64,7 @@ function ListingCard({ item, cover, lang, onPress }) {
   )
 }
 
-// Who may post decides the call to action: guests sign in, under-18s are told why (no dead button).
+// Who may post decides the call to action: guests sign in, under-18s (and anyone with no date of birth) are told why (no dead button).
 function PostCta({ session, profile, lang, onPost, onSignIn }) {
   if (!session || isGuest(session)) {
     return <Button title={t('mkSignInToPost', lang)} variant="secondary" icon="log-in-outline" onPress={() => onSignIn()} fullWidth />
@@ -72,7 +72,7 @@ function PostCta({ session, profile, lang, onPost, onSignIn }) {
   const adult = isAdultDob(profile?.date_of_birth)
   return (
     <Button title={t('mkPost', lang)} icon="add-circle-outline" onPress={onPost} fullWidth
-      disabled={!adult} disabledHint={adult ? undefined : t('mkUnder18', lang)} />
+      disabled={!adult} disabledHint={adult ? undefined : profile?.date_of_birth ? t('mkUnder18', lang) : t('mkNeedsDob', lang)} />
   )
 }
 
