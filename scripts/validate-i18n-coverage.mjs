@@ -744,9 +744,15 @@ const PETS_REGULATORY_REASON =
   'pets regulatory copy: legal requirements, kept in ' + REGULATORY_LOCALES.join('+')
   + ' so a translation cannot introduce an error a reader would only discover at a border'
 
+// The admin area is English-only whatever the app language (constants/adminLang.js), so admin* keys need only
+// an English value. Derived from the scanned keys by prefix, never listed. English is still required below.
+const ADMIN_EXEMPT = new Set(KEYS.filter(k => k.startsWith('admin')))
+const ADMIN_REASON = 'admin screens render in English only (ADMIN_LANG); the other locales keep their old values unused'
+
 const problems = []
 const usedAllowances = new Set()
 let regulatoryExempted = 0
+let adminExempted = 0
 
 for (const key of KEYS) {
   const en = t(key, 'English')
@@ -756,6 +762,7 @@ for (const key of KEYS) {
     // t() uses ??, so "" is returned as-is and is never "identical to English": check it first.
     if (!String(t(key, lang)).trim()) { problems.push(`${key} / ${lang} is an EMPTY string — it renders as a blank label`); continue }
     if (t(key, lang) !== en) continue
+    if (ADMIN_EXEMPT.has(key)) { adminExempted++; continue }
     if (PETS_REGULATORY_EXEMPT.has(key)) { regulatoryExempted++; continue }
     const reason = SAME_AS_ENGLISH[key]?.[lang]
     if (reason) { usedAllowances.add(`${key}/${lang}`); continue }
@@ -815,3 +822,4 @@ console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} loca
 console.log(`  scope: ${SURFACES.length} surface(s) — ${scopeNames}`)
 console.log(`  ${KEYS.length} of the ${enTotal} keys in the table`)
 console.log(regulatoryLine)
+console.log(`  ${ADMIN_EXEMPT.size} admin key(s) exempt from the locale comparison (${adminExempted} key x locale pair(s) matched)\n    reason: ${ADMIN_REASON}`)
