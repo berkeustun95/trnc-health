@@ -81,8 +81,8 @@ import TERMS_TR   from './terms.tr.js'
 // TERMS CHANGE this time — 9.2/9.3/9.4 and the new 9.7. New policy-updated notice text. Re-asks only at a user's first
 // post / first message in Bandabuliya via MARKETPLACE_TERMS_MIN (not this value); if the real ship date is later, move
 // both together at go-live.
-// Bumped 2026-11-11 -> 2026-11-18 for Apple 5.1.1(v): date of birth and nationality are optional, and the age tick
-// (age_confirmed_at) is disclosed. Terms text unchanged (version line follows). New policy-updated notice text.
+// Bumped 2026-11-11 -> 2026-11-18 for Yeme-İçme order status (privacy F1–F6: status, order push token, verification link,
+// restaurant PIN cookie, 12-hour window). New policy-updated notice text. Terms unchanged (version line follows).
 export const LEGAL_VERSION = '2026-11-18'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
