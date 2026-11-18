@@ -190,15 +190,17 @@ Before editing `fastlane/metadata/`, running `store:listing` or reading Play rep
   though Google's category text reads otherwise. Declaring health forces an Organization account; ADA
   is individual (the 2026-07-06 rejection). Directory + duty roster stay as a local directory. The
   unlock is an Organization account. Record: vault `play-console-status.md`.
-- Ages 13-15 / 16-17 / 18+: under-18s (by DOB) get NON-PERSONALIZED ads from day one of any ad SDK.
+- Ages 13-15 / 16-17 / 18+: under-18s (by DOB), AND anyone without a DOB, get NON-PERSONALIZED ads and no promos from day one of any ad SDK.
 - Never add an SDK disqualified under Play Families policy without flagging it (one bad SDK makes
   the whole app ineligible — analytics included).
 - Account age and content visibility are separate: the future kids module runs as guest or under a
   parent account; no coupling beyond `GATE_EXEMPT_MODULES`.
 - `MIN_SIGNUP_AGE` lives in `constants/profileGate.js`, mirrored as `interval '13 years'` in the
   20261001 trigger (cannot be a CHECK); `npm run profile:check` compares them. Never inline it.
-- The DOB screen is a neutral age screen (no stated minimum, no preset date, free entry; year list
-  stops at `currentYear - MIN_SIGNUP_AGE`). Settled — do not re-litigate.
+- Since 2026-11-18 (Apple 5.1.1(v), Berke) sign-up asks a required "{MIN_SIGNUP_AGE} or older" tick
+  (`profiles.age_confirmed_at`, server-stamped; completion CHECK = DOB OR tick). DOB and nationality are
+  optional; a DOB given + under 13 → the age-ineligible block as before; the year list still stops at
+  `currentYear - MIN_SIGNUP_AGE`.
 
 ## How I want you to work
 - Make MINIMAL changes; no unrelated refactors. Say it's done, explain shortly — don't ask to proceed.

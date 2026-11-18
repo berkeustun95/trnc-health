@@ -28,6 +28,8 @@ const REQUIRED = [
   ['vehicles', 'price_per_day', '20261165_vehicles.sql'],
   ['dealers', 'logo_path', '20261165_vehicles.sql'],
   ['vehicle_images', 'storage_path', '20261165_vehicles.sql'],
+  // 20261219 — App.js PROFILE_COLUMNS + ProfileScreen select: the age tick
+  ['profiles', 'age_confirmed_at', '20261219_age_confirmed_at.sql'],
 ]
 const PROD_REF = 'jeihxnwqytnxtytgkzgf'
 

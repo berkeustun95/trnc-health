@@ -49,7 +49,7 @@ import { supabase } from '../lib/supabase'
 import { signOutThisDevice, signOutEverywhere } from '../utils/signOut'
 import { socialProvider, hasGoogleIdentity, revokeGoogle, hasAppleIdentity, revokeApple } from '../utils/socialAuth'
 import { LEGAL_VERSION, legalLocaleFor, isLegalFallback } from '../constants/legal'
-import { colors, shadow, radius, radii, type } from '../constants/theme'
+import { colors, shadow, radius, radii, type, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
@@ -227,7 +227,9 @@ function resumeStep(p) {
   // advance because step1Ok also required it. The two together are a closed loop with no
   // error message — the user sees the wizard reopen forever. Keep this list identical to
   // the columns profiles_completion_requires_fields_check actually demands.
-  if (!p.date_of_birth || !p.nationality_code) return 1
+  // 2026-11-18: step 1 is done once the age is established — a date of birth OR the
+  // "13 or older" tick. nationality_code was dropped from this list when it became optional.
+  if (!p.age_confirmed_at && !p.date_of_birth) return 1
   return 2
 }
 
@@ -311,6 +313,9 @@ export default function ProfileSetupScreen({
   const [nationality, setNationality] = useState(profile?.nationality ?? null)
   const [cc, setCc] = useState(null)
   const [phone, setPhone] = useState('')
+  // Required unless the profile already carries it. Unticked, never pre-filled, like termsOk.
+  const [ageOk, setAgeOk] = useState(false)
+  const needsAgeTick = !profile?.age_confirmed_at
 
   // Step 2
   const [region, setRegion] = useState(profile?.region ?? prefillRegion ?? null)
@@ -373,8 +378,11 @@ export default function ProfileSetupScreen({
   // client requires MORE, the user is blocked by a button with no explanation; if it
   // requires LESS, the final write fails with a raw 23514. Both were live bugs.
   const phoneOk = !phone.trim() || /^\d{4,15}$/.test(phone.trim())
+  // Date of birth and nationality are optional (Apple 5.1.1(v)); a PARTIAL date is not.
+  const dobParts = [dobY, dobM, dobD].filter(Boolean).length
+  const dobOk = dobParts === 0 || dobParts === 3
   const step1Ok = (!needsTerms || termsOk) && firstName.trim() && lastName.trim() && nameOk &&
-    dobY && dobM && dobD && nationality && phoneOk
+    dobOk && (!needsAgeTick || ageOk) && phoneOk
   const step2Ok = region && status &&
     (status !== 'student' || level) &&
     (!INSTITUTION_REQUIRED_LEVELS.includes(level) || institution)
@@ -513,8 +521,7 @@ export default function ProfileSetupScreen({
       [firstName.trim(),                        'pgFirstName'],
       [lastName.trim(),                         'pgLastName'],
       [displayName.trim(),                      'pgDisplayName'],
-      [dobY && dobM && dobD,                    'pgDob'],
-      [nationality,                             'pgNationality'],
+      [needsAgeTick ? ageOk : true,             'pgAgeConfirmShort'],
       [region,                                  'pgRegion'],
       [status,                                  'pgResidentStatus'],
       [levelDemanded ? level : true,            'pgStudentLevel'],
@@ -593,11 +600,12 @@ export default function ProfileSetupScreen({
       // and a date of birth do not reach the row on the way past. The trigger backstops
       // a client that sends it anyway, and profiles_age_ineligible_no_dob_check
       // backstops both.
-      if (ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE && provider) {
+      const hasDob = dobY && dobM && dobD
+      if (hasDob && ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE && provider) {
         await deleteUnderageAccount()
         return
       }
-      if (ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE) {
+      if (hasDob && ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE) {
         // ⚠ THE ERROR IS CHECKED NOW, AND IT WAS NOT BEFORE. The old code awaited this
         //   write, ignored whatever came back and set a local `ageBlocked` boolean — so
         //   a write that FAILED still produced the block, for this session only, and the
@@ -631,9 +639,12 @@ export default function ProfileSetupScreen({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         display_name: displayName.trim(),
-        date_of_birth: `${dobY}-${pad(dobM)}-${pad(dobD)}`,
-        nationality,                                   // legacy English label
+        date_of_birth: hasDob ? `${dobY}-${pad(dobM)}-${pad(dobD)}` : null,
+        nationality: nationality || null,              // legacy English label
         nationality_code: NATIONALITY_CODES[nationality] ?? null,
+        // Any non-null value means "ticked"; the server stamps now() and never lets a client
+        // clear or move it. Never send null.
+        ...(needsAgeTick && ageOk ? { age_confirmed_at: new Date().toISOString() } : {}),
         // NULL, never a bare '+90'. A dial code alone is not a phone number: it is
         // unusable, it is indistinguishable from a real value to every future reader, and
         // it would make `!p.phone` false — quietly re-arming the resume trap above.
@@ -898,20 +909,22 @@ export default function ProfileSetupScreen({
                   autoCapitalize="none" autoCorrect={false} maxLength={DISPLAY_NAME_MAX} />
                 <NameFeedback state={nameState} lang={lang} onPick={n => setDisplayName(n)} />
               </Field>
-              {/* NEUTRAL AGE SCREEN. No minimum stated, no default date, free entry.
-                  Nothing on this step may hint at the threshold — and merging the date
-                  of birth in beside the name fields changes nothing about that rule.
+              {/* CHANGED 2026-11-18 (Berke, Apple 5.1.1(v)): this used to be a NEUTRAL AGE
+                  SCREEN with no minimum stated. Sign-up may not REQUIRE a date of birth or
+                  nationality, so both are optional now and the required age step is the
+                  "{age} or older" tick below. A date, when given, is still checked against
+                  the minimum. No default date, free entry, year list stops at the minimum.
                   NO SECTION HEADER between the name fields and these: the request was to
                   remove headings, so a "About you" divider must not reappear here under
                   another name. */}
-              <Field label={t('pgDob', lang)}>
+              <Field label={t('pgDobOptional', lang)}>
                 <View style={s.dobRow}>
                   <SelectField flex value={dobD ? String(dobD) : ''} placeholder={t('pgDay', lang)} onPress={() => setPicker('day')} />
                   <SelectField flex value={dobM ? months[dobM - 1] : ''} placeholder={t('pgMonth', lang)} onPress={() => setPicker('month')} />
                   <SelectField flex value={dobY ? String(dobY) : ''} placeholder={t('pgYear', lang)} onPress={() => setPicker('year')} />
                 </View>
               </Field>
-              <Field label={t('pgNationality', lang)}>
+              <Field label={t('pgNationalityOptional', lang)}>
                 <SelectField value={nationality ? getNatLabel(nationality, lang) : ''}
                   placeholder={t('pgNationalitySearch', lang)} onPress={() => setPicker('nat')} />
               </Field>
@@ -924,6 +937,15 @@ export default function ProfileSetupScreen({
                 {phone.trim() && !/^\d{4,15}$/.test(phone.trim())
                   ? <Text style={s.err}>{t('pgPhoneInvalid', lang)}</Text> : null}
               </Field>
+              {needsAgeTick && (
+                <TouchableOpacity style={[s.termsRow, { minHeight: TAP }]} onPress={() => setAgeOk(v => !v)} activeOpacity={0.7}
+                  accessibilityRole="checkbox" accessibilityState={{ checked: ageOk }}>
+                  <View style={[s.checkbox, ageOk && s.checkboxOn]}>
+                    {ageOk && <Feather name="check" size={14} color="#fff" />}
+                  </View>
+                  <Text style={s.termsText}>{t('pgAgeConfirm', lang).replace('{age}', MIN_SIGNUP_AGE)}</Text>
+                </TouchableOpacity>
+              )}
               {/* The same box and the same words as AuthScreen's signup tick — one
                   acceptance, whichever door the account came through. Continue stays
                   disabled until it is ticked. The whole row toggles; the two document
