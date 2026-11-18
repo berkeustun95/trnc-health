@@ -148,6 +148,19 @@ const MARKERS = [
     why: 'the address book (ada.eateryAddresses.v1) is AsyncStorage only; the Android Google backup caveat sits right after it' },
   { key: 'delivery pin on-phone',          re: /The pin is added to your WhatsApp message to the restaurant as a map link and saved with that address on your phone\. It is not sent to us/i,
     why: 'the map pin is built on the phone, put into the message and saved with the address; never sent to us' },
+  // Order status (Berke's approved text F1–F6, 2026-11-12): pick-up/delivery and status are stored; nothing else about delivery.
+  { key: 'order type stored',              re: /Whether you chose pick-up or delivery is saved with the order record, so that the restaurant can show you the right status\. Nothing else about the delivery reaches us/i,
+    why: 'F1: eatery_orders keeps pick-up/delivery only; the delivery details stay inside the WhatsApp message' },
+  { key: 'order status stored',            re: /If the restaurant updates the order, we save its status \(received, being prepared, on its way or ready, or cancelled with the reason\) and the time of each change\./i,
+    why: 'F2: the status, cancel reason and change times on the order record' },
+  { key: 'order push token',               re: /If you allow notifications for an order, we use your push token to tell you when the restaurant changes its status\. If you are not signed in, the token and your app language are saved with that order only and removed when the order is finished, or 12 hours after it was created at the latest\./i,
+    why: 'F3: the guest token + language live on the order and go when it finishes or at 12 hours' },
+  { key: 'verify page shows type+status',  re: /It also shows whether the order is for pick-up or delivery and its current status\./i,
+    why: 'F4: what the public verification link shows beyond the order itself' },
+  { key: 'restaurant PIN cookie',          re: /Restaurants: when you enter your restaurant's PIN on the verification page, we store a cookie on that device so you do not have to enter it again, and we record which device changed an order's status and when\. The cookie is used for nothing else\./i,
+    why: 'F5: the staff cookie and the per-device status audit' },
+  { key: 'status change window',           re: /The restaurant can change an order's status for 12 hours after it was created\./i,
+    why: 'F6: the 12-hour status window in the retention list' },
 ]
 
 // ── The field list is DERIVED from App.js PROFILE_COLUMNS, not typed here. A column
@@ -399,14 +412,19 @@ function loadGoLiveTexts() {
   return out
 }
 
-// ── Turkish in-app copy: the delivery / address-book sentences, VERBATIM ─────────────────
+// ── Turkish in-app copy: the delivery / address-book / order-status sentences, VERBATIM ────
 // The three copies above are English, so the regex markers cannot see constants/legal/privacy.tr.js.
-// These are Berke's approved Turkish sentences (2026-10-23), compared as exact text after collapsing
+// These are Berke's approved Turkish sentences (2026-10-23; order status F1–F6 2026-11-12), compared as exact text after collapsing
 // whitespace: a missing sentence OR any change to one goes red. Changing the wording = changing it here
 // in the same commit, which is the review moment.
 const TR_PATH = 'constants/legal/privacy.tr.js'
 const TR_SENTENCES = [
-  { key: 'TR delivery data WhatsApp-only', text: 'Teslimat seçiminiz, adrese verdiğiniz ad, teslimat adresiniz, teslimatta aranacak kişi için eklediğiniz telefon numarası, kurye için yazdığınız adres tarifi ve harita konumu için de aynısı geçerlidir: yalnızca WhatsApp mesajınızın içinde restorana gider.' },
+  { key: 'TR delivery data WhatsApp-only', text: 'Gel-al mı adrese teslim mi seçtiğiniz, restoranın size doğru durumu gösterebilmesi için sipariş kaydına eklenir. Teslimatla ilgili başka hiçbir bilgi bize ulaşmaz: adrese verdiğiniz ad, teslimat adresiniz, teslimatta aranacak kişi için eklediğiniz telefon numarası, kurye için yazdığınız adres tarifi ve harita konumu yalnızca WhatsApp mesajınızın içinde restorana gider.' },
+  { key: 'TR order status stored',         text: 'Restoran siparişi güncellerse, siparişin durumunu (alındı, hazırlanıyor, yolda veya hazır ya da nedeniyle birlikte iptal edildi) ve her değişikliğin saatini kaydederiz.' },
+  { key: 'TR order push token',            text: 'Bir sipariş için bildirimlere izin verirseniz, restoran sipariş durumunu değiştirdiğinde size haber vermek için anlık bildirim jetonunuzu kullanırız. Giriş yapmadıysanız jeton ve uygulama diliniz yalnızca o siparişle birlikte saklanır; sipariş tamamlandığında, en geç oluşturulmasından 12 saat sonra silinir.' },
+  { key: 'TR verify page shows type+status', text: 'Ayrıca siparişin gel-al mı adrese teslim mi olduğunu ve güncel durumunu gösterir.' },
+  { key: 'TR restaurant PIN cookie',       text: "Restoranlar: doğrulama sayfasında restoranınızın PIN'ini girdiğinizde, tekrar girmeniz gerekmesin diye o cihaza bir çerez kaydederiz ve bir siparişin durumunu hangi cihazın ne zaman değiştirdiğini kaydederiz. Çerez başka hiçbir amaçla kullanılmaz." },
+  { key: 'TR status change window',        text: 'Restoran, siparişin durumunu oluşturulmasından sonraki 12 saat boyunca değiştirebilir.' },
   { key: 'TR address book on-phone',      text: 'Tekrar yazmanız gerekmesin diye, her biri adı, harita konumu ve isteğe bağlı telefon numarasıyla birlikte en fazla 10 teslimat adresini telefonunuzda uygulamanın içinde kaydedebilirsiniz; ADA bunları bize göndermez.' },
   { key: 'TR change/delete in basket',    text: 'Her birini sepette istediğiniz zaman değiştirebilir veya silebilirsiniz.' },
   { key: 'TR Android backup',             text: "Android'de, ADA'nın diğer uygulama verileri gibi, telefonunuzun kendi Google yedeğine dahil olabilir ve uygulamayı yeniden yüklediğinizde geri gelebilir." },
