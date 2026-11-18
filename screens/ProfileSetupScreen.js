@@ -49,7 +49,7 @@ import { supabase } from '../lib/supabase'
 import { signOutThisDevice, signOutEverywhere } from '../utils/signOut'
 import { socialProvider, hasGoogleIdentity, revokeGoogle, hasAppleIdentity, revokeApple } from '../utils/socialAuth'
 import { LEGAL_VERSION, legalLocaleFor, isLegalFallback } from '../constants/legal'
-import { colors, shadow, radius, radii, type } from '../constants/theme'
+import { colors, shadow, radius, radii, type, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
@@ -938,7 +938,7 @@ export default function ProfileSetupScreen({
                   ? <Text style={s.err}>{t('pgPhoneInvalid', lang)}</Text> : null}
               </Field>
               {needsAgeTick && (
-                <TouchableOpacity style={s.termsRow} onPress={() => setAgeOk(v => !v)} activeOpacity={0.7}
+                <TouchableOpacity style={[s.termsRow, { minHeight: TAP }]} onPress={() => setAgeOk(v => !v)} activeOpacity={0.7}
                   accessibilityRole="checkbox" accessibilityState={{ checked: ageOk }}>
                   <View style={[s.checkbox, ageOk && s.checkboxOn]}>
                     {ageOk && <Feather name="check" size={14} color="#fff" />}
