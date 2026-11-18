@@ -37,8 +37,8 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 • First and last name — your real name. Held on your account; see section 3 for who can see it.
 • Display name (labelled “Username” in the app) — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
-• Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5) and whether your check-ins start hidden from other users (see section 3). It is also used to check that you are 18 or over before you post in Bandabuliya.
-• Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
+• Date of birth — optional. We ask you to confirm with a tick that you are 13 or over, and we record when you confirmed it. If you do give a date of birth, it is checked when you enter it: if it shows that you are under 13, we do not store it and the account is not eligible. A date of birth you give is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5) and whether your check-ins start hidden from other users (see section 3). It is also used to check that you are 18 or over before you post in Bandabuliya, so a date of birth is needed to post there.
+• Nationality — optional. If you give it, it is so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
 • Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Today it chooses the district name and photo at the top of the Home screen; nothing else in the app reads it yet.
 • Resident status — student, working here, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
@@ -151,7 +151,7 @@ When you send an order, it is sent from your own WhatsApp to the restaurant, so 
 Advertising is not enabled in ADA as at the "Last updated" date above. This section describes what will apply when it is, so that you know in advance rather than after the fact.
 
 • ADA may show advertising within the app, including advertising sold by us to local businesses and advertising served through third-party advertising networks.
-• If you are under 18, you will only be shown non-personalised advertising. Non-personalised advertising is based on the general context of what you are looking at, not on your personal data or your behaviour. We determine whether you are under 18 from the date of birth on your account.
+• If you are under 18, you will only be shown non-personalised advertising. Non-personalised advertising is based on the general context of what you are looking at, not on your personal data or your behaviour. We determine whether you are under 18 from the date of birth on your account. If you have not given a date of birth, we treat you as under 18.
 • If you are 18 or over, advertising may be personalised — meaning it may be selected using data such as your region, your language, the parts of the app you use, and information held by the advertising network. You can object to this at any time (see section 9).
 • Where advertising is served by a third-party network, that network may use a device advertising identifier and may set its own identifiers. When this begins, this policy will name the network or networks concerned, and, on iOS, we will ask for your permission through Apple's App Tracking Transparency prompt before any tracking takes place. You can decline, and the app will continue to work.
 • We do not pass your name, email address, phone number, date of birth, nationality, region or resident status to any advertising network.
@@ -190,7 +190,7 @@ Different data is kept for different lengths of time.
 
 ADA is for people aged 13 and over, and is not directed at children under 13.
 
-When you set up your profile we ask for your date of birth. If the date you enter shows that you are under 13, we do not store that date. We record only that the account is not eligible, and the account cannot be used.
+When you set up your profile we ask you to confirm with a tick that you are 13 or over, and we record when you confirmed it. Giving your date of birth is optional. If you give one and the date you enter shows that you are under 13, we do not store that date. We record only that the account is not eligible, and the account cannot be used.
 
 Accounts held by people aged 13 to 17 are subject to the advertising restriction in section 5.
 
