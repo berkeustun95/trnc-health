@@ -1634,7 +1634,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('places_status_check', 'active|pending|rejected|staged', 'status'),
     ('places_submitted_by_fkey', '', ''),
     ('profiles_age_ineligible_no_dob_check', '', 'age_ineligible|date_of_birth'),
-    ('profiles_completion_requires_fields_check', 'student', 'age_confirmed_at|date_of_birth|display_name|first_name|last_name|profile_completed_at|region|resident_status|student_level'),
+    ('profiles_completion_requires_fields_check', 'student', 'age_confirmed_at|age_ineligible|date_of_birth|display_name|first_name|last_name|profile_completed_at|region|resident_status|student_level'),
     ('profiles_display_name_length_check', '20|3', 'display_name'),
     ('profiles_display_preference_check', 'display_name|full_name', 'display_name|display_preference|full_name'),
     ('profiles_dob_range_check', '01|1900|1900-01-01', 'date_of_birth'),

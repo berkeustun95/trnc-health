@@ -321,7 +321,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261216_beaches_live4_locales.sql', 'f4d9fad2527d24fecf22dafd3a92570d6eecab000c0a59a1153537791bcd3044'),
   ('20261217_admin_push_sends.sql', '0df2370c53723ce814a80f1d8f80b6dec04eeef9667b315454195f2a1daf187b'),
   ('20261218_admin_alerts_english.sql', '5c8f85f2815a1e0f0fee75f513798954eee27dd39484d2e85f1e5a0cb3c5c70d'),
-  ('20261219_age_confirmed_at.sql', '2269938910a70b4b884b9aece9cc786b0ba1924b71eeb6d63053340d256c107e')
+  ('20261219_age_confirmed_at.sql', 'a7cd25e42bcde679338b1c3745cecf52d8684755e93baea1d12e5fb4ace94752')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

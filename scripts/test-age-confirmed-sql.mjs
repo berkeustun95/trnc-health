@@ -29,7 +29,7 @@ CREATE TABLE public.profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id),
   first_name text, last_name text, display_name text, date_of_birth date, region text,
   resident_status text, student_level text, nationality_code char(2), nationality text,
-  profile_completed_at timestamptz, note text,
+  profile_completed_at timestamptz, note text, age_ineligible boolean NOT NULL DEFAULT false,
   CONSTRAINT profiles_completion_requires_fields_check ${check}
 );
 INSERT INTO auth.users (id) VALUES ${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `('${U(n)}')`).join(', ')};
@@ -96,6 +96,9 @@ async function suite(d, t) {
   await d.exec(`UPDATE public.profiles SET age_confirmed_at = now() WHERE id = '${U(7)}'`)
   t('tick but no region: refused (other arms survive)', (await upd(7, `first_name='A', last_name='B', display_name='AB', resident_status='resident', profile_completed_at=now()`)).code, '23514')
   t('tick but student without level: refused (student arm survives)', (await upd(7, `${COMPLETE.replace("'resident'", "'student'")}`)).code, '23514')
+  await d.exec(`INSERT INTO public.profiles (id, age_ineligible) VALUES ('${U(8)}', true)`)
+  t('age-ineligible with the tick and profile_completed_at: refused (23514)', (await upd(8, `${COMPLETE}, age_confirmed_at=now()`)).code, '23514')
+  t('control: same row once not age-ineligible: accepted', (await upd(8, `age_ineligible=false, ${COMPLETE}, age_confirmed_at=now()`)).ok, true)
   t('incomplete row (profile_completed_at NULL) needs nothing', (await upd(7, `profile_completed_at = NULL, region = NULL`)).ok, true)
 }
 
@@ -125,17 +128,19 @@ console.log('pre-assert: a different live CHECK refuses and applies nothing')
 }
 
 console.log('red-first mutants (in-file behaviour block stripped, so THIS suite is measured)')
+const RENDER_WANT = `CHECK (((profile_completed_at IS NULL) OR ((first_name IS NOT NULL) AND (last_name IS NOT NULL) AND (display_name IS NOT NULL) AND ((date_of_birth IS NOT NULL) OR ((age_confirmed_at IS NOT NULL) AND (age_ineligible IS NOT TRUE))) AND (region IS NOT NULL) AND (resident_status IS NOT NULL) AND ((resident_status <> 'student'::text) OR (student_level IS NOT NULL)))))`
 const stripBlock = s => {
   const a = s.indexOf('-- ─── 5. Behaviour'), b = s.indexOf('DROP TABLE tmp_age_broken;')
   if (a < 0 || b < 0) throw new Error('block anchors missing')
-  return s.slice(0, a) + s.slice(b + 'DROP TABLE tmp_age_broken;'.length)
+  return mutate(s.slice(0, a) + s.slice(b + 'DROP TABLE tmp_age_broken;'.length), 'IF v_def IS DISTINCT FROM v_after THEN', 'IF false THEN')
 }
 const mutate = (s, from, to) => { if (!s.includes(from)) throw new Error(`anchor missing: ${from}`); return s.replace(from, to) }
 const MUTANTS = {
   'client may move/clear a set value (ELSE arm removed)': s => mutate(s, `  ELSE\n    NEW.age_confirmed_at := OLD.age_confirmed_at;\n  END IF;\n  RETURN NEW;`, `  END IF;\n  RETURN NEW;`),
   'anyone may clear (is_admin check dropped)': s => mutate(s, `NEW.age_confirmed_at IS NULL AND public.is_admin() IS NOT DISTINCT FROM true`, `NEW.age_confirmed_at IS NULL`),
   'NULL -> non-NULL honours the client value': s => mutate(s, `  ELSIF OLD.age_confirmed_at IS NULL THEN\n    NEW.age_confirmed_at := now();`, `  ELSIF OLD.age_confirmed_at IS NULL THEN\n    NULL;`),
-  'CHECK ignores the tick': s => mutate(s, `(date_of_birth IS NOT NULL OR age_confirmed_at IS NOT NULL)`, `date_of_birth IS NOT NULL`),
+  'CHECK ignores the tick': s => mutate(s, `(date_of_birth IS NOT NULL OR (age_confirmed_at IS NOT NULL AND age_ineligible IS NOT TRUE))`, `date_of_birth IS NOT NULL`),
+  'CHECK lets an age-ineligible account complete on the tick': s => mutate(s, `(age_confirmed_at IS NOT NULL AND age_ineligible IS NOT TRUE)`, `age_confirmed_at IS NOT NULL`),
   'CHECK drops region': s => mutate(s, `    AND region           IS NOT NULL\n    AND resident_status  IS NOT NULL\n    AND (resident_status <> 'student'`, `    AND resident_status  IS NOT NULL\n    AND (resident_status <> 'student'`),
   'CHECK still requires nationality': s => mutate(s, `    AND (resident_status <> 'student' OR student_level IS NOT NULL)\n  ));`, `    AND nationality_code IS NOT NULL\n    AND (resident_status <> 'student' OR student_level IS NOT NULL)\n  ));`),
 }
@@ -149,6 +154,18 @@ for (const [name, fn] of Object.entries(MUTANTS)) {
   const { r } = await apply(mutate(SQL, `  ELSE\n    NEW.age_confirmed_at := OLD.age_confirmed_at;\n  END IF;\n  RETURN NEW;`, `  END IF;\n  RETURN NEW;`))
   console.log(`    in-file block says: ${r.msg}`)
   T('in-file behaviour block refuses a stamp that lets the client move the value', r.ok === false && /moved|cleared/.test(r.msg), true)
+}
+
+{
+  const d = await freshDb(fixture()); const p = join(dir, 'm-render.sql'); writeFileSync(p, SQL)
+  const r = await applyRaw(d, p)
+  const def = (await q(d, `SELECT pg_get_constraintdef(oid) d FROM pg_constraint WHERE conname='profiles_completion_requires_fields_check'`))[0].d
+  console.log(`    PGlite rendering: ${def}`)
+  T('post-change constraint renders exactly as the migration expects (PGlite)', def, RENDER_WANT)
+  T('migration v_after literal equals the PGlite rendering', SQL.match(/v_after text := '(.*)';/)[1].replaceAll("''", "'"), def)
+  const { r: r2 } = await apply(mutate(SQL, `(age_confirmed_at IS NOT NULL AND age_ineligible IS NOT TRUE)`, `age_confirmed_at IS NOT NULL`))
+  console.log(`    in-file post-assert says: ${r2.msg}`)
+  T('in-file post-assert refuses a CHECK that dropped the age_ineligible clause', r2.ok === false && /age-ineligible/.test(r2.msg), true)
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')

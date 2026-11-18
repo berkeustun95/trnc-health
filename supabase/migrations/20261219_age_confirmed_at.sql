@@ -17,7 +17,8 @@
 --        UPDATE non-NULL -> NULL     -> only is_admin() may clear it
 --      check_profile_name_content() is NOT touched (profile:check parses it).
 --   3. profiles_completion_requires_fields_check rewritten: date_of_birth is satisfied by
---      EITHER a date of birth OR age_confirmed_at, and nationality_code is no longer
+--      EITHER a date of birth OR (age_confirmed_at AND age_ineligible IS NOT TRUE: an age-ineligible
+--      account has its DOB forced NULL, so the tick alone must never complete it), and nationality_code is no longer
 --      required. Every other arm is carried over from the LIVE definition, read from
 --      pg_get_constraintdef by the 2026-11-18 read-only probe (run 44291929792).
 --
@@ -101,7 +102,7 @@ ALTER TABLE public.profiles ADD  CONSTRAINT profiles_completion_requires_fields_
         first_name       IS NOT NULL
     AND last_name        IS NOT NULL
     AND display_name     IS NOT NULL
-    AND (date_of_birth IS NOT NULL OR age_confirmed_at IS NOT NULL)
+    AND (date_of_birth IS NOT NULL OR (age_confirmed_at IS NOT NULL AND age_ineligible IS NOT TRUE))
     AND region           IS NOT NULL
     AND resident_status  IS NOT NULL
     AND (resident_status <> 'student' OR student_level IS NOT NULL)
@@ -113,6 +114,7 @@ DECLARE
   v_def text;
   v_col text;
   v_trg text;
+  v_after text := 'CHECK (((profile_completed_at IS NULL) OR ((first_name IS NOT NULL) AND (last_name IS NOT NULL) AND (display_name IS NOT NULL) AND ((date_of_birth IS NOT NULL) OR ((age_confirmed_at IS NOT NULL) AND (age_ineligible IS NOT TRUE))) AND (region IS NOT NULL) AND (resident_status IS NOT NULL) AND ((resident_status <> ''student''::text) OR (student_level IS NOT NULL)))))';
 BEGIN
   SELECT pg_get_constraintdef(c.oid) INTO v_def
     FROM pg_constraint c
@@ -121,18 +123,27 @@ BEGIN
   IF v_def IS NULL THEN
     RAISE EXCEPTION 'the completion check is missing after the rewrite. Nothing applied.';
   END IF;
-  IF position('age_confirmed_at' IN v_def) = 0 THEN
-    RAISE EXCEPTION 'the completion check does not mention age_confirmed_at. Live: %', v_def;
-  END IF;
-  IF position('nationality' IN v_def) > 0 THEN
-    RAISE EXCEPTION 'the completion check still requires nationality. Live: %', v_def;
-  END IF;
-  FOREACH v_col IN ARRAY ARRAY['first_name','last_name','display_name','date_of_birth','region',
-                               'resident_status','student_level','profile_completed_at'] LOOP
-    IF position(v_col IN v_def) = 0 THEN
-      RAISE EXCEPTION 'the completion check no longer mentions % - the wrong arm was removed. Live: %', v_col, v_def;
+  IF v_def IS DISTINCT FROM v_after THEN
+    -- The exact string was derived in PGlite (PostgreSQL 18); an older server may render the same
+    -- constraint a little differently (parentheses, casts). A cosmetic difference must not block the
+    -- apply, so fall back to the structural checks; a genuinely wrong constraint still fails them.
+    RAISE NOTICE 'completion check rendering differs from the PGlite-derived string; checking structure. Live: %', v_def;
+    IF position('age_confirmed_at' IN v_def) = 0 THEN
+      RAISE EXCEPTION 'the completion check does not mention age_confirmed_at. Live: %', v_def;
     END IF;
-  END LOOP;
+    IF position('age_ineligible IS NOT TRUE' IN v_def) = 0 THEN
+      RAISE EXCEPTION 'the completion check lets an age-ineligible account complete on the tick. Live: %', v_def;
+    END IF;
+    IF position('nationality' IN v_def) > 0 THEN
+      RAISE EXCEPTION 'the completion check still requires nationality. Live: %', v_def;
+    END IF;
+    FOREACH v_col IN ARRAY ARRAY['first_name','last_name','display_name','date_of_birth','region',
+                                 'resident_status','student_level','profile_completed_at'] LOOP
+      IF position(v_col IN v_def) = 0 THEN
+        RAISE EXCEPTION 'the completion check no longer mentions % - the wrong arm was removed. Live: %', v_col, v_def;
+      END IF;
+    END LOOP;
+  END IF;
 
   SELECT pg_get_triggerdef(t.oid) INTO v_trg
     FROM pg_trigger t
@@ -226,7 +237,7 @@ RESET ROLE;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261219_age_confirmed_at.sql', '2269938910a70b4b884b9aece9cc786b0ba1924b71eeb6d63053340d256c107e')
+VALUES ('20261219_age_confirmed_at.sql', 'a7cd25e42bcde679338b1c3745cecf52d8684755e93baea1d12e5fb4ace94752')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

@@ -4523,7 +4523,10 @@ WITH report AS (
     -- have survived (a constraint rewritten down to nothing would pass the absence half).
     UNION ALL SELECT '1219_completion_check','completion check accepts date_of_birth OR age_confirmed_at, no nationality, and still guards the rest',
       COALESCE((SELECT bool_and(
+          pg_get_constraintdef(c.oid) = 'CHECK (((profile_completed_at IS NULL) OR ((first_name IS NOT NULL) AND (last_name IS NOT NULL) AND (display_name IS NOT NULL) AND ((date_of_birth IS NOT NULL) OR ((age_confirmed_at IS NOT NULL) AND (age_ineligible IS NOT TRUE))) AND (region IS NOT NULL) AND (resident_status IS NOT NULL) AND ((resident_status <> ''student''::text) OR (student_level IS NOT NULL)))))'
+          OR (
           pg_get_constraintdef(c.oid) ILIKE '%age_confirmed_at%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%age_ineligible IS NOT TRUE%'
           AND pg_get_constraintdef(c.oid) ILIKE '%date_of_birth%'
           AND pg_get_constraintdef(c.oid) NOT ILIKE '%nationality%'
           AND pg_get_constraintdef(c.oid) NOT ILIKE '%institution_id%'
@@ -4534,10 +4537,18 @@ WITH report AS (
           AND pg_get_constraintdef(c.oid) ILIKE '%region%'
           AND pg_get_constraintdef(c.oid) ILIKE '%resident_status%'
           AND pg_get_constraintdef(c.oid) ILIKE '%student_level%'
-          AND pg_get_constraintdef(c.oid) ILIKE '%profile_completed_at%')
+          AND pg_get_constraintdef(c.oid) ILIKE '%profile_completed_at%'))
         FROM pg_constraint c
         WHERE c.conrelid = to_regclass('public.profiles')
           AND c.conname='profiles_completion_requires_fields_check'), false)
+    -- stamp_age_confirmed_at() body (20261219): CREATE OR REPLACE creates no named object, so only a
+    -- behaviour token sees a rewrite. It must keep OLD.age_confirmed_at (the client cannot move a set
+    -- value) and is_admin() (only an admin clears it); dropping either lets a client erase or rewrite
+    -- the 13+ consent stamp.
+    UNION ALL SELECT '1219_age_stamp_body','stamp_age_confirmed_at() keeps OLD.age_confirmed_at and is_admin()',
+      COALESCE((SELECT pg_get_functiondef(p.oid) LIKE '%OLD.age_confirmed_at%'
+                   AND pg_get_functiondef(p.oid) LIKE '%is_admin()%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.stamp_age_confirmed_at()')), false)
     -- age_confirmed_at stamp trigger (20261219): timing and enabled state, and the function
     -- is not EXECUTE-able by the API roles. aclexplode, so an absent function reads false
     -- instead of killing the report.
