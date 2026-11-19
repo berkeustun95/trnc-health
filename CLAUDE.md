@@ -24,6 +24,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   from the lane → Berke's device check → his go on the exact lane SHA → `npm run ota` from that SHA, detached (the
   `feat/store-*` exemption below). Lane-direct PRs only for code that exists only on the lane (the age-tick screens).
   1.4.3 production OTAs are HELD while iOS 1.4.3 (29) is in App Review (see Release holds).
+  While a store lane is open, production OTAs (main and lane) go from this Mac only: Hermes gets no GitHub read
+  access, so its `npm run ota` refuses fail-closed once a lane Preview exists (Berke, 2026-11-19).
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.

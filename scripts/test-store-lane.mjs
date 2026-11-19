@@ -7,7 +7,7 @@
 // The end-to-end cases run the real check scripts inside the throwaway repo with a fake `npx` (EAS answers from files)
 // and a fake `gh` (branch rules from a file) first on PATH — test-process PATH only; the scripts honour no env override.
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -217,6 +217,54 @@ for (const [name, fn] of tests) {
   if (!ok) failed++
   console.log(`  ${ok ? '✓' : '✗'} ${name}${err}`)
 }
+// ── the REAL Apple-review freeze: this repo's release-holds.json entry on 03e738a0 against the real lane and main ──
+// Each case runs the real check-release-holds.mjs in a --shared, no-checkout clone of this repo with HEAD set to the
+// real commit (only the script and the holds file are written). STORE_LANE_HOLDS_CHECK / STORE_LANE_HOLDS_JSON point
+// at other copies only for the red-first runs, like STORE_LANE_LIB.
+const repo = resolve(here, '..')
+const LANE_HOLD = '03e738a0bef1a0c50195f96958fd0877a5db8cc6'
+const holdsCheck = process.env.STORE_LANE_HOLDS_CHECK ? resolve(process.env.STORE_LANE_HOLDS_CHECK) : join(here, 'check-release-holds.mjs')
+const holdsJson = JSON.parse(readFileSync(process.env.STORE_LANE_HOLDS_JSON ? resolve(process.env.STORE_LANE_HOLDS_JSON) : join(repo, 'release-holds.json'), 'utf8'))
+const realEntry = (holdsJson.holds || []).find(h => h.commit === LANE_HOLD)
+const rg = (...a) => execFileSync('git', a, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+const realRun = (ref, holds) => {
+  const d = join(root, `real${n++}`)
+  execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', repo, d], { stdio: 'ignore' })
+  execFileSync('git', ['update-ref', '--no-deref', 'HEAD', rg('rev-parse', `${ref}^{commit}`)], { cwd: d })
+  mkdirSync(join(d, 'scripts')); copyFileSync(holdsCheck, join(d, 'scripts/check-release-holds.mjs'))
+  writeFileSync(join(d, 'release-holds.json'), JSON.stringify(holds))
+  const r = spawnSync(process.execPath, [join(d, 'scripts/check-release-holds.mjs')], { cwd: d, encoding: 'utf8' })
+  return { code: r.status, out: `${r.stdout}\n${r.stderr}` }
+}
+const real = []
+if (realEntry?.cleared === true) {
+  console.log(`  - real freeze: the hold on ${LANE_HOLD.slice(0, 7)} is cleared in release-holds.json; real-repo cases retired`)
+} else {
+  real.push(
+    ['real freeze: release-holds.json holds 03e738a0 uncleared', () => realEntry?.cleared === false],
+    ['real freeze: origin/feat/store-1.4.3 carries 03e738a0 and origin/main does not', () => {
+      try { rg('merge-base', '--is-ancestor', LANE_HOLD, 'origin/feat/store-1.4.3') } catch { return false }
+      try { rg('merge-base', '--is-ancestor', LANE_HOLD, 'origin/main'); return false } catch { return true }
+    }],
+    ['real freeze: the lane HEAD (origin/feat/store-1.4.3) is REFUSED, naming Commit 03e738a', () => {
+      const r = realRun('origin/feat/store-1.4.3', holdsJson); return r.code === 1 && /RELEASE HOLD/.test(r.out) && r.out.includes(`Commit ${LANE_HOLD.slice(0, 7)} is on HEAD`)
+    }],
+    ['real freeze: main HEAD (origin/main) passes ("none on HEAD")', () => {
+      const r = realRun('origin/main', holdsJson); return r.code === 0 && /none on HEAD/.test(r.out)
+    }],
+    ['real freeze: the lane HEAD passes once the same entry says "cleared": true', () => {
+      const cleared = { holds: holdsJson.holds.map(h => (h.commit === LANE_HOLD ? { ...h, cleared: true } : h)) }
+      const r = realRun('origin/feat/store-1.4.3', cleared); return r.code === 0 && /none on HEAD/.test(r.out)
+    }],
+  )
+}
+for (const [name, fn] of real) {
+  let ok = false, err = ''
+  try { ok = fn() } catch (e) { err = ` (${String(e.message).split('\n')[0]})` }
+  if (!ok) failed++
+  console.log(`  ${ok ? '✓' : '✗'} ${name}${err}`)
+}
+const total = tests.length + real.length
 rmSync(root, { recursive: true, force: true })
-console.log(failed ? `\n${failed} of ${tests.length} FAILED\n` : `\nstore-lane: ${tests.length} of ${tests.length} passed\n`)
+console.log(failed ? `\n${failed} of ${total} FAILED\n` : `\nstore-lane: ${total} of ${total} passed\n`)
 process.exit(failed ? 1 : 0)
