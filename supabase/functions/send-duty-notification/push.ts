@@ -5,7 +5,10 @@
 // token, no second app) got the duty push twice on 16 Nov: Expo can deliver a batch it answered 503/429 for. A batch
 // that is not accepted is counted (`http_<code>`, `timeout`, `fetch_failed`, `bad_response`) and that day's push is
 // missed for its phones; the in-app row still lands. A missed push is recoverable, a double push to everyone is not.
-// Nothing here logs or returns Expo's body or messages (for DeviceNotRegistered they embed the push token).
+// Nothing here logs or returns Expo's body or messages (for DeviceNotRegistered they embed the push token). The one
+// exception is opt-in `diag` (push-diag.ts): a NOT-accepted answer's body, redacted and capped, never an accepted one.
+
+import { type DiagDeps, startDiag } from './push-diag.ts'
 
 export const PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 export const ATTEMPT_TIMEOUT_MS = 10_000
@@ -78,6 +81,7 @@ export async function lastSignIns(
 export interface SendDeps {
   fetchFn: (url: string, init: RequestInit) => Promise<Response>
   makeSignal?: (ms: number) => AbortSignal
+  diag?: DiagDeps
 }
 
 export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchResult> {
@@ -88,6 +92,7 @@ export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchRes
   }
   const makeSignal = d.makeSignal ?? ((ms: number) => AbortSignal.timeout(ms))
 
+  const dx = startDiag(d.diag)
   let res: Response
   try {
     res = await d.fetchFn(PUSH_URL, {
@@ -97,13 +102,16 @@ export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchRes
       signal: makeSignal(ATTEMPT_TIMEOUT_MS),
     })
   } catch (e) {
+    dx?.thrown(e, batch.length)
     const name = e instanceof Error ? e.name : 'unknown'
     console.error('Expo push batch threw:', name)
     fail(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'fetch_failed', batch.length)
     return out
   }
+  dx?.headers()
   if (!res.ok) {
-    try { await res.body?.cancel() } catch { /* body not needed */ }
+    if (dx) await dx.nonAccepted(res, batch.length)
+    else try { await res.body?.cancel() } catch { /* body not needed */ }
     console.error('Expo push batch failed: HTTP', res.status)
     fail(`http_${res.status}`, batch.length)
     return out
@@ -120,5 +128,6 @@ export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchRes
   } catch {
     fail('bad_response', batch.length)
   }
+  dx?.accepted(res)
   return out
 }

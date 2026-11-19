@@ -33,6 +33,13 @@ export async function savePushToken(token, userId) {
   await supabase.from('profiles').update({ push_token: token }).eq('id', userId)
 }
 
+// The token this device registered for the signed-in account (null if none). Read-only; the order-status card compares it to
+// the profile's push_token to know whether status pushes already reach this phone (20261194 falls back to that token).
+export async function registeredPushToken() {
+  if (rememberedToken) return rememberedToken
+  try { return await AsyncStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+
 // Guest: the RPC also sets preferred_language, which the duty push reads. RPC errors are silent; the next
 // launch's silent registration (permission already granted) retries.
 export async function saveGuestPushToken(token, userId, lang) {

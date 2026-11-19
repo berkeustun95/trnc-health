@@ -7,7 +7,7 @@ import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import {
   EATERY_CATEGORY_KEY, eateryContacts, eateryMenuUrl, eateryMenuSections, eateryPhotos, eateryWeek,
-  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryAdultItemsOk, orderRpcArgs, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
+  eateryOpenStatus, formatPrice, eateryOrderable, eateryOrderDigits, eateryOrdersByWhatsapp, eateryListMode, buildOrderMessage, orderWhatsAppUrl, orderTotal, serverOrderLines, orderCheck, orderErrorKind, orderAgeGate, eateryAdultItemsOk, orderRpcArgs, orderMode, basketLines, eateryItemOptions, deliveryReady, eateryPartnerBack, editorStartStep, deliveryFromEntry, EMPTY_DELIVERY_ADDRESS, BANNER_BAR_ROW, bannerContentPad, eateryBannerOn,
 } from '../constants/eatery'
 import { colors, font, type, radii, space, motion, listBottomPad, withAlpha, press } from '../constants/theme'
 import { ScreenHeader, Card, Button, RemoteImage, PageCanvas } from '../components/ui'
@@ -19,6 +19,7 @@ import { IS_PREVIEW, EATERY_DEMO, CONTACT_LOGGING, partnerContactNumbers, effect
 import { loadBook, setLastUsed } from '../utils/eateryAddress'
 import { QtyStepper, DishAddButton, DishOptionsSheet, OrderBar, BasketPage, SiteHandoff } from '../components/EateryOrder'
 import AddressEditor from '../components/AddressEditor'
+import EateryOrderStatusList from '../components/EateryOrderStatus'
 import { QuizPage, PartnerQuizBanner } from '../components/EateryQuiz'
 import { quizHasMains, partnerQuizConfig } from '../constants/eateryQuiz'
 import { haptic } from '../components/ui'
@@ -298,6 +299,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
   const noteRef = useRef('')
   noteRef.current = note
   const armedRef = useRef(null)     // set when the WhatsApp link was opened; { left } turns true once the app really left
+  const [statusTick, setStatusTick] = useState(0)
   const [snack, setSnack] = useState(null)   // 'eateryBasketCleared' | 'eateryBasketItemRemoved' while its "Geri al" is offered
   // Empties the basket but keeps it and the note for the snackbar's "Geri al" (no confirm dialog); see eateryBasketCore.js.
   const clearBasket = () => {
@@ -319,6 +321,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
       if (!a.left) return
       armedRef.current = null
       clearBasket()
+      setStatusTick(n => n + 1)   // back from WhatsApp: read "Siparişin" again and scroll up to it if it shows
     })
     return () => sub.remove()
   }, [partner.id])
@@ -331,7 +334,7 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
 
   // Section tabs: tab row pins (sticky) above the menu; scroll position picks the active section.
   const showTabs = sections.length >= 2
-  const tabsIndex = 1 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, [pager], [quiz banner], tabs
+  const tabsIndex = 2 + (showQuizBanner ? 1 : 0) + (gallery.length > 0 ? 1 : 0)   // children of the ScrollView: head Card, order status (always a child, may draw nothing), [pager], [quiz banner], tabs
   const scrollRef = useRef(null)
   const secRefs = useRef([])
   const tops = useRef([])          // section tops in scroll-content coordinates, refreshed by measureTops()
@@ -470,9 +473,10 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
     setSending(true)
     setOrderError(null)
     const sent = lines
+    const mode = orderMode(delivery)   // 'pickup' | 'delivery' only: the address stays in the WhatsApp text
     let res = null, kind = null
     try {
-      const { data, error } = await supabase.rpc('create_eatery_order', orderRpcArgs(partner.id, sent))
+      const { data, error } = await supabase.rpc('create_eatery_order', orderRpcArgs(partner.id, sent, mode))
       if (error || !data) kind = orderErrorKind(error)
       else { kind = orderCheck(sent, data); if (!kind) res = data }
     } catch { kind = 'generic' }
@@ -529,6 +533,9 @@ export default function EateryPartnerScreen({ partner, lang, onBack, backRef = n
           {!!partner.placeholder && <PlaceholderTag lang={lang} style={s.tag} />}
           {partner.is_active === false && <PlaceholderTag lang={lang} labelKey="eateryUnpublishedTag" style={s.tag} />}
         </Card>}
+
+        <EateryOrderStatusList lang={lang} partnerId={partner.id} active={basketOpen !== true && quizOpen !== true} refreshKey={statusTick}
+          onReveal={() => scrollRef.current?.scrollTo({ y: 0, animated: !reduce })} />
 
         {gallery.length > 0 && <PhotoPager photos={gallery} width={W} ratio={4 / 3} fit="contain" lang={lang} />}
 
