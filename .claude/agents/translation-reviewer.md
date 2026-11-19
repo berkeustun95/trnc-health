@@ -14,7 +14,7 @@ the senior fixes.
 - **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
   batch of guards. You read code; QA runs the suite. Light checks your steps name (e.g. `i18n:validate`,
   `home:check`, `hero:check`, `labels:check`, `refs:check`, `check:secrets`) are free. Heavy ones (`ads:check`,
-  `ads:selftest`, `release-lane:test`, `check:migration-numbers`) refuse without the suite lock: take it
+  `ads:selftest`, `release-lane:test`, `store-lane:test`, `check:migration-numbers`) refuse without the suite lock: take it
   (`node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`), run with `ADA_SUITE_HOLDER=<you>-<slug>`,
   release right after; held by someone else = wait, or leave it to QA and say so.
 

@@ -31,6 +31,12 @@
 // `cherry-pick -x` whose original is in HEAD, proven by release-lane.mjs's provePick unweakened (same paths, exact blob or
 // verbatim patch-id + hunk pre-images once). Each accepted copy → original is printed; a failing commit is named with its reason.
 //
+// A STORE LANE HEAD (feat/store-<V>, scripts/lib/store-lane.mjs L1–L4 all holding) is checked in lane mode: only Previews on
+// EXACTLY runtime V count (no series widening, no NEXT_LANE; main's 1.4.x Previews are main's business), each must be in
+// HEAD, and at least one Preview on V must have been built from a commit whose TREE equals HEAD's (the exact code published).
+// From main, a Preview HEAD lacks is excused only when its runtime is not HEAD's, is newer than main's, and
+// origin/feat/store-<its runtime> exists and contains its commit (previewExcusedByStoreLane); every excused Preview is printed.
+//
 // Unknown is a refusal: EAS unreachable, a group with no commit, or a commit this clone cannot
 // find after one fetch. A Preview deliberately dropped by Berke passes only with
 // PREVIEW_LINEAGE_OVERRIDE=1, which he hands over; the missing commits are printed either way.
@@ -40,6 +46,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assessReleaseLane, describeLane, assessLaneCopies } from './lib/release-lane.mjs'
+import { assessStoreLane, describeStoreLane, laneLineageScope, previewExcusedByStoreLane, treePreviewed } from './lib/store-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -66,6 +73,10 @@ ${bar}\n`)
 
 const version = (readFileSync(resolve(ROOT, 'app.config.js'), 'utf8').match(/^\s*version:\s*'([^']+)'/m) || [])[1]
 if (!version) refuse(['cannot read the app version from app.config.js — lineage unknown.'])
+const store = assessStoreLane({ cwd: ROOT })
+if (store.applies && store.versionDiffers && !store.exempt) refuse(['HEAD looks like a store lane but is not exempt:', ...describeStoreLane(store).map(l => `  ${l}`)])
+const laneMode = store.exempt
+if (laneMode) console.log('\n  ' + describeStoreLane(store).join('\n  '))
 const series = version.split('.').slice(0, 2).join('.')
 const mm = rv => typeof rv === 'string' ? rv.split('.').slice(0, 2).map(Number) : [NaN, NaN]
 const [vMaj, vMin] = mm(version)
@@ -84,7 +95,7 @@ try {
   }
   if (new Set(all.map(g => g.group)).size !== all.length) refuse([`EAS paging returned a group twice (${all.length} rows) — the pages overlap, so the list cannot be trusted.`])
   console.log(`\nPreview lineage: read ${all.length} Preview update group(s) in ${Math.ceil((all.length + 1) / PAGE)} page(s)`)
-  groups = all.filter(g => inSeries(g.runtimeVersion) || isNewer(g.runtimeVersion))
+  groups = laneMode ? all.filter(g => laneLineageScope(version, g.runtimeVersion)) : all.filter(g => inSeries(g.runtimeVersion) || isNewer(g.runtimeVersion))
 } catch (e) {
   refuse([`could not list Preview updates from EAS (${String(e.message).split('\n')[0]}) — lineage unknown.`])
 }
@@ -126,7 +137,7 @@ const known = c => { try { git('cat-file', '-e', `${c}^{commit}`); return true }
 if (views.some(v => v.commit && !known(v.commit))) { try { git('fetch', '-q', 'origin') } catch { /* reported as unknown below */ } }
 
 let laneSet = new Set()
-if (views.some(v => isNewer(v.g.runtimeVersion))) {
+if (!laneMode && views.some(v => isNewer(v.g.runtimeVersion))) {
   try { git('fetch', '-q', 'origin', 'feat/voice-input') } catch { /* reported as unknown below */ }
   try { laneSet = new Set(git('rev-list', '--first-parent', NEXT_LANE).split('\n').filter(Boolean)) }
   catch { refuse([`${NEXT_LANE} does not resolve in this clone — Previews on a newer runtime cannot be checked, lineage unknown.`]) }
@@ -135,7 +146,7 @@ if (views.some(v => isNewer(v.g.runtimeVersion))) {
 const head = git('rev-parse', '--short', 'HEAD')
 const missing = [], viaMerge = []
 let laneRes = null // computed once, on the first Preview HEAD lacks
-const onMainLane = [], viaCopies = []
+const onMainLane = [], viaCopies = [], viaStoreLane = []
 const laneOnMain = c => {
   if (!laneRes) {
     try { git('fetch', '-q', 'origin', 'main') } catch { /* origin/main may be stale; the exemption then judges what it has */ }
@@ -146,13 +157,14 @@ const laneOnMain = c => {
   const under = lines(git('rev-list', '--no-merges', c, '--not', 'HEAD'))
   return under.every(x => { try { git('merge-base', '--is-ancestor', x, 'origin/main'); return true } catch { return false } })
 }
-let copies = null
+let copies = null, ex = null
 for (const v of views) {
   const label = `${v.g.group.slice(0, 8)} ${v.g.runtimeVersion} ${v.g.message.replace(/\s*\([^)]*ago by [^)]*\)$/, '').slice(0, 90)}`
   if (v.error) missing.push(`? ${label}\n      EAS view failed: ${v.error}`)
   else if (!v.commit) missing.push(`? ${label}\n      records no git commit`)
   else if (!known(v.commit)) missing.push(`? ${v.commit.slice(0, 7)} ${label}\n      commit not in this clone, even after a fetch`)
   else if (!isAncestor(v.commit) && laneOnMain(v.commit)) onMainLane.push(`· ${v.commit.slice(0, 7)} ${label}`)
+  else if (!isAncestor(v.commit) && !laneMode && (ex = previewExcusedByStoreLane({ cwd: ROOT, previewCommit: v.commit, previewRuntime: v.g.runtimeVersion, headRuntime: version })).excused) viaStoreLane.push(`· ${v.commit.slice(0, 7)} ${label}\n      ${ex.why}`)
   else if (!isAncestor(v.commit) && (copies = assessLaneCopies({ cwd: ROOT, preview: v.commit })).ok) {
     viaCopies.push(`· ${v.commit.slice(0, 7)} ${label}\n` + copies.copies.map(x => `      ${x.pick}  ←  ${x.original}`).join('\n') +
       copies.merges.map(m => `\n      PR merge ${m.merge}  (second parent ${m.second})`).join(''))
@@ -169,12 +181,21 @@ for (const v of views) {
   }
 }
 
+let treeNote = null
+if (laneMode) {
+  const headTree = git('rev-parse', 'HEAD^{tree}')
+  const tp = treePreviewed(headTree, views.map(v => v.commit).filter(Boolean), ROOT)
+  if (tp.ok) treeNote = `  ✓ HEAD's exact tree was Previewed on ${version}: ${tp.matches.map(c => c.slice(0, 7)).join(', ')}`
+  else missing.push(`✗ no Preview on ${version} was built from a commit whose tree equals HEAD ${head} (tree ${headTree.slice(0, 7)}) — Preview this exact code (npm run ota:preview) and get Berke's check before publishing.`)
+}
 const nNew = views.filter(v => isNewer(v.g.runtimeVersion)).length
-const scope = `${views.length - nNew} on ${series}.x and ${nNew} on newer runtimes`
+const scope = laneMode ? `${views.length} on exactly ${version} (store lane mode)` : `${views.length - nNew} on ${series}.x and ${nNew} on newer runtimes`
 console.log(`\nPreview lineage: ${scope} checked against HEAD ${head}`)
+if (viaStoreLane.length) console.log(`  store lane: built on origin/feat/store-<runtime>, a newer runtime than main — NOT in HEAD, deliberately (excused):\n    ${viaStoreLane.join('\n    ')}`)
 if (excused.size) console.log(`  same patch already in HEAD under another SHA (excused):\n    ${[...excused.values()].join('\n    ')}`)
 if (onMainLane.length) console.log(`  release lane: on origin/main, the lane is deliberately behind (excused):\n    ${onMainLane.join('\n    ')}`)
 if (viaCopies.length) console.log(`  release/* lane Preview: every commit under it not in HEAD is a proven cherry-pick -x copy of one in HEAD (or a PR merge):\n    ${viaCopies.join('\n    ')}`)
 if (viaMerge.length) console.log(`  merge commit not in HEAD, but every commit under it is:\n    ${viaMerge.join('\n    ')}`)
-if (missing.length) refuse([`${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
+if (missing.length) refuse([laneMode ? `${missing.length} problem(s) with the Previews on ${version} for HEAD ${head}:` : `${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
+if (treeNote) console.log(treeNote)
 console.log(`  ✓ every checked Preview commit is contained in HEAD (newer runtimes: or on ${NEXT_LANE} first-parent)\n`)
