@@ -227,13 +227,17 @@ const holdsCheck = process.env.STORE_LANE_HOLDS_CHECK ? resolve(process.env.STOR
 const holdsJson = JSON.parse(readFileSync(process.env.STORE_LANE_HOLDS_JSON ? resolve(process.env.STORE_LANE_HOLDS_JSON) : join(repo, 'release-holds.json'), 'utf8'))
 const realEntry = (holdsJson.holds || []).find(h => h.commit === LANE_HOLD)
 const rg = (...a) => execFileSync('git', a, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+// Only this hold goes into the clone, so a later uncleared main hold cannot turn these cases red.
+const laneOnlyHolds = cleared => ({ holds: realEntry ? [{ ...realEntry, ...(cleared ? { cleared: true } : {}) }] : [] })
+// GIT_* stripped so a GIT_DIR/GIT_WORK_TREE inherited from a hook can never point the clone's git calls at this repo.
+const cloneEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')))
 const realRun = (ref, holds) => {
   const d = join(root, `real${n++}`)
-  execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', repo, d], { stdio: 'ignore' })
-  execFileSync('git', ['update-ref', '--no-deref', 'HEAD', rg('rev-parse', `${ref}^{commit}`)], { cwd: d })
+  execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', repo, d], { stdio: 'ignore', env: cloneEnv })
+  execFileSync('git', ['update-ref', '--no-deref', 'HEAD', rg('rev-parse', `${ref}^{commit}`)], { cwd: d, env: cloneEnv })
   mkdirSync(join(d, 'scripts')); copyFileSync(holdsCheck, join(d, 'scripts/check-release-holds.mjs'))
   writeFileSync(join(d, 'release-holds.json'), JSON.stringify(holds))
-  const r = spawnSync(process.execPath, [join(d, 'scripts/check-release-holds.mjs')], { cwd: d, encoding: 'utf8' })
+  const r = spawnSync(process.execPath, [join(d, 'scripts/check-release-holds.mjs')], { cwd: d, encoding: 'utf8', env: cloneEnv })
   return { code: r.status, out: `${r.stdout}\n${r.stderr}` }
 }
 const real = []
@@ -247,14 +251,13 @@ if (realEntry?.cleared === true) {
       try { rg('merge-base', '--is-ancestor', LANE_HOLD, 'origin/main'); return false } catch { return true }
     }],
     ['real freeze: the lane HEAD (origin/feat/store-1.4.3) is REFUSED, naming Commit 03e738a', () => {
-      const r = realRun('origin/feat/store-1.4.3', holdsJson); return r.code === 1 && /RELEASE HOLD/.test(r.out) && r.out.includes(`Commit ${LANE_HOLD.slice(0, 7)} is on HEAD`)
+      const r = realRun('origin/feat/store-1.4.3', laneOnlyHolds(false)); return r.code === 1 && /RELEASE HOLD/.test(r.out) && r.out.includes(`Commit ${LANE_HOLD.slice(0, 7)} is on HEAD`)
     }],
     ['real freeze: main HEAD (origin/main) passes ("none on HEAD")', () => {
-      const r = realRun('origin/main', holdsJson); return r.code === 0 && /none on HEAD/.test(r.out)
+      const r = realRun('origin/main', laneOnlyHolds(false)); return r.code === 0 && /none on HEAD/.test(r.out)
     }],
     ['real freeze: the lane HEAD passes once the same entry says "cleared": true', () => {
-      const cleared = { holds: holdsJson.holds.map(h => (h.commit === LANE_HOLD ? { ...h, cleared: true } : h)) }
-      const r = realRun('origin/feat/store-1.4.3', cleared); return r.code === 0 && /none on HEAD/.test(r.out)
+      const r = realRun('origin/feat/store-1.4.3', laneOnlyHolds(true)); return r.code === 0 && /none on HEAD/.test(r.out)
     }],
   )
 }
