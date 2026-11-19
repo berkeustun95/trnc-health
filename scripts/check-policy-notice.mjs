@@ -36,6 +36,16 @@ import { readFileSync } from 'node:fs'
   const strict = /<Modal visible=\{visible === true\}/.test(comp)
   if (!strict) bad++
   console.log(`  ${strict ? '✓' : '✗'} the Modal is shown only for visible === true (RN treats undefined as shown)`)
+  const legal = readFileSync(new URL('../constants/legal/index.js', import.meta.url), 'utf8')
+  const i18n = readFileSync(new URL('../constants/i18n.js', import.meta.url), 'utf8')
+  const cur = /export const LEGAL_VERSION = '([^']+)'/.exec(legal)?.[1]
+  const mapSrc = /POLICY_NOTICE_BODY_KEY = \{([^}]*)\}/.exec(legal)?.[1] || ''
+  const entries = [...mapSrc.matchAll(/'([^']+)':\s*'([^']+)'/g)]
+  const miss = entries.filter(([, , key]) => (i18n.match(new RegExp(`^    ${key}:`, 'gm')) || []).length !== 9).map(e => e[2])
+  const mapOk = entries.length > 0 && miss.length === 0 && entries.some(e => e[1] === cur) && /POLICY_NOTICE_BODY_KEY\[LEGAL_VERSION\]/.test(comp)
+  if (!mapOk) bad++
+  console.log(`  ${mapOk ? '✓' : '✗'} every version in POLICY_NOTICE_BODY_KEY has its key in all 9 languages, the current LEGAL_VERSION is mapped, the notice reads the map` +
+    (mapOk ? '' : `  → current ${cur}, entries ${entries.length}, keys not x9: ${miss.join(',')}`))
 }
 if (bad) { console.error(`\n  POLICY NOTICE CHECK FAILED — ${bad}\n`); process.exit(1) }
 console.log('\npolicy notice rules: OK\n')
