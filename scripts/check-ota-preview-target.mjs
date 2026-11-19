@@ -9,7 +9,9 @@
 //   (b) EAS: channel "preview" maps ONLY to branch(es) named "preview" — never production's branch;
 //   (c) the config this publish resolves (APP_VARIANT=preview) is the Preview variant;
 //   (d) tracked files are clean (eas update ships the WORKING TREE) and HEAD contains origin/main
-//       ("Nothing Previewed stays off main", CLAUDE.md) — or is a proven release/* lane (lib/release-lane.mjs);
+//       ("Nothing Previewed stays off main", CLAUDE.md) — or is a proven release/* lane (lib/release-lane.mjs).
+//       A HEAD whose version differs from main's must ALSO be a store lane (feat/store-<V>, lib/store-lane.mjs L1–L4)
+//       or a proven release/* lane, else it is refused; a store lane prints its lane-only commits;
 //   (e) the EAS preview environment carries the Supabase URL + key (names only, never values).
 // No override flag.
 import { execFileSync } from 'node:child_process'
@@ -17,6 +19,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assessReleaseLane, describeLane } from './lib/release-lane.mjs'
+import { assessStoreLane, describeStoreLane } from './lib/store-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -63,6 +66,13 @@ try {
   if (!contains && !lane.exempt) problems.push('HEAD does not contain origin/main — publish Preview only from a branch that contains main' + (lane.releaseBranch ? `\n      ${describeLane(lane).join('\n      ')}` : ''))
   row(!dirty && (contains || lane.exempt), 'tree', `${dirty ? 'tracked files MODIFIED' : 'clean'} · HEAD ${sh('git', ['rev-parse', '--short', 'HEAD'])} ${contains ? 'contains' : lane.exempt ? 'lacks (release lane, exempt)' : 'LACKS'} origin/main`)
   if (lane?.exempt) console.log(describeLane(lane).map(l => `    ${l}`).join('\n'))
+  // a runtime other than main's: only a store lane (L1–L4) or a proven release/* lane may publish it
+  const store = assessStoreLane({ cwd: ROOT })
+  if (store.applies) console.log(describeStoreLane(store).map(l => `    ${l}`).join('\n'))
+  if (store.versionDiffers && !store.exempt) {
+    const rel = lane ?? assessReleaseLane({ cwd: ROOT })
+    if (!rel.exempt) problems.push(`HEAD's runtime ${store.version} differs from origin/main's ${store.mainVersion} and HEAD is neither a store lane nor a proven release/* lane:\n      ${store.applies ? describeStoreLane(store).join('\n      ') : `not on a feat/store-${store.version} lane (no origin/feat/store-${store.version}, branch ${store.branch ?? 'detached'})`}`)
+  }
 }
 // (e)
 try {

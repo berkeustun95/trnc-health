@@ -20,7 +20,7 @@ across sessions: `node scripts/preview-lock.mjs --suite take qa-<slug> "<what fo
 `--maxWorkers`) and the guards below, then `node scripts/preview-lock.mjs --suite release qa-<slug>` right
 away, also when the run fails. Held by someone else: wait and re-check `--suite status`; never `--force`.
 A timeout-only failure while the Mac is loaded is re-run once under the lock before it counts.
-The heavy checks (`ads:check`, `ads:selftest`, `release-lane:test`, `check:migration-numbers`)
+The heavy checks (`ads:check`, `ads:selftest`, `release-lane:test`, `store-lane:test`, `check:migration-numbers`)
 refuse without the suite lock too: run them inside the same locked window.
 Run what applies to the diff and print each result:
 - `npm run i18n:validate` — duplicate keys + coverage in all 9 languages (`constants/i18n.js`).

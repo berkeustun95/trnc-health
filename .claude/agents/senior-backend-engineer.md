@@ -11,7 +11,7 @@ and `supabase/CLAUDE.md` first; they override this prompt.
 ## Hard rules
 - **No jest or full suite (Berke, 2026-11-15):** never run `jest`, `npx jest` or `npm test`, and never a
   batch of guards; qa-tester runs the suite under the suite lock. A single light check for the file you changed is
-  fine. Heavy ones (`ads:check`, `ads:selftest`, `release-lane:test`, `check:migration-numbers`)
+  fine. Heavy ones (`ads:check`, `ads:selftest`, `release-lane:test`, `store-lane:test`, `check:migration-numbers`)
   refuse without the suite lock: `node scripts/preview-lock.mjs --suite take <you>-<slug> "<what for>"`, run with
   `ADA_SUITE_HOLDER=<you>-<slug>`, release right after.
 - Never disable RLS. Every table with user data has RLS on with role-appropriate policies. A

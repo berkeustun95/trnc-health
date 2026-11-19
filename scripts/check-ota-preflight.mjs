@@ -14,6 +14,11 @@
 //      from, and refuse unless HEAD contains it. Tracked files must also be unmodified —
 //      the working tree is what ships, so a clean lineage under a dirty tree proves nothing.
 //
+//      Also (store builds): for every runtime, HEAD must contain the commit of the newest finished production store build
+//      of runtime V per platform (eas build:list) — this covers a runtime with no OTA yet, where the embedded bundle is
+//      what runs. On a store lane (scripts/lib/store-lane.mjs) HEAD must also contain main's newest production update
+//      commit (main's runtime), so a user moving from main's runtime to the lane's keeps every shipped fix.
+//
 //  (b) SUPABASE ENV. The go-live checkout had no .env. The bundle would have shipped with
 //      EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY undefined — every query failing, for everyone.
 //      So: resolve both the way Expo does for a production bundle (process env first, then
@@ -30,6 +35,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assessStoreLane, describeStoreLane, runtimeAt, newestStoreBuilds, containsBuildCommits } from './lib/store-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -123,27 +129,71 @@ console.log('\nOTA preflight')
   } else {
     const dirty = sh('git', ['status', '--porcelain', '--untracked-files=no'])
     if (dirty) problems.push(`tracked files are modified — eas update ships the WORKING TREE, not HEAD:\n      ${dirty.split('\n').join('\n      ')}`)
-    let live = null, group = null
+    const store = assessStoreLane({ cwd: ROOT })
+    if (store.applies && store.versionDiffers && !store.exempt) problems.push(`HEAD looks like a store lane but is not exempt:\n      ${describeStoreLane(store).join('\n      ')}`)
+    const laneMode = store.exempt
+    if (laneMode) console.log('  ' + describeStoreLane(store).join('\n  '))
+    const head = sh('git', ['rev-parse', '--short', 'HEAD'])
+    const showCommit = group => {
+      const view = JSON.parse(sh('npx', [...EAS, 'update:view', group, '--json']))
+      return (Array.isArray(view) ? view : [view]).map(u => u.gitCommitHash).find(Boolean) ?? null
+    }
+    const contains = c => {
+      try { sh('git', ['cat-file', '-e', `${c}^{commit}`]) } catch { try { sh('git', ['fetch', '-q', 'origin']) } catch { /* reported below */ } }
+      try { sh('git', ['merge-base', '--is-ancestor', c, 'HEAD']); return true } catch { return false }
+    }
+    let live = null, group = null, mainLive = null, mainGroup = null
+    const mainVersion = laneMode ? runtimeAt(ROOT, 'origin/main').version ?? null : null
     try {
       const list = JSON.parse(sh('npx', [...EAS, 'update:list', '--branch', 'production', '--limit', '50', '--json', '--non-interactive']))
-      group = (list.currentPage ?? []).find(g => g.runtimeVersion === version)?.group ?? null
+      const page = list.currentPage ?? []
+      group = page.find(g => g.runtimeVersion === version)?.group ?? null
       if (group) {
-        const view = JSON.parse(sh('npx', [...EAS, 'update:view', group, '--json']))
-        live = (Array.isArray(view) ? view : [view]).map(u => u.gitCommitHash).find(Boolean) ?? null
+        live = showCommit(group)
         if (!live) problems.push(`the live ${version} update ${group.slice(0, 8)} records no git commit — lineage unknown`)
+      }
+      if (laneMode) {
+        if (!mainVersion) problems.push("cannot read origin/main's runtime — lane lineage unknown, refusing")
+        else {
+          mainGroup = page.find(g => g.runtimeVersion === mainVersion)?.group ?? null
+          if (!mainGroup) problems.push(`no production update found for main's runtime ${mainVersion} in the newest 50 — cannot prove the lane keeps every shipped fix, refusing`)
+          else if (!(mainLive = showCommit(mainGroup))) problems.push(`main's live ${mainVersion} update ${mainGroup.slice(0, 8)} records no git commit — lineage unknown`)
+        }
       }
     } catch (e) {
       problems.push(`could not ask EAS what runtime ${version} is running (${String(e.message).split('\n')[0]}) — lineage unknown, refusing`)
     }
     if (live) {
-      try { sh('git', ['cat-file', '-e', `${live}^{commit}`]) } catch { try { sh('git', ['fetch', '-q', 'origin']) } catch { /* reported below */ } }
-      let contains = false
-      try { sh('git', ['merge-base', '--is-ancestor', live, 'HEAD']); contains = true } catch { /* not an ancestor, or unknown */ }
-      const head = sh('git', ['rev-parse', '--short', 'HEAD'])
-      if (!contains) problems.push(`HEAD ${head} does NOT contain ${live.slice(0, 7)}, the commit runtime ${version} is running now (update ${group.slice(0, 8)}) — publishing would roll production back. Merge it in first.`)
-      console.log(`  ${contains ? '✓' : '✗'} runtime ${version} runs ${live.slice(0, 7)} (update ${group.slice(0, 8)}); HEAD ${head} ${contains ? 'contains it' : 'does NOT contain it'}`)
+      const ok = contains(live)
+      if (!ok) problems.push(`HEAD ${head} does NOT contain ${live.slice(0, 7)}, the commit runtime ${version} is running now (update ${group.slice(0, 8)}) — publishing would roll production back. Merge it in first.`)
+      console.log(`  ${ok ? '✓' : '✗'} runtime ${version} runs ${live.slice(0, 7)} (update ${group.slice(0, 8)}); HEAD ${head} ${ok ? 'contains it' : 'does NOT contain it'}`)
     } else if (!group && !problems.some(p => p.includes('could not ask EAS'))) {
-      console.log(`  · runtime ${version} has no production OTA yet — the embedded bundle is live; nothing to roll back`)
+      console.log(`  · runtime ${version} has no production OTA yet — the embedded bundle is live (the store builds below are what runs)`)
+    }
+    if (mainLive) {
+      const ok = contains(mainLive)
+      if (!ok) problems.push(`store lane: HEAD ${head} does NOT contain ${mainLive.slice(0, 7)}, the commit main's runtime ${mainVersion} is running now (update ${mainGroup.slice(0, 8)}) — a user moving to ${version} would lose that fix. Sync main into the lane first.`)
+      console.log(`  ${ok ? '✓' : '✗'} lane keeps main's runtime ${mainVersion} fixes: runs ${mainLive.slice(0, 7)} (update ${mainGroup.slice(0, 8)}); HEAD ${ok ? 'contains it' : 'does NOT contain it'}`)
+    }
+    // store builds of THIS runtime, newest finished production build per platform: HEAD must contain what the stores run
+    if (!problems.some(p => p.includes('could not ask EAS'))) {
+      try {
+        const rows = []
+        for (let n = 0; ; n++) {
+          if (n >= 10) throw new Error('more than 10 pages of builds')
+          const page = JSON.parse(sh('npx', [...EAS, 'build:list', '--platform', 'all', '--status', 'finished', '--build-profile', 'production', '--app-version', version, '--limit', '50', '--offset', String(n * 50), '--json', '--non-interactive']))
+          rows.push(...page)
+          if (page.length < 50) break
+        }
+        const builds = newestStoreBuilds(rows, version)
+        if (!builds.length) console.log(`  · no finished production store build of runtime ${version} on EAS — nothing the stores run to protect`)
+        const r = containsBuildCommits(builds, ROOT)
+        for (const b of r.contained) console.log(`  ✓ store build ${b.platform} (${b.appBuildVersion}) of ${version} was made from ${b.gitCommitHash.slice(0, 7)}; HEAD ${head} contains it`)
+        for (const b of r.missing) {
+          problems.push(`HEAD ${head} does NOT contain ${(b.gitCommitHash ?? '?').slice(0, 7)}, the commit store build ${b.platform} (${b.appBuildVersion}) of runtime ${version} was made from (${b.why}) — an OTA would replace code the store build embeds. Merge it in first.`)
+          console.log(`  ✗ store build ${b.platform} (${b.appBuildVersion}): ${b.why}`)
+        }
+      } catch (e) { problems.push(`could not read the production store builds of runtime ${version} from EAS (${String(e.message).split('\n')[0]}) — what the stores run is unknown, refusing`) }
     }
     console.log(`  ${dirty ? '✗' : '✓'} working tree: tracked files ${dirty ? 'MODIFIED' : 'clean'}`)
   }
