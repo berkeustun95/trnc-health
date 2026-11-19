@@ -19,8 +19,11 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 
 ## ⚠ Standing warnings
 - ⚠ **1.4.3 store lane (Berke, 2026-11-16): `feat/store-1.4.3`** = version 1.4.3 + changelogs 28 on top of main; main
-  stays the 1.4.2 OTA lane. Merge every main fix into the lane; 1.4.3 builds come from it; it merges into main only
-  when 1.4.3 is live in BOTH stores; never OTA from it.
+  stays the 1.4.2 OTA lane; 1.4.3 builds come from the lane; it merges into main only when 1.4.3 is live in BOTH
+  stores. **1.4.3 fixes (Berke, 2026-11-19):** fix PR to main first → sync PR main → lane → `npm run ota:preview`
+  from the lane → Berke's device check → his go on the exact lane SHA → `npm run ota` from that SHA, detached (the
+  `feat/store-*` exemption below). Lane-direct PRs only for code that exists only on the lane (the age-tick screens).
+  1.4.3 production OTAs are HELD while iOS 1.4.3 (29) is in App Review (see Release holds).
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
@@ -88,6 +91,16 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
 - **`release/*` lane exemption** (`scripts/lib/release-lane.mjs`, `npm run release-lane:test`): `ota:preview`'s "contains origin/main" and the Preview-lineage check are waived only on a `release/*` branch of a DIFFERENT runtime than main whose every non-merge commit is a `cherry-pick -x` of a commit on main touching the same paths (merge originals via `-m 1`): an exact blob match where the pre-image matches main's; where a file diverged, a verbatim `git patch-id` (diff pinned to -U3, no `GIT_DIFF_OPTS`) plus each hunk's pre-image occurring exactly once in the lane file, printed as "file diverged"; clean tree, merges only as PR merges whose tree equals the PR head; read from git, no flag, picks printed. Anything else still needs HEAD ⊇ main.
 - **Preview-lineage and `release/*` Previews:** from a non-release HEAD (main), a Preview built on an `origin/release/*` lane counts as contained only if every commit in `preview --not HEAD` is a PR merge or a `cherry-pick -x` copy of a commit in HEAD, proven by the same `provePick` as above (printed copy → original); anything else refuses and names the commit.
+- **`feat/store-*` lane exemption** (`scripts/lib/store-lane.mjs`, `npm run store-lane:test`, Berke 2026-11-19): a HEAD
+  whose runtime differs from main's may publish (Preview and production) only as a store lane, all read from git/GitHub,
+  no flag: L1 HEAD's version V ≠ main's, branch (if named) is `feat/store-V`, HEAD is on the pushed `origin/feat/store-V`;
+  L2 main's runtime is below V (main reaching V = "lane closed", the automatic end); L3 GitHub's rules for the lane show
+  pull_request + non_fast_forward + deletion (refuses until `refs/heads/feat/store-*` is in `protect-release-lanes`);
+  L4 clean tree. `ota:preview` still needs HEAD ⊇ origin/main (sync first) and prints the lane-only commits; any other
+  version mismatch is refused unless a proven `release/*` lane. Lane `npm run ota`: lineage checks only Previews on exactly
+  V and needs one built from a commit with HEAD's exact tree; preflight needs HEAD ⊇ main's live production commit and ⊇
+  the newest finished production store build per platform of V (every runtime, main included). From main, a Preview is
+  excused only if its runtime is newer than main's and it sits on `origin/feat/store-<its runtime>` (printed).
 - **ONE session at a time on the Preview channel and the test phone — the preview lock** (Berke, 2026-11-01:
   a Preview published minutes after another's replaced it on the phone mid-check, and an Expo Go session took the
   phone mid-run). Before `ota:preview` or ANY phone use (adb, screenshots, Expo Go):
@@ -115,7 +128,11 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
 - **Release holds** (`release-holds.json`, `scripts/check-release-holds.mjs`, Berke 2026-11-08): a merge on main
   that is NOT cleared for production. `npm run ota` refuses while HEAD contains an uncleared hold; no env override.
-  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. Held now: none (#404 re-landed as #417 and #392 re-landed as #432, both cleared after Berke's Preview check).
+  Clearing = `"cleared": true` in a PR, only after Berke's go in chat. A hold may also name a store-lane-only commit:
+  it then blocks that lane's production OTAs and never main's (main lacks the commit; holds are by ancestry, nothing
+  requires a main merge). **Held now: the 1.4.3 lane** (commit `03e738a0`, the lane's 1.4.3 version bump, its first
+  lane-only commit, so every lane HEAD carries it) while iOS 1.4.3 (29) is in App Review. Lift: after Apple approves 29
+  and Berke says go, a PR to main sets `"cleared": true`, then a sync PR carries it into the lane. Preview is unaffected.
 - **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
   refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
   (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
@@ -386,7 +403,8 @@ under the publish locks instead. Hermes has no vault, so the check passes there 
 Berke's gates are unchanged and stop the loop: migration apply, edge-function deploy, Preview device check
 before every production OTA, web deploy, flag flips, version bumps. One question per message.
 
-**Branch ruleset `protect-release-lanes`** (2026-10-12): `main`, `feat/voice-input`, `release/**` need a pull
+**Branch ruleset `protect-release-lanes`** (2026-10-12): `main`, `feat/voice-input`, `release/**` (and `feat/store-*`, added by
+Berke for the store-lane exemption; L3 refuses until GitHub shows it) need a pull
 request, no force-push, no deletion; only Berke's admin role bypasses (a Mac push prints "Bypassed rule
 violations" — expected). ⚠ Never add a write DEPLOY KEY: on this personal repo it counts as admin and bypasses.
 **Who merges** (Berke, 2026-10-23): Code on this Mac (`ada-claude-code[bot]`) merges its OWN PRs to `main`
