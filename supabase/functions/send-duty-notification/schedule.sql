@@ -1,16 +1,21 @@
 -- Duty notification schedule — documentation only. The live job is created by
--- supabase/migrations/20261103_duty_push_famagusta.sql (applied via supabase-migrate).
+-- supabase/migrations/20261103_duty_push_famagusta.sql (applied via supabase-migrate); schedule + shift by 20261221.
 -- To verify: gh workflow run supabase-readonly -f file=supabase/readonly/duty_push_schedule.sql
 --
--- One pg_cron job, 'duty-push', every 30 minutes ('0,30 * * * *', UTC). It POSTs only when
--- public.duty_push_due() says the current Asia/Famagusta (TRNC) 30-minute slot is today's
--- send time, so it stays on local time across DST (UTC+3 summer, UTC+2 winter):
+-- One pg_cron job, 'duty-push', at :27 and :57 past every hour ('27,57 * * * *', UTC), moved from '0,30 * * * *'
+-- by 20261221 (S3 time-shift experiment: the push goes out 3 minutes early). It POSTs only when
+-- public.duty_push_due() says the current Asia/Famagusta (TRNC) 30-minute slot, read 3 minutes ahead
+-- ((p_at + interval '3 minutes') before AT TIME ZONE), is today's send time, so it stays on local time
+-- across DST (UTC+3 summer, UTC+2 winter). The slot is unchanged; the call lands 3 minutes before it:
 --
---   Mon/Tue/Wed/Fri  17:00 TRNC   (30 min before 17:30 close)
---   Thursday         public.duty_thursday_closing_local() − 30 min
---                    winter 17:30 → 17:00 · summer 13:30 → 13:00
---   Saturday         13:00 TRNC   (30 min before 13:30 close)
---   Sunday           08:00 TRNC   (at pharmacy open time)
+--   Mon/Tue/Wed/Fri  16:57 TRNC   (slot 17:00, 30 min before 17:30 close)
+--   Thursday         public.duty_thursday_closing_local() − 30 min − 3 min
+--                    winter 17:30 → 16:57 · summer 13:30 → 12:57
+--   Saturday         12:57 TRNC   (slot 13:00, 30 min before 13:30 close)
+--   Sunday           07:57 TRNC   (slot 08:00, pharmacy open time)
+--
+-- The weekend digest (weekend_digest_due, 'weekend-digest') stays at 17:00 on Fridays as the comparison.
+-- Rollback = 20261222_duty_push_shift_rollback.sql (restores 17:00 and '0,30 * * * *'), applied only on Berke's go.
 --
 -- Seasonal switch = a migration that CREATE OR REPLACEs duty_thursday_closing_local() with the
 -- new time, plus the 1103 H token in verify_schema.sql.
