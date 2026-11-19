@@ -125,7 +125,7 @@ const tests = [
   }],
   ['lineage lane mode: a missing 1.4.3 Preview (not in HEAD) refuses, named', f => {
     const bad = f.side(f.bump, 'unlanded'); f.previews([{ rv: '1.4.3', commit: f.bump }, { rv: '1.4.3', commit: bad }])
-    const r = f.run('check-preview-lineage.mjs'); return r.code === 1 && r.out.includes(bad.slice(0, 7)) && /NOT in HEAD/.test(r.out)
+    const r = f.run('check-preview-lineage.mjs'); return r.code === 1 && r.out.includes(bad.slice(0, 7)) && /problem\(s\) with the Previews on 1\.4\.3/.test(r.out) && /not in HEAD/.test(r.out)
   }],
   ['lineage lane mode: no 1.4.3 Preview with HEAD\'s tree refuses', f => {
     f.laneCommit(true); f.previews([{ rv: '1.4.3', commit: f.bump }])
