@@ -35,8 +35,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   `main` only; since 2026-10-12), plus `production-storage`'s OWN secret key (below) — never repo-level, never on this Mac, never in the Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
   writer = new `workflow_dispatch` workflow, dry by default.
 - ⚠ **Supabase CLI on this Mac (Berke, 2026-10-07; replaces the 2026-10-01 "never `supabase login`").**
-  Long-term login in the Keychain ("Supabase CLI"), token scoped to trnc-health only: Project Settings
-  read; Database, Edge Functions, Edge Function Secrets read-write; NO API-keys read (so `supabase link`
+  Long-term login in the Keychain ("Supabase CLI"); since 2026-11-19 the token "ADA Mac – Claude Code (logs)",
+  scoped to trnc-health only: Project Settings read; Database, Edge Functions, Edge Function Secrets read-write;
+  Logs read (`analytics_logs_read`: read-only `GET /v1/projects/<ref>/analytics/endpoints/logs`, ClickHouse SQL on one
+  `logs` table; `logs.all` is removed); NO API-keys read (so `supabase link`
   fails — not needed, and it keeps the service key unreadable). Always through `scripts/sb.sh` (token +
   `--project-ref`; CLI 2.104.0's `secrets` ignores the Keychain; allowlist: `functions`/`secrets` only).
   Claude sets function secrets itself
