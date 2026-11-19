@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const libPath = process.env.STORE_LANE_LIB ? resolve(process.env.STORE_LANE_LIB) : resolve(here, 'lib/store-lane.mjs')
-const { assessStoreLane, previewExcusedByStoreLane, laneLineageScope, treePreviewed, containsBuildCommits, newestStoreBuilds } = await import(pathToFileURL(libPath).href)
+const { assessStoreLane, previewExcusedByStoreLane, laneLineageScope, treePreviewed, containsBuildCommits, newestStoreBuilds, assessStoreBuildRows, nextLaneAllowance } = await import(pathToFileURL(libPath).href)
 
 const cfg = v => `module.exports = { expo: {\n  version: '${v}',\n  runtimeVersion: { policy: 'appVersion' },\n} }\n`
 const PROT = () => ['deletion', 'non_fast_forward', 'pull_request']
@@ -63,6 +63,9 @@ function fixture() {
   // a Preview commit that is NOT on origin's lane: a side branch from the lane bump (1.4.3) or from main base (1.4.2)
   f.side = (from, name) => { const cur = g('rev-parse', '--abbrev-ref', 'HEAD'); g('checkout', '-qb', `side-${name}`, from); w(`${name}.txt`, 'x\n'); g('add', `${name}.txt`); g('commit', '-qm', name); const c = g('rev-parse', 'HEAD'); g('checkout', '-q', cur); return c }
   f.main = () => g('checkout', '-q', 'main')
+  // feat/voice-input at 1.4.0 (pushed), then main moves on; hermes() = a two-parent merge of main INTO a voice-input commit
+  f.voice = () => { const cur = g('rev-parse', '--abbrev-ref', 'HEAD'); g('checkout', '-qb', 'feat/voice-input', f.mainBase); w('app.config.js', cfg('1.4.0')); g('commit', '-qam', 'voice 1.4.0'); g('push', '-q', 'origin', 'feat/voice-input'); const c = g('rev-parse', 'HEAD'); g('checkout', '-q', 'main'); w('m.txt', 'main moved\n'); g('add', 'm.txt'); g('commit', '-qm', 'main moves'); g('push', '-q', 'origin', 'main'); g('checkout', '-q', cur); return c }
+  f.hermes = () => { const v = f.voice(); g('checkout', '-q', '-B', 'agent/x-14', v); g('merge', '-q', '--no-ff', '-m', 'merge main', 'origin/main'); return v }
   f.lane = () => g('checkout', '-q', 'feat/store-1.4.3')
   f.bumpMain = () => { f.main(); w('app.config.js', cfg('1.4.3')); g('commit', '-qam', 'main reaches 1.4.3'); g('push', '-q', 'origin', 'main') }
   f.previews = groups => {
@@ -99,13 +102,13 @@ const tests = [
   ['L3 asks for the lane branch by name (the rules of feat/store-1.4.3, not main)', f => { let asked = null; assess(f, b => { asked = b; return PROT() }); return asked === 'feat/store-1.4.3' }],
 
   // ── pure deciders ──
-  ['excuse: main HEAD (1.4.2) excuses a 1.4.3 Preview built on the pushed lane', f => { f.main(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2' }); return r.excused && /origin\/feat\/store-1\.4\.3/.test(r.why) }],
-  ['excuse: not a 1.4.3 Preview built off the lane (commit not on origin/feat/store-1.4.3)', f => { f.main(); const c = f.side(f.bump, 'offlane'); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: c, previewRuntime: '1.4.3', headRuntime: '1.4.2' }); return !r.excused && /not on origin\/feat\/store-1\.4\.3/.test(r.why) }],
-  ['excuse: not after main reaches 1.4.3 (HEAD runtime = the Preview runtime)', f => { f.bumpMain(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.3' }); return !r.excused }],
-  ['excuse: not for HEAD\'s own runtime even while main is still below it (HEAD on the lane, Preview on the lane)', f => { const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.3' }); return !r.excused && /HEAD's own runtime/.test(r.why) }],
-  ['excuse: not once origin/main is 1.4.3 even while HEAD still says 1.4.2 (not newer than main)', f => { f.bumpMain(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2' }); return !r.excused && /not newer than main/.test(r.why) }],
-  ['excuse: not a 1.4.2 feature-branch Preview (HEAD\'s own runtime)', f => { f.main(); const c = f.side(f.mainBase, 'feat142'); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: c, previewRuntime: '1.4.2', headRuntime: '1.4.2' }); return !r.excused }],
-  ['excuse: not a newer runtime with no lane on origin (1.4.9 Preview)', f => { f.main(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.9', headRuntime: '1.4.2' }); return !r.excused && /does not exist/.test(r.why) }],
+  ['excuse: main HEAD (1.4.2) excuses a 1.4.3 Preview built on the pushed lane', f => { f.main(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2', ruleTypes: PROT }); return r.excused && /origin\/feat\/store-1\.4\.3/.test(r.why) }],
+  ['excuse: not a 1.4.3 Preview built off the lane (commit not on origin/feat/store-1.4.3)', f => { f.main(); const c = f.side(f.bump, 'offlane'); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: c, previewRuntime: '1.4.3', headRuntime: '1.4.2', ruleTypes: PROT }); return !r.excused && /not on origin\/feat\/store-1\.4\.3/.test(r.why) }],
+  ['excuse: not after main reaches 1.4.3 (HEAD runtime = the Preview runtime)', f => { f.bumpMain(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.3', ruleTypes: PROT }); return !r.excused }],
+  ['excuse: not for HEAD\'s own runtime even while main is still below it (HEAD on the lane, Preview on the lane)', f => { const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.3', ruleTypes: PROT }); return !r.excused && /HEAD's own runtime/.test(r.why) }],
+  ['excuse: not once origin/main is 1.4.3 even while HEAD still says 1.4.2 (not newer than main)', f => { f.bumpMain(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2', ruleTypes: PROT }); return !r.excused && /not newer than main/.test(r.why) }],
+  ['excuse: not a 1.4.2 feature-branch Preview (HEAD\'s own runtime)', f => { f.main(); const c = f.side(f.mainBase, 'feat142'); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: c, previewRuntime: '1.4.2', headRuntime: '1.4.2', ruleTypes: PROT }); return !r.excused }],
+  ['excuse: not a newer runtime with no lane on origin (1.4.9 Preview)', f => { f.main(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.9', headRuntime: '1.4.2', ruleTypes: PROT }); return !r.excused && /does not exist/.test(r.why) }],
   ['scope: lane mode checks exactly its runtime — 1.4.3 in, 1.4.2 and 1.4.4 and 1.4.30 out', () => laneLineageScope('1.4.3', '1.4.3') === true && laneLineageScope('1.4.3', '1.4.2') === false && laneLineageScope('1.4.3', '1.4.4') === false && laneLineageScope('1.4.3', '1.4.30') === false],
   ['tree: a Preview commit with HEAD\'s tree is accepted, even under another SHA', f => { f.g('commit', '-q', '--allow-empty', '-m', 'same tree, new sha'); const twin = f.rev('HEAD'); const r = treePreviewed(f.tree('HEAD'), [f.bump, twin], f.dir); return r.ok && r.matches.includes(twin) && r.matches.length === 2 }],
   ['tree: no Preview with HEAD\'s tree (an ancestor with another tree) is refused; an unknown commit is no match', f => { f.laneCommit(false); const r = treePreviewed(f.tree('HEAD'), [f.bump, 'deadbeef'.repeat(5)], f.dir); return !r.ok && r.matches.length === 0 }],
@@ -117,6 +120,19 @@ const tests = [
     const r = newestStoreBuilds([row('IOS', '24', 'old'), row('IOS', '29', 'new'), row('ANDROID', '33', 'andr'), row('ANDROID', '34', 'internal', { distribution: 'INTERNAL' }), row('IOS', '30', 'err', { status: 'ERRORED' }), row('IOS', '31', 'other', { appVersion: '1.4.2', runtime: { version: '1.4.2' } })], '1.4.3')
     return r.map(b => b.gitCommitHash).sort().join() === 'andr,new'
   }],
+
+  ['next lane: a Hermes-shaped merge (first parent on feat/voice-input, 1.4.0) is allowed, one line printed', f => { f.hermes(); const r = nextLaneAllowance({ cwd: f.dir }); return r.allowed && /next lane: runtime 1\.4\.0 = origin\/feat\/voice-input, first parent on it/.test(r.why) }],
+  ['next lane: a different version whose first parent is NOT on voice-input refuses', f => { f.voice(); f.main(); f.g('checkout', '-qb', 'feat/other'); f.w('app.config.js', cfg('1.4.0')); f.g('commit', '-qam', 'own 1.4.0'); const r = nextLaneAllowance({ cwd: f.dir }); return !r.allowed && /neither HEAD nor its first parent/.test(r.why) }],
+  ['next lane: a version equal to neither main nor voice-input refuses even with a first parent on voice-input', f => { f.hermes(); f.w('app.config.js', cfg('1.9.9')); f.g('commit', '-qam', 'odd version'); const r = nextLaneAllowance({ cwd: f.dir }); return !r.allowed && /is not origin\/feat\/voice-input's 1\.4\.0/.test(r.why) }],
+  ['next lane: no origin/feat/voice-input at all refuses', f => { const r = nextLaneAllowance({ cwd: f.dir }); return !r.allowed }],
+  ['preflight builds: rows present but none parsed refuses, saying so', () => { const r = assessStoreBuildRows([{ platform: 'IOS', renamedStatus: 'FINISHED' }, { platform: 'ANDROID' }], '1.4.2'); return r.builds.length === 0 && /EAS returned 2 production build rows for runtime 1\.4\.2 but none parsed/.test(r.problem) }],
+  ['preflight builds: zero rows is no problem (printed pass); parsed rows are no problem', () => {
+    const row = { platform: 'IOS', appBuildVersion: '19', gitCommitHash: 'abc', status: 'FINISHED', buildProfile: 'production', distribution: 'STORE', runtime: { version: '1.4.2' } }
+    return assessStoreBuildRows([], '1.4.2').problem === null && assessStoreBuildRows([row], '1.4.2').problem === null && assessStoreBuildRows([row], '1.4.2').builds.length === 1
+  }],
+  ['excuse: an unprotected feat/store-<runtime> (no rules) does not excuse, lacking rules named', f => { f.main(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2', ruleTypes: () => [] }); return !r.excused && /not protected \(lacking \[deletion, non_fast_forward, pull_request\]\)/.test(r.why) }],
+  ['excuse: unreadable rules do not excuse, with the reason', f => { f.main(); const r = previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2', ruleTypes: () => { throw new Error('gh: HTTP 401') } }); return !r.excused && /cannot read the branch rules.*HTTP 401/.test(r.why) }],
+  ['excuse: asks the rules of the PREVIEW runtime lane by name', f => { f.main(); let asked = null; previewExcusedByStoreLane({ cwd: f.dir, previewCommit: f.bump, previewRuntime: '1.4.3', headRuntime: '1.4.2', ruleTypes: b => { asked = b; return PROT() } }); return asked === 'feat/store-1.4.3' }],
 
   // ── end-to-end: the real check scripts in the throwaway repo ──
   ['lineage lane mode: a missing 1.4.2 Preview is ignored, a Preview of HEAD\'s tree on 1.4.3 passes', f => {
@@ -166,6 +182,12 @@ const tests = [
   ['ota:preview target: a stray branch whose version differs from main (no lane) refuses', f => {
     f.main(); f.g('checkout', '-qb', 'feat/stray'); f.w('app.config.js', cfg('1.4.9')); f.g('commit', '-qam', 'stray bump')
     const r = f.run('check-ota-preview-target.mjs'); return r.code === 1 && /neither a store lane nor a proven release\/\* lane/.test(r.out)
+  }],
+  ['ota:preview target: a Hermes-shaped 1.4.0 merge on voice-input passes and prints the next-lane line', f => { f.hermes(); const r = f.run('check-ota-preview-target.mjs'); return r.code === 0 && /next lane: runtime 1\.4\.0 = origin\/feat\/voice-input, first parent on it/.test(r.out) }],
+  ['ota:preview target: a 1.4.0 HEAD whose first parent is off voice-input still refuses', f => { f.voice(); f.main(); f.g('checkout', '-qb', 'feat/other2'); f.w('app.config.js', cfg('1.4.0')); f.g('commit', '-qam', 'own 1.4.0'); const r = f.run('check-ota-preview-target.mjs'); return r.code === 1 && /neither a store lane nor a proven release/.test(r.out) }],
+  ['lineage main: an unprotected lane (rules unreadable) no longer excuses the 1.4.3 Preview', f => {
+    f.main(); f.rules([]); f.previews([{ rv: '1.4.3', commit: f.bump }])
+    const r = f.run('check-preview-lineage.mjs'); return r.code === 1 && !/store lane: built on/.test(r.out)
   }],
   ['ota:preview target (positive control): main itself passes, no store-lane noise', f => { f.main(); const r = f.run('check-ota-preview-target.mjs'); return r.code === 0 && !/store lane/.test(r.out) }],
   ['ota:preview target: a lane that lacks origin/main still refuses (HEAD must contain main)', f => {

@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assessReleaseLane, describeLane } from './lib/release-lane.mjs'
-import { assessStoreLane, describeStoreLane } from './lib/store-lane.mjs'
+import { assessStoreLane, describeStoreLane, nextLaneAllowance } from './lib/store-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -71,7 +71,9 @@ try {
   if (store.applies) console.log(describeStoreLane(store).map(l => `    ${l}`).join('\n'))
   if (store.versionDiffers && !store.exempt) {
     const rel = lane ?? assessReleaseLane({ cwd: ROOT })
-    if (!rel.exempt) problems.push(`HEAD's runtime ${store.version} differs from origin/main's ${store.mainVersion} and HEAD is neither a store lane nor a proven release/* lane:\n      ${store.applies ? describeStoreLane(store).join('\n      ') : `not on a feat/store-${store.version} lane (no origin/feat/store-${store.version}, branch ${store.branch ?? 'detached'})`}`)
+    const next = rel.exempt ? null : nextLaneAllowance({ cwd: ROOT })
+    if (next?.allowed) console.log(`    ${next.why}`)
+    else if (!rel.exempt) problems.push(`HEAD's runtime ${store.version} differs from origin/main's ${store.mainVersion} and HEAD is neither a store lane nor a proven release/* lane:\n      ${store.applies ? describeStoreLane(store).join('\n      ') : `not on a feat/store-${store.version} lane (no origin/feat/store-${store.version}, branch ${store.branch ?? 'detached'})`}`)
   }
 }
 // (e)

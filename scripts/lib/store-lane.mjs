@@ -120,7 +120,7 @@ export const laneLineageScope = (laneVersion, previewRuntime) => typeof previewR
 
 // Main side: may a Preview that HEAD lacks be excused because it was built on a store lane? All must hold:
 // its runtime is not HEAD's, it is newer than main's, origin/feat/store-<its runtime> exists and contains the commit.
-export function previewExcusedByStoreLane({ cwd, previewCommit, previewRuntime, headRuntime }) {
+export function previewExcusedByStoreLane({ cwd, previewCommit, previewRuntime, headRuntime, ruleTypes = ghRuleTypes }) {
   const no = why => ({ excused: false, why })
   if (!previewCommit || !semver(previewRuntime)) return no('no commit or no x.y.z runtime')
   if (previewRuntime === headRuntime) return no(`runtime ${previewRuntime} is HEAD's own runtime`)
@@ -130,7 +130,37 @@ export function previewExcusedByStoreLane({ cwd, previewCommit, previewRuntime, 
   const lane = `origin/feat/store-${previewRuntime}`
   if (!succeeds(cwd, 'rev-parse', '--verify', '-q', `refs/remotes/${lane}^{commit}`)) return no(`${lane} does not exist`)
   if (!succeeds(cwd, 'merge-base', '--is-ancestor', previewCommit, lane)) return no(`${previewCommit.slice(0, 7)} is not on ${lane}`)
+  try {
+    const rules = new Set(ruleTypes(`feat/store-${previewRuntime}`))
+    const lacking = REQUIRED_RULES.filter(r => !rules.has(r))
+    if (lacking.length) return no(`${lane} is not protected (lacking [${lacking.join(', ')}])`)
+  } catch (e) { return no(`cannot read the branch rules for ${lane} (${String(e.message).split('\n')[0]}) — protection unknown`) }
   return { excused: true, why: `built on ${lane} (runtime ${previewRuntime} ahead of main ${main.version})`, lane }
+}
+
+// ota:preview from the Hermes 1.4.0 flow (ops/hermes/ada-publish cmd_preview): HEAD is a merge of main into a feat/voice-input
+// commit. Allowed only when HEAD's runtime equals app.config.js's version at NEXT_LANE and HEAD^1 (or HEAD) is on NEXT_LANE.
+export const NEXT_LANE = 'origin/feat/voice-input'
+export function nextLaneAllowance({ cwd, fetch = true }) {
+  const no = why => ({ allowed: false, why })
+  if (fetch) fetchQuiet(cwd, 'feat/voice-input')
+  const head = runtimeAt(cwd, 'HEAD'), lane = runtimeAt(cwd, NEXT_LANE)
+  if (head.error) return no(head.error)
+  if (lane.error) return no(lane.error)
+  if (head.version !== lane.version) return no(`runtime ${head.version} is not ${NEXT_LANE}'s ${lane.version}`)
+  const first = succeeds(cwd, 'rev-parse', '--verify', '-q', 'HEAD^1^{commit}') ? 'HEAD^1' : 'HEAD'
+  if (!succeeds(cwd, 'merge-base', '--is-ancestor', first, NEXT_LANE) && !succeeds(cwd, 'merge-base', '--is-ancestor', 'HEAD', NEXT_LANE)) return no(`neither HEAD nor its first parent is on ${NEXT_LANE}`)
+  return { allowed: true, why: `next lane: runtime ${head.version} = ${NEXT_LANE}, first parent on it` }
+}
+
+// Preflight: EAS build rows → the newest finished store build per platform. Rows present but none parsed = the field names
+// changed (or the shape is wrong): a refusal, never a silent pass. Zero rows is the legitimate "nothing the stores run".
+export function assessStoreBuildRows(rows, version) {
+  const builds = newestStoreBuilds(rows, version)
+  const problem = rows.length > 0 && builds.length === 0
+    ? `EAS returned ${rows.length} production build rows for runtime ${version} but none parsed as a finished store build — field names changed? refusing`
+    : null
+  return { builds, problem }
 }
 
 // Lane mode: some Preview must have been built from a commit whose TREE equals HEAD's (the exact code being published).

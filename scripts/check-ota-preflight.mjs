@@ -35,7 +35,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assessStoreLane, describeStoreLane, runtimeAt, newestStoreBuilds, containsBuildCommits } from './lib/store-lane.mjs'
+import { assessStoreLane, describeStoreLane, runtimeAt, assessStoreBuildRows, containsBuildCommits } from './lib/store-lane.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EAS = ['-y', 'eas-cli@24.7.0']
@@ -185,8 +185,9 @@ console.log('\nOTA preflight')
           rows.push(...page)
           if (page.length < 50) break
         }
-        const builds = newestStoreBuilds(rows, version)
-        if (!builds.length) console.log(`  · no finished production store build of runtime ${version} on EAS — nothing the stores run to protect`)
+        const { builds, problem } = assessStoreBuildRows(rows, version)
+        if (problem) problems.push(problem)
+        if (!builds.length && !problem) console.log(`  · no finished production store build of runtime ${version} on EAS — nothing the stores run to protect`)
         const r = containsBuildCommits(builds, ROOT)
         for (const b of r.contained) console.log(`  ✓ store build ${b.platform} (${b.appBuildVersion}) of ${version} was made from ${b.gitCommitHash.slice(0, 7)}; HEAD ${head} contains it`)
         for (const b of r.missing) {
