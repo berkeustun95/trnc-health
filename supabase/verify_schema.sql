@@ -171,6 +171,8 @@ WITH report AS (
                 WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- 20261219: 13+ tick (Apple 5.1.1(v)); registered ahead of the apply; red until it runs.
+    ('20261219_age_confirmed_at','profiles','age_confirmed_at'),
     -- Ehliyet driving schools (1108): registered ahead of the apply; red until it runs.
     ('1108_driving_schools','driving_schools','id'),
     ('1108_driving_schools','driving_schools','name'),
@@ -641,6 +643,8 @@ WITH report AS (
                 WHERE n.nspname='public' AND p.proname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
+    ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
     ('1103_duty_push_famagusta','duty_push_due'),
     ('20261177_weekend_digest_schedule','weekend_digest_due'),
@@ -880,6 +884,8 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
+    ('20261219_age_confirmed_at','profiles_age_confirmed_stamp'),
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages_rate_guard'),
     -- Araçlar (20261165/20261166): registered ahead of the apply; red until it runs.
@@ -4508,40 +4514,53 @@ WITH report AS (
           AND pg_get_functiondef(p.oid) LIKE '%Yeni mesaj isteği%'
           AND pg_get_functiondef(p.oid) LIKE '%200C%'
           AND pg_get_functiondef(p.oid) LIKE '%2026%')
-    -- ══ completion check loses institution_id (20261030) ════════════════════
-    -- THE CONSTRAINT NAME DID NOT CHANGE. Section E asserts
-    -- profiles_completion_requires_fields_check is PRESENT and stays green word for word
-    -- over the OLD definition, so this is the only row in the report that can tell a
-    -- database with 20261030 applied from one without it.
-    --
-    -- It matters more than a usual behaviour token, in both directions:
-    --   • UNAPPLIED, with the OTA shipped: ProfileScreen's education editor writes the
-    --     institution to student_education and never to profiles, so every path into
-    --     university-level student status ends in a 23514 the user cannot clear.
-    --   • UNAPPLIED, when 20261027 runs: DROP COLUMN institution_id FAILS, because a
-    --     multi-column CHECK still references it.
-    --
-    -- Both directions asserted, because either alone certifies a blind spot: the ABSENCE
-    -- of institution_id (the point of the file) AND the presence of the arms that must
-    -- have survived (without which a constraint rewritten down to nothing would pass the
-    -- absence half and silently stop guarding profile completion entirely).
-    UNION ALL SELECT '1030_completion_check','completion check no longer requires institution_id, and still guards the rest',
-      EXISTS(SELECT 1 FROM pg_constraint c
-        WHERE c.conname='profiles_completion_requires_fields_check'
+    -- ══ completion check takes the 13+ tick instead of date of birth (20261219) ═══
+    -- RETIRES '1030_completion_check' (one count, one owner): that token asserted
+    -- ILIKE '%nationality_code%', which 20261219 removes on purpose. Its other halves (no
+    -- institution_id, no phone, the surviving arms) are carried here, read from the live
+    -- pg_get_constraintdef. THE CONSTRAINT NAME DID NOT CHANGE, so section E is blind to it.
+    -- Both directions: the tick arm present AND nationality gone, AND every arm that must
+    -- have survived (a constraint rewritten down to nothing would pass the absence half).
+    UNION ALL SELECT '1219_completion_check','completion check accepts date_of_birth OR age_confirmed_at, no nationality, and still guards the rest',
+      COALESCE((SELECT bool_and(
+          pg_get_constraintdef(c.oid) = 'CHECK (((profile_completed_at IS NULL) OR ((first_name IS NOT NULL) AND (last_name IS NOT NULL) AND (display_name IS NOT NULL) AND ((date_of_birth IS NOT NULL) OR ((age_confirmed_at IS NOT NULL) AND (age_ineligible IS NOT TRUE))) AND (region IS NOT NULL) AND (resident_status IS NOT NULL) AND ((resident_status <> ''student''::text) OR (student_level IS NOT NULL)))))'
+          OR (
+          pg_get_constraintdef(c.oid) ILIKE '%age_confirmed_at%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%age_ineligible IS NOT TRUE%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%date_of_birth%'
+          AND pg_get_constraintdef(c.oid) NOT ILIKE '%nationality%'
           AND pg_get_constraintdef(c.oid) NOT ILIKE '%institution_id%'
-          -- phone's ABSENCE, and this half is the older debt. It was removed from the live
-          -- constraint BY HAND on or before 2026-09-12 (the DB half of 721c0d3, which says
-          -- so in its own message), and the recording migration + H token that commit and
-          -- 2026-09-12_phone-optional.md both named as the follow-up were never written.
-          -- For six days the repo said the constraint required phone and prod did not, and
-          -- nothing in this report could tell the difference — section E checks the NAME.
-          -- This is that follow-up.
           AND pg_get_constraintdef(c.oid) NOT ILIKE '%phone%'
           AND pg_get_constraintdef(c.oid) ILIKE '%first_name%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%last_name%'
           AND pg_get_constraintdef(c.oid) ILIKE '%display_name%'
-          AND pg_get_constraintdef(c.oid) ILIKE '%nationality_code%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%region%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%resident_status%'
           AND pg_get_constraintdef(c.oid) ILIKE '%student_level%'
-          AND pg_get_constraintdef(c.oid) ILIKE '%profile_completed_at%')
+          AND pg_get_constraintdef(c.oid) ILIKE '%profile_completed_at%'))
+        FROM pg_constraint c
+        WHERE c.conrelid = to_regclass('public.profiles')
+          AND c.conname='profiles_completion_requires_fields_check'), false)
+    -- stamp_age_confirmed_at() body (20261219): CREATE OR REPLACE creates no named object, so only a
+    -- behaviour token sees a rewrite. It must keep OLD.age_confirmed_at (the client cannot move a set
+    -- value) and is_admin() (only an admin clears it); dropping either lets a client erase or rewrite
+    -- the 13+ consent stamp.
+    UNION ALL SELECT '1219_age_stamp_body','stamp_age_confirmed_at() keeps OLD.age_confirmed_at and is_admin()',
+      COALESCE((SELECT pg_get_functiondef(p.oid) LIKE '%OLD.age_confirmed_at%'
+                   AND pg_get_functiondef(p.oid) LIKE '%is_admin()%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.stamp_age_confirmed_at()')), false)
+    -- age_confirmed_at stamp trigger (20261219): timing and enabled state, and the function
+    -- is not EXECUTE-able by the API roles. aclexplode, so an absent function reads false
+    -- instead of killing the report.
+    UNION ALL SELECT '1219_age_stamp_trigger','age_confirmed_at stamp trigger is BEFORE INSERT OR UPDATE OF, enabled, function closed to anon/authenticated',
+      COALESCE((SELECT bool_and(pg_get_triggerdef(t.oid) LIKE '%BEFORE INSERT OR UPDATE OF age_confirmed_at%' AND t.tgenabled <> 'D')
+                  FROM pg_trigger t WHERE t.tgrelid = to_regclass('public.profiles')
+                   AND t.tgname='profiles_age_confirmed_stamp' AND NOT t.tgisinternal), false)
+      AND to_regprocedure('public.stamp_age_confirmed_at()') IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p, aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
+                      WHERE p.oid = to_regprocedure('public.stamp_age_confirmed_at()')
+                        AND (a.grantee = 0 OR a.grantee IN (SELECT oid FROM pg_roles WHERE rolname IN ('anon','authenticated')))
+                        AND a.privilege_type = 'EXECUTE')
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
@@ -5071,6 +5090,10 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261152_bidda_badadez_activate.sql')
       OR COALESCE((SELECT p.is_active IS NOT DISTINCT FROM true AND to_jsonb(p)->>'order_method' = 'phone' AND p.whatsapp IS NULL
                      FROM public.eatery_partners p WHERE p.slug = 'bidda-badadez'), false)
+    UNION ALL SELECT '20261220_crunchy_order_status_on','crunchy-express order_status_enabled = true, once 1220 is applied; red later = order status was switched off for it, review it',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261220_crunchy_order_status_on.sql')
+      OR COALESCE((SELECT p.order_status_enabled IS NOT DISTINCT FROM true
+                     FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
     -- 1151: eatery_partners.banner_path. Nullable text, NO default, no column-level ACL (the table-level SELECT covers it), the CHECK is
     --       logo_path_check with the column renamed (compared as renamed text, so no regex decoding; the rendering is PG-18-only until read from
     --       prod), the COMMENT names the bucket, launch_complete_check does NOT mention banner_path (a banner is optional), anon/authenticated

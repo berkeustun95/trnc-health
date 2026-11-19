@@ -894,18 +894,18 @@ export default function ProfileSetupScreen({
             <>
               {!hideFirst && (
                 <Field label={t('pgFirstName', lang)}>
-                  <TextInput style={s.input} value={firstName} onChangeText={setFirstName}
+                  <TextInput style={s.input} value={firstName} onChangeText={setFirstName} accessibilityLabel={t('pgFirstName', lang)}
                     autoCapitalize="words" autoCorrect={false} />
                 </Field>
               )}
               {!hideLast && (
                 <Field label={t('pgLastName', lang)}>
-                  <TextInput style={s.input} value={lastName} onChangeText={setLastName}
+                  <TextInput style={s.input} value={lastName} onChangeText={setLastName} accessibilityLabel={t('pgLastName', lang)}
                     autoCapitalize="words" autoCorrect={false} />
                 </Field>
               )}
               <Field label={t('pgDisplayName', lang)} hint={t('pgDisplayNameHint', lang)}>
-                <TextInput style={s.input} value={displayName} onChangeText={setDisplayName}
+                <TextInput style={s.input} value={displayName} onChangeText={setDisplayName} accessibilityLabel={t('pgDisplayName', lang)}
                   autoCapitalize="none" autoCorrect={false} maxLength={DISPLAY_NAME_MAX} />
                 <NameFeedback state={nameState} lang={lang} onPick={n => setDisplayName(n)} />
               </Field>
@@ -931,7 +931,7 @@ export default function ProfileSetupScreen({
               <Field label={t('pgPhone', lang)}>
                 <View style={s.phoneRow}>
                   <SelectField value={cc || ''} placeholder={t('pgPhoneCountry', lang)} onPress={() => setPicker('cc')} />
-                  <TextInput style={[s.input, { flex: 1 }]} value={phone} onChangeText={setPhone}
+                  <TextInput style={[s.input, { flex: 1 }]} value={phone} onChangeText={setPhone} accessibilityLabel={t('pgPhone', lang)}
                     keyboardType="phone-pad" maxLength={15} />
                 </View>
                 {phone.trim() && !/^\d{4,15}$/.test(phone.trim())
