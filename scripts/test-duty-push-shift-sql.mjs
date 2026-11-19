@@ -260,11 +260,13 @@ console.log('── refusals (the file stops, nothing applied)')
 
 console.log('── apply window: the file at a controlled clock (harness clock_timestamp(); 20261210 gate, slot [17:00,17:30) local weekdays)')
 const REFUSAL = "within 20 minutes of today's duty push slot"
-const attempt = async (localIso, sql = SHIFT_SQL) => {
+const attemptDb = async (localIso, sql = SHIFT_SQL) => {
   const d = await base()
   await clock(d, localIso)
-  return run(d, nonotify(sql))
+  const r = await run(d, nonotify(sql))
+  return { r, d }
 }
+const attempt = async (localIso, sql = SHIFT_SQL) => (await attemptDb(localIso, sql)).r
 const dayName = iso => new Date(iso.slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
 const WIN = [
   ['2026-11-20 16:30', false], ['2026-11-20 16:39:59', false], ['2026-11-20 16:40', true], ['2026-11-20 16:58', true], ['2026-11-20 17:10', true],
@@ -280,8 +282,10 @@ for (const [iso, refuse] of WIN) {
   if (refused && iso.endsWith('16:58') && iso.startsWith('2026-11-20')) console.log(`      message: ${r.msg}`)
 }
 {
-  const r = await attempt('2026-11-20 16:58')
-  t('refusal leaves nothing applied (schedule still 0,30, gate unshifted)', [r.ok, (await (await base()).query(`SELECT schedule FROM cron.job WHERE jobname='duty-push'`)).rows[0].schedule], [false, '0,30 * * * *'])
+  const { r, d } = await attemptDb('2026-11-20 16:58')
+  await d.exec('ROLLBACK')
+  const after = await d.query(`SELECT (SELECT schedule FROM cron.job WHERE jobname='duty-push') sched, pg_get_functiondef('public.duty_push_due(timestamptz)'::regprocedure) def`)
+  t('refusal leaves nothing applied (schedule still 0,30, gate unshifted)', [r.ok, after.rows[0].sched, after.rows[0].def.includes("interval '3 minutes'")], [false, '0,30 * * * *', false])
 }
 {
   const IF_BLOCK = SHIFT_SQL.slice(SHIFT_SQL.indexOf('  IF EXISTS (SELECT 1 FROM generate_series(clock_timestamp()'), SHIFT_SQL.indexOf('  -- captured, compared again at the end'))
