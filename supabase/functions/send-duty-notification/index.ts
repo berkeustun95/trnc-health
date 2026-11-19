@@ -81,6 +81,7 @@ serve(async (req) => {
     console.error('send-duty-notification: caller refused')
     return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
   }
+  const runStartMs = Date.now()
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -192,7 +193,7 @@ serve(async (req) => {
   let batchesAccepted = 0
   let batchesFailed = 0
   for (let i = 0; i < messages.length; i += 100) {
-    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch })
+    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch, diag: { group: i / 100, runStartMs } })
     pushOk += r.ok
     if (r.accepted) batchesAccepted++
     else batchesFailed++
