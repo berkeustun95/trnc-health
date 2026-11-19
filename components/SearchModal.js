@@ -42,7 +42,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
-import { colors, radius } from '../constants/theme'
+import { colors, radius, TAP } from '../constants/theme'
 import { t } from '../constants/i18n'
 
 export default function SearchModal({
@@ -178,7 +178,7 @@ export default function SearchModal({
             data={list}
             keyExtractor={o => String(o.value)}
             ListHeaderComponent={canClear ? (
-              <TouchableOpacity style={s.modalItem} onPress={clear} accessibilityRole="button">
+              <TouchableOpacity style={[s.modalItem, { minHeight: TAP }]} onPress={clear} accessibilityRole="button">
                 <Text style={[s.modalItemText, s.modalItemClear]}>{t('uiClear', lang)}</Text>
                 <Feather name="x-circle" size={15} color={colors.textSecondary} accessibilityElementsHidden importantForAccessibility="no" />
               </TouchableOpacity>
