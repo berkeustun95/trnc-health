@@ -83,8 +83,15 @@ import TERMS_TR   from './terms.tr.js'
 // both together at go-live.
 // Bumped 2026-11-11 -> 2026-11-18 for Yeme-İçme order status (privacy F1–F6: status, order push token, verification link,
 // restaurant PIN cookie, 12-hour window). New policy-updated notice text. Terms unchanged (version line follows).
-// Bumped again 2026-11-18 -> 2026-11-19 for the age tick / optional date of birth (age_confirmed_at). Same notice text.
+// Bumped again 2026-11-18 -> 2026-11-19 for the age tick / optional date of birth (age_confirmed_at). Own notice text, see POLICY_NOTICE_BODY_KEY.
 export const LEGAL_VERSION = '2026-11-19'
+
+// Which i18n key the policy-updated notice shows for each LEGAL_VERSION. A version with no entry falls back
+// to 'policyUpdatedBody' in components/PolicyUpdateNotice.js.
+export const POLICY_NOTICE_BODY_KEY = {
+  '2026-11-18': 'policyUpdatedBody',
+  '2026-11-19': 'policyUpdatedBodyV20261119',
+}
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue
