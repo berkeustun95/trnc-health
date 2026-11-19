@@ -36,7 +36,7 @@ if (!blocking.length) { console.log('release holds: none on HEAD'); process.exit
 const bar = '═'.repeat(72)
 console.error(`\n${bar}
   RELEASE HOLD — production OTA refused. Nothing was published.
-${blocking.map(h => `  ${what(h)} (${h.commit.slice(0, 7)}) is on HEAD and NOT cleared for production:
+${blocking.map(h => `  ${h.pr == null ? what(h) : `${what(h)} (${h.commit.slice(0, 7)})`} is on HEAD and NOT cleared for production:
     ${h.what} — held since ${h.since}.
     Clear: ${h.clear}`).join('\n')}
   Preview is unaffected (npm run ota:preview).

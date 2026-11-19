@@ -196,6 +196,6 @@ if (excused.size) console.log(`  same patch already in HEAD under another SHA (e
 if (onMainLane.length) console.log(`  release lane: on origin/main, the lane is deliberately behind (excused):\n    ${onMainLane.join('\n    ')}`)
 if (viaCopies.length) console.log(`  release/* lane Preview: every commit under it not in HEAD is a proven cherry-pick -x copy of one in HEAD (or a PR merge):\n    ${viaCopies.join('\n    ')}`)
 if (viaMerge.length) console.log(`  merge commit not in HEAD, but every commit under it is:\n    ${viaMerge.join('\n    ')}`)
-if (missing.length) refuse([`${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
+if (missing.length) refuse([laneMode ? `${missing.length} problem(s) with the Previews on ${version} for HEAD ${head}:` : `${missing.length} of ${views.length} Preview update(s) (${scope}) are NOT in HEAD ${head}:`, ...missing.map(m => `  ${m}`)])
 if (treeNote) console.log(treeNote)
 console.log(`  ✓ every checked Preview commit is contained in HEAD (newer runtimes: or on ${NEXT_LANE} first-parent)\n`)
