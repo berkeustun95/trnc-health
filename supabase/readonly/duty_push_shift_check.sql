@@ -3,6 +3,9 @@
 -- Times and statuses only: no counts of users or tokens, no ids, no tokens, no return_message (it can hold response bodies),
 -- and none of duty_push_runs' notified / push_* columns; error_kinds is read as KEYS only (jsonb_object_keys, never the values).
 --
+-- This probe reads BOTH states and judges neither: the shifted state (27,57, has_3min_shift true) is what 20261221 leaves; after the
+-- rollback 20261222 the same fields read '0,30 * * * *' / false again and 'minutes_seen' shows {0,30}. Read the fields, not a verdict.
+--
 -- BEFORE the apply: 'ledger_20261221' is [] (no row), duty-push reads '0,30 * * * *', the gate has_3min_shift is false.
 -- AFTER the apply: ledger_20261221 holds one row, duty-push reads '27,57 * * * *', has_3min_shift true, weekend-digest still '0,30 * * * 5,6'.
 --

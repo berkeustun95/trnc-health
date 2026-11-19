@@ -15,7 +15,7 @@
 --  1. public.duty_push_due(timestamptz): identical to the 20261210 definition except the clock it reads is
 --     (p_at + interval '3 minutes'), added to the INSTANT, before AT TIME ZONE and before the 30-minute rounding.
 --     A tick at 16:57 reads as 17:00 and is the weekday send; 17:27 reads as 17:30 and is not. A cron start that
---     is late by up to 26 minutes still lands in the same slot (so a pg_cron reload lag at apply time is harmless).
+--     is late by up to 29 minutes still lands in the same slot.
 --  2. cron job 'duty-push': ONLY the schedule changes, '0,30 * * * *' -> '27,57 * * * *', through
 --     cron.alter_job(job_id, schedule). The command (the Vault lookup, the 60 s timeout, the gate) is never
 --     written: its md5 is captured before and asserted equal after. The jobid does not change.
@@ -34,8 +34,17 @@
 --  - the pause switch: due -> paused (not due) -> resumed (due), in a sub-transaction that leaves no row changed.
 --  REFUSAL: if duty-push is paused at apply time the file stops (the one-send-a-day sweep cannot be proven).
 --
--- ROLLBACK. A SEPARATE file, 20261222_duty_push_shift_rollback.sql, kept on its own branch (never in this run):
--- it restores the 20261210 body and '0,30 * * * *'. It is applied only on Berke's go.
+-- APPLY WINDOW (refusal in the pre-flight). pg_cron does not run a tick it missed, so committing this file close to
+-- today's send slot can lose or double the day's push: committed after the 16:57 tick time but before pg_cron reloads
+-- (before 17:00), no due tick is left that day (SKIP: 17:27 reads 17:30, not due). The file therefore REFUSES when,
+-- by the gate AS IT STANDS BEFORE this file (slot = [17:00, 17:30) local on a weekday, Sat 13:00, Sun 08:00, Thursday
+-- closing minus 30 min), any minute from 5 minutes ago to 20 minutes ahead is a due instant: i.e. from 20 minutes
+-- before the slot (16:40 weekdays) until 5 minutes after it ends (17:35). Apply outside that window.
+--
+-- ROLLBACK. A SEPARATE file, 20261222_duty_push_shift_rollback.sql, on its own branch (chore/duty-push-shift-rollback).
+-- Production is main-only, so supabase-migrate cannot dispatch it from that branch: it is applied only on Berke's go,
+-- and to apply it its file is first landed on main by a PR (then dispatched alone). It is never part of this run.
+-- It restores the 20261210 body and '0,30 * * * *'.
 --
 -- Apply: gh workflow run supabase-migrate -f file=20261221_duty_push_shift_3min.sql (dry), then -f apply=true
 -- (Berke approves production-db).
@@ -99,6 +108,12 @@ BEGIN
      OR v_def NOT LIKE '%AND NOT public.data_job_paused(''duty-push'')%'
      OR v_def NOT LIKE '%public.duty_thursday_closing_local() - interval ''30 minutes''%' THEN
     RAISE EXCEPTION 'REFUSING: duty_push_due is not the 20261210 definition this file replaces. Nothing applied.';
+  END IF;
+
+  -- apply window: the gate as it stands now (20261210, slot [17:00,17:30) etc.); see APPLY WINDOW in the header
+  IF EXISTS (SELECT 1 FROM generate_series(clock_timestamp() - interval '5 minutes', clock_timestamp() + interval '20 minutes', interval '1 minute') g
+              WHERE public.duty_push_due(g)) THEN
+    RAISE EXCEPTION 'REFUSING: within 20 minutes of today''s duty push slot (Asia/Famagusta); apply later. Nothing applied.';
   END IF;
 
   -- captured, compared again at the end
@@ -359,7 +374,7 @@ $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261221_duty_push_shift_3min.sql', '50cadb7ecac30bf30024905a729f2ec49f7700d3d2baa7b7310a743d06092f75')
+VALUES ('20261221_duty_push_shift_3min.sql', 'f9223ddf30ebfcc530a063cd737d656893241b1cf5fd0cbce47285392a4d0c96')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

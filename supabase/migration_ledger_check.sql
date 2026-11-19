@@ -323,8 +323,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261218_admin_alerts_english.sql', '5c8f85f2815a1e0f0fee75f513798954eee27dd39484d2e85f1e5a0cb3c5c70d'),
   ('20261219_age_confirmed_at.sql', 'a7cd25e42bcde679338b1c3745cecf52d8684755e93baea1d12e5fb4ace94752'),
   ('20261220_crunchy_order_status_on.sql', 'ed126db7b84de72a7471c2792703f7eef03e0a047df2731afe8643e73ef91f91'),
-  ('20261221_duty_push_shift_3min.sql', '50cadb7ecac30bf30024905a729f2ec49f7700d3d2baa7b7310a743d06092f75'),
-  ('20261222_duty_push_shift_rollback.sql', '4106eb1bb605d372fa8b2846cd0a811b66cf2a0587dd758c6313e43162903128')
+  ('20261221_duty_push_shift_3min.sql', 'f9223ddf30ebfcc530a063cd737d656893241b1cf5fd0cbce47285392a4d0c96'),
+  ('20261222_duty_push_shift_rollback.sql', '0aba9cb72e8c3dadf3ffdd2d26163127a3b43b84bcb230c26f1d8ae19babce75')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

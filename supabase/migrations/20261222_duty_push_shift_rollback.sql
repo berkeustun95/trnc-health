@@ -3,7 +3,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
 --
 -- DO NOT APPLY unless Berke says so. This file lives on its own branch (chore/duty-push-shift-rollback, a DRAFT PR
--- that is never merged); applying it is a manual decision after the 3-minute experiment.
+-- that stays unmerged until then). Production is main-only, so supabase-migrate cannot dispatch it from this branch:
+-- on Berke's go its file is first landed on main by a PR, then dispatched alone. Never part of the 20261221 run.
 --
 -- WHAT. Restores the state 20261210 + 20261139 left:
 --  1. public.duty_push_due(timestamptz): the 20261210 definition, byte for byte (no + interval '3 minutes').
@@ -20,7 +21,10 @@
 -- 2026, the March and October 2027 clock changes), over the ticks the job's own schedule produces, exactly ONE tick is
 -- due and it is the slot itself (Mon-Fri 17:00, Thursday closing minus 30 min, Sat 13:00, Sun 08:00); a tick 3 minutes
 -- early (16:57) and the :27 / :57 ticks are not due; the pause switch still stops the send.
--- REFUSAL: duty-push paused at apply time, or the live state is not what 20261221 left.
+-- REFUSAL: duty-push paused at apply time, or the live state is not what 20261221 left, or the apply minute is within
+-- 20 minutes of today's send slot (the gate as it stands before this file, the shifted one: slot [16:57, 17:27) local
+-- on a weekday): pg_cron does not run a missed tick, so a commit after a 16:57 send and before 17:00 would let the
+-- restored 17:00 tick send AGAIN. The window runs from 5 minutes ago to 20 minutes ahead: 16:37 until 17:32 on weekdays.
 --
 -- Apply: gh workflow run supabase-migrate -f file=20261222_duty_push_shift_rollback.sql (dry), then -f apply=true
 -- (Berke approves production-db).
@@ -80,6 +84,12 @@ BEGIN
      OR v_def NOT LIKE '%AND NOT public.data_job_paused(''duty-push'')%'
      OR v_def NOT LIKE '%public.duty_thursday_closing_local() - interval ''30 minutes''%' THEN
     RAISE EXCEPTION 'REFUSING: duty_push_due is not the 20261221 definition this file replaces. Nothing applied.';
+  END IF;
+
+  -- apply window: the gate as it stands now (the shifted one); see REFUSAL in the header
+  IF EXISTS (SELECT 1 FROM generate_series(clock_timestamp() - interval '5 minutes', clock_timestamp() + interval '20 minutes', interval '1 minute') g
+              WHERE public.duty_push_due(g)) THEN
+    RAISE EXCEPTION 'REFUSING: within 20 minutes of today''s duty push slot (Asia/Famagusta); apply later. Nothing applied.';
   END IF;
 
   PERFORM set_config('r222.duty_cmd',  (SELECT md5(command) FROM cron.job WHERE jobname = 'duty-push'), true);
@@ -317,7 +327,7 @@ $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261222_duty_push_shift_rollback.sql', '4106eb1bb605d372fa8b2846cd0a811b66cf2a0587dd758c6313e43162903128')
+VALUES ('20261222_duty_push_shift_rollback.sql', '0aba9cb72e8c3dadf3ffdd2d26163127a3b43b84bcb230c26f1d8ae19babce75')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

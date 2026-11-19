@@ -116,8 +116,18 @@ const base = async () => {
   const db = await freshDb(SEED)
   const r1 = await run(db, nonotify(read(R1))); assert.ok(r1.ok, 'R1 must apply: ' + r1.msg)
   const ra = await run(db, nonotify(read(A))); assert.ok(ra.ok, '20261210 must apply: ' + ra.msg)
+  await clock(db, SAFE)
   return db
 }
+// HARNESS-ONLY clock: the files' apply-window check reads clock_timestamp() unqualified; a schema placed BEFORE pg_catalog in this
+// session's search_path supplies a clock_timestamp() that returns harness.now. Nothing of this exists in the migrations or in prod.
+const clock = async (d, localIso) => {
+  await d.exec(`CREATE SCHEMA IF NOT EXISTS clk;
+    CREATE OR REPLACE FUNCTION clk.clock_timestamp() RETURNS timestamptz LANGUAGE sql STABLE AS $$ SELECT current_setting('harness.now')::timestamptz $$;
+    SET search_path = clk, public, pg_catalog;`)
+  await d.query(`SELECT set_config('harness.now', (timestamp '${localIso}' AT TIME ZONE 'Asia/Famagusta')::text, false)`)
+}
+const SAFE = '2026-11-18 12:00'
 const SHIFT_SQL = read(SHIFT)
 const ROLL_SQL = read(ROLL)
 
@@ -206,6 +216,51 @@ console.log('── refusals (the file stops, nothing applied)')
   await da.exec(`DROP FUNCTION cron.alter_job(bigint, text, text, text, text, boolean)`)
   const ra = await run(da, nonotify(ROLL_SQL))
   t('pg_cron without alter_job: refused', [ra.ok, (ra.msg || '').includes('no cron.alter_job')], [false, true])
+}
+
+console.log('── apply window: 20261222 at a controlled clock, on the SHIFTED gate (slot [16:57,17:27) local weekdays)')
+const REFUSAL = "within 20 minutes of today's duty push slot"
+const attempt = async (localIso, sql = ROLL_SQL) => {
+  const d = await shifted()
+  await clock(d, localIso)
+  const r = await run(d, nonotify(sql))
+  return { r, d }
+}
+const dayName = iso => new Date(iso.slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+const WIN = [
+  ['2026-11-20 16:30', false], ['2026-11-20 16:36:59', false], ['2026-11-20 16:37', true], ['2026-11-20 16:58', true], ['2026-11-20 17:10', true],
+  ['2026-11-20 17:31:59', true], ['2026-11-20 17:32', false], ['2026-11-20 17:40', false],
+  ['2026-11-21 12:30', false], ['2026-11-21 12:37', true], ['2026-11-21 12:58', true], ['2026-11-21 13:31:59', true], ['2026-11-21 13:32', false],
+  ['2026-11-22 07:30', false], ['2026-11-22 07:37', true], ['2026-11-22 07:58', true], ['2026-11-22 08:32', false],
+  ['2026-11-19 16:58', true], ['2026-11-19 16:30', false],
+]
+for (const [iso, refuse] of WIN) {
+  const { r } = await attempt(iso)
+  const refused = !r.ok && r.msg.includes(REFUSAL)
+  t(`${dayName(iso)} ${iso.slice(11)} local: ${refuse ? 'REFUSED' : 'accepted'}`, [r.ok, refused, r.ok ? null : (refused ? null : r.msg)], [!refuse, refuse, null])
+  if (refused && iso.endsWith('16:58') && iso.startsWith('2026-11-20')) console.log(`      message: ${r.msg}`)
+}
+{
+  const { r, d } = await attempt('2026-11-20 16:58')
+  await d.exec('ROLLBACK')
+  t('refusal leaves nothing applied (schedule still 27,57, gate still shifted)', [r.ok, (await d.query(`SELECT schedule FROM cron.job WHERE jobname='duty-push'`)).rows[0].schedule], [false, '27,57 * * * *'])
+}
+{
+  const from = ROLL_SQL.indexOf('  IF EXISTS (SELECT 1 FROM generate_series(clock_timestamp()')
+  const IF_BLOCK = ROLL_SQL.slice(from, ROLL_SQL.indexOf("  PERFORM set_config('r222.duty_cmd'"))
+  assert.ok(from > 0 && IF_BLOCK.includes('REFUSING: within 20 minutes') && IF_BLOCK.length < 700, 'refusal block slice')
+  const noRefusal = ROLL_SQL.replace(IF_BLOCK, '')
+  assert.ok(noRefusal !== ROLL_SQL && !noRefusal.includes('within 20 minutes of'), 'mutant landed')
+  const m1 = await attempt('2026-11-20 16:58', noRefusal)
+  t('red-first: refusal removed -> the file APPLIES at Fri 16:58 (the DOUBLE-send case; the window test above would fail = caught)', m1.r.ok, true)
+  const short = ROLL_SQL.replace("clock_timestamp() + interval '20 minutes'", "clock_timestamp() + interval '2 minutes'")
+  assert.ok(short !== ROLL_SQL, 'short mutant landed')
+  const m2 = await attempt('2026-11-20 16:37', short)
+  t('red-first: window shortened to +2 min -> applies at Fri 16:37 (caught)', m2.r.ok, true)
+  const noback = ROLL_SQL.replace("clock_timestamp() - interval '5 minutes'", "clock_timestamp()")
+  assert.ok(noback !== ROLL_SQL, 'noback mutant landed')
+  const m3 = await attempt('2026-11-20 17:31:59', noback)
+  t('red-first: look-back (-5 min) removed -> applies at Fri 17:31:59 (caught)', m3.r.ok, true)
 }
 
 console.log('── red-first mutants (each breaks ONE thing; the file itself must refuse; the anchor is asserted present)')
