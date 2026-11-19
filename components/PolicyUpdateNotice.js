@@ -2,6 +2,7 @@ import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { LEGAL_VERSION, POLICY_NOTICE_BODY_KEY } from '../constants/legal'
 
 // "We've updated our Privacy Policy" — shown once per LEGAL_VERSION to people who used ADA
 // under an older one (who sees it: utils/policyNoticeRules.js; when: App.js). Both buttons
@@ -15,7 +16,7 @@ export default function PolicyUpdateNotice({ visible, lang, onRead, onDismiss })
         <View style={s.card}>
           <Ionicons name="shield-checkmark-outline" size={28} color={colors.primary} />
           <Text style={s.title}>{t('policyUpdatedTitle', lang)}</Text>
-          <Text style={s.body}>{t('policyUpdatedBody', lang)}</Text>
+          <Text style={s.body}>{t(POLICY_NOTICE_BODY_KEY[LEGAL_VERSION] || 'policyUpdatedBody', lang)}</Text>
           <TouchableOpacity style={s.primary} onPress={onRead} activeOpacity={0.85}>
             <Text style={s.primaryText}>{t('policyUpdatedRead', lang)}</Text>
           </TouchableOpacity>

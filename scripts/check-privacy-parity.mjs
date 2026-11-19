@@ -172,6 +172,8 @@ const DISCLOSURE = {
   last_name:         /first and last name/i,
   display_name:      /display name/i,
   date_of_birth:     /date of birth/i,
+  // 2026-11-18: the required "13 or over" tick (Apple 5.1.1(v)); the date of birth is optional now.
+  age_confirmed_at:  /when you confirmed it/i,
   region:            /\bregion\b/i,
   resident_status:   /resident status/i,
   student_level:     /study level/i,

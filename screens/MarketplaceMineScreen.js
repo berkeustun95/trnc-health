@@ -57,7 +57,7 @@ export default function MarketplaceMineScreen({ lang, session, profile, onBack, 
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <EmptyState icon="pricetags-outline" category="homeLife" title={t('mkMineEmptyTitle', lang)}
-                message={t(adult ? 'mkMineEmptySub' : 'mkUnder18', lang)}
+                message={t(adult ? 'mkMineEmptySub' : profile?.date_of_birth ? 'mkUnder18' : 'mkNeedsDob', lang)}
                 action={adult ? { label: t('mkPost', lang), onPress: onPost } : undefined} />
             }
             renderItem={({ item }) => {
