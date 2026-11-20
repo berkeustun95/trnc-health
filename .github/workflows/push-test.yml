@@ -1,6 +1,7 @@
 # ─── One test push to one account's device ────────────────────────────────────
 #
 #   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty|datajobs]
+#   S2 double-send: -f repeat=2 -f gap_s=10 -f keys=on|none (QA accounts only, like every send here)
 #
 # Reads the token read-only, sends one push, prints the ticket and receipt status. Writes nothing.
 # Actions logs are public: the email is masked, and details are sealed. Engine: scripts/push-test.mjs.
@@ -34,6 +35,21 @@ on:
         type: string
         required: false
         default: ''
+      repeat:
+        description: 'Double-send test: 2 = send the same message twice (one account only)'
+        type: choice
+        options: ['1', '2']
+        default: '1'
+      gap_s:
+        description: 'Seconds between the two copies'
+        type: choice
+        options: ['0', '10', '30']
+        default: '10'
+      keys:
+        description: 'Replace keys: on = collapseId + tag (test key ada-s2-test), none = no keys'
+        type: choice
+        options: ['none', 'on']
+        default: 'none'
 
 concurrency: { group: push-test, cancel-in-progress: false }
 
@@ -51,6 +67,9 @@ jobs:
       IN_KIND: ${{ inputs.kind }}
       IN_DEDUPE: ${{ inputs.dedupe }}
       IN_TEXT: ${{ inputs.text }}
+      IN_REPEAT: ${{ inputs.repeat }}
+      IN_GAP: ${{ inputs.gap_s }}
+      IN_KEYS: ${{ inputs.keys }}
     steps:
       # Read from the event, not `env:`, which GitHub prints in every step before a mask can apply.
       - name: Mask the email
@@ -69,4 +88,4 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with: { node-version: '24' }
       - name: Send
-        run: node --disable-warning=ExperimentalWarning scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND" "$IN_EMAIL2" "$IN_DEDUPE" "$IN_TEXT"
+        run: node --disable-warning=ExperimentalWarning scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND" "$IN_EMAIL2" "$IN_DEDUPE" "$IN_TEXT" "$IN_REPEAT" "$IN_GAP" "$IN_KEYS"
