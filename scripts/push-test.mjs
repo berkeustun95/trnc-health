@@ -18,6 +18,7 @@
 // kind=datajobs sends the data-jobs watchdog's data ({screen:'admin', tab:'datajobs'}, as 20261211): tapping it must open
 // AdminScreen's Data jobs tab. Admin accounts only (AdminScreen is the only reader; a non-admin tap is a no-op).
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 import { seal } from './lib/readonly-seal.mjs'
 import { errorKind, onePerToken } from '../supabase/functions/send-duty-notification/push.ts'
@@ -35,10 +36,28 @@ const dedupe = process.argv[5] || 'on'
 // Optional unique text (2026-11-14: "ADA test A" to one tester, so he can say whether THAT push arrived). Title and body.
 const text = (process.argv[6] || '').trim()
 if (text && !/^[A-Za-z0-9 ]{1,24}$/.test(text)) fail('Refused: text must be 1-24 letters, digits or spaces.')
+// Double-send test (S2, 2026-11-20): the same message `repeat` times, `gap` seconds apart, as a retried Expo batch would
+// land. keys=on adds the replace keys (collapseId: iOS replaces a shown notification; tag: Android) under a TEST key, so a
+// test copy can never replace a real duty push on the phone.
+const repeat = Number(process.argv[7] || '1')
+const gap = Number(process.argv[8] || '0')
+const keys = process.argv[9] || 'none'
+if (![1, 2].includes(repeat)) fail(`Refused: repeat must be 1 or 2, got ${process.argv[7]}.`)
+if (![0, 10, 30].includes(gap)) fail(`Refused: gap must be 0, 10 or 30 seconds, got ${process.argv[8]}.`)
+if (!['none', 'on'].includes(keys)) fail(`Refused: keys must be none or on, got ${keys}.`)
+const REPLACE_KEY = 'ada-s2-test'
 if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
 if (!['plain', 'messages', 'duty', 'datajobs'].includes(kind)) fail(`Refused: kind must be plain, messages, duty or datajobs, got ${kind}.`)
 const mailbox = e => { const [l, d] = e.split('@'); return `${l.split('+')[0]}@${d}` }
+// QA accounts only (Berke, 2026-11-20): the QA mailbox and its +tags (QA account 1 and berkeps15+qa2-style accounts).
+// Matched by the SHA-256 of the lower-cased mailbox, the same value 20261133 already carries as one of its two e-mail hashes, so no new
+// identifier enters this public repo.
+const QA_MAILBOX_SHA256 = 'c5f67310246afe9b8deb939625d530743650b4412bcbf3ba5e852956130a025c'
+const isQa = e => createHash('sha256').update(mailbox(e)).digest('hex') === QA_MAILBOX_SHA256
+if (!isQa(email)) fail('Refused: push-test sends to the QA test accounts only.')
+if (email2 && repeat !== 1) fail('Refused: repeat=2 is one account only; leave email2 empty.')
 if (email2) {
+  if (!isQa(email2)) fail('Refused: push-test sends to the QA test accounts only.')
   if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email2)) fail('Refused: the second e-mail is not an email.')
   if (email2 === email || mailbox(email2) !== mailbox(email)) fail('Refused: the second e-mail must be a +tag of the same mailbox.')
   if (!['on', 'off'].includes(dedupe)) fail(`Refused: dedupe must be on or off, got ${dedupe}.`)
@@ -80,22 +99,30 @@ const BODY = {
   plain: tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.',
 }
 const TITLE = kind === 'duty' ? (tr ? '💊 Bugünkü Nöbetçi Eczane' : "💊 Today's Duty Pharmacy") : (tr ? 'ADA test bildirimi' : 'ADA test notification')
-const send = await fetch('https://exp.host/--/api/v2/push/send', {
-  method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-  body: JSON.stringify(recipients.map(({ push_token: to }) => ({ to, sound: 'default', data, channelId: 'default',
-    title: text || TITLE, body: text || BODY[kind] }))),
-})
-const tickets = [].concat((await send.json().catch(() => ({})))?.data ?? [])
+const messages = recipients.map(({ push_token: to }) => ({ to, sound: 'default', data, channelId: 'default',
+  title: text || TITLE, body: text || BODY[kind], ...(keys === 'on' ? { collapseId: REPLACE_KEY, tag: REPLACE_KEY } : {}) }))
+let send
+const tickets = []
+for (let r = 0; r < repeat; r++) {
+  if (r > 0) await new Promise(res => setTimeout(res, gap * 1000))
+  send = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(messages),
+  })
+  tickets.push(...[].concat((await send.json().catch(() => ({})))?.data ?? []))
+  console.log(`copy ${r + 1}/${repeat} sent at ${new Date().toISOString()} (keys ${keys})`)
+}
+const expected = recipients.length * repeat
 const ticket = tickets[0]
 const publicKey = readFileSync('scripts/lib/readonly-results.pub', 'utf8')
 console.log(seal(JSON.stringify({ account: `${id.slice(0, 8)}…`, role, language: lang, token: `…${pt.slice(-5, -1)}`, ticket,
-  ...(email2 ? { dedupe, same_token: accounts[0].push_token === accounts[1].push_token, messages_sent: recipients.length, tickets } : {}) }), publicKey))
+  repeat, gap, keys, ...(email2 ? { dedupe, same_token: accounts[0].push_token === accounts[1].push_token, messages_sent: recipients.length, tickets } : {}) }), publicKey))
 if (email2) console.log(`two-account mode: dedupe ${dedupe}, messages sent: ${recipients.length}`)
 console.log(`ticket: ${ticket?.status ?? 'none'}`)
-if (tickets.length !== recipients.length || tickets.some(x => x?.status !== 'ok')) {
+if (tickets.length !== expected || tickets.some(x => x?.status !== 'ok')) {
   // Never Expo's free-text message: for DeviceNotRegistered it embeds the push token (public log).
   const bad = tickets.find(x => x?.status !== 'ok')
-  fail(`Expo refused the message: ${bad ? errorKind(bad.details?.error) : `HTTP ${send.status}, ${tickets.length}/${recipients.length} tickets`}`)
+  fail(`Expo refused the message: ${bad ? errorKind(bad.details?.error) : `HTTP ${send.status}, ${tickets.length}/${expected} tickets`}`)
 }
 
 // Receipts appear after the provider answers; poll briefly.
