@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─── Send ONE test push to one account's device, from GitHub Actions only ────
 //
-//   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty|datajobs]
+//   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty|datajobs|weekend|marketplace|marketplace_conversation|eatery_order]
 //
 // Proves the chain the app depends on: profiles.push_token → Expo push service → FCM (Android)
 // or APNs (iOS) → device. The token is looked up through the Management API's READ-ONLY
@@ -17,6 +17,16 @@
 // Nöbetçi Eczane from a killed, a backgrounded and a foreground app.
 // kind=datajobs sends the data-jobs watchdog's data ({screen:'admin', tab:'datajobs'}, as 20261211): tapping it must open
 // AdminScreen's Data jobs tab. Admin accounts only (AdminScreen is the only reader; a non-admin tap is a no-op).
+// Routes added 2026-11-21 (each mirrors its real sender's data; a tap must open the screen from a killed, a backgrounded and a
+// foreground app):
+// kind=weekend: {screen:'weekend'} (send-weekend-digest/index.ts:115) → the weekend list on the map.
+// kind=marketplace: {screen:'marketplace', listing_id:null} (marketplace-photo-review/review.ts:105 sends a real id; null on
+// purpose, so no real listing is needed) → Bandabuliya's landing list (screens/MarketplaceScreen.js:99).
+// kind=marketplace_conversation: {screen:'marketplace_conversation', type:'message', conversation_id:null, listing_id:null}
+// (20261184_marketplace_messaging.sql:388-389; null ids) → Bandabuliya chat with no thread, i.e. the inbox (MarketplaceChatScreen.js:135).
+// kind=eatery_order: {screen:'eatery_order', code:'TESTTEST'} (20261194_eatery_order_status_partner.sql:616) → Yeme-İçme. The code
+// must match ORDER_CODE_RE (constants/eatery.js:403: 8 of 23456789A-Z without I and O) or the tap does nothing; no such order
+// exists, so the app stays on the Yeme-İçme list (EateryScreen.js:89-98).
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
@@ -55,7 +65,8 @@ const silent = r => sound === 'off' || (sound === 'second_off' && r > 0)
 // each other, never another case's. Text is already limited to letters, digits and spaces.
 const REPLACE_KEY = text ? `ada-s2-test-${text.toLowerCase().replace(/ +/g, '-')}` : 'ada-s2-test'
 if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
-if (!['plain', 'messages', 'duty', 'datajobs'].includes(kind)) fail(`Refused: kind must be plain, messages, duty or datajobs, got ${kind}.`)
+const KINDS = ['plain', 'messages', 'duty', 'datajobs', 'weekend', 'marketplace', 'marketplace_conversation', 'eatery_order']
+if (!KINDS.includes(kind)) fail(`Refused: kind must be ${KINDS.join(', ')}, got ${kind}.`)
 const mailbox = e => { const [l, d] = e.split('@'); return `${l.split('+')[0]}@${d}` }
 // QA accounts only (Berke, 2026-11-20): the QA mailbox and its +tags (QA account 1 and berkeps15+qa2-style accounts).
 // Matched by the SHA-256 of the lower-cased mailbox, the same value 20261133 already carries as one of its two e-mail hashes, so no new
@@ -99,11 +110,19 @@ const tr = lang === 'Turkish'
 const trncToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Famagusta' }).format(new Date())
 const data = kind === 'messages' ? { screen: 'conversation', type: 'message' }
   : kind === 'duty' ? { screen: 'duty', date: trncToday }
-  : kind === 'datajobs' ? { screen: 'admin', tab: 'datajobs' } : {}
+  : kind === 'datajobs' ? { screen: 'admin', tab: 'datajobs' }
+  : kind === 'weekend' ? { screen: 'weekend' }
+  : kind === 'marketplace' ? { screen: 'marketplace', listing_id: null }
+  : kind === 'marketplace_conversation' ? { screen: 'marketplace_conversation', type: 'message', conversation_id: null, listing_id: null }
+  : kind === 'eatery_order' ? { screen: 'eatery_order', code: 'TESTTEST' } : {}
 const BODY = {
   messages: tr ? 'Dokun: Mesajlar açılmalı' : 'Tap: Messages should open',
   duty: tr ? 'Test: dokun, Nöbetçi Eczane açılmalı' : 'Test: tap, Duty Pharmacies should open',
   datajobs: tr ? 'Test: dokun, Veri görevleri açılmalı' : 'Test: tap, Data jobs should open',
+  weekend: tr ? 'Test: dokun, hafta sonu listesi açılmalı' : 'Test: tap, the weekend list should open',
+  marketplace: tr ? 'Test: dokun, Bandabuliya açılmalı' : 'Test: tap, Bandabuliya should open',
+  marketplace_conversation: tr ? 'Test: dokun, Bandabuliya mesajları açılmalı' : 'Test: tap, Bandabuliya messages should open',
+  eatery_order: tr ? 'Test: dokun, Yeme-İçme açılmalı' : 'Test: tap, Yeme-İçme should open',
   plain: tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.',
 }
 const TITLE = kind === 'duty' ? (tr ? '💊 Bugünkü Nöbetçi Eczane' : "💊 Today's Duty Pharmacy") : (tr ? 'ADA test bildirimi' : 'ADA test notification')
