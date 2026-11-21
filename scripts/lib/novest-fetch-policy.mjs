@@ -25,7 +25,7 @@ export function createRetryingFetch({ fetch: base, route, mediaGapMs = 0, sleep 
   const waitMs = retryAfter => {
     if (retryAfter !== null) {
       const secs = /^\d+$/.test(retryAfter) ? Number(retryAfter) : (Date.parse(retryAfter) - now()) / 1000
-      return Math.min(60, Math.max(1, Math.ceil(secs))) * 1000
+      if (Number.isFinite(secs)) return Math.min(60, Math.max(1, Math.ceil(secs))) * 1000
     }
     return BACKOFF_MS[used - 1]
   }

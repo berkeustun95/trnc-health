@@ -755,6 +755,7 @@ else {
   t('Retry-After HTTP-date in the past -> 1 s', await clamp({ 'retry-after': new Date(Date.UTC(2026, 10, 21, 11, 0, 0)).toUTCString() }), 1000)
   t('Retry-After HTTP-date far ahead -> 60 s', await clamp({ 'retry-after': new Date(Date.UTC(2026, 10, 21, 18, 0, 0)).toUTCString() }), 60000)
   t('invalid Retry-After (soon) -> 10 s backoff', await clamp({ 'retry-after': 'soon' }), 10000)
+  t('unparseable HTTP-date Retry-After -> 10 s backoff', await clamp({ 'retry-after': 'Mon, 99 Jan 2026 99:99:99 GMT' }), 10000)
   t('overlong Retry-After -> 10 s backoff', await clamp({ 'retry-after': '9999999' }), 10000)
   t('direct route honours Retry-After too', await clamp({ 'retry-after': '5' }, 'direct'), 5000)
   const bk = mkPolicy([429, 429, 429, 200], { route: 'direct' })
