@@ -42,12 +42,13 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
-import { colors, radius } from '../constants/theme'
+import { colors, radius, TAP } from '../constants/theme'
 import { t } from '../constants/i18n'
 
 export default function SearchModal({
   lang,   // only for the close button's accessibilityLabel
   visible, title, searchPlaceholder, options, value, searchable, onSelect, onClose,
+  onClear,   // optional: adds a "Temizle" row above the list while a value is set (optional fields only)
 }) {
   const [q, setQ] = useState('')
   const [kbHeight, setKbHeight] = useState(0)
@@ -141,6 +142,12 @@ export default function SearchModal({
     setQ('')
     onSelect(v)
   }
+  const canClear = typeof onClear === 'function' && value != null && value !== ''
+  function clear() {
+    Keyboard.dismiss()
+    setQ('')
+    onClear()
+  }
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -170,6 +177,12 @@ export default function SearchModal({
           <FlatList
             data={list}
             keyExtractor={o => String(o.value)}
+            ListHeaderComponent={canClear ? (
+              <TouchableOpacity style={[s.modalItem, { minHeight: TAP }]} onPress={clear} accessibilityRole="button">
+                <Text style={[s.modalItemText, s.modalItemClear]}>{t('uiClear', lang)}</Text>
+                <Feather name="x-circle" size={15} color={colors.textSecondary} accessibilityElementsHidden importantForAccessibility="no" />
+              </TouchableOpacity>
+            ) : null}
             // flex, NOT a computed height. The alternative was subtracting the header and
             // search box from the card — a hand-counted constant that silently goes wrong
             // the day either grows a line. Letting the list take what remains means the
@@ -201,13 +214,11 @@ export default function SearchModal({
               //   waiting on a narrow enough screen.
               <TouchableOpacity style={s.modalItem} onPress={() => choose(item.value)}>
                 <Text style={[s.modalItemText, value === item.value && s.modalItemTextOn]}>{item.label}</Text>
-                <Feather
-                  name="check"
-                  size={15}
-                  color={value === item.value ? colors.primary : 'transparent'}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                />
+                {/* A fixed 15 pt slot on every row keeps the measured layout above; the tick itself is drawn only on the
+                    selected row (a transparent glyph showed on every row on a Samsung S25). */}
+                {value === item.value
+                  ? <Feather name="check" size={15} color={colors.primary} accessibilityElementsHidden importantForAccessibility="no" />
+                  : <View style={s.tickSlot} />}
               </TouchableOpacity>
             )}
           />
@@ -240,4 +251,6 @@ const s = StyleSheet.create({
   // flex:1, not flexShrink:1 — see the note on renderItem above and f1a7b99.
   modalItemText: { fontSize: 15, color: colors.textPrimary, flex: 1, paddingRight: 10 },
   modalItemTextOn: { color: colors.primary, fontFamily: 'Inter_700Bold' },
+  modalItemClear: { color: colors.textSecondary },
+  tickSlot: { width: 15, height: 15 },
 })

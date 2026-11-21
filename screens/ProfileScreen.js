@@ -1569,14 +1569,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               call. Education has its own pickers further down, writing to the DRAFT — the
               institution is no longer a field on this form at all. */}
           <SearchModal lang={lang} visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
-            value={form.dobD} onSelect={v => { set('dobD')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+            value={form.dobD} onSelect={v => { set('dobD')(v); setPicker(null) }} onClose={() => setPicker(null)}
+            onClear={isCustomer ? () => { setForm(f => ({ ...f, dobY: null, dobM: null, dobD: null })); setPicker(null) } : undefined} />
           <SearchModal lang={lang} visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
-            value={form.dobM} onSelect={v => { set('dobM')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+            value={form.dobM} onSelect={v => { set('dobM')(v); setPicker(null) }} onClose={() => setPicker(null)}
+            onClear={isCustomer ? () => { setForm(f => ({ ...f, dobY: null, dobM: null, dobD: null })); setPicker(null) } : undefined} />
           <SearchModal lang={lang} visible={picker === 'year'} title={t('pgYear', lang)} options={yearOptions}
-            value={form.dobY} onSelect={v => { set('dobY')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+            value={form.dobY} onSelect={v => { set('dobY')(v); setPicker(null) }} onClose={() => setPicker(null)}
+            onClear={isCustomer ? () => { setForm(f => ({ ...f, dobY: null, dobM: null, dobD: null })); setPicker(null) } : undefined} />
           <SearchModal lang={lang} visible={picker === 'nat'} searchable title={t('pgNationality', lang)}
             searchPlaceholder={t('pgNationalitySearch', lang)} options={natOptions}
-            value={form.nationality} onSelect={v => { set('nationality')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+            value={form.nationality} onSelect={v => { set('nationality')(v); setPicker(null) }} onClose={() => setPicker(null)}
+            onClear={isCustomer ? () => { set('nationality')(''); setPicker(null) } : undefined} />
           <SearchModal lang={lang} visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
             searchPlaceholder={t('pgNationalitySearch', lang)} options={ccOptions}
             value={selectedCC} onSelect={v => { setSelectedCC(v); setPicker(null) }} onClose={() => setPicker(null)} />
