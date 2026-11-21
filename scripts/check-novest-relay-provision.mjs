@@ -62,6 +62,20 @@ try {
       t(`${n} dry-run: no IPv4 address at all`, ipv4.test(o), false)
     }
     t('provision dry-run never mentions the variable route as a command', /variable set|NOVEST_ROUTE=/.test(po), false)
+    const dryR = (script) => spawnSync(BASH, [script, '--rotate-cert', '--dry-run'], { env, encoding: 'utf8', cwd: tmp })
+    const rs = dryR(SETUP), rp = dryR(PROVISION)
+    t('setup.sh --rotate-cert --dry-run exits 0', [rs.status, rs.stderr], [0, ''])
+    t('provision.sh --rotate-cert --dry-run exits 0', [rp.status, rp.stderr], [0, ''])
+    t('rotate dry runs executed nothing (no stub called)', lines(log), '')
+    for (const f of ['openssl ecparam -name prime256v1 -genkey -noout -out /etc/novest-relay/tls.key.new', '-days 730', 'subjectAltName=IP:<ip>', 'mv /etc/novest-relay/tls.key.new /etc/novest-relay/tls.key', 'mv /etc/novest-relay/tls.crt.new /etc/novest-relay/tls.crt', 'systemctl restart novest-relay', 'key.sha256 is not touched', 'expect 401', 'expect 405', '<staging-dir>/tls.crt'])
+      t(`setup rotate dry-run prints: ${f}`, rs.stdout.includes(f), true)
+    for (const f of ['setup.sh --rotate-cert --staging <staging-dir>', 'gh secret set NOVEST_RELAY_CA --env production', 'no relay key, no hash', 'keyed checks are impossible', 'fail TLS pinning', 'ssh -G <ssh-alias>'])
+      t(`provision rotate dry-run prints: ${f}`, rp.stdout.includes(f), true)
+    t('provision rotate dry-run sets exactly one secret (CA), no key generation', [rp.stdout.split('\n').filter(l => /secret set /.test(l)).length, /secret set NOVEST_RELAY_(KEY|URL)|rand -hex|shasum/.test(rp.stdout)], [1, false])
+    for (const [n, o] of [['setup rotate', rs.stdout], ['provision rotate', rp.stdout]]) {
+      t(`${n} dry-run: no 64-hex value, no IPv4 address`, [/[0-9a-f]{64}/.test(o), ipv4.test(o)], [false, false])
+      t(`${n} dry-run: never mentions the relay key hash file as an input`, /sha256\(key\)/.test(o), false)
+    }
   }
 
   console.log('setup.sh real mode refuses early')
@@ -72,6 +86,8 @@ try {
     const r = (...a) => spawnSync(BASH, [SETUP, ...a], { env, encoding: 'utf8', cwd: tmp })
     const a = r(), b = r('--staging', '/tmp/novest-relay.abc123'), c = r('1.2.3.4')
     t('no arguments is refused with usage', [a.status, a.stderr.startsWith('REFUSED: usage')], [1, true])
+    const rotNoStg = r('--rotate-cert')
+    t('--rotate-cert without --staging is refused with usage', [rotNoStg.status, rotNoStg.stderr.startsWith('REFUSED: usage')], [1, true])
     t('a bare IP argument (the old interface) is refused', [c.status, c.stderr.startsWith('REFUSED: usage')], [1, true])
     if (process.getuid && process.getuid() !== 0) t('without root: refused before touching anything', [b.status, b.stderr.includes('run as root')], [1, true])
     t('no system tool was called', lines(log), '')
@@ -88,7 +104,7 @@ try {
     }
     const goodCert = mkCert(FAKE_IP), wrongCert = mkCert('5.6.7.8')
 
-    const scenario = (name, { ip = FAKE_IP, cert = goodCert, ghApiFail = '', curlBad = '', alias = [] } = {}) => {
+    const scenario = (name, { ip = FAKE_IP, cert = goodCert, ghApiFail = '', curlBad = '', alias = [], setFail = '' } = {}) => {
       const stubs = freshDir(name + '-stubs'), log = freshDir(name + '-log')
       writeStub(stubs, 'ssh', `echo "$*" >> "$LOG/ssh.argv"
 if [ "$1" = "-G" ]; then echo "hostname $STUB_IP"; echo "user ops"; exit 0; fi
@@ -104,7 +120,7 @@ if [ "$1" = "api" ]; then
   if [ -n "$STUB_GH_API_FAIL" ]; then echo "gh: HTTP 403" >&2; exit 1; fi
   echo '{"key_id":"x","key":"y"}'; exit 0
 fi
-if [ "$1" = "secret" ] && [ "$2" = "set" ]; then cat > "$LOG/gh.stdin.$3"; echo "Set Actions secret $3 for the repository"; exit 0; fi
+if [ "$1" = "secret" ] && [ "$2" = "set" ]; then cat > "$LOG/gh.stdin.$3"; [ "$3" = "$STUB_GH_SET_FAIL" ] && { echo "gh: boom" >&2; exit 1; }; echo "Set Actions secret $3 for the repository"; exit 0; fi
 exit 1`)
       writeStub(stubs, 'curl', `echo "$*" >> "$LOG/curl.argv"
 cfg=$(cat); printf '%s\\n--\\n' "$cfg" >> "$LOG/curl.stdin"
@@ -122,7 +138,7 @@ if [ -n "$out" ] && [ "$out" != /dev/null ]; then echo imagebytes > "$out"; fi
 printf %s "$code"`)
       writeStub(stubs, 'shasum', `if [ $# -eq 2 ]; then exec "${REAL_SHASUM}" "$@"; fi
 echo "${IMG_SHA}  $3"`)
-      const env = { PATH: `${stubs}:/usr/bin:/bin`, HOME: tmp, LOG: log, STUB_IP: ip, STUB_CERT: cert, STUB_GH_API_FAIL: ghApiFail, STUB_CURL_BAD: curlBad }
+      const env = { PATH: `${stubs}:/usr/bin:/bin`, HOME: tmp, LOG: log, STUB_IP: ip, STUB_CERT: cert, STUB_GH_API_FAIL: ghApiFail, STUB_CURL_BAD: curlBad, STUB_GH_SET_FAIL: setFail }
       const r = spawnSync(BASH, [PROVISION, ...alias], { env, encoding: 'utf8', cwd: tmp, input: '' })
       const logs = f => lines(join(log, f))
       return { r, logs, log }
@@ -173,6 +189,38 @@ echo "${IMG_SHA}  $3"`)
     const badCheck = scenario('badcheck', { curlBad: '1' })
     t('a failed remote check stops the run: no secret set, teardown path printed', [badCheck.r.status, badCheck.logs('gh.argv').includes('secret set'), badCheck.r.stderr.includes('ssh -t ada-hermes sudo bash /usr/local/lib/novest-relay/teardown.sh')], [1, false, true])
     t('  the failed run still never printed the key or IP', [badCheck.r.stdout + badCheck.r.stderr].some(o => o.includes(FAKE_IP) || /[0-9a-f]{64}/.test(o.split(IMG_SHA).join(''))), false)
+
+    const partial = scenario('partial', { setFail: 'NOVEST_RELAY_URL' })
+    t('a failure after NOVEST_RELAY_KEY was set says so (not "No GitHub secret was set")', [partial.r.status, partial.r.stderr.includes('No GitHub secret was set'), partial.r.stderr.includes('ALREADY set in this run: NOVEST_RELAY_KEY.'), partial.r.stderr.includes('NOVEST_RELAY_CA.')], [1, false, true, false])
+    const none = scenario('noneset', { setFail: 'NOVEST_RELAY_KEY' })
+    t('a failure on the first secret still says no secret was set', [none.r.status, none.r.stderr.includes('No GitHub secret was set.')], [1, true])
+    const late = scenario('late', { curlBad: '1' })
+    t('a failure before any secret still says no secret was set', late.r.stderr.includes('No GitHub secret was set.'), true)
+
+    const rot = scenario('rot', { alias: ['--rotate-cert'] })
+    const rOut = rot.r.stdout + rot.r.stderr
+    t('rotate: exits 0 and says only NOVEST_RELAY_CA changed', [rot.r.status, rOut.includes('Only NOVEST_RELAY_CA was changed')], [0, true])
+    t('rotate: only NOVEST_RELAY_CA was set, over stdin, no value on argv', rot.logs('gh.argv').split('\n').filter(l => l.startsWith('secret set')), ['secret set NOVEST_RELAY_CA --env production --repo berkeustun95/trnc-health'])
+    const rca = rot.logs('gh.stdin.NOVEST_RELAY_CA')
+    t('rotate: the CA secret is the new public certificate, no private key', [rca.includes('BEGIN CERTIFICATE'), rca.includes('PRIVATE KEY')], [true, false])
+    t('rotate: no KEY or URL secret stdin file exists', [existsSync(join(rot.log, 'gh.stdin.NOVEST_RELAY_KEY')), existsSync(join(rot.log, 'gh.stdin.NOVEST_RELAY_URL'))], [false, false])
+    const rssh = rot.logs('ssh.argv').trim().split('\n')
+    t('rotate: ssh calls in order -G, upload, setup --rotate-cert (-t), cert fetch', [rssh[0], rssh[1].startsWith('ada-hermes umask'), rssh[2], rssh[3], rssh.length],
+      ['-G ada-hermes', true, '-t ada-hermes sudo bash /tmp/novest-relay.Ab12Cd/setup.sh --rotate-cert --staging /tmp/novest-relay.Ab12Cd', 'ada-hermes cat /tmp/novest-relay.Ab12Cd/tls.crt && rm -rf /tmp/novest-relay.Ab12Cd', 4])
+    const rex = freshDir('rot-extract')
+    spawnSync('tar', ['-x', '-C', rex, '-f', join(rot.log, 'upload.tar')])
+    t('rotate: the upload is only setup.sh and ip (no key, no hash, no relay.mjs)', readdirSync(rex).sort(), ['ip', 'setup.sh'])
+    t('rotate: ip file holds the address, nothing else was uploaded', readFileSync(join(rex, 'ip'), 'utf8').trim(), FAKE_IP)
+    t('rotate: one curl call (no key), url on stdin, no Authorization header, nothing on argv', [rot.logs('curl.argv').trim().split('\n').length, rot.logs('curl.stdin').includes('Authorization'), /:8443/.test(rot.logs('curl.argv'))], [1, false, false])
+    t('rotate: the IP is on no argv and in no output', [['ssh.argv', 'gh.argv', 'curl.argv'].some(f => rot.logs(f).includes(FAKE_IP)), rOut.includes(FAKE_IP)], [false, false])
+    t('rotate: output tells the operator the keyed checks are skipped and the pinning-gap note', [rOut.includes('keyed checks are skipped'), rOut.includes('fail TLS pinning')], [true, true])
+    t('rotate: prints the fingerprint only', /certificate: .*Fingerprint=([0-9A-F]{2}:){31}[0-9A-F]{2}/i.test(rOut), true)
+    const rwrong = scenario('rotwrong', { cert: wrongCert, alias: ['--rotate-cert'] })
+    t('rotate: a certificate for another IP is refused, no secret set', [rwrong.r.status, rwrong.logs('gh.argv').includes('secret set')], [1, false])
+    const rbad = scenario('rotbad', { curlBad: '1', alias: ['--rotate-cert'] })
+    t('rotate: a failed pinned check sets no secret and does not suggest teardown', [rbad.r.status, rbad.logs('gh.argv').includes('secret set'), rbad.r.stderr.includes('No GitHub secret was set.'), rbad.r.stderr.includes('Teardown is not needed')], [1, false, true, true])
+    const rsetfail = scenario('rotsetfail', { setFail: 'NOVEST_RELAY_CA', alias: ['--rotate-cert'] })
+    t('rotate: a failed NOVEST_RELAY_CA set is reported, nothing else was set', [rsetfail.r.status, rsetfail.r.stderr.includes('setting NOVEST_RELAY_CA failed')], [1, true])
 
     const custom = scenario('alias', { alias: ['my-box'] })
     t('a custom ssh alias is used for every call', custom.logs('ssh.argv').trim().split('\n').every(l => /^(-G |-t |)my-box/.test(l)), true)

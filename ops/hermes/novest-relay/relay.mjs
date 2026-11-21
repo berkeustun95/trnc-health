@@ -4,8 +4,11 @@
 //
 // Rules: Node built-ins only. `GET /n/<path>?<query>` maps to https://coldwellbankernovest.com/<path>?<query>;
 // the client never names a host. Order of checks: method, auth, path, query, User-Agent. Bearer key compared by
-// sha256 + timingSafeEqual; 10 failed auths/min per IP locks that IP for 10 min. Upstream DNS answers in private,
-// loopback, link-local, CGNAT, multicast or ULA space are refused (also IPv4-mapped). Redirects are followed by
+// sha256 + timingSafeEqual; 10 failed auths/min per IP locks that IP for 10 min; on top, a global fixed window
+// (120/min, all IPs) of requests WITHOUT a valid key: over it they get 429, a valid key is never counted or refused
+// by it. Upstream DNS answers in private,
+// loopback, link-local, CGNAT, multicast, ULA, 6to4 (2002::/16) and Teredo (2001:0::/32) space are refused (also
+// IPv4-mapped; 6to4/Teredo are refused outright, so their embedded IPv4 is never decoded). Redirects are followed by
 // hand (max 3) and re-checked against every allowlist. Own errors are JSON {error:code} + x-relay-error and never
 // carry upstream text. Logs: one line per request, query LENGTH only, never headers, key or bodies.
 // Secrets and the cert arrive as systemd credentials ($CREDENTIALS_DIRECTORY/tls.key, tls.crt, key.sha256).
@@ -36,6 +39,8 @@ export const DEFAULT_LIMITS = Object.freeze({
   authFails: 10,
   authWindowMs: 60_000,
   authBlockMs: 10 * 60_000,
+  unauthMax: 120,
+  unauthWindowMs: 60_000,
 })
 export const PORT = 8443
 export const FIRST_HOST = ALLOWED_HOSTS[0]
@@ -100,6 +105,8 @@ export function isBlockedAddress(addr) {
   if (b.slice(0, 10).every(x => x === 0) && b[10] === 0xff && b[11] === 0xff) return blockedV4(b.slice(12))
   if (b[0] === 0 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b && b.slice(4, 12).every(x => x === 0)) return blockedV4(b.slice(12))
   if ((b[0] & 0xfe) === 0xfc) return true
+  if (b[0] === 0x20 && b[1] === 0x02) return true
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0 && b[3] === 0) return true
   if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true
   if (b[0] === 0xfe && (b[1] & 0xc0) === 0xc0) return true
   if (b[0] === 0xff) return true
@@ -192,6 +199,8 @@ export function createRelay({ keyHash, upstreamRequest = makeUpstreamRequest(), 
   let nextSlot = 0
   let day = ''
   let dayCalls = 0
+  let unauthStart = 0
+  let unauthCount = 0
 
   function pruneAuth(t) {
     for (const [ip, e] of authState) if (e.until <= t && !e.fails.some(x => t - x < L.authWindowMs)) authState.delete(ip)
@@ -301,7 +310,13 @@ export function createRelay({ keyHash, upstreamRequest = makeUpstreamRequest(), 
       const m = /^Bearer (\S+)$/.exec(String(req.headers.authorization ?? ''))
       const presented = crypto.createHash('sha256').update(m ? m[1] : '').digest()
       const ok = crypto.timingSafeEqual(presented, stored) && m !== null
-      if (!ok) { recordFail(ip, t); return fail(401, 'unauthorized') }
+      if (!ok) {
+        recordFail(ip, t)
+        if (t - unauthStart >= L.unauthWindowMs || t < unauthStart) { unauthStart = t; unauthCount = 0 }
+        if (unauthCount >= L.unauthMax) return fail(429, 'rate_limited', { 'retry-after': String(Math.max(1, Math.ceil((unauthStart + L.unauthWindowMs - t) / 1000))) })
+        unauthCount++
+        return fail(401, 'unauthorized')
+      }
 
       const rawUrl = String(req.url ?? '')
       const qi = rawUrl.indexOf('?')

@@ -2,6 +2,8 @@
 # Installs the Novest relay on Hermes. Normally run by provision.sh (on the Mac), which uploads a staging dir:
 #   sudo bash setup.sh --staging <dir>     <dir> holds `ip` (the public IPv4) and `key.sha256` (the relay key's hash)
 #   bash setup.sh --dry-run                prints every command with placeholders; needs no root and touches nothing
+#   sudo bash setup.sh --rotate-cert --staging <dir>   replaces the TLS key+cert of an installed relay (<dir> holds `ip` only);
+#   bash setup.sh --rotate-cert --dry-run              the relay key hash and every other file are left untouched
 # This script never receives, generates or prints the relay key (only its sha256), and never prints the IP.
 # Not idempotent by choice: it REFUSES if the user, the folders, the unit or a ufw rule for 8443 already exist
 # (it never overwrites or backs up). Run teardown.sh first to start over. Installs nothing from the network.
@@ -10,12 +12,13 @@ cd "$(dirname "$0")"
 
 U=novest-relay; PORT=8443; LIB=/usr/local/lib/novest-relay; ETC=/etc/novest-relay; UNIT=/etc/systemd/system/novest-relay.service
 die() { echo "REFUSED: $*" >&2; exit 1; }
-USAGE="usage: sudo bash setup.sh --staging <dir>   |   bash setup.sh --dry-run"
+USAGE="usage: sudo bash setup.sh --staging <dir>   |   sudo bash setup.sh --rotate-cert --staging <dir>   |   bash setup.sh [--rotate-cert] --dry-run"
 
-DRY=0; STG=""
+DRY=0; ROT=0; STG=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     --dry-run) DRY=1; shift;;
+    --rotate-cert) ROT=1; shift;;
     --staging) [[ $# -ge 2 ]] || die "$USAGE"; STG=$2; shift 2;;
     *) die "$USAGE";;
   esac
@@ -34,10 +37,14 @@ run() { if (( DRY )); then printf '+'; printf ' %s' "$@"; printf '\n'; else "$@"
 if (( DRY )); then
   echo "DRY RUN: nothing below is executed"
   chk "running as root, and SUDO_USER is a non-root user"
-  chk "staging dir matches ^/tmp/novest-relay\\.[A-Za-z0-9]+\$, owned by SUDO_USER, not group/world writable; ip and key.sha256 are plain files"
+  if (( ROT )); then
+    chk "staging dir matches ^/tmp/novest-relay\\.[A-Za-z0-9]+\$, owned by SUDO_USER, not group/world writable; ip is a plain file"
+  else
+    chk "staging dir matches ^/tmp/novest-relay\\.[A-Za-z0-9]+\$, owned by SUDO_USER, not group/world writable; ip and key.sha256 are plain files"
+  fi
   chk "ip is a public IPv4 (not 0/10/127/169.254/192.168/172.16-31/100.64-127/224+)"
-  chk "key.sha256 matches ^[0-9a-f]{64}\$"
-  say "read ip and key.sha256 from $STG, then rm -f $STG/ip $STG/key.sha256"
+  (( ROT )) || chk "key.sha256 matches ^[0-9a-f]{64}\$"
+  if (( ROT )); then say "read ip from $STG, then rm -f $STG/ip"; else say "read ip and key.sha256 from $STG, then rm -f $STG/ip $STG/key.sha256"; fi
 else
   [[ $(id -u) -eq 0 ]] || die "run as root: sudo bash setup.sh --staging <dir>"
   [[ -n ${SUDO_USER:-} && $SUDO_USER != root ]] || die "run it with sudo from the operator account (SUDO_USER is needed to hand the public certificate back)"
@@ -45,14 +52,80 @@ else
   [[ -d $STG && ! -L $STG ]] || die "staging dir missing or a symlink"
   [[ $(stat -c %U "$STG") == "$SUDO_USER" ]] || die "staging dir is not owned by $SUDO_USER"
   (( (8#$(stat -c %a "$STG") & 8#022) == 0 )) || die "staging dir is group/world writable"
-  for f in ip key.sha256; do [[ -f $STG/$f && ! -L $STG/$f ]] || die "$STG/$f is missing or not a plain file"; done
-  IP=$(<"$STG/ip"); HASH=$(<"$STG/key.sha256")
+  INPUTS=(ip); (( ROT )) || INPUTS=(ip key.sha256)
+  for f in "${INPUTS[@]}"; do [[ -f $STG/$f && ! -L $STG/$f ]] || die "$STG/$f is missing or not a plain file"; done
+  IP=$(<"$STG/ip"); HASH=""; (( ROT )) || HASH=$(<"$STG/key.sha256")
   rm -f "$STG/ip" "$STG/key.sha256"
   [[ $IP =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || die "the staged ip is not an IPv4 address"
   for o in "${BASH_REMATCH[@]:1}"; do (( 10#$o <= 255 )) || die "the staged ip is not an IPv4 address"; done
   [[ $IP =~ ^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.|2(2[4-9]|[3-5][0-9])\.) ]] \
     && die "the staged ip is not a public address"
-  [[ $HASH =~ ^[0-9a-f]{64}$ ]] || die "key.sha256 is not 64 lowercase hex characters"
+  (( ROT )) || [[ $HASH =~ ^[0-9a-f]{64}$ ]] || die "key.sha256 is not 64 lowercase hex characters"
+fi
+
+# Check-and-curl helpers shared by install and rotation (only checks that need no key run here; the keyed ones run
+# from the Mac through the public port, see provision.sh).
+FAILS=0
+check() {
+  local name=$1 want=$2 got=$3
+  if [[ $got == "$want" ]]; then echo "  PASS $name -> $got"; else echo "  FAIL $name -> $got (wanted $want)"; FAILS=$((FAILS+1)); fi
+}
+local_curl() { curl -sS --max-time 30 --cacert "$ETC/tls.crt" --connect-to "$IP:$PORT:localhost:$PORT" "$@" 2>/dev/null; }
+P=/n/wp-json/wp/v2/properties
+
+if (( ROT )); then
+  # Order: (1) write BOTH new files under temporary names and back up the live pair (a failure up to here leaves the live
+  # pair untouched); (2) mv the key, then the cert (atomic renames, same directory). Key first because the old key
+  # without the old cert is useless anyway and the cert is what clients pin; if the second mv fails the old key is put
+  # back, so the live pair is always one consistent pair. (3) restart; if the service does not come back, both old
+  # files are restored and it is restarted again, and the script says so. key.sha256 is never touched.
+  NEWK="$ETC/tls.key.new"; NEWC="$ETC/tls.crt.new"
+  if (( DRY )); then
+    chk "relay is installed: user $U, $ETC, $ETC/tls.key, $ETC/tls.crt, $ETC/key.sha256 and $UNIT exist (else REFUSED)"
+    say "(umask 077) openssl ecparam -name prime256v1 -genkey -noout -out $NEWK   # the TLS private key never leaves this server"
+    say "chmod 600 $NEWK"
+    say "openssl req -new -x509 -key $NEWK -sha256 -days 730 -subj /CN=novest-relay -addext subjectAltName=IP:<ip> -out $NEWC"
+    say "chmod 644 $NEWC"
+    say "cp -p $ETC/tls.key $ETC/tls.key.old; cp -p $ETC/tls.crt $ETC/tls.crt.old   # backup of the live pair"
+    say "mv $NEWK $ETC/tls.key   # key first, then cert; key.sha256 is not touched"
+    say "mv $NEWC $ETC/tls.crt   # if this fails: restore the old key, stop"
+    say "systemctl restart novest-relay"
+    say "(if the service is not active afterwards: restore tls.key.old and tls.crt.old, restart, report; else rm -f the .old files)"
+    say "wait up to 10 s for port $PORT to listen"
+    say "systemctl is-active -q novest-relay   # else print the last 20 journal lines and stop"
+    say "install -o <operator> -m 644 $ETC/tls.crt $STG/tls.crt"
+    say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' https://<ip>:$PORT$P?per_page=1   # expect 401 (no key), NEW cert pinned"
+    say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' -X POST https://<ip>:$PORT$P   # expect 405"
+    echo "certificate rotated (dry run)"
+    exit 0
+  fi
+  id "$U" >/dev/null 2>&1 || die "user $U does not exist: the relay is not installed (rotation needs an installed relay)"
+  for f in "$ETC/tls.key" "$ETC/tls.crt" "$ETC/key.sha256" "$UNIT"; do [[ -f $f ]] || die "$f is missing: the relay is not installed (rotation needs an installed relay)"; done
+  command -v openssl >/dev/null && command -v curl >/dev/null && command -v ss >/dev/null && command -v systemctl >/dev/null || die "openssl, curl, ss and systemctl are required"
+  [[ ! -e $NEWK && ! -e $NEWC && ! -e $ETC/tls.key.old && ! -e $ETC/tls.crt.old ]] || die "a .new or .old file is left over in $ETC from an earlier run; inspect and remove it first"
+  (umask 077; openssl ecparam -name prime256v1 -genkey -noout -out "$NEWK")
+  chmod 600 "$NEWK"
+  openssl req -new -x509 -key "$NEWK" -sha256 -days 730 -subj "/CN=novest-relay" -addext "subjectAltName=IP:$IP" -out "$NEWC" || { rm -f "$NEWK" "$NEWC"; die "could not create the new certificate; nothing was replaced"; }
+  chmod 644 "$NEWC"
+  (umask 077; cp -p "$ETC/tls.key" "$ETC/tls.key.old"; cp -p "$ETC/tls.crt" "$ETC/tls.crt.old")
+  mv "$NEWK" "$ETC/tls.key"
+  mv "$NEWC" "$ETC/tls.crt" || { mv -f "$ETC/tls.key.old" "$ETC/tls.key"; rm -f "$NEWC" "$ETC/tls.crt.old"; die "could not install the new certificate; the old key and certificate are in place"; }
+  systemctl restart novest-relay
+  for _ in $(seq 1 20); do [[ -n $(ss -ltnH "sport = :$PORT") ]] && break; sleep 0.5; done
+  if ! systemctl is-active -q novest-relay; then
+    journalctl -u novest-relay -n 20 --no-pager >&2
+    mv -f "$ETC/tls.key.old" "$ETC/tls.key"; mv -f "$ETC/tls.crt.old" "$ETC/tls.crt"
+    systemctl restart novest-relay || true
+    die "service did not restart with the new certificate; the OLD key and certificate were restored (set no secret)"
+  fi
+  rm -f "$ETC/tls.key.old" "$ETC/tls.crt.old"
+  install -o "$SUDO_USER" -m 644 "$ETC/tls.crt" "$STG/tls.crt"
+  echo "local checks (no key, NEW certificate pinned):"
+  check "no key" 401 "$(local_curl -o /dev/null -w '%{http_code}' "https://$IP:$PORT$P?per_page=1" || echo err)"
+  check "POST" 405 "$(local_curl -o /dev/null -w '%{http_code}' -X POST "https://$IP:$PORT$P" || echo err)"
+  (( FAILS == 0 )) || { echo "$FAILS local check(s) FAILED" >&2; exit 1; }
+  echo "certificate rotated; relay listening on :$PORT"
+  exit 0
 fi
 
 if (( DRY )); then
@@ -137,14 +210,6 @@ fi
 
 run install -o "${SUDO_USER:-<operator>}" -m 644 "$ETC/tls.crt" "$STG/tls.crt"
 
-# Only checks that need no key run here; the keyed ones run from the Mac through the public port (provision.sh).
-FAILS=0
-check() {
-  local name=$1 want=$2 got=$3
-  if [[ $got == "$want" ]]; then echo "  PASS $name -> $got"; else echo "  FAIL $name -> $got (wanted $want)"; FAILS=$((FAILS+1)); fi
-}
-local_curl() { curl -sS --max-time 30 --cacert "$ETC/tls.crt" --connect-to "$IP:$PORT:localhost:$PORT" "$@" 2>/dev/null; }
-P=/n/wp-json/wp/v2/properties
 if (( DRY )); then
   say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' https://<ip>:$PORT$P?per_page=1   # expect 401 (no key)"
   say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' -X POST https://<ip>:$PORT$P   # expect 405"

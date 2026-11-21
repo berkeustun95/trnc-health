@@ -1,6 +1,8 @@
 #!/bin/bash
 # Provisions the Novest relay on Hermes from the Mac, in one run:
 #   bash ops/hermes/novest-relay/provision.sh [--dry-run] [<ssh-alias>]      (alias defaults to ada-hermes)
+#   bash ops/hermes/novest-relay/provision.sh --rotate-cert [--dry-run] [<ssh-alias>]   replaces only the TLS certificate
+#     (new key + cert made ON Hermes, the private TLS key never leaves it) and sets only NOVEST_RELAY_CA; the relay key is not involved
 # The relay key is generated here, lives only in a shell variable (never a file, never argv, never printed) and goes
 # straight into the GitHub production secret NOVEST_RELAY_KEY over stdin. Hermes only ever gets sha256(key).
 # The public IP is read from `ssh -G <alias>` and is never printed or put on any command line.
@@ -22,17 +24,37 @@ IMG_UA='ADA-TRNC-Health/1.0 (+partner image mirror)'
 PROP=/n/wp-json/wp/v2/properties?per_page=1
 TEARDOWN='/usr/local/lib/novest-relay/teardown.sh'
 
-DRY=0; ALIAS=ada-hermes; SEEN_ALIAS=0
+DRY=0; ROT=0; ALIAS=ada-hermes; SEEN_ALIAS=0
 for a in "$@"; do
   case $a in
     --dry-run) DRY=1;;
-    -*) echo "usage: provision.sh [--dry-run] [<ssh-alias>]" >&2; exit 1;;
-    *) (( SEEN_ALIAS == 0 )) || { echo "usage: provision.sh [--dry-run] [<ssh-alias>]" >&2; exit 1; }
+    --rotate-cert) ROT=1;;
+    -*) echo "usage: provision.sh [--rotate-cert] [--dry-run] [<ssh-alias>]" >&2; exit 1;;
+    *) (( SEEN_ALIAS == 0 )) || { echo "usage: provision.sh [--rotate-cert] [--dry-run] [<ssh-alias>]" >&2; exit 1; }
        ALIAS=$a; SEEN_ALIAS=1;;
   esac
 done
 [[ $ALIAS =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "REFUSED: odd ssh alias" >&2; exit 1; }
 
+if (( DRY && ROT )); then
+  A='<ssh-alias>'
+  echo "DRY RUN: nothing below is executed (no network, no ssh)"
+  cat <<EOF
++ ssh -G $A | hostname line -> public IPv4, validated, never printed (setup.sh's private-range rules)
++ $GH api repos/$REPO/environments/production/secrets/public-key >/dev/null   # preflight; on 403: refuse, nothing changed
++ mktemp -d (700) holding setup.sh ip   # no relay key, no hash; trap-deleted
++ COPYFILE_DISABLE=1 tar --no-xattrs -c ... | ssh $A 'umask 077; d=\$(mktemp -d /tmp/novest-relay.XXXXXX) && tar -x -C "\$d" && printf %s "\$d"'   # -> <staging-dir>
++ ssh -t $A 'sudo bash <staging-dir>/setup.sh --rotate-cert --staging <staging-dir>'   # sudo may prompt; refuses unless the relay is installed
++ ssh $A 'cat <staging-dir>/tls.crt && rm -rf <staging-dir>'   # public certificate only
++ openssl x509 -in <public cert> -noout -text   # must parse, be EC P-256, IP SAN equals <ip> (compared, not printed); prints only the sha256 fingerprint
++ curl -K - (url on stdin) --cacert <NEW public cert>: no key -> 401   # proves the pin works; keyed checks are impossible here: the Mac does not have the relay key in a rotation
++ (any FAIL: stop, set no secret)
++ printf %s "<public cert PEM>" | $GH secret set NOVEST_RELAY_CA --env production --repo $REPO
+note: runs of the GitHub job between the relay restart and this secret update fail TLS pinning; rotate outside a novest-images run.
+reminder: NOVEST_RELAY_KEY, NOVEST_RELAY_URL and the variable NOVEST_ROUTE are not touched
+EOF
+  exit 0
+fi
 if (( DRY )); then
   A='<ssh-alias>'
   echo "DRY RUN: nothing below is executed (no network, no ssh)"
@@ -61,13 +83,19 @@ EOF
   exit 0
 fi
 
-WORK=""; STG=""; KEY=""; INSTALLED=0
+WORK=""; STG=""; KEY=""; INSTALLED=0; SET_DONE=""
 cleanup() { [[ -z $WORK ]] || rm -rf "$WORK"; KEY=""; }
 trap cleanup EXIT
 fail() {
   echo "FAILED: $*" >&2
-  echo "No GitHub secret was set." >&2
-  if (( INSTALLED )); then
+  if [[ -z $SET_DONE ]]; then
+    echo "No GitHub secret was set." >&2
+  else
+    echo "GitHub secrets ALREADY set in this run:${SET_DONE}. The ones not listed were NOT set, so the secrets are now inconsistent; do not set NOVEST_ROUTE." >&2
+  fi
+  if (( ROT )); then
+    echo "The relay stays installed (rotation changes only its certificate; setup.sh restores the old pair if the service would not restart). Teardown is not needed." >&2
+  elif (( INSTALLED )); then
     echo "To remove the relay from Hermes: ssh -t $ALIAS sudo bash $TEARDOWN" >&2
   else
     echo "If setup.sh got past its checks and installed anything, remove it with: ssh -t $ALIAS sudo bash $TEARDOWN" >&2
@@ -101,22 +129,28 @@ if (( GHRC != 0 )); then
   exit 1
 fi
 
-KEY=$(openssl rand -hex 32)
-[[ $KEY =~ ^[0-9a-f]{64}$ ]] || fail "key generation returned an unexpected value"
-HASH=$(printf %s "$KEY" | shasum -a 256 | cut -d' ' -f1)
-[[ $HASH =~ ^[0-9a-f]{64}$ ]] || fail "hash computation returned an unexpected value"
-
 WORK=$(mktemp -d); chmod 700 "$WORK"
 mkdir "$WORK/up"
-for f in relay.mjs novest-relay.service setup.sh teardown.sh; do cp "$HERE/$f" "$WORK/up/$f"; done
-printf '%s\n' "$HASH" > "$WORK/up/key.sha256"
+if (( ROT )); then
+  UPFILES="setup.sh ip"
+  cp "$HERE/setup.sh" "$WORK/up/setup.sh"
+else
+  KEY=$(openssl rand -hex 32)
+  [[ $KEY =~ ^[0-9a-f]{64}$ ]] || fail "key generation returned an unexpected value"
+  HASH=$(printf %s "$KEY" | shasum -a 256 | cut -d' ' -f1)
+  [[ $HASH =~ ^[0-9a-f]{64}$ ]] || fail "hash computation returned an unexpected value"
+  UPFILES="relay.mjs novest-relay.service setup.sh teardown.sh key.sha256 ip"
+  for f in relay.mjs novest-relay.service setup.sh teardown.sh; do cp "$HERE/$f" "$WORK/up/$f"; done
+  printf '%s\n' "$HASH" > "$WORK/up/key.sha256"
+fi
 printf '%s\n' "$IP" > "$WORK/up/ip"
-STG=$(COPYFILE_DISABLE=1 tar --no-xattrs -c -C "$WORK/up" relay.mjs novest-relay.service setup.sh teardown.sh key.sha256 ip \
+STG=$(COPYFILE_DISABLE=1 tar --no-xattrs -c -C "$WORK/up" $UPFILES \
   | ssh "$ALIAS" 'umask 077; d=$(mktemp -d /tmp/novest-relay.XXXXXX) && tar -x -C "$d" && printf %s "$d"') || fail "uploading the staging files to Hermes failed"
 rm -rf "$WORK/up"
 [[ $STG =~ ^/tmp/novest-relay\.[A-Za-z0-9]+$ ]] || fail "unexpected staging path from Hermes"
 
-if ! ssh -t "$ALIAS" "sudo bash $STG/setup.sh --staging $STG"; then
+SETUP_ARGS="--staging $STG"; (( ROT == 0 )) || SETUP_ARGS="--rotate-cert --staging $STG"
+if ! ssh -t "$ALIAS" "sudo bash $STG/setup.sh $SETUP_ARGS"; then
   ssh "$ALIAS" "rm -rf $STG" >/dev/null 2>&1 || true
   INSTALLED=1
   fail "setup.sh on Hermes did not finish"
@@ -147,6 +181,16 @@ check() {
   local name=$1 want=$2 got=$3
   if [[ $got == "$want" ]]; then echo "  PASS $name -> $got"; else echo "  FAIL $name -> $got (wanted $want)"; FAILS=$((FAILS+1)); fi
 }
+if (( ROT )); then
+  echo "keyed checks are skipped in a rotation: this Mac does not have the relay key (only GitHub does). The no-key check below proves the NEW certificate pin works."
+  check "no key, NEW certificate pinned" 401 "$(rcurl nokey "$PROP" /dev/null || echo err)"
+  (( FAILS == 0 )) || fail "the new certificate does not pass the pinned check"
+  echo "note: runs of the GitHub novest-images job between the relay restart and the NOVEST_RELAY_CA update below fail TLS pinning."
+  printf %s "$PEM" | "$GH" secret set NOVEST_RELAY_CA --env production --repo "$REPO" || fail "setting NOVEST_RELAY_CA failed (the relay already serves the NEW certificate: set NOVEST_RELAY_CA by hand from the certificate, or run --rotate-cert again)"
+  echo "set NOVEST_RELAY_CA"
+  echo "Done. Only NOVEST_RELAY_CA was changed (NOVEST_RELAY_KEY, NOVEST_RELAY_URL and NOVEST_ROUTE are untouched)."
+  exit 0
+fi
 echo "checks through the public port:"
 check "no key" 401 "$(rcurl nokey "$PROP" /dev/null || echo err)"
 check "properties?per_page=1 with key (positive control)" 200 "$(rcurl key "$PROP" /dev/null -A "$FEED_UA" || echo err)"
@@ -158,10 +202,10 @@ check "curl's default User-Agent with key" 400 "$(rcurl key "$PROP" /dev/null ||
 
 set_secret() { printf %s "$2" | "$GH" secret set "$1" --env production --repo "$REPO"; }
 set_secret NOVEST_RELAY_KEY "$KEY" || fail "setting NOVEST_RELAY_KEY failed"
-echo "set NOVEST_RELAY_KEY"
+echo "set NOVEST_RELAY_KEY"; SET_DONE="$SET_DONE NOVEST_RELAY_KEY"
 set_secret NOVEST_RELAY_URL "https://$IP:$PORT" || fail "setting NOVEST_RELAY_URL failed"
-echo "set NOVEST_RELAY_URL"
+echo "set NOVEST_RELAY_URL"; SET_DONE="$SET_DONE NOVEST_RELAY_URL"
 set_secret NOVEST_RELAY_CA "$PEM" || fail "setting NOVEST_RELAY_CA failed"
-echo "set NOVEST_RELAY_CA"
+echo "set NOVEST_RELAY_CA"; SET_DONE="$SET_DONE NOVEST_RELAY_CA"
 unset KEY
 echo "Done. The variable NOVEST_ROUTE is NOT touched and is still unset: the relay is installed and tested but unused until Berke sets it."
