@@ -7,11 +7,14 @@
 # This script never receives, generates or prints the relay key (only its sha256), and never prints the IP.
 # Not idempotent by choice: it REFUSES if the user, the folders, the unit or a ufw rule for 8443 already exist
 # (it never overwrites or backs up). Run teardown.sh first to start over. Installs nothing from the network.
+# Exit codes: 0 done; 3 REFUSED BEFORE CHANGING ANYTHING (preflight; nothing to remove); 1 failed after it started changing
+# things (install: run teardown.sh; rotation: the old key+cert were restored whenever the new ones were already in place).
 set -euo pipefail
 cd "$(dirname "$0")"
 
 U=novest-relay; PORT=8443; LIB=/usr/local/lib/novest-relay; ETC=/etc/novest-relay; UNIT=/etc/systemd/system/novest-relay.service
-die() { echo "REFUSED: $*" >&2; exit 1; }
+PRE=1
+die() { echo "REFUSED: $*" >&2; exit $(( PRE ? 3 : 1 )); }
 USAGE="usage: sudo bash setup.sh --staging <dir>   |   sudo bash setup.sh --rotate-cert --staging <dir>   |   bash setup.sh [--rotate-cert] --dry-run"
 
 DRY=0; ROT=0; STG=""
@@ -50,6 +53,8 @@ else
   [[ -n ${SUDO_USER:-} && $SUDO_USER != root ]] || die "run it with sudo from the operator account (SUDO_USER is needed to hand the public certificate back)"
   [[ $STG =~ ^/tmp/novest-relay\.[A-Za-z0-9]+$ ]] || die "staging dir must look like /tmp/novest-relay.XXXXXX"
   [[ -d $STG && ! -L $STG ]] || die "staging dir missing or a symlink"
+  [[ $(pwd -P) == "$(cd "$STG" && pwd -P)" ]] || die "setup.sh is not running from the staging dir"
+  [[ -f setup.sh && ! -L setup.sh ]] || die "setup.sh in the staging dir is missing or a symlink"
   [[ $(stat -c %U "$STG") == "$SUDO_USER" ]] || die "staging dir is not owned by $SUDO_USER"
   (( (8#$(stat -c %a "$STG") & 8#022) == 0 )) || die "staging dir is group/world writable"
   INPUTS=(ip); (( ROT )) || INPUTS=(ip key.sha256)
@@ -89,13 +94,13 @@ if (( ROT )); then
     say "cp -p $ETC/tls.key $ETC/tls.key.old; cp -p $ETC/tls.crt $ETC/tls.crt.old   # backup of the live pair"
     say "mv $NEWK $ETC/tls.key   # key first, then cert; key.sha256 is not touched"
     say "mv $NEWC $ETC/tls.crt   # if this fails: restore the old key, stop"
-    say "systemctl restart novest-relay"
-    say "(if the service is not active afterwards: restore tls.key.old and tls.crt.old, restart, report; else rm -f the .old files)"
+    say "systemctl restart novest-relay   # a failing restart is caught, not fatal: it triggers the rollback below"
     say "wait up to 10 s for port $PORT to listen"
-    say "systemctl is-active -q novest-relay   # else print the last 20 journal lines and stop"
-    say "install -o <operator> -m 644 $ETC/tls.crt $STG/tls.crt"
     say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' https://<ip>:$PORT$P?per_page=1   # expect 401 (no key), NEW cert pinned"
     say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' -X POST https://<ip>:$PORT$P   # expect 405"
+    say "sleep 3; systemctl is-active -q novest-relay and port $PORT still listening   # catches a Restart=always flap"
+    say "install -o <operator> -m 644 $ETC/tls.crt $STG/tls.crt"
+    say "(ANY failure above: print the last 20 journal lines, restore tls.key.old and tls.crt.old, restart, say 'old certificate restored', exit 1; only when all pass: rm -f the .old files)"
     echo "certificate rotated (dry run)"
     exit 0
   fi
@@ -103,6 +108,7 @@ if (( ROT )); then
   for f in "$ETC/tls.key" "$ETC/tls.crt" "$ETC/key.sha256" "$UNIT"; do [[ -f $f ]] || die "$f is missing: the relay is not installed (rotation needs an installed relay)"; done
   command -v openssl >/dev/null && command -v curl >/dev/null && command -v ss >/dev/null && command -v systemctl >/dev/null || die "openssl, curl, ss and systemctl are required"
   [[ ! -e $NEWK && ! -e $NEWC && ! -e $ETC/tls.key.old && ! -e $ETC/tls.crt.old ]] || die "a .new or .old file is left over in $ETC from an earlier run; inspect and remove it first"
+  PRE=0
   (umask 077; openssl ecparam -name prime256v1 -genkey -noout -out "$NEWK")
   chmod 600 "$NEWK"
   openssl req -new -x509 -key "$NEWK" -sha256 -days 730 -subj "/CN=novest-relay" -addext "subjectAltName=IP:$IP" -out "$NEWC" || { rm -f "$NEWK" "$NEWC"; die "could not create the new certificate; nothing was replaced"; }
@@ -110,21 +116,39 @@ if (( ROT )); then
   (umask 077; cp -p "$ETC/tls.key" "$ETC/tls.key.old"; cp -p "$ETC/tls.crt" "$ETC/tls.crt.old")
   mv "$NEWK" "$ETC/tls.key"
   mv "$NEWC" "$ETC/tls.crt" || { mv -f "$ETC/tls.key.old" "$ETC/tls.key"; rm -f "$NEWC" "$ETC/tls.crt.old"; die "could not install the new certificate; the old key and certificate are in place"; }
-  systemctl restart novest-relay
-  for _ in $(seq 1 20); do [[ -n $(ss -ltnH "sport = :$PORT") ]] && break; sleep 0.5; done
-  if ! systemctl is-active -q novest-relay; then
-    journalctl -u novest-relay -n 20 --no-pager >&2
+  listening() { [[ -n $(ss -ltnH "sport = :$PORT") ]]; }
+  rot_ok=1; why=""
+  systemctl restart novest-relay || { rot_ok=0; why="systemctl restart failed"; }
+  if (( rot_ok )); then
+    for _ in $(seq 1 20); do listening && break; sleep 0.5; done
+    listening || { rot_ok=0; why="the relay is not listening on :$PORT"; }
+  fi
+  g401=err; g405=err
+  if (( rot_ok )); then
+    g401=$(local_curl -o /dev/null -w '%{http_code}' "https://$IP:$PORT$P?per_page=1") || g401=err
+    g405=$(local_curl -o /dev/null -w '%{http_code}' -X POST "https://$IP:$PORT$P") || g405=err
+    [[ $g401 == 401 && $g405 == 405 ]] || { rot_ok=0; why="the local checks with the new certificate failed (no key: $g401, POST: $g405)"; }
+  fi
+  if (( rot_ok )); then
+    sleep 3
+    { systemctl is-active -q novest-relay && listening; } || { rot_ok=0; why="the service is not stable after the restart"; }
+  fi
+  if (( rot_ok )); then
+    install -o "$SUDO_USER" -m 644 "$ETC/tls.crt" "$STG/tls.crt" || { rot_ok=0; why="could not hand the public certificate back"; }
+  fi
+  if (( ! rot_ok )); then
+    echo "FAILED: $why" >&2
+    journalctl -u novest-relay -n 20 --no-pager >&2 || true
     mv -f "$ETC/tls.key.old" "$ETC/tls.key"; mv -f "$ETC/tls.crt.old" "$ETC/tls.crt"
     systemctl restart novest-relay || true
-    die "service did not restart with the new certificate; the OLD key and certificate were restored (set no secret)"
+    echo "old certificate restored (key and certificate; the relay was restarted with them). Set no secret." >&2
+    exit 1
   fi
   rm -f "$ETC/tls.key.old" "$ETC/tls.crt.old"
-  install -o "$SUDO_USER" -m 644 "$ETC/tls.crt" "$STG/tls.crt"
   echo "local checks (no key, NEW certificate pinned):"
-  check "no key" 401 "$(local_curl -o /dev/null -w '%{http_code}' "https://$IP:$PORT$P?per_page=1" || echo err)"
-  check "POST" 405 "$(local_curl -o /dev/null -w '%{http_code}' -X POST "https://$IP:$PORT$P" || echo err)"
-  (( FAILS == 0 )) || { echo "$FAILS local check(s) FAILED" >&2; exit 1; }
-  echo "certificate rotated; relay listening on :$PORT"
+  check "no key" 401 "$g401"
+  check "POST" 405 "$g405"
+echo "certificate rotated; relay listening on :$PORT"
   exit 0
 fi
 
@@ -139,7 +163,7 @@ if (( DRY )); then
   chk "$ETC, $LIB and $UNIT do not exist"
   NODE='<node-path>'
 else
-  [[ -f relay.mjs && -f novest-relay.service && -f teardown.sh ]] || die "relay.mjs, novest-relay.service and teardown.sh must sit next to setup.sh"
+  for f in relay.mjs novest-relay.service teardown.sh; do [[ -f $f && ! -L $f ]] || die "$f must sit next to setup.sh as a plain file (not a symlink)"; done
   for c in openssl curl ss systemctl ufw useradd; do command -v "$c" >/dev/null || die "$c not found"; done
 
   if ! ufw status | grep -q '^Status: active'; then
@@ -168,6 +192,7 @@ else
   [[ -e $ETC || -e $LIB || -e $UNIT ]] && die "$ETC, $LIB or $UNIT already exists; run teardown.sh first"
 fi
 
+PRE=0
 run useradd --system --no-create-home --shell /usr/sbin/nologin "$U"
 run install -d -o root -g root -m 755 "$LIB"
 run install -o root -g root -m 644 relay.mjs "$LIB/relay.mjs"

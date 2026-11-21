@@ -143,11 +143,13 @@ console.log('per-IP lockout')
   for (let i = 0; i < 10; i++) bads.push((await call(relay, { key: `bad${i}`, ip: '198.51.100.1' })).status)
   t('first 10 bad auths from one IP are 401', bads, Array(10).fill(401))
   t('11th bad auth is 429 rate_limited', errOf(await call(relay, { key: 'bad', ip: '198.51.100.1' })), [429, 'rate_limited'])
-  t('the right key from the locked IP is also 429', errOf(await call(relay, { ip: '198.51.100.1' })), [429, 'rate_limited'])
+  t('a wrong key from the locked IP is still 429', errOf(await call(relay, { key: 'bad', ip: '198.51.100.1' })), [429, 'rate_limited'])
+  t('no key from the locked IP is still 429', errOf(await call(relay, { key: null, ip: '198.51.100.1' })), [429, 'rate_limited'])
+  t('the right key from the locked IP gets through (the key is checked before the lockout)', (await call(relay, { ip: '198.51.100.1' })).status, 200)
   t('per IP only: another IP with the right key still works (positive control)', (await call(relay, { ip: '198.51.100.2' })).status, 200)
   t('per IP only: another IP is not locked after the first IP', (await call(relay, { key: 'bad', ip: '198.51.100.3' })).status, 401)
   clock += 9 * 60_000
-  t('still locked after 9 minutes', (await call(relay, { ip: '198.51.100.1' })).status, 429)
+  t('still locked after 9 minutes (wrong key)', (await call(relay, { key: 'bad', ip: '198.51.100.1' })).status, 429)
   clock += 2 * 60_000
   t('unlocked after 10 minutes (positive control)', (await call(relay, { ip: '198.51.100.1' })).status, 200)
   const s = []

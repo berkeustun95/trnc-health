@@ -4,7 +4,8 @@
 //
 // Rules: Node built-ins only. `GET /n/<path>?<query>` maps to https://coldwellbankernovest.com/<path>?<query>;
 // the client never names a host. Order of checks: method, auth, path, query, User-Agent. Bearer key compared by
-// sha256 + timingSafeEqual; 10 failed auths/min per IP locks that IP for 10 min; on top, a global fixed window
+// sha256 + timingSafeEqual, checked BEFORE any lockout (a valid key is never refused by one: a 256-bit key makes the lockouts
+// a noise/DoS control only); 10 failed auths/min per IP locks that IP for 10 min (a locked IP's missing/wrong keys get 429); on top, a global fixed window
 // (120/min, all IPs) of requests WITHOUT a valid key: over it they get 429, a valid key is never counted or refused
 // by it. Upstream DNS answers in private,
 // loopback, link-local, CGNAT, multicast, ULA, 6to4 (2002::/16) and Teredo (2001:0::/32) space are refused (also
@@ -305,12 +306,12 @@ export function createRelay({ keyHash, upstreamRequest = makeUpstreamRequest(), 
       if (req.method !== 'GET') return fail(405, 'method_not_allowed', { allow: 'GET' })
 
       const t = now()
-      const st = authState.get(ip)
-      if (st && st.until > t) return fail(429, 'rate_limited', { 'retry-after': String(Math.ceil((st.until - t) / 1000)) })
       const m = /^Bearer (\S+)$/.exec(String(req.headers.authorization ?? ''))
       const presented = crypto.createHash('sha256').update(m ? m[1] : '').digest()
       const ok = crypto.timingSafeEqual(presented, stored) && m !== null
       if (!ok) {
+        const st = authState.get(ip)
+        if (st && st.until > t) return fail(429, 'rate_limited', { 'retry-after': String(Math.ceil((st.until - t) / 1000)) })
         recordFail(ip, t)
         if (t - unauthStart >= L.unauthWindowMs || t < unauthStart) { unauthStart = t; unauthCount = 0 }
         if (unauthCount >= L.unauthMax) return fail(429, 'rate_limited', { 'retry-after': String(Math.max(1, Math.ceil((unauthStart + L.unauthWindowMs - t) / 1000))) })
