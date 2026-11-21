@@ -50,7 +50,7 @@ import { SOURCE, get, getAll, metaArray, setNovestFetch } from '../supabase/func
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
 import { readAllRows, readAllResult } from './lib/read-all-rows.mjs'
-import { resolveNovestRoute, relayFetch, largestResponseBytes, RELAY_RESPONSE_CAP } from './lib/novest-relay-client.mjs'
+import { resolveNovestRoute, pruneRouteRefusal, relayFetch, largestResponseBytes, RELAY_RESPONSE_CAP } from './lib/novest-relay-client.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -86,6 +86,13 @@ if (refusal) {
   console.error(`REFUSED: ${refusal}`)
   process.exit(1)
 }
+let route
+try { route = resolveNovestRoute(process.env) } catch (e) { console.error(`::error::${e.message}`); process.exit(1) }
+const routeRefusal = pruneRouteRefusal({ prune, route })
+if (routeRefusal) {
+  console.error(`REFUSED: ${routeRefusal}`)
+  process.exit(1)
+}
 prodWriteGuard({ wouldWrite: !dry, workflow: 'novest-images', dryHint: 'node scripts/mirror-novest-images.mjs --dry' })
 
 // Polite to a partner's shared host. Sequential-ish: 4 in flight, each spaced.
@@ -95,8 +102,6 @@ const SPACING_MS = 150
 const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' }
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
-let route
-try { route = resolveNovestRoute(process.env) } catch (e) { fail(`::error::${e.message}`) }
 console.log(`route: ${route}`)
 if (route === 'relay') {
   setNovestFetch(relayFetch)

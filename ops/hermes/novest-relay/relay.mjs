@@ -317,12 +317,12 @@ export function createRelay({ keyHash, upstreamRequest = makeUpstreamRequest(), 
       const query = canonicalQuery(mapped, rawQuery)
       if (query === null) return fail(400, 'bad_query')
       const ua = req.headers['user-agent']
-      if (ua !== undefined && !ALLOWED_USER_AGENTS.includes(ua)) return fail(400, 'bad_user_agent')
+      if (typeof ua !== 'string' || !ALLOWED_USER_AGENTS.includes(ua)) return fail(400, 'bad_user_agent')
 
       const headers = { 'Accept-Encoding': 'identity' }
       const accept = req.headers.accept
       if (typeof accept === 'string' && accept.length <= 200 && /^[\x20-\x7e]*$/.test(accept)) headers.Accept = accept
-      if (ua !== undefined) headers['User-Agent'] = ua
+      headers['User-Agent'] = ua
       const first = new URL(`https://${FIRST_HOST}${mapped}${query ? `?${query}` : ''}`)
 
       if (inflight >= L.maxInflight) return fail(429, 'busy')

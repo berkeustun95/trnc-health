@@ -33,6 +33,11 @@ export function resolveNovestRoute(env = process.env) {
   return env.GITHUB_EVENT_NAME === 'workflow_dispatch' ? 'relay' : 'direct'
 }
 
+// Feed data that decides deletions must come from Novest directly, never through the relay.
+export function pruneRouteRefusal({ prune, route }) {
+  return prune && route === 'relay' ? 'prune runs only on the direct route (NOVEST_ROUTE is relay for this run)' : null
+}
+
 const TLS_CODE = /CERT|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|ERR_TLS|ERR_SSL|SSL|EPROTO/
 const safeCode = c => (typeof c === 'string' && /^[A-Z0-9_]{1,45}$/.test(c) ? c : 'ERROR')
 

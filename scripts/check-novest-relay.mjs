@@ -61,8 +61,8 @@ function mk({ up, limits = {}, now, lookup, key = KEY_HASH } = {}) {
   return { relay, calls, logs }
 }
 
-async function call(relay, { method = 'GET', url = '/n/wp-json/wp/v2/properties?per_page=1', headers = {}, ip = '203.0.113.7', key = KEY } = {}) {
-  const h = { ...headers }
+async function call(relay, { method = 'GET', url = '/n/wp-json/wp/v2/properties?per_page=1', headers = {}, ip = '203.0.113.7', key = KEY, noUA = false } = {}) {
+  const h = noUA ? { ...headers } : { 'user-agent': UA1, ...headers }
   if (key !== null) h.authorization = `Bearer ${key}`
   const req = Object.assign(Readable.from([]), { method, url, headers: h, socket: { remoteAddress: ip } })
   return new Promise(res => {
@@ -182,10 +182,10 @@ console.log('path, query, user agent')
   const before = calls.length
   t('UA 1 accepted', (await call(relay, { headers: { 'user-agent': UA1 } })).status, 200)
   t('UA 2 accepted', (await call(relay, { headers: { 'user-agent': UA2 } })).status, 200)
-  t('no UA accepted', (await call(relay)).status, 200)
-  t('UA forwarded verbatim', [calls[before].headers['User-Agent'], calls[before + 1].headers['User-Agent'], calls[before + 2].headers['User-Agent'] ?? null], [UA1, UA2, null])
+  t('no UA is refused', errOf(await call(relay, { noUA: true })), [400, 'bad_user_agent'])
+  t('UA forwarded verbatim', [calls[before].headers['User-Agent'], calls[before + 1].headers['User-Agent'], calls.length - before], [UA1, UA2, 2])
   await call(relay, { headers: { accept: 'image/*', cookie: 'a=b', 'x-forwarded-for': '1.2.3.4', 'x-api-key': 'z', 'accept-language': 'tr', host: 'evil.example' } })
-  t('only Accept and UA(+identity encoding) are sent upstream', Object.keys(calls.at(-1).headers).sort(), ['Accept', 'Accept-Encoding'])
+  t('only Accept and UA(+identity encoding) are sent upstream', Object.keys(calls.at(-1).headers).sort(), ['Accept', 'Accept-Encoding', 'User-Agent'])
   t('the upstream URL is the mapped Novest URL', (await call(relay, { url: '/n/wp-json/wp/v2/properties?page=2&per_page=1' }), calls.at(-1).url), 'https://coldwellbankernovest.com/wp-json/wp/v2/properties?page=2&per_page=1')
 }
 
@@ -396,7 +396,7 @@ console.log('real upstream function and TLS 1.3 server (local, throwaway cert)')
     const srv = createServer(relay, { key, cert })
     const sport = await listen(srv)
     const req = (extra, withKey) => new Promise(res => {
-      const r = https.request({ host: '127.0.0.1', port: sport, path: '/n/wp-json/wp/v2/properties?per_page=1', ca: cert, servername: 'localhost', headers: withKey ? { authorization: `Bearer ${KEY}` } : {}, ...extra }, rs => {
+      const r = https.request({ host: '127.0.0.1', port: sport, path: '/n/wp-json/wp/v2/properties?per_page=1', ca: cert, servername: 'localhost', headers: withKey ? { authorization: `Bearer ${KEY}`, 'user-agent': UA1 } : {}, ...extra }, rs => {
         rs.resume(); rs.on('end', () => res(rs.statusCode))
       })
       r.on('error', e => res(e.code ?? e.message)); r.end()
@@ -550,6 +550,16 @@ console.log('client: relayFetch against a local TLS 1.3 stub (throwaway certs)')
   }
 }
 
+console.log('prune is refused on the relay route (subprocess, no Supabase key, no network)')
+{
+  const env = { PATH: process.env.PATH, HOME: process.env.HOME ?? '', NOVEST_ROUTE: 'relay', NOVEST_RELAY_URL: 'https://192.0.2.1:8443', NOVEST_RELAY_KEY: 'dummy-key', NOVEST_RELAY_CA: 'dummy-ca' }
+  const run = (extra, flags) => spawnSync(process.execPath, [join(ROOT, 'scripts/mirror-novest-images.mjs'), ...flags], { env: { ...env, ...extra }, encoding: 'utf8', timeout: 20000, cwd: tmpdir() })
+  const r = run({}, ['--prune', '--dry'])
+  t('relay + --prune exits 1 with the refusal', [r.status, r.stderr.includes('REFUSED: prune runs only on the direct route (NOVEST_ROUTE is relay for this run)'), r.stdout.includes('route:')], [1, true, false])
+  const r2 = run({ NOVEST_ROUTE: 'relay-dispatch', GITHUB_EVENT_NAME: 'workflow_dispatch' }, ['--prune', '--dry'])
+  t('relay-dispatch resolving to relay + --prune is refused too', [r2.status, r2.stderr.includes('REFUSED: prune runs only on the direct route')], [1, true])
+}
+
 console.log('client wiring in the sources')
 {
   const read = f => readFileSync(join(ROOT, f), 'utf8')
@@ -558,6 +568,7 @@ console.log('client wiring in the sources')
   t('mirror: route resolved, printed, relay installed and size line on exit', [/resolveNovestRoute\(process\.env\)/.test(mirror), mirror.includes('console.log(`route: ${route}`)'), mirror.includes('setNovestFetch(relayFetch)'), /process\.on\('exit'[^\n]*largest relay response: \$\{largestResponseBytes\(\)\} bytes \(cap \$\{RELAY_RESPONSE_CAP\}\)/.test(mirror)], [true, true, true, true])
   t('mirror: images use the routed fetch with the unchanged User-Agent', [mirror.includes(`const MIRROR_UA = '${UA2}'`), mirror.includes('await imageFetch(url, { headers: { \'User-Agent\': MIRROR_UA } })')], [true, true])
   t('shared feed: UA unchanged, hook defaults to global fetch, no node: import', [feedSrc.includes(`const UA = '${UA1}'`), feedSrc.includes('let fetchImpl = (u, i) => fetch(u, i)'), /^\s*import .*node:/m.test(feedSrc)], [true, true, false])
+  t('mirror: prune refused on the relay route, after pruneRefusal and before prodWriteGuard', /pruneRefusal\(\{ prune, env: process\.env \}\)[\s\S]*?pruneRouteRefusal\(\{ prune, route \}\)[\s\S]*?prodWriteGuard\(\{/.test(mirror), true)
   t('setup.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), setup.includes('bad_user_agent')], [true, true, true])
 }
 
