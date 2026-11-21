@@ -145,6 +145,11 @@ export function makeUpstreamRequest({ ca, connectMs = DEFAULT_LIMITS.connectMs }
 const PATH_CHARS = /^[A-Za-z0-9\-._~%!$&'()*+,;=:@/]+$/
 const BAD_RAW = /\.\.|%2e|%2f|%5c|%00|\\/i
 const QUERY_VALUE = /^[A-Za-z0-9_.,-]{0,200}$/
+// `include` is the media-id batch the image mirror sends (100 ids = WP per_page ceiling): digits only, no empty element.
+const INCLUDE_VALUE = /^\d{1,10}(,\d{1,10}){0,99}$/
+// Raw cap: the client's URL.searchParams encodes commas as %2C. Worst case 100 ten-digit ids = 1000 + 99*3 = 1297,
+// + 'include=' 8 = 1305; other params (_fields ~60, per_page, page, orderby, order, separators) stay under ~150. 2000 leaves headroom.
+const MAX_RAW_QUERY = 2000
 
 function pathnameAllowed(p) {
   if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//')) return false
@@ -154,12 +159,12 @@ function pathnameAllowed(p) {
 
 function canonicalQuery(pathname, rawQuery) {
   if (rawQuery === '') return ''
-  if (pathname.startsWith(UPLOADS_PREFIX) || rawQuery.length > 500) return null
+  if (pathname.startsWith(UPLOADS_PREFIX) || rawQuery.length > MAX_RAW_QUERY) return null
   let sp
   try { sp = new URLSearchParams(rawQuery) } catch { return null }
   let n = 0
   for (const [k, v] of sp) {
-    if (++n > 12 || !ALLOWED_QUERY_KEYS.includes(k) || !QUERY_VALUE.test(v)) return null
+    if (++n > 12 || !ALLOWED_QUERY_KEYS.includes(k) || !(k === 'include' ? INCLUDE_VALUE : QUERY_VALUE).test(v)) return null
   }
   return sp.toString()
 }

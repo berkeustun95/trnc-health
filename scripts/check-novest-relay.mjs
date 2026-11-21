@@ -405,6 +405,44 @@ console.log('real upstream function and TLS 1.3 server (local, throwaway cert)')
     t('TLS 1.3 with the key -> 200 (positive control)', await req({ minVersion: 'TLSv1.3' }, true), 200)
     const old = await req({ maxVersion: 'TLSv1.2' }, true)
     t('TLS 1.2 client is refused', typeof old === 'string' && old !== '200', true)
+
+    // End to end, query built EXACTLY as novest-feed.mjs get() / mirror-novest-images.mjs do (URL + searchParams.set,
+    // which encodes commas as %2C): client relayFetch -> real TLS relay -> stubbed upstream.
+    const seenUp = []
+    const relay2 = createRelay({ keyHash: KEY_HASH, log: () => {}, limits: { minGapMs: 0 },
+      upstreamRequest: async url => { seenUp.push(url); return resp(200, { 'content-type': 'application/json', 'x-wp-totalpages': '1' }, '[]') } })
+    const srv2 = createServer(relay2, { key, cert })
+    const s2port = await listen(srv2)
+    const env1 = { u: process.env.NOVEST_RELAY_URL, k: process.env.NOVEST_RELAY_KEY, c: process.env.NOVEST_RELAY_CA }
+    Object.assign(process.env, { NOVEST_RELAY_URL: `https://127.0.0.1:${s2port}`, NOVEST_RELAY_KEY: KEY, NOVEST_RELAY_CA: cert.toString() })
+    const clientUrl = (path, params) => {
+      const u = new URL('https://coldwellbankernovest.com/wp-json/wp/v2' + path)
+      for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v))
+      return u
+    }
+    const viaClient = async (path, params) => {
+      const n = seenUp.length
+      const r = await C.relayFetch(clientUrl(path, params), { headers: { 'User-Agent': UA1, Accept: 'application/json' } }).then(x => x.status, e => e.message)
+      return { r, up: seenUp.slice(n) }
+    }
+    const ids = n => Array.from({ length: n }, (_, i) => 20000 + i * 7)
+    const mediaParams = list => ({ include: list.join(','), _fields: 'id,source_url,mime_type,media_details', per_page: 100, page: 1 })
+    const batch = ids(100)
+    const m100 = await viaClient('/media', mediaParams(batch))
+    t('media batch of 100 five-digit ids through relayFetch -> 200', m100.r, 200)
+    t('  the upstream received all 100 ids, in order, plus _fields/per_page/page',
+      [m100.up.length === 1 && m100.up[0].searchParams.get('include'), m100.up[0]?.searchParams.get('_fields'), m100.up[0]?.searchParams.get('per_page'), m100.up[0]?.searchParams.get('page')],
+      [batch.join(','), 'id,source_url,mime_type,media_details', '100', '1'])
+    const big = ids(100).map(i => 9_000_000_000 + i)
+    t('100 ten-digit ids (worst case) -> 200', (await viaClient('/media', mediaParams(big))).r, 200)
+    t('101 ids -> relay error 400 bad_query', (await viaClient('/media', mediaParams(ids(101)))).r, 'relay error 400 bad_query')
+    t('a non-digit in include -> 400', (await viaClient('/media', mediaParams(['123', '45a']))).r, 'relay error 400 bad_query')
+    t('an empty include element (1,,2) -> 400', (await viaClient('/media', mediaParams(['1', '', '2']))).r, 'relay error 400 bad_query')
+    t('an 11-digit id -> 400', (await viaClient('/media', mediaParams(['12345678901']))).r, 'relay error 400 bad_query')
+    t('properties page query (orderby=modified&order=desc&per_page=100&page=2) -> 200', (await viaClient('/properties', { orderby: 'modified', order: 'desc', per_page: 100, page: 2 })).r, 200)
+    t('prune probe get(/properties, per_page=1) -> 200', (await viaClient('/properties', { per_page: 1 })).r, 200)
+    for (const [k, v] of [['u', 'NOVEST_RELAY_URL'], ['k', 'NOVEST_RELAY_KEY'], ['c', 'NOVEST_RELAY_CA']]) { if (env1[k] === undefined) delete process.env[v]; else process.env[v] = env1[k] }
+    srv2.close(); srv2.closeAllConnections?.()
     for (const s of [origin, srv]) { s.close(); s.closeAllConnections?.() }
   } finally { rmSync(dir, { recursive: true, force: true }) }
 }
