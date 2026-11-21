@@ -41,7 +41,7 @@ describe('pushIntake', () => {
 
   test('route with a session', () => {
     expect(pushIntake(resp('a', { screen: 'duty' }), { hasSession: true, handled: new Set() }))
-      .toEqual({ action: 'route', id: 'a', data: { screen: 'duty' } })
+      .toEqual({ action: 'route', id: 'a|', data: { screen: 'duty' } })
   })
 
   test('park without a session', () => {
@@ -49,7 +49,7 @@ describe('pushIntake', () => {
   })
 
   test('dup when the id was already handled, even without a session', () => {
-    const handled = new Set(['a'])
+    const handled = new Set(['a|'])
     expect(pushIntake(resp('a', {}), { hasSession: true, handled }).action).toBe('dup')
     expect(pushIntake(resp('a', {}), { hasSession: false, handled }).action).toBe('dup')
     expect(pushIntake(resp('b', {}), { hasSession: true, handled }).action).toBe('route')
