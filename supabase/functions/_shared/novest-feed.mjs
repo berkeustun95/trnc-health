@@ -31,6 +31,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 let lastRequestAt = 0
 
+let fetchImpl = (u, i) => fetch(u, i)
+export function setNovestFetch(fn) { fetchImpl = fn }
+
 export async function get(path, params = {}) {
   const url = new URL(BASE + path)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v))
@@ -39,7 +42,7 @@ export async function get(path, params = {}) {
   if (wait > 0) await sleep(wait)
   lastRequestAt = Date.now()
 
-  const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
+  const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
   if (!res.ok) throw new Error(`GET ${url.pathname}${url.search} -> ${res.status} ${res.statusText}`)
   return {
     body: await res.json(),

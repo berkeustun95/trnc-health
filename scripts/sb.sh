@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Supabase CLI with the Mac's long-term access token (Keychain "Supabase CLI", from
-# `supabase login`, 2026-10-07; scoped to project trnc-health: Project Settings read; Database,
-# Edge Functions, Edge Function Secrets read-write).
+# `supabase login`, 2026-10-07; token replaced 2026-11-19 by "ADA Mac – Claude Code (logs)", scoped to
+# project trnc-health: Project Settings read; Database, Edge Functions, Edge Function Secrets read-write;
+# Logs read).
 #
 #   scripts/sb.sh secrets list -o json
 #   scripts/sb.sh functions deploy <name> --use-api        # only with Berke's go
