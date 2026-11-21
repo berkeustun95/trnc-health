@@ -1825,7 +1825,7 @@ export default function App() {
     const { action, id, data } = pushIntake(response, { hasSession: !!sessionRef.current, handled: handledPushIdsRef.current })
     const kind = action === 'none' ? null : pushRoute(data, { studentHub: MODULE_FLAGS.studentHub })
     console.log(`[push-route] ${source} ${action} ${kind ?? '-'}`)
-    if (action === 'park') { pendingPushRef.current = response; return }
+    if (action === 'park') { pendingPushRef.current = response; pushRoutedRef.current = true; return }
     if (action !== 'route') return
     if (id != null) handledPushIdsRef.current.add(id)
     pushRoutedRef.current = true

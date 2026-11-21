@@ -55,6 +55,16 @@ describe('pushIntake', () => {
     expect(pushIntake(resp('b', {}), { hasSession: true, handled }).action).toBe('route')
   })
 
+  test('same identifier, different date (Android tag) -> routes again; same date -> dup', () => {
+    const handled = new Set()
+    const at = (date) => ({ notification: { date, request: { identifier: 'tag', content: { data: {} } } } })
+    const first = pushIntake(at(1), { hasSession: true, handled })
+    expect(first.action).toBe('route')
+    handled.add(first.id)
+    expect(pushIntake(at(2), { hasSession: true, handled }).action).toBe('route')
+    expect(pushIntake(at(1), { hasSession: true, handled }).action).toBe('dup')
+  })
+
   test('missing data -> {}', () => {
     expect(pushIntake({ notification: { request: { identifier: 'a', content: {} } } }, { hasSession: true, handled: new Set() }).data).toEqual({})
   })

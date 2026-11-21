@@ -17,7 +17,7 @@ on:
         type: string
         required: true
       kind:
-        description: 'plain, messages (Student Hub payload without a thread → Messages tab) duty (duty push payload → Nöbetçi Eczane) datajobs (watchdog payload → Admin Data jobs; admin accounts only), weekend, marketplace (landing list), marketplace_conversation (chat inbox) or eatery_order (placeholder code → Yeme-İçme list)'
+        description: 'plain, messages (Student Hub payload without a thread → Messages tab), duty (duty push payload → Nöbetçi Eczane) datajobs (watchdog payload → Admin Data jobs; admin accounts only), weekend, marketplace (landing list), marketplace_conversation (chat inbox) or eatery_order (placeholder code → Yeme-İçme list)'
         type: choice
         options: [plain, messages, duty, datajobs, weekend, marketplace, marketplace_conversation, eatery_order]
         default: plain

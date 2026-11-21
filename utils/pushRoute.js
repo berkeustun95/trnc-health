@@ -26,7 +26,9 @@ export function pushIntake(response, { hasSession, handled } = {}) {
   try {
     const request = response?.notification?.request
     if (!request) return { action: 'none', id: null, data: {} }
-    const id = request.identifier ?? null
+    // Android expo-notifications sets the identifier to the push's `tag`, so two pushes can share it; the date tells them apart
+    // (warm and cold reads of ONE tap carry the same notification, hence the same date).
+    const id = request.identifier == null ? null : `${request.identifier}|${response.notification.date ?? ''}`
     const data = request.content?.data ?? {}
     if (id != null && handled?.has(id)) return { action: 'dup', id, data }
     if (!hasSession) return { action: 'park', id, data }
