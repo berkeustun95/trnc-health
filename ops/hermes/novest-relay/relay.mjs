@@ -11,7 +11,9 @@
 // loopback, link-local, CGNAT, multicast, ULA, 6to4 (2002::/16) and Teredo (2001:0::/32) space are refused (also
 // IPv4-mapped; 6to4/Teredo are refused outright, so their embedded IPv4 is never decoded). Redirects are followed by
 // hand (max 3) and re-checked against every allowlist. Own errors are JSON {error:code} + x-relay-error and never
-// carry upstream text. Logs: one line per request, query LENGTH only, never headers, key or bodies.
+// carry upstream text. Every own refusal carries x-relay-source: relay, every passed-through upstream answer
+// x-relay-source: upstream (a client can tell Novest's 429 from the relay's); an upstream retry-after is forwarded
+// only when it is digits or an IMF-fixdate, anything else is dropped. Logs: one line per request, query LENGTH only, never headers, key or bodies.
 // Secrets and the cert arrive as systemd credentials ($CREDENTIALS_DIRECTORY/tls.key, tls.crt, key.sha256).
 
 import https from 'node:https'
@@ -47,6 +49,9 @@ export const PORT = 8443
 export const FIRST_HOST = ALLOWED_HOSTS[0]
 const UPLOADS_PREFIX = '/wp-content/uploads/'
 const FORWARD_HEADERS = ['content-type', 'content-length', 'x-wp-total', 'x-wp-totalpages']
+const RETRY_AFTER_SECONDS = /^\d{1,6}$/
+const RETRY_AFTER_DATE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/
+const validRetryAfter = v => typeof v === 'string' && v.length <= 40 && (RETRY_AFTER_SECONDS.test(v) || RETRY_AFTER_DATE.test(v))
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 class RelayError extends Error {
@@ -298,7 +303,7 @@ export function createRelay({ keyHash, upstreamRequest = makeUpstreamRequest(), 
       res.writeHead(status, { ...headers, 'x-relay-bytes': String(body.length), 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
       res.end(body)
     }
-    const fail = (status, code, extra = {}) => reply(status, { 'content-type': 'application/json', 'x-relay-error': code, ...extra }, Buffer.from(JSON.stringify({ error: code })), code)
+    const fail = (status, code, extra = {}) => reply(status, { 'content-type': 'application/json', 'x-relay-error': code, 'x-relay-source': 'relay', ...extra }, Buffer.from(JSON.stringify({ error: code })), code)
     const ctx = { aborted: false, destroyers: new Set() }
     let deadline
     try {
@@ -362,6 +367,8 @@ export function createRelay({ keyHash, upstreamRequest = makeUpstreamRequest(), 
         if (name.startsWith('x-wp-') && !/^\d+$/.test(v)) continue
         fwd[name] = v
       }
+      if (validRetryAfter(out.headers['retry-after'])) fwd['retry-after'] = out.headers['retry-after']
+      fwd['x-relay-source'] = 'upstream'
       fwd['content-length'] = String(out.body.length)
       return reply(out.status, fwd, out.body)
     } catch (e) {

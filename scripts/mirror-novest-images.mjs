@@ -51,6 +51,7 @@ import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
 import { readAllRows, readAllResult } from './lib/read-all-rows.mjs'
 import { resolveNovestRoute, pruneRouteRefusal, relayFetch, largestResponseBytes, RELAY_RESPONSE_CAP } from './lib/novest-relay-client.mjs'
+import { createRetryingFetch, resolveMediaGapMs } from './lib/novest-fetch-policy.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -88,6 +89,8 @@ if (refusal) {
 }
 let route
 try { route = resolveNovestRoute(process.env) } catch (e) { console.error(`::error::${e.message}`); process.exit(1) }
+let gap
+try { gap = resolveMediaGapMs(process.env, route) } catch (e) { console.error(`::error::${e.message}`); process.exit(1) }
 const routeRefusal = pruneRouteRefusal({ prune, route })
 if (routeRefusal) {
   console.error(`REFUSED: ${routeRefusal}`)
@@ -103,12 +106,14 @@ const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
 console.log(`route: ${route}`)
+console.log(`media lookup gap: ${gap.ms} ms (${gap.source})`)
+const baseFetch = route === 'relay' ? relayFetch : (u, i) => fetch(u, i)
+const novestFetch = createRetryingFetch({ fetch: baseFetch, route, mediaGapMs: gap.ms })
+setNovestFetch(novestFetch)
 if (route === 'relay') {
-  setNovestFetch(relayFetch)
   process.on('exit', () => console.log(`largest relay response: ${largestResponseBytes()} bytes (cap ${RELAY_RESPONSE_CAP})`))
 }
 const MIRROR_UA = 'ADA-TRNC-Health/1.0 (+partner image mirror)'
-const imageFetch = route === 'relay' ? relayFetch : (u, i) => fetch(u, i)
 
 // ─── Credentials ─────────────────────────────────────────────────────────────
 if (existsSync(resolve(ROOT, '.env'))) {
@@ -155,7 +160,7 @@ async function politeFetch(url) {
   const wait = SPACING_MS - (Date.now() - lastFetchAt)
   if (wait > 0) await new Promise(r => setTimeout(r, wait))
   lastFetchAt = Date.now()
-  const res = await imageFetch(url, { headers: { 'User-Agent': MIRROR_UA } })
+  const res = await novestFetch(url, { headers: { 'User-Agent': MIRROR_UA } })
     .catch(e => { throw new Error(`GET ${url}: ${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''}`) })
   if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`)
   return { body: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || '' }

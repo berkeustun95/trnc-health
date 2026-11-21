@@ -3,6 +3,7 @@
 
 import https from 'node:https'
 import net from 'node:net'
+import { sanitizeRetryAfter } from './novest-fetch-policy.mjs'
 
 export const RELAY_RESPONSE_CAP = 16 * 1024 * 1024
 const TIMEOUT_MS = 90_000
@@ -92,7 +93,11 @@ export function relayFetch(url, init = {}) {
         if (body.length > largest) largest = body.length
         const status = res.statusCode
         const relayErr = res.headers['x-relay-error']
-        if (relayErr !== undefined) return done(reject, new Error(`relay error ${status} ${/^[a-z_]{1,40}$/.test(String(relayErr)) ? relayErr : 'unknown'}`))
+        const retryAfter = sanitizeRetryAfter(res.headers['retry-after'])
+        if (relayErr !== undefined) {
+          const code = /^[a-z_]{1,40}$/.test(String(relayErr)) ? String(relayErr) : 'unknown'
+          return done(reject, Object.assign(new Error(`relay refused: ${code} (${status})`), { relayError: code, status, retryAfter }))
+        }
         const wp = res.headers['x-wp-totalpages']
         if (status >= 200 && status < 300 && target.pathname.startsWith('/wp-json/') && !(typeof wp === 'string' && /^\d+$/.test(wp))) {
           return done(reject, new Error('relay response lacks x-wp-totalpages (refusing to paginate blind)'))
@@ -101,9 +106,13 @@ export function relayFetch(url, init = {}) {
         for (const n of ['content-type', 'x-wp-total', 'x-wp-totalpages', 'x-relay-bytes']) {
           if (typeof res.headers[n] === 'string') out.set(n, res.headers[n])
         }
+        if (retryAfter !== null) out.set('retry-after', retryAfter)
+        const source = res.headers['x-relay-source']
+        if (source === 'relay' || source === 'upstream') out.set('x-relay-source', source)
+        const statusText = status >= 400 ? `${res.statusMessage ?? ''} (via relay)`.trim() : res.statusMessage ?? ''
         const nullBody = status === 204 || status === 205 || status === 304
         let response
-        try { response = new Response(nullBody ? null : body, { status, statusText: res.statusMessage ?? '', headers: out }) } catch { return done(reject, new Error(`relay: unusable status ${status}`)) }
+        try { response = new Response(nullBody ? null : body, { status, statusText, headers: out }) } catch { return done(reject, new Error(`relay: unusable status ${status}`)) }
         done(resolve, response)
       })
     })
