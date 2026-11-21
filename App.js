@@ -26,6 +26,7 @@ import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
 import { fetchNotifications, notificationRoute, marketplaceListingTarget, createListingTap, adminPushRequest } from './utils/notificationRoute'
+import { pushRoute, pushIntake } from './utils/pushRoute'
 import { getListing as getMarketplaceListing } from './utils/marketplaceApi'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
@@ -920,6 +921,8 @@ export default function App() {
   const handledColdStartRef = useRef(false)
   // A push tap navigated in this runtime: the launch-time OTA reload must not throw that screen away.
   const pushRoutedRef = useRef(false)
+  const pendingPushRef = useRef(null)          // a tap that arrived before the session restored; drained by the cold-start effect
+  const handledPushIdsRef = useRef(new Set())  // notification ids already routed this runtime
   const prevUidRef = useRef(undefined)
 
   function openMenu() {
@@ -1048,6 +1051,7 @@ export default function App() {
       .then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))))
   }
   function closeDutyList() {
+    console.log('[push-route] reset closeDutyList')
     const fromPush = dutyFromPushRef.current
     dutyFromPushRef.current = false
     setShowDutyList(false); setDutyRegion(null)
@@ -1224,6 +1228,7 @@ export default function App() {
           await AsyncStorage.setItem(BOOT_SPLASH_KEY, splashRecord(localDay(), fetchedId)).catch(() => {})
         }
         if (touchedRef.current || sheetUpRef.current || pushRoutedRef.current || AppState.currentState !== 'active') return
+        console.log('[push-route] reset ota-reload')
         await Updates.reloadAsync()
       }).catch(() => {})
   }, [])
@@ -1303,7 +1308,7 @@ export default function App() {
       // because which of the two wins the event is not worth depending on.
       if (updateTier === 'force') {
         if (showEmergencyModal) { setShowEmergencyModal(false); return true }
-        if (showDutyList) { closeDutyList(); return true }
+        if (showDutyList) { console.log('[push-route] reset backchain'); closeDutyList(); return true }
         return true
       }
       // The second duty-alert offer (Onboarding v2 S4). A Modal, whose onRequestClose takes Android back
@@ -1326,7 +1331,7 @@ export default function App() {
       if (!sessionRef.current) { if (!showWelcome) { setShowWelcome(true); return true } return false }
       if (onbStepRef.current === 'duty') return false
       // Duty first: a notification opens the duty list ON TOP of Notifications (slice 10).
-      if (showDutyList) { closeDutyList(); return true }
+      if (showDutyList) { console.log('[push-route] reset backchain'); closeDutyList(); return true }
       if (showNotifs) { closeNotifs(); return true }
       // Gated read-only directory. Sits with the other exempt surfaces so back returns to
       // the wizard; on the wizard itself nothing here matches and the chain falls through
@@ -1801,63 +1806,47 @@ export default function App() {
     return true
   }
 
+  // One place that acts on a push tap. The warm listener, the cold-start read and a tap parked before the session restored
+  // all come through takePushResponse; utils/pushRoute.js decides, and the notification id stops one tap routing twice.
+  // Breadcrumbs are plain console.log (read from logcat on a Preview build) and never carry ids, codes or text.
+  const routePush = data => {
+    switch (pushRoute(data, { studentHub: MODULE_FLAGS.studentHub })) {
+      case 'duty': dutyFromPushRef.current = true; setShowDutyList(true); break
+      case 'weekend': openWeekendOnMap(); break
+      case 'profile': setActiveTab('profile'); break
+      case 'notifications': setShowNotifs(true); break
+      case 'conversation': setPendingConvId(data.conversation_id ?? null); setShowStudentHub(true); break
+      case 'eatery_order': openEateryOrderPush(data); break
+      case 'admin': openAdminPush(data); break
+      case 'marketplace': openMarketplacePush(data); break
+    }
+  }
+  const takePushResponse = (response, source) => {
+    const { action, id, data } = pushIntake(response, { hasSession: !!sessionRef.current, handled: handledPushIdsRef.current })
+    const kind = action === 'none' ? null : pushRoute(data, { studentHub: MODULE_FLAGS.studentHub })
+    console.log(`[push-route] ${source} ${action} ${kind ?? '-'}`)
+    if (action === 'park') { pendingPushRef.current = response; return }
+    if (action !== 'route') return
+    if (id != null) handledPushIdsRef.current.add(id)
+    pushRoutedRef.current = true
+    routePush(data)
+    // Handled once: cleared, so nothing in this runtime reads the same tap again.
+    try { Notifications.clearLastNotificationResponse() } catch {}
+  }
+
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      if (!sessionRef.current) return
-      pushRoutedRef.current = true
-      const data   = response.notification.request.content.data ?? {}
-      const screen = data.screen
-      if (screen === 'duty') {
-        dutyFromPushRef.current = true
-        setShowDutyList(true)
-      } else if (screen === 'weekend') {
-        openWeekendOnMap()
-      } else if (screen === 'profile') {
-        setActiveTab('profile')
-      } else if (screen === 'notifications') {
-        setShowNotifs(true)
-      } else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
-        // ► GATED ON THE FLAG, because a tap must never land on Coming Soon. The push that
-        //   carries this can only have been sent by 20261029's messaging, so if the module
-        //   is dark on this build the notification is from a feature this bundle does not
-        //   have — opening the hub would show a placeholder and read as the tap breaking.
-        //   Doing nothing leaves the user where they were, which is honest.
-        setPendingConvId(data.conversation_id ?? null)
-        setShowStudentHub(true)
-      } else if (screen === 'eatery_order') {
-        openEateryOrderPush(data)
-      } else if (!openAdminPush(data)) openMarketplacePush(data)
-    })
+    const sub = Notifications.addNotificationResponseReceivedListener(response => takePushResponse(response, 'warm'))
     return () => sub.remove()
   }, [])
 
-  // Handle cold-start notification tap (app killed → tapped → opened)
+  // Cold-start tap (app killed, tapped, opened): first any tap parked while there was no session, then the last response.
   useEffect(() => {
     if (!session || handledColdStartRef.current) return
     handledColdStartRef.current = true
-    Notifications.getLastNotificationResponseAsync().then(response => {
-      if (!response) return
-      pushRoutedRef.current = true
-      const data = response.notification.request.content.data ?? {}
-      const screen = data.screen
-      if (screen === 'duty') { dutyFromPushRef.current = true; setShowDutyList(true) }
-      else if (screen === 'weekend') openWeekendOnMap()
-      // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
-      //   case for a message notification — the app is not usually already open when one
-      //   arrives — and without this branch that tap landed on Home with no explanation.
-      //   The warm listener above and this one must stay in step; they are two paths to
-      //   the same destination and only one of them was ever exercised.
-      else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
-        setPendingConvId(data.conversation_id ?? null)
-        setShowStudentHub(true)
-      }
-      else if (screen === 'profile') setActiveTab('profile')
-      else if (screen === 'notifications') setShowNotifs(true)
-      else if (screen === 'eatery_order') openEateryOrderPush(data)
-      else if (!openAdminPush(data)) openMarketplacePush(data)
-      // Handled once: cleared, so nothing in this runtime reads the same tap again.
-      try { Notifications.clearLastNotificationResponse() } catch {}
-    })
+    const parked = pendingPushRef.current
+    pendingPushRef.current = null
+    if (parked) takePushResponse(parked, 'parked')
+    Notifications.getLastNotificationResponseAsync().then(r => takePushResponse(r, 'cold')).catch(() => {})
   }, [session])
 
   useEffect(() => {
@@ -3404,6 +3393,7 @@ export default function App() {
   }
 
   const oliNavigate = (target) => {
+    console.log(`[push-route] reset oliNavigate ${target}`)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false); setShowDuyurular(false); setShowEhliyet(false); setShowCars(false); setShowMarketplace(null); setShowEatery(false); setEateryPartner(null)
@@ -3445,6 +3435,7 @@ export default function App() {
   // carries the region so the target screen opens filtered to that city.
   const cityNavigate = (target) => {
     const region = cityWelcome?.region
+    console.log(`[push-route] reset cityNavigate ${target}`)
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false); setShowHotels(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
