@@ -2266,6 +2266,17 @@ WITH report AS (
            AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) !~* '(hâlâ|düzeldi|durduruldu|yeniden başladı|başarısız|sessiz|kapalı|Veri işleri|fotoğraf|onay bekliyor)'
            AND pg_get_functiondef(to_regprocedure('public.marketplace_photo_review_reminder()')) !~ '[çğışöüâÇĞİŞÖÜ]', false)
     -- 1218-END
+    -- 1221-BEGIN
+    -- 20261221: duty_push_due reads the clock 3 minutes ahead (+ interval '3 minutes' on the instant, BEFORE AT TIME ZONE). Registered ahead of the apply; red until it runs.
+    -- The 20261210 token above keeps the pause clause / STABLE / ACL halves; this one owns the shift. pg_get_functiondef returns the LANGUAGE sql body as written (harness-checked on PG 18).
+    UNION ALL SELECT '20261221_duty_push_shift_3min','duty_push_due: (p_at + interval ''3 minutes'') AT TIME ZONE Asia/Famagusta, pause clause, Thursday closing arm, not client-callable',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamptz)')) LIKE '%(p_at + interval ''3 minutes'') AT TIME ZONE ''Asia/Famagusta''%'
+           AND pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamptz)')) NOT LIKE '%p_at AT TIME ZONE%'
+           AND pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamptz)')) LIKE '%AND NOT public.data_job_paused(''duty-push'')%'
+           AND pg_get_functiondef(to_regprocedure('public.duty_push_due(timestamptz)')) LIKE '%public.duty_thursday_closing_local() - interval ''30 minutes''%'
+           AND NOT has_function_privilege('anon', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE'), false)
+    -- 1221-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -6999,15 +7010,30 @@ SELECT '20261211_data_jobs_watchdog', 'data-jobs-watchdog: schedule 14,44 * * * 
 
 UNION ALL
 -- ─── 1139: duty-push and google-places-refresh wait 60 s for pg_net's reply (the 5 s default logged a timeout 2026-10-26 15:00Z) ───
-SELECT '20261139_duty_push_places_refresh_cron_timeout', 'duty-push + google-places-refresh: schedule, Vault key, 60 s timeout, original gate/body kept',
+-- The duty-push SCHEDULE is no longer this token's fact: 20261221 moved it to 27,57 and its own token below owns it (one count, one owner).
+SELECT '20261139_duty_push_places_refresh_cron_timeout', 'duty-push + google-places-refresh: Vault key, 60 s timeout, original gate/body kept (duty-push schedule: see 20261221)',
        CASE WHEN (SELECT count(*) FROM cron.job WHERE active
-                    AND ((jobname = 'duty-push' AND schedule = '0,30 * * * *' AND command LIKE '%public.duty_push_due()%')
+                    AND ((jobname = 'duty-push' AND command LIKE '%public.duty_push_due()%')
                       OR (jobname = 'google-places-refresh' AND schedule = '21 3 * * *' AND command LIKE '%"action":"refresh"%'))
                     AND command LIKE '%timeout_milliseconds := 60000%'
                     AND command LIKE '%vault.decrypted_secrets%'
                     AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 2
               THEN 'OK'
             ELSE 'MISSING 60 s TIMEOUT OR WRONG SCHEDULE/COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261221: duty-push fires 3 minutes early (27,57); the command is the 20261139 one, untouched ───
+-- Owns the duty-push SCHEDULE (the 1139 token above keeps only the command halves). Red until the file is applied.
+SELECT '20261221_duty_push_shift_3min', 'duty-push: exactly one job, active, schedule 27,57 * * * *, gate + 60 s timeout + Vault lookup, no inline key',
+       CASE WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'duty-push') = 1
+             AND (SELECT count(*) FROM cron.job WHERE jobname = 'duty-push' AND active
+                    AND schedule = '27,57 * * * *'
+                    AND command LIKE '%public.duty_push_due()%'
+                    AND command LIKE '%timeout_milliseconds := 60000%'
+                    AND command LIKE '%vault.decrypted_secrets%'
+                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
+              THEN 'OK'
+            ELSE 'duty-push IS NOT THE ACTIVE JOB AT 27,57 * * * * WITH ITS ORIGINAL COMMAND ← FIX (20261221)' END
 ORDER BY status ASC, migration;
 
 

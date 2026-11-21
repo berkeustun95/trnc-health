@@ -109,6 +109,14 @@
       "clear": "Only when the privacy F1–F6 text is live (in-app, web and docs) and Berke says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #399 is held (needs a merge commit, not a squash).",
       "clearedOn": "2026-11-18",
       "clearedBy": "Berke, in chat 2026-11-18: \"When QA passes, merge #402 and web:deploy straight after, then clear #399's hold and publish to Preview.\" #402 (F1–F6, LEGAL_VERSION 2026-11-18) merged as f5415512; web and docs live 2026-11-18 (legal:live PASS). The in-app copy ships in the same production OTA as #399, which still needs Berke's production go after Preview."
+    },
+    {
+      "pr": 529,
+      "commit": "4d4954bdb9db1178aa6adb89fd41b256ca03eb4a",
+      "what": "Push taps: one routing path, parked tap before session, dedupe, [push-route] logs; merged to main 2026-11-21",
+      "since": "2026-11-21",
+      "cleared": false,
+      "clear": "Only after Berke has seen the recorded Preview device check (cold cases + every push type, warm and cold) and says go in chat (Berke 2026-11-21). Then set cleared to true in a PR."
     }
   ]
 }

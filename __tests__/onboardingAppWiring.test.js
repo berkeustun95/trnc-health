@@ -126,11 +126,11 @@ test('closeDutyList hands the from-push mark to the second offer', () => {
   expect(at(b, 'const fromPush = dutyFromPushRef.current', 'read')).toBeLessThan(at(b, 'maybeOfferDutyAgain(fromPush)', 'offer'))
 })
 
-test('both push handlers (warm and cold start) mark the duty list as push-opened', () => {
-  const warm = src.match(/if \(screen === 'duty'\) \{\s*dutyFromPushRef\.current = true\s*\n\s*setShowDutyList\(true\)/g) || []
-  const cold = src.match(/if \(screen === 'duty'\) \{ dutyFromPushRef\.current = true; setShowDutyList\(true\) \}/g) || []
-  expect([warm.length, cold.length]).toEqual([1, 1])
-  // and no duty-screen push branch opens the list without the mark
+test('every push path (warm, cold, parked) marks the duty list as push-opened', () => {
+  // All three reach routePush through takePushResponse (__tests__/pushRouteSource.test.js), so ONE branch carries the mark.
+  const marked = src.match(/case 'duty': dutyFromPushRef\.current = true; setShowDutyList\(true\); break/g) || []
+  expect(marked.length).toBe(1)
+  // and no push branch opens the list without the mark
   const unmarked = src.match(/screen === 'duty'\)\s*setShowDutyList\(true\)/g) || []
   expect(unmarked).toEqual([])
 })
