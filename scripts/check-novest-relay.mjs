@@ -90,7 +90,7 @@ console.log('constants and source-of-truth strings')
   t('path prefixes', [...R.ALLOWED_PATH_PREFIXES], ['/wp-json/wp/v2/properties', '/wp-json/wp/v2/media', '/wp-content/uploads/'])
   t('query keys', [...R.ALLOWED_QUERY_KEYS], ['per_page', 'page', 'orderby', 'order', 'include', '_fields'])
   t('allowlists are frozen', [R.ALLOWED_HOSTS, R.ALLOWED_PATH_PREFIXES, R.ALLOWED_QUERY_KEYS, R.ALLOWED_USER_AGENTS, R.DEFAULT_LIMITS].map(Object.isFrozen), [true, true, true, true, true])
-  t('production limits', R.DEFAULT_LIMITS, { maxBytes: 16 * MB, connectMs: 10000, totalMs: 60000, maxInflight: 4, minGapMs: 150, dailyCap: 3000, maxHops: 3, authFails: 10, authWindowMs: 60000, authBlockMs: 600000 })
+  t('production limits', R.DEFAULT_LIMITS, { maxBytes: 16 * MB, connectMs: 10000, totalMs: 60000, maxInflight: 4, minGapMs: 150, dailyCap: 3000, maxHops: 3, authFails: 10, authWindowMs: 60000, authBlockMs: 600000, unauthMax: 120, unauthWindowMs: 60000 })
   t('port', R.PORT, 8443)
   let threw = false
   try { createRelay({ keyHash: 'nothex' }) } catch { threw = true }
@@ -113,6 +113,28 @@ console.log('method, auth, order of checks')
   t('right key', good.status, 200)
 }
 
+console.log('global limit on requests without a valid key')
+{
+  let clock = Date.UTC(2026, 10, 20, 12, 0, 0)
+  const { relay, calls } = mk({ up: ok200, now: () => clock })
+  const flood = []
+  for (let i = 0; i < 130; i++) flood.push(errOf(await call(relay, { key: `bad${i}`, ip: `198.51.${100 + (i % 100)}.${1 + Math.floor(i / 100)}` })))
+  t('first 120 bad-key requests (spread over IPs, none locked) are 401', flood.slice(0, 120).every(x => x[0] === 401 && x[1] === 'unauthorized'), true)
+  t('requests 121..130 are 429 rate_limited', flood.slice(120).every(x => x[0] === 429 && x[1] === 'rate_limited'), true)
+  const over = await call(relay, { key: null, ip: '192.0.2.50' })
+  t('a keyless request over the limit is 429 with retry-after in 1..60', [over.status, /^([1-9]|[1-5][0-9]|60)$/.test(over.headers['retry-after'])], [429, true])
+  const before = calls.length
+  t('a valid-key request DURING the flood still gets 200 from the upstream', [(await call(relay, { ip: '192.0.2.51' })).status, calls.length], [200, before + 1])
+  for (let i = 0; i < 50; i++) await call(relay, { ip: '192.0.2.52' })
+  t('after 50 more valid-key requests the counter is unchanged: a bad one is still 429', [errOf(await call(relay, { key: 'x', ip: '192.0.2.53' }))], [[429, 'rate_limited']])
+  clock += 59_000
+  t('still limited 59 s into the window', errOf(await call(relay, { key: 'x', ip: '192.0.2.54' })), [429, 'rate_limited'])
+  clock += 2_000
+  t('the window resets once now advances: 401 again (positive control)', errOf(await call(relay, { key: 'x', ip: '192.0.2.55' })), [401, 'unauthorized'])
+  const small = mk({ up: ok200, limits: { unauthMax: 2 } })
+  t('the cap is the limits option (unauthMax: 2)', [(await call(small.relay, { key: 'a', ip: '192.0.2.60' })).status, (await call(small.relay, { key: 'b', ip: '192.0.2.61' })).status, (await call(small.relay, { key: 'c', ip: '192.0.2.62' })).status], [401, 401, 429])
+}
+
 console.log('per-IP lockout')
 {
   let clock = Date.UTC(2026, 10, 20, 12, 0, 0)
@@ -121,11 +143,13 @@ console.log('per-IP lockout')
   for (let i = 0; i < 10; i++) bads.push((await call(relay, { key: `bad${i}`, ip: '198.51.100.1' })).status)
   t('first 10 bad auths from one IP are 401', bads, Array(10).fill(401))
   t('11th bad auth is 429 rate_limited', errOf(await call(relay, { key: 'bad', ip: '198.51.100.1' })), [429, 'rate_limited'])
-  t('the right key from the locked IP is also 429', errOf(await call(relay, { ip: '198.51.100.1' })), [429, 'rate_limited'])
+  t('a wrong key from the locked IP is still 429', errOf(await call(relay, { key: 'bad', ip: '198.51.100.1' })), [429, 'rate_limited'])
+  t('no key from the locked IP is still 429', errOf(await call(relay, { key: null, ip: '198.51.100.1' })), [429, 'rate_limited'])
+  t('the right key from the locked IP gets through (the key is checked before the lockout)', (await call(relay, { ip: '198.51.100.1' })).status, 200)
   t('per IP only: another IP with the right key still works (positive control)', (await call(relay, { ip: '198.51.100.2' })).status, 200)
   t('per IP only: another IP is not locked after the first IP', (await call(relay, { key: 'bad', ip: '198.51.100.3' })).status, 401)
   clock += 9 * 60_000
-  t('still locked after 9 minutes', (await call(relay, { ip: '198.51.100.1' })).status, 429)
+  t('still locked after 9 minutes (wrong key)', (await call(relay, { key: 'bad', ip: '198.51.100.1' })).status, 429)
   clock += 2 * 60_000
   t('unlocked after 10 minutes (positive control)', (await call(relay, { ip: '198.51.100.1' })).status, 200)
   const s = []
@@ -274,10 +298,10 @@ console.log('upstream address guard (DNS rebinding)')
   const lk = a => new Promise(res => createSafeLookup(fake(Array.isArray(a) ? a : [a]))('coldwellbankernovest.com', {}, (e, addr) => res(e ? e.code : addr)))
   for (const a of ['127.0.0.1', '127.255.255.254', '169.254.169.254', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '100.64.0.1', '100.127.255.255', '0.0.0.0', '0.1.2.3',
     '224.0.0.1', '255.255.255.255', '192.0.0.8', '198.18.0.1', '::1', '::', '::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:10.0.0.1', '::ffff:169.254.169.254', '::ffff:192.168.0.1', '::ffff:100.64.0.1',
-    'fc00::1', 'fd12:3456::1', 'fe80::1', 'febf::1', 'ff02::1', '::127.0.0.1', '64:ff9b::7f00:1', 'not-an-ip']) {
+    'fc00::1', 'fd12:3456::1', 'fe80::1', 'febf::1', 'ff02::1', '::127.0.0.1', '64:ff9b::7f00:1', '2002::1', '2002:808:808::1', '2002:ffff:ffff:ffff::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '2001::1', '2001:0000:1::1', 'not-an-ip']) {
     t(`refuses ${a}`, await lk(a), 'EBLOCKED')
   }
-  for (const a of ['8.8.8.8', '104.21.0.1', '100.63.255.255', '100.128.0.1', '172.15.0.1', '172.32.0.1', '2606:4700::1111', '2a00:1450:4001::1', '::ffff:8.8.8.8']) {
+  for (const a of ['8.8.8.8', '104.21.0.1', '100.63.255.255', '100.128.0.1', '172.15.0.1', '172.32.0.1', '2606:4700::1111', '2a00:1450:4001::1', '::ffff:8.8.8.8', '2001:4860:4860::8888', '2001:1::1', '2001:ffff::1', '2003::1', '2001:0001::1']) {
     t(`allows ${a} (positive control)`, await lk(a), a)
   }
   t('one private answer among public ones refuses the lot', await lk(['8.8.8.8', '10.0.0.1']), 'EBLOCKED')
@@ -560,16 +584,27 @@ console.log('prune is refused on the relay route (subprocess, no Supabase key, n
   t('relay-dispatch resolving to relay + --prune is refused too', [r2.status, r2.stderr.includes('REFUSED: prune runs only on the direct route')], [1, true])
 }
 
+console.log('systemd unit hardening (static)')
+{
+  const unit = readFileSync(join(ROOT, 'ops/hermes/novest-relay/novest-relay.service'), 'utf8')
+  const lineOf = d => unit.split('\n').filter(l => l.trim() === d)
+  for (const d of ['ProtectKernelTunables=yes', 'ProtectKernelModules=yes', 'ProtectKernelLogs=yes', 'ProtectControlGroups=yes', 'ProtectClock=yes', 'ProtectHostname=yes', 'RestrictNamespaces=yes', 'RestrictRealtime=yes', 'RestrictSUIDSGID=yes',
+    'LockPersonality=yes', 'SystemCallArchitectures=native', 'UMask=0077', 'ProtectProc=invisible', 'NoNewPrivileges=yes', 'ProtectSystem=strict', 'PrivateDevices=yes', 'CapabilityBoundingSet='])
+    t(`unit has exactly one ${d}`, lineOf(d).length, 1)
+  t('unit has no MemoryDenyWriteExecute (V8 JIT needs W+X)', /MemoryDenyWriteExecute/.test(unit), false)
+  t('unit has no ProcSubset (Node/libuv read /proc/meminfo, /proc/stat; unverified under pid)', /ProcSubset/.test(unit), false)
+}
+
 console.log('client wiring in the sources')
 {
   const read = f => readFileSync(join(ROOT, f), 'utf8')
-  const mirror = read('scripts/mirror-novest-images.mjs'), feedSrc = read('supabase/functions/_shared/novest-feed.mjs'), setup = read('ops/hermes/novest-relay/setup.sh')
+  const mirror = read('scripts/mirror-novest-images.mjs'), feedSrc = read('supabase/functions/_shared/novest-feed.mjs'), setup = read('ops/hermes/novest-relay/provision.sh')
   t('mirror: empty-feed guard right after the feed read', /await getAll\('\/properties'[^\n]*\nif \(feed\.length === 0\) fail\('feed returned 0 listings: refusing to report clean'\)/.test(mirror), true)
   t('mirror: route resolved, printed, relay installed and size line on exit', [/resolveNovestRoute\(process\.env\)/.test(mirror), mirror.includes('console.log(`route: ${route}`)'), mirror.includes('setNovestFetch(relayFetch)'), /process\.on\('exit'[^\n]*largest relay response: \$\{largestResponseBytes\(\)\} bytes \(cap \$\{RELAY_RESPONSE_CAP\}\)/.test(mirror)], [true, true, true, true])
   t('mirror: images use the routed fetch with the unchanged User-Agent', [mirror.includes(`const MIRROR_UA = '${UA2}'`), mirror.includes('await imageFetch(url, { headers: { \'User-Agent\': MIRROR_UA } })')], [true, true])
   t('shared feed: UA unchanged, hook defaults to global fetch, no node: import', [feedSrc.includes(`const UA = '${UA1}'`), feedSrc.includes('let fetchImpl = (u, i) => fetch(u, i)'), /^\s*import .*node:/m.test(feedSrc)], [true, true, false])
   t('mirror: prune refused on the relay route, after pruneRefusal and before prodWriteGuard', /pruneRefusal\(\{ prune, env: process\.env \}\)[\s\S]*?pruneRouteRefusal\(\{ prune, route \}\)[\s\S]*?prodWriteGuard\(\{/.test(mirror), true)
-  t('setup.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), setup.includes('bad_user_agent')], [true, true, true])
+  t('provision.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), /curl's default User-Agent with key" 400/.test(setup)], [true, true, true])
 }
 
 console.log(bad ? `\n${bad} check(s) FAILED` : '\nall checks passed')
