@@ -1,0 +1,43 @@
+[Unit]
+Description=Novest GET relay for the GitHub novest-images job (TLS 1.3, port 8443)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=novest-relay
+Group=novest-relay
+# setup.sh replaces @NODE@ with the absolute node path it verified
+ExecStart=@NODE@ /usr/local/lib/novest-relay/relay.mjs
+LoadCredential=tls.key:/etc/novest-relay/tls.key
+LoadCredential=tls.crt:/etc/novest-relay/tls.crt
+LoadCredential=key.sha256:/etc/novest-relay/key.sha256
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

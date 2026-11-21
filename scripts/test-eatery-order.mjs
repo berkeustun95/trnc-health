@@ -883,9 +883,13 @@ eq('NEL does not survive in an address field', sanitizeAddressField('x\u0085y'),
 {
   const app = fs.readFileSync(new URL('../App.js', import.meta.url), 'utf8')
   const cut = (from, to) => { const i = app.indexOf(from); return i < 0 ? '' : app.slice(i, app.indexOf(to, i)) }
+  // Since #529 the warm listener, the cold-start read and a parked tap all go through takePushResponse → routePush.
   const warm = cut('addNotificationResponseReceivedListener(', 'return () => sub.remove()')
-  const cold = cut('Notifications.getLastNotificationResponseAsync().then(', '}, [session])')
-  eq('push tap: warm AND cold handlers route eatery_order', [warm.length > 0, cold.length > 0, warm.includes("screen === 'eatery_order'") && warm.includes('openEateryOrderPush(data)'), cold.includes("screen === 'eatery_order') openEateryOrderPush(data)")], [true, true, true, true])
+  const cold = cut('if (!session || handledColdStartRef.current) return', '}, [session])')
+  const take = cut('const takePushResponse = (response, source) => {', '\n  }\n')
+  const router = cut('const routePush = data => {', '\n  }\n')
+  const { pushRoute } = await import('../utils/pushRoute.js')
+  eq('push tap: warm, cold AND parked taps reach routePush, which routes eatery_order', [warm.includes("takePushResponse(response, 'warm')"), cold.includes("takePushResponse(r, 'cold')"), cold.includes("takePushResponse(parked, 'parked')"), take.includes('routePush(data)'), router.includes("case 'eatery_order': openEateryOrderPush(data)"), pushRoute({ screen: 'eatery_order' })], [true, true, true, true, true, 'eatery_order'])
   const opener = cut('const openEateryOrderPush = data => {', '\n  }\n')
   eq('push tap: gated on EATERY, validated code, reset-then-open via oliNavigate(\'eatery\')', ['if (!EATERY || !code) return false', 'orderPushCode(data)', "('eatery')", 'setEateryOrderTap({ code, at: Date.now() })'].map(x => opener.includes(x)), [true, true, true, true])
   // Every selector branch ABOVE Yeme-İçme that a customer can be on must be closed by the tap (oliNavigate's resets + the extras).
