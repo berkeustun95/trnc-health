@@ -59,6 +59,7 @@
     "ios:submit": "set -a && . ~/.appstoreconnect/ada-eas.env && set +a && npx -y eas-cli@24.7.0 submit --platform ios --profile production --latest --non-interactive",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:sync-novest-auth": "node scripts/check-sync-novest-auth.mjs",
+    "novest-relay:test": "node scripts/check-novest-relay.mjs",
     "check:push-fn-auth": "node scripts/check-push-fn-auth.mjs",
     "check:admin-push-auth": "node scripts/check-admin-push-auth.mjs",
     "check:admin-push-strings": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-admin-push-strings.mjs",

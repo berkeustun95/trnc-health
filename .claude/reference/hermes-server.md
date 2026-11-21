@@ -15,3 +15,5 @@ changes go through an `agent/*` PR and apply after Berke merges. Managed-policy 
 Production OTA (`ada-publish production`) and migration apply are outside the team's sudoers (and managed policy);
 Berke asks Hermes for them, and production then waits for his `GO <code>` reply to the separate gate bot.
 
+
+**Novest relay** (server user `novest-relay`, port 8443 opened in ufw): a GET-only relay to coldwellbankernovest.com, because GitHub runners are intermittently blocked by Novest and Hermes is not. Installed by `ops/hermes/novest-relay/setup.sh`, removed by `teardown.sh`. It holds no production credential. The GitHub switch is the variable `NOVEST_ROUTE` (unset/`direct`, `relay-dispatch`, `relay`; rollback = unset it); header of `.github/workflows/novest-images.yml`.
