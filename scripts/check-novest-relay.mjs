@@ -563,13 +563,13 @@ console.log('prune is refused on the relay route (subprocess, no Supabase key, n
 console.log('client wiring in the sources')
 {
   const read = f => readFileSync(join(ROOT, f), 'utf8')
-  const mirror = read('scripts/mirror-novest-images.mjs'), feedSrc = read('supabase/functions/_shared/novest-feed.mjs'), setup = read('ops/hermes/novest-relay/setup.sh')
+  const mirror = read('scripts/mirror-novest-images.mjs'), feedSrc = read('supabase/functions/_shared/novest-feed.mjs'), setup = read('ops/hermes/novest-relay/provision.sh')
   t('mirror: empty-feed guard right after the feed read', /await getAll\('\/properties'[^\n]*\nif \(feed\.length === 0\) fail\('feed returned 0 listings: refusing to report clean'\)/.test(mirror), true)
   t('mirror: route resolved, printed, relay installed and size line on exit', [/resolveNovestRoute\(process\.env\)/.test(mirror), mirror.includes('console.log(`route: ${route}`)'), mirror.includes('setNovestFetch(relayFetch)'), /process\.on\('exit'[^\n]*largest relay response: \$\{largestResponseBytes\(\)\} bytes \(cap \$\{RELAY_RESPONSE_CAP\}\)/.test(mirror)], [true, true, true, true])
   t('mirror: images use the routed fetch with the unchanged User-Agent', [mirror.includes(`const MIRROR_UA = '${UA2}'`), mirror.includes('await imageFetch(url, { headers: { \'User-Agent\': MIRROR_UA } })')], [true, true])
   t('shared feed: UA unchanged, hook defaults to global fetch, no node: import', [feedSrc.includes(`const UA = '${UA1}'`), feedSrc.includes('let fetchImpl = (u, i) => fetch(u, i)'), /^\s*import .*node:/m.test(feedSrc)], [true, true, false])
   t('mirror: prune refused on the relay route, after pruneRefusal and before prodWriteGuard', /pruneRefusal\(\{ prune, env: process\.env \}\)[\s\S]*?pruneRouteRefusal\(\{ prune, route \}\)[\s\S]*?prodWriteGuard\(\{/.test(mirror), true)
-  t('setup.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), setup.includes('bad_user_agent')], [true, true, true])
+  t('provision.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), /curl's default User-Agent with key" 400/.test(setup)], [true, true, true])
 }
 
 console.log(bad ? `\n${bad} check(s) FAILED` : '\nall checks passed')

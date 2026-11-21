@@ -1,5 +1,8 @@
 #!/bin/bash
-# Installs the Novest relay on Hermes. Run as root from this folder:  sudo bash setup.sh <public-ip>
+# Installs the Novest relay on Hermes. Normally run by provision.sh (on the Mac), which uploads a staging dir:
+#   sudo bash setup.sh --staging <dir>     <dir> holds `ip` (the public IPv4) and `key.sha256` (the relay key's hash)
+#   bash setup.sh --dry-run                prints every command with placeholders; needs no root and touches nothing
+# This script never receives, generates or prints the relay key (only its sha256), and never prints the IP.
 # Not idempotent by choice: it REFUSES if the user, the folders, the unit or a ufw rule for 8443 already exist
 # (it never overwrites or backs up). Run teardown.sh first to start over. Installs nothing from the network.
 set -euo pipefail
@@ -7,103 +10,149 @@ cd "$(dirname "$0")"
 
 U=novest-relay; PORT=8443; LIB=/usr/local/lib/novest-relay; ETC=/etc/novest-relay; UNIT=/etc/systemd/system/novest-relay.service
 die() { echo "REFUSED: $*" >&2; exit 1; }
+USAGE="usage: sudo bash setup.sh --staging <dir>   |   bash setup.sh --dry-run"
 
-[[ $(id -u) -eq 0 ]] || die "run as root: sudo bash setup.sh <public-ip>"
-[[ $# -eq 1 ]] || die "usage: sudo bash setup.sh <public-ip> (the server's public IPv4)"
-IP=$1
-[[ $IP =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || die "'$IP' is not an IPv4 address"
-for o in "${BASH_REMATCH[@]:1}"; do (( 10#$o <= 255 )) || die "'$IP' is not an IPv4 address"; done
-[[ $IP =~ ^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.|2(2[4-9]|[3-5][0-9])\.) ]] \
-  && die "$IP is not a public address; pass the server's public IPv4"
-[[ -f relay.mjs && -f novest-relay.service ]] || die "relay.mjs and novest-relay.service must sit next to setup.sh"
-for c in openssl curl sha256sum ss systemctl ufw useradd; do command -v "$c" >/dev/null || die "$c not found"; done
-
-if ! ufw status | grep -q '^Status: active'; then
-  die "ufw is not active; it is the only firewall layer on this host (no Hetzner Cloud Firewall). Enable ufw with SSH allowed first, then re-run."
-fi
-ufw status | grep -Eq "^${PORT}(/tcp)?[[:space:]]" && die "a ufw rule for ${PORT} already exists; remove it or run teardown.sh"
-
-NODE_CMD=$(command -v node || true)
-[[ -n $NODE_CMD ]] || die "node not found in root's PATH. Install a system Node 20+ (root-owned, e.g. /usr/bin/node) yourself, then re-run. This script never installs anything."
-NODE=$(readlink -f "$NODE_CMD")
-node_info="path=$NODE owner=$(stat -c %U "$NODE") mode=$(stat -c %a "$NODE")"
-[[ $NODE =~ ^[A-Za-z0-9/._+-]+$ ]] || die "odd characters in node path. Found: $node_info"
-case $NODE in /home/*|/root/*|/tmp/*|/var/tmp/*) die "node must not live under /home, /root or /tmp. Found: $node_info";; esac
-[[ $(stat -c %U "$NODE") == root ]] || die "node must be root-owned. Found: $node_info"
-(( (8#$(stat -c %a "$NODE") & 8#022) == 0 )) || die "node must not be group/world writable. Found: $node_info"
-d=$(dirname "$NODE")
-while [[ $d != / ]]; do
-  [[ $(stat -c %U "$d") == root ]] && (( (8#$(stat -c %a "$d") & 8#022) == 0 )) || die "directory $d (above node) is not root-owned and non-writable. Found: $node_info"
-  d=$(dirname "$d")
+DRY=0; STG=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --dry-run) DRY=1; shift;;
+    --staging) [[ $# -ge 2 ]] || die "$USAGE"; STG=$2; shift 2;;
+    *) die "$USAGE";;
+  esac
 done
-NODE_VER=$("$NODE" -p 'process.versions.node')
-(( ${NODE_VER%%.*} >= 20 )) || die "node must be >= 20. Found: $node_info version=$NODE_VER"
+if (( DRY )); then
+  [[ -n $STG ]] || STG='<staging-dir>'
+  IP='<ip>'; HASH='<sha256(key)>'
+else
+  [[ -n $STG ]] || die "$USAGE"
+fi
 
-[[ -z $(ss -ltnH "sport = :$PORT") ]] || die "port $PORT is already in use"
-id "$U" >/dev/null 2>&1 && die "user $U already exists; run teardown.sh first"
-[[ -e $ETC || -e $LIB || -e $UNIT ]] && die "$ETC, $LIB or $UNIT already exists; run teardown.sh first"
+say() { printf '+ %s\n' "$*"; }
+chk() { printf 'check: %s\n' "$*"; }
+run() { if (( DRY )); then printf '+'; printf ' %s' "$@"; printf '\n'; else "$@"; fi; }
 
-useradd --system --no-create-home --shell /usr/sbin/nologin "$U"
-install -d -o root -g root -m 755 "$LIB"
-install -o root -g root -m 644 relay.mjs "$LIB/relay.mjs"
-install -d -o root -g root -m 700 "$ETC"
-(umask 077; openssl ecparam -name prime256v1 -genkey -noout -out "$ETC/tls.key")
-chmod 600 "$ETC/tls.key"
-openssl req -new -x509 -key "$ETC/tls.key" -sha256 -days 730 -subj "/CN=novest-relay" -addext "subjectAltName=IP:$IP" -out "$ETC/tls.crt"
-chmod 644 "$ETC/tls.crt"
-KEY=$(openssl rand -hex 32)
-printf '%s' "$KEY" | sha256sum | cut -d' ' -f1 > "$ETC/key.sha256"
-chmod 600 "$ETC/key.sha256"
+if (( DRY )); then
+  echo "DRY RUN: nothing below is executed"
+  chk "running as root, and SUDO_USER is a non-root user"
+  chk "staging dir matches ^/tmp/novest-relay\\.[A-Za-z0-9]+\$, owned by SUDO_USER, not group/world writable; ip and key.sha256 are plain files"
+  chk "ip is a public IPv4 (not 0/10/127/169.254/192.168/172.16-31/100.64-127/224+)"
+  chk "key.sha256 matches ^[0-9a-f]{64}\$"
+  say "read ip and key.sha256 from $STG, then rm -f $STG/ip $STG/key.sha256"
+else
+  [[ $(id -u) -eq 0 ]] || die "run as root: sudo bash setup.sh --staging <dir>"
+  [[ -n ${SUDO_USER:-} && $SUDO_USER != root ]] || die "run it with sudo from the operator account (SUDO_USER is needed to hand the public certificate back)"
+  [[ $STG =~ ^/tmp/novest-relay\.[A-Za-z0-9]+$ ]] || die "staging dir must look like /tmp/novest-relay.XXXXXX"
+  [[ -d $STG && ! -L $STG ]] || die "staging dir missing or a symlink"
+  [[ $(stat -c %U "$STG") == "$SUDO_USER" ]] || die "staging dir is not owned by $SUDO_USER"
+  (( (8#$(stat -c %a "$STG") & 8#022) == 0 )) || die "staging dir is group/world writable"
+  for f in ip key.sha256; do [[ -f $STG/$f && ! -L $STG/$f ]] || die "$STG/$f is missing or not a plain file"; done
+  IP=$(<"$STG/ip"); HASH=$(<"$STG/key.sha256")
+  rm -f "$STG/ip" "$STG/key.sha256"
+  [[ $IP =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || die "the staged ip is not an IPv4 address"
+  for o in "${BASH_REMATCH[@]:1}"; do (( 10#$o <= 255 )) || die "the staged ip is not an IPv4 address"; done
+  [[ $IP =~ ^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.|2(2[4-9]|[3-5][0-9])\.) ]] \
+    && die "the staged ip is not a public address"
+  [[ $HASH =~ ^[0-9a-f]{64}$ ]] || die "key.sha256 is not 64 lowercase hex characters"
+fi
 
-tmpl=$(<novest-relay.service)
-(umask 022; printf '%s\n' "${tmpl//@NODE@/$NODE}" > "$UNIT")
-chown root:root "$UNIT"; chmod 644 "$UNIT"
-ufw allow "$PORT/tcp" comment novest-relay
-systemctl daemon-reload
-systemctl enable --now novest-relay
+if (( DRY )); then
+  chk "relay.mjs, novest-relay.service and teardown.sh sit next to setup.sh"
+  chk "openssl curl ss systemctl ufw useradd are installed"
+  chk "ufw is active (the only firewall layer on this host)"
+  chk "no ufw rule for $PORT exists"
+  chk "node is on root's PATH, root-owned, not group/world writable, every directory above it root-owned and non-writable, not under /home /root /tmp /var/tmp, version >= 20 (otherwise stop and report path/owner/version)"
+  chk "port $PORT is free"
+  chk "user $U does not exist"
+  chk "$ETC, $LIB and $UNIT do not exist"
+  NODE='<node-path>'
+else
+  [[ -f relay.mjs && -f novest-relay.service && -f teardown.sh ]] || die "relay.mjs, novest-relay.service and teardown.sh must sit next to setup.sh"
+  for c in openssl curl ss systemctl ufw useradd; do command -v "$c" >/dev/null || die "$c not found"; done
 
-for _ in $(seq 1 20); do [[ -n $(ss -ltnH "sport = :$PORT") ]] && break; sleep 0.5; done
-systemctl is-active -q novest-relay || { journalctl -u novest-relay -n 20 --no-pager >&2; die "service did not start (key was NOT shown; run teardown.sh and retry)"; }
-
-IMG=/n/wp-content/uploads/2026/11/WhatsApp-Image-2026-11-04-at-15.40.38-2-1536x2048.jpeg
-IMG_SHA=d580dcf07676857e71cf3246b15df32224e4305bbfb0c83cb3b11f6d4c641041
-FEED_UA='ADA-TRNC-Health/1.0 (+https://getadaapp.com; partner listing sync; getadaapp@gmail.com)'
-IMG_UA='ADA-TRNC-Health/1.0 (+partner image mirror)'
-WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
-FAILS=0
-call() {
-  local with_key=$1; shift
-  if [[ $with_key == key ]]; then
-    printf 'Authorization: Bearer %s\n' "$KEY" | curl -sS --max-time 90 --cacert "$ETC/tls.crt" --connect-to "$IP:$PORT:127.0.0.1:$PORT" -H @- "$@"
-  else
-    curl -sS --max-time 90 --cacert "$ETC/tls.crt" --connect-to "$IP:$PORT:127.0.0.1:$PORT" "$@"
+  if ! ufw status | grep -q '^Status: active'; then
+    die "ufw is not active; it is the only firewall layer on this host (no Hetzner Cloud Firewall). Enable ufw with SSH allowed first, then re-run."
   fi
-}
+  ufw status | grep -Eq "^${PORT}(/tcp)?[[:space:]]" && die "a ufw rule for ${PORT} already exists; remove it or run teardown.sh"
+
+  NODE_CMD=$(command -v node || true)
+  [[ -n $NODE_CMD ]] || die "node not found in root's PATH. Install a system Node 20+ (root-owned, e.g. /usr/bin/node) yourself, then re-run. This script never installs anything."
+  NODE=$(readlink -f "$NODE_CMD")
+  node_info="path=$NODE owner=$(stat -c %U "$NODE") mode=$(stat -c %a "$NODE")"
+  [[ $NODE =~ ^[A-Za-z0-9/._+-]+$ ]] || die "odd characters in node path. Found: $node_info"
+  case $NODE in /home/*|/root/*|/tmp/*|/var/tmp/*) die "node must not live under /home, /root or /tmp. Found: $node_info";; esac
+  [[ $(stat -c %U "$NODE") == root ]] || die "node must be root-owned. Found: $node_info"
+  (( (8#$(stat -c %a "$NODE") & 8#022) == 0 )) || die "node must not be group/world writable. Found: $node_info"
+  d=$(dirname "$NODE")
+  while [[ $d != / ]]; do
+    [[ $(stat -c %U "$d") == root ]] && (( (8#$(stat -c %a "$d") & 8#022) == 0 )) || die "directory $d (above node) is not root-owned and non-writable. Found: $node_info"
+    d=$(dirname "$d")
+  done
+  NODE_VER=$("$NODE" -p 'process.versions.node')
+  (( ${NODE_VER%%.*} >= 20 )) || die "node must be >= 20. Found: $node_info version=$NODE_VER"
+
+  [[ -z $(ss -ltnH "sport = :$PORT") ]] || die "port $PORT is already in use"
+  id "$U" >/dev/null 2>&1 && die "user $U already exists; run teardown.sh first"
+  [[ -e $ETC || -e $LIB || -e $UNIT ]] && die "$ETC, $LIB or $UNIT already exists; run teardown.sh first"
+fi
+
+run useradd --system --no-create-home --shell /usr/sbin/nologin "$U"
+run install -d -o root -g root -m 755 "$LIB"
+run install -o root -g root -m 644 relay.mjs "$LIB/relay.mjs"
+run install -o root -g root -m 755 teardown.sh "$LIB/teardown.sh"
+run install -d -o root -g root -m 700 "$ETC"
+if (( DRY )); then
+  say "(umask 077) openssl ecparam -name prime256v1 -genkey -noout -out $ETC/tls.key   # the TLS private key never leaves this server"
+else
+  (umask 077; openssl ecparam -name prime256v1 -genkey -noout -out "$ETC/tls.key")
+fi
+run chmod 600 "$ETC/tls.key"
+run openssl req -new -x509 -key "$ETC/tls.key" -sha256 -days 730 -subj "/CN=novest-relay" -addext "subjectAltName=IP:$IP" -out "$ETC/tls.crt"
+run chmod 644 "$ETC/tls.crt"
+if (( DRY )); then
+  say "(umask 077) write <sha256(key)> to $ETC/key.sha256"
+else
+  (umask 077; printf '%s\n' "$HASH" > "$ETC/key.sha256")
+fi
+run chmod 600 "$ETC/key.sha256"
+
+if (( DRY )); then
+  say "render novest-relay.service with @NODE@ replaced by $NODE -> $UNIT (umask 022)"
+else
+  tmpl=$(<novest-relay.service)
+  (umask 022; printf '%s\n' "${tmpl//@NODE@/$NODE}" > "$UNIT")
+fi
+run chown root:root "$UNIT"
+run chmod 644 "$UNIT"
+run ufw allow "$PORT/tcp" comment novest-relay
+run systemctl daemon-reload
+run systemctl enable --now novest-relay
+
+if (( DRY )); then
+  say "wait up to 10 s for port $PORT to listen"
+  say "systemctl is-active -q novest-relay   # else print the last 20 journal lines and stop"
+else
+  for _ in $(seq 1 20); do [[ -n $(ss -ltnH "sport = :$PORT") ]] && break; sleep 0.5; done
+  systemctl is-active -q novest-relay || { journalctl -u novest-relay -n 20 --no-pager >&2; die "service did not start; run: sudo bash $LIB/teardown.sh"; }
+fi
+
+run install -o "${SUDO_USER:-<operator>}" -m 644 "$ETC/tls.crt" "$STG/tls.crt"
+
+# Only checks that need no key run here; the keyed ones run from the Mac through the public port (provision.sh).
+FAILS=0
 check() {
   local name=$1 want=$2 got=$3
   if [[ $got == "$want" ]]; then echo "  PASS $name -> $got"; else echo "  FAIL $name -> $got (wanted $want)"; FAILS=$((FAILS+1)); fi
 }
-BASE="https://$IP:$PORT"
-echo "local checks:"
-check "no key" 401 "$(call nokey -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
-check "POST" 405 "$(call nokey -o /dev/null -w '%{http_code}' -X POST "$BASE/n/wp-json/wp/v2/properties" || echo err)"
-check "/n/wp-admin/ with key" 403 "$(call key -o /dev/null -w '%{http_code}' "$BASE/n/wp-admin/" || echo err)"
-check "properties?per_page=1 with key (positive control)" 200 "$(call key -A "$FEED_UA" -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
-check "image with key (positive control)" 200 "$(call key -A "$IMG_UA" -o "$WORK/img" -w '%{http_code}' "$BASE$IMG" || echo err)"
-check "curl's default User-Agent with key" 400 "$(call key -A 'curl/8' -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
-check "  ...and its error code" bad_user_agent "$(call key -A 'curl/8' -D - -o /dev/null "$BASE/n/wp-json/wp/v2/properties?per_page=1" | tr -d '\r' | sed -n 's/^x-relay-error: //Ip' || echo err)"
-check "image sha256" "$IMG_SHA" "$(sha256sum "$WORK/img" 2>/dev/null | cut -d' ' -f1)"
-
-echo
-echo "================================================================"
-echo "Copy into GitHub production secret NOVEST_RELAY_KEY NOW. It is not stored anywhere:"
-echo "$KEY"
-echo "----------------------------------------------------------------"
-echo "GitHub production secret NOVEST_RELAY_URL:"
-echo "https://$IP:$PORT"
-echo "----------------------------------------------------------------"
-echo "GitHub production secret NOVEST_RELAY_CA (whole PEM):"
-cat "$ETC/tls.crt"
-echo "================================================================"
-(( FAILS == 0 )) || { echo "$FAILS local check(s) FAILED; do not wire the workflow yet" >&2; exit 1; }
-echo "all local checks passed"
+local_curl() { curl -sS --max-time 30 --cacert "$ETC/tls.crt" --connect-to "$IP:$PORT:localhost:$PORT" "$@" 2>/dev/null; }
+P=/n/wp-json/wp/v2/properties
+if (( DRY )); then
+  say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' https://<ip>:$PORT$P?per_page=1   # expect 401 (no key)"
+  say "curl --cacert $ETC/tls.crt --connect-to <ip>:$PORT:localhost:$PORT -o /dev/null -w '%{http_code}' -X POST https://<ip>:$PORT$P   # expect 405"
+  echo "relay listening on :$PORT (dry run)"
+  exit 0
+fi
+echo "local checks (no key):"
+check "no key" 401 "$(local_curl -o /dev/null -w '%{http_code}' "https://$IP:$PORT$P?per_page=1" || echo err)"
+check "POST" 405 "$(local_curl -o /dev/null -w '%{http_code}' -X POST "https://$IP:$PORT$P" || echo err)"
+(( FAILS == 0 )) || { echo "$FAILS local check(s) FAILED; run: sudo bash $LIB/teardown.sh" >&2; exit 1; }
+echo "relay listening on :$PORT"
