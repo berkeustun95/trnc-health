@@ -24,6 +24,6 @@ if (error) { console.error('read failed:', error.message); process.exit(2) }
 const hours = data?.[0] ? (Date.now() - new Date(data[0].started_at).getTime()) / 36e5 : null
 console.log(`\n── duty push health ──\n  last sent : ${hours === null ? 'never' : hours.toFixed(1) + 'h ago'}\n  cap       : ${MAX_AGE_H}h\n`)
 if (hours === null || hours > MAX_AGE_H) {
-  console.error('::error::The duty-pharmacy push has not gone out. Check the duty-push cron response (supabase/readonly/cron_auth_state.sql).')
+  console.error('::error::The duty-pharmacy push has no fully sent run within the cap. Check the duty-push cron response (supabase/readonly/cron_auth_state.sql).')
   process.exit(1)
 }
