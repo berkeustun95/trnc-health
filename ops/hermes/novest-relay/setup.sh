@@ -67,6 +67,8 @@ systemctl is-active -q novest-relay || { journalctl -u novest-relay -n 20 --no-p
 
 IMG=/n/wp-content/uploads/2026/11/WhatsApp-Image-2026-11-04-at-15.40.38-2-1536x2048.jpeg
 IMG_SHA=d580dcf07676857e71cf3246b15df32224e4305bbfb0c83cb3b11f6d4c641041
+FEED_UA='ADA-TRNC-Health/1.0 (+https://getadaapp.com; partner listing sync; getadaapp@gmail.com)'
+IMG_UA='ADA-TRNC-Health/1.0 (+partner image mirror)'
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 FAILS=0
 call() {
@@ -86,8 +88,10 @@ echo "local checks:"
 check "no key" 401 "$(call nokey -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
 check "POST" 405 "$(call nokey -o /dev/null -w '%{http_code}' -X POST "$BASE/n/wp-json/wp/v2/properties" || echo err)"
 check "/n/wp-admin/ with key" 403 "$(call key -o /dev/null -w '%{http_code}' "$BASE/n/wp-admin/" || echo err)"
-check "properties?per_page=1 with key (positive control)" 200 "$(call key -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
-check "image with key (positive control)" 200 "$(call key -o "$WORK/img" -w '%{http_code}' "$BASE$IMG" || echo err)"
+check "properties?per_page=1 with key (positive control)" 200 "$(call key -A "$FEED_UA" -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
+check "image with key (positive control)" 200 "$(call key -A "$IMG_UA" -o "$WORK/img" -w '%{http_code}' "$BASE$IMG" || echo err)"
+check "curl's default User-Agent with key" 400 "$(call key -A 'curl/8' -o /dev/null -w '%{http_code}' "$BASE/n/wp-json/wp/v2/properties?per_page=1" || echo err)"
+check "  ...and its error code" bad_user_agent "$(call key -A 'curl/8' -D - -o /dev/null "$BASE/n/wp-json/wp/v2/properties?per_page=1" | tr -d '\r' | sed -n 's/^x-relay-error: //Ip' || echo err)"
 check "image sha256" "$IMG_SHA" "$(sha256sum "$WORK/img" 2>/dev/null | cut -d' ' -f1)"
 
 echo

@@ -5,6 +5,7 @@
 //
 //   node scripts/check-novest-relay.mjs
 //   node scripts/check-novest-relay.mjs --relay <alt.mjs>   # red-first: run against a broken copy
+//   node scripts/check-novest-relay.mjs --client <alt.mjs>  # red-first: client cases against a broken copy of the client
 
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -21,6 +22,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ri = process.argv.indexOf('--relay')
 const relayPath = ri !== -1 ? resolve(process.argv[ri + 1]) : join(ROOT, 'ops/hermes/novest-relay/relay.mjs')
 const R = await import(pathToFileURL(relayPath).href)
+const ci = process.argv.indexOf('--client')
+const clientPath = ci !== -1 ? resolve(process.argv[ci + 1]) : join(ROOT, 'scripts/lib/novest-relay-client.mjs')
+const C = await import(pathToFileURL(clientPath).href)
+const { setNovestFetch, get, getAll } = await import(pathToFileURL(join(ROOT, 'supabase/functions/_shared/novest-feed.mjs')).href)
 const { createRelay, createSafeLookup, isBlockedAddress, makeUpstreamRequest, createServer } = R
 
 let bad = 0
@@ -77,7 +82,7 @@ console.log('constants and source-of-truth strings')
   const feed = readFileSync(join(ROOT, 'supabase/functions/_shared/novest-feed.mjs'), 'utf8')
   const mirror = readFileSync(join(ROOT, 'scripts/mirror-novest-images.mjs'), 'utf8')
   const feedUa = /const UA = '([^']+)'/.exec(feed)?.[1]
-  const mirrorUa = /'User-Agent': '([^']+)'/.exec(mirror)?.[1]
+  const mirrorUa = /const MIRROR_UA = '([^']+)'/.exec(mirror)?.[1]
   t('feed UA read from novest-feed.mjs is in the relay list', R.ALLOWED_USER_AGENTS.includes(feedUa), true)
   t('mirror UA read from mirror-novest-images.mjs is in the relay list', R.ALLOWED_USER_AGENTS.includes(mirrorUa), true)
   t('relay list is exactly those two, in order', [...R.ALLOWED_USER_AGENTS], [feedUa, mirrorUa])
@@ -402,6 +407,120 @@ console.log('real upstream function and TLS 1.3 server (local, throwaway cert)')
     t('TLS 1.2 client is refused', typeof old === 'string' && old !== '200', true)
     for (const s of [origin, srv]) { s.close(); s.closeAllConnections?.() }
   } finally { rmSync(dir, { recursive: true, force: true }) }
+}
+
+console.log('client: route resolution')
+{
+  const full = { NOVEST_RELAY_URL: 'https://203.0.113.9:8443', NOVEST_RELAY_KEY: 'k', NOVEST_RELAY_CA: 'c' }
+  const r = (env) => { try { return C.resolveNovestRoute(env) } catch { return 'THROWS' } }
+  const D = { GITHUB_EVENT_NAME: 'workflow_dispatch' }, S = { GITHUB_EVENT_NAME: 'schedule' }
+  for (const [v, d, sch] of [[undefined, 'direct', 'direct'], ['', 'direct', 'direct'], ['direct', 'direct', 'direct'], ['relay', 'relay', 'relay'], ['relay-dispatch', 'relay', 'direct']]) {
+    const base = v === undefined ? {} : { NOVEST_ROUTE: v }
+    t(`NOVEST_ROUTE=${v === undefined ? '(unset)' : JSON.stringify(v)} -> dispatch ${d}, schedule ${sch}`, [r({ ...full, ...base, ...D }), r({ ...full, ...base, ...S })], [d, sch])
+  }
+  t('direct/unset needs no relay secrets', [r({ ...D }), r({ NOVEST_ROUTE: 'direct', ...S })], ['direct', 'direct'])
+  for (const bad of ['Relay', 'relay ', 'dispatch', 'on', 'true', 'relay,direct']) t(`NOVEST_ROUTE=${JSON.stringify(bad)} throws`, r({ ...full, NOVEST_ROUTE: bad, ...D }), 'THROWS')
+  for (const route of ['relay', 'relay-dispatch'])
+    for (const k of ['NOVEST_RELAY_URL', 'NOVEST_RELAY_KEY', 'NOVEST_RELAY_CA'])
+      for (const ev of [D, S]) { const e = { ...full, NOVEST_ROUTE: route, ...ev }; delete e[k]; t(`${route} without ${k} (${ev.GITHUB_EVENT_NAME}) throws, never silently direct`, r(e), 'THROWS') }
+  for (const u of ['http://203.0.113.9:8443', 'https://203.0.113.9:8443/x', 'https://203.0.113.9:8443/?a=1', 'https://u:p@203.0.113.9:8443', 'not a url'])
+    t(`relay URL ${JSON.stringify(u)} throws`, r({ ...full, NOVEST_ROUTE: 'relay', NOVEST_RELAY_URL: u, ...D }), 'THROWS')
+  t('relay URL https://host:port/ is accepted', r({ ...full, NOVEST_ROUTE: 'relay', NOVEST_RELAY_URL: 'https://203.0.113.9:8443/', ...D }), 'relay')
+  t('client cap equals the relay cap', [C.RELAY_RESPONSE_CAP, C.RELAY_RESPONSE_CAP === R.DEFAULT_LIMITS.maxBytes], [16 * MB, true])
+}
+
+console.log('client: relayFetch against a local TLS 1.3 stub (throwaway certs)')
+{
+  const dir = mkdtempSync(join(tmpdir(), 'novest-relay-client-'))
+  const env0 = { ...process.env }
+  try {
+    const gen = n => {
+      const g = spawnSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes', '-keyout', join(dir, `${n}k.pem`), '-out', join(dir, `${n}c.pem`),
+        '-days', '2', '-subj', '/CN=stub', '-addext', 'subjectAltName=IP:127.0.0.1'], { encoding: 'utf8' })
+      if (g.status !== 0) throw new Error('openssl could not generate the throwaway cert')
+      return { key: readFileSync(join(dir, `${n}k.pem`)), cert: readFileSync(join(dir, `${n}c.pem`)) }
+    }
+    const good = gen('a'), other = gen('b')
+    const seen = []
+    let maxSent = 0
+    const photo = Buffer.alloc(5000, 7)
+    const stub = https.createServer({ key: good.key, cert: good.cert, minVersion: 'TLSv1.3' }, (req, res) => {
+      seen.push({ url: req.url, names: Object.keys(req.headers), auth: req.headers.authorization, ua: req.headers['user-agent'], accept: req.headers.accept })
+      const send = (status, headers, body) => { const b = Buffer.from(body); maxSent = Math.max(maxSent, b.length); res.writeHead(status, headers); res.end(b) }
+      const u = new URL(req.url, 'https://x')
+      if (u.pathname === '/n/wp-json/wp/v2/properties') {
+        const page = Number(u.searchParams.get('page') ?? 1)
+        if (page === 9) return send(401, { 'x-relay-error': 'unauthorized', 'content-type': 'application/json' }, '{"error":"unauthorized"}')
+        return send(200, { 'content-type': 'application/json', 'x-wp-total': '3', 'x-wp-totalpages': '2' }, JSON.stringify([{ id: page * 10 }, { id: page * 10 + 1 }]))
+      }
+      if (u.pathname === '/n/wp-json/wp/v2/media') return send(200, { 'content-type': 'application/json', 'x-wp-total': '1' }, '[{"id":1}]')
+      if (u.pathname === '/n/wp-json/wp/v2/missing') return send(404, { 'content-type': 'application/json', 'x-wp-totalpages': '0' }, '{"code":"rest_no_route"}')
+      if (u.pathname === '/n/wp-content/uploads/a.jpg') return send(200, { 'content-type': 'image/jpeg' }, photo)
+      send(500, {}, 'x')
+    })
+    await new Promise(r => stub.listen(0, '127.0.0.1', r))
+    const port = stub.address().port
+    const hostport = `127.0.0.1:${port}`
+    const set = (ca, p = port) => { Object.assign(process.env, { NOVEST_RELAY_URL: `https://127.0.0.1:${p}`, NOVEST_RELAY_KEY: 'stub-key', NOVEST_RELAY_CA: ca.toString() }) }
+    const fx = (url, init) => C.relayFetch(url, init).then(r => ({ ok: r }), e => ({ err: e.message }))
+    const UAx = 'ADA-TRNC-Health/1.0 (+partner image mirror)'
+    set(good.cert)
+
+    for (const u of ['http://coldwellbankernovest.com/wp-content/uploads/a.jpg', 'https://evil.example/wp-content/uploads/a.jpg', 'https://coldwellbankernovest.com.evil.example/a', 'https://coldwellbankernovest.com:444/a', 'https://user@coldwellbankernovest.com/a', 'nonsense']) {
+      t(`relayFetch refuses ${u}`, (await fx(u, {})).err?.startsWith('relay: ') === true, true)
+    }
+    t('  nothing reached the stub for refused URLs', seen.length, 0)
+
+    const ok = await fx('https://coldwellbankernovest.com/wp-content/uploads/a.jpg', { headers: { 'User-Agent': UAx, Accept: 'image/*', Cookie: 'leak=1', 'X-Other': '1' } })
+    t('photo: a real Response, status 200, bytes intact', [ok.ok instanceof Response, ok.ok?.status, ok.ok && Buffer.from(await ok.ok.arrayBuffer()).equals(photo)], [true, 200, true])
+    t('  stub saw exactly /n/<path>, the bearer, UA and Accept and no other client header',
+      [seen[0].url, seen[0].auth, seen[0].ua, seen[0].accept, seen[0].names.filter(n => !['authorization', 'user-agent', 'accept', 'host', 'connection'].includes(n))],
+      ['/n/wp-content/uploads/a.jpg', 'Bearer stub-key', UAx, 'image/*', []])
+    const www = await fx('https://www.coldwellbankernovest.com/wp-content/uploads/a.jpg', { headers: { 'User-Agent': UAx } })
+    t('www. host is accepted', www.ok?.status, 200)
+
+    setNovestFetch(C.relayFetch)
+    const g1 = await get('/properties', { per_page: 1 })
+    t('x-wp-total / x-wp-totalpages reach get()', [g1.total, g1.totalPages, g1.body.length, seen.at(-1).url], [3, 2, 2, '/n/wp-json/wp/v2/properties?per_page=1'])
+    const all = await getAll('/properties')
+    t('getAll paginates through the relay (2 pages)', all.map(x => x.id), [10, 11, 20, 21])
+    const noPages = await fx('https://coldwellbankernovest.com/wp-json/wp/v2/media?include=1', {})
+    t('2xx under /wp-json without x-wp-totalpages THROWS', noPages.err ?? 'resolved', 'relay response lacks x-wp-totalpages (refusing to paginate blind)')
+    t('getAll over such a response rejects instead of stopping at page 1', await getAll('/media', { include: '1' }).then(() => 'resolved', () => 'rejected'), 'rejected')
+    const nf = await fx('https://coldwellbankernovest.com/wp-json/wp/v2/missing', {})
+    t('an upstream 404 is passed on as a Response (get() reports it)', nf.ok?.status, 404)
+    t('relay own error -> "relay error <status> <code>"', (await fx('https://coldwellbankernovest.com/wp-json/wp/v2/properties?page=9', {})).err, 'relay error 401 unauthorized')
+    t('largestResponseBytes is the largest body seen', C.largestResponseBytes(), maxSent)
+
+    const msgs = []
+    set(other.cert)
+    const pinned = await fx('https://coldwellbankernovest.com/wp-content/uploads/a.jpg', {})
+    msgs.push(pinned.err)
+    t('a different cert is rejected by the pin', /^relay TLS pin rejected \([A-Z0-9_]+\)$/.test(pinned.err ?? ''), true)
+    stub.close(); stub.closeAllConnections?.()
+    set(good.cert)
+    const down = await fx('https://coldwellbankernovest.com/wp-content/uploads/a.jpg', {})
+    msgs.push(down.err)
+    t('a closed port -> relay unreachable (ECONNREFUSED)', down.err, 'relay unreachable (ECONNREFUSED)')
+    set(good.cert, 1)
+    msgs.push((await fx('https://coldwellbankernovest.com/wp-content/uploads/a.jpg', {})).err)
+    t('error text never contains the relay host or port', msgs.some(m => !m || m.includes('127.0.0.1') || m.includes(hostport) || m.includes(String(port)) || m.includes('stub-key')), false)
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in env0)) delete process.env[k]
+    Object.assign(process.env, env0)
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+console.log('client wiring in the sources')
+{
+  const read = f => readFileSync(join(ROOT, f), 'utf8')
+  const mirror = read('scripts/mirror-novest-images.mjs'), feedSrc = read('supabase/functions/_shared/novest-feed.mjs'), setup = read('ops/hermes/novest-relay/setup.sh')
+  t('mirror: empty-feed guard right after the feed read', /await getAll\('\/properties'[^\n]*\nif \(feed\.length === 0\) fail\('feed returned 0 listings: refusing to report clean'\)/.test(mirror), true)
+  t('mirror: route resolved, printed, relay installed and size line on exit', [/resolveNovestRoute\(process\.env\)/.test(mirror), mirror.includes('console.log(`route: ${route}`)'), mirror.includes('setNovestFetch(relayFetch)'), /process\.on\('exit'[^\n]*largest relay response: \$\{largestResponseBytes\(\)\} bytes \(cap \$\{RELAY_RESPONSE_CAP\}\)/.test(mirror)], [true, true, true, true])
+  t('mirror: images use the routed fetch with the unchanged User-Agent', [mirror.includes(`const MIRROR_UA = '${UA2}'`), mirror.includes('await imageFetch(url, { headers: { \'User-Agent\': MIRROR_UA } })')], [true, true])
+  t('shared feed: UA unchanged, hook defaults to global fetch, no node: import', [feedSrc.includes(`const UA = '${UA1}'`), feedSrc.includes('let fetchImpl = (u, i) => fetch(u, i)'), /^\s*import .*node:/m.test(feedSrc)], [true, true, false])
+  t('setup.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), setup.includes('bad_user_agent')], [true, true, true])
 }
 
 console.log(bad ? `\n${bad} check(s) FAILED` : '\nall checks passed')
