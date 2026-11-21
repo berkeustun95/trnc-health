@@ -1,6 +1,6 @@
 # ─── One test push to one account's device ────────────────────────────────────
 #
-#   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty|datajobs]
+#   gh workflow run push-test -f email=<account email> [-f kind=plain|messages|duty|datajobs|weekend|marketplace|marketplace_conversation|eatery_order]
 #   S2 double-send: -f repeat=2 -f gap_s=10 -f keys=on|none (QA accounts only, like every send here)
 #   Silent copy: -f sound=second_off (copy 2 silent) | off (all silent)
 #
@@ -17,9 +17,9 @@ on:
         type: string
         required: true
       kind:
-        description: 'plain, messages (Student Hub payload without a thread → Messages tab) duty (duty push payload → Nöbetçi Eczane) or datajobs (watchdog payload → Admin Data jobs; admin accounts only)'
+        description: 'plain, messages (Student Hub payload without a thread → Messages tab), duty (duty push payload → Nöbetçi Eczane) datajobs (watchdog payload → Admin Data jobs; admin accounts only), weekend, marketplace (landing list), marketplace_conversation (chat inbox) or eatery_order (placeholder code → Yeme-İçme list)'
         type: choice
-        options: [plain, messages, duty, datajobs]
+        options: [plain, messages, duty, datajobs, weekend, marketplace, marketplace_conversation, eatery_order]
         default: plain
       email2:
         description: 'Optional: a +tag of the SAME mailbox (two accounts on one phone; duplicate-push proof)'
