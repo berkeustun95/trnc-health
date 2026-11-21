@@ -32,6 +32,7 @@ function run(state, home=null, prof=null, refs={}){
     if(k==='sessionRef') return {current: {user:{id:'u'}}}
     if(typeof k==='string' && (/^(set|close|petsSubBack)/.test(k))) return (...a)=>calls.push(k+'('+a.map(x=>JSON.stringify(x)).join(',')+')')
     if(k==='closePetHotel') return ()=>calls.push('closePetHotel')
+    if(k==='console') return {log:()=>{}}   // the chain logs a [push-route] breadcrumb before closeDutyList
     if(typeof k==='string' && k.endsWith('Ref')) return {current:null}
     return undefined }})
   const r=fn(ctx); return {r, calls:calls.join(' ')}
