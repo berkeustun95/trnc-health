@@ -51,7 +51,9 @@ if (!['none', 'on'].includes(keys)) fail(`Refused: keys must be none or on, got 
 const sound = process.argv[10] || 'on'
 if (!['on', 'second_off', 'off'].includes(sound)) fail(`Refused: sound must be on, second_off or off, got ${sound}.`)
 const silent = r => sound === 'off' || (sound === 'second_off' && r > 0)
-const REPLACE_KEY = 'ada-s2-test'
+// One key per case (Berke, 2026-11-21): with a text, the key is ada-s2-test-<text>, so one case's copies can only replace
+// each other, never another case's. Text is already limited to letters, digits and spaces.
+const REPLACE_KEY = text ? `ada-s2-test-${text.toLowerCase().replace(/ +/g, '-')}` : 'ada-s2-test'
 if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
 if (!['plain', 'messages', 'duty', 'datajobs'].includes(kind)) fail(`Refused: kind must be plain, messages, duty or datajobs, got ${kind}.`)
 const mailbox = e => { const [l, d] = e.split('@'); return `${l.split('+')[0]}@${d}` }
