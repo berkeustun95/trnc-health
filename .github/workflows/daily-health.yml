@@ -71,8 +71,8 @@ jobs:
       - name: duty push sent recently
         if: success() || failure()
         run: node scripts/check-duty-push-staleness.mjs
-      # Round 5 (2026-11-16): duty push sends each batch once (#479). Pass/fail only; passes itself after 2026-11-23.
-      - name: duty push send-once watch (until 2026-11-23)
+      # Round 5 (2026-11-16): duty push sends each batch once (#479). Pass/fail only; runs from 20 Nov until the 503 work closes.
+      - name: duty push send-once watch
         if: success() || failure()
         run: |
           node scripts/check-duty-push-send-once.mjs --self
