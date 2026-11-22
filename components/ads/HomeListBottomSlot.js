@@ -31,7 +31,8 @@ import AdSlot from '../AdSlot'
 // ad_banners, added by hand, over the same Supabase client every other screen uses. One
 // non-compliant SDK would make the whole app ineligible under Play Families policy.
 //
-// Unsold renders null: zero height, no placeholder, no house ad.
+// Unsold renders null (zero height, no placeholder), EXCEPT that this is one of the two AD_HOUSE_PLACEMENTS:
+// where HOUSE_BANNER is on, a confirmed-unsold slot shows ADA's own house banner once per app open (components/AdSlot.js).
 export default function HomeListBottomSlot({ lang, onNavigate }) {
   return <AdSlot position="list_bottom" module="home" lang={lang} onNavigate={onNavigate} />
 }

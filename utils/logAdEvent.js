@@ -65,7 +65,10 @@ const TIMEOUT_MS = 4000
 //   failed write is dropped and there is no retry queue.
 const viewedThisProcess = new Set()
 
-function fire(adId, kind) {
+// `call` builds the rpc query; `label` names it in dev warnings; `quietWhenMissing` is for an RPC that ships before its
+// migration is applied (the house counter): a missing function is the expected state, silent even in development.
+const RPC_MISSING = new Set(['PGRST202', '42883'])
+function fire(adId, kind, call = () => supabase.rpc('bump_ad_counter', { p_ad_id: adId, p_kind: kind }), quietWhenMissing = false) {
   try {
     if (!adId || !kind) return
 
@@ -80,7 +83,7 @@ function fire(adId, kind) {
       done = () => clearTimeout(timer)
     }
 
-    let q = supabase.rpc('bump_ad_counter', { p_ad_id: adId, p_kind: kind })
+    let q = call()
     if (signal) q = q.abortSignal(signal)
 
     // BOTH handlers. The second is what makes an aborted or network-failed write a no-op
@@ -91,7 +94,7 @@ function fire(adId, kind) {
         // Production stays silent by design. In development that same silence is what
         // would let a broken call site survive to the OTA, so surface it where somebody
         // can act on it.
-        if (__DEV__ && res && res.error) {
+        if (__DEV__ && res && res.error && !(quietWhenMissing && (RPC_MISSING.has(res.error.code) || res.status === 404))) {
           console.warn(`[logAdEvent] ${kind} failed:`, res.error.message)
         }
       },
@@ -133,4 +136,37 @@ export function logAdView(adId) {
 // advertiser, and it is the number they care about most.
 export function logAdTap(adId) {
   fire(adId, 'tap')
+}
+
+// ─── ADA's own house banner: the same anonymous counters, in their own table ─
+//
+// bump_house_ad_counter(p_position, p_module, p_kind) counts views and taps of the house banner per placement. No identifier,
+// same rules as above. It ships before its migration is applied, so a missing function (PGRST202 / 404 / 42883) is silent.
+// A view is counted once per position/module per app process, when the banner mounts; a tap is never deduped.
+const houseViewedThisProcess = new Set()
+
+function fireHouse(position, module, kind) {
+  fire(`${position}/${module}`, kind,
+    () => supabase.rpc('bump_house_ad_counter', { p_position: position, p_module: module, p_kind: kind }), true)
+}
+
+export function logHouseView(position, module) {
+  try {
+    if (!position || !module) return
+    const key = `${position}/${module}`
+    if (houseViewedThisProcess.has(key)) return
+    houseViewedThisProcess.add(key)
+    fireHouse(position, module, 'view')
+  } catch (e) {
+    if (__DEV__) console.warn('[logAdEvent] house view threw synchronously:', e?.message || e)
+  }
+}
+
+export function logHouseTap(position, module) {
+  try {
+    if (!position || !module) return
+    fireHouse(position, module, 'tap')
+  } catch (e) {
+    if (__DEV__) console.warn('[logAdEvent] house tap threw synchronously:', e?.message || e)
+  }
 }

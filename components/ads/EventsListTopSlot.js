@@ -13,7 +13,8 @@ import AdSlot from '../AdSlot'
 //   gated facility list — two of which are on the permanent exclusion list. Deleting this
 //   indirection deletes the thing that makes those distinctions checkable.
 //
-// Unsold renders null: zero height, no placeholder, no house ad.
+// Unsold renders null (zero height, no placeholder), EXCEPT that this is one of the two AD_HOUSE_PLACEMENTS:
+// where HOUSE_BANNER is on, a confirmed-unsold slot shows ADA's own house banner once per app open (components/AdSlot.js).
 export default function EventsListTopSlot({ lang, onNavigate }) {
   return <AdSlot position="list_top" module="events" lang={lang} onNavigate={onNavigate} />
 }

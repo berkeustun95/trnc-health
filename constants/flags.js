@@ -254,6 +254,11 @@ export const REDESIGN_LIVE = true   // live from 1.3.0 (release/redesign-1, 2026
 //   is_active DEFAULT, and not this flag, is what keeps a draft campaign invisible.
 export const AD_BANNERS_LIVE = false
 
+// ADA's own house banner in the two unsold placements below (constants/ads.js AD_HOUSE_PLACEMENTS), once per
+// app open. A working-tree true would show it to every production user; ADA Preview sees it through
+// constants/redesign.js HOUSE_BANNER. Baselined in check-module-flags.mjs.
+export const AD_HOUSE_BANNER_LIVE = false
+
 
 // Ev Hizmetleri partner preview. false = the module shows only what the database
 // returns, which is what production does and the only thing users ever see. true = the
