@@ -162,6 +162,8 @@ const WAITLIST_BLAST_DONE = new Set([
 
 const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
+  // Veles Bit Postası Home banner: a working-tree true would show it to every production user.
+  VELES_LIVE:            false,
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
   // Both lived as local constants in App.js until 2026-10-11, outside this guard.
