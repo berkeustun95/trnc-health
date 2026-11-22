@@ -5845,7 +5845,7 @@ const translations = {
     hrRowTutorial: "أعد مشاهدة الجولة",
     hrRowWorkWithAda: "اعمل مع ADA",
     // PLACEHOLDER copy — house banner content is parked (Berke 2026-11-22)
-    adHouseTitle: "اصل إلى الناس في شمال قبرص مع ADA",
+    adHouseTitle: "صِل إلى الناس في شمال قبرص مع ADA",
     adHouseCta: "اعرف المزيد",
     hrRowLegal: "الخصوصية والشروط",
     hrRowDelete: "حذف الحساب",
@@ -11111,9 +11111,9 @@ const translations = {
     hrRowRate: "Αξιολόγησε την εφαρμογή",
     hrRowShare: "Μοιράσου με φίλο",
     hrRowTutorial: "Δες ξανά την περιήγηση",
-    hrRowWorkWithAda: "Συνεργαστείτε με την ADA",
+    hrRowWorkWithAda: "Συνεργάσου με την ADA",
     // PLACEHOLDER copy — house banner content is parked (Berke 2026-11-22)
-    adHouseTitle: "Φτάστε σε όλη τη Βόρεια Κύπρο με την ADA",
+    adHouseTitle: "Φτάσε σε όλη τη Βόρεια Κύπρο με την ADA",
     adHouseCta: "Μάθε περισσότερα",
     hrRowLegal: "Απόρρητο & όροι",
     hrRowDelete: "Διαγραφή λογαριασμού",
@@ -21597,7 +21597,7 @@ const translations = {
     hrRowTutorial: "دیدن دوباره معرفی",
     hrRowWorkWithAda: "همکاری با ADA",
     // PLACEHOLDER copy — house banner content is parked (Berke 2026-11-22)
-    adHouseTitle: "با ADA به مردم سراسر قبرس شمالی برس",
+    adHouseTitle: "با ADA به مردم سراسر قبرس شمالی دسترسی پیدا کنید",
     adHouseCta: "بیشتر بدانید",
     hrRowLegal: "حریم خصوصی و شرایط",
     hrRowDelete: "حذف حساب",
