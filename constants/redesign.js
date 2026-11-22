@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE, OLI_CHAT_LIVE } from './flags'
+import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE, OLI_CHAT_LIVE, VELES_LIVE } from './flags'
 
 // The one switch every redesigned surface reads. On when:
 //   • REDESIGN_LIVE is flipped (go-live, both files in one commit — the flag guard), or
@@ -56,6 +56,11 @@ export const CARS = MODULE_FLAGS.cars || (typeof __DEV__ !== 'undefined' && __DE
 // Preview unlock only (Berke, 2026-11-07). Set MARKETPLACE_PREVIEW to false if Preview must stop showing it.
 const MARKETPLACE_PREVIEW = true
 export const MARKETPLACE = MODULE_FLAGS.marketplace || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && MARKETPLACE_PREVIEW)
+
+// Veles Bit Postası Home banner before go-live: dev bundles and ADA Preview show it; VELES_LIVE stays off, so
+// production Home is unchanged (preflight (c) keeps a production publish off the Preview config).
+const VELES_PREVIEW = true
+export const VELES = VELES_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && VELES_PREVIEW)
 
 // Yeme-İçme (eateries) before go-live: dev bundles and ADA Preview open the section and the
 // Crunchy Express partner; the _LIVE flags stay off, so production shows nothing (preflight (c)

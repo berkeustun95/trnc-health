@@ -56,11 +56,22 @@ const WEATHER_ION = {
   drizzle: 'rainy', rain: 'rainy', snow: 'snow', showers: 'rainy', thunder: 'thunderstorm',
 }
 
-export const heroHeight = insetTop => Math.max(HERO_TOTAL, insetTop + HERO_MIN_BODY)
+// Short phones (VELES banner on): the Veles banner takes 76pt of Home's first screen, so the hero gives back 76.
+export const HERO_TOTAL_COMPACT = 154
+export const HERO_MIN_BODY_COMPACT = 100
+
+export const heroHeight = (insetTop, compact = false) => (compact
+  ? Math.max(HERO_TOTAL_COMPACT, insetTop + HERO_MIN_BODY_COMPACT)
+  : Math.max(HERO_TOTAL, insetTop + HERO_MIN_BODY))
+
+// Does the first screen need the compact hero? Full hero 230 + banner 12+64 + Oli gap 16 + OLI_BAR_H 110 + tile gap 12 +
+// TILE_H_ALERT 128 = 572 must end above the floating tab bar's top = H - (TAB_BAR_H 64 + 12 + max(b, 8)), so compact below
+// H = 572 + 76 + max(b, 8) = 648 + max(b, 8). The alert tile height is used (not TILE_H) so a phone always gets the same hero.
+export const heroNeedsCompact = (frameH, insetBottom) => frameH < 648 + Math.max(insetBottom, 8)
 
 export default function RedesignHero({
   region, lang, hasUnread, hideActions, onShowNotifs, onOpenMenu, hamburgerRef, onOpenPlace,
-  weatherData, onOpenWeather, weatherRef,
+  weatherData, onOpenWeather, weatherRef, compact = false,
 }) {
   const insets = useSafeAreaInsets()
   const chipCap = useWindowDimensions().width < 350 ? CHIP_CAP_NARROW : CHIP_CAP
@@ -69,7 +80,7 @@ export default function RedesignHero({
   const district = region && REGION_LABEL_KEY[region]
     ? t(REGION_LABEL_KEY[region], lang)
     : t('homeHeroFallbackTitle', lang)
-  const height = heroHeight(insets.top)
+  const height = heroHeight(insets.top, compact)
   const cur = weatherData?.current
   const temp = cur?.temperature_2m != null ? `${Math.round(cur.temperature_2m)}°` : null
   // The tile's short forecast term for "partly cloudy" (ru/fr/es), as the tile had.
