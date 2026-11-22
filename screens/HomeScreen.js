@@ -51,7 +51,7 @@ import { DutyTile, EmergencyTile, StripSlider, dutyTileNeedsRoom, TILE_H, TILE_H
 import ServicePanels, { FavouritePanel, PAGE_INSET } from '../components/home/redesign/ServicePanels'
 import { CustomiseCard, ServicesHeader, AllServicesButton } from '../components/home/redesign/HomeServices'
 import DuyurularBanner from '../components/home/redesign/DuyurularBanner'
-import VelesBanner, { VELES_BANNER_BLOCK_H } from '../components/home/redesign/VelesBanner'
+import VelesBanner, { VELES_BANNER_BLOCK_H, VELES_BANNER_GAP } from '../components/home/redesign/VelesBanner'
 import { openVeles } from '../utils/velesLink'
 import TourChip from '../components/home/redesign/TourChip'
 import { useTabBarFootprint, RemoteImage, PageCanvas, ScreenHeader } from '../components/ui'
@@ -1034,7 +1034,8 @@ export default function HomeScreen({
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(visibleIds.map(id => [id, moduleById(id)]))
-    const compact = VELES && heroNeedsCompact(frame.height, insets.bottom)
+    const showVeles = VELES && !hideHeaderActions
+    const compact = showVeles && heroNeedsCompact(frame.height, insets.bottom)
     const heroH = heroHeight(insets.top, compact)
     const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
     const cur = weatherData?.current
@@ -1051,7 +1052,7 @@ export default function HomeScreen({
             const y = e.nativeEvent.contentOffset.y
             const over = y > heroH - 12
             if (over !== overCanvas) setOverCanvas(over)
-            const oli = y < heroH + (VELES ? VELES_BANNER_BLOCK_H : 0) + 16 + OLI_BAR_H
+            const oli = y < heroH + (showVeles ? VELES_BANNER_BLOCK_H : 0) + 16 + OLI_BAR_H
             if (oli !== oliOnScreen) setOliOnScreen(oli)
           }}
           contentContainerStyle={{ paddingBottom: tabFootprint + FADE_H + 8 }}>
@@ -1061,8 +1062,8 @@ export default function HomeScreen({
             weatherRef={weatherRef} compact={compact} />
 
           <View style={s.rBelow}>
-            {VELES && !hideHeaderActions && (
-              <View style={{ marginTop: 12 }}>
+            {showVeles && (
+              <View style={{ marginTop: VELES_BANNER_GAP }}>
                 <VelesBanner lang={lang} onPress={() => openVeles(lang)} />
               </View>
             )}

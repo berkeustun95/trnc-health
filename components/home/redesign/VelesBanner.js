@@ -10,7 +10,8 @@ import { TILE_FONT_CAP } from './Widgets'
 // no "Sponsorlu", nothing from ad_banners. The pill says the site is in Turkish and is hidden for
 // Turkish readers. The logo is ONE file (assets/veles/veles-logo.png): swapping it is a one-file change.
 export const VELES_BANNER_H = 64
-export const VELES_BANNER_BLOCK_H = 12 + VELES_BANNER_H   // marginTop + card, what the hero gives back / the Oli check adds
+export const VELES_BANNER_GAP = 12
+export const VELES_BANNER_BLOCK_H = VELES_BANNER_GAP + VELES_BANNER_H   // marginTop + card, what the hero gives back / the Oli check adds
 export const VELES_NAME = 'Veles Bit Postası'
 // TODO(Berke): Veles brand colour (neutral placeholder until the brand is supplied)
 export const VELES_BRAND = '#3F4E57'
