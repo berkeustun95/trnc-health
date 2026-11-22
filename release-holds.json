@@ -119,6 +119,14 @@
       "clear": "Only after Berke has seen the recorded Preview device check (cold cases + every push type, warm and cold) and says go in chat (Berke 2026-11-21). Then set cleared to true in a PR.",
       "clearedOn": "2026-11-22",
       "clearedBy": "Berke, in chat 2026-11-22: \"GO for production, both lanes. I watched the 1.4.2 and 1.4.3 push-tap videos and the profile picker clip.\" 1.4.3 Preview 01a20074 @ eaa93c97; 1.4.2 Preview 01a1fe9c @ 2e009388."
+    },
+    {
+      "pr": 540,
+      "commit": "83f013607ff7f8f2d19095704afb77472bf93687",
+      "what": "Bandabuliya dark again (MODULE_FLAGS.marketplace false, MARKETPLACE_PREVIEW false), 2026-11-22",
+      "since": "2026-11-22",
+      "cleared": false,
+      "clear": "Only after Berke has seen the dark state on ADA Preview (or a recorded walkthrough) and says go in chat, with the plain go-live rundown (Berke 2026-11-22). Then set cleared to true in a PR."
     }
   ]
 }
