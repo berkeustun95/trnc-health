@@ -1259,7 +1259,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('contact_events_action_check', 'book|call|call_secondary|email|facebook|instagram|maps|menu|order_website|order_whatsapp|route_complete|website|whatsapp', 'action'),
     ('contact_events_item_id_check', '0|eatery', 'item_id|module'),
     ('contact_events_lang_check', 'Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish', 'lang'),
-    ('contact_events_module_check', 'accommodation|cars|connectivity|eatery|ehliyet|events|explore|garages|grooming|homeServices|hotels|insurance|jobs|pets|studentHub|towing|transport', 'module'),
+    ('contact_events_module_check', 'accommodation|cars|connectivity|eatery|ehliyet|events|explore|garages|grooming|homeServices|hotels|insurance|jobs|news|pets|studentHub|towing|transport', 'module'),
     ('contact_events_pkey', '', ''),
     ('contact_events_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
     ('content_reports_content_type_check', 'answer|facility|listing|message|place|profile|question|review|vehicle', 'content_type'),

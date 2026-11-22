@@ -31,7 +31,9 @@
     "Acılı Soğan Halkası (8 Adet)": "ys-07.jpg",
     "Acılı Soğan Halkası (12 Adet)": "ys-08.jpg",
     "Patates Kızartması": "ys-09.jpg",
-    "Nutella Smash": "ys-10.jpg"
+    "Nutella Smash": "ys-10.jpg",
+    "Cypriot Smash Burger": "ys-11.jpg",
+    "Vegan Semi Smash Burger": "ys-12.jpg"
   },
   "dishSizeWaivers": {
     "Nutella Smash": {
@@ -39,6 +41,18 @@
       "reason": "Only photo available (Crunchy's Yemeksepeti listing, 719 px before trim); one-time exception approved by Berke",
       "approvedBy": "Berke",
       "date": "2026-10-21"
+    },
+    "Cypriot Smash Burger": {
+      "minShortSide": 653,
+      "reason": "Only photo available (Crunchy's Yemeksepeti listing, screenshot from Berke's phone, 2026-11-22); hot dogs wait for Crunchy's original files",
+      "approvedBy": "Berke",
+      "date": "2026-11-22"
+    },
+    "Vegan Semi Smash Burger": {
+      "minShortSide": 648,
+      "reason": "Only photo available (Crunchy's Yemeksepeti listing, screenshot from Berke's phone, 2026-11-22); hot dogs wait for Crunchy's original files",
+      "approvedBy": "Berke",
+      "date": "2026-11-22"
     }
   }
 }

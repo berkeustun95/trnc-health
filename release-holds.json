@@ -129,6 +129,14 @@
       "clear": "Only after Berke has seen the dark state on ADA Preview (or a recorded walkthrough) and says go in chat, with the plain go-live rundown (Berke 2026-11-22). Then set cleared to true in a PR.",
       "clearedOn": "2026-11-22",
       "clearedBy": "Berke, in chat 2026-11-22: \"I watched the walkthrough and checked the admin photo queue myself on Preview: it is gone. Go for production on Bandabuliya-dark (#540): publish from 233d5487 plus the hold-clear commit only; nothing from #541 goes out, and its hold stays on.\" Preview 5e00c717 (Android 01a204ed) @ 233d5487."
+    },
+    {
+      "pr": 541,
+      "commit": "7237155c1a3474e269b28c77c4cb56c8f7cf61c2",
+      "what": "Veles Bit Postası Home banner (VELES_LIVE false; on in Preview and dev only), merged to main 2026-11-22 as 8568e232",
+      "since": "2026-11-22",
+      "cleared": false,
+      "clear": "Only after Berke has seen the banner on ADA Preview (Turkish and one non-Turkish UI, the compact hero on a short screen, the tap opening Veles) and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #541 is held."
     }
   ]
 }
