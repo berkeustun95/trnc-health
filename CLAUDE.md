@@ -19,9 +19,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 
 ## ⚠ Standing warnings
 - ⚠ **Runtime lanes (Berke, 2026-11-19): main = 1.4.3** (the `feat/store-1.4.3` lane merged in once 1.4.3 was live in
-  both stores; `npm run ota` from main reaches 1.4.3 only). **`release/1.4.2`** (from 65d755de = 1.4.2 production OTA
-  225186ed) carries only important fixes for 1.4.2 users during the transition: `cherry-pick -x` of commits on main,
-  `npm run ota:preview` first, Berke's go on the exact commit. Never OTA from `feat/store-1.4.3`.
+  both stores; `npm run ota` from main reaches 1.4.3 only). **Runtime 1.4.2 is FROZEN (Berke, 2026-11-22):** no fixes,
+  no OTAs (Preview or production); 1.4.2 users get fixes by updating to 1.4.3, as with 1.1.0. Live 1.4.2 stays 225186ed
+  (65d755de); `release/1.4.2` was reverted to that tree (#535) and its lane check refuses every OTA. Never OTA from `feat/store-1.4.3`.
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
