@@ -5084,12 +5084,10 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261122_crunchy_express_menu_1020.sql')
       OR (SELECT count(*) FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
            WHERE p.slug = 'crunchy-express' AND i.name IN ('Cheeseme Chicken Burger','Crunchy Classic Nachos','Buffalo Nachos','Hot Honey Nachos','Eritilmiş Peynir Sos')) = 5
-    UNION ALL SELECT '20261124_crunchy_express_dish_tags','crunchy-express has 46 tagged dishes, 26 of them mains, once 1124 is applied (to_jsonb: never names the columns)',
-      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261124_crunchy_express_dish_tags.sql')
-      OR COALESCE((SELECT count(*) FILTER (WHERE to_jsonb(i)->>'role' IS NOT NULL AND to_jsonb(i)->>'protein' IS NOT NULL AND to_jsonb(i)->>'spicy' IS NOT NULL) = 46
-                          AND count(*) FILTER (WHERE to_jsonb(i)->>'role' = 'main') = 26
-                     FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
-                    WHERE p.slug = 'crunchy-express'), false)
+    -- 1124 Crunchy dish tags (data). ONLY its own half is left: the file is in the ledger. The counts it once asserted
+    --     (46 tagged, 26 mains) moved to 1224 below (one count, one owner): 1224 adds 3 tagged dishes, 2 untagged.
+    UNION ALL SELECT '20261124_crunchy_express_dish_tags','20261124 (Crunchy dish-finder tags) is in the ledger; the tag counts live in the 20261224 token',
+      EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261124_crunchy_express_dish_tags.sql')
     UNION ALL SELECT '20261126_crunchy_express_contacts','crunchy-express phone = whatsapp = +905391161059, once 1126 is applied',
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261126_crunchy_express_contacts.sql')
       OR COALESCE((SELECT p.phone IS NOT DISTINCT FROM '+905391161059' AND p.whatsapp IS NOT DISTINCT FROM '+905391161059' FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
@@ -5105,6 +5103,19 @@ WITH report AS (
       NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261220_crunchy_order_status_on.sql')
       OR COALESCE((SELECT p.order_status_enabled IS NOT DISTINCT FROM true
                      FROM public.eatery_partners p WHERE p.slug = 'crunchy-express'), false)
+    -- 1224 Crunchy menu 2026-11-22 (data). Owns the menu counts: 51 dishes in 10 sections, 49 tagged (29 mains; the Trüf Mayonezli and
+    --     Barbekü Soslu hot dogs stay untagged until the owner names the sausage), the 3 new prices, menu_verified_on >= 2026-11-22.
+    --     A later menu migration retires this count half (one count, one owner).
+    UNION ALL SELECT '20261224_crunchy_express_menu_1122','crunchy-express has 51 dishes in 10 sections (49 tagged, 29 mains), soğan halkası 200/280, Nutella Smash 250, menu_verified_on >= 2026-11-22, once 1224 is applied',
+      NOT EXISTS(SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261224_crunchy_express_menu_1122.sql')
+      OR COALESCE((SELECT count(*) = 51 AND count(DISTINCT i.section) = 10
+                          AND count(*) FILTER (WHERE to_jsonb(i)->>'role' IS NOT NULL AND to_jsonb(i)->>'protein' IS NOT NULL AND to_jsonb(i)->>'spicy' IS NOT NULL) = 49
+                          AND count(*) FILTER (WHERE to_jsonb(i)->>'role' = 'main') = 29
+                          AND count(*) FILTER (WHERE (i.name, i.price) IN (('Acılı Soğan Halkası (8 Adet)', 200::numeric), ('Acılı Soğan Halkası (12 Adet)', 280::numeric), ('Nutella Smash', 250::numeric))) = 3
+                          AND count(*) FILTER (WHERE i.section = 'Hot Dogs') = 3
+                          AND bool_and(p.menu_verified_on >= DATE '2026-11-22')
+                     FROM public.eatery_menu_items i JOIN public.eatery_partners p ON p.id = i.partner_id
+                    WHERE p.slug = 'crunchy-express'), false)
     -- 1151: eatery_partners.banner_path. Nullable text, NO default, no column-level ACL (the table-level SELECT covers it), the CHECK is
     --       logo_path_check with the column renamed (compared as renamed text, so no regex decoding; the rendering is PG-18-only until read from
     --       prod), the COMMENT names the bucket, launch_complete_check does NOT mention banner_path (a banner is optional), anon/authenticated
