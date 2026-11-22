@@ -161,7 +161,9 @@ WITH report AS (
     -- Bağlantı & eSIM landing link targets (1113).
     ('1113_connectivity_links','connectivity_links'),
     -- Onboarding v2 offer counter (20261202): registered ahead of the apply; red until it runs.
-    ('20261202_onboarding_events','onboarding_events')
+    ('20261202_onboarding_events','onboarding_events'),
+    -- House banner daily counters (20261227): registered ahead of the apply; red until it runs.
+    ('20261227_ad_house_daily','ad_house_daily')
   ) e(m,o)
 
   UNION ALL
@@ -632,7 +634,13 @@ WITH report AS (
     ('20261202_onboarding_events','onboarding_events','event'),
     ('20261202_onboarding_events','onboarding_events','platform'),
     ('20261202_onboarding_events','onboarding_events','runtime_version'),
-    ('20261202_onboarding_events','onboarding_events','created_at')
+    ('20261202_onboarding_events','onboarding_events','created_at'),
+    -- 20261227. Exactly these five and no person column: the H token owns "no sixth column".
+    ('20261227_ad_house_daily','ad_house_daily','day'),
+    ('20261227_ad_house_daily','ad_house_daily','position'),
+    ('20261227_ad_house_daily','ad_house_daily','module'),
+    ('20261227_ad_house_daily','ad_house_daily','view_count'),
+    ('20261227_ad_house_daily','ad_house_daily','tap_count')
 
   ) e(m,t,c)
 
@@ -643,6 +651,8 @@ WITH report AS (
                 WHERE n.nspname='public' AND p.proname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- 20261227: the only write path on ad_house_daily; registered ahead of the apply; red until it runs.
+    ('20261227_ad_house_daily','bump_house_ad_counter'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
@@ -1497,7 +1507,12 @@ WITH report AS (
     ('20261202_onboarding_events','onboarding_events_pkey'),
     ('20261202_onboarding_events','onboarding_events_event_check'),
     ('20261202_onboarding_events','onboarding_events_platform_check'),
-    ('20261202_onboarding_events','onboarding_events_runtime_len_check')
+    ('20261202_onboarding_events','onboarding_events_runtime_len_check'),
+    -- 20261227. The position vocabulary is also asserted by the H token; the FK is what ties a row to a real module.
+    ('20261227_ad_house_daily','ad_house_daily_pkey'),
+    ('20261227_ad_house_daily','ad_house_daily_position_check'),
+    ('20261227_ad_house_daily','ad_house_daily_module_fkey'),
+    ('20261227_ad_house_daily','ad_house_daily_counts_check')
 
   ) e(m,o)
 
@@ -1659,6 +1674,8 @@ WITH report AS (
                   AND a.privilege_type='EXECUTE' AND r.rolname='authenticated')
               THEN 'OK' ELSE 'CHECK (no explicit grant)' END
   FROM (VALUES
+    -- House banner counters (20261227): EXECUTE also reaches anon (H token); registered ahead of the apply; red until it runs.
+    ('20261227_ad_house_daily','bump_house_ad_counter'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
     ('1093_checkins_google_places','get_google_place_pins'),
     -- Araçlar renew + my listings (20261165): registered ahead of the apply; red until it runs.
@@ -2055,6 +2072,48 @@ WITH report AS (
                    AND c.conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('public.profiles') AND a.attname = 'id')]::smallint[]
                    AND c.confkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = to_regclass('auth.users') AND a.attname = 'id')]::smallint[]), false)
     -- 1201-END
+    -- 1227-BEGIN
+    -- 20261227 ad_house_daily + bump_house_ad_counter: red until applied, never an error (to_regclass / to_regprocedure / aclexplode / COALESCE).
+    -- Table: RLS on; exactly ONE policy (admin-only SELECT); SELECT held by authenticated only; no write / TRUNCATE / REFERENCES / TRIGGER for anon or authenticated
+    -- (table or column level); nothing for PUBLIC; the five anonymous columns and no sixth (the set IS the fact). Admin-only read, so a guest reads zero rows.
+    UNION ALL SELECT '20261227_ad_house_daily','ad_house_daily: RLS on; exactly ad_house_daily_select_admin (SELECT, PERMISSIVE, authenticated, is_admin()); authenticated SELECT only, anon nothing, no write grant, no PUBLIC; exactly the five anonymous columns',
+      COALESCE((SELECT c.relrowsecurity
+                       AND has_table_privilege('authenticated', c.oid, 'SELECT')
+                       AND NOT has_table_privilege('authenticated', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                       AND NOT has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                       AND NOT has_any_column_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+                       AND NOT has_any_column_privilege('authenticated', c.oid, 'INSERT,UPDATE,REFERENCES')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0)
+                  FROM pg_class c WHERE c.oid = to_regclass('public.ad_house_daily')), false)
+      AND COALESCE((SELECT string_agg(policyname || ':' || cmd || ':' || permissive || ':' || roles::text, ',' ORDER BY policyname)
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ad_house_daily')
+                   = 'ad_house_daily_select_admin:SELECT:PERMISSIVE:{authenticated}', false)
+      AND COALESCE((SELECT strpos(qual, 'is_admin') > 0 AND with_check IS NULL
+                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ad_house_daily' AND policyname = 'ad_house_daily_select_admin'), false)
+      AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) FROM pg_attribute a
+                     WHERE a.attrelid = to_regclass('public.ad_house_daily') AND a.attnum > 0 AND NOT a.attisdropped)
+                   = 'day,module,position,tap_count,view_count', false)
+      AND COALESCE((SELECT pg_get_constraintdef(c.oid) LIKE '%''list_top''%' AND pg_get_constraintdef(c.oid) LIKE '%''list_inline''%'
+                           AND pg_get_constraintdef(c.oid) LIKE '%''list_bottom''%' AND pg_get_constraintdef(c.oid) LIKE '%''detail_bottom''%'
+                      FROM pg_constraint c WHERE c.conrelid = to_regclass('public.ad_house_daily') AND c.conname = 'ad_house_daily_position_check'), false)
+    -- Function: one overload; SECURITY DEFINER with a pinned search_path; EXECUTE for anon and authenticated, none for PUBLIC (a default ACL is not a revoke).
+    -- Body: the allow-list is EXACTLY the two house pairs. Positives are the two pair shapes; the negative is the count of `p_module = '` comparisons (2 = home, events),
+    -- so a third module cannot be added by a stray CREATE OR REPLACE; the day is the Asia/Famagusta day; auth.uid() is never read (nothing may attach to a person).
+    UNION ALL SELECT '20261227_ad_house_daily','bump_house_ad_counter(text,text,text): one overload, DEFINER, search_path pinned; EXECUTE anon + authenticated, no PUBLIC; body allows exactly (list_bottom, home) and (list_top, events); Famagusta day; no auth.uid()',
+      COALESCE((SELECT p.prosecdef AND p.prorettype = 'void'::regtype
+                       AND p.proconfig IS NOT NULL AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+                       AND p.proacl IS NOT NULL
+                       AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.bump_house_ad_counter(text,text,text)')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'bump_house_ad_counter') = 1
+      AND COALESCE((SELECT strpos(d, '(p_position = ''list_bottom'' AND p_module = ''home'')') > 0
+                       AND strpos(d, '(p_position = ''list_top'' AND p_module = ''events'')') > 0
+                       AND (length(d) - length(replace(d, 'p_module = ''', ''))) / length('p_module = ''') = 2
+                       AND strpos(d, 'Asia/Famagusta') > 0
+                       AND strpos(d, 'auth.uid()') = 0
+                  FROM (SELECT pg_get_functiondef(to_regprocedure('public.bump_house_ad_counter(text,text,text)')) d) f), false)
+    -- 1227-END
     -- 1202-BEGIN
     -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
     UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the event list (11 in 20261202, 14 since 20261204) / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
