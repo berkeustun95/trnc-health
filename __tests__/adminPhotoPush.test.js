@@ -48,13 +48,10 @@ describe('App.js / AdminScreen.js wiring', () => {
   const admin = fs.readFileSync(path.join(__dirname, '..', 'screens', 'AdminScreen.js'), 'utf8')
   const between = (src, from, to) => { const a = src.indexOf(from); const b = src.indexOf(to, a); expect(a).toBeGreaterThan(-1); expect(b).toBeGreaterThan(a); return src.slice(a, b) }
 
-  test('the one tap router sends admin to openAdminPush and Bandabuliya to openMarketplacePush (every path goes through it)', () => {
-    const routing = between(app, 'const routePush = data', 'const takePushResponse')
-    expect(routing).toContain("case 'admin': openAdminPush(data); break")
-    expect(routing).toContain("case 'marketplace': openMarketplacePush(data); break")
-    const handlers = between(app, 'addNotificationResponseReceivedListener(', '}, [session])')
-    expect(handlers).toContain("takePushResponse(response, 'warm')")
-    expect(handlers).toContain("takePushResponse(r, 'cold')")
+  test('both tap handlers try the admin route before the Bandabuliya one', () => {
+    const warm = between(app, 'addNotificationResponseReceivedListener(', 'return () => sub.remove()')
+    const cold = between(app, 'Notifications.getLastNotificationResponseAsync().then(', '}, [session])')
+    for (const h of [warm, cold]) expect(h).toContain('if (!openAdminPush(data)) openMarketplacePush(data)')
   })
 
   test("openMarketplacePush is unchanged: 'marketplace' still opens the listing, the chat its thread", () => {
