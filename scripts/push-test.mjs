@@ -45,12 +45,6 @@ const keys = process.argv[9] || 'none'
 if (![1, 2].includes(repeat)) fail(`Refused: repeat must be 1 or 2, got ${process.argv[7]}.`)
 if (![0, 10, 30].includes(gap)) fail(`Refused: gap must be 0, 10 or 30 seconds, got ${process.argv[8]}.`)
 if (!['none', 'on'].includes(keys)) fail(`Refused: keys must be none or on, got ${keys}.`)
-// Silent copy (Berke, 2026-11-21): sound=second_off sends copy 2 without a sound; sound=off sends every copy without one
-// (repeat=1 + off = "only the silent copy arrived"). iOS plays no sound when `sound` is absent. On Android 8+ the app's
-// channel decides the sound, not the message, so the 'default' channel may still ring: that is what the test measures.
-const sound = process.argv[10] || 'on'
-if (!['on', 'second_off', 'off'].includes(sound)) fail(`Refused: sound must be on, second_off or off, got ${sound}.`)
-const silent = r => sound === 'off' || (sound === 'second_off' && r > 0)
 const REPLACE_KEY = 'ada-s2-test'
 if (!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)) fail('Refused: that is not an email.')
 if (!['plain', 'messages', 'duty', 'datajobs'].includes(kind)) fail(`Refused: kind must be plain, messages, duty or datajobs, got ${kind}.`)
@@ -105,24 +99,24 @@ const BODY = {
   plain: tr ? 'Bu geldiyse bildirimler çalışıyor.' : 'If this arrived, push works.',
 }
 const TITLE = kind === 'duty' ? (tr ? '💊 Bugünkü Nöbetçi Eczane' : "💊 Today's Duty Pharmacy") : (tr ? 'ADA test bildirimi' : 'ADA test notification')
-const messagesFor = r => recipients.map(({ push_token: to }) => ({ to, ...(silent(r) ? {} : { sound: 'default' }), data,
-  channelId: 'default', title: text || TITLE, body: text || BODY[kind], ...(keys === 'on' ? { collapseId: REPLACE_KEY, tag: REPLACE_KEY } : {}) }))
+const messages = recipients.map(({ push_token: to }) => ({ to, sound: 'default', data, channelId: 'default',
+  title: text || TITLE, body: text || BODY[kind], ...(keys === 'on' ? { collapseId: REPLACE_KEY, tag: REPLACE_KEY } : {}) }))
 let send
 const tickets = []
 for (let r = 0; r < repeat; r++) {
   if (r > 0) await new Promise(res => setTimeout(res, gap * 1000))
   send = await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(messagesFor(r)),
+    body: JSON.stringify(messages),
   })
   tickets.push(...[].concat((await send.json().catch(() => ({})))?.data ?? []))
-  console.log(`copy ${r + 1}/${repeat} sent at ${new Date().toISOString()} (keys ${keys}, ${silent(r) ? 'no sound' : 'sound'})`)
+  console.log(`copy ${r + 1}/${repeat} sent at ${new Date().toISOString()} (keys ${keys})`)
 }
 const expected = recipients.length * repeat
 const ticket = tickets[0]
 const publicKey = readFileSync('scripts/lib/readonly-results.pub', 'utf8')
 console.log(seal(JSON.stringify({ account: `${id.slice(0, 8)}…`, role, language: lang, token: `…${pt.slice(-5, -1)}`, ticket,
-  repeat, gap, keys, sound, ...(email2 ? { dedupe, same_token: accounts[0].push_token === accounts[1].push_token, messages_sent: recipients.length, tickets } : {}) }), publicKey))
+  repeat, gap, keys, ...(email2 ? { dedupe, same_token: accounts[0].push_token === accounts[1].push_token, messages_sent: recipients.length, tickets } : {}) }), publicKey))
 if (email2) console.log(`two-account mode: dedupe ${dedupe}, messages sent: ${recipients.length}`)
 console.log(`ticket: ${ticket?.status ?? 'none'}`)
 if (tickets.length !== expected || tickets.some(x => x?.status !== 'ok')) {
