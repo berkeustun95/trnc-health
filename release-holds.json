@@ -125,8 +125,10 @@
       "commit": "83f013607ff7f8f2d19095704afb77472bf93687",
       "what": "Bandabuliya dark again (MODULE_FLAGS.marketplace false, MARKETPLACE_PREVIEW false), 2026-11-22",
       "since": "2026-11-22",
-      "cleared": false,
-      "clear": "Only after Berke has seen the dark state on ADA Preview (or a recorded walkthrough) and says go in chat, with the plain go-live rundown (Berke 2026-11-22). Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has seen the dark state on ADA Preview (or a recorded walkthrough) and says go in chat, with the plain go-live rundown (Berke 2026-11-22). Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-22",
+      "clearedBy": "Berke, in chat 2026-11-22: \"I watched the walkthrough and checked the admin photo queue myself on Preview: it is gone. Go for production on Bandabuliya-dark (#540): publish from 233d5487 plus the hold-clear commit only; nothing from #541 goes out, and its hold stays on.\" Preview 5e00c717 (Android 01a204ed) @ 233d5487."
     },
     {
       "pr": 541,
