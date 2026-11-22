@@ -59,6 +59,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MIGRATION_A = 'supabase/migrations/20261008_ad_banners.sql'
 const MIGRATION_B = 'supabase/migrations/20261009_ad_slots_position_module.sql'
 const AD_COMPONENT = 'components/AdSlot.js'
+const HOUSE_COMPONENT = 'components/AdHouseBanner.js'
 const APP = 'App.js'
 
 const adsMod = await import(resolve(ROOT, 'constants/ads.js'))
@@ -77,6 +78,7 @@ const adsPlain = () => ({
   AD_DEFERRED_MODULES: { ...adsMod.AD_DEFERRED_MODULES },
   AD_REJECTED_PLACEMENTS: { ...adsMod.AD_REJECTED_PLACEMENTS },
   AD_PAGE_INSET: adsMod.AD_PAGE_INSET,
+  AD_HOUSE_PLACEMENTS: [...adsMod.AD_HOUSE_PLACEMENTS],
 })
 
 // ─── Input gathering ────────────────────────────────────────────────────────
@@ -270,6 +272,41 @@ const CHECKS = [
       return `these files import AdSlot directly but are not wrappers in AD_PLACEMENTS: ${offenders.join(', ')}\n`
         + `      A new placement is a deliberate edit to constants/ads.js plus a wrapper in components/ads/,\n`
         + `      reviewed against the exclusion list. Importing AdSlot into a screen bypasses both.`
+    }
+    return null
+  }],
+
+  // ADA's own banner is not an ad, but it sits in ad slots: it may be drawn only by AdSlot, which decides WHERE
+  // (AD_HOUSE_PLACEMENTS) and HOW OFTEN. A screen importing it would put it anywhere, uncapped.
+  ['only AdSlot imports the house banner', ({ files }) => {
+    const offenders = []
+    for (const [rel, src] of Object.entries(files)) {
+      if (rel === AD_COMPONENT || rel === HOUSE_COMPONENT) continue
+      if (/from\s+['"][^'"]*\/AdHouseBanner['"]|require\(['"][^'"]*\/AdHouseBanner['"]\)/.test(stripComments(src))) offenders.push(rel)
+    }
+    if (offenders.length) {
+      return `these files import AdHouseBanner but only ${AD_COMPONENT} may: ${offenders.join(', ')}\n`
+        + `      AdSlot is where the placement list and the once-per-app-open cap live; a direct import skips both.`
+    }
+    return null
+  }],
+
+  ['house placements are real placements', ({ ads }) => {
+    const real = new Set(ads.AD_PLACEMENTS.map(p => `${p.position}/${p.module}`))
+    for (const k of ads.AD_HOUSE_PLACEMENTS) {
+      if (!real.has(k)) return `AD_HOUSE_PLACEMENTS lists "${k}", which is not a position/module pair of any AD_PLACEMENTS entry — `
+        + `no wrapper mounts it, so the house banner would be configured for a slot that does not exist.`
+    }
+    return null
+  }],
+
+  ['no house banner in a list or detail-end slot', ({ ads }) => {
+    for (const k of ads.AD_HOUSE_PLACEMENTS) {
+      const position = k.split('/')[0]
+      if (position === 'list_inline' || position === 'detail_bottom') {
+        return `AD_HOUSE_PLACEMENTS lists "${k}". list_inline sits among listings and detail_bottom ends a detail screen; `
+          + `ADA's own banner is only for list_top and list_bottom.`
+      }
     }
     return null
   }],
@@ -619,6 +656,19 @@ const CASES = [
     const i = clone()
     i.files['screens/DutyListScreen.js'] = `import AdSlot from '../components/AdSlot'\n` + base.files['screens/DutyListScreen.js']
     return [i, s => /from\s+['"][^'"]*\/AdSlot['"]/.test(stripComments(s.files['screens/DutyListScreen.js']))]
+  }],
+  ['only AdSlot imports the house banner', () => {
+    const i = clone()
+    i.files['screens/DutyListScreen.js'] = `import AdHouseBanner from '../components/AdHouseBanner'\n` + base.files['screens/DutyListScreen.js']
+    return [i, s => /from\s+['"][^'"]*\/AdHouseBanner['"]/.test(stripComments(s.files['screens/DutyListScreen.js']))]
+  }],
+  ['house placements are real placements', () => {
+    const i = clone(); i.ads.AD_HOUSE_PLACEMENTS.push('list_top/nowhere')
+    return [i, s => s.ads.AD_HOUSE_PLACEMENTS.includes('list_top/nowhere')]
+  }],
+  ['no house banner in a list or detail-end slot', () => {
+    const i = clone(); i.ads.AD_HOUSE_PLACEMENTS.push('list_inline/events')
+    return [i, s => s.ads.AD_HOUSE_PLACEMENTS.includes('list_inline/events')]
   }],
   // ⚠ THE CASE THE MODEL EXISTS TO CATCH: someone reasons "explore is an allowed module,
   //   so its detail screen is fine" and allowlists FacilityProfileScreen for
