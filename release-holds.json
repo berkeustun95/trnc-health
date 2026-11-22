@@ -127,6 +127,14 @@
       "since": "2026-11-22",
       "cleared": false,
       "clear": "Only after Berke has seen the dark state on ADA Preview (or a recorded walkthrough) and says go in chat, with the plain go-live rundown (Berke 2026-11-22). Then set cleared to true in a PR."
+    },
+    {
+      "pr": 541,
+      "commit": "7237155c1a3474e269b28c77c4cb56c8f7cf61c2",
+      "what": "Veles Bit Postası Home banner (VELES_LIVE false; on in Preview and dev only), merged to main 2026-11-22 as 8568e232",
+      "since": "2026-11-22",
+      "cleared": false,
+      "clear": "Only after Berke has seen the banner on ADA Preview (Turkish and one non-Turkish UI, the compact hero on a short screen, the tap opening Veles) and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #541 is held."
     }
   ]
 }
