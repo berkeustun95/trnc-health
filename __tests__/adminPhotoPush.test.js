@@ -6,18 +6,15 @@ const path = require('path')
 
 const PUSH = { screen: 'admin', tab: 'marketplace', view: 'photos' }
 
-const load = ({ dev = false, variant, flagOff = false } = {}) => {
+// The flag is always forced (never the repo value), so flipping Bandabuliya on or off needs no test edit.
+const load = ({ dev = false, variant, flag = true } = {}) => {
   jest.resetModules()
   global.__DEV__ = dev
   jest.doMock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: variant ? { appVariant: variant } : {} } } }))
-  if (flagOff) {
-    jest.doMock('../constants/flags', () => {
-      const real = jest.requireActual('../constants/flags')
-      return { ...real, MODULE_FLAGS: { ...real.MODULE_FLAGS, marketplace: false } }
-    })
-  } else {
-    jest.dontMock('../constants/flags')
-  }
+  jest.doMock('../constants/flags', () => {
+    const real = jest.requireActual('../constants/flags')
+    return { ...real, MODULE_FLAGS: { ...real.MODULE_FLAGS, marketplace: flag } }
+  })
   return require('../utils/notificationRoute').adminPushRequest
 }
 const devBefore = global.__DEV__
@@ -28,10 +25,11 @@ describe('adminPushRequest', () => {
     expect(load()(PUSH)).toEqual({ tab: 'Bandabuliya', view: 'Photos' })
   })
   test('flag off on a production bundle: ignored', () => {
-    expect(load({ flagOff: true })(PUSH)).toBeNull()
+    expect(load({ flag: false })(PUSH)).toBeNull()
   })
-  test('control: flag off still opens on ADA Preview', () => {
-    expect(load({ variant: 'preview', flagOff: true })(PUSH)).toEqual({ tab: 'Bandabuliya', view: 'Photos' })
+  test('flag off on ADA Preview: ignored too (MARKETPLACE_PREVIEW false); control: a dev bundle still opens it', () => {
+    expect(load({ variant: 'preview', flag: false })(PUSH)).toBeNull()
+    expect(load({ dev: true, flag: false })(PUSH)).toEqual({ tab: 'Bandabuliya', view: 'Photos' })
   })
   test("Bandabuliya's own pushes and other admin data are not this route", () => {
     const req = load()
@@ -109,7 +107,7 @@ describe('App.js / AdminScreen.js wiring', () => {
 describe('adminPushRequest: Data jobs', () => {
   test('opens the Data jobs tab, with or without the Bandabuliya flag', () => {
     expect(load()({ screen: 'admin', tab: 'datajobs' })).toEqual({ tab: 'DataJobs' })
-    expect(load({ flagOff: true })({ screen: 'admin', tab: 'datajobs' })).toEqual({ tab: 'DataJobs' })
+    expect(load({ flag: false })({ screen: 'admin', tab: 'datajobs' })).toEqual({ tab: 'DataJobs' })
   })
   test('other tabs and screens are not this route', () => {
     const req = load()
