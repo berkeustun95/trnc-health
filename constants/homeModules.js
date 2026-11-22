@@ -185,13 +185,14 @@ export const HOME_MODULES = [
   { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
     gridLabel: { key: 'hsTitle', lines: 3 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
-  // Driving schools (MODULE_FLAGS.ehliyet). Dark: the tile shows only through HomeScreen's `unlocked` Set on dev / ADA Preview.
+  // Driving schools (MODULE_FLAGS.ehliyet). Live since 2026-10-14; off = tile hidden again.
   { id: 'ehliyet',            icon: 'id-card-outline',          tint: 'standard', labelKey: 'menuEhliyet',
     gridLabel: { key: 'menuEhliyet', lines: 2 } },   // per-language size: Russian / German break mid-word at 11pt (GRID_LABEL_FIT)
   // Araçlar (MODULE_FLAGS.cars). Dark: shown only where CARS is true (constants/homeGroups.js GATES: dev / ADA Preview).
   // speedometer-outline because car-outline (transport, towing) and car-sport-outline (garages) are taken.
   { id: 'cars',               icon: 'speedometer-outline',      tint: 'standard', labelKey: 'menuCars' },
-  // Bandabuliya (MODULE_FLAGS.marketplace). Dark: the tile shows only through HomeScreen's `unlocked` Set on dev / ADA Preview.
+  // Bandabuliya (MODULE_FLAGS.marketplace). Live 2026-11-12, dark again from 2026-11-22: while off, the tile shows only
+  // through HomeScreen's `unlocked` Set on dev (and on ADA Preview only if MARKETPLACE_PREVIEW is true).
   // subKey: a second line under the name; the name is not self-explanatory (Berke, 2026-11-09).
   { id: 'marketplace',        icon: 'storefront-outline',       tint: 'standard', labelKey: 'menuMarketplace', subKey: 'mkTagline' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },

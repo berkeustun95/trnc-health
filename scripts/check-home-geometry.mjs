@@ -271,13 +271,14 @@ for (const id of MUST_EXCLUDE) {
   if (!knownIds.has(id)) problems.push(`'${id}' is not a known tile id`)
 }
 
-// Hand-maintained, in Home's group order: a copy of the 19 ids printed by
-// __tests__/homeServices.test.js (this file cannot import homeGroups). The real gates are
+// Hand-maintained, in Home's group order: a copy of the 18 ids printed by
+// __tests__/homeServices.test.js with Bandabuliya off (dark again from 2026-11-22; add 'marketplace'
+// back after 'homeServices' when it returns). This file cannot import homeGroups. The real gates are
 // covered by `npm run test:home`, which runs in the ota and ota:preview chains.
 const VISIBLE = [
   'duty', 'health', 'emergency',
   'exploreTab', 'events', 'walkingRoutes', 'hotels', 'eatery',
-  'accommodation', 'homeServices', 'marketplace', 'pets', 'studentHub',
+  'accommodation', 'homeServices', 'pets', 'studentHub',
   'esim', 'municipal', 'towing', 'ehliyet', 'exchangeRates', 'newcomerEssentials',
 ]
 for (const id of VISIBLE) {

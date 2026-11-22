@@ -166,10 +166,10 @@ let homeState = null
 
 // The one module a score editor may see before LIVE_SCORES_LIVE flips. Module scope: one Set, not one per render.
 const TESTER_UNLOCK = new Set(['liveScores'])
-// Ehliyet is dark (MODULE_FLAGS.ehliyet): dev and ADA Preview see its tile through the same Set (constants/redesign.js EHLIYET).
+// Ehliyet (MODULE_FLAGS.ehliyet, live since 2026-10-14): when off, dev and ADA Preview still see its tile through this Set (constants/redesign.js EHLIYET).
 const EHLIYET_UNLOCK = new Set(['ehliyet'])
 const TESTER_EHLIYET_UNLOCK = new Set(['liveScores', 'ehliyet'])
-// Bandabuliya is dark (MODULE_FLAGS.marketplace): dev and ADA Preview see its tile too (constants/redesign.js MARKETPLACE).
+// Bandabuliya (MODULE_FLAGS.marketplace): added wherever MARKETPLACE is true (constants/redesign.js: flag, dev, or Preview if MARKETPLACE_PREVIEW).
 const withMarketplace = set => (MARKETPLACE ? new Set([...(set || []), 'marketplace']) : set)
 const HOME_UNLOCK = withMarketplace(EHLIYET ? EHLIYET_UNLOCK : undefined)
 const HOME_TESTER_UNLOCK = withMarketplace(EHLIYET ? TESTER_EHLIYET_UNLOCK : TESTER_UNLOCK)
