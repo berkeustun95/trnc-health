@@ -68,6 +68,8 @@ jobs:
         run: node scripts/migration-ledger.mjs --verify 20261065_hotels_commons_photo_credit.sql
       - name: Offline proofs
         run: node scripts/test-supabase-migrate.mjs
+      - name: contact_events vocabulary tokens (post-apply schema check, read from the files)
+        run: node scripts/check-contact-events-vocab.mjs
       - name: Migrate (dry)
         run: |
           set -f
