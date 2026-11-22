@@ -10,7 +10,10 @@
 // 20261136 section: applies on the 1135 state, per-dish before/after, ids kept, re-run writes nothing, red-first mutants. Its verify_schema token is
 //   ledger-only since 20261137 (one count, one owner); the row-count token and its red-first probes live in the 20261137 section.
 // 20261137 section (bottom): Big Pork's dana bacon extra -> domuz bacon by DELETE + INSERT on the 1136 state; before/after rows, one id replaced,
-//   re-run writes nothing, the 1137 token (red before / green after / red on each drift), red-first mutants.
+//   re-run writes nothing, the 1137 token (ledger half since 20261226: red before / green after), red-first mutants.
+// 20261226 section (bottom): free sausage extras on the 3 hot dogs + 2 descriptions, on the 1137 state plus the 20261224 dishes and the
+//   20261150 price CHECK (both stood in: their own files are tested in test-crunchy-menu-1122-sql.mjs / test-bidda-*); the 1226 token owns
+//   the option counts now (red before / green after / red on each drift, the 1137 probes moved here), refusals, red-first mutants.
 // Not wired into package.json / pre-push / CI, like its siblings: run by hand.
 //
 //   node scripts/test-crunchy-item-options-sql.mjs
@@ -420,8 +423,11 @@ const refused37 = async (name, file, wantMsg, prep = async () => {}) => {
 }
 const VS37 = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
 {
-  const i0 = VS37.indexOf("    UNION ALL SELECT '20261137_crunchy_express_bigpork_pork_bacon'"), i1 = VS37.indexOf('    -- ── 1134: per-dish options')
+  const i0 = VS37.indexOf("    UNION ALL SELECT '20261137_crunchy_express_bigpork_pork_bacon'"), i1 = VS37.indexOf("    -- 1226 Crunchy hot dogs'")
   if (i0 < 0 || i1 < i0) throw new Error('1137 token anchors missing')
+  const j0 = VS37.indexOf("    UNION ALL SELECT '20261226_crunchy_express_hotdog_sausage_extras'"), j1 = VS37.indexOf('    -- ── 1134: per-dish options')
+  if (j0 < i1 || j1 < j0) throw new Error('1226 token anchors missing')
+  globalThis.TOK25 = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS37.slice(j0, j1)}) z`
   globalThis.TOK37 = `SELECT migration, object, ok FROM (SELECT ''::text migration, ''::text object, false ok WHERE false\n${VS37.slice(i0, i1)}) z`
 }
 const tok37 = async (d) => { try { return (await q(d, globalThis.TOK37)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] } }
@@ -484,23 +490,6 @@ t('verify_schema 1137 token AFTER apply: green; 1136 and 1135 tokens (ledger onl
   t('re-apply wrote nothing: rows, ids, identity sequence, menu all identical', [stB.opts, stB.opts_md5, stB.seq, stB.menu_md5], [stA.opts, stA.opts_md5, stA.seq, stA.menu_md5])
 }
 
-// the token notices each thing it pins (red-first: green before, red after)
-{
-  const probe37 = async (name, sql) => {
-    const d = await after1136(); await applyFile(d, F1137)
-    const green = await tok37(d)
-    await d.exec(sql)
-    t(`token 1137 turns red on: ${name} (green before: ${green})`, [green, await tok37(d)], [[true], [false]])
-  }
-  await probe37('(c) the inserted domuz bacon row priced 95', `UPDATE public.eatery_item_options SET price = 95 WHERE message_tr = 'domuz bacon'`)
-  await probe37('köfte max_qty 1 on one dish', `UPDATE public.eatery_item_options SET max_qty = 1 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'köfte')`)
-  await probe37('hellim price 80 on one dish', `UPDATE public.eatery_item_options SET price = 80 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'hellim')`)
-  await probe37('an extra disabled by hand', `UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'extra')`)
-  await probe37('a refused extra (cheddar) back', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT item_id, 'extra', label_i18n, 'cheddar', 10 FROM public.eatery_item_options WHERE message_tr = 'hellim' LIMIT 1`)
-  await probe37('dana bacon back on Big Pork (5 dana bacon extras)', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, sort_order) SELECT i.id, 'extra', (SELECT label_i18n FROM public.eatery_item_options WHERE message_tr = 'dana bacon' LIMIT 1), 'dana bacon', 90, 4 FROM public.eatery_menu_items i WHERE i.name = '${BP}'`)
-  await probe37('domuz bacon on a second dish (2 domuz bacon extras)', `UPDATE public.eatery_item_options SET message_tr = 'domuz bacon' WHERE id = (SELECT o.id FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name = 'BBQ Smash Burger' AND o.message_tr = 'dana bacon')`)
-  await probe37('a removal deleted (76 removals)', `DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'remove')`)
-}
 {
   const d = await after1136()
   await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '${NAME37}'`)
@@ -539,6 +528,127 @@ await refused37('(a) the INSERT writes the dana_bacon label and message',
   mutant37('r37keep2', [["VALUES (v_bp, 'extra', v_lab -> (v_e_new ->> 0) -> 'l', v_lab -> (v_e_new ->> 0) ->> 'ex',", "VALUES (v_bp, 'extra', v_lab -> (v_e_old ->> 0) -> 'l', v_lab -> (v_e_old ->> 0) ->> 'ex',"]]), 'after: ')
 await refused37('the write counts notice a DELETE that did not happen (AND false)',
   mutant37('r37nodel', [["WHERE o.item_id = v_bp AND o.kind = 'extra' AND o.message_tr = v_lab -> (v_e_old ->> 0) ->> 'ex'\n    RETURNING", "WHERE o.item_id = v_bp AND o.kind = 'extra' AND o.message_tr = v_lab -> (v_e_old ->> 0) ->> 'ex' AND false\n    RETURNING"]]), 'deleted 0 rows, expected 1')
+
+console.log('\n20261226_crunchy_express_hotdog_sausage_extras — on the 1137 state + the 20261224 dishes + the 20261150 price CHECK')
+const F1225 = M('20261226_crunchy_express_hotdog_sausage_extras.sql')
+const SQL25 = readFileSync(F1225, 'utf8')
+const NAME25 = '20261226_crunchy_express_hotdog_sausage_extras.sql'
+const DOGS = ['Hot Dog Bacon Wrapped', 'Trüf Mayonezli Hot Dog', 'Barbekü Soslu Hot Dog']
+const CY0 = 'Özel çörek ekmeği arasına; smash burger köftesi, hellim peyniri, soğan, salatalık turşusu'
+const BW0 = 'Domuz bacona sarılmış sosis, hardal sos, ketçap, turşu, çiğ soğan, kaşar peyniri, patates kızartması'
+const CY1 = CY0 + ', crunchy bikla mayo sosu. Seçeceğiniz sos ile', BW1 = BW0 + ' (Domuz eti içerir.)'
+const P1150 = readFileSync(M('20261150_bidda_badadez_free_options.sql'), 'utf8')
+const ck0 = P1150.indexOf('ALTER TABLE public.eatery_item_options DROP CONSTRAINT IF EXISTS eatery_item_options_price_check;'), ck1 = P1150.indexOf('CHECK (price IS NULL OR price >= 0);', ck0)
+if (ck0 < 0 || ck1 < ck0) throw new Error('1150 price CHECK anchors missing')
+const CHECK1150 = P1150.slice(ck0, ck1 + 'CHECK (price IS NULL OR price >= 0);'.length)
+const lit = (v) => `'${v.replace(/'/g, "''")}'`
+const after1137 = async () => { const d = await after1136(); const r = await applyFile(d, F1137); if (!r.ok) throw new Error('1137: ' + r.msg)
+  await d.exec(CHECK1150)
+  await d.exec(`INSERT INTO public.eatery_menu_items (partner_id, section, section_order, name, description, price, currency, sort_order) VALUES
+    ('${CID}', 'Beef Burgers', 2, 'Cypriot Smash Burger', ${lit(CY0)}, 850, 'TRY', 6),
+    ('${CID}', 'Vejetaryen Burgerler', 4, 'Vegan Semi Smash Burger', 'Vegan burger köftesi, vegan ekmek, turşu, hardal, ketçap', 750, 'TRY', 2),
+    ('${CID}', 'Hot Dogs', 6, 'Hot Dog Bacon Wrapped', ${lit(BW0)}, 490, 'TRY', 1),
+    ('${CID}', 'Hot Dogs', 6, 'Trüf Mayonezli Hot Dog', 'Eritilmiş peynir, trüf mayonez, parmesan peyniri, dana bacon, soğan. Patates kızartması ile', 490, 'TRY', 2),
+    ('${CID}', 'Hot Dogs', 6, 'Barbekü Soslu Hot Dog', 'Çıtır soğan, turşu, eritilmiş peynir, barbekü sos. Patates kızartması ile', 490, 'TRY', 3);
+    INSERT INTO public.schema_migrations_applied (filename, checksum) VALUES ('20261150_bidda_badadez_free_options.sql', 'x'), ('20261224_crunchy_express_menu_1122.sql', 'x')`)
+  return d }
+const after1225 = async () => { const d = await after1137(); const r = await applyFile(d, F1225); if (!r.ok) throw new Error('1226: ' + r.msg); return d }
+const tok25 = async (d) => { try { return (await q(d, globalThis.TOK25)).map(r => r.ok) } catch (e) { return String(e.message).split('\n')[0] } }
+const led25 = async (d) => (await q(d, `SELECT count(*)::int n FROM public.schema_migrations_applied WHERE filename = '${NAME25}'`))[0].n
+const descs = async (d) => (await q(d, `SELECT name, description FROM public.eatery_menu_items WHERE name IN ('Cypriot Smash Burger', 'Hot Dog Bacon Wrapped') ORDER BY name`)).map(r => r.description)
+const dogRows = async (d) => (await q(d, `SELECT i.name, o.kind, o.message_tr, o.price::float8 p, o.max_qty, o.sort_order, o.is_available, o.label_i18n ->> 'Turkish' tr, o.label_i18n ->> 'English' en
+  FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name IN (${DOGS.map(lit).join(', ')}) ORDER BY i.id, o.sort_order`)).map(r => `${r.name} ${r.kind} "${r.message_tr}" ${r.p} x${r.max_qty} #${r.sort_order} ${r.is_available} ${r.tr} / ${r.en}`)
+const mutant25 = (name, pairs) => {
+  let text = SQL25
+  for (const [from, to] of pairs) {
+    const n = text.split(from).length - 1
+    if (n !== 1) { bad++; console.log(`  ✗ ${name}: anchor ${JSON.stringify(from.slice(0, 70))} found ${n}x`); return null }
+    text = text.replace(from, () => to)
+  }
+  const p = join(dir, name.replace(/\W+/g, '_') + '.sql'); writeFileSync(p, text); return p
+}
+const refused25 = async (name, file, wantMsg, prep = async () => {}) => {
+  if (!file) return
+  const d = await after1137(); await prep(d)
+  const before = await state(d)
+  const r = await applyFile(d, file)
+  t(`${name}: apply FAILS with "${wantMsg}"`, [r.ok, (r.msg || '').includes(wantMsg)], [false, true])
+  console.log(`      ${r.ok ? '(applied!)' : r.msg}`)
+  await d.exec('ROLLBACK').catch(() => {}); await d.exec('RESET ROLE').catch(() => {})
+  const after = await state(d)
+  t(`${name}: nothing written (options and menu md5 equal), no ledger row`, [after.opts_md5, after.menu_md5, await led25(d)], [before.opts_md5, before.menu_md5, 0])
+}
+
+const d25 = await after1137()
+const s25a = await state(d25)
+t('1137 state + stand-ins: 96 option rows, 0 on the hot dogs, 20261224 descriptions', [s25a.opts, (await dogRows(d25)).length, await descs(d25)], [96, 0, [CY0, BW0]])
+t('verify_schema 1226 token BEFORE apply: no error, red', await tok25(d25), [false])
+t('verify_schema 1226 token with the table MISSING (prod before 1134): no error, red', await (async () => { const d = await freshDb(FIXTURE); return tok25(d) })(), [false])
+const r25 = await applyFile(d25, F1225)
+console.log('  apply:', r25.ok ? 'ok' : r25.msg)
+t('1226 applies cleanly (in-file asserts green)', r25, { ok: true, msg: null })
+if (!r25.ok) process.exit(1)
+const rows25 = await dogRows(d25)
+for (const x of rows25) console.log('    ' + x)
+t('hot dogs: Sosis: Domuz #1 / Sosis: Normal #2, free extras, max 1, available, on each of the 3',
+  rows25, DOGS.flatMap(n => [`${n} extra "sosis tercihi: domuz" 0 x1 #1 true Sosis: Domuz / Sausage: Pork`, `${n} extra "sosis tercihi: normal" 0 x1 #2 true Sosis: Normal / Sausage: Regular`]))
+t('descriptions complete', await descs(d25), [CY1, BW1])
+const s25b = await state(d25)
+t('102 option rows, partner live, ledger row', [s25b.opts, s25b.active, await led25(d25)], [102, true, 1])
+t('verify_schema 1226 token AFTER apply: green; 1137 token (ledger only) still green', [await tok25(d25), await tok37(d25)], [[true], [true]])
+t('anon reads the 6 sausage rows (app shows them as free extras)', (await asRole(d25, 'anon', null, `SELECT count(*)::int n FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name IN (${DOGS.map(lit).join(', ')}) AND o.price = 0`)).rows?.[0]?.n, 6)
+t('1226 applies a SECOND time, writes nothing', [await applyFile(d25, F1225), (await state(d25)).opts_md5, (await state(d25)).menu_md5, (await state(d25)).seq], [{ ok: true, msg: null }, s25b.opts_md5, s25b.menu_md5, s25b.seq])
+{
+  const d = await after1137(); await d.exec(`UPDATE public.eatery_menu_items SET description = ${lit(CY1)} WHERE name = 'Cypriot Smash Burger'`)
+  t('applies when one description is already the new text', [await applyFile(d, F1225), await descs(d)], [{ ok: true, msg: null }, [CY1, BW1]])
+}
+
+// the token notices each thing it pins (red-first: green before, red after)
+{
+  const probe25 = async (name, sql) => {
+    const d = await after1225()
+    const green = await tok25(d)
+    await d.exec(sql)
+    t(`token 1226 turns red on: ${name} (green before: ${green})`, [green, await tok25(d)], [[true], [false]])
+  }
+  await probe25('(c) the inserted domuz bacon row priced 95', `UPDATE public.eatery_item_options SET price = 95 WHERE message_tr = 'domuz bacon'`)
+  await probe25('köfte max_qty 1 on one dish', `UPDATE public.eatery_item_options SET max_qty = 1 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'köfte')`)
+  await probe25('hellim price 80 on one dish', `UPDATE public.eatery_item_options SET price = 80 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'hellim')`)
+  await probe25('an extra disabled by hand', `UPDATE public.eatery_item_options SET is_available = false WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'extra')`)
+  await probe25('a refused extra (cheddar) back', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT item_id, 'extra', label_i18n, 'cheddar', 10 FROM public.eatery_item_options WHERE message_tr = 'hellim' LIMIT 1`)
+  await probe25('dana bacon back on Big Pork (5 dana bacon extras)', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, sort_order) SELECT i.id, 'extra', (SELECT label_i18n FROM public.eatery_item_options WHERE message_tr = 'dana bacon' LIMIT 1), 'dana bacon', 90, 4 FROM public.eatery_menu_items i WHERE i.name = '${BP}'`)
+  await probe25('domuz bacon on a second dish (2 domuz bacon extras)', `UPDATE public.eatery_item_options SET message_tr = 'domuz bacon' WHERE id = (SELECT o.id FROM public.eatery_item_options o JOIN public.eatery_menu_items i ON i.id = o.item_id WHERE i.name = 'BBQ Smash Burger' AND o.message_tr = 'dana bacon')`)
+  await probe25('a removal deleted (76 removals)', `DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'remove')`)
+  await probe25('a sausage row priced 10', `UPDATE public.eatery_item_options SET price = 10 WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'sosis tercihi: domuz')`)
+  await probe25('a sausage row missing (5 free extras)', `DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'sosis tercihi: normal')`)
+  await probe25('a sausage label swapped (Domuz label on the normal row)', `UPDATE public.eatery_item_options SET label_i18n = (SELECT label_i18n FROM public.eatery_item_options WHERE message_tr = 'sosis tercihi: domuz' LIMIT 1) WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE message_tr = 'sosis tercihi: normal')`)
+  await probe25('a removal added on a hot dog', `INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price, max_qty) SELECT id, 'remove', (SELECT label_i18n FROM public.eatery_item_options WHERE kind = 'remove' LIMIT 1), 'turşusuz', NULL, 1 FROM public.eatery_menu_items WHERE name = 'Barbekü Soslu Hot Dog'`)
+  await probe25('the Cypriot description cut back', `UPDATE public.eatery_menu_items SET description = ${lit(CY0)} WHERE name = 'Cypriot Smash Burger'`)
+  await probe25('the pork note dropped from Bacon Wrapped', `UPDATE public.eatery_menu_items SET description = ${lit(BW0)} WHERE name = 'Hot Dog Bacon Wrapped'`)
+}
+{
+  const d = await after1225()
+  await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '${NAME25}'`)
+  t('token 1226 is red without its ledger row even though no row drift exists', await tok25(d), [false])
+}
+
+console.log('red-first refusals and mutants of 20261226 (each makes the apply FAIL, readable message):')
+await refused25('20261224 not in the ledger', F1225, 'are not all in the ledger',
+  async (d) => { await d.exec(`DELETE FROM public.schema_migrations_applied WHERE filename = '20261224_crunchy_express_menu_1122.sql'`) })
+await refused25('partner not live', F1225, 'missing or not live',
+  async (d) => { await d.exec(`UPDATE public.eatery_partners SET is_active = false WHERE id = '${CID}'`) })
+await refused25('a hot dog missing', F1225, 'Trüf Mayonezli Hot Dog (0)',
+  async (d) => { await d.exec(`DELETE FROM public.eatery_menu_items WHERE name = 'Trüf Mayonezli Hot Dog'`) })
+await refused25('a description hand-edited', F1225, 'neither the 20261224 text nor the new one: Hot Dog Bacon Wrapped',
+  async (d) => { await d.exec(`UPDATE public.eatery_menu_items SET description = 'x' WHERE name = 'Hot Dog Bacon Wrapped'`) })
+await refused25('a hand-made priced sausage row on a hot dog', F1225, 'Barbekü Soslu Hot Dog has 1 option rows',
+  async (d) => { await d.exec(`INSERT INTO public.eatery_item_options (item_id, kind, label_i18n, message_tr, price) SELECT id, 'extra', (SELECT label_i18n FROM public.eatery_item_options LIMIT 1), 'domuz sosis', 20 FROM public.eatery_menu_items WHERE name = 'Barbekü Soslu Hot Dog'`) })
+await refused25('another dish lost an option (95 outside the hot dogs)', F1225, 'expected 96',
+  async (d) => { await d.exec(`DELETE FROM public.eatery_item_options WHERE id = (SELECT min(id) FROM public.eatery_item_options WHERE kind = 'remove')`) })
+await refused25('a label with 8 languages (eatery_option_label_valid / CHECK)', mutant25('r25lang', [['"Persian":"سوسیس: معمولی"', '"Farsi":"سوسیس: معمولی"']]), 'eatery_item_options_label_check')
+await refused25('RED-FIRST: the INSERT writes price 5: the post-state raises', mutant25('r25price', [["SELECT v_item, 'extra', t->2, t->>0, 0, 1,", "SELECT v_item, 'extra', t->2, t->>0, 5, 1,"]]), 'after: sausage rows not matched exactly once')
+await refused25('RED-FIRST: the UPDATE also touches another dish: the menu md5 raises', mutant25('r25menu', [["WHERE i.partner_id = c_id AND i.name = d->>0 AND i.description IS DISTINCT FROM d->>2;", "WHERE i.partner_id = c_id AND (i.name = d->>0 OR i.name = 'Vegan Semi Smash Burger') AND i.description IS DISTINCT FROM d->>2;"]]), 'after: the menu changed beyond the 2 descriptions')
+
 
 console.log(bad ? `\n${bad} FAILED` : '\nall green')
 process.exit(bad ? 1 : 0)
