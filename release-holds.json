@@ -115,10 +115,8 @@
       "commit": "4d4954bdb9db1178aa6adb89fd41b256ca03eb4a",
       "what": "Push taps: one routing path, parked tap before session, dedupe, [push-route] logs; merged to main 2026-11-21",
       "since": "2026-11-21",
-      "cleared": true,
-      "clear": "Only after Berke has seen the recorded Preview device check (cold cases + every push type, warm and cold) and says go in chat (Berke 2026-11-21). Then set cleared to true in a PR.",
-      "clearedOn": "2026-11-22",
-      "clearedBy": "Berke, in chat 2026-11-22: \"GO for production, both lanes. I watched the 1.4.2 and 1.4.3 push-tap videos and the profile picker clip.\" 1.4.3 Preview 01a20074 @ eaa93c97; 1.4.2 Preview 01a1fe9c @ 2e009388."
+      "cleared": false,
+      "clear": "Only after Berke has seen the recorded Preview device check (cold cases + every push type, warm and cold) and says go in chat (Berke 2026-11-21). Then set cleared to true in a PR."
     }
   ]
 }
