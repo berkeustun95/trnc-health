@@ -6155,10 +6155,12 @@ WITH report AS (
                LIKE '%''^https://\\S+$''::text%<= 2048%', false)
     -- ── 20261225: contact_events module 'news' (Veles Bit Postası Home banner). DROP/ADD of the
     --    SAME CHECK name, so the E-section name token cannot see it. Quoted literal, as 'book' above.
-    UNION ALL SELECT '20261225_contact_events_news','contact_events module CHECK permits news',
-      COALESCE(position('''news''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
-        WHERE conrelid = to_regclass('public.contact_events')
-          AND conname  = 'contact_events_module_check')) > 0, false)
+    UNION ALL SELECT '20261225_contact_events_news','contact_events module vocabulary is exactly the 18-module set (incl. news)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','cars','connectivity','eatery','ehliyet','events','explore','garages','grooming',
+                                 'homeServices','hotels','insurance','jobs','news','pets','studentHub','towing','transport']
     -- ── 1084: contact_events — the app writes a random per-tap id (outbox dedupe) ──
     -- A GRANT creates no named object, so only a token sees it. The outbox (utils/logContactEvent.js)
     -- sends its own id and treats a primary-key conflict as "delivered"; without this grant every
@@ -6621,6 +6623,7 @@ WITH report AS (
       WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
     IS NOT DISTINCT FROM ARRAY['accommodation','cars','connectivity','eatery','ehliyet','events','explore','garages','grooming',
                                'homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport']
+    OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261225_contact_events_news.sql') -- NEWS-CONTACT-EVENTS:supersede (one count, one owner: the 20261225 token owns the set once the ledger records it)
   -- 20261166: vehicles in the report flow. Registered ahead of the apply; RED UNTIL IT RUNS.
   UNION ALL SELECT '20261166_vehicles_moderation','auto_hide_reported_content has the vehicle branch (and keeps its five); vehicles_hide_reported RESTRICTIVE; hidden_* guarded',
     COALESCE(pg_get_functiondef(to_regprocedure('public.auto_hide_reported_content()')) LIKE '%NEW.content_type = ''vehicle''%UPDATE vehicles%'

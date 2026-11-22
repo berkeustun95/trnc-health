@@ -91,6 +91,7 @@
     "drift:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs --check",
     "drift:regen": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs",
     "migration:next": "node scripts/check-migration-numbers.mjs --next",
+    "check:contact-events-vocab": "node scripts/check-contact-events-vocab.mjs",
     "check:migration-numbers": "node scripts/preview-lock.mjs --suite check && node scripts/check-migration-numbers.mjs",
     "partners:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-partner-assets.mjs",
     "preview:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-partner-preview.mjs",

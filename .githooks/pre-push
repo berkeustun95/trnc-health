@@ -87,6 +87,14 @@ node scripts/check-migration-numbers.mjs || {
   exit 1
 }
 
+# A migration that rebuilds a contact_events vocabulary CHECK must hand the verify_schema "exactly N" token
+# over to itself, or its apply commits and then goes red (20261225, run 45066684322). The dry run cannot see it.
+node scripts/check-contact-events-vocab.mjs >/dev/null || {
+  node scripts/check-contact-events-vocab.mjs >&2
+  echo "  push blocked: update the contact_events vocabulary tokens in supabase/verify_schema.sql"
+  exit 1
+}
+
 # Explore map pin-source gate. Blocks a push where the map would draw a dark module's
 # content — a leak no flag guard sees, because the flag is still false and only the
 # CONSUMER of it is wrong. See the header of scripts/validate-map-sources.mjs.
