@@ -56,7 +56,7 @@ const EXPECTED_MODULES = {
   duyurular:     true,   // live 2026-10-11 — official announcements (20261102/20261104/20261105)
   ehliyet:       true,   // live 2026-10-14 — driving schools (20261108/20261109/20261110); no waitlist
   cars:          false,  // Araçlar, dark — 20261165/20261166/20261167; Coming Soon + waitlist until live
-  marketplace:   true,   // live 2026-11-12 — Bandabuliya (20261183/84/85 + 20261190); no waitlist
+  marketplace:   false,  // Bandabuliya, dark again 2026-11-22 (was live 2026-11-12; 20261183/84/85 + 20261190); no waitlist
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //
@@ -156,8 +156,8 @@ const WAITLIST_BLAST_DONE = new Set([
   'duyurular',
   'ehliyet',  // 0 signups (read 2026-10-14, supabase/readonly/ehliyet_golive.sql, run 38559171228):
               // no waitlist UI and no ComingSoon screen (NO_WAITLIST), so nothing is owed.
-  'marketplace',  // Bandabuliya, live 2026-11-12: never had a waitlist UI or ComingSoon screen (NO_WAITLIST,
-                  // checked structurally below), so nobody could sign up and nothing is owed.
+  'marketplace',  // Bandabuliya, live 2026-11-12, dark again 2026-11-22: never had a waitlist UI or ComingSoon screen
+                  // (NO_WAITLIST, checked structurally below), so nobody could sign up and nothing is owed.
 ])
 
 const EXPECTED_SCALARS = {
@@ -402,7 +402,7 @@ try {
   // Modules with no Coming Soon screen and no waitlist: nobody can sign up, so nothing is ever
   // notified and the notify path needs no entry. ehliyet (2026-10-13): dark until a flag flip.
   // Remove the entry if it ever gets a waitlist.
-  // marketplace (2026-11-07): hidden tile, Preview unlock only (Berke).
+  // marketplace: live 2026-11-12, dark again from 2026-11-22 (tile hidden, Preview dark too; no Coming Soon).
   const NO_WAITLIST = new Set(['ehliyet', 'marketplace'])
   // The exemption must not mask a real gap: an exempt key has to be a known module, must never
   // reach ComingSoonScreen (that screen takes waitlist signups), and must not be COMING_SOON.

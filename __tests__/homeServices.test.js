@@ -5,10 +5,16 @@
 // switch reads Constants.expoConfig.extra.appVariant), exactly as marketplaceDark.test.js does.
 // Expected counts were DERIVED by printing the lists, not remembered; the rows ride in every failure message.
 
-const load = ({ dev }) => {
+// `marketplace` (Bandabuliya) is forced when given, never read from the repo, so flipping it needs no test edit.
+const load = ({ dev, marketplace }) => {
   jest.resetModules()
   global.__DEV__ = dev
   jest.doMock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: {} } } }))
+  if (marketplace === undefined) jest.dontMock('../constants/flags')
+  else jest.doMock('../constants/flags', () => {
+    const real = jest.requireActual('../constants/flags')
+    return { ...real, MODULE_FLAGS: { ...real.MODULE_FLAGS, marketplace } }
+  })
   return {
     groups: require('../constants/homeGroups'),
     fav: require('../constants/homeFavourites'),
@@ -18,18 +24,19 @@ const load = ({ dev }) => {
 const devBefore = global.__DEV__
 afterAll(() => { global.__DEV__ = devBefore })
 
-// HomeScreen's HOME_UNLOCK on ADA Preview / dev: ehliyet + marketplace. Both flags are live now, so production
-// shows 19; dev adds `cars` (dark in production) for 20.
+// HomeScreen's HOME_UNLOCK on ADA Preview / dev: ehliyet + marketplace. Production shows 19 with Bandabuliya on,
+// 18 with it off (dark again from 2026-11-22); dev adds `cars` (dark in production) for 20.
 const PREVIEW_UNLOCK = new Set(['ehliyet', 'marketplace'])
 
 const LOCKED_FRESH = ['events', 'accommodation', 'exchangeRates', 'newcomerEssentials', 'exploreTab', 'eatery', 'hotels', 'pets']
 
-test('production gates (no unlock): exact count, no hidden or soon tile', () => {
-  const { groups, modules } = load({ dev: false })
+test.each([[true, 19], [false, 18]])('production gates (no unlock), Bandabuliya %s: exact count, no hidden or soon tile', (marketplace, n) => {
+  const { groups, modules } = load({ dev: false, marketplace })
   const list = groups.visibleServiceIds()
   const rows = `\n${list.join('\n')}`
-  expect({ n: list.length, rows }).toEqual({ n: 19, rows })
+  expect({ n: list.length, rows }).toEqual({ n, rows })
   expect(list).not.toContain('cars')
+  expect(list.includes('marketplace')).toBe(marketplace)
   expect(new Set(list).size).toBe(list.length)
   for (const id of list) expect([id, modules.HIDDEN_TILES.has(id)]).toEqual([id, false])
   const soon = groups.liveGroups().flatMap(g => g.modules).filter(m => m.soon).map(m => m.id)
