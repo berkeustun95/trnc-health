@@ -8,7 +8,7 @@ import { notifyAdmins } from './notify'
 // approved photos; the seller sees their own in every state.
 //
 // ─── Preview fixture ────────────────────────────────────────────────────────
-// Before 20261183 is applied the tables do not exist. In dev / ADA Preview (MARKETPLACE on, flag off)
+// Before 20261183 is applied the tables do not exist. In dev (MARKETPLACE on, flag off; ADA Preview only if MARKETPLACE_PREVIEW)
 // a "table / function missing" answer switches this module to an in-memory store so the screens can be
 // walked on a phone; once on, it stays on until the app is reloaded (never switched back). Production
 // never gets here: with MODULE_FLAGS.marketplace false the screens are unreachable, and with it true
