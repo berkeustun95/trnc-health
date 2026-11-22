@@ -6143,6 +6143,12 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_hotelrunner_url_check')
                LIKE '%''^https://\\S+$''::text%<= 2048%', false)
+    -- ── 20261225: contact_events module 'news' (Veles Bit Postası Home banner). DROP/ADD of the
+    --    SAME CHECK name, so the E-section name token cannot see it. Quoted literal, as 'book' above.
+    UNION ALL SELECT '20261225_contact_events_news','contact_events module CHECK permits news',
+      COALESCE(position('''news''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_module_check')) > 0, false)
     -- ── 1084: contact_events — the app writes a random per-tap id (outbox dedupe) ──
     -- A GRANT creates no named object, so only a token sees it. The outbox (utils/logContactEvent.js)
     -- sends its own id and treats a primary-key conflict as "delivered"; without this grant every
