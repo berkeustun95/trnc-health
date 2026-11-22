@@ -32,6 +32,7 @@ import {
 } from '../components/ui'
 import { colors as C, category as CAT, type, radii, elevation, listBottomPad } from '../constants/theme'
 import { withReadableTitle } from '../utils/readableTitle'
+import { feedAdsAllowed } from '../constants/ads'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -668,7 +669,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
   //   to zero two ways here — a category/date filter that matches nothing, and a feed with
   //   no approved rows at all. An ad sitting above "no upcoming events" is worse than no ad:
   //   it is the only content on the screen, so the screen becomes an advert with an apology under it.
-  const topSlot = filtered.length > 0
+  const topSlot = feedAdsAllowed(filtered.length)
     ? <EventsListTopSlot lang={lang} onNavigate={onAdNavigate} />
     : null
   // The list already reserves insets+96 below its content for a FAB that is not visible on

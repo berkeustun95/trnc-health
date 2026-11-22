@@ -3,13 +3,16 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, Linking } from 'react-
 import { t } from '../constants/i18n'
 import { colors } from '../constants/theme'
 import { AD_BANNERS_LIVE } from '../constants/flags'
+import { HOUSE_BANNER } from '../constants/redesign'
 import { fetchAdForSlot } from '../utils/adBanner'
-import { logAdView, logAdTap } from '../utils/logAdEvent'
+import { logAdView, logAdTap, logHouseView, logHouseTap } from '../utils/logAdEvent'
+import { openWorkWithAda } from '../utils/workWithAda'
 import {
   adRatioFor, adSpecFor, AD_RATIO_TOLERANCE, AD_PAGE_INSET,
-  AD_SHOW_SPONSORED_LABEL, AD_SPONSORED_KEY,
+  AD_SHOW_SPONSORED_LABEL, AD_SPONSORED_KEY, AD_HOUSE_PLACEMENTS,
 } from '../constants/ads'
 import { RemoteImage } from './ui'
+import AdHouseBanner from './AdHouseBanner'
 
 // ─── One ad placement. Direct-sold, no SDK, no network, no targeting. ───────
 //
@@ -28,7 +31,11 @@ import { RemoteImage } from './ui'
 //
 // null on every path that is not "an ad is live and renderable": flag off, still loading,
 // nothing sold, a row this bundle cannot honour. The screen then looks exactly as it does
-// today — no reserved space, no house ad, no "advertise here".
+// today — no reserved space, no "advertise here".
+//
+// EXCEPT the two AD_HOUSE_PLACEMENTS (list_bottom/home, list_top/events): when HOUSE_BANNER is on
+// and the slot is confirmed unsold (or ads are not live yet), ADA's own banner shows there ONCE PER
+// APP OPEN. Loading, failed and offline stay zero height, and a paid ad always wins.
 //
 // ─── NON-PERSONALIZED BY CONSTRUCTION ───────────────────────────────────────
 //
@@ -45,16 +52,47 @@ import { RemoteImage } from './ui'
 //   the reasoning, the three rejected component-side fixes and the escape hatch are all in
 //   constants/ads.js. This component deliberately does NOT append a cache-buster: doing so
 //   would make an image fetched on every app open uncacheable forever, to fix a rare event.
+// ─── THE HOUSE BANNER: ONCE PER APP OPEN ────────────────────────────────────
+// Module-level, so it resets only when the JS process does (cold start, OTA reload). Returning from background
+// is not a new open, so there is deliberately no AppState reset. The first mount to claim a placement keeps it
+// for its whole life; any later mount of that placement renders nothing.
+const houseShownThisProcess = new Set()
+
 export default function AdSlot({ position, module, lang, onNavigate }) {
   const [ad, setAd] = useState(null)
+  const [showHouse, setShowHouse] = useState(false)
   const viewed = useRef(null)
+  const houseOwned = useRef(false)
 
   useEffect(() => {
-    if (!AD_BANNERS_LIVE || !position || !module) return
+    if (!position || !module) return
+    const houseKey = `${position}/${module}`
+    const houseEligible = HOUSE_BANNER && AD_HOUSE_PLACEMENTS.includes(houseKey)
+    // Claimed once per mount: an effect, not render (render can run twice or be thrown away), and the ref keeps
+    // an effect re-run of the same mount the owner.
+    const claimHouse = () => {
+      if (!houseEligible) return
+      if (!houseOwned.current) {
+        if (houseShownThisProcess.has(houseKey)) return
+        houseShownThisProcess.add(houseKey)
+        houseOwned.current = true
+      }
+      setShowHouse(true)
+    }
+    // Ads not live: nothing is sold and nothing is queried. An eligible slot shows the house banner, the rest stay empty.
+    if (!AD_BANNERS_LIVE) { claimHouse(); return }
     let alive = true
-    fetchAdForSlot(position, module).then(row => { if (alive) setAd(row) })
+    fetchAdForSlot(position, module).then(res => {
+      if (!alive || res.failed) return          // failed / offline: zero height, never the house banner
+      if (res.row) setAd(res.row)               // sold: paid always wins, uncapped
+      else claimHouse()                         // confirmed unsold
+    })
     return () => { alive = false }
   }, [position, module])
+
+  useEffect(() => {
+    if (showHouse) logHouseView(position, module)
+  }, [showHouse, position, module])
 
   // ─── __DEV__ ONLY: is this the right creative for THIS position? ──────────
   // Two specs now — 3.2:1 for list_top/list_bottom/detail_bottom, 6.4:1 for list_inline —
@@ -81,6 +119,20 @@ export default function AdSlot({ position, module, lang, onNavigate }) {
       () => {},
     )
   }, [ad, position, module])
+
+  if (showHouse) {
+    return (
+      <AdHouseBanner
+        position={position}
+        lang={lang}
+        onPress={() => {
+          // Counted BEFORE the page opens, same rule as a paid tap; neither call can throw.
+          logHouseTap(position, module)
+          openWorkWithAda(lang)
+        }}
+      />
+    )
+  }
 
   if (!AD_BANNERS_LIVE || !ad) return null
 

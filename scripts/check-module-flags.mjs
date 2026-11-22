@@ -219,6 +219,7 @@ const EXPECTED_SCALARS = {
   // that map's WAITLIST_BLAST_DONE and notify-path checks would fail against a perfectly
   // correct app. Same resolution as HOME_V2_LIVE and PROFILE_GATE_LIVE.
   AD_BANNERS_LIVE:       false,
+  AD_HOUSE_BANNER_LIVE:  false,
   // Ev Hizmetleri partner preview (dev-only). It is dead-coded out of a release bundle by
   // `__DEV__ &&`, so unlike every scalar above it a flip cannot reach a user through the
   // app at all. It is baselined anyway, and the reason is worth stating: the fold happens

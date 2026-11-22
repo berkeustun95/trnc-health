@@ -11,7 +11,7 @@ import { CAN_RESET_ONBOARDING } from '../../utils/previewTools'
 // The drawer is gone; everything it held lives here, in four groups. Every row calls an
 // App.js handler, so a setting behaves the same wherever else it might be reached.
 // `a` = actions: { onLanguage, onCityWelcome, onNotifications, onContact, onRate, onShare,
-//                  onTutorial, onLegal, onAbout, onSignOut, onDeleteAccount?, onResetOnboarding? }
+//                  onTutorial, onWorkWithAda, onLegal, onAbout, onSignOut, onDeleteAccount?, onResetOnboarding? }
 function Group({ title, children }) {
   return (
     <View style={s.group}>
@@ -37,6 +37,7 @@ export function SettingsGroups({ lang, a, isGuest = false }) {
         {row('star-outline', 'homeLife', 'hrRowRate', a.onRate)}
         {row('share-social-outline', 'homeLife', 'hrRowShare', a.onShare)}
         {row('compass-outline', 'homeLife', 'hrRowTutorial', a.onTutorial)}
+        {row('briefcase-outline', 'homeLife', 'hrRowWorkWithAda', a.onWorkWithAda)}
       </Group>
       <Group title={t('hrSetLegal', lang)}>
         {row('document-text-outline', 'explore', 'hrRowLegal', a.onLegal)}

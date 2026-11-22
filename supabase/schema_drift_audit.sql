@@ -1169,6 +1169,11 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('admin_push_sends', 'push_ok', false, NULL, 'integer'),
     ('admin_push_sends', 'push_errors', false, NULL, 'integer'),
     ('admin_push_sends', 'error_kinds', false, NULL, 'jsonb'),
+    ('ad_house_daily', 'day', true, NULL, 'date'),
+    ('ad_house_daily', 'position', true, NULL, 'text'),
+    ('ad_house_daily', 'module', true, NULL, 'text'),
+    ('ad_house_daily', 'view_count', true, '0', 'bigint'),
+    ('ad_house_daily', 'tap_count', true, '0', 'bigint'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1183,6 +1188,10 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_position_check', 'detail_bottom|list_bottom|list_inline|list_top', 'position'),
     ('ad_banners_route_check', 'accommodation|beaches|esim|events|exchangeRates|explore|games|garages|grooming|homeServices|insurance|jobPostings|municipal|newcomerEssentials|pets|studentHub|towing|transport', 'route'),
     ('ad_banners_window_check', '', 'ends_at|starts_at'),
+    ('ad_house_daily_counts_check', '0', 'tap_count|view_count'),
+    ('ad_house_daily_module_fkey', '', 'module'),
+    ('ad_house_daily_pkey', '', 'day|module|position'),
+    ('ad_house_daily_position_check', 'detail_bottom|list_bottom|list_inline|list_top', 'position'),
     ('ad_modules_pkey', '', ''),
     ('admin_push_sends_error_kinds_check', 'object', 'error_kinds'),
     ('admin_push_sends_kind_check', 'broadcast|duty_swap', 'kind'),

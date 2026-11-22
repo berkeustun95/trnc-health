@@ -154,6 +154,7 @@ import OliSearchSheet from './components/OliSearchSheet'
 import OliChatSheet, { OliErrorBoundary } from './components/OliChatSheet'
 import { EmergencySheet, MunicipalSheet, LanguageSheet, AboutSheet } from './components/shell/Sheets'
 import { SettingsGroups, GuestProfile } from './components/shell/Settings'
+import { openWorkWithAda } from './utils/workWithAda'
 import { ConfirmDialog } from './components/ui'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
@@ -3075,6 +3076,7 @@ export default function App() {
       onRate:          rateApp,
       onShare:         shareApp,
       onTutorial:      () => startCoachMarks(),
+      onWorkWithAda:   () => openWorkWithAda(lang),
       onLegal:         () => setShowLegal(true),
       onAbout:         () => setShowAboutSheet(true),
       onSignOut:       () => setSignOutAsk(isGuest(session) ? 'guest' : 'user'),

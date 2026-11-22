@@ -137,6 +137,14 @@
       "since": "2026-11-22",
       "cleared": false,
       "clear": "Only after Berke has seen the banner on ADA Preview (Turkish and one non-Turkish UI, the compact hero on a short screen, the tap opening Veles) and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #541 is held."
+    },
+    {
+      "pr": 546,
+      "commit": "778c83cb28a321e6432cc73934923b00f798975b",
+      "what": "House banner (Home bottom + Events top, flag AD_HOUSE_BANNER_LIVE off) and the ungated 'ADA ile çalışın' Settings row, merged to main 2026-11-22",
+      "since": "2026-11-22",
+      "cleared": false,
+      "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before the flag flips. Then set cleared to true in a PR."
     }
   ]
 }

@@ -309,3 +309,14 @@ export const AD_INLINE_RULE_HAIRLINE = 1
 // this whole slice adds NO new string and cannot drift from the strip's word.
 export const AD_SHOW_SPONSORED_LABEL = true
 export const AD_SPONSORED_KEY = 'stripSponsored'
+
+// ─── ADA's own house banner ─────────────────────────────────────────────────
+// The only placements that may show it, as `position/module`, when the slot is confirmed UNSOLD (or ads are not live yet).
+// Never list_inline (a strip among listings) or detail_bottom (end of a detail screen, health surfaces sit next to them).
+// scripts/check-ad-placement.mjs keeps every entry a real AD_PLACEMENTS pair. Shown once per app open (components/AdSlot.js).
+export const AD_HOUSE_PLACEMENTS = ['list_bottom/home', 'list_top/events']
+export const AD_HOUSE_URL_TR = 'https://getadaapp.com/tr/ada-ile-calisin'
+export const AD_HOUSE_URL_EN = 'https://getadaapp.com/en/work-with-ada'
+
+// A list-top / list-bottom slot may mount only over a non-empty feed ("an ad above 'no upcoming events' is worse than none").
+export const feedAdsAllowed = count => count > 0
