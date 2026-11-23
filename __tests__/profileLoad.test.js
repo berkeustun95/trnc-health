@@ -112,3 +112,26 @@ test('the profile-failed branch sits BEFORE both (loading || !profile) branches'
   const comp = at(src, 'function ProfileLoadFailedScreen(', 'comp')
   expect(comp).toBeLessThan(at(src, 'export default function App()', 'App'))
 })
+
+test('loadProfile applies a result only for the newest call (sequence guard)', () => {
+  const start = at(src, 'async function loadProfile(', 'loadProfile')
+  const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
+  expect(fn).toContain('const seq = ++profileLoadSeqRef.current')
+  expect(fn).toContain('seq !== profileLoadSeqRef.current')
+  expect(fn.indexOf('seq !== profileLoadSeqRef.current')).toBeLessThan(fn.indexOf('setProfileLoadFailedUid(uid)'))
+})
+
+test('a failed reload with a row already held for the same uid does not set the failed uid', () => {
+  const start = at(src, 'async function loadProfile(', 'loadProfile')
+  const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
+  expect(fn).toContain('if (heldProfileUidRef.current !== uid) setProfileLoadFailedUid(uid)')
+  expect(fn).toContain('heldProfileUidRef.current = session.user.id')
+  expect(src).toContain('heldProfileUidRef.current = null; setNotifications([])')
+})
+
+test('both Onboarding v2 spinners sit on PageCanvas, not the legacy colors.bg View', () => {
+  const spin = '<PageCanvas><SplashStatusBar style="dark" /><View style={styles.centerOnPage}><ActivityIndicator'
+  expect(src.split(spin).length - 1).toBe(2)
+  expect(src).toMatch(/centerOnPage:\s+\{[^}]*\}/)
+  expect(src.match(/centerOnPage:\s+\{[^}]*\}/)[0]).not.toContain('backgroundColor')
+})

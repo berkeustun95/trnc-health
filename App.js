@@ -927,6 +927,8 @@ export default function App() {
   const wxCoachTriedRef    = useRef(false)  // the deferred weather coach mark: once per launch
   const menuAnim = useRef(new Animated.Value(260)).current
   const sessionRef = useRef(null)
+  const profileLoadSeqRef = useRef(0)
+  const heldProfileUidRef = useRef(null)
   const toSignUpRef = useRef(false)
   // The onboarding step as last rendered (the back chain reads it; it is derived below that hook), and the
   // DEVICE language for guest push saves: the device copy, not the server-first `lang`, so a failed
@@ -1601,15 +1603,19 @@ export default function App() {
   async function loadProfile(session) {
     const uid = session.user.id
     const isCurrent = () => sessionRef.current?.user?.id === uid
+    // Every TOKEN_REFRESHED re-runs this for the same uid; only the newest call may apply a result.
+    const seq = ++profileLoadSeqRef.current
     const { data, error } = await loadWithRetry(
       () => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).single(),
       { isCurrent },
     )
-    if (!isCurrent()) return
-    if (error || !data) { setProfileLoadFailedUid(uid); return }
+    if (!isCurrent() || seq !== profileLoadSeqRef.current) return
+    // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
+    if (error || !data) { if (heldProfileUidRef.current !== uid) setProfileLoadFailedUid(uid); return }
     setProfileLoadFailedUid(null)
     setProfile(data ?? null)
     setProfileUid(session.user.id)
+    heldProfileUidRef.current = session.user.id
 
     // Language self-heal (SERVER column only — in-app already resolves a NULL
     // column via pendingLang since the L1 migration). A pre-auth/onboarding
@@ -1658,7 +1664,7 @@ export default function App() {
       setShowNotifs(false)
     }
     if (!session) {
-      setProfile(null); setProfileUid(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
+      setProfile(null); setProfileUid(null); heldProfileUidRef.current = null; setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
     setProfileLoadFailedUid(null)
     loadProfile(session)
@@ -2348,7 +2354,7 @@ export default function App() {
   } else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {
     // Onboarding v2: Screen 2 comes next (or may, after Giriş yap), so a Home-shaped skeleton here would flash
     // a screen the user is not going to.
-    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+    content = <PageCanvas><SplashStatusBar style="dark" /><View style={styles.centerOnPage}><ActivityIndicator size="large" color={colors.primary} /></View></PageCanvas>
   } else if (loading || !profile) {
     content = (
       <PageCanvas>
@@ -2402,7 +2408,7 @@ export default function App() {
     content = <AgeIneligibleScreen lang={lang} />
   } else if (onbStep === 'wait') {
     // Onboarding v2: the held profile is not this session's yet; Screen 2 or Home is decided once it is.
-    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+    content = <PageCanvas><SplashStatusBar style="dark" /><View style={styles.centerOnPage}><ActivityIndicator size="large" color={colors.primary} /></View></PageCanvas>
   } else if (onbStep === 'duty') {
     // Onboarding v2 Screen 2. After the wizard in the FLOW although above it here: decideOnboardingStep never
     // returns 'duty' while gateActive or ageIneligible holds (the wizard runs first and hands 'signup' on as
@@ -3848,6 +3854,7 @@ const styles = StyleSheet.create({
   boneOnPage:       { backgroundColor: colors.card },   // a bare bone (colors.border) vanishes on PageCanvas
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  centerOnPage:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header:           { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
   headerLogoWrap:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
   wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
