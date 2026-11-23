@@ -80,7 +80,10 @@ is reported as `renamed`. The pin is copied to `dovec_projects.latitude` / `long
 the feed upsert never names those columns, so a sync cannot clear a pin.
 Caveat: `mapProject` trims the feed's name before storing it, so the comparison is against the STORED (trimmed) name: a feed name with
 stray outer spaces still attaches. Spelling, case or inner differences never do.
-Readable by: the service role only (the sync response, `dovec-health`, a service-key probe). No app role can read the seed table or the status.
+Readable by: `dovec_coord_status()` is executable by anon, authenticated and the service role (read-only; it returns only seed names, Döveç
+project names and ids, and a status word: no lead, user or count data). The seed table itself and `dovec_sync_coords()` stay service-role only.
+After the first sync, read the match with `select * from dovec_coord_status();` in the SQL editor, or a REST rpc call
+(`POST /rest/v1/rpc/dovec_coord_status` with the anon key as `apikey`). Empty `unmatched`, `renamed` and `live_without_coords` = all five pinned.
 
 ## The test enquiry (prepared here, never sent by any of these steps)
 

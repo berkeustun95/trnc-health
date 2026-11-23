@@ -2466,7 +2466,7 @@ WITH report AS (
                        AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_forget_user()')), false)
-    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, service_role only',
+    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, EXECUTE for anon, authenticated and service_role (read-only: seed names, project names and ids, a status word; no lead or user data), no PUBLIC',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_project_coords')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_project_coords') = 0
       AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, to_regclass('public.dovec_project_coords'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -2491,7 +2491,7 @@ WITH report AS (
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_sync_coords') = 1
       AND COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
                        AND has_function_privilege('service_role', p.oid, 'EXECUTE')
-                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_status()')), false)
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_coord_status') = 1

@@ -12,7 +12,7 @@
 --   dovec_leads      one row per enquiry. No policy and no grant for any app role: edge functions only. At most ONE row may be
 --                    the agreed test enquiry (is_test, external_id 'TEST-1'); see "THE TEST ENQUIRY" below.
 --   dovec_project_coords  five seeded map pins (the feed carries no coordinates) and their attachment state; edge functions only.
---   dovec_sync_coords() / dovec_coord_status()  attach a pin to a project by EXACT name and report what is unmatched; service role only.
+--   dovec_sync_coords() / dovec_coord_status()  attach a pin to a project by EXACT name and report what is unmatched; sync is service role only, status is read-only for anon and authenticated.
 --   dovec_feed_is_fresh()       STABLE helper the dovec_projects read policy calls.
 --   dovec_lead_counts()         admin-only counts per project / month / status. No personal field.
 --   dovec_leads_wipe_pii()      90-day retention (service role / cron only).
@@ -44,8 +44,9 @@
 --   dovec_project_coords
 --     RLS is on and there are ZERO policies; anon and authenticated hold no privilege. The service role may SELECT only; the
 --     rows change through dovec_sync_coords() (SECURITY DEFINER, EXECUTE service_role only), never by a client write.
---     dovec_coord_status() (service_role only) lists unmatched seeds, renamed projects and live projects without a pin: public
---     marketing names and Döveç ids, no user data. The latitude / longitude that the app reads are copied onto
+--     dovec_coord_status() (EXECUTE for anon, authenticated and service_role, read-only STABLE) lists unmatched seeds, renamed projects and live projects without a pin: public
+--     marketing names, Döveç ids and a status word, no lead, user or count data. It is open so the pin match can be read
+--     without a service key. The latitude / longitude that the app reads are copied onto
 --     dovec_projects, which the existing read policy already covers.
 --
 -- COORDINATES (the feed has none)
@@ -311,9 +312,9 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.dovec_coord_status() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.dovec_coord_status() FROM PUBLIC, anon, authenticated;  -- re-granted below: read-only, names/ids/status only
 REVOKE ALL ON FUNCTION public.dovec_sync_coords() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO service_role;
+GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role;
 
 -- ─── 3. dovec_leads ────────────────────────────────────────────────────────
@@ -601,7 +602,13 @@ BEGIN
   END IF;
 
   -- 7d. Function grants (aclexplode, so a missing grant reads as absent).
-  FOREACH v_t IN ARRAY ARRAY['public.dovec_sync_coords()','public.dovec_coord_status()'] LOOP
+  IF to_regprocedure('public.dovec_coord_status()') IS NULL THEN RAISE EXCEPTION 'dovec_coord_status() is missing'; END IF;
+  IF NOT (has_function_privilege('anon', 'public.dovec_coord_status()', 'EXECUTE') AND has_function_privilege('authenticated', 'public.dovec_coord_status()', 'EXECUTE')
+          AND has_function_privilege('service_role', 'public.dovec_coord_status()', 'EXECUTE'))
+     OR EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = to_regprocedure('public.dovec_coord_status()') AND a.grantee = 0) THEN
+    RAISE EXCEPTION 'dovec_coord_status() must be executable by anon, authenticated and service_role and not PUBLIC';
+  END IF;
+  FOREACH v_t IN ARRAY ARRAY['public.dovec_sync_coords()'] LOOP
     IF to_regprocedure(v_t) IS NULL THEN RAISE EXCEPTION '% is missing', v_t; END IF;
     IF has_function_privilege('anon', v_t, 'EXECUTE') OR has_function_privilege('authenticated', v_t, 'EXECUTE')
        OR EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = to_regprocedure(v_t) AND a.grantee = 0) THEN
@@ -989,7 +996,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261229_dovec_projects.sql', '0550d478e1279be063b1230233b24624e3aa2523d9f77e2cf45cf73538503f47')
+VALUES ('20261229_dovec_projects.sql', '0f2521d32106d8a20cad0e0f5ebeed6b4a43accbcad4d819d21a50bfff53477b')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

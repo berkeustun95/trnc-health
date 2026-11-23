@@ -287,8 +287,15 @@ const pinOf = async (d, id) => (await d.query(`SELECT latitude::float8 la, longi
   // who may call what (every denial beside a positive control)
   t('anon cannot run the pin sync', (await asRole(d, 'anon', null, `SELECT public.dovec_sync_coords()`)).ok, false)
   t('a signed-in user cannot run the pin sync', (await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_sync_coords()`)).ok, false)
-  t('anon / signed-in cannot read the status or the table', [(await asRole(d, 'anon', null, `SELECT public.dovec_coord_status()`)).ok, (await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_coord_status()`)).ok,
-    (await asRole(d, 'anon', null, `SELECT 1 FROM public.dovec_project_coords`)).ok, (await asRole(d, 'authenticated', OTHER, `SELECT 1 FROM public.dovec_project_coords`)).ok], [false, false, false, false])
+  t('anon / signed-in cannot read the pin table', [(await asRole(d, 'anon', null, `SELECT 1 FROM public.dovec_project_coords`)).ok, (await asRole(d, 'authenticated', OTHER, `SELECT 1 FROM public.dovec_project_coords`)).ok], [false, false])
+  {
+    const a = await asRole(d, 'anon', null, `SELECT public.dovec_coord_status() AS s`)
+    const u = await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_coord_status() AS s`)
+    t('anon / signed-in can read the pin status (read-only)', [a.ok, u.ok], [true, true])
+    const s = a.rows?.[0]?.s
+    t('the status has exactly the three lists and nothing else', s && Object.keys(s).sort(), ['live_without_coords', 'renamed', 'unmatched'])
+    t('every status entry carries only names, ids and a status word', s && Object.values(s).flat().every(e => Object.keys(e).every(k => ['seed', 'reason', 'project_id', 'name', 'id'].includes(k))), true)
+  }
   t('service_role can read both (positive control)', [(await svcq(d, `SELECT public.dovec_coord_status()`)).ok, (await svcq(d, `SELECT 1 FROM public.dovec_project_coords`)).ok], [true, true])
   t('service_role cannot write the table directly', (await svcq(d, `UPDATE public.dovec_project_coords SET latitude = 1`)).ok, false)
   t('anon reads the pin through the project row once the feed is fresh (positive control)', await (async () => {
@@ -343,6 +350,7 @@ for (const [name, from, to, re] of [
   ['counts open to non-admins', `IF NOT is_admin() THEN`, `IF false THEN`, /not refused with ADMIN_ONLY/],
   ['pin match folds case and trims', `WHERE p.listed AND p.name COLLATE "C" = s.seed_name COLLATE "C"`, `WHERE p.listed AND lower(btrim(p.name)) = lower(s.seed_name)`, /near-miss was attached or mis-reported/],
   ['pins readable by anon', `GRANT SELECT ON TABLE public.dovec_project_coords TO service_role;`, `GRANT SELECT ON TABLE public.dovec_project_coords TO service_role, anon;`, /holds a privilege on dovec_project_coords/],
+  ['pin status closed to anon again', `GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO anon, authenticated, service_role;`, `GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO service_role;`, /dovec_coord_status\(\) must be executable/],
   ['pin sync executable by anon', `GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role;`, `GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role, anon;`, /dovec_sync_coords\(\) is executable by an app role/],
   ['a policy appears on the pins table', `ALTER TABLE public.dovec_project_coords ENABLE ROW LEVEL SECURITY;`, `ALTER TABLE public.dovec_project_coords ENABLE ROW LEVEL SECURITY;\nCREATE POLICY leak ON public.dovec_project_coords FOR SELECT TO anon USING (true);`, /carries 1 policies/],
   ['a sixth pin is seeded', `('Long Beach Panorama', 35.2572000, 33.8945000)\nON CONFLICT`, `('Long Beach Panorama', 35.2572000, 33.8945000), ('Extra', 35.0, 33.0)\nON CONFLICT`, /not exactly the five agreed pins|seeds: 6/],
