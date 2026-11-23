@@ -5,6 +5,16 @@ ADA es la guía y el asistente todo en uno para residentes, estudiantes y recié
 - Mapa Explorar – lugares, cafés, restaurantes, playas y rutas a pie por la ciudad
 - Eventos – conciertos, festivales, teatro e información de entradas
 - Inmuebles y alojamiento – viviendas en venta, alquiler, estancias cortas y residencias de estudiantes
+- Hoteles – hoteles del norte de Chipre con sus datos de contacto
+- Comida y bebida – consulta menús, prepara tu cesta y haz tu pedido
+- Anuncios oficiales – oposiciones, vacantes, becas y licitaciones, cada uno con el enlace a su fuente oficial
+- Student Hub – universidades, portales de estudiantes y lo básico de la vida estudiantil
+- Línea móvil – elige tu eSIM, línea y paquete antes de llegar a Chipre
+- Tipos de cambio – tipos oficiales del Banco Central y calculadora de divisas
+- Check-in – haz check-in en lugares y descubre qué pasa en la ciudad
+- Oli – haz una pregunta y Oli responde con la información de ADA
+- Grúa y asistencia en carretera – empresas que dan servicio en tu zona
+- Permiso de conducir – sedes de autoescuelas y clases de permiso
 - Reformas y mantenimiento – profesionales y empresas de confianza
 - Mascotas – veterinarios y hoteles para mascotas
 

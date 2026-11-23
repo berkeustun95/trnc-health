@@ -5,6 +5,16 @@ ADA est le guide et assistant tout-en-un pour les résidents, étudiants et nouv
 - Carte Explorer – lieux, cafés, restaurants, plages et itinéraires de promenade en ville
 - Événements – concerts, festivals, théâtre et infos billetterie
 - Immobilier et séjours – biens à vendre, locations, courts séjours et résidences étudiantes
+- Hôtels – les hôtels de Chypre du Nord avec leurs coordonnées
+- Restauration – parcourez les menus, préparez votre panier et commandez
+- Annonces officielles – concours, postes vacants, bourses et appels d'offres, chacun avec le lien vers sa source officielle
+- Student Hub – universités, portails étudiants et l'essentiel de la vie étudiante
+- Ligne mobile – choisissez votre eSIM, votre ligne et votre forfait avant d'arriver à Chypre
+- Taux de change – taux officiels de la Banque centrale et convertisseur de devises
+- Check-in – faites un check-in dans les lieux et voyez ce qui se passe en ville
+- Oli – posez une question, Oli répond avec les informations d'ADA
+- Dépannage et remorquage – les entreprises qui desservent votre secteur
+- Permis de conduire – agences d'auto-école et catégories de permis
 - Travaux et entretien – artisans et entreprises de confiance
 - Animaux – vétérinaires et pensions pour animaux
 

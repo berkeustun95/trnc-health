@@ -5,6 +5,16 @@ ADA is the all-in-one city guide and assistant for residents, students and newco
 - Explore map – places, cafés, restaurants, beaches and city walking routes
 - Events – concerts, festivals, theatre and ticket info
 - Property & stays – homes for sale, rentals, short stays and student dorms
+- Hotels – hotels across North Cyprus with their contact details
+- Food & drink – browse menus, build your basket and order
+- Announcements – exams, job vacancies, scholarships and tenders, each linked to its official source
+- Student Hub – universities, student portals and the basics of student life
+- Mobile line – choose your eSIM, line and package before you land in Cyprus
+- Exchange rates – Central Bank of the TRNC rates and a currency calculator
+- Check-in – check in at places and see what's happening around the city
+- Oli – ask a question and Oli answers from ADA's own information
+- Towing & roadside assistance – companies serving your area
+- Driving licence – driving school branches and licence classes
 - Repairs & maintenance – trusted tradespeople and companies
 - Pets – vets and pet hotels
 

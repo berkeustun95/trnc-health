@@ -5,6 +5,16 @@ ADA, Kuzey Kıbrıs'ta (KKTC) yaşayanlar, öğrenciler ve yeni gelenler için h
 - Keşfet haritası – mekanlar, kafeler, restoranlar, plajlar ve şehir yürüyüş rotaları
 - Etkinlikler – konserler, festivaller, tiyatro ve bilet bilgileri
 - Emlak ve konaklama – satılık, kiralık, kısa süreli evler ve öğrenci yurtları
+- Oteller – Kuzey Kıbrıs'taki oteller ve iletişim bilgileri
+- Yeme-İçme – menülere göz at, sepetini hazırla ve sipariş ver
+- Duyurular – sınavlar, münhaller, burslar ve ihaleler; her biri resmî kaynağına bağlantılı
+- Student Hub – üniversiteler, öğrenci portalları ve öğrenci hayatının temelleri
+- Mobil Hat – Kıbrıs'a gelmeden eSIM, hat ve paketini seç
+- Döviz kurları – KKTC Merkez Bankası kurları ve kur hesaplama
+- Check-in – mekanlarda check-in yap, şehirde neler olduğunu gör
+- Oli – sorunu yaz, Oli ADA'nın kendi bilgileriyle cevaplasın
+- Çekici ve yol yardımı – bölgene hizmet veren firmalar
+- Ehliyet – sürücü kursu şubeleri ve ehliyet sınıfları
 - Tadilat, bakım, onarım – güvenilir ustalar ve firmalar
 - Evcil hayvanlar – veterinerler ve pet otelleri
 
