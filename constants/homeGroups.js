@@ -105,6 +105,17 @@ export function liveGroups(unlocked) {
     .filter(g => g.modules.length > 0)
 }
 
+// Nöbetçi Eczane and Acil already sit as tiles at the top of Home, so the "Tüm hizmetler" panels leave
+// them out (audit D-01, Berke 2026-11-23). They stay in HOME_GROUPS on purpose: that keeps their
+// category colour and keeps them in visibleServiceIds, so a favourite the user pinned still shows.
+export const ON_HOME_TOP = new Set(['duty', 'emergency'])
+
+export function panelGroups(unlocked) {
+  return liveGroups(unlocked)
+    .map(g => ({ ...g, modules: g.modules.filter(m => !ON_HOME_TOP.has(m.id)) }))
+    .filter(g => g.modules.length > 0)
+}
+
 // The ONE visibility source: Home's favourites, the count of services, the "Tüm hizmetler"
 // screen and the picker all read this. Group order, ids only, "Yakında" tiles excluded.
 export function visibleServiceIds(unlocked) {
