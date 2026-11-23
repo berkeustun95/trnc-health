@@ -298,6 +298,9 @@ name joined to a clinic review is a health disclosure about an identified person
   `onLayout` positions; measure with `measureRef()` when needed.
 - Reinstall does NOT reset first-run state (Auto Backup restores AsyncStorage) — a test artifact, not
   a bug. Use Clear storage or `adb shell pm clear com.berkeustun95.ada`; `EXPO_PUBLIC_DEV_ONBOARDED`.
+- **Mark test phones (Berke, 2026-11-23):** after EVERY reset (`pm clear`, Clear storage, reinstall), before the first
+  launch: `adb shell am start -a android.intent.action.VIEW -d ada://test-device com.berkeustun95.ada` (sets
+  `@ada_test_device`; the production app then sends no onboarding_events). iPhone: Safari → `ada://test-device` → Open.
 
 ## Geocoding — storage policy (revised 2026-09-29)
 - **Google Places pins are an ACCEPTED KNOWN RISK for pharmacies and hotels** (breaks Places' 30-day
