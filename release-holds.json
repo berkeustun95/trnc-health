@@ -205,6 +205,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after Berke has seen the content on Preview (video 2026-11-23) and says go in chat for the house-banner go-live. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 561,
+      "commit": "4fe14b454e8fe8cce33feea9e9c49e6e4716c175",
+      "what": "Onboarding v2 follow-ups: profile-read retry + Retry screen, profile-load timeouts (no endless skeleton), onboarding events from production builds and first-time phones only, 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined Preview built from main with this PR and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
     }
   ]
 }
