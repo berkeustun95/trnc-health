@@ -2207,9 +2207,9 @@ WITH report AS (
     -- 1228-BEGIN
     -- 20261228 KTFF tables + ktff_sync_due: red until applied, never an error (to_regclass / catalogs / COALESCE).
     -- Public data, so anon and authenticated read the three display tables and nobody but service_role touches ktff_sync_state.
-    UNION ALL SELECT '20261228_live_scores_ktff','ktff_*: RLS on all four; exactly three policies (ktff_{leagues,standings,fixtures}_select_public: one permissive SELECT, anon + authenticated, USING true) and none on ktff_sync_state; anon/authenticated SELECT the three and nothing else; no write-class grant on any; ktff_sync_state unreadable to clients (table and column level); service_role writes all four; no PUBLIC',
-      COALESCE((SELECT count(*) = 4 AND bool_and(c.relrowsecurity)
-                  FROM pg_class c WHERE c.oid IN (to_regclass('public.ktff_leagues'), to_regclass('public.ktff_standings'), to_regclass('public.ktff_fixtures'), to_regclass('public.ktff_sync_state'))), false)
+    UNION ALL SELECT '20261228_live_scores_ktff','ktff_*: RLS on all five; exactly three policies (ktff_{leagues,standings,fixtures}_select_public: one permissive SELECT, anon + authenticated, USING true) and none on ktff_sync_state or ktff_logo_failures; anon/authenticated SELECT the three and nothing else; no write-class grant on any; ktff_sync_state and ktff_logo_failures unreadable to clients (table and column level); service_role writes all five; no PUBLIC',
+      COALESCE((SELECT count(*) = 5 AND bool_and(c.relrowsecurity)
+                  FROM pg_class c WHERE c.oid IN (to_regclass('public.ktff_leagues'), to_regclass('public.ktff_standings'), to_regclass('public.ktff_fixtures'), to_regclass('public.ktff_sync_state'), to_regclass('public.ktff_logo_failures'))), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename LIKE 'ktff\_%') = 3
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ktff_sync_state') = 0
       AND (SELECT count(*) FROM pg_policies p
@@ -2221,12 +2221,14 @@ WITH report AS (
       AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, t.o, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                                     AND NOT has_any_column_privilege(r.n, t.o, 'INSERT,UPDATE'))
                       FROM (VALUES ('anon'), ('authenticated')) r(n),
-                           (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures')), (to_regclass('public.ktff_sync_state'))) t(o)), false)
+                           (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures')), (to_regclass('public.ktff_sync_state')), (to_regclass('public.ktff_logo_failures'))) t(o)), false)
       AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, to_regclass('public.ktff_sync_state'), 'SELECT')
-                                    AND NOT has_any_column_privilege(r.n, to_regclass('public.ktff_sync_state'), 'SELECT'))
+                                    AND NOT has_any_column_privilege(r.n, to_regclass('public.ktff_sync_state'), 'SELECT')
+                                    AND NOT has_table_privilege(r.n, to_regclass('public.ktff_logo_failures'), 'SELECT')
+                                    AND NOT has_any_column_privilege(r.n, to_regclass('public.ktff_logo_failures'), 'SELECT'))
                       FROM (VALUES ('anon'), ('authenticated')) r(n)), false)
       AND COALESCE((SELECT bool_and(has_table_privilege('service_role', t.o, 'SELECT,INSERT,UPDATE,DELETE'))
-                      FROM (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures')), (to_regclass('public.ktff_sync_state'))) t(o)), false)
+                      FROM (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures')), (to_regclass('public.ktff_sync_state')), (to_regclass('public.ktff_logo_failures'))) t(o)), false)
       AND NOT EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a
                        WHERE c.relname LIKE 'ktff\_%' AND c.relnamespace = 'public'::regnamespace AND c.relkind = 'r' AND a.grantee = 0)
     UNION ALL SELECT '20261228_live_scores_ktff','ktff_sync_due(): one overload, INVOKER, search_path pinned, STABLE; EXECUTE service_role only (no anon, authenticated, PUBLIC); body gates on the standings next_allowed_at, the 6-hour freshness and the -150 / +30 minute kickoff window',

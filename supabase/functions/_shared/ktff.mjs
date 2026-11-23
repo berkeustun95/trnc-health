@@ -68,7 +68,8 @@ export function ktffLogoSource(v) {
   if (u.protocol !== 'https:' || u.username !== '' || u.password !== '' || u.port !== '') return null
   const h = u.hostname.toLowerCase()
   if (h !== 'ktff.org' && !h.endsWith('.ktff.org')) return null
-  return u.toString()
+  const out = u.toString()
+  return out.length > 500 ? null : out
 }
 
 const cleanWeek = v => (Number.isInteger(v) && v >= 1 && v <= MAX_WEEK ? v : null)

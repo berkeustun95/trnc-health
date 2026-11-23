@@ -23,6 +23,7 @@ eq([cleanText(''), cleanText('   '), cleanText(5), cleanText(null)], [null, null
 eq([cleanInt(3), cleanInt(-7), cleanInt('3'), cleanInt(1.5), cleanInt(null), cleanInt(2 ** 40)], [3, -7, null, null, null, null], 'ints')
 eq([cleanColor('#00FF7a'), cleanColor('00ff7a'), cleanColor('#0f0'), cleanColor('#00ff7aff'), cleanColor(null)], ['#00FF7a', null, null, null, null], 'colours')
 eq(ktffLogoSource('https://ktff.org/storage/a.png'), 'https://ktff.org/storage/a.png', 'ktff.org logo kept')
+eq(ktffLogoSource('https://ktff.org/' + 'é'.repeat(100)), null, 'logo refused when the normalised (percent-encoded) URL exceeds 500')
 for (const bad of ['http://ktff.org/a.png', 'https://evilktff.org/a.png', 'https://ktff.org.evil.com/a.png', 'https://user:p@ktff.org/a.png',
   'https://ktff.org:8443/a.png', 'https://127.0.0.1/a.png', 'https://example.com/a.png', '/storage/a.png', '', null, 'javascript:alert(1)'])
   eq(ktffLogoSource(bad), null, `logo source refused: ${bad}`)
