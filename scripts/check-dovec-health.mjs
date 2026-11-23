@@ -10,6 +10,7 @@
 //   stale                no good sync for more than 30 minutes (the cron runs every 10)
 //   stuck                an enquiry has waited for a send (retry / pending) for over an hour
 //   rejected             an enquiry was rejected by Döveç or failed for good in the last 24 hours
+// The one agreed test enquiry (is_test) is never read here: it has its own report (workflow dovec-test-lead).
 // Map pins (informational, NEVER red): prints dovec_coord_status() (seeded pins not attached, attached projects renamed since,
 // live projects without a pin). Public marketing names and Döveç project ids only, no user data; a missing function (20261229
 // not applied) or a read error is printed, not failed.
@@ -31,7 +32,7 @@ if (error) { console.error('read failed:', error.message); process.exit(2) }
 if (!s) { console.error('::error::dovec_settings has no row (is 20261229 applied?)'); process.exit(1) }
 
 const exists = async (build) => {
-  const { data, error: e } = await build(sb.from('dovec_leads').select('id').limit(1))
+  const { data, error: e } = await build(sb.from('dovec_leads').select('id').eq('is_test', false).limit(1))
   if (e) { console.error('read failed:', e.message); process.exit(2) }
   return (data ?? []).length > 0
 }
