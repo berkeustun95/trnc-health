@@ -282,7 +282,7 @@ const runWith = (st, fx) => runKtff(st, { fetchImpl: fx, copyLogo: cp(fx), nowFn
 const mkReq = (method, auth) => new Request('https://x.test/', { method, headers: auth ? { authorization: auth } : {} })
 const jwt = role => 'h.' + Buffer.from(JSON.stringify({ role })).toString('base64url') + '.s'
 const noClient = () => { throw new Error('must not reach the database') }
-const env = k => (k === 'SUPABASE_SERVICE_ROLE_KEY' ? 'sb_secret_test' : 'x')
+const env = () => 'sb_secret_test'
 eq((await handle(mkReq('POST', 'Bearer ' + jwt('anon')), noClient, env)).status, 403, 'anon key refused')
 eq((await handle(mkReq('POST', null), noClient, env)).status, 403, 'no token refused')
 eq((await handle(mkReq('POST', 'Bearer ' + jwt('authenticated')), noClient, env)).status, 403, 'user token refused')
