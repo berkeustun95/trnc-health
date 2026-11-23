@@ -1,5 +1,4 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
 import { t } from '../../../constants/i18n'
 import { press, colors, radii, space, type, font, elevation } from '../../../constants/theme'
 import { TILE_FONT_CAP } from './Widgets'
@@ -22,25 +21,22 @@ export const VELES_SLOGAN = 'Adanın bütün haberleri tek sepette.'
 const LOGO = require('../../../assets/veles/veles-logo-trimmed.png')
 
 export default function VelesBanner({ lang, onPress }) {
-  const showTurkishPill = lang !== 'Turkish'
+  // Non-Turkish UIs: a "TR" badge says the news is in Turkish (the a11y label says it in full). The slogan gets
+  // the whole second line: with a translated pill beside it, it was cut at 360 wide (Berke chose this, 2026-11-23).
+  const showTurkishBadge = lang !== 'Turkish'
   return (
     <TouchableOpacity style={[s.card, elevation.card]} onPress={onPress} activeOpacity={press.card} accessibilityRole="link"
       accessibilityLabel={t('velesBannerA11y', lang)}>
       <Image source={LOGO} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
       <View style={s.text}>
-        <Text style={s.title} numberOfLines={1} maxFontSizeMultiplier={TILE_FONT_CAP} adjustsFontSizeToFit minimumFontScale={0.85}>{VELES_NAME}</Text>
-        <View style={s.line2}>
-          <Text style={s.sub} numberOfLines={1} maxFontSizeMultiplier={TILE_FONT_CAP}>{VELES_SLOGAN}</Text>
-          {showTurkishPill ? (
-            <View style={s.pill}>
-              <Text style={s.pillText} numberOfLines={1} maxFontSizeMultiplier={TILE_FONT_CAP}>
-                {t('velesBannerInTurkish', lang)}
-              </Text>
-            </View>
+        <View style={s.line1}>
+          <Text style={s.title} numberOfLines={1} maxFontSizeMultiplier={TILE_FONT_CAP}>{VELES_NAME}</Text>
+          {showTurkishBadge ? (
+            <View style={s.badge}><Text style={s.badgeText} maxFontSizeMultiplier={TILE_FONT_CAP}>TR</Text></View>
           ) : null}
         </View>
+        <Text style={s.sub} numberOfLines={1} maxFontSizeMultiplier={TILE_FONT_CAP}>{VELES_SLOGAN}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.tileInk} />
     </TouchableOpacity>
   )
 }
@@ -50,9 +46,9 @@ const s = StyleSheet.create({
               borderRadius: radii.widget, paddingHorizontal: space[12] },
   logo:     { width: 44, height: 44 },
   text:     { flex: 1, minWidth: 0, gap: 1 },
-  title:    { ...type.rowTitle, color: VELES_BRAND },
-  line2:    { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
-  sub:      { ...type.meta, color: colors.tileInk, flexShrink: 1 },
-  pill:     { flexShrink: 0, backgroundColor: colors.soft, borderRadius: radii.pill, paddingHorizontal: 8, paddingVertical: 3 },
-  pillText: { ...type.meta, fontFamily: font.bold, color: colors.tileInk },
+  line1:    { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  title:    { ...type.rowTitle, color: VELES_BRAND, flexShrink: 1 },
+  sub:      { ...type.meta, color: colors.tileInk },
+  badge:    { flexShrink: 0, backgroundColor: colors.soft, borderRadius: radii.pill, paddingHorizontal: 6, paddingVertical: 1 },
+  badgeText: { ...type.meta, fontFamily: font.bold, color: colors.tileInk },
 })

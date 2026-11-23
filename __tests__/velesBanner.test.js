@@ -92,5 +92,9 @@ test('banner brand: #0A5688, the slogan untranslated in every language, trimmed 
   expect([slogan, [...slogan].length]).toEqual(['Adanın bütün haberleri tek sepette.', 35])
   expect(src).not.toMatch(/velesBannerSub/)
   expect(src).toContain("require('../../../assets/veles/veles-logo-trimmed.png')")
-  expect(fs.readFileSync(require.resolve('../constants/i18n.js'), 'utf8')).not.toMatch(/velesBannerSub/)
+  expect(fs.readFileSync(require.resolve('../constants/i18n.js'), 'utf8')).not.toMatch(/velesBannerSub|velesBannerInTurkish/)
+  // Layout A (Berke, 2026-11-23): the slogan has line 2 to itself, "TR" badge beside the title, no chevron.
+  expect(src).toMatch(/<Text style=\{s\.sub\}[^>]*>\{VELES_SLOGAN\}<\/Text>\n      <\/View>/)
+  expect(src).toContain('>TR</Text>')
+  expect(src).not.toMatch(/chevron-forward|velesBannerInTurkish/)
 })
