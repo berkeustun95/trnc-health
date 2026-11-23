@@ -163,7 +163,12 @@ WITH report AS (
     -- Onboarding v2 offer counter (20261202): registered ahead of the apply; red until it runs.
     ('20261202_onboarding_events','onboarding_events'),
     -- House banner daily counters (20261227): registered ahead of the apply; red until it runs.
-    ('20261227_ad_house_daily','ad_house_daily')
+    ('20261227_ad_house_daily','ad_house_daily'),
+    -- KTFF football (20261228): registered ahead of the apply; red until it runs.
+    ('20261228_live_scores_ktff','ktff_leagues'),
+    ('20261228_live_scores_ktff','ktff_standings'),
+    ('20261228_live_scores_ktff','ktff_fixtures'),
+    ('20261228_live_scores_ktff','ktff_sync_state')
   ) e(m,o)
 
   UNION ALL
@@ -640,7 +645,59 @@ WITH report AS (
     ('20261227_ad_house_daily','ad_house_daily','position'),
     ('20261227_ad_house_daily','ad_house_daily','module'),
     ('20261227_ad_house_daily','ad_house_daily','view_count'),
-    ('20261227_ad_house_daily','ad_house_daily','tap_count')
+    ('20261227_ad_house_daily','ad_house_daily','tap_count'),
+    -- 20261228: every column the app (and the sync function) reads or writes.
+    ('20261228_live_scores_ktff','ktff_leagues','league_id'),
+    ('20261228_live_scores_ktff','ktff_leagues','name_tr'),
+    ('20261228_live_scores_ktff','ktff_leagues','name_en'),
+    ('20261228_live_scores_ktff','ktff_leagues','logo_url'),
+    ('20261228_live_scores_ktff','ktff_leagues','source_logo_url'),
+    ('20261228_live_scores_ktff','ktff_leagues','available_weeks'),
+    ('20261228_live_scores_ktff','ktff_leagues','current_week'),
+    ('20261228_live_scores_ktff','ktff_leagues','legend'),
+    ('20261228_live_scores_ktff','ktff_leagues','updated_at'),
+    ('20261228_live_scores_ktff','ktff_standings','league_id'),
+    ('20261228_live_scores_ktff','ktff_standings','team_id'),
+    ('20261228_live_scores_ktff','ktff_standings','rank'),
+    ('20261228_live_scores_ktff','ktff_standings','team_tr'),
+    ('20261228_live_scores_ktff','ktff_standings','team_en'),
+    ('20261228_live_scores_ktff','ktff_standings','logo_url'),
+    ('20261228_live_scores_ktff','ktff_standings','source_logo_url'),
+    ('20261228_live_scores_ktff','ktff_standings','played'),
+    ('20261228_live_scores_ktff','ktff_standings','won'),
+    ('20261228_live_scores_ktff','ktff_standings','drawn'),
+    ('20261228_live_scores_ktff','ktff_standings','lost'),
+    ('20261228_live_scores_ktff','ktff_standings','goals_for'),
+    ('20261228_live_scores_ktff','ktff_standings','goals_against'),
+    ('20261228_live_scores_ktff','ktff_standings','goal_difference'),
+    ('20261228_live_scores_ktff','ktff_standings','points'),
+    ('20261228_live_scores_ktff','ktff_standings','marker_id'),
+    ('20261228_live_scores_ktff','ktff_standings','marker_color'),
+    ('20261228_live_scores_ktff','ktff_standings','marker_text_color'),
+    ('20261228_live_scores_ktff','ktff_standings','updated_at'),
+    ('20261228_live_scores_ktff','ktff_fixtures','match_id'),
+    ('20261228_live_scores_ktff','ktff_fixtures','league_id'),
+    ('20261228_live_scores_ktff','ktff_fixtures','week'),
+    ('20261228_live_scores_ktff','ktff_fixtures','home_team_tr'),
+    ('20261228_live_scores_ktff','ktff_fixtures','home_team_en'),
+    ('20261228_live_scores_ktff','ktff_fixtures','away_team_tr'),
+    ('20261228_live_scores_ktff','ktff_fixtures','away_team_en'),
+    ('20261228_live_scores_ktff','ktff_fixtures','home_logo_url'),
+    ('20261228_live_scores_ktff','ktff_fixtures','away_logo_url'),
+    ('20261228_live_scores_ktff','ktff_fixtures','home_source_logo_url'),
+    ('20261228_live_scores_ktff','ktff_fixtures','away_source_logo_url'),
+    ('20261228_live_scores_ktff','ktff_fixtures','home_score'),
+    ('20261228_live_scores_ktff','ktff_fixtures','away_score'),
+    ('20261228_live_scores_ktff','ktff_fixtures','match_local'),
+    ('20261228_live_scores_ktff','ktff_fixtures','kickoff_at'),
+    ('20261228_live_scores_ktff','ktff_fixtures','updated_at'),
+    ('20261228_live_scores_ktff','ktff_sync_state','endpoint'),
+    ('20261228_live_scores_ktff','ktff_sync_state','etag'),
+    ('20261228_live_scores_ktff','ktff_sync_state','last_status'),
+    ('20261228_live_scores_ktff','ktff_sync_state','last_attempt_at'),
+    ('20261228_live_scores_ktff','ktff_sync_state','last_success_at'),
+    ('20261228_live_scores_ktff','ktff_sync_state','next_allowed_at'),
+    ('20261228_live_scores_ktff','ktff_sync_state','fail_count')
 
   ) e(m,t,c)
 
@@ -653,6 +710,8 @@ WITH report AS (
   FROM (VALUES
     -- 20261227: the only write path on ad_house_daily; registered ahead of the apply; red until it runs.
     ('20261227_ad_house_daily','bump_house_ad_counter'),
+    -- 20261228: the cron's due-gate; service_role only, so there is deliberately NO G row (G lists authenticated EXECUTE) - the H token owns the grants.
+    ('20261228_live_scores_ktff','ktff_sync_due'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
@@ -1512,7 +1571,28 @@ WITH report AS (
     ('20261227_ad_house_daily','ad_house_daily_pkey'),
     ('20261227_ad_house_daily','ad_house_daily_position_check'),
     ('20261227_ad_house_daily','ad_house_daily_module_fkey'),
-    ('20261227_ad_house_daily','ad_house_daily_counts_check')
+    ('20261227_ad_house_daily','ad_house_daily_counts_check'),
+    -- 20261228. The logo CHECKs are what keep a non-bucket URL out of a column the app renders; the endpoint CHECK bounds the sync-state keys.
+    ('20261228_live_scores_ktff','ktff_leagues_pkey'),
+    ('20261228_live_scores_ktff','ktff_leagues_id_check'),
+    ('20261228_live_scores_ktff','ktff_leagues_legend_check'),
+    ('20261228_live_scores_ktff','ktff_leagues_logo_check'),
+    ('20261228_live_scores_ktff','ktff_leagues_source_logo_check'),
+    ('20261228_live_scores_ktff','ktff_standings_pkey'),
+    ('20261228_live_scores_ktff','ktff_standings_league_fkey'),
+    ('20261228_live_scores_ktff','ktff_standings_logo_check'),
+    ('20261228_live_scores_ktff','ktff_standings_source_logo_check'),
+    ('20261228_live_scores_ktff','ktff_standings_marker_color_check'),
+    ('20261228_live_scores_ktff','ktff_standings_marker_text_color_check'),
+    ('20261228_live_scores_ktff','ktff_fixtures_pkey'),
+    ('20261228_live_scores_ktff','ktff_fixtures_league_fkey'),
+    ('20261228_live_scores_ktff','ktff_fixtures_home_logo_check'),
+    ('20261228_live_scores_ktff','ktff_fixtures_away_logo_check'),
+    ('20261228_live_scores_ktff','ktff_fixtures_home_source_logo_check'),
+    ('20261228_live_scores_ktff','ktff_fixtures_away_source_logo_check'),
+    ('20261228_live_scores_ktff','ktff_sync_state_pkey'),
+    ('20261228_live_scores_ktff','ktff_sync_state_endpoint_check'),
+    ('20261228_live_scores_ktff','ktff_sync_state_fail_count_check')
 
   ) e(m,o)
 
@@ -1522,6 +1602,9 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- KTFF fixtures (20261228): the week picker and the due-gate's match window.
+    ('20261228_live_scores_ktff','ktff_fixtures_league_week_idx'),
+    ('20261228_live_scores_ktff','ktff_fixtures_kickoff_idx'),
     -- Ask Oli chat history (20261163): one user's thread, newest first.
     ('20261163_oli_messages','oli_messages_user_created_idx'),
     -- Araçlar (20261165): the browse list, an owner's listings, a dealer page, the expiry job, photo order.
@@ -2114,6 +2197,47 @@ WITH report AS (
                        AND strpos(d, 'auth.uid()') = 0
                   FROM (SELECT pg_get_functiondef(to_regprocedure('public.bump_house_ad_counter(text,text,text)')) d) f), false)
     -- 1227-END
+    -- 1228-BEGIN
+    -- 20261228 KTFF tables + ktff_sync_due: red until applied, never an error (to_regclass / catalogs / COALESCE).
+    -- Public data, so anon and authenticated read the three display tables and nobody but service_role touches ktff_sync_state.
+    UNION ALL SELECT '20261228_live_scores_ktff','ktff_*: RLS on all four; exactly three policies (ktff_{leagues,standings,fixtures}_select_public: one permissive SELECT, anon + authenticated, USING true) and none on ktff_sync_state; anon/authenticated SELECT the three and nothing else; no write-class grant on any; ktff_sync_state unreadable to clients (table and column level); service_role writes all four; no PUBLIC',
+      COALESCE((SELECT count(*) = 4 AND bool_and(c.relrowsecurity)
+                  FROM pg_class c WHERE c.oid IN (to_regclass('public.ktff_leagues'), to_regclass('public.ktff_standings'), to_regclass('public.ktff_fixtures'), to_regclass('public.ktff_sync_state'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename LIKE 'ktff\_%') = 3
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ktff_sync_state') = 0
+      AND (SELECT count(*) FROM pg_policies p
+            WHERE p.schemaname = 'public' AND p.tablename IN ('ktff_leagues','ktff_standings','ktff_fixtures')
+              AND p.policyname = p.tablename || '_select_public' AND p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE'
+              AND p.roles::text[] @> ARRAY['anon','authenticated']::text[] AND cardinality(p.roles) = 2 AND p.qual = 'true') = 3
+      AND COALESCE((SELECT bool_and(has_table_privilege('anon', t.o, 'SELECT') AND has_table_privilege('authenticated', t.o, 'SELECT'))
+                      FROM (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures'))) t(o)), false)
+      AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, t.o, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                    AND NOT has_any_column_privilege(r.n, t.o, 'INSERT,UPDATE'))
+                      FROM (VALUES ('anon'), ('authenticated')) r(n),
+                           (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures')), (to_regclass('public.ktff_sync_state'))) t(o)), false)
+      AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, to_regclass('public.ktff_sync_state'), 'SELECT')
+                                    AND NOT has_any_column_privilege(r.n, to_regclass('public.ktff_sync_state'), 'SELECT'))
+                      FROM (VALUES ('anon'), ('authenticated')) r(n)), false)
+      AND COALESCE((SELECT bool_and(has_table_privilege('service_role', t.o, 'SELECT,INSERT,UPDATE,DELETE'))
+                      FROM (VALUES (to_regclass('public.ktff_leagues')), (to_regclass('public.ktff_standings')), (to_regclass('public.ktff_fixtures')), (to_regclass('public.ktff_sync_state'))) t(o)), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a
+                       WHERE c.relname LIKE 'ktff\_%' AND c.relnamespace = 'public'::regnamespace AND c.relkind = 'r' AND a.grantee = 0)
+    UNION ALL SELECT '20261228_live_scores_ktff','ktff_sync_due(): one overload, INVOKER, search_path pinned, STABLE; EXECUTE service_role only (no anon, authenticated, PUBLIC); body gates on the standings next_allowed_at, the 6-hour freshness and the -150 / +30 minute kickoff window',
+      COALESCE((SELECT NOT p.prosecdef AND p.provolatile = 's' AND p.prorettype = 'boolean'::regtype
+                       AND p.proconfig IS NOT NULL AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+                       AND p.proacl IS NOT NULL
+                       AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.ktff_sync_due()')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'ktff_sync_due') = 1
+      AND COALESCE((SELECT strpos(d, 'next_allowed_at') > 0
+                       AND strpos(d, 'interval ''6 hours''') > 0
+                       AND strpos(d, 'interval ''150 minutes''') > 0
+                       AND strpos(d, 'interval ''30 minutes''') > 0
+                       AND strpos(d, 'FROM public.ktff_fixtures f') > 0
+                  FROM (SELECT pg_get_functiondef(to_regprocedure('public.ktff_sync_due()')) d) f), false)
+    -- 1228-END
     -- 1202-BEGIN
     -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
     UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the event list (11 in 20261202, 14 since 20261204) / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
@@ -7032,6 +7156,19 @@ SELECT '20261203_onboarding_events_retention', 'purge-onboarding-events: schedul
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 -- 1203-Q2-END
+
+UNION ALL
+-- ─── 20261228: live-scores-ktff every 15 minutes at off-minutes; POSTs the function with the Vault key, only when ktff_sync_due() ───
+SELECT '20261228_live_scores_ktff', 'live-scores-ktff: schedule 7,22,37,52 * * * *, function URL, Vault key, due gate, no inline key',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'live-scores-ktff') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'live-scores-ktff' AND active
+                    AND schedule = '7,22,37,52 * * * *'
+                    AND command LIKE '%/functions/v1/live-scores-ktff%'
+                    AND command LIKE '%vault.decrypted_secrets%novest_sync_key%'
+                    AND command LIKE '%WHERE public.ktff_sync_due()%'
+                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
 UNION ALL
 -- ─── 20261185: marketplace-maintenance runs daily at 01:23 UTC and POSTs {"apply": true} with the Vault key ───
