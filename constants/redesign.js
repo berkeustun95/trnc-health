@@ -10,8 +10,8 @@ import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_H
 // Kept out of flags.js because node scripts import flags.js, and they cannot load expo-constants.
 const IS_PREVIEW_BUILD = Constants.expoConfig?.extra?.appVariant === 'preview'
 
-// Döveç projects (Emlak): dev bundles and ADA Preview show them whatever dovec_settings.published says
-// (constants/dovec.js dovecShown); production needs DOVEC_PARTNER_LIVE and published.
+// Döveç projects (Emlak): dev bundles and ADA Preview skip the DOVEC_PARTNER_LIVE / published entry check (constants/dovec.js
+// dovecShown); the rows themselves are RLS-gated by published (20261231), so non-admins still see none until Döveç approves.
 export const DOVEC_PREVIEW = (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
 
 export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD

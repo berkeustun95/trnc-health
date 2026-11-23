@@ -4,8 +4,8 @@ Döveç's partner API is real (`https://atlas.dovecgroup.com`, Bearer key `DOVEC
 secret). This replaces the old guess-the-API checklist. Nothing here has been applied or deployed: every step below
 waits for Berke's go, one at a time.
 
-- `GET /api/partner/projects` (60/min) → `sync-dovec` → `dovec_projects` (read by the app; RLS: `listed` AND a good
-  sync within 24 h AND not suspended).
+- `GET /api/partner/projects` (60/min) → `sync-dovec` → `dovec_projects` (read by the app; RLS since 20261231: `listed` AND
+  (an admin, OR `dovec_settings.published` AND a good sync within 24 h AND not suspended). Until Döveç approves, nobody but an admin reads it).
 - `POST /api/partner/leads` (30/min) ← `dovec-lead` ← the app. `dovec_leads` has RLS on and zero policies: the app
   never reads it, only the service role does.
 - A partner field Döveç leaves empty stays empty (a null `from_price` is valid; the app shows its "ask" label).
@@ -80,10 +80,10 @@ is reported as `renamed`. The pin is copied to `dovec_projects.latitude` / `long
 the feed upsert never names those columns, so a sync cannot clear a pin.
 Caveat: `mapProject` trims the feed's name before storing it, so the comparison is against the STORED (trimmed) name: a feed name with
 stray outer spaces still attaches. Spelling, case or inner differences never do.
-Readable by: `dovec_coord_status()` is executable by anon, authenticated and the service role (read-only; it returns only seed names, Döveç
-project names and ids, and a status word: no lead, user or count data). The seed table itself and `dovec_sync_coords()` stay service-role only.
-After the first sync, read the match with `select * from dovec_coord_status();` in the SQL editor, or a REST rpc call
-(`POST /rest/v1/rpc/dovec_coord_status` with the anon key as `apikey`). Empty `unmatched`, `renamed` and `live_without_coords` = all five pinned.
+Readable by: `dovec_coord_status()` is admin / service role only in every state (20261231; anon cannot execute it, a signed-in non-admin gets
+`DOVEC_NOT_PUBLIC`). It wraps `dovec_coord_report()` (seed names, Döveç project names and ids, a status word: no lead, user or count data),
+which no app role can execute. The seed table itself and `dovec_sync_coords()` stay service-role only.
+After the first sync, read the match with `select public.dovec_coord_report();` as postgres in the SQL editor (the anon REST call no longer works). Empty `unmatched`, `renamed` and `live_without_coords` = all five pinned.
 
 ## The test enquiry (prepared here, never sent by any of these steps)
 
@@ -143,7 +143,7 @@ override, so the partner key cannot be redirected by changing a secret.
 - **Account deletion.** `dovec_leads.user_id` has no foreign key on purpose. Deleting a profile wipes that user's
   name, phone, email, message and `user_id` (pending or retrying leads become `failed`) and keeps the row for counts.
   Every lead's PII is wiped after 90 days anyway.
-- **Stale feed.** 24 hours after the last good sync the projects stop being readable. By design; the cron's
+- **Stale feed.** 24 hours after the last good sync the projects stop being readable (admins excepted, 20261231). By design; the cron's
   rollback (`cron.unschedule`) therefore also empties the app after a day.
 - **Logs and probes** carry counts and status words only: the repo and its Actions logs are public.
 

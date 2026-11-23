@@ -12,8 +12,10 @@ import { join } from 'node:path'
 import { freshDb, applyFile, asRole } from './migration-harness.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261229_dovec_projects.sql', import.meta.url))
+const GATE = fileURLToPath(new URL('../supabase/migrations/20261231_dovec_read_gate.sql', import.meta.url))
 const SQL = readFileSync(FILE, 'utf8')
 const ADMIN = '00000000-0000-4000-8000-000000000001', CUSTOMER = '00000000-0000-4000-8000-000000000002'
+const SVC = '00000000-0000-4000-8000-0000000000f1'   // service_role calls carry a role claim, as PostgREST does
 const OTHER = '00000000-0000-4000-8000-000000000003'
 
 const MODS18 = ['accommodation','events','explore','garages','grooming','homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport','ehliyet','connectivity','eatery','cars','news']
@@ -32,6 +34,14 @@ CREATE TABLE public.profiles (id uuid PRIMARY KEY REFERENCES auth.users(id) ON D
 CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path TO 'public' AS $f$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
 $f$;
+-- auth.role() is not in the shared harness: stand-in = the JWT role claim, as in Supabase.
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $f$
+  SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
+$f$;
+GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $f$ SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb) $f$;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
+CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE AS $f$ SELECT coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) $f$;
 INSERT INTO auth.users (id) VALUES ('${ADMIN}'), ('${CUSTOMER}'), ('${OTHER}');
 INSERT INTO public.profiles (id, role) VALUES ('${ADMIN}', 'admin'), ('${CUSTOMER}', 'customer'), ('${OTHER}', 'customer');
 `
@@ -45,7 +55,7 @@ const ins = (user, extra = {}) => {
 }
 async function limitChecks(d) {
   await d.exec(`DELETE FROM public.dovec_leads`)
-  const svc = sql => asRole(d, 'service_role', null, sql)
+  const svc = sql => asRole(d, 'service_role', SVC, sql)
   const first = []
   for (let i = 0; i < 4; i++) first.push((await svc(ins(LU))).ok)
   t('limit: 3 an hour per user, the 4th insert is refused', first, [true, true, true, false])
@@ -94,7 +104,9 @@ const t = (name, got, want) => {
 }
 const ready = async (file = FILE) => {
   const d = await freshDb(FIXTURE)
-  return { d, r: await applyFile(d, file) }
+  const r = await applyFile(d, file)
+  if (file === FILE && r.ok) { const g = await applyFile(d, GATE); if (!g.ok) return { d, r: g } }
+  return { d, r }
 }
 const mutant = (from, to) => {
   if (!SQL.includes(from)) { bad++; console.log(`  ✗ mutant anchor missing: ${from.slice(0, 50)}`); return null }
@@ -127,6 +139,7 @@ console.log('20261229 — real file')
       u1.map((r, i) => ({ id: r.id, name: i ? 'E Two v2' : 'E One v2', entity_uuid: r.entity_uuid })))
     t('the sync sources never name entity_uuid',
       ['../supabase/functions/sync-dovec/index.ts', '../supabase/functions/_shared/dovec-feed.mjs'].map(f => /entity_uuid/.test(readFileSync(new URL(f, import.meta.url), 'utf8'))), [false, false])
+    await d.exec(`UPDATE public.dovec_settings SET published = true`)
     t('anon sees no project before the first good sync', (await asRole(d, 'anon', null, `SELECT entity_uuid FROM public.dovec_projects WHERE id = 'e1'`)).rows.length, 0)
     await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now()`)
     t('anon reads entity_uuid once the feed is fresh', (await asRole(d, 'anon', null, `SELECT entity_uuid FROM public.dovec_projects WHERE id = 'e1'`)).rows, [{ entity_uuid: u1[0].entity_uuid }])
@@ -139,8 +152,9 @@ console.log('20261229 — real file')
     t('the taps are stored for that project', (await d.query(`SELECT count(*)::int n FROM public.contact_events WHERE module = 'dovec' AND entity_id = '${u1[0].entity_uuid}'`)).rows[0].n, 2)
     const def = (await d.query(`SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'contact_events_module_check'`)).rows[0].d
     t('module CHECK now lists 19 modules', [...new Set([...def.matchAll(/'([A-Za-z]+)'::text/g)].map(m => m[1]))].length, 19)
-    await d.exec(`DELETE FROM public.contact_events; DELETE FROM public.dovec_projects WHERE id IN ('e1','e2'); UPDATE public.dovec_settings SET last_good_sync_at = NULL`)
+    await d.exec(`DELETE FROM public.contact_events; DELETE FROM public.dovec_projects WHERE id IN ('e1','e2'); UPDATE public.dovec_settings SET last_good_sync_at = NULL, published = false`)
     t('re-applying the file is clean (re-runnable pre-state, now 19 modules)', (await applyFile(d, FILE)).ok, true)
+    t('re-applying the read gate is clean', (await applyFile(d, GATE)).ok, true)
     await d.exec('RESET ROLE;')
   }
 
@@ -201,7 +215,21 @@ console.log('20261229 — real file')
   await limitChecks(d)
 
   // Reads as the app roles, with controls.
-  t('anon reads the project while fresh (positive control)', (await asRole(d, 'anon', null, `SELECT count(*)::int n FROM public.dovec_projects`)).rows[0].n, 1)
+  const ALL = `SELECT count(*)::int n FROM public.dovec_projects`
+  const nOf = async (who, uid) => (await asRole(d, who, uid, ALL)).rows[0].n
+  await d.exec(`UPDATE public.dovec_settings SET published = false, suspended = false`)
+  t('unpublished + fresh: anon / guest / customer read 0 rows, admin reads the row',
+    [await nOf('anon', null), await nOf('authenticated', OTHER), await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [0, 0, 0, 1])
+  await d.exec(`UPDATE public.dovec_settings SET published = true`)
+  t('published + fresh: anon / customer / admin read the row (positive control)',
+    [await nOf('anon', null), await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [1, 1, 1])
+  await d.exec(`UPDATE public.dovec_settings SET suspended = true`)
+  t('published + suspended: anon / customer read 0, admin still reads', [await nOf('anon', null), await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [0, 0, 1])
+  await d.exec(`UPDATE public.dovec_settings SET suspended = false, last_good_sync_at = now() - interval '25 hours'`)
+  t('published + stale: anon / customer read 0, admin still reads', [await nOf('anon', null), await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [0, 0, 1])
+  await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now()`)
+  t('fresh again: anon reads the row (positive control)', await nOf('anon', null), 1)
+  await d.exec(`UPDATE public.dovec_settings SET published = false`)
   t('guest/customer reads settings: only the five columns',
     (await asRole(d, 'authenticated', OTHER, `SELECT published, suspended, whatsapp_e164, last_good_sync_at IS NOT NULL AS synced FROM public.dovec_settings`)).rows,
     [{ published: false, suspended: false, whatsapp_e164: '+905338880515', synced: true }])
@@ -221,7 +249,7 @@ console.log('20261229 — real file')
 
 console.log('20261229 — map pins (dovec_project_coords) and the single test enquiry')
 const PIN = { 'D-Point': [35.2695453, 33.901635], Natulux: [35.3632832, 33.6722565] }
-const svcq = (d, sql) => asRole(d, 'service_role', null, sql)
+const svcq = (d, sql) => asRole(d, 'service_role', SVC, sql)
 const addP = (id, name, extra = '') => `INSERT INTO public.dovec_projects (id, name, city, status, website_url${extra ? ', ' + extra.split('=')[0] : ''}) VALUES ('${id}', '${name}', 'Testville', 'on_sale', 'https://example.com/${id}'${extra ? ', ' + extra.split('=')[1] : ''})`
 const stat = async (d) => Object.fromEntries((await d.query(`SELECT seed_name, last_status, project_id FROM public.dovec_project_coords ORDER BY 1`)).rows.map(r => [r.seed_name, [r.last_status, r.project_id]]))
 const pinOf = async (d, id) => (await d.query(`SELECT latitude::float8 la, longitude::float8 lo FROM public.dovec_projects WHERE id = '${id}'`)).rows[0]
@@ -291,16 +319,19 @@ const pinOf = async (d, id) => (await d.query(`SELECT latitude::float8 la, longi
   {
     const a = await asRole(d, 'anon', null, `SELECT public.dovec_coord_status() AS s`)
     const u = await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_coord_status() AS s`)
-    t('anon / signed-in can read the pin status (read-only)', [a.ok, u.ok], [true, true])
-    const s = a.rows?.[0]?.s
+    const ad = await asRole(d, 'authenticated', ADMIN, `SELECT public.dovec_coord_status() AS s`)
+    t('anon / signed-in non-admin cannot run the pin status; an admin can (positive control)', [a.ok, u.ok, ad.ok], [false, false, true])
+    const s = ad.rows?.[0]?.s
     t('the status has exactly the three lists and nothing else', s && Object.keys(s).sort(), ['live_without_coords', 'renamed', 'unmatched'])
     t('every status entry carries only names, ids and a status word', s && Object.values(s).flat().every(e => Object.keys(e).every(k => ['seed', 'reason', 'project_id', 'name', 'id'].includes(k))), true)
   }
   t('service_role can read both (positive control)', [(await svcq(d, `SELECT public.dovec_coord_status()`)).ok, (await svcq(d, `SELECT 1 FROM public.dovec_project_coords`)).ok], [true, true])
   t('service_role cannot write the table directly', (await svcq(d, `UPDATE public.dovec_project_coords SET latitude = 1`)).ok, false)
   t('anon reads the pin through the project row once the feed is fresh (positive control)', await (async () => {
-    await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now(); UPDATE public.dovec_projects SET listed = true, delisted_at = NULL WHERE id = 'x1'`)
-    return (await asRole(d, 'anon', null, `SELECT latitude::float8 la FROM public.dovec_projects WHERE id = 'x1'`)).rows
+    await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now(), published = true; UPDATE public.dovec_projects SET listed = true, delisted_at = NULL WHERE id = 'x1'`)
+    const r = (await asRole(d, 'anon', null, `SELECT latitude::float8 la FROM public.dovec_projects WHERE id = 'x1'`)).rows
+    await d.exec(`UPDATE public.dovec_settings SET published = false`)
+    return r
   })(), [{ la: PIN['D-Point'][0] }])
 
   // the test enquiry: exactly one, fixed shape, outside every count and limit
@@ -425,9 +456,9 @@ console.log('20261229 — contact_events pre-state and post-state guards')
   }
 }
 
-console.log('20261230 — cron file, on top of 20261229')
+console.log('20261232 — cron file, on top of 20261229 + 20261231')
 {
-  const FILE_B = fileURLToPath(new URL('../supabase/migrations/20261230_dovec_cron.sql', import.meta.url))
+  const FILE_B = fileURLToPath(new URL('../supabase/migrations/20261232_dovec_cron.sql', import.meta.url))
   const SEED_B = `
 CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid serial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, username text DEFAULT 'postgres', active boolean DEFAULT true);
@@ -447,7 +478,7 @@ CREATE TABLE public.data_jobs (key text PRIMARY KEY, runner text NOT NULL, kind 
   }
   {
     const d = await build(false)
-    t('A applies', (await applyFile(d, FILE)).ok, true)
+    t('A applies', [(await applyFile(d, FILE)).ok, (await applyFile(d, GATE)).ok], [true, true])
     const r = await applyFile(d, FILE_B)
     t('B refuses without the Vault secret', [r.ok, /novest_sync_key is missing/.test(r.msg || '')], [false, true])
     await d.exec('ROLLBACK; RESET ROLE;')
@@ -459,6 +490,7 @@ CREATE TABLE public.data_jobs (key text PRIMARY KEY, runner text NOT NULL, kind 
     t('B refuses before A', [r0.ok, /20261229 is not applied/.test(r0.msg || '')], [false, true])
     await d.exec('ROLLBACK; RESET ROLE;')
     await applyFile(d, FILE)
+    await applyFile(d, GATE)
     t('B applies with the secret', await applyFile(d, FILE_B), { ok: true, msg: null })
     t('three jobs, one registry row each', (await d.query(`SELECT j.jobname, (SELECT count(*)::int FROM public.data_jobs x WHERE j.jobname = ANY (x.cron_jobnames)) AS rows FROM cron.job j ORDER BY 1`)).rows,
       [{ jobname: 'dovec-lead-retry', rows: 1 }, { jobname: 'dovec-leads-wipe', rows: 1 }, { jobname: 'dovec-sync', rows: 1 }])

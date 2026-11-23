@@ -464,6 +464,7 @@ export default function AccommodationScreen({
 
   const [sheet, setSheet] = useState(null)           // which picker is open
   // Döveç projects: the entry card shows only when the module is visible (flag + published, or dev/Preview) AND projects exist.
+  // Until published, RLS returns 0 rows to non-admins, so the card stays hidden for them even in Preview.
   const [dovecReady, setDovecReady] = useState(false)
   useEffect(() => {
     if (!DOVEC_PARTNER_LIVE && !DOVEC_PREVIEW) return undefined

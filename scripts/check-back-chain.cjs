@@ -64,6 +64,8 @@ const cases4=[
  ['Günlük Kiralık apartment open over Konaklama -> closes the apartment only, NOT the module', {...base, showAccommodation:true, openedRental:{slug:'yasemin-2plus1'}}, {}, r=>r.r===true && r.calls==='setOpenedRental(null)'],
  ['Döveç projects overlay over Konaklama, a layer open (project / form / thank-you) -> steps back inside it, nothing closes', {...base, showAccommodation:true, openedDovec:true}, {dovecBackRef:()=>true}, r=>r.r===true && r.calls===''],
  ['Döveç projects overlay at its list -> closes the overlay only, NOT the module', {...base, showAccommodation:true, openedDovec:true}, {dovecBackRef:()=>false}, r=>r.r===true && r.calls==='setOpenedDovec(false)'],
+ ['Admin Döveç preview, a layer open -> steps back inside it, preview stays', {...base, adminPreview:'dovec'}, {dovecBackRef:()=>true}, r=>r.r===true && r.calls===''],
+ ['Admin Döveç preview at its list -> closes the preview', {...base, adminPreview:'dovec'}, {dovecBackRef:()=>false}, r=>r.r===true && r.calls==='setAdminPreview(null)'],
  ['Konaklama, no overlay open -> closes the module (the apartment overlay is not left holding back)', {...base, showAccommodation:true, openedRental:null}, {}, r=>r.r===true && r.calls==='setShowAccommodation(false)'],
  ['S10 Duty over notifications -> closes duty, notifs stay', {...base, showNotifs:true, showDutyList:true}, {}, r=>r.calls==='closeDutyList()'],
  ['S10 Facility reviews -> closes reviews, not profile', {...base, selectedFacility:{id:1}}, {facilityBackRef:()=>true}, r=>r.calls===''],

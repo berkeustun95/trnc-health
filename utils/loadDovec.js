@@ -2,7 +2,8 @@ import { supabase } from '../lib/supabase'
 
 const COLS = 'id, entity_uuid, name, city, area, status, planned_delivery_month, from_price, currency, available_units, unit_types, cover_url, website_url, description, gallery, latitude, longitude'
 
-// dovec_settings (published, whatsapp_e164) and the visible projects (RLS hides unlisted, stale and suspended ones).
+// dovec_settings (published, whatsapp_e164) and the visible projects (RLS, 20261231: listed rows only, and only for an admin until
+// published; for everyone else while published, fresh and not suspended).
 // -> { settings, projects } or throws.
 export async function loadDovec() {
   const [s, p] = await Promise.all([

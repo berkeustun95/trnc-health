@@ -11,8 +11,9 @@ export const DOVEC_LOGO = null
 export const DOVEC_CONSENT_VERSION = 'dovec-consent-2026-11-23'
 export const DOVEC_MESSAGE_MAX = 2000
 
-// Production: the code flag AND dovec_settings.published. A dev bundle or ADA Preview (`preview`) shows it whatever
-// `published` says, so the design can be checked on real rows while published = false.
+// Production: the code flag AND dovec_settings.published. A dev bundle or ADA Preview (`preview`) skips these two checks only;
+// the rows still come through RLS (20261231), so while published = false a non-admin reads none and sees no entry (the entry also
+// needs projects.length > 0). An admin checks the real rows from AdminScreen's "Open Döveç projects (preview)", not through Emlak.
 export function dovecShown({ published, preview, live = DOVEC_PARTNER_LIVE }) {
   return preview === true || (live === true && published === true)
 }
