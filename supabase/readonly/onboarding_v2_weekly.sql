@@ -12,8 +12,8 @@
 --   reoffer_later_allowed        reoffer_granted ÷ reoffer_shown
 --   reoffer_existing_allowed     reoffer_existing_granted ÷ reoffer_existing_shown
 -- Row 10, screen2_reach_first_time_guest = offer_shown ÷ start_choice_guest, counted only from first_time_from.
---   The app change that logs start_choice_* on first-time phones only is not yet live; before it, returning phones'
---   guest taps are in the denominator and never reach Screen 2. Rows before first_time_from are excluded from both
+--   The app change that logs start_choice_* on first-time phones only went live 2026-11-23 (production OTA cec5a28f);
+--   before it, returning phones' guest taps are in the denominator and never reach Screen 2. Rows before first_time_from are excluded from both
 --   numerator and denominator. Caveats: offer_shown also counts Screen 2 views reached via sign-up and Giriş yap,
 --   so the ratio can exceed 100%; and old app bundles still log returning-phone taps until they update.
 --   'not live' while first_time_from is not before today; 'n/a' when the guest-tap denominator is empty.
@@ -23,7 +23,7 @@ with w as (
   select (date_trunc('day', now() at time zone 'Asia/Famagusta') - interval '7 days') at time zone 'Asia/Famagusta' as t0,
          (date_trunc('day', now() at time zone 'Asia/Famagusta')) at time zone 'Asia/Famagusta'                     as t1,
          -- Set to the first full Famagusta day after the production OTA carrying the first-time-only start_choice logging.
-         (date '2099-01-01')::timestamp at time zone 'Asia/Famagusta'                                              as ftf
+         (date '2026-11-23')::timestamp at time zone 'Asia/Famagusta'                                              as ftf
 ), e as (
   select o.event, count(*) as n,
          count(*) filter (where o.created_at >= w.ftf) as n_ft
