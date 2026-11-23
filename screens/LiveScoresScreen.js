@@ -1,505 +1,304 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, AppState, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, AppState, RefreshControl, useWindowDimensions,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase, isGuest } from '../lib/supabase'
-import { colors, type, radii, press, TAP } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { supabase } from '../lib/supabase'
+import { colors, type, radii, press, spacing, TAP, listBottomPad, contrastRatio, readableOn } from '../constants/theme'
+import { t, dateLocale } from '../constants/i18n'
 import {
   ScreenHeader as UiHeader, FilterBar, ErrorState, EmptyState, CardSkeleton, Card, ModuleScreen, OnPhotoLabel,
 } from '../components/ui'
-import LiveScoresEditorScreen from './LiveScoresEditorScreen'
+import { CARD_BG, PILL_ALPHA } from '../components/ui/ModuleScreen'
 
-// Canlı Skor. Reads Supabase only — matches/teams/match_events and f1_* — and keeps them
-// current through Realtime. It never calls a sports API: the sync is server-side
-// (supabase/functions/live-scores-*), and the free-plan quota is shared by every user.
-//
-// ONE CHANNEL, ONLY WHILE LOOKED AT. Each tab mounts its own view, which subscribes on
-// mount and unsubscribes on unmount, and drops the channel while the app is backgrounded.
-// Realtime connections are a project-wide quota; a channel per idle phone would spend it.
+// Canlı Skor: TRNC football only (KTFF Süper Lig + 1. Lig). Reads Supabase tables that a
+// server-side sync fills from the KTFF API (ktff_leagues / ktff_standings / ktff_fixtures);
+// the phone never calls KTFF. No live data: results land after the match, so a refresh is
+// a re-query, not a subscription. Every API-derived string is rendered as plain <Text>.
 
-const SPORTS = ['football', 'basketball', 'f1']
-const SPORT_LABEL = { football: 'lsTabFootball', basketball: 'lsTabBasketball', f1: 'lsTabF1' }
-const MATCH_COLS = 'id, league_id, source, status, period, minute, clock, home_score, away_score, kickoff_at, last_synced_at, updated_at, '
-  + 'home:teams!matches_home_team_fkey(name, short_name, logo_url), away:teams!matches_away_team_fkey(name, short_name, logo_url)'
-// The provider's name for the national team (read 2026-10-04); 'Turkey' kept for safety.
-const TURKEY_TEAM = new Set(['Türkiye', 'Turkey'])
-const TURKEY_PIN_SORT = 15   // after Süper Lig (10), before the internationals (20–49)
-const leagueLabel = (l, lang) => l.name_i18n?.[lang] || l.name
-const byKickoff = (a, b) =>
-  (dayKey(new Date(a.kickoff_at)) === dayKey(new Date(b.kickoff_at))
-    ? (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || a.kickoff_at.localeCompare(b.kickoff_at)
-    : a.kickoff_at.localeCompare(b.kickoff_at))
-
-const STATUS_ORDER = { live: 0, ht: 0, scheduled: 1, ft: 2, postponed: 3, suspended: 3, cancelled: 3 }
-
-const pad2 = n => String(n).padStart(2, '0')
-const hhmm = iso => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
-const dayKey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+const LEAGUES = [1, 2]
+const LEAGUE_FALLBACK = { 1: 'lsLeagueSuper', 2: 'lsLeagueFirst' }
+const HEX = /^#[0-9A-Fa-f]{6}$/
+const OUR_LOGOS = `${(process.env.EXPO_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/public/team-logos/`
+const WIDE_MIN = 410   // dp at fontScale 1: below it the G/B/M columns are dropped (keeps the team column >= ~120pt)
+const isEn = lang => lang === 'English'
+const pick = (row, base, lang) => (isEn(lang) && row[`${base}_en`]) || row[`${base}_tr`] || row[`${base}_en`] || ''
 const fill = (s, vars) => Object.entries(vars).reduce((a, [k, v]) => a.replace(`{${k}}`, String(v)), s)
 
-function dayLabel(iso, lang) {
-  const d = new Date(iso), now = new Date()
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-  if (dayKey(d) === dayKey(now)) return t('lsToday', lang)
-  if (dayKey(d) === dayKey(tomorrow)) return t('lsTomorrow', lang)
-  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}`
+// match_local is 'YYYY-MM-DD HH:mm' in TRNC time already: split it, never run it through a
+// timezone. The Date is built from parts only to get a weekday/month name in the app language.
+function parseLocal(ml) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}))?/.exec(ml || '')
+  return m ? { day: `${m[1]}-${m[2]}-${m[3]}`, y: +m[1], mo: +m[2], d: +m[3], time: m[4] || null } : null
+}
+function dayLabel(p, lang) {
+  try {
+    return new Date(p.y, p.mo - 1, p.d).toLocaleDateString(dateLocale(lang), { weekday: 'long', day: 'numeric', month: 'long' })
+  } catch { return p.day }
 }
 
-function updatedAgo(iso, lang) {
-  if (!iso) return null
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (mins < 1) return t('lsUpdatedJustNow', lang)
-  if (mins < 60) return fill(t('lsUpdatedMinAgo', lang), { n: mins })
-  return fill(t('lsUpdatedHoursAgo', lang), { n: Math.floor(mins / 60) })
-}
-
-// Re-renders every 30 s so "updated X min ago" and the F1 countdown stay true.
-function useTicker(ms = 30000) {
-  const [, setN] = useState(0)
-  useEffect(() => { const id = setInterval(() => setN(n => n + 1), ms); return () => clearInterval(id) }, [ms])
-}
-
-function useAppActive() {
-  const [active, setActive] = useState(AppState.currentState === 'active')
+function useAppActive(onActive) {
+  const cb = useRef(onActive)
+  cb.current = onActive
   useEffect(() => {
-    const sub = AppState.addEventListener('change', st => setActive(st === 'active'))
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') cb.current() })
     return () => sub.remove()
   }, [])
-  return active
 }
 
-// ─── Status column ───────────────────────────────────────────────────────────
-function StatusCell({ m, sport, lang }) {
-  if (m.status === 'live') {
-    const txt = sport === 'football'
-      ? (m.minute != null ? `${m.minute}'` : t('lsLive', lang))
-      : [m.period, m.clock != null ? `${m.clock}'` : null].filter(Boolean).join(' ')
-    return (
-      <View style={s.statusCol}>
-        <Text style={s.statusLive} numberOfLines={1}>{txt || t('lsLive', lang)}</Text>
-        <View style={s.liveDotSmall} />
-      </View>
-    )
-  }
-  const label = {
-    ht: t('lsHalfTime', lang), ft: t('lsFullTime', lang), postponed: t('lsPostponed', lang),
-    cancelled: t('lsCancelled', lang), suspended: t('lsSuspended', lang),
-  }[m.status]
-  return (
-    <View style={s.statusCol}>
-      <Text style={[s.statusText, m.status === 'ht' && s.statusHt]} numberOfLines={2}>{label || hhmm(m.kickoff_at)}</Text>
-    </View>
-  )
-}
-
-// Our team-logos bucket and nothing else (20261071): a phone never requests the provider's
-// media host. The database enforces the same rule; this keeps it true if a row ever slips.
-const OUR_LOGOS = '/storage/v1/object/public/team-logos/'
+// Our team-logos bucket and nothing else: a phone never requests another host.
 function TeamLogo({ uri }) {
-  if (!uri || !uri.includes(OUR_LOGOS)) return <View style={[s.logo, s.logoBlank]}><Ionicons name="shield-outline" size={12} color={colors.textSecondary} /></View>
+  if (!uri || typeof uri !== 'string' || !uri.startsWith(OUR_LOGOS)) {
+    return <View style={[s.logo, s.logoBlank]}><Ionicons name="shield-outline" size={14} color={colors.textSecondary} /></View>
+  }
   return <Image source={{ uri }} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
 }
 
-function scorerLine(events, side, lang) {
-  return events
-    .filter(e => e.team_side === side && (e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal'))
-    .map(e => {
-      const min = e.minute != null ? ` ${e.minute}${e.extra_minute ? `+${e.extra_minute}` : ''}'` : ''
-      const tag = e.type === 'penalty' ? ` (${t('lsPenaltyShort', lang)})` : e.type === 'own_goal' ? ` (${t('lsOwnGoalShort', lang)})` : ''
-      return `${e.player_name || '—'}${min}${tag}`
-    })
-    .join(', ')
+function Pill({ label, on, onPress }) {
+  return (
+    <TouchableOpacity style={[s.tab, on && s.tabOn]} onPress={onPress} activeOpacity={press.small}
+      accessibilityRole="tab" accessibilityState={{ selected: on }}>
+      <Text style={[s.tabText, on && s.tabTextOn]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  )
 }
 
-function MatchRow({ m, sport, events, comp, lang }) {
-  const started = m.status !== 'scheduled' && m.status !== 'postponed' && m.status !== 'cancelled'
-  const live = m.status === 'live' || m.status === 'ht'
-  const homeName = m.home?.name || '—', awayName = m.away?.name || '—'
-  const homeGoals = sport === 'football' && events?.length ? scorerLine(events, 'home', lang) : ''
-  const awayGoals = sport === 'football' && events?.length ? scorerLine(events, 'away', lang) : ''
-  const winHome = m.status === 'ft' && m.home_score > m.away_score
-  const winAway = m.status === 'ft' && m.away_score > m.home_score
+function FixtureRow({ m, lang }) {
+  const home = pick(m, 'home_team', lang), away = pick(m, 'away_team', lang)
+  const played = m.home_score != null && m.away_score != null && m.home_score !== '' && m.away_score !== ''
+  const time = parseLocal(m.match_local)?.time
   return (
-    <View style={s.row}
-      accessible
-      accessibilityLabel={`${homeName} ${started ? m.home_score ?? 0 : ''} – ${started ? m.away_score ?? 0 : ''} ${awayName}`}>
-      <StatusCell m={m} sport={sport} lang={lang} />
-      <View style={s.teams}>
-        {!!comp && <Text style={s.comp} numberOfLines={1}>{comp}</Text>}
-        <View style={s.teamLine}>
-          <TeamLogo uri={m.home?.logo_url} />
-          <Text style={[s.teamName, winHome && s.winner]} numberOfLines={1}>{homeName}</Text>
-          <Text style={[s.score, live && s.scoreLive, winHome && s.winner]}>{started ? (m.home_score ?? 0) : ''}</Text>
-        </View>
-        {!!homeGoals && <Text style={s.scorers} numberOfLines={2}>{homeGoals}</Text>}
-        <View style={s.teamLine}>
-          <TeamLogo uri={m.away?.logo_url} />
-          <Text style={[s.teamName, winAway && s.winner]} numberOfLines={1}>{awayName}</Text>
-          <Text style={[s.score, live && s.scoreLive, winAway && s.winner]}>{started ? (m.away_score ?? 0) : ''}</Text>
-        </View>
-        {!!awayGoals && <Text style={s.scorers} numberOfLines={2}>{awayGoals}</Text>}
+    <View style={s.row} accessible
+      accessibilityLabel={`${home} ${played ? `${m.home_score}–${m.away_score}` : time ? `${time},` : '–'} ${away}`}>
+      <View style={[s.side, s.sideHome]}>
+        <Text style={[s.teamName, s.nameHome]} numberOfLines={2}>{home || '—'}</Text>
+        <TeamLogo uri={m.home_logo_url} />
+      </View>
+      <View style={s.mid}>
+        <Text style={played ? s.score : s.vs}>{played ? `${m.home_score} – ${m.away_score}` : 'VS'}</Text>
+        {!played && !!time && <Text style={s.kick}>{time}</Text>}
+      </View>
+      <View style={s.side}>
+        <TeamLogo uri={m.away_logo_url} />
+        <Text style={s.teamName} numberOfLines={2}>{away || '—'}</Text>
       </View>
     </View>
   )
 }
 
-function LeagueSection({ league, matches, sport, eventsByMatch, connected, compOf, lang }) {
-  const manual = league.source === 'manual'
-  const lastSync = manual ? null : matches.reduce((a, m) => (m.last_synced_at && (!a || m.last_synced_at > a) ? m.last_synced_at : a), null)
-  let lastDay = null
-  return (
-    <View style={s.section}>
-      <View style={s.sectionHead}>
-        <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{leagueLabel(league, lang)}</OnPhotoLabel>
-        {manual
-          ? connected && (
-            <View style={s.livePill}>
-              <View style={s.liveDot} />
-              <Text style={s.livePillText}>{t('lsLiveUpdates', lang)}</Text>
-            </View>
-          )
-          : !!lastSync && <OnPhotoLabel style={s.metaPill} textStyle={s.metaPillText}>{updatedAgo(lastSync, lang)}</OnPhotoLabel>}
-      </View>
+function FixtureList({ fixtures, lang }) {
+  const days = []
+  for (const m of fixtures) {
+    const p = parseLocal(m.match_local)
+    const key = p?.day || ''
+    if (!days.length || days[days.length - 1].key !== key) days.push({ key, p, list: [] })
+    days[days.length - 1].list.push(m)
+  }
+  return days.map(d => (
+    <View key={d.key || 'undated'} style={s.section}>
+      {!!d.p && <OnPhotoLabel style={s.dayPill} accessibilityRole="header">{dayLabel(d.p, lang)}</OnPhotoLabel>}
       <Card padding={0}>
-        {matches.map((m, i) => {
-          const dk = dayKey(new Date(m.kickoff_at))
-          const showDay = dk !== lastDay
-          lastDay = dk
-          return (
-            <View key={m.id}>
-              {showDay && <Text style={[s.dayDivider, i > 0 && s.dayDividerGap]}>{dayLabel(m.kickoff_at, lang)}</Text>}
-              {!showDay && <View style={s.hairline} />}
-              <MatchRow m={m} sport={sport} events={eventsByMatch[m.id]} comp={compOf?.(m)} lang={lang} />
-            </View>
-          )
-        })}
+        {d.list.map((m, i) => (
+          <View key={m.match_id}>
+            {i > 0 && <View style={s.hairline} />}
+            <FixtureRow m={m} lang={lang} />
+          </View>
+        ))}
       </Card>
     </View>
-  )
+  ))
 }
 
-// ─── Football / basketball ───────────────────────────────────────────────────
-function MatchesView({ sport, lang }) {
-  const [leagues, setLeagues] = useState([])
-  const [matches, setMatches] = useState([])
-  const [eventsByMatch, setEventsByMatch] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState(false)
-  const [connected, setConnected] = useState(false)
-  const appActive = useAppActive()
-  const reloadTimer = useRef(null)
-  // The ids on screen, for the Realtime handler: a state updater runs later, so it cannot
-  // tell the handler whether the row was already known.
-  const idsRef = useRef(new Set())
-  useEffect(() => { idsRef.current = new Set(matches.map(m => m.id)) }, [matches])
-  useTicker()
-
-  const load = useCallback(async () => {
-    const now = new Date()
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const from = new Date(Math.min(startOfToday.getTime(), now.getTime() - 6 * 3600000)).toISOString()
-    const to = new Date(startOfToday.getTime() + 2 * 86400000).toISOString()
-    const [lg, mt] = await Promise.all([
-      supabase.from('leagues').select('id, name, name_i18n, country, source, sort_order').eq('sport', sport).eq('enabled', true).order('sort_order'),
-      supabase.from('matches').select(MATCH_COLS).eq('sport', sport).gte('kickoff_at', from).lt('kickoff_at', to).order('kickoff_at'),
-    ])
-    if (lg.error || mt.error) { setError(true); setLoading(false); setRefreshing(false); return }
-    setLeagues(lg.data)
-    setMatches(mt.data)
-    if (sport === 'football') {
-      const ids = mt.data.filter(m => m.status !== 'scheduled').map(m => m.id)
-      if (ids.length) {
-        const { data: ev, error: evErr } = await supabase.from('match_events')
-          .select('id, match_id, type, team_side, player_name, minute, extra_minute')
-          .in('match_id', ids).order('minute', { ascending: true, nullsFirst: false })
-        if (!evErr) {
-          const by = {}
-          for (const e of ev) (by[e.match_id] ||= []).push(e)
-          setEventsByMatch(by)
-        }
-      } else setEventsByMatch({})
-    }
-    setError(false); setLoading(false); setRefreshing(false)
-  }, [sport])
-
-  const scheduleReload = useCallback(() => {
-    clearTimeout(reloadTimer.current)
-    reloadTimer.current = setTimeout(load, 1500)
-  }, [load])
-
-  useEffect(() => () => clearTimeout(reloadTimer.current), [])
-
-  // Load + subscribe while the app is in front; drop the channel in the background and
-  // reload on return, since anything that changed meanwhile was not delivered.
-  useEffect(() => {
-    if (!appActive) return
-    load()
-    const ch = supabase.channel(`ls-${sport}-${Date.now()}`)
-      // DELETE unfiltered as well: a deleted KTFF fixture must leave every screen at once.
-      // REPLICA IDENTITY FULL (20261071) lets the filtered stream carry it too; removing an
-      // id that is not on screen is a no-op, so receiving it twice is harmless.
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'matches' }, p => {
-        setMatches(ms => ms.filter(m => m.id !== p.old?.id))
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `sport=eq.${sport}` }, p => {
-        if (p.eventType === 'DELETE') { setMatches(ms => ms.filter(m => m.id !== p.old?.id)); return }
-        // A match not on screen (new, or moved into the window) needs the joined read for its teams.
-        if (!idsRef.current.has(p.new.id)) { scheduleReload(); return }
-        setMatches(ms => ms.map(m => (m.id === p.new.id ? { ...m, ...p.new, home: m.home, away: m.away } : m)))
-      })
-    if (sport === 'football') {
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'match_events' }, p => {
-        if (p.eventType === 'DELETE') {
-          setEventsByMatch(by => {
-            const next = {}
-            for (const [k, list] of Object.entries(by)) next[k] = list.filter(e => e.id !== p.old.id)
-            return next
-          })
-        } else if (p.eventType === 'INSERT') {
-          setEventsByMatch(by => {
-            const list = [...(by[p.new.match_id] || []).filter(e => e.id !== p.new.id), p.new]
-            list.sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999))
-            return { ...by, [p.new.match_id]: list }
-          })
-        }
-      })
-    }
-    ch.subscribe(st => setConnected(st === 'SUBSCRIBED'))
-    return () => { setConnected(false); supabase.removeChannel(ch) }
-  }, [sport, appActive, load, scheduleReload])
-
-  if (loading) return <View style={s.pad}><CardSkeleton /><CardSkeleton /><CardSkeleton /></View>
-  if (error) return <ErrorState lang={lang} onRetry={() => { setLoading(true); load() }} />
-
-  // Türkiye national-team games are pinned above the other internationals (Berke, 2026-10-04):
-  // lifted out of whichever international competition they belong to, shown in one section
-  // with the competition on each row.
-  const leagueById = new Map(leagues.map(l => [l.id, l]))
-  const isTurkeyGame = m => leagueById.get(m.league_id)?.country === 'World'
-    && (TURKEY_TEAM.has(m.home?.name) || TURKEY_TEAM.has(m.away?.name))
-  const pinned = sport === 'football' ? matches.filter(isTurkeyGame) : []
-  const pinnedIds = new Set(pinned.map(m => m.id))
-  const sections = leagues
-    .map(l => ({ league: l, matches: matches.filter(m => m.league_id === l.id && !pinnedIds.has(m.id)).sort(byKickoff) }))
-    .concat(pinned.length ? [{
-      league: { id: 'turkey-national', name: t('lsTurkeyTeam', lang), source: 'api', sort_order: TURKEY_PIN_SORT },
-      matches: [...pinned].sort(byKickoff),
-      compOf: m => { const l = leagueById.get(m.league_id); return l ? leagueLabel(l, lang) : null },
-    }] : [])
-    .filter(sec => sec.matches.length)
-    .sort((a, b) => a.league.sort_order - b.league.sort_order)
-
+function StandingRow({ r, lang, wide, legend }) {
+  const bar = HEX.test(r.marker_color || '') ? r.marker_color : null
+  const supplied = HEX.test(r.marker_text_color || '') ? r.marker_text_color : null
+  const chipText = bar ? (supplied && contrastRatio(supplied, bar) >= 4.5 ? supplied : readableOn(bar)) : null
+  const mk = bar && legend.find(it => (it.color || '').toLowerCase() === bar.toLowerCase())
+  const team = pick(r, 'team', lang)
   return (
-    <ScrollView contentContainerStyle={s.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} tintColor="#FFFFFF" onRefresh={() => { setRefreshing(true); load() }} />}>
-      {sections.length === 0
-        ? <EmptyState icon={sport === 'football' ? 'football-outline' : 'basketball-outline'} category="explore"
-            title={t('lsEmptyTitle', lang)} message={t('lsEmptyBody', lang)} />
-        : sections.map(sec => (
-          <LeagueSection key={sec.league.id} league={sec.league} matches={sec.matches} sport={sport}
-            eventsByMatch={eventsByMatch} connected={connected} compOf={sec.compOf} lang={lang} />
-        ))}
-    </ScrollView>
-  )
-}
-
-// ─── Formula 1 ───────────────────────────────────────────────────────────────
-// API-Sports' free plan sees yesterday/today/tomorrow only, so this tab is honest about
-// that: today's and tomorrow's sessions, and the live or last race result. No calendar and
-// no standings — there is no free source for either that a commercial app may use.
-function Countdown({ iso, lang }) {
-  const ms = Math.max(0, new Date(iso).getTime() - Date.now())
-  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000)
-  return <Text style={s.countdown}>{fill(t('lsF1Countdown', lang), { d, h, m })}</Text>
-}
-
-const SESSION_LABEL = {
-  race: 'lsF1Race', sprint: 'lsF1Sprint', qualifying: 'lsF1Qualifying', sprint_qualifying: 'lsF1SprintQualifying',
-}
-function sessionLabel(type, lang) {
-  const p = /^practice([123])$/.exec(type)
-  return p ? fill(t('lsF1Practice', lang), { n: p[1] }) : t(SESSION_LABEL[type] || 'lsF1Race', lang)
-}
-
-function SessionRow({ x, isNext, suffix, lang }) {
-  return (
-    <View style={s.f1Row}>
-      <Text style={s.f1Time}>{hhmm(x.race_at)}</Text>
-      <View style={s.f1Who}>
-        <Text style={s.teamName} numberOfLines={1}>{sessionLabel(x.session_type, lang)}{suffix ? ` · ${suffix}` : ''}</Text>
-        <Text style={s.f1Team} numberOfLines={1}>{x.name}</Text>
+    <View style={s.stRow} accessible
+      accessibilityLabel={`${r.rank}. ${team}, ${r.points} ${t('lsColPts', lang)}${mk ? `, ${pick({ label_tr: mk.label_tr, label_en: mk.label_en }, 'label', lang)}` : ''}`}>
+      <View style={[s.rankChip, bar && { backgroundColor: bar }]}>
+        <Text style={[s.rankText, chipText && { color: chipText }]}>{r.rank}</Text>
       </View>
-      {x.status === 'live'
-        ? <View style={[s.livePill, s.f1LiveInline]}><View style={s.liveDot} /><Text style={s.livePillText}>{t('lsLive', lang)}</Text></View>
-        : x.status === 'finished'
-          ? <Text style={s.f1Right}>{t('lsF1Finished', lang)}</Text>
-          : x.status === 'cancelled' || x.status === 'postponed'
-            ? <Text style={s.f1Right}>{t(x.status === 'cancelled' ? 'lsCancelled' : 'lsPostponed', lang)}</Text>
-            : isNext ? <Countdown iso={x.race_at} lang={lang} /> : null}
+      <TeamLogo uri={r.logo_url} />
+      <Text style={s.stTeam} numberOfLines={1}>{team}</Text>
+      <Num style={s.stNum}>{r.played}</Num>
+      {wide && <Num style={s.stNum}>{r.won}</Num>}
+      {wide && <Num style={s.stNum}>{r.drawn}</Num>}
+      {wide && <Num style={s.stNum}>{r.lost}</Num>}
+      <Num style={s.stGd}>{r.goal_difference}</Num>
+      <Num style={s.stPts}>{r.points}</Num>
     </View>
   )
 }
 
-// API-Sports splits qualifying into three sessions; on screen they read Q1 / Q2 / Q3
-// (SQ1-SQ3 for sprint qualifying), numbered in time order within the day.
-function qualiPart(list, x) {
-  if (x.session_type !== 'qualifying' && x.session_type !== 'sprint_qualifying') return null
-  const same = list.filter(y => y.session_type === x.session_type)
-  if (same.length < 2) return null
-  return `${x.session_type === 'qualifying' ? 'Q' : 'SQ'}${same.indexOf(x) + 1}`
+// Fixed column widths shared by header and rows; a 3-digit value shrinks instead of clipping.
+function Num({ style, children }) {
+  return <Text style={[s.stCell, style]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{children}</Text>
 }
 
-function F1View({ lang }) {
-  const [sessions, setSessions] = useState([])
-  const [race, setRace] = useState(null)
-  const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const appActive = useAppActive()
-  useTicker()
-
-  const load = useCallback(async () => {
-    const now = new Date()
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const [ss, lr] = await Promise.all([
-      supabase.from('f1_races').select('id, name, circuit, session_type, race_at, status')
-        .gte('race_at', startOfToday.toISOString())
-        .lt('race_at', new Date(startOfToday.getTime() + 2 * 86400000).toISOString())
-        .order('race_at'),
-      supabase.from('f1_races').select('id, name, circuit, race_at, status')
-        .eq('session_type', 'race').in('status', ['live', 'finished'])
-        .order('race_at', { ascending: false }).limit(1),
-    ])
-    if (ss.error || lr.error) { setError(true); setLoading(false); return }
-    const last = lr.data[0] || null
-    let res = []
-    if (last) {
-      const r = await supabase.from('f1_results').select('position, driver_name, driver_code, team, time_text')
-        .eq('race_id', last.id).order('position', { ascending: true, nullsFirst: false }).limit(10)
-      if (r.error) { setError(true); setLoading(false); return }
-      res = r.data
-    }
-    setSessions(ss.data); setRace(last); setResults(res); setError(false); setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    if (!appActive) return
-    load()
-    let timer = null
-    const ch = supabase.channel(`ls-f1-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'f1_results' }, () => {
-        clearTimeout(timer); timer = setTimeout(load, 1500)
-      })
-      .subscribe()
-    return () => { clearTimeout(timer); supabase.removeChannel(ch) }
-  }, [appActive, load])
-
-  if (loading) return <View style={s.pad}><CardSkeleton /><CardSkeleton /></View>
-  if (error) return <ErrorState lang={lang} onRetry={() => { setLoading(true); load() }} />
-  if (!sessions.length && !race) return <EmptyState icon="flag-outline" category="explore" title={t('lsF1Empty', lang)} />
-
-  const now = Date.now()
-  const next = sessions.find(x => x.status === 'scheduled' && new Date(x.race_at).getTime() > now)
-  const days = []
-  for (const x of sessions) {
-    const k = dayKey(new Date(x.race_at))
-    if (!days.length || days[days.length - 1].key !== k) days.push({ key: k, iso: x.race_at, list: [] })
-    days[days.length - 1].list.push(x)
-  }
-
+function StandingsHead({ lang, wide }) {
   return (
-    <ScrollView contentContainerStyle={s.scroll}>
-      {days.length === 0
-        ? <Card><Text style={s.f1Meta}>{t('lsF1NoSessions', lang)}</Text></Card>
-        : days.map(d => (
-          <View key={d.key} style={s.section}>
-            <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{dayLabel(d.iso, lang)}</OnPhotoLabel>
-            <Card padding={0}>
-              {d.list.map((x, i) => (
-                <View key={x.id}>
-                  {i > 0 && <View style={s.hairline} />}
-                  <SessionRow x={x} isNext={next?.id === x.id} suffix={qualiPart(d.list, x)} lang={lang} />
-                </View>
-              ))}
-            </Card>
-          </View>
-        ))}
-
-      {!!race && results.length > 0 && (
-        <View style={s.section}>
-          <View style={s.sectionHead}>
-            <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">
-              {`${race.status === 'live' ? t('lsF1Live', lang) : t('lsF1LastRace', lang)} · ${race.name}`}
-            </OnPhotoLabel>
-          </View>
-          <Card padding={0}>
-            {results.map((r, i) => (
-              <View key={r.driver_name}>
-                {i > 0 && <View style={s.hairline} />}
-                <View style={s.f1Row}>
-                  <Text style={s.f1Pos}>{r.position ?? '–'}</Text>
-                  <View style={s.f1Who}>
-                    <Text style={s.teamName} numberOfLines={1}>{r.driver_name}</Text>
-                    {!!r.team && <Text style={s.f1Team} numberOfLines={1}>{r.team}</Text>}
-                  </View>
-                  <Text style={s.f1Right} numberOfLines={1}>{r.time_text || ''}</Text>
-                </View>
-              </View>
-            ))}
-          </Card>
-        </View>
-      )}
-    </ScrollView>
+    <View style={s.stRow}>
+      <View style={s.rankChip} />
+      <View style={s.logo} />
+      <Text style={s.stTeam} />
+      <Num style={[s.stNum, s.stHead]}>{t('lsColPlayed', lang)}</Num>
+      {wide && <Num style={[s.stNum, s.stHead]}>{t('lsColWon', lang)}</Num>}
+      {wide && <Num style={[s.stNum, s.stHead]}>{t('lsColDrawn', lang)}</Num>}
+      {wide && <Num style={[s.stNum, s.stHead]}>{t('lsColLost', lang)}</Num>}
+      <Num style={[s.stGd, s.stHead]}>{t('lsColGD', lang)}</Num>
+      <Num style={[s.stPts, s.stHead]}>{t('lsColPts', lang)}</Num>
+    </View>
   )
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-export default function LiveScoresScreen({ lang, session, onBack, backRef = null }) {
-  const [sport, setSport] = useState('football')
-  const [isEditor, setIsEditor] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const editorBackRef = useRef(null)
+function Legend({ items, lang }) {
+  return (
+    <Card style={s.legend}>
+      {items.map((it, i) => (
+        <View key={it.id ?? i} style={s.legendRow}>
+          <View style={[s.legendDot, HEX.test(it.color || '') && { backgroundColor: it.color }]} />
+          <Text style={s.legendText}>{pick({ label_tr: it.label_tr, label_en: it.label_en }, 'label', lang)}</Text>
+        </View>
+      ))}
+    </Card>
+  )
+}
 
-  // Only a signed-in, non-guest user can be an editor; the database decides (is_score_editor).
-  useEffect(() => {
-    if (!session || isGuest(session)) { setIsEditor(false); return }
-    let alive = true
-    supabase.rpc('is_score_editor').then(({ data, error }) => { if (alive) setIsEditor(!error && data === true) })
-    return () => { alive = false }
-  }, [session])
+function WeekPicker({ weeks, week, onChange, lang }) {
+  const i = weeks.indexOf(week)
+  const prev = i > 0 ? weeks[i - 1] : null
+  const next = i >= 0 && i < weeks.length - 1 ? weeks[i + 1] : null
+  return (
+    <View style={s.weekBar}>
+      <TouchableOpacity style={[s.weekBtn, prev == null && s.weekOff]} disabled={prev == null}
+        onPress={() => onChange(prev)} activeOpacity={press.small}
+        accessibilityRole="button" accessibilityLabel={t('lsWeekPrev', lang)}>
+        <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+      </TouchableOpacity>
+      <View style={s.weekMid}>
+        <OnPhotoLabel style={s.credit} accessibilityRole="header">{fill(t('lsWeekN', lang), { n: week })}</OnPhotoLabel>
+      </View>
+      <TouchableOpacity style={[s.weekBtn, next == null && s.weekOff]} disabled={next == null}
+        onPress={() => onChange(next)} activeOpacity={press.small}
+        accessibilityRole="button" accessibilityLabel={t('lsWeekNext', lang)}>
+        <Ionicons name="chevron-forward" size={20} color={colors.textPrimary} />
+      </TouchableOpacity>
+    </View>
+  )
+}
 
-  // App's central back chain asks this first: the editor's own layers, then the editor.
-  useEffect(() => {
-    if (!backRef) return
-    backRef.current = () => {
-      if (!editing) return false
-      if (editorBackRef.current?.()) return true
-      setEditing(false)
-      return true
+export default function LiveScoresScreen({ lang, onBack }) {
+  const [tab, setTab] = useState('fixtures')
+  const [leagueId, setLeagueId] = useState(1)
+  const [weekSel, setWeekSel] = useState(null)
+  const [leagues, setLeagues] = useState([])
+  const [fixtures, setFixtures] = useState([])
+  const [standings, setStandings] = useState([])
+  const [week, setWeek] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
+  const [shownTab, setShownTab] = useState('fixtures')
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState(false)
+  const reqRef = useRef(0)
+  const insets = useSafeAreaInsets()
+  const { width, fontScale } = useWindowDimensions()
+  const wide = width / fontScale >= WIDE_MIN
+
+  const load = useCallback(async () => {
+    const req = ++reqRef.current
+    const done = () => { if (req === reqRef.current) { setLoading(false); setRefreshing(false) } }
+    const fail = () => { if (req === reqRef.current) setError(true); done() }
+    const lg = await supabase.from('ktff_leagues')
+      .select('league_id,name_tr,name_en,logo_url,available_weeks,current_week,legend')
+    if (lg.error) return fail()
+    const L = (lg.data || []).find(x => x.league_id === leagueId)
+    const weeks = L?.available_weeks || []
+    const w = weekSel != null && weeks.includes(weekSel) ? weekSel : (L?.current_week ?? weeks[weeks.length - 1] ?? null)
+    let fx = [], st = []
+    if (tab === 'fixtures') {
+      if (w != null) {
+        const r = await supabase.from('ktff_fixtures').select('*').eq('league_id', leagueId).eq('week', w)
+          .order('kickoff_at', { nullsFirst: false }).order('match_id')
+        if (r.error) return fail()
+        fx = r.data || []
+      }
+    } else {
+      const r = await supabase.from('ktff_standings').select('*').eq('league_id', leagueId).order('rank')
+      if (r.error) return fail()
+      st = r.data || []
     }
-    return () => { backRef.current = null }
-  }, [backRef, editing])
+    if (req !== reqRef.current) return
+    setLeagues(lg.data || []); setWeek(w); setFixtures(fx); setStandings(st); setShownTab(tab); setLoaded(true)
+    setError(false); done()
+  }, [leagueId, weekSel, tab])
 
-  if (editing) return <LiveScoresEditorScreen lang={lang} onBack={() => setEditing(false)} backRef={editorBackRef} />
+  useEffect(() => { setLoading(true); load() }, [load])
+  useAppActive(load)
+
+  const leagueName = id => {
+    const l = leagues.find(x => x.league_id === id)
+    return (l && pick(l, 'name', lang)) || t(LEAGUE_FALLBACK[id], lang)
+  }
+  const cur = leagues.find(x => x.league_id === leagueId)
+  const weeks = cur?.available_weeks || []
+  const legend = Array.isArray(cur?.legend) ? cur.legend : []
+
+  const body = () => {
+    if (loading && !loaded) return <View style={s.pad}><CardSkeleton /><CardSkeleton /><CardSkeleton /></View>
+    if (error) return <ErrorState lang={lang} onRetry={() => { setLoading(true); load() }} />
+    return (
+      <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: listBottomPad(insets) }, loading && !refreshing && s.dim]}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.onPrimary} colors={[colors.primary]} onRefresh={() => { setRefreshing(true); load() }} />}>
+        {shownTab === 'fixtures' ? (
+          week == null || weeks.length === 0
+            ? <EmptyState icon="football-outline" category="explore" title={t('lsNoFixturesTitle', lang)} message={t('lsNoFixturesBody', lang)} />
+            : <>
+                <WeekPicker weeks={weeks} week={week} onChange={setWeekSel} lang={lang} />
+                {fixtures.length === 0
+                  ? <EmptyState icon="football-outline" category="explore" title={t('lsNoFixturesTitle', lang)} message={t('lsNoFixturesBody', lang)} />
+                  : <FixtureList fixtures={fixtures} lang={lang} />}
+              </>
+        ) : (
+          standings.length === 0
+            ? <EmptyState icon="list-outline" category="explore" title={t('lsNoStandingsTitle', lang)} message={t('lsNoStandingsBody', lang)} />
+            : <>
+                <Card padding={0}>
+                  <StandingsHead lang={lang} wide={wide} />
+                  {standings.map(r => (
+                    <View key={r.team_id}>
+                      <View style={s.hairline} />
+                      <StandingRow r={r} lang={lang} wide={wide} legend={legend} />
+                    </View>
+                  ))}
+                </Card>
+                {legend.length > 0 && <Legend items={legend} lang={lang} />}
+              </>
+        )}
+        <OnPhotoLabel style={s.credit}>{t('lsSourceKtff', lang)}</OnPhotoLabel>
+      </ScrollView>
+    )
+  }
 
   return (
     <ModuleScreen>
       <SafeAreaView style={s.safe} edges={['top']}>
-        <UiHeader lang={lang} title={t('menuLiveScores', lang)} onBack={onBack}
-          actions={isEditor ? [{ icon: 'create-outline', onPress: () => setEditing(true), accessibilityLabel: t('lsEditOpen', lang) }] : []} />
+        <UiHeader lang={lang} title={t('menuLiveScores', lang)} onBack={onBack} />
         <FilterBar>
-          {SPORTS.map(sp => (
-            <TouchableOpacity key={sp} style={[s.tab, sport === sp && s.tabOn]} onPress={() => setSport(sp)}
-              activeOpacity={press.small} accessibilityRole="tab" accessibilityState={{ selected: sport === sp }}>
-              <Text style={[s.tabText, sport === sp && s.tabTextOn]}>{t(SPORT_LABEL[sp], lang)}</Text>
-            </TouchableOpacity>
+          <Pill label={t('lsTabFixtures', lang)} on={tab === 'fixtures'} onPress={() => setTab('fixtures')} />
+          <Pill label={t('lsTabStandings', lang)} on={tab === 'standings'} onPress={() => setTab('standings')} />
+        </FilterBar>
+        <FilterBar style={s.leagueBar}>
+          {LEAGUES.map(id => (
+            <Pill key={id} label={leagueName(id)} on={leagueId === id}
+              onPress={() => { if (id !== leagueId) { setLeagueId(id); setWeekSel(null) } }} />
           ))}
         </FilterBar>
-        {sport === 'f1' ? <F1View lang={lang} /> : <MatchesView key={sport} sport={sport} lang={lang} />}
+        {body()}
       </SafeAreaView>
     </ModuleScreen>
   )
@@ -507,55 +306,53 @@ export default function LiveScoresScreen({ lang, session, onBack, backRef = null
 
 const s = StyleSheet.create({
   safe:        { flex: 1 },
-  pad:         { padding: 16, gap: 12 },
-  scroll:      { padding: 16, paddingBottom: 48, gap: 20 },
+  pad:         { padding: spacing.md, gap: 12 },
+  scroll:      { padding: spacing.md, gap: spacing.md },
+  dim:         { opacity: 0.6 },
+  leagueBar:   { marginTop: -4 },
 
-  tab:         { minHeight: 36, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radii.pill,
-                 backgroundColor: 'rgba(0,0,0,0.45)' },
+  tab:         { minHeight: TAP, paddingHorizontal: spacing.md, justifyContent: 'center', borderRadius: radii.pill,
+                 backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
   tabOn:       { backgroundColor: colors.card },
-  tabText:     { ...type.small, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  tabText:     { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.onPrimary },
   tabTextOn:   { color: colors.textPrimary },
 
-  section:     { gap: 8 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  leaguePill:  { flexShrink: 1 },
-  metaPill:    { paddingHorizontal: 10, paddingVertical: 4 },
-  metaPillText:{ ...type.meta, color: '#FFFFFF' },
-  livePill:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)',
-                 borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  livePillText:{ ...type.meta, color: '#FFFFFF' },
-  liveDot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
+  weekBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  weekBtn:     { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center',
+                 backgroundColor: CARD_BG },
+  weekOff:     { opacity: 0.4 },
+  weekMid:     { flex: 1, alignItems: 'center' },
 
-  dayDivider:  { ...type.caption, color: colors.textSecondary, letterSpacing: 0.2,
-                 paddingHorizontal: 16, paddingTop: 12, paddingBottom: 2 },
-  dayDividerGap: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 4 },
-  hairline:    { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginLeft: 72 },
+  section:     { gap: spacing.sm },
+  dayPill:     { maxWidth: '100%' },
+  hairline:    { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider },
 
-  row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingRight: 16, minHeight: TAP + 12 },
-  statusCol:   { width: 64, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  statusText:  { ...type.meta, color: colors.textSecondary, textAlign: 'center' },
-  statusHt:    { color: colors.dangerInk, fontFamily: 'Inter_600SemiBold' },
-  statusLive:  { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
-  liveDotSmall:{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dangerInk },
-  teams:       { flex: 1, gap: 4 },
-  teamLine:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, minHeight: TAP + 12 },
+  side:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sideHome:    { justifyContent: 'flex-end' },
+  teamName:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, flexShrink: 1 },
+  nameHome:    { textAlign: 'right' },
+  mid:         { width: 68, alignItems: 'center', justifyContent: 'center' },
+  score:       { ...type.sheetTitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+  vs:          { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  kick:        { ...type.caption, color: colors.textSecondary, fontVariant: ['tabular-nums'] },
   logo:        { width: 20, height: 20 },
   logoBlank:   { alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.soft },
-  teamName:    { ...type.body, color: colors.textPrimary, flex: 1 },
-  winner:      { fontFamily: 'Inter_700Bold' },
-  score:       { ...type.rowTitle, color: colors.textPrimary, minWidth: 28, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  scoreLive:   { color: colors.dangerInk },
-  comp:        { ...type.caption, color: colors.textSecondary },
-  scorers:     { ...type.caption, color: colors.textSecondary, marginLeft: 28 },
 
-  f1Meta:      { ...type.small, color: colors.textSecondary, marginTop: 4 },
-  countdown:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark, fontVariant: ['tabular-nums'] },
-  f1Time:      { ...type.rowTitle, color: colors.textPrimary, width: 48, fontVariant: ['tabular-nums'] },
-  f1LiveInline:{ backgroundColor: colors.dangerInk },
-  f1Row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, gap: 12, minHeight: TAP },
-  f1Pos:       { ...type.rowTitle, color: colors.textSecondary, width: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  f1Who:       { flex: 1 },
-  f1Team:      { ...type.meta, color: colors.textSecondary },
-  f1Right:     { ...type.meta, color: colors.textSecondary, maxWidth: 110, textAlign: 'right' },
+  stRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: 10, gap: spacing.xs, minHeight: 40 },
+  rankChip:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
+  rankText:    { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+  stTeam:      { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, flex: 1 },
+  stCell:      { ...type.small, color: colors.textPrimary, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  stNum:       { width: 22 },
+  stGd:        { width: 30 },
+  stPts:       { width: 30, fontFamily: 'Inter_700Bold' },
+  stHead:      { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
+  legend:      { gap: spacing.sm },
+  legendRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  legendDot:   { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.soft },
+  legendText:  { ...type.small, color: colors.textPrimary, flex: 1 },
+
+  credit:      { alignSelf: 'center' },
 })
