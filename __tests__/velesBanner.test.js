@@ -70,3 +70,16 @@ test('a failing openURL returns false and the tap is still logged', async () => 
   expect(await m.openVeles('English')).toBe(false)
   expect(m.calls[0]).toEqual(['log', 'news', m.VELES_ENTITY_ID, 'website', null, 'English'])
 })
+
+test('the site is "Velesbit Postası" everywhere a user can see it: banner title + accessibility label in all 9 languages', () => {
+  const fs = require('fs')
+  const path = require('path')
+  const banner = fs.readFileSync(path.join(__dirname, '../components/home/redesign/VelesBanner.js'), 'utf8')
+  expect(banner).toMatch(/export const VELES_NAME = 'Velesbit Postası'/)
+  const i18n = fs.readFileSync(path.join(__dirname, '../constants/i18n.js'), 'utf8')
+  const labels = [...i18n.matchAll(/velesBannerA11y:\s*"([^"]*)"/g)].map(m => m[1])
+  expect(labels).toHaveLength(9)
+  for (const l of labels) expect([l, l.includes('Velesbit Postası')]).toEqual([l, true])
+  const visible = [...i18n.matchAll(/veles\w*:\s*"([^"]*)"/g)].map(m => m[1])
+  for (const v of visible) expect([v, /Veles(?!bit)/.test(v)]).toEqual([v, false])
+})

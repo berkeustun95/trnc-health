@@ -4,7 +4,7 @@ import { t } from '../../../constants/i18n'
 import { press, colors, radii, space, type, font, elevation } from '../../../constants/theme'
 import { TILE_FONT_CAP } from './Widgets'
 
-// ─── Home: Veles Bit Postası banner (Berke, 2026-11-22) ─────────────────────
+// ─── Home: Velesbit Postası banner (Berke, 2026-11-22) ─────────────────────
 // A news site card under the hero, before the Oli bar. Fixed 64pt; every text is one line and the
 // font may grow only to TILE_FONT_CAP. Shown only while VELES is on (HomeScreen decides). NOT an ad:
 // no "Sponsorlu", nothing from ad_banners. The pill says the site is in Turkish and is hidden for
@@ -12,7 +12,7 @@ import { TILE_FONT_CAP } from './Widgets'
 export const VELES_BANNER_H = 64
 export const VELES_BANNER_GAP = 12
 export const VELES_BANNER_BLOCK_H = VELES_BANNER_GAP + VELES_BANNER_H   // marginTop + card, what the hero gives back / the Oli check adds
-export const VELES_NAME = 'Veles Bit Postası'
+export const VELES_NAME = 'Velesbit Postası'
 // TODO(Berke): Veles brand colour (neutral placeholder until the brand is supplied)
 export const VELES_BRAND = '#3F4E57'
 
