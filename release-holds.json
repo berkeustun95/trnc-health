@@ -169,6 +169,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Clears together with #541: only after Berke has seen the banner on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit."
+    },
+    {
+      "pr": 563,
+      "commit": "dd655d942052acba7212a65f05a3d048b23c75b2",
+      "what": "Velesbit Postası banner: brand blue #0A5688, untranslated slogan line, trimmed real logo, layout A ('TR' badge, no chevron), merged to main 2026-11-23 as 87e5386d",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has seen it on Preview and says go in chat, together with #541/#546/#551/#552/#553. Then set cleared to true in a PR."
     }
   ]
 }
