@@ -9,6 +9,9 @@ import { getIntent } from '../constants/oliIntents'
 import { loadOliHistory, saveOliMessage } from '../utils/oliHistory'
 import { oliProvider } from '../utils/oliAnswers'
 
+// 3 tests here timed out at 5 s during the 2026-11-23 Preview preflight (load 12); green on retry (Berke, 2026-11-15 rule).
+jest.setTimeout(15000)
+
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default)
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }))
 jest.mock('../lib/supabase', () => ({ supabase: {} }))
