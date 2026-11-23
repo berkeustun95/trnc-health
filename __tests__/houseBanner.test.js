@@ -7,6 +7,7 @@ let mockLive = false
 let mockHouse = true
 let mockResult = { data: [], error: null }
 let mockPending = null            // a promise the query waits on, to hold "loading"
+let mockShare = 1                 // share of the banner on screen, as measureShare would report it
 const mockCalls = []
 
 jest.mock('../constants/flags', () => {
@@ -16,6 +17,8 @@ jest.mock('../constants/flags', () => {
 jest.mock('../constants/redesign', () => ({ get HOUSE_BANNER() { return mockHouse } }))
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }))
 jest.mock('../components/ui', () => ({ RemoteImage: () => require('react').createElement('View', { testID: 'paid-image' }) }))
+jest.mock('../utils/adVisibility', () => ({ HOUSE_VISIBLE_SHARE: 0.5, measureShare: (_node, _inset, cb) => cb(mockShare) }))
+jest.mock('../components/ui/FloatingTabBar', () => ({ useTabBarFootprint: () => 0 }))
 jest.mock('../utils/workWithAda', () => ({ openWorkWithAda: lang => { mockCalls.push(['open', lang]) } }))
 jest.mock('../utils/logAdEvent', () => ({
   logAdView: jest.fn(), logAdTap: jest.fn(),
@@ -58,7 +61,7 @@ const house = () => screen.queryByLabelText(houseLabel('English'))
 
 beforeAll(() => { jest.spyOn(RN.Image, 'getSize').mockImplementation(() => {}) })
 beforeEach(() => {
-  mockLive = false; mockHouse = true; mockResult = { data: [], error: null }; mockPending = null
+  mockLive = false; mockHouse = true; mockResult = { data: [], error: null }; mockPending = null; mockShare = 1
   mockCalls.length = 0; supabase.from.mockClear()
 })
 
@@ -174,6 +177,49 @@ describe('once per app open', () => {
     await act(async () => {})
     expect(screen.toJSON()).toBeNull()
     expect(mockCalls.filter(c => c[0] === 'view')).toHaveLength(1)
+  })
+
+  const views = () => mockCalls.filter(c => c[0] === 'view').length
+
+  test('offered but never on screen: no view, nothing used up, the next mount offers it again', async () => {
+    mockShare = 0.4                                  // below half: under the fold / under the tab bar
+    const AdSlot = freshSlot()
+    const view = await render(<Mounts S={AdSlot} keys={['a']} />)
+    await waitFor(() => expect(house()).toBeTruthy())
+    await act(async () => { await new Promise(r => setTimeout(r, 900)) })   // two polls, still not on screen
+    expect(views()).toBe(0)
+
+    await view.rerender(<Mounts S={AdSlot} keys={[]} />)                       // left Home without scrolling down
+    mockShare = 1
+    await view.rerender(<Mounts S={AdSlot} keys={['b']} />)                    // came back
+    await waitFor(() => expect(views()).toBe(1))
+    expect(house()).toBeTruthy()
+
+    await view.rerender(<Mounts S={AdSlot} keys={['c']} />)                    // seen, then left again
+    await act(async () => {})
+    expect(screen.toJSON()).toBeNull()
+    expect(views()).toBe(1)
+  })
+
+  test('scrolled into view later: claimed by the poll, one view', async () => {
+    mockShare = 0
+    const AdSlot = freshSlot()
+    await render(<Mounts S={AdSlot} keys={['a']} />)
+    await waitFor(() => expect(house()).toBeTruthy())
+    expect(views()).toBe(0)
+    mockShare = 0.5
+    await waitFor(() => expect(views()).toBe(1))
+    expect(house()).toBeTruthy()
+  })
+
+  test('two unseen mounts: the first to be seen keeps it, the other gives it up', async () => {
+    mockShare = 0
+    const AdSlot = freshSlot()
+    await render(<Mounts S={AdSlot} keys={['a', 'b']} />)
+    await waitFor(() => expect(screen.queryAllByLabelText(houseLabel('English'))).toHaveLength(2))
+    mockShare = 1
+    await waitFor(() => expect(screen.queryAllByLabelText(houseLabel('English'))).toHaveLength(1))
+    expect(views()).toBe(1)
   })
 
   test('the cap is per placement: the Events slot still gets its own', async () => {

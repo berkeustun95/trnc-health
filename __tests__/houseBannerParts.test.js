@@ -128,6 +128,33 @@ describe('Settings: Work with ADA is the last row of Destek', () => {
     expect(a.onWorkWithAda).toHaveBeenCalledTimes(1)
     expect(a.onTutorial).not.toHaveBeenCalled()
   })
+  test('absent when WORK_WITH_ADA_ROW is off (production until Berke clears it)', async () => {
+    const React = require('react')
+    const RN = require('react-native')
+    let Groups
+    jest.isolateModules(() => {
+      jest.doMock('react', () => React)
+      jest.doMock('react-native', () => RN)
+      jest.doMock('../constants/redesign', () => ({ WORK_WITH_ADA_ROW: false }))
+      Groups = require('../components/shell/Settings').SettingsGroups
+    })
+    await render(<Groups lang="Turkish" a={{ onWorkWithAda: jest.fn() }} />)
+    expect(screen.queryByText('ADA ile çalışın')).toBeNull()
+    expect(screen.getByText(t('hrRowTutorial', 'Turkish'))).toBeTruthy()
+  })
+})
+
+describe('visibility share', () => {
+  const { shareOnScreen, HOUSE_VISIBLE_SHARE } = require('../utils/adVisibility')
+  test.each([
+    ['fully on screen', 300, 100, 1],
+    ['below the fold', 900, 100, 0],
+    ['half under the tab bar', 650, 100, 0.5],
+    ['scrolled off the top', -100, 100, 0],
+    ['half off the top', -50, 100, 0.5],
+    ['zero height', 300, 0, 0],
+  ])('%s', (_n, y, h, want) => expect(shareOnScreen(y, h, 800, 100)).toBeCloseTo(want))
+  test('threshold is half', () => expect(HOUSE_VISIBLE_SHARE).toBe(0.5))
 })
 
 describe('Events: no ad over an empty feed', () => {

@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE, OLI_CHAT_LIVE, VELES_LIVE, AD_HOUSE_BANNER_LIVE } from './flags'
+import { REDESIGN_LIVE, MODULE_FLAGS, EATERY_LIVE, CRUNCHY_EXPRESS_LIVE, NORTH_HOUSES_LIVE, NORTH_HOUSES_FORM_LIVE, OLI_CHAT_LIVE, VELES_LIVE, AD_HOUSE_BANNER_LIVE, WORK_WITH_ADA_ROW_LIVE } from './flags'
 
 // The one switch every redesigned surface reads. On when:
 //   • REDESIGN_LIVE is flipped (go-live, both files in one commit — the flag guard), or
@@ -66,6 +66,10 @@ export const VELES = VELES_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) |
 // stays off, so production is unchanged (preflight (c) keeps a production publish off the Preview config).
 const HOUSE_BANNER_PREVIEW = true
 export const HOUSE_BANNER = AD_HOUSE_BANNER_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && HOUSE_BANNER_PREVIEW)
+
+// Settings "ADA ile çalışın" row before go-live: same mechanism as the house banner; production does not show it.
+const WORK_WITH_ADA_ROW_PREVIEW = true
+export const WORK_WITH_ADA_ROW = WORK_WITH_ADA_ROW_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && WORK_WITH_ADA_ROW_PREVIEW)
 
 // Yeme-İçme (eateries) before go-live: dev bundles and ADA Preview open the section and the
 // Crunchy Express partner; the _LIVE flags stay off, so production shows nothing (preflight (c)
