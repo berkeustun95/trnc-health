@@ -5,6 +5,16 @@ ADA es la guía y el asistente todo en uno para residentes, estudiantes y recié
 - Mapa Explorar – lugares, cafés, restaurantes, playas y rutas a pie por la ciudad
 - Eventos – conciertos, festivales, teatro e información de entradas
 - Inmuebles y alojamiento – viviendas en venta, alquiler, estancias cortas y residencias de estudiantes
+- Hoteles – hoteles del norte de Chipre con sus datos de contacto
+- Comida y bebida – consulta menús, prepara tu cesta y haz tu pedido
+- Anuncios oficiales – exámenes, vacantes, becas y licitaciones, cada uno con el enlace a su fuente oficial
+- Student Hub – universidades, portales de estudiantes y lo básico de la vida estudiantil
+- Línea móvil – elige tu eSIM, línea y paquete antes de llegar a Chipre
+- Tipos de cambio – tipos oficiales del Banco Central y calculadora de divisas
+- Check-in – haz check-in en lugares y descubre qué pasa en la ciudad
+- Oli – haz una pregunta y Oli responde con la información de ADA
+- Grúa y asistencia en carretera – empresas que dan servicio en tu zona
+- Permiso de conducir – sedes de autoescuelas y clases de permiso
 - Reformas y mantenimiento – profesionales y empresas de confianza
 - Mascotas – veterinarios y hoteles para mascotas
 
@@ -19,6 +29,14 @@ Tipos de cambio — Banco Central de la RTNC: https://mb.gov.ct.tr/tr/veriler/do
 Embajadas e información consular — Ministerio de Asuntos Exteriores de la RTNC: https://mfa.gov.ct.tr/tr
 
 Pasos fronterizos, normas de conducción e información de tráfico — Dirección General de Policía de la RTNC: https://www.polis.gov.ct.tr/
+
+Exámenes y plazas vacantes en la función pública — Comisión de la Función Pública de la RTNC: https://khk.gov.ct.tr/
+
+Anuncios de educación — Ministerio de Educación Nacional de la RTNC: https://www.mebnet.net/
+
+Anuncios de educación superior — Consejo de Educación Superior de la RTNC (YÖDAK): https://yodak.gov.ct.tr/
+
+Licitaciones públicas — Ministerio de Hacienda de la RTNC: https://maliye.gov.ct.tr/
 
 En la app, cada ficha tomada de una fuente oficial enlaza a esa fuente.
 

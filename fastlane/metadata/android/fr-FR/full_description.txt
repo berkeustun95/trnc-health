@@ -5,6 +5,16 @@ ADA est le guide et assistant tout-en-un pour les résidents, étudiants et nouv
 - Carte Explorer – lieux, cafés, restaurants, plages et itinéraires de promenade en ville
 - Événements – concerts, festivals, théâtre et infos billetterie
 - Immobilier et séjours – biens à vendre, locations, courts séjours et résidences étudiantes
+- Hôtels – les hôtels de Chypre du Nord avec leurs coordonnées
+- Restauration – parcourez les menus, préparez votre panier et commandez
+- Annonces officielles – concours, postes vacants, bourses et appels d'offres, chacun avec le lien vers sa source officielle
+- Student Hub – universités, portails étudiants et l'essentiel de la vie étudiante
+- Ligne mobile – choisissez votre eSIM, votre ligne et votre forfait avant d'arriver à Chypre
+- Taux de change – taux officiels de la Banque centrale et convertisseur de devises
+- Check-in – faites un check-in dans les lieux et voyez ce qui se passe en ville
+- Oli – posez une question, Oli répond avec les informations d'ADA
+- Dépannage et remorquage – les entreprises qui desservent votre secteur
+- Permis de conduire – agences d'auto-école et catégories de permis
 - Travaux et entretien – artisans et entreprises de confiance
 - Animaux – vétérinaires et pensions pour animaux
 
@@ -19,6 +29,14 @@ Taux de change — Banque centrale de la RTCN : https://mb.gov.ct.tr/tr/veriler/
 Ambassades et informations consulaires — Ministère des Affaires étrangères de la RTCN : https://mfa.gov.ct.tr/tr
 
 Passages frontaliers, code de la route et informations sur la circulation — Direction générale de la police de la RTCN : https://www.polis.gov.ct.tr/
+
+Concours et postes vacants de la fonction publique — Commission de la fonction publique de la RTCN : https://khk.gov.ct.tr/
+
+Annonces liées à l'éducation — Ministère de l'Éducation nationale de la RTCN : https://www.mebnet.net/
+
+Annonces de l'enseignement supérieur — Conseil de l'enseignement supérieur de la RTCN (YÖDAK) : https://yodak.gov.ct.tr/
+
+Appels d'offres publics — Ministère des Finances de la RTCN : https://maliye.gov.ct.tr/
 
 Dans l'application, chaque fiche issue d'une source officielle renvoie vers cette source.
 

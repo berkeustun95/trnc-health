@@ -5,6 +5,16 @@ ADA ist der All-in-one-Stadtführer und Assistent für Einwohner, Studierende un
 - Entdecken-Karte – Orte, Cafés, Restaurants, Strände und Stadtspaziergänge
 - Veranstaltungen – Konzerte, Festivals, Theater und Ticketinfos
 - Immobilien & Unterkünfte – Kauf, Miete, Kurzaufenthalte und Studentenwohnheime
+- Hotels – Hotels in Nordzypern mit Kontaktdaten
+- Essen & Trinken – Menüs ansehen, Warenkorb füllen und bestellen
+- Bekanntmachungen – Prüfungen, offene Stellen, Stipendien und Ausschreibungen, jeweils mit Link zur offiziellen Quelle
+- Student Hub – Universitäten, Studierendenportale und das Wichtigste zum Studentenleben
+- Mobilfunk – eSIM, Nummer und Tarif wählen, noch bevor du in Zypern landest
+- Wechselkurse – offizielle Kurse der Zentralbank und ein Währungsrechner
+- Check-in – an Orten einchecken und sehen, was in der Stadt los ist
+- Oli – stell eine Frage, Oli antwortet mit ADAs eigenen Informationen
+- Abschleppdienst & Pannenhilfe – Firmen in deiner Region
+- Führerschein – Fahrschulfilialen und Führerscheinklassen
 - Renovierung & Instandhaltung – zuverlässige Handwerker und Firmen
 - Haustiere – Tierärzte und Tierpensionen
 
@@ -19,6 +29,14 @@ Wechselkurse — Zentralbank der TRNZ: https://mb.gov.ct.tr/tr/veriler/doviz_kur
 Botschaften und konsularische Informationen — Außenministerium der TRNZ: https://mfa.gov.ct.tr/tr
 
 Grenzübergänge, Verkehrsregeln und Verkehrsinformationen — Generaldirektion der Polizei der TRNZ: https://www.polis.gov.ct.tr/
+
+Prüfungen und Stellenausschreibungen im öffentlichen Dienst — Kommission für den öffentlichen Dienst der TRNZ: https://khk.gov.ct.tr/
+
+Mitteilungen zur Bildung — Ministerium für Nationale Bildung der TRNZ: https://www.mebnet.net/
+
+Mitteilungen zur Hochschulbildung — Hochschulrat der TRNZ (YÖDAK): https://yodak.gov.ct.tr/
+
+Öffentliche Ausschreibungen — Finanzministerium der TRNZ: https://maliye.gov.ct.tr/
 
 In der App verweist jeder Eintrag aus einer offiziellen Quelle auf diese Quelle.
 

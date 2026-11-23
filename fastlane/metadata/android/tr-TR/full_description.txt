@@ -5,6 +5,16 @@ ADA, Kuzey Kıbrıs'ta (KKTC) yaşayanlar, öğrenciler ve yeni gelenler için h
 - Keşfet haritası – mekanlar, kafeler, restoranlar, plajlar ve şehir yürüyüş rotaları
 - Etkinlikler – konserler, festivaller, tiyatro ve bilet bilgileri
 - Emlak ve konaklama – satılık, kiralık, kısa süreli evler ve öğrenci yurtları
+- Oteller – Kuzey Kıbrıs'taki oteller ve iletişim bilgileri
+- Yeme-İçme – menülere göz at, sepetini hazırla ve sipariş ver
+- Duyurular – sınavlar, münhaller, burslar ve ihaleler; her biri resmî kaynağına bağlantılı
+- Student Hub – üniversiteler, öğrenci portalları ve öğrenci hayatının temelleri
+- Mobil Hat – Kıbrıs'a gelmeden eSIM, hat ve paketini seç
+- Döviz kurları – KKTC Merkez Bankası kurları ve kur hesaplama
+- Check-in – mekanlarda check-in yap, şehirde neler olduğunu gör
+- Oli – sorunu yaz, Oli ADA'nın kendi bilgileriyle cevaplasın
+- Çekici ve yol yardımı – bölgene hizmet veren firmalar
+- Ehliyet – sürücü kursu şubeleri ve ehliyet sınıfları
 - Tadilat, bakım, onarım – güvenilir ustalar ve firmalar
 - Evcil hayvanlar – veterinerler ve pet otelleri
 
@@ -19,6 +29,14 @@ Döviz kurları — KKTC Merkez Bankası: https://mb.gov.ct.tr/tr/veriler/doviz_
 Büyükelçilikler ve konsolosluk bilgileri — KKTC Dışişleri Bakanlığı: https://mfa.gov.ct.tr/tr
 
 Sınır kapıları, sürüş kuralları ve trafik bilgileri — KKTC Polis Genel Müdürlüğü: https://www.polis.gov.ct.tr/
+
+Sınavlar ve münhal ilanları — KKTC Kamu Hizmeti Komisyonu: https://khk.gov.ct.tr/
+
+Eğitim duyuruları — KKTC Milli Eğitim Bakanlığı: https://www.mebnet.net/
+
+Yükseköğretim duyuruları — YÖDAK: https://yodak.gov.ct.tr/
+
+İhale duyuruları — KKTC Maliye Bakanlığı: https://maliye.gov.ct.tr/
 
 Uygulamada, resmi bir kaynaktan alınan her kayıt o kaynağa bağlantı verir.
 
