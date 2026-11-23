@@ -30,6 +30,14 @@ Büyükelçilikler ve konsolosluk bilgileri — KKTC Dışişleri Bakanlığı: 
 
 Sınır kapıları, sürüş kuralları ve trafik bilgileri — KKTC Polis Genel Müdürlüğü: https://www.polis.gov.ct.tr/
 
+Sınavlar ve münhal ilanları — KKTC Kamu Hizmeti Komisyonu: https://khk.gov.ct.tr/
+
+Eğitim duyuruları — KKTC Milli Eğitim Bakanlığı: https://www.mebnet.net/
+
+Yükseköğretim duyuruları — YÖDAK: https://yodak.gov.ct.tr/
+
+İhale duyuruları — KKTC Maliye Bakanlığı: https://maliye.gov.ct.tr/
+
 Uygulamada, resmi bir kaynaktan alınan her kayıt o kaynağa bağlantı verir.
 
 Ücretsiz indir, Kıbrıs'ı keşfet.
