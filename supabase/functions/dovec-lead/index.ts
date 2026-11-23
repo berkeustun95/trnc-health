@@ -54,6 +54,16 @@ Deno.serve(async (req) => {
   try { body = await req.json() } catch { return json(400, { error: 'invalid_request', field: 'body' }) }
 
   const store = {
+    async isPublished() {
+      const { data, error } = await admin.from('dovec_settings').select('published').eq('id', 1).maybeSingle()
+      if (error) throw error
+      return data?.published === true
+    },
+    async isAdmin(userId: string) {
+      const { data, error } = await admin.from('profiles').select('role').eq('id', userId).maybeSingle()
+      if (error) throw error
+      return data?.role === 'admin'
+    },
     async findByRequest(userId: string, crid: string) {
       const { data, error } = await admin.from('dovec_leads').select(COLS).eq('user_id', userId).eq('client_request_id', crid).maybeSingle()
       if (error) throw error

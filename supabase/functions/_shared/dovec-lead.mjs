@@ -153,7 +153,8 @@ const publicResult = lead => lead.status === 'rejected'
   : { status: 200, body: { ok: true, external_id: lead.external_id, status: lead.status === 'failed' ? 'retry' : lead.status } }
 
 // caller: { kind: 'user', id } | { kind: 'service' }  (the edge function resolves it; guests never get here)
-// store: findByRequest(userId, crid) · getVisibleProject(id) · getDateOfBirth(userId) · countLeads({ userId?, sinceIso })
+// store: isPublished() -> bool (dovec_settings.published, anything but true is false) · isAdmin(userId) -> bool
+//        findByRequest(userId, crid) · getVisibleProject(id) · getDateOfBirth(userId) · countLeads({ userId?, sinceIso })
 //        insertLead(row) · updateLead(id, patch) · dueLeads(limit, nowIso, statuses) · claimLead(id, nowIso, untilIso) -> row | null
 // The count below is only a courtesy pre-check; the limits are enforced atomically by the BEFORE INSERT trigger on
 // dovec_leads (20261229, SQLSTATE DV429), which insertLead surfaces and this function maps to 429.
@@ -167,6 +168,10 @@ export async function handleLead({ caller, body, deps }) {
   if (caller.kind !== 'user') return { status: 403, body: { error: 'forbidden' } }
   const v = validateLead(body)
   if (!v.ok) return { status: v.status, body: { error: v.error, ...(v.field ? { field: v.field } : {}) } }
+  // Dark module: while dovec_settings.published is not true, only an admin (the admin preview form) may enquire; everyone
+  // else gets the not-found answer, before any other read or write. getVisibleProject keeps its freshness check (suspended,
+  // 24 h) for admins too: stricter than the DB read gate on a stale feed, accepted because nothing can be delivered then.
+  if ((await store.isPublished()) !== true && (await store.isAdmin(caller.id)) !== true) return { status: 404, body: { error: 'project_unavailable' } }
   const dob = await store.getDateOfBirth(caller.id)
   if (isUnder18(dob, now())) return { status: 403, body: { error: 'under_18' } }
   const hash = await payloadHash(v.value)

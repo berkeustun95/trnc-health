@@ -24,13 +24,16 @@ const t = (name, got, want) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
 }
 
-const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false } = {}) => {
-  const s = { leads: [...preload], seq: preload.length, updates: [] }
+const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false, published = true, admin = false } = {}) => {
+  const s = { leads: [...preload], seq: preload.length, updates: [], calls: { isPublished: 0, isAdmin: 0, getVisibleProject: 0, insertLead: 0 } }
+  s.isPublished = async () => { s.calls.isPublished++; return published }
+  s.isAdmin = async () => { s.calls.isAdmin++; return admin }
   s.getDateOfBirth = async () => dob
   s.findByRequest = async (u, c) => s.leads.find(l => l.user_id === u && l.client_request_id === c) ?? null
-  s.getVisibleProject = async id => (visible ? PROJECTS.find(p => p.id === id) ?? null : null)
+  s.getVisibleProject = async id => (s.calls.getVisibleProject++, visible ? PROJECTS.find(p => p.id === id) ?? null : null)
   s.countLeads = async ({ userId, sinceIso }) => s.leads.filter(l => (!userId || l.user_id === userId) && l.created_at >= sinceIso).length
   s.insertLead = async row => {
+    s.calls.insertLead++
     if (dbLimits) {   // what the BEFORE INSERT trigger does, serialised
       const n = f => s.leads.filter(f).length
       if (n(() => true) >= LIMITS.globalDay || n(l => l.user_id === row.user_id) >= LIMITS.perUserHour) throw Object.assign(new Error('dovec_rate_limited'), { code: 'DV429' })
@@ -400,6 +403,30 @@ console.log('logs carry no personal data')
   await post(BODY, store, d)
   t('one log line: external id, status, http code', lines, ['dovec-lead ADA-1 sent http=202'])
   t('no name, phone, e-mail or user id in it', lines.some(l => /Test Person|441234|example\.com|user-a/.test(l)), false)
+}
+
+console.log('B1: no enquiry while the module is unpublished (admins excepted)')
+{
+  const store = makeStore({ published: false })
+  const r = await post(BODY, store)
+  t('customer + unpublished: 404 project_unavailable, same as not-found', [r.status, r.body], [404, { error: 'project_unavailable' }])
+  t('  ... insertLead 0 calls, getVisibleProject 0 calls, isAdmin asked once', [store.calls.insertLead, store.calls.getVisibleProject, store.calls.isAdmin, store.leads.length], [0, 0, 1, 0])
+  t('  ... identical to the answer for an unknown project', (await post({ ...clone(BODY), project_id: 'nope' }, makeStore())).body, r.body)
+  const g = makeStore({ published: false }); const f = stub()
+  await post(BODY, g, deps(g, { mode: 'live', live: true, fetchImpl: f }))
+  t('  ... even with both lead locks open nothing is sent or saved', [f.calls.length, g.leads.length], [0, 0])
+}
+{
+  const store = makeStore({ published: false, admin: true })
+  const r = await post(BODY, store)
+  t('admin + unpublished: proceeds, exactly one insert, status mock', [r.status, r.body.status, store.calls.insertLead, store.leads.length], [200, 'mock', 1, 1])
+  const stale = makeStore({ published: false, admin: true, visible: false })
+  t('admin + unpublished + stale/suspended feed: still 404 (freshness applies to everyone)', [(await post(BODY, stale)).status, stale.calls.insertLead], [404, 0])
+}
+{
+  const store = makeStore({ published: true })
+  const r = await post(BODY, store)
+  t('customer + published: proceeds (positive control), one insert, isAdmin not asked', [r.status, r.body.status, store.calls.insertLead, store.calls.isAdmin], [200, 'mock', 1, 0])
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
