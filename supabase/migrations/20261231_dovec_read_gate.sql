@@ -17,8 +17,9 @@
 --                              No app role and no service_role may execute it; only the two DEFINER functions below call it.
 --   dovec_sync_coords()        REPLACED (same body, same service_role-only grant) but it now returns dovec_coord_report(), so the
 --                              sync never meets the gate.
---   dovec_coord_status()       REPLACED. Same name, same grants, same return shape, but it refuses (SQLSTATE 42501, message
---                              DOVEC_NOT_PUBLIC) unless the caller is the service role or dovec_projects_visible() is true.
+--   dovec_coord_status()       REPLACED. Same name and return shape, but admin-or-service only in EVERY state: it refuses (SQLSTATE
+--                              42501, message DOVEC_NOT_PUBLIC) unless the caller is the service role or an admin. EXECUTE is
+--                              revoked from anon (it has no app caller; it is a diagnostic); authenticated and service_role keep it.
 --   Nothing else: no table, column, grant on a table, or cron job changes. dovec_settings stays readable by app roles
 --   (the app reads `published` and `whatsapp_e164` from it as a non-admin; there is no project data in that row).
 --
@@ -27,11 +28,12 @@
 --   STATE 1: published = false (today, and until Döveç approves)
 --     Read projects:   admins only (signed-in role 'admin'). Anonymous visitors, guests (anonymous sign-ins) and every
 --                      ordinary signed-in customer or provider read ZERO rows, however fresh the feed is.
---     dovec_coord_status():  admins and the service role only; everyone else gets DOVEC_NOT_PUBLIC (42501).
+--     dovec_coord_status():  admins and the service role only (in every state); anon cannot execute it; signed-in non-admins
+--                      and guests get DOVEC_NOT_PUBLIC (42501).
 --     Write projects:  nobody from the app. The sync function (service role) inserts and updates, and it is NOT affected by
 --                      the gate (the service role bypasses row security), so syncing may run before go-live.
 --   STATE 2: published = true, feed fresh (last good sync under 24 h) and not suspended
---     Read projects:   everyone, guests included (listed rows only). dovec_coord_status() is open to everyone again.
+--     Read projects:   everyone, guests included (listed rows only). dovec_coord_status() stays admin / service role only.
 --   STATE 3: published = true but the feed is suspended (401 kill switch) or the last good sync is 24 h old or older
 --     Read projects:   admins only again. Nobody else sees a stale or suspended feed, as before.
 --     An admin sees listed rows even when the feed is suspended or stale, so they can check the data; that is deliberate.
@@ -47,9 +49,10 @@
 --   It is wrapped in (SELECT ...) in the policy so it is evaluated once per statement, not once per row.
 --
 -- WHY dovec_coord_status() IS SPLIT
---   It is executable by anon and returns project names and ids from dovec_projects, so on its own it would have leaked the
---   project list while the table read was closed. The report body now lives in dovec_coord_report() (private) and the
---   public function is the gate in front of it. dovec_sync_coords() (called by sync-dovec with the service key, and by SQL)
+--   It was executable by anon and returns project names and ids from dovec_projects, including delisted ones that RLS hides,
+--   so it would have leaked the project list. It has no app caller (a diagnostic), so it is now admin / service role only in
+--   every state and anon loses EXECUTE. The report body lives in dovec_coord_report() (private) and the
+--   gated function is the gate in front of it. dovec_sync_coords() (called by sync-dovec with the service key, and by SQL)
 --   calls the report directly. The service role is recognised by the JWT role claim (auth.role()), the same call 20260904
 --   and 20261039 use for 'authenticated'; the health script calls dovec_coord_status through PostgREST with the service key,
 --   which carries role = service_role.
@@ -167,7 +170,7 @@ BEGIN
 END;
 $function$;
 
--- The public face: the service role (the health script, with the service key) or whoever may read the projects.
+-- The gated face: the service role (the health script, with the service key) or an admin, in every state.
 CREATE OR REPLACE FUNCTION public.dovec_coord_status()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -176,7 +179,7 @@ CREATE OR REPLACE FUNCTION public.dovec_coord_status()
  SET search_path TO 'public'
 AS $function$
 BEGIN
-  IF NOT (COALESCE(auth.role(), '') = 'service_role' OR public.dovec_projects_visible()) THEN
+  IF NOT (COALESCE(auth.role(), '') = 'service_role' OR public.is_admin()) THEN
     RAISE EXCEPTION 'DOVEC_NOT_PUBLIC' USING ERRCODE = '42501';
   END IF;
   RETURN public.dovec_coord_report();
@@ -185,8 +188,8 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.dovec_sync_coords() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role;
-REVOKE ALL ON FUNCTION public.dovec_coord_status() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.dovec_coord_status() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO authenticated, service_role;
 
 -- ─── 4. Structural assertions (they print what they read; no counts of users or leads) ───
 DO $$
@@ -238,12 +241,14 @@ BEGIN
       RAISE EXCEPTION '% is not SECURITY DEFINER with a pinned search_path', v_f;
     END IF;
   END LOOP;
-  FOREACH v_f IN ARRAY ARRAY['public.dovec_projects_visible()','public.dovec_coord_status()'] LOOP
-    IF NOT (has_function_privilege('anon', v_f, 'EXECUTE') AND has_function_privilege('authenticated', v_f, 'EXECUTE')
-            AND has_function_privilege('service_role', v_f, 'EXECUTE')) THEN
-      RAISE EXCEPTION '% must be executable by anon, authenticated and service_role', v_f;
-    END IF;
-  END LOOP;
+  IF NOT (has_function_privilege('anon', 'public.dovec_projects_visible()', 'EXECUTE') AND has_function_privilege('authenticated', 'public.dovec_projects_visible()', 'EXECUTE')
+          AND has_function_privilege('service_role', 'public.dovec_projects_visible()', 'EXECUTE')) THEN
+    RAISE EXCEPTION 'dovec_projects_visible() must be executable by anon, authenticated and service_role';
+  END IF;
+  IF has_function_privilege('anon', 'public.dovec_coord_status()', 'EXECUTE')
+     OR NOT (has_function_privilege('authenticated', 'public.dovec_coord_status()', 'EXECUTE') AND has_function_privilege('service_role', 'public.dovec_coord_status()', 'EXECUTE')) THEN
+    RAISE EXCEPTION 'dovec_coord_status() must be executable by authenticated and service_role and NOT by anon';
+  END IF;
   IF has_function_privilege('anon', 'public.dovec_coord_report()', 'EXECUTE') OR has_function_privilege('authenticated', 'public.dovec_coord_report()', 'EXECUTE')
      OR has_function_privilege('service_role', 'public.dovec_coord_report()', 'EXECUTE') THEN
     RAISE EXCEPTION 'dovec_coord_report() is executable by an app role or the service role';
@@ -263,7 +268,8 @@ BEGIN
     RAISE EXCEPTION 'dovec_sync_coords() does not return the private report';
   END IF;
   IF pg_get_functiondef(to_regprocedure('public.dovec_coord_status()')) NOT LIKE '%DOVEC_NOT_PUBLIC%'
-     OR pg_get_functiondef(to_regprocedure('public.dovec_coord_status()')) NOT LIKE '%public.dovec_projects_visible()%'
+     OR pg_get_functiondef(to_regprocedure('public.dovec_coord_status()')) NOT LIKE '%public.is_admin()%'
+     OR pg_get_functiondef(to_regprocedure('public.dovec_coord_status()')) LIKE '%dovec_projects_visible%'
      OR pg_get_functiondef(to_regprocedure('public.dovec_coord_status()')) NOT LIKE '%RETURN public.dovec_coord_report();%' THEN
     RAISE EXCEPTION 'dovec_coord_status() is not the gate in front of the report';
   END IF;
@@ -365,7 +371,7 @@ BEGIN
         SELECT count(*) FILTER (WHERE id = v_pl), count(*) FILTER (WHERE id = v_pu) INTO v_nl, v_nu
           FROM public.dovec_projects WHERE id IN (v_pl, v_pu);
         BEGIN
-          v_j := public.dovec_coord_status();
+          EXECUTE 'SELECT public.dovec_coord_status()' INTO v_j;
           v_st := CASE WHEN jsonb_typeof(v_j -> 'unmatched') = 'array' THEN 'ok' ELSE 'badshape' END;
         EXCEPTION WHEN insufficient_privilege THEN
           v_st := CASE WHEN SQLERRM = 'DOVEC_NOT_PUBLIC' THEN 'gate' ELSE 'privdenied' END;
@@ -398,12 +404,14 @@ BEGIN
     SELECT count(*) INTO v_att FROM public.dovec_project_coords WHERE seed_name = 'D-Point' AND project_id = v_px AND last_status = 'matched';
     SELECT latitude INTO v_lat FROM public.dovec_projects WHERE id = v_px;
 
+    -- Calls in the role loops use EXECUTE: a plpgsql expression's EXECUTE-privilege check is cached per transaction, so a call
+    -- compiled while one role ran can be reused for the next role without a fresh check.
     -- f. The private report and the sync are closed to app roles; the report is closed to the service role too.
     FOREACH v_role IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
       EXECUTE format('SET LOCAL ROLE %I', v_role);
-      BEGIN PERFORM public.dovec_sync_coords(); v_den := v_den || jsonb_build_object('sync_' || v_role, 'ALLOWED');
+      BEGIN EXECUTE 'SELECT public.dovec_sync_coords()'; v_den := v_den || jsonb_build_object('sync_' || v_role, 'ALLOWED');
       EXCEPTION WHEN insufficient_privilege THEN v_den := v_den || jsonb_build_object('sync_' || v_role, 'denied'); END;
-      BEGIN PERFORM public.dovec_coord_report(); v_den := v_den || jsonb_build_object('report_' || v_role, 'ALLOWED');
+      BEGIN EXECUTE 'SELECT public.dovec_coord_report()'; v_den := v_den || jsonb_build_object('report_' || v_role, 'ALLOWED');
       EXCEPTION WHEN insufficient_privilege THEN v_den := v_den || jsonb_build_object('report_' || v_role, 'denied'); END;
       RESET ROLE;
     END LOOP;
@@ -419,16 +427,16 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
 
   RAISE NOTICE 'gate probe, per case and identity (listed/unlisted probe rows seen / coord_status): %', v_res;
-  RAISE NOTICE 'sync path with the gate closed: insert rows=%, update rows=%, sync with claims=%, sync without claims=%, D-Point pinned=% (real D-Point rows present beforehand: %)',
-    v_ins, v_upd, v_sync1, v_sync2, v_att, v_pre;
+  RAISE NOTICE 'sync path with the gate closed: insert rows=%, update rows=%, sync with claims=%, sync without claims=%, D-Point pinned=% (exact-name positive control: %)',
+    v_ins, v_upd, v_sync1, v_sync2, v_att, CASE WHEN v_pre = 0 THEN 'ran' ELSE 'skipped' END;
   RAISE NOTICE 'denials: %, report as owner=%', v_den, v_owner;
 
   v_want := jsonb_build_object(
     'ctx_admin', 'admin=true,anonymous=false', 'ctx_customer', 'admin=false,anonymous=false', 'ctx_guest', 'admin=false,anonymous=true',
-    'a_admin', '1/0/ok', 'a_anon', '0/0/gate', 'a_customer', '0/0/gate', 'a_guest', '0/0/gate', 'a_service', '1/1/ok',
-    'b_admin', '1/0/ok', 'b_anon', '1/0/ok', 'b_customer', '1/0/ok', 'b_guest', '1/0/ok', 'b_service', '1/1/ok',
-    'c_admin', '1/0/ok', 'c_anon', '0/0/gate', 'c_customer', '0/0/gate', 'c_guest', '0/0/gate', 'c_service', '1/1/ok',
-    'd_admin', '1/0/ok', 'd_anon', '0/0/gate', 'd_customer', '0/0/gate', 'd_guest', '0/0/gate', 'd_service', '1/1/ok');
+    'a_admin', '1/0/ok', 'a_anon', '0/0/privdenied', 'a_customer', '0/0/gate', 'a_guest', '0/0/gate', 'a_service', '1/1/ok',
+    'b_admin', '1/0/ok', 'b_anon', '1/0/privdenied', 'b_customer', '1/0/gate', 'b_guest', '1/0/gate', 'b_service', '1/1/ok',
+    'c_admin', '1/0/ok', 'c_anon', '0/0/privdenied', 'c_customer', '0/0/gate', 'c_guest', '0/0/gate', 'c_service', '1/1/ok',
+    'd_admin', '1/0/ok', 'd_anon', '0/0/privdenied', 'd_customer', '0/0/gate', 'd_guest', '0/0/gate', 'd_service', '1/1/ok');
   IF v_res IS DISTINCT FROM v_want THEN
     RAISE EXCEPTION 'read gate behaviour is not what was intended. got % want %', v_res, v_want;
   END IF;
@@ -461,7 +469,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261231_dovec_read_gate.sql', '1d909fea53960b04007c8e8ac581f28a003b738fc9dbfc1f1814e3663cc258b3')
+VALUES ('20261231_dovec_read_gate.sql', '1e6ecdd3dc61ec793a23026e560fa43ab70a373c06695770b2dabbbfa91a937b')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

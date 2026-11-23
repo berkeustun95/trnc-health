@@ -2471,7 +2471,7 @@ WITH report AS (
                        AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_forget_user()')), false)
-    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, EXECUTE for anon, authenticated and service_role, no PUBLIC (since 20261231 it is the gate in front of dovec_coord_report(); the 20261231 token owns what it returns and to whom)',
+    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, no PUBLIC (since 20261231 it is the admin-or-service gate in front of dovec_coord_report(), anon holds no EXECUTE; the 20261231 token owns what it returns and to whom)',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_project_coords')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_project_coords') = 0
       AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, to_regclass('public.dovec_project_coords'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -2496,7 +2496,7 @@ WITH report AS (
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_sync_coords') = 1
       AND COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
                        AND has_function_privilege('service_role', p.oid, 'EXECUTE')
-                       AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_status()')), false)
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_coord_status') = 1
@@ -2537,7 +2537,7 @@ WITH report AS (
       AND COALESCE((SELECT s.published = false FROM public.dovec_settings s WHERE s.id = 1), false)
       AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) = 'false' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
                      WHERE d.adrelid = to_regclass('public.dovec_settings') AND a.attname = 'published'), false)
-    UNION ALL SELECT '20261231_dovec_read_gate','dovec_coord_report(): DEFINER, STABLE, search_path pinned, NO EXECUTE for anon, authenticated, service_role or PUBLIC (only DEFINER code calls it), one overload. dovec_coord_status(): DEFINER, STABLE, body raises DOVEC_NOT_PUBLIC unless auth.role() is service_role or dovec_projects_visible(), then returns dovec_coord_report(); EXECUTE grants unchanged (anon, authenticated, service_role, no PUBLIC). dovec_sync_coords(): body returns dovec_coord_report() not the gated function; still service_role only',
+    UNION ALL SELECT '20261231_dovec_read_gate','dovec_coord_report(): DEFINER, STABLE, search_path pinned, NO EXECUTE for anon, authenticated, service_role or PUBLIC (only DEFINER code calls it), one overload. dovec_coord_status(): DEFINER, STABLE, body raises DOVEC_NOT_PUBLIC unless auth.role() is service_role or is_admin() (never the published path), then returns dovec_coord_report(); EXECUTE for authenticated and service_role only, NOT anon, no PUBLIC. dovec_sync_coords(): body returns dovec_coord_report() not the gated function; still service_role only',
       COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
                        AND p.proconfig IS NOT NULL AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
                        AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
@@ -2547,12 +2547,13 @@ WITH report AS (
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_report()')), false)
       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_coord_report') = 1
       AND COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
-                       AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND has_function_privilege('service_role', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                        AND strpos(pg_get_functiondef(p.oid), 'DOVEC_NOT_PUBLIC') > 0
                        AND strpos(pg_get_functiondef(p.oid), 'auth.role()') > 0
-                       AND strpos(pg_get_functiondef(p.oid), 'public.dovec_projects_visible()') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'public.is_admin()') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'dovec_projects_visible') = 0
                        AND strpos(pg_get_functiondef(p.oid), 'RETURN public.dovec_coord_report();') > 0
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_status()')), false)
       AND COALESCE((SELECT p.prosecdef AND p.proacl IS NOT NULL

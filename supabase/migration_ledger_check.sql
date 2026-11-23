@@ -331,7 +331,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261227_ad_house_daily.sql', '0b6d763ccf4e782cf4c9bfeec6da00583eb0f2c982d61bc6c9ad1288d3d8610e'),
   ('20261228_live_scores_ktff.sql', '655e1126d08ed91e2caa34bdcf7dc82cb0752cd34dc0d17026d94ea9a31eaf1d'),
   ('20261229_dovec_projects.sql', '0f2521d32106d8a20cad0e0f5ebeed6b4a43accbcad4d819d21a50bfff53477b'),
-  ('20261231_dovec_read_gate.sql', '1d909fea53960b04007c8e8ac581f28a003b738fc9dbfc1f1814e3663cc258b3'),
+  ('20261231_dovec_read_gate.sql', '1e6ecdd3dc61ec793a23026e560fa43ab70a373c06695770b2dabbbfa91a937b'),
   ('20261232_dovec_cron.sql', 'c8e505bf28a2f1b4cea8e56434fee3789b43b993bdd937386b69e50c01b385f5')
 )
 SELECT * FROM (
