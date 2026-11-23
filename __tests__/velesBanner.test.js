@@ -1,5 +1,6 @@
 // Veles banner: hero height maths (VELES off = today's exact heights), the compact cutoff, and the tap path per platform.
-// iOS must open Safari with Linking and never load expo-web-browser (Berke's Apple decision).
+// Both platforms open the external browser with Linking and never load expo-web-browser (Berke, 2026-11-23: gambling ads
+// on some Veles outlets must not render inside ADA).
 
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: {} } } }))
 jest.mock('../constants/i18n', () => ({ t: k => k }))
@@ -44,31 +45,28 @@ const load = os => {
   const Linking = { openURL: jest.fn(async () => { calls.push('open') }) }
   jest.doMock('react-native', () => ({ Platform: { OS: os }, Linking, AppState: { addEventListener: () => ({ remove() {} }) } }))
   jest.doMock('../utils/logContactEvent', () => ({ logContactEvent: jest.fn((...a) => { calls.push(['log', ...a]) }) }))
-  jest.doMock('../constants/theme', () => ({ colors: { primary: '#000' } }))
   jest.doMock('expo-web-browser', () => {
     webBrowser.touched += 1
     return { openBrowserAsync: jest.fn(async () => { webBrowser.touched += 1; return { type: 'opened' } }) }
   })
-  jest.doMock('../utils/browserFallback', () => ({ openWithFallback: jest.fn(async ({ open }) => { calls.push('in-app'); await open() }) }))
   const mod = require('../utils/velesLink')
-  return { ...mod, calls, webBrowser, Linking, fallback: require('../utils/browserFallback') }
+  return { ...mod, calls, webBrowser, Linking }
 }
 
-test('iOS: logs first, opens Safari via Linking, never loads expo-web-browser', async () => {
-  const m = load('ios')
-  expect(await m.openVeles('English')).toBe(true)
-  expect(m.Linking.openURL).toHaveBeenCalledWith(m.VELES_URL)
-  expect(m.calls).toEqual([['log', 'news', m.VELES_ENTITY_ID, 'website', null, 'English'], 'open'])
-  expect(m.fallback.openWithFallback).not.toHaveBeenCalled()
-  expect(m.webBrowser.touched).toBe(0)
-})
+for (const os of ['ios', 'android']) {
+  test(`${os}: logs first with lang, opens the external browser via Linking, never loads expo-web-browser`, async () => {
+    const m = load(os)
+    expect(await m.openVeles('Turkish')).toBe(true)
+    expect(m.Linking.openURL).toHaveBeenCalledTimes(1)
+    expect(m.Linking.openURL).toHaveBeenCalledWith(m.VELES_URL)
+    expect(m.calls).toEqual([['log', 'news', m.VELES_ENTITY_ID, 'website', null, 'Turkish'], 'open'])
+    expect(m.webBrowser.touched).toBe(0)
+  })
+}
 
-test('Android: logs first, opens in-app through openWithFallback with expo-web-browser', async () => {
+test('a failing openURL returns false and the tap is still logged', async () => {
   const m = load('android')
-  expect(await m.openVeles('Turkish')).toBe(true)
-  expect(m.calls[0]).toEqual(['log', 'news', m.VELES_ENTITY_ID, 'website', null, 'Turkish'])
-  expect(m.calls[1]).toBe('in-app')
-  expect(m.fallback.openWithFallback).toHaveBeenCalledTimes(1)
-  expect(require('expo-web-browser').openBrowserAsync).toHaveBeenCalledWith(m.VELES_URL, expect.objectContaining({ dismissButtonStyle: 'close', createTask: false }))
-  expect(m.Linking.openURL).not.toHaveBeenCalled()
+  m.Linking.openURL.mockImplementationOnce(async () => { throw new Error('no browser') })
+  expect(await m.openVeles('English')).toBe(false)
+  expect(m.calls[0]).toEqual(['log', 'news', m.VELES_ENTITY_ID, 'website', null, 'English'])
 })
