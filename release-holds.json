@@ -219,6 +219,14 @@
       "clear": "Only after Berke has checked the combined Preview built from main with this PR and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
       "clearedOn": "2026-11-23",
       "clearedBy": "Berke, in chat 2026-11-23: \"Second go: publish to production from main 20dafc03 plus the one commit that clears the release holds. Nothing else.\" Goes live with the same OTA (no flag; visible only when a profile load fails or stalls)."
+    },
+    {
+      "pr": 575,
+      "commit": "87685109b057ac9bdbc9cbc6dea674c52bed1d5a",
+      "what": "Audit fix pack A: Home offline screen from the first failed read + Tüm hizmetler without Nöbetçi/Acil, 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
     }
   ]
 }
