@@ -41,7 +41,7 @@ function DeadlineCard({ item, lang, inText }) {
 }
 
 export default function DuyuruDetailScreen({ item, lang, onBack }) {
-  const [openFailed, setOpenFailed] = useState(false)
+  const [openFailed, setOpenFailed] = useState(null)
   const cat = DUY_CATEGORY[item.category]
   const region = item.region && item.region !== 'all'
     ? t(REGION_LABEL_KEY[DUY_REGION_TO_DISTRICT[item.region]], lang)
@@ -49,11 +49,12 @@ export default function DuyuruDetailScreen({ item, lang, onBack }) {
   // KHK münhal deadlines live in PDFs the fetcher does not read (robots.txt, 2026-10-10).
   const deadlineInText = !item.deadline_at && item.kind === 'open' && item.institution === KHK_INSTITUTION
 
-  const openUrl = async url => {
-    setOpenFailed(false)
-    try { await Linking.openURL(url) } catch { setOpenFailed(true) }
+  // The alert shows beside what was tapped: the main button or the earlier-stage list.
+  const openUrl = async (url, where) => {
+    setOpenFailed(null)
+    try { await Linking.openURL(url) } catch { setOpenFailed(where) }
   }
-  const openSource = () => openUrl(item.official_url)
+  const openSource = () => openUrl(item.official_url, 'main')
   const earlier = item.earlier || []
 
   return (
@@ -83,19 +84,20 @@ export default function DuyuruDetailScreen({ item, lang, onBack }) {
 
       <View style={s.ctaBlock}>
         <Button title={t('duyGoToSource', lang)} icon="open-outline" onPress={openSource} />
-        {openFailed && <InlineAlert message={t('duyOpenFailed', lang)} />}
+        {openFailed === 'main' && <InlineAlert message={t('duyOpenFailed', lang)} />}
       </View>
 
       {earlier.length > 0 && (
         <View style={s.earlier}>
-          <Text style={s.earlierHead}>{t('duyEarlierStages', lang)}</Text>
+          <Text style={s.earlierHead} accessibilityRole="header">{t('duyEarlierStages', lang)}</Text>
           {earlier.map((e, i) => (
             <TouchableOpacity
               key={e.id}
               style={[s.earlierRow, i > 0 && s.earlierDivider]}
-              onPress={() => openUrl(e.official_url)}
+              onPress={() => openUrl(e.official_url, 'earlier')}
               activeOpacity={press.small}
               accessibilityRole="link"
+              accessibilityLabel={`${e.title}, ${formatDuyDate(e.published_at, lang)}`}
             >
               <View style={{ flex: 1 }}>
                 <Text style={s.earlierTitle}>{e.title}</Text>
@@ -104,6 +106,7 @@ export default function DuyuruDetailScreen({ item, lang, onBack }) {
               <Ionicons name="open-outline" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
+          {openFailed === 'earlier' && <InlineAlert message={t('duyOpenFailed', lang)} style={s.earlierAlert} />}
         </View>
       )}
 
@@ -124,6 +127,7 @@ const s = StyleSheet.create({
   dlSub:        { ...type.small, color: colors.textSecondary, marginTop: 2 },
   disclaimer:   { marginTop: 20 },
   earlier:      { marginTop: 24 },
+  earlierAlert: { marginTop: 10 },
   earlierHead:  { ...type.rowTitle, color: colors.textPrimary, marginBottom: 4 },
   earlierRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 48 },
   earlierDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

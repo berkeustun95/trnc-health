@@ -77,7 +77,8 @@ export function isClosingSoon(item, now = new Date()) {
 export function matchesQuery(item, q) {
   const words = String(q ?? '').trim().split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const hay = `${item.title} ${item.institution}`
+  // A grouped card also answers for its hidden stages and reposts (groupDuyurular's `earlier`).
+  const hay = [item, ...(item.earlier || [])].map(r => `${r.title} ${r.institution}`).join(' ')
   return words.every(w => searchMatch(hay, w))
 }
 
@@ -203,4 +204,9 @@ export function groupDuyurular(rows) {
     }
   }
   return out.sort(byNewest)
+}
+
+// Home banner count: closing-soon CARDS as the list shows them, not raw rows (a repost counts once).
+export function closingSoonCount(rows) {
+  return groupDuyurular(rows).length
 }
