@@ -123,7 +123,7 @@ import {
   decideOnboardingStep, shouldArmPending, pendingAfterWizard, launchMayRegisterPush, decideReoffer, reofferNoCity,
 } from './utils/onboardingState'
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
-import { logOnboardingEvent } from './utils/onboardingEvents'
+import { logOnboardingEvent, isTestDeviceLink, markTestDevice } from './utils/onboardingEvents'
 import { loadWithRetry } from './utils/profileLoad'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
@@ -1287,6 +1287,11 @@ export default function App() {
   useEffect(() => {
     async function handleDeepLink(url) {
       if (!url?.startsWith('ada://')) return
+      if (isTestDeviceLink(url)) {
+        await markTestDevice()
+        Alert.alert(t('testDeviceTitle', deviceLangRef.current), t('testDeviceBody', deviceLangRef.current))
+        return
+      }
       try {
         const parsed     = new URL(url.replace('ada://', 'https://x/'))
         const qp         = parsed.searchParams
