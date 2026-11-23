@@ -247,10 +247,16 @@ test('tap counts BEFORE the page opens, with the app language', async () => {
 
 describe('house copy exists in every language', () => {
   test.each(LANGUAGES.map(l => l.key))('%s', lang => {
-    for (const k of ['hrRowWorkWithAda', 'adHouseTitle', 'adHouseCta']) {
+    for (const k of ['hrRowWorkWithAda', 'adHouseTitle', 'adHouseLine', 'adHouseCta']) {
       expect(t(k, lang)).toBeTruthy()
       if (lang !== 'English') expect(t(k, lang)).not.toBe(t(k, 'English'))
     }
   })
   test('Turkish row label is exact', () => expect(t('hrRowWorkWithAda', 'Turkish')).toBe('ADA ile çalışın'))
+  test('banner copy is exact in Turkish and English (Berke 2026-11-23)', () => {
+    expect([t('adHouseTitle', 'Turkish'), t('adHouseLine', 'Turkish'), t('adHouseCta', 'Turkish')])
+      .toEqual(['Bu alan sizin olabilir', "Kuzey Kıbrıs'ta sizi arayanlara ulaşın", 'Bize yazın'])
+    expect([t('adHouseTitle', 'English'), t('adHouseLine', 'English'), t('adHouseCta', 'English')])
+      .toEqual(['This space could be yours', 'Reach people looking for you in North Cyprus', 'Contact us'])
+  })
 })
