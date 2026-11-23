@@ -734,6 +734,7 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_projects','updated_at'),
     ('20261229_dovec_projects','dovec_projects','description'),
     ('20261229_dovec_projects','dovec_projects','gallery'),
+    ('20261229_dovec_projects','dovec_projects','entity_uuid'),
     ('20261229_dovec_projects','dovec_leads','id'),
     ('20261229_dovec_projects','dovec_leads','external_id'),
     ('20261229_dovec_projects','dovec_leads','user_id'),
@@ -1683,6 +1684,7 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_projects_cover_check'),
     ('20261229_dovec_projects','dovec_projects_website_check'),
     ('20261229_dovec_projects','dovec_projects_delisted_check'),
+    ('20261229_dovec_projects','dovec_projects_entity_uuid_key'),
     ('20261229_dovec_projects','dovec_leads_pkey'),
     ('20261229_dovec_projects','dovec_leads_external_id_key'),
     ('20261229_dovec_projects','dovec_leads_request_key'),
@@ -6546,6 +6548,14 @@ WITH report AS (
          FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
       IS NOT DISTINCT FROM ARRAY['accommodation','cars','connectivity','eatery','ehliyet','events','explore','garages','grooming',
+                                 'homeServices','hotels','insurance','jobs','news','pets','studentHub','towing','transport']
+    OR EXISTS (SELECT 1 FROM public.schema_migrations_applied WHERE filename = '20261229_dovec_projects.sql') -- DOVEC-CONTACT-EVENTS:supersede (one count, one owner: the 20261229 token owns the set once the ledger records it)
+    -- ── 20261229: contact_events module 'dovec' (thank-you screen WhatsApp taps). Owner of the set.
+    UNION ALL SELECT '20261229_dovec_projects','contact_events module vocabulary is exactly the 19-module set (incl. dovec)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c, LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','cars','connectivity','dovec','eatery','ehliyet','events','explore','garages','grooming',
                                  'homeServices','hotels','insurance','jobs','news','pets','studentHub','towing','transport']
     -- ── 1084: contact_events — the app writes a random per-tap id (outbox dedupe) ──
     -- A GRANT creates no named object, so only a token sees it. The outbox (utils/logContactEvent.js)

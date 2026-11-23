@@ -13,6 +13,7 @@
 --   dovec_feed_is_fresh()       STABLE helper the dovec_projects read policy calls.
 --   dovec_lead_counts()         admin-only counts per project / month / status. No personal field.
 --   dovec_leads_wipe_pii()      90-day retention (service role / cron only).
+--   contact_events_module_check gains 'dovec' (thank-you screen WhatsApp taps), see section 5.
 --   dovec_leads_forget_user()   AFTER DELETE trigger on profiles: account deletion wipes that user's lead PII.
 --
 -- WHO CAN READ / WRITE WHAT, IN PLAIN ENGLISH
@@ -127,7 +128,9 @@ CREATE TABLE IF NOT EXISTS public.dovec_projects (
   updated_at             timestamptz NOT NULL DEFAULT now(),
   description            text,
   gallery                jsonb,
+  entity_uuid            uuid        NOT NULL DEFAULT gen_random_uuid(),
   CONSTRAINT dovec_projects_pkey PRIMARY KEY (id),
+  CONSTRAINT dovec_projects_entity_uuid_key UNIQUE (entity_uuid),
   CONSTRAINT dovec_projects_id_check CHECK (char_length(id) BETWEEN 1 AND 100),
   CONSTRAINT dovec_projects_name_check CHECK (char_length(btrim(name)) BETWEEN 1 AND 200),
   CONSTRAINT dovec_projects_city_check CHECK (char_length(btrim(city)) BETWEEN 1 AND 100),
@@ -579,6 +582,95 @@ BEGIN
   RAISE NOTICE 'dovec: read path hides stale / suspended / delisted, leads closed to app roles, wipe works, probe rolled back';
 END $$;
 
+-- ─── 5. contact_events: module 'dovec' (WhatsApp taps on the thank-you screen) ───
+-- contact_events.entity_id is uuid and dovec_projects.id is Döveç's text id, so each project carries its own
+-- entity_uuid (above): generated here, never written by sync-dovec (its upsert does not name the column), readable
+-- through the existing dovec_projects_read policy and SELECT grant. The tap is the existing anonymous
+-- contact_events insert (ce_insert_public); nothing about who may read or write contact_events changes
+-- (insert: anon + authenticated; select: admins only; update/delete: nobody).
+--
+-- SOURCE OF THE LIST: 20261225_contact_events_news.sql (18 modules). The live pg_get_constraintdef is the authority:
+-- the file REFUSES if the live CHECK holds a module outside the 18 (+ dovec) or lacks one of the 18. Re-runnable.
+-- The list is static on purpose: scripts/audit-schema-drift.mjs reads CHECK literals from this file.
+DO $$
+DECLARE
+  v_def   text;
+  v_live  text[];
+  v_want  text[] := ARRAY['accommodation','events','explore','garages','grooming','homeServices','hotels',
+                          'insurance','jobs','pets','studentHub','towing','transport','ehliyet','connectivity','eatery','cars','news'];
+  v_extra text[];
+  v_miss  text[];
+BEGIN
+  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
+   WHERE conrelid = to_regclass('public.contact_events') AND conname = 'contact_events_module_check';
+  IF v_def IS NULL THEN RAISE EXCEPTION 'contact_events_module_check does not exist'; END IF;
+  RAISE NOTICE 'contact_events_module_check before: %', v_def;
+  SELECT coalesce(array_agg(DISTINCT m[1]), ARRAY[]::text[]) INTO v_live
+    FROM regexp_matches(v_def, '''([^'']+)''::text', 'g') AS m;
+  SELECT coalesce(array_agg(x ORDER BY x), ARRAY[]::text[]) INTO v_extra
+    FROM unnest(v_live) x WHERE x <> 'dovec' AND x <> ALL (v_want);
+  IF cardinality(v_extra) > 0 THEN
+    RAISE EXCEPTION 'REFUSING: the live CHECK has modules this file would drop: %. def=%', v_extra, v_def;
+  END IF;
+  SELECT coalesce(array_agg(x ORDER BY x), ARRAY[]::text[]) INTO v_miss
+    FROM unnest(v_want) x WHERE x <> ALL (v_live);
+  IF cardinality(v_miss) > 0 THEN
+    RAISE EXCEPTION 'REFUSING: the live CHECK lacks modules this file re-adds: %. def=%', v_miss, v_def;
+  END IF;
+  IF position('''whatsapp''' in coalesce((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events') AND conname = 'contact_events_action_check'), '')) = 0 THEN
+    RAISE EXCEPTION 'contact_events_action_check does not accept whatsapp';
+  END IF;
+END $$;
+
+ALTER TABLE public.contact_events DROP CONSTRAINT contact_events_module_check;
+ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_module_check
+  CHECK (module IN ('accommodation','events','explore','garages','grooming','homeServices','hotels',
+                    'insurance','jobs','pets','studentHub','towing','transport','ehliyet','connectivity','eatery','cars','news','dovec'));
+
+DO $$
+DECLARE
+  v_def   text;
+  v_live  text[];
+  v_probe uuid := '00000000-0000-4000-8000-0000000071e6';
+  v_role  text;
+  v_bogus text := 'unset';
+  v_n     int;
+BEGIN
+  SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
+   WHERE conrelid = to_regclass('public.contact_events') AND conname = 'contact_events_module_check';
+  SELECT coalesce(array_agg(DISTINCT m[1]), ARRAY[]::text[]) INTO v_live
+    FROM regexp_matches(coalesce(v_def, ''), '''([^'']+)''::text', 'g') AS m;
+  IF cardinality(v_live) IS DISTINCT FROM 19 OR position('''dovec''' in coalesce(v_def, '')) = 0 THEN
+    RAISE EXCEPTION 'contact_events_module_check post-state is not the 18 + dovec. def=%', v_def;
+  END IF;
+  RAISE NOTICE 'contact_events_module_check after: %', v_def;
+
+  IF EXISTS (SELECT 1 FROM public.contact_events WHERE id = v_probe OR entity_id = v_probe) THEN
+    RAISE EXCEPTION 'a probe row already exists before the test';
+  END IF;
+  SET LOCAL ROLE anon;
+  v_role := current_user;
+  INSERT INTO public.contact_events (id, module, entity_id, action, region, lang)
+  VALUES (v_probe, 'dovec', v_probe, 'whatsapp', NULL, 'Turkish');
+  BEGIN
+    INSERT INTO public.contact_events (module, entity_id, action, region)
+    VALUES ('not_a_real_module', v_probe, 'whatsapp', NULL);
+    v_bogus := 'ACCEPTED';
+  EXCEPTION WHEN check_violation THEN v_bogus := 'rejected';
+  END;
+  RESET ROLE;
+  IF v_role IS DISTINCT FROM 'anon' THEN RAISE EXCEPTION 'probe did not run as anon (ran as %)', v_role; END IF;
+  IF v_bogus IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'CONTROL FAILED: a bogus module was %', v_bogus; END IF;
+  SELECT count(*) INTO v_n FROM public.contact_events
+   WHERE id = v_probe AND module = 'dovec' AND action = 'whatsapp' AND lang = 'Turkish';
+  IF v_n IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'the dovec probe row was not stored exactly once (found %)', v_n; END IF;
+  DELETE FROM public.contact_events WHERE id = v_probe OR entity_id = v_probe;
+  IF EXISTS (SELECT 1 FROM public.contact_events WHERE id = v_probe OR entity_id = v_probe) THEN
+    RAISE EXCEPTION 'probe rows survived the cleanup';
+  END IF;
+END $$;
+
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
 -- Machine-generated by scripts/migration-ledger.mjs --stamp. Do not hand-edit.
 -- The checksum is of THIS FILE WITH THIS BLOCK STRIPPED, which is what lets the file
@@ -590,7 +682,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261229_dovec_projects.sql', 'a0ec3e26ea34db7e4a74c568ff8adae6a2cbf31baff394c7a3a09a3be6798029')
+VALUES ('20261229_dovec_projects.sql', 'e931763ac99b08aa01907978d6720716ba9a533e75f84260a0c71eed0db56f54')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

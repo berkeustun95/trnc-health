@@ -16,7 +16,18 @@ const SQL = readFileSync(FILE, 'utf8')
 const ADMIN = '00000000-0000-4000-8000-000000000001', CUSTOMER = '00000000-0000-4000-8000-000000000002'
 const OTHER = '00000000-0000-4000-8000-000000000003'
 
-const FIXTURE = `
+const MODS18 = ['accommodation','events','explore','garages','grooming','homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport','ehliyet','connectivity','eatery','cars','news']
+const CE = (mods = MODS18) => `
+CREATE TABLE public.contact_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), module text NOT NULL, entity_id uuid NOT NULL, action text NOT NULL,
+  region text, lang text, item_id text, created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT contact_events_module_check CHECK (module IN (${mods.map(m => `'${m}'`).join(',')})),
+  CONSTRAINT contact_events_action_check CHECK (action IN ('call','whatsapp','call_secondary','website')));
+ALTER TABLE public.contact_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.contact_events FROM PUBLIC, anon, authenticated;
+GRANT INSERT (id, module, entity_id, action, region, item_id, lang) ON public.contact_events TO anon, authenticated;
+CREATE POLICY ce_insert_public ON public.contact_events FOR INSERT TO anon, authenticated WITH CHECK (true);
+`
+const FIXTURE = CE() + `
 CREATE TABLE public.profiles (id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE, role text NOT NULL DEFAULT 'customer');
 CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path TO 'public' AS $f$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
@@ -47,6 +58,41 @@ console.log('20261229 — real file')
   const { d, r } = await ready()
   t('applies, including its own assertions', r, { ok: true, msg: null })
   if (!r.ok) { console.log(r.msg); process.exit(1) }
+
+  // contact_events 'dovec' + entity_uuid
+  {
+    const dd = (await d.query(`SELECT column_default AS def, is_nullable AS nul, data_type AS ty FROM information_schema.columns WHERE table_name = 'dovec_projects' AND column_name = 'entity_uuid'`)).rows
+    t('entity_uuid: uuid, NOT NULL, default gen_random_uuid()', dd, [{ def: 'gen_random_uuid()', nul: 'NO', ty: 'uuid' }])
+    t('entity_uuid is UNIQUE (named constraint)', (await d.query(`SELECT contype FROM pg_constraint WHERE conname = 'dovec_projects_entity_uuid_key'`)).rows, [{ contype: 'u' }])
+    await d.exec(`INSERT INTO public.dovec_projects (id, name, city, status, website_url) VALUES ('e1', 'E One', 'Town', 'on_sale', 'https://example.com/e1'), ('e2', 'E Two', 'Town', 'on_sale', 'https://example.com/e2')`)
+    const u1 = (await d.query(`SELECT id, entity_uuid FROM public.dovec_projects WHERE id IN ('e1','e2') ORDER BY id`)).rows
+    t('two projects get two different uuids', [u1.length, u1[0].entity_uuid !== u1[1].entity_uuid], [2, true])
+    const upsert = `INSERT INTO public.dovec_projects (id, name, city, status, website_url, listed, delisted_at, last_seen_at, updated_at)
+      VALUES ('e1', 'E One v2', 'Town', 'on_sale', 'https://example.com/e1', true, NULL, now(), now()), ('e2', 'E Two v2', 'Town', 'on_sale', 'https://example.com/e2', true, NULL, now(), now())
+      ON CONFLICT (id) DO UPDATE SET name = excluded.name, city = excluded.city, status = excluded.status, website_url = excluded.website_url,
+        listed = excluded.listed, delisted_at = excluded.delisted_at, last_seen_at = excluded.last_seen_at, updated_at = excluded.updated_at`
+    for (let i = 0; i < 2; i++) { const r = await asRole(d, 'service_role', null, upsert); if (!r.ok) t('service_role upsert runs', r.msg, 'ok') }
+    t('sync-style upsert (run twice) keeps entity_uuid stable and does update the row',
+      (await d.query(`SELECT id, name, entity_uuid FROM public.dovec_projects WHERE id IN ('e1','e2') ORDER BY id`)).rows,
+      u1.map((r, i) => ({ id: r.id, name: i ? 'E Two v2' : 'E One v2', entity_uuid: r.entity_uuid })))
+    t('the sync sources never name entity_uuid',
+      ['../supabase/functions/sync-dovec/index.ts', '../supabase/functions/_shared/dovec-feed.mjs'].map(f => /entity_uuid/.test(readFileSync(new URL(f, import.meta.url), 'utf8'))), [false, false])
+    t('anon sees no project before the first good sync', (await asRole(d, 'anon', null, `SELECT entity_uuid FROM public.dovec_projects WHERE id = 'e1'`)).rows.length, 0)
+    await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now()`)
+    t('anon reads entity_uuid once the feed is fresh', (await asRole(d, 'anon', null, `SELECT entity_uuid FROM public.dovec_projects WHERE id = 'e1'`)).rows, [{ entity_uuid: u1[0].entity_uuid }])
+    const tap = (m, who = 'anon') => asRole(d, who, who === 'anon' ? null : OTHER, `INSERT INTO public.contact_events (module, entity_id, action, lang) VALUES ('${m}', '${u1[0].entity_uuid}', 'whatsapp', 'Turkish')`)
+    t("contact_events accepts module 'dovec' / whatsapp as anon", (await tap('dovec')).ok, true)
+    t("... and as an authenticated user", (await tap('dovec', 'authenticated')).ok, true)
+    t('an unknown module is still refused (negative control)', (await tap('not_a_real_module')).ok, false)
+    t("an existing module is still accepted (positive control)", (await tap('news')).ok, true)
+    t('anon cannot read contact_events back', (await asRole(d, 'anon', null, `SELECT 1 FROM public.contact_events`)).ok, false)
+    t('the taps are stored for that project', (await d.query(`SELECT count(*)::int n FROM public.contact_events WHERE module = 'dovec' AND entity_id = '${u1[0].entity_uuid}'`)).rows[0].n, 2)
+    const def = (await d.query(`SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'contact_events_module_check'`)).rows[0].d
+    t('module CHECK now lists 19 modules', [...new Set([...def.matchAll(/'([A-Za-z]+)'::text/g)].map(m => m[1]))].length, 19)
+    await d.exec(`DELETE FROM public.contact_events; DELETE FROM public.dovec_projects WHERE id IN ('e1','e2'); UPDATE public.dovec_settings SET last_good_sync_at = NULL`)
+    t('re-applying the file is clean (re-runnable pre-state, now 19 modules)', (await applyFile(d, FILE)).ok, true)
+    await d.exec('RESET ROLE;')
+  }
 
   const proj = await d.query(`SELECT count(*)::int AS n FROM public.dovec_projects`)
   t('probe left no project behind', proj.rows[0].n, 0)
@@ -138,6 +184,31 @@ for (const [name, from, to, re] of [
   const r = await applyFile(d, p)
   t(`${name}: refused`, [r.ok, re.test(r.msg || '')], [false, true])
   if (r.ok === false && !re.test(r.msg || '')) console.log('    refused for a different reason:', r.msg)
+}
+
+console.log('20261229 — contact_events pre-state and post-state guards')
+{
+  const bare = m => m.map(x => `'${x}'`).join(',')
+  for (const [name, mods, re] of [
+    ['live list lacks a module the file re-adds (cars)', MODS18.filter(m => m !== 'cars'), /lacks modules this file re-adds: \{cars\}/],
+    ['live list holds a module the file would drop', [...MODS18, 'surprise'], /would drop: \{surprise\}/],
+  ]) {
+    const d = await freshDb(CE(mods) + FIXTURE.slice(CE().length))
+    const r = await applyFile(d, FILE)
+    t(`${name}: refused`, [r.ok, re.test(r.msg || '')], [false, true])
+    if (r.ok === false && !re.test(r.msg || '')) console.log('    refused for a different reason:', r.msg)
+  }
+  {
+    const d = await freshDb(CE().replace("('call','whatsapp','call_secondary','website')", "('call','call_secondary','website')") + FIXTURE.slice(CE().length))
+    const r = await applyFile(d, FILE)
+    t('action CHECK without whatsapp: refused', [r.ok, /does not accept whatsapp/.test(r.msg || '')], [false, true])
+  }
+  const p = mutant(`'cars','news','dovec'));`, `'cars','news'));`)
+  if (p) {
+    const d = await freshDb(FIXTURE)
+    const r = await applyFile(d, p)
+    t("ADD without 'dovec': refused by the post-state check", [r.ok, /post-state is not the 18 \+ dovec/.test(r.msg || '')], [false, true])
+  }
 }
 
 console.log('20261230 — cron file, on top of 20261229')
