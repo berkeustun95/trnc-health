@@ -791,6 +791,9 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_lead_counts'),
     ('20261229_dovec_projects','dovec_sync_coords'),
     ('20261229_dovec_projects','dovec_coord_status'),
+    -- 20261231 Dovec read gate: the visibility helper inside the read policy and the private pin report; red until applied.
+    ('20261231_dovec_read_gate','dovec_projects_visible'),
+    ('20261231_dovec_read_gate','dovec_coord_report'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
@@ -1900,6 +1903,8 @@ WITH report AS (
     -- Döveç projects (20261229): the freshness helper (anon + authenticated, H token) and the admin counts (authenticated only, H token); registered ahead of the apply; red until it runs.
     ('20261229_dovec_projects','dovec_feed_is_fresh'),
     ('20261229_dovec_projects','dovec_lead_counts'),
+    -- Dovec read gate (20261231): the visibility helper (anon + authenticated + service_role, H token); dovec_coord_report has NO app grant, so no G row (its H token owns that); red until it runs.
+    ('20261231_dovec_read_gate','dovec_projects_visible'),
     -- House banner counters (20261227): EXECUTE also reaches anon (H token); registered ahead of the apply; red until it runs.
     ('20261227_ad_house_daily','bump_house_ad_counter'),
     -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
@@ -2411,13 +2416,13 @@ WITH report AS (
                    AND (SELECT bool_and(NOT has_column_privilege('service_role', to_regclass('public.dovec_settings'), c.col, 'UPDATE'))
                           FROM (VALUES ('id'), ('published'), ('whatsapp_e164')) c(col)), false)
       AND NOT EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('public.dovec_settings') AND a.grantee = 0)
-    UNION ALL SELECT '20261229_dovec_projects','dovec_projects: RLS on; exactly one policy dovec_projects_read (SELECT, PERMISSIVE, anon + authenticated) whose USING reads listed AND dovec_feed_is_fresh() and never published; anon/authenticated SELECT and nothing else; service_role SELECT, INSERT, UPDATE and NO DELETE; no PUBLIC',
+    UNION ALL SELECT '20261229_dovec_projects','dovec_projects: RLS on; exactly one policy dovec_projects_read (SELECT, PERMISSIVE, anon + authenticated); anon/authenticated SELECT and nothing else; service_role SELECT, INSERT, UPDATE and NO DELETE; no PUBLIC. What its USING says is owned by the 20261231 token (the 20261229 dovec_feed_is_fresh() expression was replaced)',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_projects')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_projects') = 1
       AND (SELECT count(*) FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'dovec_projects'
               AND p.policyname = 'dovec_projects_read' AND p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE'
               AND p.roles::text[] @> ARRAY['anon','authenticated']::text[] AND cardinality(p.roles) = 2
-              AND strpos(p.qual, 'listed') > 0 AND strpos(p.qual, 'dovec_feed_is_fresh()') > 0 AND strpos(p.qual, 'published') = 0) = 1
+              ) = 1
       AND COALESCE((SELECT bool_and(has_table_privilege(r.n, to_regclass('public.dovec_projects'), 'SELECT')
                                     AND NOT has_table_privilege(r.n, to_regclass('public.dovec_projects'), 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                                     AND NOT has_any_column_privilege(r.n, to_regclass('public.dovec_projects'), 'INSERT,UPDATE'))
@@ -2466,7 +2471,7 @@ WITH report AS (
                        AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_forget_user()')), false)
-    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, EXECUTE for anon, authenticated and service_role (read-only: seed names, project names and ids, a status word; no lead or user data), no PUBLIC',
+    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, EXECUTE for anon, authenticated and service_role, no PUBLIC (since 20261231 it is the gate in front of dovec_coord_report(); the 20261231 token owns what it returns and to whom)',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_project_coords')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_project_coords') = 0
       AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, to_regclass('public.dovec_project_coords'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -2510,6 +2515,54 @@ WITH report AS (
       AND COALESCE((SELECT strpos(pg_get_functiondef(p.oid), 'NEW.is_test') > 0 AND strpos(pg_get_functiondef(p.oid), 'AND NOT is_test') > 0
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()')), false)
     -- 1229-END
+    -- 1231-BEGIN
+    -- 20261231 Dovec read gate: red until applied, never an error (to_regclass / catalogs / COALESCE).
+    UNION ALL SELECT '20261231_dovec_read_gate','dovec_projects read gate: exactly one policy dovec_projects_read whose USING reads listed AND dovec_projects_visible() (not the 20261229 dovec_feed_is_fresh() expression); dovec_projects_visible(): one overload, DEFINER, STABLE, boolean, search_path pinned, EXECUTE anon + authenticated + service_role, no PUBLIC, body = is_admin() OR (published AND dovec_feed_is_fresh()); dovec_settings.published is false and its DEFAULT is false',
+      (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_projects') = 1
+      AND (SELECT count(*) FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'dovec_projects'
+              AND p.policyname = 'dovec_projects_read' AND p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE'
+              AND p.roles::text[] @> ARRAY['anon','authenticated']::text[] AND cardinality(p.roles) = 2
+              AND strpos(p.qual, 'listed') > 0 AND strpos(p.qual, 'dovec_projects_visible') > 0 AND strpos(p.qual, 'dovec_feed_is_fresh') = 0) = 1
+      AND COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.prorettype = 'boolean'::regtype
+                       AND p.proconfig IS NOT NULL AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+                       AND p.proacl IS NOT NULL
+                       AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                       AND strpos(pg_get_functiondef(p.oid), 'public.is_admin()') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 's.published') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'public.dovec_feed_is_fresh()') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_projects_visible()')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_projects_visible') = 1
+      AND COALESCE((SELECT s.published = false FROM public.dovec_settings s WHERE s.id = 1), false)
+      AND COALESCE((SELECT pg_get_expr(d.adbin, d.adrelid) = 'false' FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                     WHERE d.adrelid = to_regclass('public.dovec_settings') AND a.attname = 'published'), false)
+    UNION ALL SELECT '20261231_dovec_read_gate','dovec_coord_report(): DEFINER, STABLE, search_path pinned, NO EXECUTE for anon, authenticated, service_role or PUBLIC (only DEFINER code calls it), one overload. dovec_coord_status(): DEFINER, STABLE, body raises DOVEC_NOT_PUBLIC unless auth.role() is service_role or dovec_projects_visible(), then returns dovec_coord_report(); EXECUTE grants unchanged (anon, authenticated, service_role, no PUBLIC). dovec_sync_coords(): body returns dovec_coord_report() not the gated function; still service_role only',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
+                       AND p.proconfig IS NOT NULL AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                       AND strpos(pg_get_functiondef(p.oid), 'live_without_coords') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_report()')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_coord_report') = 1
+      AND COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
+                       AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                       AND strpos(pg_get_functiondef(p.oid), 'DOVEC_NOT_PUBLIC') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'auth.role()') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'public.dovec_projects_visible()') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'RETURN public.dovec_coord_report();') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_status()')), false)
+      AND COALESCE((SELECT p.prosecdef AND p.proacl IS NOT NULL
+                       AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                       AND strpos(pg_get_functiondef(p.oid), 'RETURN public.dovec_coord_report();') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'RETURN public.dovec_coord_status()') = 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_sync_coords()')), false)
+    -- 1231-END
     -- 1202-BEGIN
     -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
     UNION ALL SELECT '20261202_onboarding_events','onboarding_events: RLS on; exactly oe_insert_public (INSERT, repeats the event list (11 in 20261202, 14 since 20261204) / 2 platforms / 64-char runtime) + oe_no_update + oe_no_delete; no client SELECT / UPDATE / DELETE / TRUNCATE; INSERT only on event, platform, runtime_version; no PUBLIC',
@@ -7451,8 +7504,8 @@ SELECT '20261228_live_scores_ktff', 'live-scores-ktff: schedule 7,22,37,52 * * *
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
 UNION ALL
--- ─── 20261230: dovec-sync every 10 minutes, POSTs the function with the Vault key (no inline key) ───
-SELECT '20261230_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key novest_sync_key, 60 s timeout, no inline key',
+-- ─── 20261232: dovec-sync every 10 minutes, POSTs the function with the Vault key (no inline key) ───
+SELECT '20261232_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key novest_sync_key, 60 s timeout, no inline key',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync') THEN 'MISSING'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync' AND active
                     AND schedule = '*/10 * * * *'
@@ -7464,8 +7517,8 @@ SELECT '20261230_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, 
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
 UNION ALL
--- ─── 20261230: dovec-lead-retry every 10 minutes at :05, POSTs {"mode":"retry"} only when a retry or old pending lead exists ───
-SELECT '20261230_dovec_cron', 'dovec-lead-retry: schedule 5,15,25,35,45,55 * * * *, function URL, Vault key, retry body, EXISTS gate, no inline key',
+-- ─── 20261232: dovec-lead-retry every 10 minutes at :05, POSTs {"mode":"retry"} only when a retry or old pending lead exists ───
+SELECT '20261232_dovec_cron', 'dovec-lead-retry: schedule 5,15,25,35,45,55 * * * *, function URL, Vault key, retry body, EXISTS gate, no inline key',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-lead-retry') THEN 'MISSING'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-lead-retry' AND active
                     AND schedule = '5,15,25,35,45,55 * * * *'
@@ -7479,8 +7532,8 @@ SELECT '20261230_dovec_cron', 'dovec-lead-retry: schedule 5,15,25,35,45,55 * * *
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
 UNION ALL
--- ─── 20261230: dovec-leads-wipe runs daily at 03:30 and calls the PII wipe function ───
-SELECT '20261230_dovec_cron', 'dovec-leads-wipe: schedule 30 3 * * * and the exact wipe call',
+-- ─── 20261232: dovec-leads-wipe runs daily at 03:30 and calls the PII wipe function ───
+SELECT '20261232_dovec_cron', 'dovec-leads-wipe: schedule 30 3 * * * and the exact wipe call',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-leads-wipe') THEN 'MISSING'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-leads-wipe' AND active
                     AND schedule = '30 3 * * *'
