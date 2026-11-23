@@ -2,7 +2,7 @@
 // ONB_APP_SRC points the source scan at a scratch copy of App.js (red-first checks).
 const fs = require('fs')
 const path = require('path')
-const { loadWithRetry, PROFILE_RETRY_DELAYS } = require('../utils/profileLoad')
+const { loadWithRetry, PROFILE_RETRY_DELAYS, PROFILE_ATTEMPT_TIMEOUT_MS } = require('../utils/profileLoad')
 
 const src = fs.readFileSync(process.env.ONB_APP_SRC || path.join(__dirname, '..', 'App.js'), 'utf8')
 
@@ -82,6 +82,43 @@ test('never throws: a rejecting fetch is a failure and is retried', async () => 
   await expect(loadWithRetry(h2.fetchFn, { sleep: h2.sleep })).resolves.toMatchObject({ data: null })
 })
 
+test('a hung fetch is aborted per attempt and the call still resolves { data: null, error } within the bound', async () => {
+  jest.useFakeTimers()
+  try {
+    expect(PROFILE_ATTEMPT_TIMEOUT_MS).toBe(8000)
+    const signals = []
+    const fetchFn = jest.fn(signal => { signals.push(signal); return new Promise(() => {}) })
+    let res = null
+    const p = loadWithRetry(fetchFn).then(r => { res = r })
+    // 4 attempts x 8 s + waits 1 + 2 + 4 s
+    await jest.advanceTimersByTimeAsync(4 * PROFILE_ATTEMPT_TIMEOUT_MS + 7000)
+    await p
+    expect(fetchFn).toHaveBeenCalledTimes(4)
+    expect(signals.every(sig => sig && sig.aborted === true)).toBe(true)
+    expect(res.data).toBeNull()
+    expect(res.error).toBeTruthy()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('a hung fetch with isCurrent() false after the first timeout stops the loop', async () => {
+  jest.useFakeTimers()
+  try {
+    let current = true
+    const fetchFn = jest.fn(() => new Promise(() => {}))
+    const sleep = jest.fn(async () => { current = false })
+    const p = loadWithRetry(fetchFn, { sleep, isCurrent: () => current })
+    await jest.advanceTimersByTimeAsync(PROFILE_ATTEMPT_TIMEOUT_MS + 1)
+    const res = await p
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+    expect(res.data).toBeNull()
+    expect(res.error).toBeTruthy()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 // ── App.js wiring ──
 function at(hay, needle, label) {
   const i = hay.indexOf(needle)
@@ -134,4 +171,11 @@ test('both Onboarding v2 spinners sit on PageCanvas, not the legacy colors.bg Vi
   expect(src.split(spin).length - 1).toBe(2)
   expect(src).toMatch(/centerOnPage:\s+\{[^}]*\}/)
   expect(src.match(/centerOnPage:\s+\{[^}]*\}/)[0]).not.toContain('backgroundColor')
+})
+
+test('the profile query carries the attempt signal (.abortSignal)', () => {
+  const start = at(src, 'async function loadProfile(', 'loadProfile')
+  const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
+  expect(fn).toContain('signal => supabase.from(\'profiles\')')
+  expect(fn).toContain('.abortSignal(signal)')
 })

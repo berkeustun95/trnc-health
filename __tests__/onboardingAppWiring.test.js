@@ -238,3 +238,50 @@ test('Start choices (start_choice_*) are logged only on first-time phones; start
   expect(m[0]).toContain('logChoices={armPending()}')
   expect(at(src, 'const armPending = () => shouldArmPending(', 'armPending')).toBeLessThan(selectorStart)
 })
+
+// ── Hung-request safety (RN OkHttp has no timeout) ──
+function loadEffectBody() {
+  const start = at(src, '    async function load() {', 'load()')
+  return src.slice(start, at(src, '  }, [retryCount])', 'load effect end'))
+}
+
+test('load() ends loading in a finally, so a throw cannot leave the skeleton up', () => {
+  const body = loadEffectBody()
+  expect(body).toMatch(/\} finally \{[^}]*setLoading\(false\)/)
+  expect(body).toContain('      try {\n')
+  expect(at(body, 'try {', 'try')).toBeLessThan(at(body, "AsyncStorage.getItem('ada_favorites')", 'first read'))
+})
+
+test('load() reads are bounded: facilities / duty / reviews at 10 s with an abort signal, location raced at 8 s, a facilities timeout sets facilityLoadError', () => {
+  const body = loadEffectBody()
+  expect(body.match(/\.abortSignal\(s\)/g).length).toBe(3)
+  expect(body.match(/, 10000\)/g).length).toBe(3)
+  expect(body).toContain('.catch(e => ({ data: null, error: e }))\n      if (error) setFacilityLoadError(true)')
+  const loc = body.slice(at(body, 'Location.getForegroundPermissionsAsync()', 'perm'))
+  expect(loc.indexOf('}, 8000)')).toBeGreaterThan(loc.indexOf('passiveFix('))
+  expect(loc.indexOf('}, 8000)')).toBeLessThan(loc.indexOf('} catch {'))
+})
+
+test('weather invoke has a timeout and a failure still clears the key; weather does not hold loading', () => {
+  const fn = fnBody('fetchWeather')
+  expect(fn).toContain("supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon }, timeout: 8000 })")
+  expect(fn).toContain('weatherKeyRef.current = null')
+  const body = loadEffectBody()
+  expect(at(body, 'setLoading(false)\n      await fetchWeather(', 'loading before weather')).toBeGreaterThan(0)
+})
+
+test('45 s safety net: a held (loading || !profile) routes to ProfileLoadFailedScreen; Retry reloads the profile AND bumps retryCount', () => {
+  const eff = src.slice(at(src, '  // Safety net: a session whose profile', 'safety net'))
+  const effEnd = eff.slice(0, at(eff, '[session?.user?.id, loading, profile, retryCount])', 'deps'))
+  expect(effEnd).toContain('!(loading || !profile)')
+  expect(effEnd).toContain('setTimeout(() => setLoadStalledUid(uid), 45000)')
+  expect(effEnd).toContain('return () => clearTimeout(timer)')
+  const sel = src.slice(selectorStart)
+  const branch = sel.slice(at(sel, 'profileLoadFailedUid === session.user.id || loadStalledUid === session.user.id', 'stalled branch'))
+  const retry = branch.slice(0, at(branch, '/>', 'end of screen'))
+  expect(retry).toContain('<ProfileLoadFailedScreen')
+  expect(retry).toContain('loadProfile(sess)')
+  expect(retry).toContain('setLoading(true)')
+  expect(retry).toContain('setRetryCount(c => c + 1)')
+  expect(src.indexOf('const [loadStalledUid')).toBeLessThan(selectorStart)
+})

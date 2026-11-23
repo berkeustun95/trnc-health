@@ -125,6 +125,7 @@ import {
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent, isTestDeviceLink, markTestDevice } from './utils/onboardingEvents'
 import { loadWithRetry } from './utils/profileLoad'
+import { withTimeout } from './utils/withTimeout'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
 import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
@@ -724,6 +725,7 @@ export default function App() {
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [loadStalledUid, setLoadStalledUid] = useState(null)   // uid whose loading/profile state held for 45 s
   const [weatherData, setWeatherData] = useState(null)
   const weatherKeyRef = useRef(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -1602,7 +1604,7 @@ export default function App() {
     // Every TOKEN_REFRESHED re-runs this for the same uid; only the newest call may apply a result.
     const seq = ++profileLoadSeqRef.current
     const { data, error } = await loadWithRetry(
-      () => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).single(),
+      signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single(),
       { isCurrent },
     )
     if (!isCurrent() || seq !== profileLoadSeqRef.current) return
@@ -1696,7 +1698,7 @@ export default function App() {
     if (weatherKeyRef.current === key) return
     weatherKeyRef.current = key
     try {
-      const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
+      const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon }, timeout: 8000 })
       // Latest request wins: a home-city change can overtake a slower earlier fetch.
       if (weatherKeyRef.current !== key) return
       if (weatherJson?.current) setWeatherData(weatherJson)
@@ -1887,26 +1889,31 @@ export default function App() {
   useEffect(() => {
     setFacilityLoadError(false)
     async function load() {
+      try {
       const favVal = await AsyncStorage.getItem('ada_favorites')
       if (favVal) setFavorites(new Set(JSON.parse(favVal)))
       const placeFavVal = await AsyncStorage.getItem('ada_fav_places')
       if (placeFavVal) setPlaceFavorites(new Set(JSON.parse(placeFavVal).map(id => MERGED_PLACE_IDS[id] || id)))
 
-      const { data, error } = await supabase.from('facilities').select('*').order('name')
+      // A hung request never settles on RN (no OkHttp timeout): every read is bounded, a timeout counts as an error.
+      const { data, error } = await withTimeout(s => supabase.from('facilities').select('*').order('name').abortSignal(s), 10000)
+        .catch(e => ({ data: null, error: e }))
       if (error) setFacilityLoadError(true)
       else setFacilities(data ?? [])
 
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
       // and 03:00 the UTC date is still YESTERDAY — exactly the hours someone needs this.
       const today = localDateKey()
-      const { data: duty } = await supabase
-        .from('duty_schedule').select('facility_id').eq('date', today).maybeSingle()
+      const { data: duty } = await withTimeout(s => supabase
+        .from('duty_schedule').select('facility_id').eq('date', today).abortSignal(s).maybeSingle(), 10000)
+        .catch(() => ({ data: null }))
       if (duty) setDutyFacilityId(duty.facility_id)
 
 
       // TODO: replace with a computed avg_rating + review_count column on facilities
       // once review volume grows, to avoid fetching every row on startup.
-      const { data: reviewsData } = await supabase.from('reviews').select('facility_id, rating').limit(2000)
+      const { data: reviewsData } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
+        .catch(() => ({ data: null }))
       if (reviewsData?.length) {
         const map = {}
         for (const r of reviewsData) {
@@ -1926,17 +1933,20 @@ export default function App() {
       // "near me", the map); a permission already granted is still read silently. locationDenied /
       // locationCanAsk are set as before, so distance sort and the "turn on location" offers still work.
       try {
-        const perm = await Location.getForegroundPermissionsAsync()
-        setLocationCanAsk(perm.canAskAgain !== false)
-        if (perm.status !== 'granted') {
-          setLocationDenied(true)
-        } else {
-          // Startup is not a tap: never the "turn on location" dialog (utils/locationServices.js).
-          // Device location off → treated like denied; the app works without it.
-          const loc = await passiveFix(Location.Accuracy.Balanced)
-          if (!loc) setLocationDenied(true)
-          else { setUserLocation(loc.coords); resolvedCoords = loc.coords }
-        }
+        // Raced at 8 s: a timeout throws into the catch below, the same as no fix.
+        await withTimeout(async () => {
+          const perm = await Location.getForegroundPermissionsAsync()
+          setLocationCanAsk(perm.canAskAgain !== false)
+          if (perm.status !== 'granted') {
+            setLocationDenied(true)
+          } else {
+            // Startup is not a tap: never the "turn on location" dialog (utils/locationServices.js).
+            // Device location off → treated like denied; the app works without it.
+            const loc = await passiveFix(Location.Accuracy.Balanced)
+            if (!loc) setLocationDenied(true)
+            else { setUserLocation(loc.coords); resolvedCoords = loc.coords }
+          }
+        }, 8000)
       } catch {
         setLocationDenied(true)
       }
@@ -1946,12 +1956,24 @@ export default function App() {
         const st = await loadCityWelcomeState().catch(() => null)
         resolvedCoords = weatherPointFor(REGIONS.includes(st?.home) ? st.home : profileRegionRef.current)
       }
-      await fetchWeather(resolvedCoords)
-
+      // Home does not wait for the weather: loading ends first, the hero's temperature fills in when it lands.
       setLoading(false)
+      await fetchWeather(resolvedCoords)
+      } finally {
+        // A throw anywhere above (e.g. JSON.parse of a corrupt favourites value) must not leave the skeleton up.
+        setLoading(false)
+      }
     }
     load()
   }, [retryCount])
+
+  // Safety net: a session whose profile has not arrived after 45 s gets the Retry screen, not a skeleton forever.
+  useEffect(() => {
+    const uid = session?.user?.id
+    if (!uid || !(loading || !profile)) { setLoadStalledUid(null); return }
+    const timer = setTimeout(() => setLoadStalledUid(uid), 45000)
+    return () => clearTimeout(timer)
+  }, [session?.user?.id, loading, profile, retryCount])
 
   // ─── Roster health — SESSION-GATED, and that is the whole point ────────────
   //
@@ -2340,11 +2362,14 @@ export default function App() {
     )
   } else if (!session) {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
-  } else if (profileLoadFailedUid === session.user.id) {
+  } else if (profileLoadFailedUid === session.user.id || loadStalledUid === session.user.id) {
     content = <ProfileLoadFailedScreen lang={lang} onRetry={() => {
       const sess = sessionRef.current
       if (!sess) return
       setProfileLoadFailedUid(null)
+      setLoadStalledUid(null)
+      setLoading(true)
+      setRetryCount(c => c + 1)
       loadProfile(sess)
     }} />
   } else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {
