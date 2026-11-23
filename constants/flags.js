@@ -259,6 +259,11 @@ export const AD_BANNERS_LIVE = false
 // constants/redesign.js HOUSE_BANNER. Baselined in check-module-flags.mjs.
 export const AD_HOUSE_BANNER_LIVE = false
 
+// Settings → Destek → "ADA ile çalışın" (opens the Work with ADA page). Not approved for production yet (Berke
+// 2026-11-23): ADA Preview and dev see it through constants/redesign.js WORK_WITH_ADA_ROW. Baselined in
+// check-module-flags.mjs, so a working-tree true cannot ship in an OTA or a store build.
+export const WORK_WITH_ADA_ROW_LIVE = false
+
 
 // Ev Hizmetleri partner preview. false = the module shows only what the database
 // returns, which is what production does and the only thing users ever see. true = the

@@ -6,6 +6,7 @@ import { t } from '../../constants/i18n'
 import { ListRow, Button, CategoryIcon, useTabBarFootprint, PageCanvas } from '../ui'
 import { FADE_H } from '../ui/FloatingTabBar'
 import { CAN_RESET_ONBOARDING } from '../../utils/previewTools'
+import { WORK_WITH_ADA_ROW } from '../../constants/redesign'
 
 // ─── Profil: the ONE settings place (redesign Slice 2) ──────────────────────
 // The drawer is gone; everything it held lives here, in four groups. Every row calls an
@@ -37,7 +38,7 @@ export function SettingsGroups({ lang, a, isGuest = false }) {
         {row('star-outline', 'homeLife', 'hrRowRate', a.onRate)}
         {row('share-social-outline', 'homeLife', 'hrRowShare', a.onShare)}
         {row('compass-outline', 'homeLife', 'hrRowTutorial', a.onTutorial)}
-        {row('briefcase-outline', 'homeLife', 'hrRowWorkWithAda', a.onWorkWithAda)}
+        {WORK_WITH_ADA_ROW && row('briefcase-outline', 'homeLife', 'hrRowWorkWithAda', a.onWorkWithAda)}
       </Group>
       <Group title={t('hrSetLegal', lang)}>
         {row('document-text-outline', 'explore', 'hrRowLegal', a.onLegal)}

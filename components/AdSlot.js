@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, Image, StyleSheet, TouchableOpacity, Linking } from 'react-native'
+import { View, Text, Image, StyleSheet, TouchableOpacity, Linking, AppState } from 'react-native'
 import { t } from '../constants/i18n'
 import { colors } from '../constants/theme'
 import { AD_BANNERS_LIVE } from '../constants/flags'
@@ -7,6 +7,8 @@ import { HOUSE_BANNER } from '../constants/redesign'
 import { fetchAdForSlot } from '../utils/adBanner'
 import { logAdView, logAdTap, logHouseView, logHouseTap } from '../utils/logAdEvent'
 import { openWorkWithAda } from '../utils/workWithAda'
+import { measureShare, HOUSE_VISIBLE_SHARE } from '../utils/adVisibility'
+import { useTabBarFootprint } from './ui/FloatingTabBar'
 import {
   adRatioFor, adSpecFor, AD_RATIO_TOLERANCE, AD_PAGE_INSET,
   AD_SHOW_SPONSORED_LABEL, AD_SPONSORED_KEY, AD_HOUSE_PLACEMENTS,
@@ -35,7 +37,8 @@ import AdHouseBanner from './AdHouseBanner'
 //
 // EXCEPT the two AD_HOUSE_PLACEMENTS (list_bottom/home, list_top/events): when HOUSE_BANNER is on
 // and the slot is confirmed unsold (or ads are not live yet), ADA's own banner shows there ONCE PER
-// APP OPEN. Loading, failed and offline stay zero height, and a paid ad always wins.
+// APP OPEN, counted from when it is actually on screen. Loading, failed and offline stay zero height, and a
+// paid ad always wins.
 //
 // ─── NON-PERSONALIZED BY CONSTRUCTION ───────────────────────────────────────
 //
@@ -54,8 +57,11 @@ import AdHouseBanner from './AdHouseBanner'
 //   would make an image fetched on every app open uncacheable forever, to fix a rare event.
 // ─── THE HOUSE BANNER: ONCE PER APP OPEN ────────────────────────────────────
 // Module-level, so it resets only when the JS process does (cold start, OTA reload). Returning from background
-// is not a new open, so there is deliberately no AppState reset. The first mount to claim a placement keeps it
-// for its whole life; any later mount of that placement renders nothing.
+// is not a new open, so there is deliberately no AppState reset.
+// The open is used up when the banner is SEEN (Berke 2026-11-23), not when the slot mounts: Home's bottom slot
+// mounts at launch below the fold, so claiming on mount spent it before anyone scrolled there. A mount that is
+// never seen claims nothing, and the next mount offers it again. The mount that sees it first keeps it for its
+// whole life (and records the one view); any later mount of that placement renders nothing.
 const houseShownThisProcess = new Set()
 
 export default function AdSlot({ position, module, lang, onNavigate }) {
@@ -63,36 +69,55 @@ export default function AdSlot({ position, module, lang, onNavigate }) {
   const [showHouse, setShowHouse] = useState(false)
   const viewed = useRef(null)
   const houseOwned = useRef(false)
+  const houseBox = useRef(null)
+  const footprint = useTabBarFootprint()
 
   useEffect(() => {
     if (!position || !module) return
     const houseKey = `${position}/${module}`
     const houseEligible = HOUSE_BANNER && AD_HOUSE_PLACEMENTS.includes(houseKey)
-    // Claimed once per mount: an effect, not render (render can run twice or be thrown away), and the ref keeps
-    // an effect re-run of the same mount the owner.
-    const claimHouse = () => {
+    // Offered, not claimed: the claim happens in the visibility effect below, once it is on screen.
+    const offerHouse = () => {
       if (!houseEligible) return
-      if (!houseOwned.current) {
-        if (houseShownThisProcess.has(houseKey)) return
-        houseShownThisProcess.add(houseKey)
-        houseOwned.current = true
-      }
+      if (!houseOwned.current && houseShownThisProcess.has(houseKey)) return
       setShowHouse(true)
     }
-    // Ads not live: nothing is sold and nothing is queried. An eligible slot shows the house banner, the rest stay empty.
-    if (!AD_BANNERS_LIVE) { claimHouse(); return }
+    // Ads not live: nothing is sold and nothing is queried. An eligible slot offers the house banner, the rest stay empty.
+    if (!AD_BANNERS_LIVE) { offerHouse(); return }
     let alive = true
     fetchAdForSlot(position, module).then(res => {
       if (!alive || res.failed) return          // failed / offline: zero height, never the house banner
       if (res.row) setAd(res.row)               // sold: paid always wins, uncapped
-      else claimHouse()                         // confirmed unsold
+      else offerHouse()                         // confirmed unsold
     })
     return () => { alive = false }
   }, [position, module])
 
+  // Claims the open and records the one view only once at least HOUSE_VISIBLE_SHARE of the banner is on screen
+  // above the tab bar. Measured on mount and then every 400 ms while unseen, foreground only; no scroll wiring,
+  // so it covers a restored scroll offset and a strip that grows above it. Stops at the claim or the unmount.
   useEffect(() => {
-    if (showHouse) logHouseView(position, module)
-  }, [showHouse, position, module])
+    if (!showHouse || houseOwned.current) return
+    const houseKey = `${position}/${module}`
+    let done = false
+    let timer = null
+    const stop = () => { done = true; if (timer) clearInterval(timer) }
+    const check = () => {
+      if (done) return
+      if (houseShownThisProcess.has(houseKey)) { stop(); setShowHouse(false); return }   // another mount saw it first
+      if (AppState.currentState === 'background') return   // 'unknown' at an iOS launch still counts as foreground
+      measureShare(houseBox.current, footprint, share => {
+        if (done || share < HOUSE_VISIBLE_SHARE || houseShownThisProcess.has(houseKey)) return
+        stop()
+        houseShownThisProcess.add(houseKey)
+        houseOwned.current = true
+        logHouseView(position, module)
+      })
+    }
+    timer = setInterval(check, 400)
+    check()
+    return stop
+  }, [showHouse, position, module, footprint])
 
   // ─── __DEV__ ONLY: is this the right creative for THIS position? ──────────
   // Two specs now — 3.2:1 for list_top/list_bottom/detail_bottom, 6.4:1 for list_inline —
@@ -123,6 +148,7 @@ export default function AdSlot({ position, module, lang, onNavigate }) {
   if (showHouse) {
     return (
       <AdHouseBanner
+        boxRef={houseBox}
         position={position}
         lang={lang}
         onPress={() => {

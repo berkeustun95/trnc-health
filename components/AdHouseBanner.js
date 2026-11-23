@@ -11,34 +11,37 @@ import { adRatioFor } from '../constants/ads'
 //
 // PARKED PLACEHOLDER: the content (emblem chip, one title, one CTA) is not final. Copy and artwork are
 // parked (Berke 2026-11-22); the box, the tap and the counters are what this slice ships.
-export default function AdHouseBanner({ position, lang, onPress }) {
+// boxRef: AdSlot measures this box to tell whether the banner is on screen (the margin sits outside it).
+export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
   return (
-    <TouchableOpacity
-      style={[s.slot, { aspectRatio: adRatioFor(position) }]}
-      onPress={onPress}
-      activeOpacity={0.9}
-      accessibilityRole="button"
-      accessibilityLabel={`${t('adHouseTitle', lang)}. ${t('adHouseCta', lang)}`}
-    >
-      <View style={s.chip}>
-        <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.emblem} resizeMode="contain" />
-      </View>
-      <View style={s.text}>
-        <Text style={s.title} numberOfLines={2}>{t('adHouseTitle', lang)}</Text>
-        <View style={s.cta}>
-          <Text style={s.ctaText} numberOfLines={1}>{t('adHouseCta', lang)}</Text>
-          <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
+    <View ref={boxRef} collapsable={false} style={s.box}>
+      <TouchableOpacity
+        style={[s.slot, { aspectRatio: adRatioFor(position) }]}
+        onPress={onPress}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('adHouseTitle', lang)}. ${t('adHouseCta', lang)}`}
+      >
+        <View style={s.chip}>
+          <Image source={require('../assets/brand/v2/ada-emblem.webp')} style={s.emblem} resizeMode="contain" />
         </View>
-      </View>
-    </TouchableOpacity>
+        <View style={s.text}>
+          <Text style={s.title} numberOfLines={2}>{t('adHouseTitle', lang)}</Text>
+          <View style={s.cta}>
+            <Text style={s.ctaText} numberOfLines={1}>{t('adHouseCta', lang)}</Text>
+            <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
   )
 }
 
 const s = StyleSheet.create({
   // Same rules as AdSlot's s.slot; the fill is the app's teal instead of artwork.
+  box: { width: '100%', marginTop: 24 },
   slot: {
     width: '100%',
-    marginTop: 24,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: colors.primary,
