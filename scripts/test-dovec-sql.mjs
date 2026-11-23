@@ -54,6 +54,31 @@ console.log('20261229 — real file')
     (await d.query(`SELECT count(*)::int n, bool_or(published) p, bool_or(last_good_sync_at IS NOT NULL) s FROM public.dovec_settings`)).rows[0], { n: 1, p: false, s: false })
   t('a second settings row is refused', (await d.query(`INSERT INTO public.dovec_settings (id) VALUES (2)`).catch(e => ({ err: /dovec_settings_single_row/.test(e.message) }))).err, true)
 
+  // verify_schema.sql registrations: every name registered for this migration exists in the applied catalogs, and the H tokens hold.
+  {
+    const vs = readFileSync(new URL('../supabase/verify_schema.sql', import.meta.url), 'utf8')
+    const two = [...vs.matchAll(/\('20261229_dovec_projects','([a-z0-9_]+)'\)/g)].map(m => m[1])
+    const three = [...vs.matchAll(/\('20261229_dovec_projects','([a-z0-9_]+)','([a-z0-9_]+)'\)/g)].map(m => [m[1], m[2]])
+    const names = (await d.query(`
+      SELECT relname AS n FROM pg_class WHERE relnamespace = 'public'::regnamespace
+      UNION SELECT proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+      UNION SELECT tgname FROM pg_trigger WHERE NOT tgisinternal
+      UNION SELECT conname FROM pg_constraint WHERE connamespace = 'public'::regnamespace`)).rows.map(r => r.n)
+    t('registered A/C/D/E/F/G names found', two.filter(n => !names.includes(n)), [])
+    t('registered names are a real list', two.length >= 40, true)
+    const cols = new Set((await d.query(`SELECT table_name || '.' || column_name AS c FROM information_schema.columns WHERE table_schema = 'public'`)).rows.map(r => r.c))
+    t('registered B columns found', three.filter(([tb, c]) => !cols.has(`${tb}.${c}`)), [])
+    t('every real column is registered (no unregistered column)',
+      [...cols].filter(c => c.startsWith('dovec_') && !three.some(([tb, col]) => `${tb}.${col}` === c)), [])
+    const h = vs.slice(vs.indexOf('-- 1229-BEGIN'), vs.indexOf('-- 1229-END'))
+    const tok = await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`).then(r => r.rows, e => ({ err: e.message }))
+    t('H tokens run and are all true', Array.isArray(tok) ? [tok.length, tok.every(r => r.ok === true)] : tok, [4, true])
+    const bad2 = await d.query(`GRANT DELETE ON public.dovec_leads TO service_role`).then(async () =>
+      (await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`)).rows.filter(r => r.ok !== true).length)
+    t('red-first: a DELETE grant on leads turns an H token red', bad2, 1)
+    await d.query(`REVOKE DELETE ON public.dovec_leads FROM service_role`)
+  }
+
   // Account deletion: the whole point of "no FK + AFTER DELETE trigger".
   await d.exec(`
     INSERT INTO public.dovec_settings AS s (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET last_good_sync_at = now();
