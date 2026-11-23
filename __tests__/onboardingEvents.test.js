@@ -108,6 +108,13 @@ describe('isTestDeviceLink', () => {
     ['ada://auth?code=x', false],
     ['https://x/test-device', false],
     ['ada://test-devices', false],
+    ['ada://', false],
+    ['ada://test-device-x', false],
+    ['ada://test-device/x', false],
+    ['ada://test-device#f', true],
+    ['', false],
+    [42, false],
+    ['ada://auth?code=test-device', false],
     [null, false],
     [undefined, false],
   ])('%s -> %s', (url, expected) => { expect(isTestDeviceLink(url)).toBe(expected) })
