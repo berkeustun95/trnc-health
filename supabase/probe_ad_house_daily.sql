@@ -2,7 +2,7 @@
 -- Prints only slot, day and the anonymous view/tap counters (no user column exists), plus two positive controls.
 --   table_visible true    = this role can see rows of the table at all; an empty list then means no count yet.
 --   role_bypasses_rls true = the role is not subject to RLS (so table_visible false would mean an empty table).
---   gh workflow run supabase-readonly -f file=supabase/probe_ad_house_daily.sql --ref probe/ad-house-daily
+--   gh workflow run supabase-readonly -f file=supabase/probe_ad_house_daily.sql
 select json_build_object(
   'famagusta_today', (now() at time zone 'Asia/Famagusta')::date,
   'table_visible', exists(select 1 from public.ad_house_daily),
