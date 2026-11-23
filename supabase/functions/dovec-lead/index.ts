@@ -1,0 +1,103 @@
+// dovec-lead — saves an enquiry about a Döveç project and forwards it to Döveç.
+//
+//   POST { client_request_id, project_id, unit_type?, name, phone, email?, message?, consent: true,
+//          consent_text_version, language }                      (a signed-in, non-guest user)
+//     -> 200 { ok: true, external_id, status }  | 200 { ok: false, error: 'rejected', external_id }
+//     -> 400 invalid_request{field} / consent_required · 403 sign_in_required · 404 project_unavailable
+//        409 request_changed · 429 rate_limited
+//   POST { mode: 'retry' }                                         (service key only: cron 20261230)
+//
+// Deploy:  scripts/fn-deploy.sh dovec-lead --go   (after Berke's go; verify_jwt true, deploy-config.json)
+// Secrets: DOVEC_PARTNER_KEY (Bearer for Döveç), DOVEC_LEADS_MODE ('live' = lock 2 of 2; with the code constant
+//          LEADS_LIVE_ALLOWED in ../_shared/dovec-lead.mjs = lock 1). Unless BOTH, nothing leaves: status 'mock'.
+// Who: the caller's id comes from auth.getUser() on THAT JWT, never from the body. Guests are refused. dovec_leads has no
+//      policy and no grant for an app role: this function (service role) is the only way in and never returns another
+//      person's lead.
+// PRIVACY: logs hold external_id, a status word and an HTTP code. Never a name, phone, e-mail, message or user id.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serviceCaller } from '../_shared/caller-auth.mjs'
+import { handleLead } from '../_shared/dovec-lead.mjs'
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+const ONE_JWT = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/
+const PENDING_GRACE_MS = 10 * 60000
+const COLS = 'id,external_id,status,payload_hash,attempts,project_id,unit_type,name,phone,email,message,language_code,consent,created_at,next_attempt_at'
+
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
+  const url = Deno.env.get('SUPABASE_URL')!
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  const authz = req.headers.get('Authorization')
+
+  let caller: { kind: 'user'; id: string } | { kind: 'service' }
+  if (await serviceCaller(authz, key)) {
+    caller = { kind: 'service' }
+  } else {
+    const jwt = ONE_JWT.exec(authz ?? '')?.[1]
+    if (!jwt) return json(401, { error: 'unauthorized' })
+    const { data, error } = await admin.auth.getUser(jwt)
+    const user = data?.user
+    if (error || !user) return json(401, { error: 'unauthorized' })
+    if (user.is_anonymous === true) return json(403, { error: 'sign_in_required' })
+    caller = { kind: 'user', id: user.id }
+  }
+
+  let body: unknown = null
+  try { body = await req.json() } catch { return json(400, { error: 'invalid_request', field: 'body' }) }
+
+  const store = {
+    async findByRequest(userId: string, crid: string) {
+      const { data, error } = await admin.from('dovec_leads').select(COLS).eq('user_id', userId).eq('client_request_id', crid).maybeSingle()
+      if (error) throw error
+      return data
+    },
+    async getVisibleProject(id: string) {
+      const fresh = await admin.rpc('dovec_feed_is_fresh')
+      if (fresh.error) throw fresh.error
+      if (fresh.data !== true) return null
+      const { data, error } = await admin.from('dovec_projects').select('id,name,unit_types').eq('id', id).eq('listed', true).maybeSingle()
+      if (error) throw error
+      return data
+    },
+    async countLeads({ userId, sinceIso }: { userId?: string; sinceIso: string }) {
+      let q = admin.from('dovec_leads').select('id', { count: 'exact', head: true }).gte('created_at', sinceIso)
+      if (userId) q = q.eq('user_id', userId)
+      const { count, error } = await q
+      if (error) throw error
+      return count ?? 0
+    },
+    async insertLead(row: Record<string, unknown>) {
+      const { data, error } = await admin.from('dovec_leads').insert(row).select(COLS).single()
+      if (error) throw error
+      return data
+    },
+    async updateLead(id: number, patch: Record<string, unknown>) {
+      const { error } = await admin.from('dovec_leads').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    async dueLeads(limit: number, nowIso: string) {
+      const { data, error } = await admin.from('dovec_leads').select(COLS).in('status', ['retry', 'pending'])
+        .order('created_at').limit(200)
+      if (error) throw error
+      const t = new Date(nowIso).getTime()
+      return (data ?? []).filter((l: { next_attempt_at: string | null; created_at: string }) =>
+        (l.next_attempt_at ? new Date(l.next_attempt_at).getTime() : new Date(l.created_at).getTime() + PENDING_GRACE_MS) <= t).slice(0, limit)
+    },
+  }
+
+  try {
+    const res = await handleLead({
+      caller, body,
+      deps: {
+        store, log: (s: string) => console.log(s),
+        env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY'), baseUrl: Deno.env.get('DOVEC_API_BASE_URL') },
+      },
+    })
+    return json(res.status, res.body)
+  } catch {
+    console.error('dovec-lead: failed')
+    return json(500, { error: 'server_error' })
+  }
+})
