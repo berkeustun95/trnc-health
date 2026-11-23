@@ -153,7 +153,10 @@ describe('wiring', () => {
     expect(read('screens/DuyurularScreen.js')).toMatch(/setItems\(groupDuyurular\(await fetchAll\(\)\)\)/)
     const d = read('screens/DuyuruDetailScreen.js')
     expect(d).toMatch(/earlier\.map\(/)
-    expect(d).toMatch(/openUrl\(e\.official_url\)/)
+    expect(d).toMatch(/openUrl\(e\.official_url, 'earlier'\)/)
+    // A failed open shows its alert beside what was tapped, not under the main button.
+    expect(d).toMatch(/openFailed === 'main' && <InlineAlert/)
+    expect(d).toMatch(/openFailed === 'earlier' && <InlineAlert/)
     expect(d).toMatch(/t\('duyEarlierStages', lang\)/)
   })
 })
