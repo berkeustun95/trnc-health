@@ -124,6 +124,7 @@ import {
 } from './utils/onboardingState'
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent } from './utils/onboardingEvents'
+import { loadWithRetry } from './utils/profileLoad'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
 import { signOutThisDevice, signOutEverywhere, savePushToken, saveGuestPushToken, saveGuestPushLang, endGuestSessionThen } from './utils/signOut'
@@ -155,7 +156,7 @@ import OliChatSheet, { OliErrorBoundary } from './components/OliChatSheet'
 import { EmergencySheet, MunicipalSheet, LanguageSheet, AboutSheet } from './components/shell/Sheets'
 import { SettingsGroups, GuestProfile } from './components/shell/Settings'
 import { openWorkWithAda } from './utils/workWithAda'
-import { ConfirmDialog } from './components/ui'
+import { ConfirmDialog, ErrorState } from './components/ui'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -493,6 +494,18 @@ const MERGED_PLACE_IDS = {
   '613c310f-c118-4668-9ea1-e5b4494164e9': '9f14da0c-e9a2-4489-81e2-20973b662942',
 }
 
+// The profile read failed every retry (a network blip right after sign-in): a Retry, never a spinner for good.
+function ProfileLoadFailedScreen({ lang, onRetry }) {
+  return (
+    <PageCanvas>
+      <SplashStatusBar style="dark" />
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center' }} edges={['top', 'bottom']}>
+        <ErrorState lang={lang} message={t('profileLoadFailed', lang)} onRetry={onRetry} />
+      </SafeAreaView>
+    </PageCanvas>
+  )
+}
+
 export default function App() {
   // ─── FOUR INTER WEIGHTS, AND TWO OF THEM ARE A BUG FIX ────────────────────
   //
@@ -657,6 +670,7 @@ export default function App() {
   // Whose row `profile` is: on a session switch without a sign-out the previous row is still held until the
   // new one loads, and Screen 2's routing must not decide on it.
   const [profileUid, setProfileUid] = useState(null)
+  const [profileLoadFailedUid, setProfileLoadFailedUid] = useState(null)   // uid whose profile read failed every retry
   const [bootSplashDone, setBootSplashDone] = useState(false)
   // While the boot splash is up, nothing may open over it: an RN Modal is its own native
   // window and draws above any View, so each launch-time sheet/notice below waits for this.
@@ -1577,6 +1591,56 @@ export default function App() {
     }
   }
 
+  // The profile read for one session, with bounded retries. A result for a session that is no longer the
+  // current one is dropped; a final failure is keyed to that uid so App shows a Retry screen, not a spinner.
+  async function loadProfile(session) {
+    const uid = session.user.id
+    const isCurrent = () => sessionRef.current?.user?.id === uid
+    const { data, error } = await loadWithRetry(
+      () => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).single(),
+      { isCurrent },
+    )
+    if (!isCurrent()) return
+    if (error || !data) { setProfileLoadFailedUid(uid); return }
+    setProfileLoadFailedUid(null)
+    setProfile(data ?? null)
+    setProfileUid(session.user.id)
+
+    // Language self-heal (SERVER column only — in-app already resolves a NULL
+    // column via pendingLang since the L1 migration). A pre-auth/onboarding
+    // language pick lives solely in AsyncStorage (@trnc_lang) because no session
+    // exists at onboarding; persist it to the server the FIRST time the column is
+    // still unset, so cross-user notifications and the duty-push edge function use
+    // the right language. Reads @trnc_lang directly (not the possibly-stale
+    // pendingLang state) to avoid a mount-effect race. Runs on every session load,
+    // but writes at most once: the `== null` guard means an existing value is
+    // never overwritten, and guests are excluded EXPLICITLY (they cannot write the
+    // row — not left to the RLS block to fail silently).
+    const storedLang = await AsyncStorage.getItem('@trnc_lang')
+    const effectiveLang = data?.preferred_language || storedLang || 'English'
+    if (data && data.preferred_language == null && !isGuest(session) && storedLang) {
+      const { error: syncErr } = await supabase.from('profiles')
+        .update({ preferred_language: storedLang }).eq('id', session.user.id)
+      if (!syncErr) setProfile(prev => (prev ? { ...prev, preferred_language: storedLang } : prev))
+    }
+
+    // The signup tick, if one is waiting. Guests are excluded EXPLICITLY rather than
+    // left to the RESTRICTIVE no_anon_update_profiles policy to reject silently —
+    // same reasoning as the language self-heal above. `data` must exist: without the
+    // row there is no recorded version to compare against, and the decision would be
+    // made against `undefined`.
+    if (data && !isGuest(session)) {
+      const consent = await flushPendingConsent(session, data)
+      if (consent) setProfile(prev => (prev ? { ...prev, ...consent } : prev))
+    }
+
+    // Onboarding v2: no automatic tour and no home-city question here any more. Screen 2 asks the
+    // city; the tour is offered from Home (S3) and stays in Profile / the menu.
+    if (data?.role === 'provider') {
+      loadProviderFacility()
+    }
+  }
+
   useEffect(() => {
     sessionRef.current = session
     // Reset the UI only when the USER changes. Every TOKEN_REFRESHED is a new session object,
@@ -1591,45 +1655,8 @@ export default function App() {
     if (!session) {
       setProfile(null); setProfileUid(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
-    supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.user.id).single()
-      .then(async ({ data }) => {
-        setProfile(data ?? null)
-        setProfileUid(session.user.id)
-
-        // Language self-heal (SERVER column only — in-app already resolves a NULL
-        // column via pendingLang since the L1 migration). A pre-auth/onboarding
-        // language pick lives solely in AsyncStorage (@trnc_lang) because no session
-        // exists at onboarding; persist it to the server the FIRST time the column is
-        // still unset, so cross-user notifications and the duty-push edge function use
-        // the right language. Reads @trnc_lang directly (not the possibly-stale
-        // pendingLang state) to avoid a mount-effect race. Runs on every session load,
-        // but writes at most once: the `== null` guard means an existing value is
-        // never overwritten, and guests are excluded EXPLICITLY (they cannot write the
-        // row — not left to the RLS block to fail silently).
-        const storedLang = await AsyncStorage.getItem('@trnc_lang')
-        const effectiveLang = data?.preferred_language || storedLang || 'English'
-        if (data && data.preferred_language == null && !isGuest(session) && storedLang) {
-          const { error: syncErr } = await supabase.from('profiles')
-            .update({ preferred_language: storedLang }).eq('id', session.user.id)
-          if (!syncErr) setProfile(prev => (prev ? { ...prev, preferred_language: storedLang } : prev))
-        }
-
-        // The signup tick, if one is waiting. Guests are excluded EXPLICITLY rather than
-        // left to the RESTRICTIVE no_anon_update_profiles policy to reject silently —
-        // same reasoning as the language self-heal above. `data` must exist: without the
-        // row there is no recorded version to compare against, and the decision would be
-        // made against `undefined`.
-        if (data && !isGuest(session)) {
-          const consent = await flushPendingConsent(session, data)
-          if (consent) setProfile(prev => (prev ? { ...prev, ...consent } : prev))
-        }
-
-        // Onboarding v2: no automatic tour and no home-city question here any more. Screen 2 asks the
-        // city; the tour is offered from Home (S3) and stays in Profile / the menu.
-        if (data?.role === 'provider') {
-          loadProviderFacility()
-        }
-      })
+    setProfileLoadFailedUid(null)
+    loadProfile(session)
     setNotifsLoading(true)
     fetchNotifications(supabase, session.user.id, { guest: isGuest(session) })
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
@@ -2303,6 +2330,13 @@ export default function App() {
     )
   } else if (!session) {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
+  } else if (profileLoadFailedUid === session.user.id) {
+    content = <ProfileLoadFailedScreen lang={lang} onRetry={() => {
+      const sess = sessionRef.current
+      if (!sess) return
+      setProfileLoadFailedUid(null)
+      loadProfile(sess)
+    }} />
   } else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {
     // Onboarding v2: Screen 2 comes next (or may, after Giriş yap), so a Home-shaped skeleton here would flash
     // a screen the user is not going to.
