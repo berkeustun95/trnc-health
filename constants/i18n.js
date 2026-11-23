@@ -15530,7 +15530,7 @@ const translations = {
     dovecAbout: "À propos du projet",
     dovecGallery: "Galerie",
     dovecWebsite: "Visiter le site",
-    dovecOpenMaps: "Ouvrir dans Plans",
+    dovecOpenMaps: "Ouvrir la carte",
     dovecEnquire: "Envoyer une demande",
     dovecEmpty: "Aucun projet à afficher pour le moment.",
     dovecLoadError: "Impossible de charger les projets.",
