@@ -133,7 +133,7 @@
     {
       "pr": 541,
       "commit": "7237155c1a3474e269b28c77c4cb56c8f7cf61c2",
-      "what": "Veles Bit Postası Home banner (VELES_LIVE false; on in Preview and dev only), merged to main 2026-11-22 as 8568e232",
+      "what": "Velesbit Postası Home banner (VELES_LIVE false; on in Preview and dev only), merged to main 2026-11-22 as 8568e232",
       "since": "2026-11-22",
       "cleared": false,
       "clear": "Only after Berke has seen the banner on ADA Preview (Turkish and one non-Turkish UI, the compact hero on a short screen, the tap opening Veles) and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #541 is held."
@@ -153,6 +153,22 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before AD_HOUSE_BANNER_LIVE flips. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #551 is held."
+    },
+    {
+      "pr": 552,
+      "commit": "f5ab6532c190be2d9450c4782c97e423d28f8e79",
+      "what": "Velesbit Postası banner opens in the external browser on Android too (no in-app browser on either platform; tap still logged), merged to main 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Clears together with #541: only after Berke has seen the tap leave ADA on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit."
+    },
+    {
+      "pr": 553,
+      "commit": "72175b603a738bd7303cf6844a64f748f2e13f5d",
+      "what": "Name 'Velesbit Postası' (one word) in the banner title and all 9 accessibility labels, merged to main 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Clears together with #541: only after Berke has seen the banner on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit."
     }
   ]
 }
