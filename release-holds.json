@@ -135,48 +135,68 @@
       "commit": "7237155c1a3474e269b28c77c4cb56c8f7cf61c2",
       "what": "Velesbit Postası Home banner (VELES_LIVE false; on in Preview and dev only), merged to main 2026-11-22 as 8568e232",
       "since": "2026-11-22",
-      "cleared": false,
-      "clear": "Only after Berke has seen the banner on ADA Preview (Turkish and one non-Turkish UI, the compact hero on a short screen, the tap opening Veles) and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #541 is held."
+      "cleared": true,
+      "clear": "Only after Berke has seen the banner on ADA Preview (Turkish and one non-Turkish UI, the compact hero on a short screen, the tap opening Veles) and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #541 is held.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Goes live with VELES_LIVE = true in this PR."
     },
     {
       "pr": 546,
       "commit": "778c83cb28a321e6432cc73934923b00f798975b",
       "what": "House banner (Home bottom + Events top, flag AD_HOUSE_BANNER_LIVE off) and the 'ADA ile çalışın' Settings row (ungated in #546; behind WORK_WITH_ADA_ROW_LIVE since #551), merged to main 2026-11-22",
       "since": "2026-11-22",
-      "cleared": false,
-      "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before the flag flips. Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before the flag flips. Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Ships switched off: AD_HOUSE_BANNER_LIVE and WORK_WITH_ADA_ROW_LIVE stay false; flipping either needs its own go."
     },
     {
       "pr": 551,
       "commit": "38f43d4e26921721d66eaa102fbe1b5ac2818a0b",
       "what": "House banner counted only when seen + Settings row behind WORK_WITH_ADA_ROW_LIVE (false; on in Preview and dev only), 2026-11-23",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before AD_HOUSE_BANNER_LIVE flips. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #551 is held."
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before AD_HOUSE_BANNER_LIVE flips. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #551 is held.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Ships switched off: AD_HOUSE_BANNER_LIVE and WORK_WITH_ADA_ROW_LIVE stay false; flipping either needs its own go."
     },
     {
       "pr": 552,
       "commit": "f5ab6532c190be2d9450c4782c97e423d28f8e79",
       "what": "Velesbit Postası banner opens in the external browser on Android too (no in-app browser on either platform; tap still logged), merged to main 2026-11-23",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Clears together with #541: only after Berke has seen the tap leave ADA on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit."
+      "cleared": true,
+      "clear": "Clears together with #541: only after Berke has seen the tap leave ADA on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Goes live with VELES_LIVE = true in this PR."
     },
     {
       "pr": 553,
       "commit": "72175b603a738bd7303cf6844a64f748f2e13f5d",
       "what": "Name 'Velesbit Postası' (one word) in the banner title and all 9 accessibility labels, merged to main 2026-11-23",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Clears together with #541: only after Berke has seen the banner on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit."
+      "cleared": true,
+      "clear": "Clears together with #541: only after Berke has seen the banner on ADA Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's first commit.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Goes live with VELES_LIVE = true in this PR."
     },
     {
       "pr": 563,
       "commit": "dd655d942052acba7212a65f05a3d048b23c75b2",
       "what": "Velesbit Postası banner: brand blue #0A5688, untranslated slogan line, trimmed real logo, layout A ('TR' badge, no chevron), merged to main 2026-11-23 as 87e5386d",
       "since": "2026-11-23",
+      "cleared": true,
+      "clear": "Only after Berke has seen it on Preview and says go in chat, together with #541/#546/#551/#552/#553. Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Goes live with VELES_LIVE = true in this PR."
+    },
+    {
+      "pr": 565,
+      "commit": "3e843ef484ff07548e0382d10c1837fc06136051",
+      "what": "Velesbit Postası go-live: VELES_LIVE = true (banner on Home for every 1.4.3 user) + #558 app files reverted, 2026-11-23",
+      "since": "2026-11-23",
       "cleared": false,
-      "clear": "Only after Berke has seen it on Preview and says go in chat, together with #541/#546/#551/#552/#553. Then set cleared to true in a PR."
+      "clear": "Only after Berke has checked the Preview built from this PR's merge commit and gives his SECOND go in chat for the exact commit (his first go covered the PR and Preview only). Then set cleared to true in a PR; production = the previewed merge commit plus that hold-clear commit only."
     }
   ]
 }
