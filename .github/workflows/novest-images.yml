@@ -105,6 +105,10 @@ jobs:
       # ONE write gate, read by the Mirror step and the record step: a scheduled run applies, a dispatch only with apply=true.
       WRITE: ${{ github.event_name == 'schedule' || inputs.apply == true }}
       NOVEST_ROUTE: ${{ vars.NOVEST_ROUTE }}
+      # Relay-route rate limit (unset = 4 calls per 65 s, downloads counted); repo variables, read by the Mirror step.
+      NOVEST_RATE_CALLS: ${{ vars.NOVEST_RATE_CALLS }}
+      NOVEST_RATE_WINDOW_S: ${{ vars.NOVEST_RATE_WINDOW_S }}
+      NOVEST_RATE_COUNT_DOWNLOADS: ${{ vars.NOVEST_RATE_COUNT_DOWNLOADS }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0

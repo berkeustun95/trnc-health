@@ -51,7 +51,7 @@ import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { planPrune, pruneRefusal, parseImageUrl, deletablePaths } from './lib/novest-prune-plan.mjs'
 import { readAllRows, readAllResult } from './lib/read-all-rows.mjs'
 import { resolveNovestRoute, pruneRouteRefusal, relayFetch, largestResponseBytes, RELAY_RESPONSE_CAP } from './lib/novest-relay-client.mjs'
-import { createRetryingFetch, resolveMediaGapMs } from './lib/novest-fetch-policy.mjs'
+import { createRetryingFetch, resolveRateLimit } from './lib/novest-fetch-policy.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -89,8 +89,8 @@ if (refusal) {
 }
 let route
 try { route = resolveNovestRoute(process.env) } catch (e) { console.error(`::error::${e.message}`); process.exit(1) }
-let gap
-try { gap = resolveMediaGapMs(process.env, route) } catch (e) { console.error(`::error::${e.message}`); process.exit(1) }
+let rate
+try { rate = resolveRateLimit(process.env, route) } catch (e) { console.error(`::error::${e.message}`); process.exit(1) }
 const routeRefusal = pruneRouteRefusal({ prune, route })
 if (routeRefusal) {
   console.error(`REFUSED: ${routeRefusal}`)
@@ -106,10 +106,11 @@ const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
 console.log(`route: ${route}`)
-console.log(`media lookup gap: ${gap.ms} ms (${gap.source})`)
+console.log(rate ? `rate limit: ${rate.calls} calls per ${rate.windowMs / 1000} s, downloads ${rate.countDownloads ? 'counted' : 'not counted'} (${rate.source})` : 'rate limit: off (direct route)')
 const baseFetch = route === 'relay' ? relayFetch : (u, i) => fetch(u, i)
-const novestFetch = createRetryingFetch({ fetch: baseFetch, route, mediaGapMs: gap.ms })
+const novestFetch = createRetryingFetch({ fetch: baseFetch, route, rate })
 setNovestFetch(novestFetch)
+process.on('exit', () => console.log(novestFetch.summary()))
 if (route === 'relay') {
   process.on('exit', () => console.log(`largest relay response: ${largestResponseBytes()} bytes (cap ${RELAY_RESPONSE_CAP})`))
 }
