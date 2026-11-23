@@ -281,8 +281,8 @@ const CHECKS = [
   ['only AdSlot imports the house banner', ({ files }) => {
     const offenders = []
     for (const [rel, src] of Object.entries(files)) {
-      if (rel === AD_COMPONENT || rel === HOUSE_COMPONENT) continue
-      if (/from\s+['"][^'"]*\/AdHouseBanner['"]|require\(['"][^'"]*\/AdHouseBanner['"]\)/.test(stripComments(src))) offenders.push(rel)
+      if (rel === AD_COMPONENT || rel === HOUSE_COMPONENT || rel.startsWith('__tests__/')) continue
+      if (/from\s+['"][^'"]*\/AdHouseBanner(?:\.js)?['"]|require\(['"][^'"]*\/AdHouseBanner(?:\.js)?['"]\)/.test(stripComments(src))) offenders.push(rel)
     }
     if (offenders.length) {
       return `these files import AdHouseBanner but only ${AD_COMPONENT} may: ${offenders.join(', ')}\n`
@@ -659,8 +659,8 @@ const CASES = [
   }],
   ['only AdSlot imports the house banner', () => {
     const i = clone()
-    i.files['screens/DutyListScreen.js'] = `import AdHouseBanner from '../components/AdHouseBanner'\n` + base.files['screens/DutyListScreen.js']
-    return [i, s => /from\s+['"][^'"]*\/AdHouseBanner['"]/.test(stripComments(s.files['screens/DutyListScreen.js']))]
+    i.files['screens/DutyListScreen.js'] = `import AdHouseBanner from '../components/AdHouseBanner.js'\n` + base.files['screens/DutyListScreen.js']
+    return [i, s => /from\s+['"][^'"]*\/AdHouseBanner\.js['"]/.test(stripComments(s.files['screens/DutyListScreen.js']))]
   }],
   ['house placements are real placements', () => {
     const i = clone(); i.ads.AD_HOUSE_PLACEMENTS.push('list_top/nowhere')

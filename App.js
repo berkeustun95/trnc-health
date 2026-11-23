@@ -135,6 +135,7 @@ import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import LiveScoresScreen from './screens/LiveScoresScreen'
+import LiveScoresEditorScreen from './screens/LiveScoresEditorScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
@@ -899,6 +900,8 @@ export default function App() {
   const facilityBackRef = useRef(null)
   const towingBackRef = useRef(null)
   const carPostBackRef = useRef(null)
+  const liveScoresBackRef = useRef(null)          // LiveScoresScreen: its editor layer
+  const liveScoresEditorBackRef = useRef(null)    // admin's editor: fixture/new → list
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -1409,11 +1412,12 @@ export default function App() {
       if (showExplore)          { setShowExplore(false); return true }
       if (showCheckinFeed)      { if (checkinFeedBackRef.current?.()) return true; setShowCheckinFeed(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
-      if (showLiveScores) { setShowLiveScores(false); return true }
+      if (showLiveScores) { if (liveScoresBackRef.current?.()) return true; setShowLiveScores(false); return true }
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
       if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
+      if (adminPreview === 'liveScoresEditor' && liveScoresEditorBackRef.current?.()) return true
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
@@ -2525,6 +2529,7 @@ export default function App() {
     }
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
+      onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
       onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined}
       openRequest={adminOpen} onOpenRequestHandled={() => setAdminOpen(null)} />
   } else if (profile.role === 'provider') {
@@ -2808,8 +2813,12 @@ export default function App() {
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
+  } else if (adminPreview === 'liveScoresEditor') {
+    // Admins enter KTFF fixtures from here (they never reach Home). Not flag-gated: fixtures
+    // are entered before LIVE_SCORES_LIVE flips.
+    content = <LiveScoresEditorScreen lang={lang} onBack={() => setAdminPreview(null)} backRef={liveScoresEditorBackRef} />
   } else if (showLiveScores) {
-    content = <LiveScoresScreen lang={lang} onBack={() => setShowLiveScores(false)} />
+    content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and
   // back returns to the guide (slice 8). Opened alone (Home), it is unaffected.
   } else if (showExchangeRates) {
