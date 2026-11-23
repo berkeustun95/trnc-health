@@ -57,7 +57,7 @@ export const CARS = MODULE_FLAGS.cars || (typeof __DEV__ !== 'undefined' && __DE
 const MARKETPLACE_PREVIEW = false
 export const MARKETPLACE = MODULE_FLAGS.marketplace || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && MARKETPLACE_PREVIEW)
 
-// Veles Bit Postası Home banner before go-live: dev bundles and ADA Preview show it; VELES_LIVE stays off, so
+// Velesbit Postası Home banner before go-live: dev bundles and ADA Preview show it; VELES_LIVE stays off, so
 // production Home is unchanged (preflight (c) keeps a production publish off the Preview config).
 const VELES_PREVIEW = true
 export const VELES = VELES_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && VELES_PREVIEW)

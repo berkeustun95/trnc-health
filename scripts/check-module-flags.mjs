@@ -162,7 +162,7 @@ const WAITLIST_BLAST_DONE = new Set([
 
 const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
-  // Veles Bit Postası Home banner: a working-tree true would show it to every production user.
+  // Velesbit Postası Home banner: a working-tree true would show it to every production user.
   VELES_LIVE:            false,
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
