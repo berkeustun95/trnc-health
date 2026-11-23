@@ -21,7 +21,7 @@ const LEAGUES = [1, 2]
 const LEAGUE_FALLBACK = { 1: 'lsLeagueSuper', 2: 'lsLeagueFirst' }
 const HEX = /^#[0-9A-Fa-f]{6}$/
 const OUR_LOGOS = `${(process.env.EXPO_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/public/team-logos/`
-const WIDE_MIN = 380   // dp at fontScale 1: below it the G/B/M columns are dropped
+const WIDE_MIN = 410   // dp at fontScale 1: below it the G/B/M columns are dropped (keeps the team column >= ~120pt)
 const isEn = lang => lang === 'English'
 const pick = (row, base, lang) => (isEn(lang) && row[`${base}_en`]) || row[`${base}_tr`] || row[`${base}_en`] || ''
 const fill = (s, vars) => Object.entries(vars).reduce((a, [k, v]) => a.replace(`{${k}}`, String(v)), s)
