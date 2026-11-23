@@ -1,0 +1,73 @@
+# Döveç projects — going live
+
+Döveç's partner API is real (`https://atlas.dovecgroup.com`, Bearer key `DOVEC_PARTNER_KEY`, already a production
+secret). This replaces the old guess-the-API checklist. Nothing here has been applied or deployed: every step below
+waits for Berke's go, one at a time.
+
+- `GET /api/partner/projects` (60/min) → `sync-dovec` → `dovec_projects` (read by the app; RLS: `listed` AND a good
+  sync within 24 h AND not suspended).
+- `POST /api/partner/leads` (30/min) ← `dovec-lead` ← the app. `dovec_leads` has RLS on and zero policies: the app
+  never reads it, only the service role does.
+- A partner field Döveç leaves empty stays empty (a null `from_price` is valid; the app shows its "ask" label).
+
+## Production steps, in this order
+
+1. **Merge the PR to main.** The migration dry run refuses a feature-branch ref, so no dry run exists until then.
+2. **Dry run, then apply `20261229_dovec_projects.sql`** (`gh workflow run supabase-migrate -f file=20261229_dovec_projects.sql`;
+   apply waits for the `production-db` approval). Creates the three tables, the read policy, the helper
+   `dovec_feed_is_fresh()`, the account-deletion trigger and the 90-day wipe function. `dovec_settings.published`
+   starts `false`; nothing is visible yet.
+3. **Deploy both functions** (`scripts/fn-deploy.sh sync-dovec --go`, `scripts/fn-deploy.sh dovec-lead --go`;
+   verify_jwt true in `deploy-config.json`). `dovec-lead` starts in mock mode: no request ever leaves for Döveç.
+4. **Create the Vault secret `dovec_sync_key`** (the service key the cron sends to the two functions; read by name
+   from `vault.decrypted_secrets`, never in a file). Done by Berke in the Supabase dashboard Vault, not from here.
+5. **Dry run, then apply `20261230_dovec_cron.sql`.** It refuses unless 20261229 is applied and the Vault secret exists
+   exactly once. Schedules `dovec-sync` (every 10 min), `dovec-lead-retry` (every 10 min, only when a lead is waiting)
+   and `dovec-leads-wipe` (03:30 UTC), with one `data_jobs` row each.
+6. **The first good sync arms monitoring.** `dovec-health` (hourly) stays green and idle while `dovec_settings.last_run_at`
+   is null, so a not-yet-live feed does not page anyone. After the first run it goes red on: suspended, a last status
+   other than `ok`, a good sync older than 30 min, a lead stuck over 1 h, or a rejected or failed lead in the last 24 h.
+7. **Check what the sync wrote** from the admin screen or a read-only probe (no user data lives in this table, but print
+   counts only). Then decide the go-live: `dovec_settings.published` flips by a migration, never from the dashboard.
+8. **Real leads, later, a separate go.** Two locks, both needed: the code constant `LEADS_LIVE_ALLOWED` in
+   `_shared/dovec-lead.mjs` (a reviewed commit + a deploy of `dovec-lead`) AND the secret `DOVEC_LEADS_MODE=live`
+   (`scripts/sb.sh secrets set --env-file <600 file>`, checked by digest). Until both are set every enquiry is stored
+   with status `mock` and nothing is sent.
+
+## Behaviour worth knowing
+
+- **Suspension.** A 401 from Döveç sets `dovec_settings.suspended = true`: the projects disappear from the app at once
+  (the read policy checks it) and `dovec-health` goes red. The next good sync clears it. A 503 `not_provisioned` is a
+  refused run, not a suspension.
+- **Mass-delist refusal.** A sync that would delist more than half of the listed projects (or all of them) is refused
+  (`refused_mass_delist`) and changes nothing, as are an empty feed (`refused_empty`) and a count that does not match
+  the list (`refused_count_mismatch`). If Döveç really did remove most projects, that is a manual step: ask Berke.
+  Projects are never deleted, only delisted.
+- **A bad project does not delist itself.** One that fails validation is skipped and counted; if it was already listed
+  it stays as it was.
+- **Account deletion.** `dovec_leads.user_id` has no foreign key on purpose. Deleting a profile wipes that user's
+  name, phone, email, message and `user_id` (pending or retrying leads become `failed`) and keeps the row for counts.
+  Every lead's PII is wiped after 90 days anyway.
+- **Stale feed.** 24 hours after the last good sync the projects stop being readable. By design; the cron's
+  rollback (`cron.unschedule`) therefore also empties the app after a day.
+- **Logs and probes** carry counts and status words only: the repo and its Actions logs are public.
+
+## Tests (by hand, not CI)
+
+`npm run dovec:test` runs the feed test, the lead test and the SQL test against fixtures with a mocked `fetch`.
+No test or script ever calls `atlas.dovecgroup.com`. The SQL test needs the PGlite package; when the checkout has no
+`node_modules/@electric-sql/pglite`, run it from a directory that links one.
+
+## Later work (not dropped)
+
+The earlier partner slice lives on branch `feat/dovec-partner` (PR #262), written against the guessed schema. It is
+not merged; these three pieces are wanted on top of the real feed once projects are live:
+
+- **Explore map pins:** `assets/map-pins/dovec@2x.png` and `dovec@3x.png`, added in `f8459510`
+  ("Prices follow the app language; "Call for price" in Konaklama; Döveç pin + header fixes").
+- **A Home slot:** `components/home/redesign/DovecHomeSlot.js`, added in `8d5e4218`
+  ("Döveç partner, slice 2: partner page, map pins, Home slot, tracked contact (flag OFF)").
+- **The partner page:** `screens/DovecPartnerScreen.js`, added in `8d5e4218`, later changed in `f8459510`.
+
+They need rework to read `dovec_projects` / `dovec_settings` (column names and statuses changed) and to go through the
+module go-live SOP (seed inactive, spot-check in Turkish, flag in both files, Preview before production).
