@@ -755,7 +755,7 @@ export default function AccommodationScreen({
             // GATED ON A NON-EMPTY LIST: an ad above "no results" is worse than no ad,
             // and this list's filters intersect to zero routinely.
             <>
-              {dovecReady && !isDorm && <DovecEntryCard lang={lang} onPress={onOpenDovec} />}
+              {dovecReady && !isDorm && (intent === 'sale' || intent === 'all') && <DovecEntryCard lang={lang} onPress={onOpenDovec} />}
               {items.length > 0 ? <AccommodationListTopSlot lang={lang} onNavigate={onAdNavigate} /> : null}
             </>
           }

@@ -1267,6 +1267,7 @@ export default function App() {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
         setAdminOpen(null)
+        setAdminPreview(null)
         // A sign-out ends any onboarding hand-off: Screen 2 belongs to the session that armed it.
         setOnbPending(null)
         setSigninPerm(null)
