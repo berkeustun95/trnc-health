@@ -155,13 +155,22 @@ test('loadProfile applies a result only for the newest call (sequence guard)', (
   const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
   expect(fn).toContain('const seq = ++profileLoadSeqRef.current')
   expect(fn).toContain('seq !== profileLoadSeqRef.current')
-  expect(fn.indexOf('seq !== profileLoadSeqRef.current')).toBeLessThan(fn.indexOf('setProfileLoadFailedUid(uid)'))
+  // Final result: the guard line comes before the failure is shown.
+  const finalGuard = fn.indexOf('if (!isCurrent() || seq !== profileLoadSeqRef.current) return')
+  expect(finalGuard).toBeGreaterThan(-1)
+  expect(finalGuard).toBeLessThan(fn.indexOf('showFailed(error)'))
+  // Early offline screen: the per-attempt callback checks the same guard before showing anything.
+  const cb = fn.slice(fn.indexOf('onAttemptFailed: err => {'), fn.indexOf('showFailed(err)\n        },'))
+  expect(cb).toContain('seq !== profileLoadSeqRef.current')
 })
 
 test('a failed reload with a row already held for the same uid does not set the failed uid', () => {
   const start = at(src, 'async function loadProfile(', 'loadProfile')
   const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
-  expect(fn).toContain('if (heldProfileUidRef.current !== uid) setProfileLoadFailedUid(uid)')
+  expect(fn).toContain('if (heldProfileUidRef.current !== uid) showFailed(error)')
+  // The early offline screen must not replace a working app on a refresh-time reload either.
+  const cb = fn.slice(fn.indexOf('onAttemptFailed: err => {'), fn.indexOf('showFailed(err)\n        },'))
+  expect(cb).toContain('if (heldProfileUidRef.current === uid) return')
   expect(fn).toContain('heldProfileUidRef.current = session.user.id')
   expect(src).toContain('heldProfileUidRef.current = null; setNotifications([])')
 })
@@ -178,4 +187,42 @@ test('the profile query carries the attempt signal (.abortSignal)', () => {
   const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
   expect(fn).toContain('signal => supabase.from(\'profiles\')')
   expect(fn).toContain('.abortSignal(signal)')
+})
+
+// ─── Offline screen (audit U-01) ───────────────────────────────────────────────
+const { isNetworkError } = require('../utils/profileLoad')
+const { TimeoutError } = require('../utils/withTimeout')
+
+test('isNetworkError: timeouts and failed fetches yes, server errors no', () => {
+  expect(isNetworkError(new TimeoutError(8000))).toBe(true)
+  expect(isNetworkError({ message: 'TypeError: Network request failed' })).toBe(true)
+  expect(isNetworkError({ name: 'AbortError', message: 'Aborted' })).toBe(true)
+  expect(isNetworkError({ message: 'JWT expired', code: 'PGRST301' })).toBe(false)
+  expect(isNetworkError(new Error('profile row not returned'))).toBe(false)
+  expect(isNetworkError(null)).toBe(false)
+})
+
+test('onAttemptFailed fires after EVERY failed attempt, before the retry sleep', async () => {
+  const h = harness([ERR, ERR, OK])
+  const order = []
+  h.sleep.mockImplementation(ms => { order.push(`sleep ${ms}`); return Promise.resolve() })
+  const res = await loadWithRetry(h.fetchFn, { sleep: h.sleep, onAttemptFailed: (e, i) => order.push(`fail ${i}`) })
+  expect(res).toEqual(OK)
+  expect(order).toEqual(['fail 0', 'sleep 1000', 'fail 1', 'sleep 2000'])
+})
+
+test('a throwing onAttemptFailed does not stop the retries', async () => {
+  const h = harness([ERR, OK])
+  const res = await loadWithRetry(h.fetchFn, { sleep: h.sleep, onAttemptFailed: () => { throw new Error('x') } })
+  expect(res).toEqual(OK)
+})
+
+test('App: offline screen from the first network failure, recovery reloads Home data, foreground retries', () => {
+  const start = at(src, 'async function loadProfile(', 'loadProfile')
+  const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
+  expect(fn).toContain('if (!isNetworkError(err) || !isCurrent() || seq !== profileLoadSeqRef.current) return')
+  expect(fn).toContain('if (offlineShownRef.current) { offlineShownRef.current = false; setRetryCount(c => c + 1) }')
+  expect(src).toContain("message={t(offline ? 'profileLoadOffline' : 'profileLoadFailed', lang)}")
+  expect(src).toContain('onRetry={retryProfileLoad}')
+  expect(src).toMatch(/if \(!profileFailedHere\) return\n\s+const sub = AppState\.addEventListener\('change', next => \{ if \(next === 'active'\) retryProfileLoad\(\) \}\)\n\s+return \(\) => sub\.remove\(\)/)
 })

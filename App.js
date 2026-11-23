@@ -124,7 +124,7 @@ import {
 } from './utils/onboardingState'
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent, isTestDeviceLink, markTestDevice } from './utils/onboardingEvents'
-import { loadWithRetry } from './utils/profileLoad'
+import { loadWithRetry, isNetworkError } from './utils/profileLoad'
 import { withTimeout } from './utils/withTimeout'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
@@ -496,12 +496,14 @@ const MERGED_PLACE_IDS = {
 }
 
 // The profile read failed every retry (a network blip right after sign-in): a Retry, never a spinner for good.
-function ProfileLoadFailedScreen({ lang, onRetry }) {
+// offline: the failure was a timeout or a failed fetch, shown from the FIRST failed attempt while the retries
+// continue behind it; the screen leaves on its own when one succeeds or the app comes back to the foreground.
+function ProfileLoadFailedScreen({ lang, onRetry, offline }) {
   return (
     <PageCanvas>
       <SplashStatusBar style="dark" />
       <SafeAreaView style={{ flex: 1, justifyContent: 'center' }} edges={['top', 'bottom']}>
-        <ErrorState lang={lang} message={t('profileLoadFailed', lang)} onRetry={onRetry} />
+        <ErrorState lang={lang} message={t(offline ? 'profileLoadOffline' : 'profileLoadFailed', lang)} onRetry={onRetry} />
       </SafeAreaView>
     </PageCanvas>
   )
@@ -727,6 +729,7 @@ export default function App() {
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const [loadStalledUid, setLoadStalledUid] = useState(null)   // uid whose loading/profile state held for 45 s
+  const [profileLoadOffline, setProfileLoadOffline] = useState(false)   // the failed read was a network failure
   const [weatherData, setWeatherData] = useState(null)
   const weatherKeyRef = useRef(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -931,6 +934,7 @@ export default function App() {
   const sessionRef = useRef(null)
   const profileLoadSeqRef = useRef(0)
   const heldProfileUidRef = useRef(null)
+  const offlineShownRef = useRef(false)   // the offline screen was up for this load: reload Home's data when it recovers
   const toSignUpRef = useRef(false)
   // The onboarding step as last rendered (the back chain reads it; it is derived below that hook), and the
   // DEVICE language for guest push saves: the device copy, not the server-first `lang`, so a failed
@@ -1607,14 +1611,30 @@ export default function App() {
     const isCurrent = () => sessionRef.current?.user?.id === uid
     // Every TOKEN_REFRESHED re-runs this for the same uid; only the newest call may apply a result.
     const seq = ++profileLoadSeqRef.current
+    const showFailed = err => {
+      setProfileLoadOffline(isNetworkError(err))
+      setProfileLoadFailedUid(uid)
+    }
     const { data, error } = await loadWithRetry(
       signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single(),
-      { isCurrent },
+      {
+        isCurrent,
+        // No network: say so at once instead of ~40 s of grey cards; the retries go on behind the screen.
+        onAttemptFailed: err => {
+          if (!isNetworkError(err) || !isCurrent() || seq !== profileLoadSeqRef.current) return
+          if (heldProfileUidRef.current === uid) return
+          offlineShownRef.current = true
+          showFailed(err)
+        },
+      },
     )
     if (!isCurrent() || seq !== profileLoadSeqRef.current) return
     // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
-    if (error || !data) { if (heldProfileUidRef.current !== uid) setProfileLoadFailedUid(uid); return }
+    if (error || !data) { if (heldProfileUidRef.current !== uid) showFailed(error); return }
     setProfileLoadFailedUid(null)
+    setLoadStalledUid(null)
+    // Recovered behind the offline screen: Home's own reads (facilities, duty, ratings) failed too, so run them again.
+    if (offlineShownRef.current) { offlineShownRef.current = false; setRetryCount(c => c + 1) }
     setProfile(data ?? null)
     setProfileUid(session.user.id)
     heldProfileUidRef.current = session.user.id
@@ -1978,6 +1998,25 @@ export default function App() {
     const timer = setTimeout(() => setLoadStalledUid(uid), 45000)
     return () => clearTimeout(timer)
   }, [session?.user?.id, loading, profile, retryCount])
+
+  function retryProfileLoad() {
+    const sess = sessionRef.current
+    if (!sess) return
+    offlineShownRef.current = false
+    setProfileLoadFailedUid(null)
+    setLoadStalledUid(null)
+    setLoading(true)
+    setRetryCount(c => c + 1)
+    loadProfile(sess)
+  }
+
+  // On the failed/offline screen, coming back to the app retries by itself (the network is often back by then).
+  const profileFailedHere = !!session && (profileLoadFailedUid === session.user.id || loadStalledUid === session.user.id)
+  useEffect(() => {
+    if (!profileFailedHere) return
+    const sub = AppState.addEventListener('change', next => { if (next === 'active') retryProfileLoad() })
+    return () => sub.remove()
+  }, [profileFailedHere])
 
   // ─── Roster health — SESSION-GATED, and that is the whole point ────────────
   //
@@ -2367,15 +2406,7 @@ export default function App() {
   } else if (!session) {
     content = <AuthScreen lang={lang} initialMode={authMode} onBack={() => setShowWelcome(true)} onModeChange={authModeChanged} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l).catch(() => {}) }} />
   } else if (profileLoadFailedUid === session.user.id || loadStalledUid === session.user.id) {
-    content = <ProfileLoadFailedScreen lang={lang} onRetry={() => {
-      const sess = sessionRef.current
-      if (!sess) return
-      setProfileLoadFailedUid(null)
-      setLoadStalledUid(null)
-      setLoading(true)
-      setRetryCount(c => c + 1)
-      loadProfile(sess)
-    }} />
+    content = <ProfileLoadFailedScreen lang={lang} offline={profileLoadOffline && profileLoadFailedUid === session.user.id} onRetry={retryProfileLoad} />
   } else if ((loading || !profile) && (onbPending === PENDING_DUTY || onbPending === PENDING_SIGNIN)) {
     // Onboarding v2: Screen 2 comes next (or may, after Giriş yap), so a Home-shaped skeleton here would flash
     // a screen the user is not going to.

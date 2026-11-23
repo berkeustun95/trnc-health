@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'r
 import { colors, category as CATEGORY, type, radii, elevation, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
 import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT, tileLabel } from '../../../constants/homeModules'
-import { liveGroups, categoryOf } from '../../../constants/homeGroups'
+import { panelGroups, categoryOf } from '../../../constants/homeGroups'
 import { CategoryIcon } from '../../ui'
 
 // ─── WIDTH BUDGET — WHY THE PANEL HAS A 4pt INNER GUTTER ───────────────────
@@ -67,7 +67,7 @@ export default function ServicePanels({ lang, onPress, unlocked }) {
   const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
-      {liveGroups(unlocked).map(g => (
+      {panelGroups(unlocked).map(g => (
         <View key={g.key} style={[s.panel, elevation.card]}>
           <View style={s.head}>
             <View style={[s.dot, { backgroundColor: CATEGORY[g.key].ink }]} />

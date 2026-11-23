@@ -126,3 +126,26 @@ test('usage outranks the defaults, and a pin outranks usage', () => {
   const pinned = fav.resolveFavourites({ pins: ['towing'], usage: { health: 9 }, visible })
   expect(pinned.slice(0, 2)).toEqual(['towing', 'health'])
 })
+
+// Audit D-01 (Berke 2026-11-23): Nöbetçi + Acil are Home's top tiles, so "Tüm hizmetler" does not repeat them,
+// but they stay visible (pinnable) and keep the health colour.
+test('Tüm hizmetler panels leave out duty + emergency; visibility and colour keep them', () => {
+  const { groups } = load({ dev: false })
+  const panelIds = groups.panelGroups().flatMap(g => g.modules.map(m => m.id))
+  const liveIds = groups.liveGroups().flatMap(g => g.modules.map(m => m.id))
+  const dropped = liveIds.filter(id => !panelIds.includes(id))
+  expect({ dropped, panelHasDuty: panelIds.includes('duty') }).toEqual({ dropped: ['duty', 'emergency'], panelHasDuty: false })
+  expect(groups.visibleServiceIds()).toEqual(expect.arrayContaining(['duty', 'emergency']))
+  expect([groups.categoryOf('duty'), groups.categoryOf('emergency')]).toEqual(['health', 'health'])
+  const health = groups.panelGroups().find(g => g.key === 'health')
+  expect(health && health.modules.map(m => m.id)).toEqual(['health'])
+})
+
+test('the Tüm hizmetler screen renders panelGroups, not liveGroups', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'components/home/redesign/ServicePanels.js'), 'utf8')
+  expect(src).toContain('{panelGroups(unlocked).map(g => (')
+  expect(src).not.toContain('liveGroups(')
+  // The button's count is the number of tiles the panels show.
+  const home = require('fs').readFileSync(require('path').join(__dirname, '..', 'screens/HomeScreen.js'), 'utf8')
+  expect(home).toContain('count={visibleIds.filter(id => !ON_HOME_TOP.has(id)).length}')
+})
