@@ -129,7 +129,7 @@ function StandingRow({ r, lang, wide, legend }) {
       {wide && <Num style={s.stNum}>{r.drawn}</Num>}
       {wide && <Num style={s.stNum}>{r.lost}</Num>}
       <Num style={s.stGd}>{r.goal_difference}</Num>
-      <Num style={[s.stPts]}>{r.points}</Num>
+      <Num style={s.stPts}>{r.points}</Num>
     </View>
   )
 }
@@ -180,7 +180,7 @@ function WeekPicker({ weeks, week, onChange, lang }) {
         <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
       </TouchableOpacity>
       <View style={s.weekMid}>
-        <OnPhotoLabel accessibilityRole="header">{fill(t('lsWeekN', lang), { n: week })}</OnPhotoLabel>
+        <OnPhotoLabel style={s.credit} accessibilityRole="header">{fill(t('lsWeekN', lang), { n: week })}</OnPhotoLabel>
       </View>
       <TouchableOpacity style={[s.weekBtn, next == null && s.weekOff]} disabled={next == null}
         onPress={() => onChange(next)} activeOpacity={press.small}
