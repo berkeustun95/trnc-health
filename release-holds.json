@@ -219,6 +219,14 @@
       "clear": "Only after Berke has checked the combined Preview built from main with this PR and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
       "clearedOn": "2026-11-23",
       "clearedBy": "Berke, in chat 2026-11-23: \"Second go: publish to production from main 20dafc03 plus the one commit that clears the release holds. Nothing else.\" Goes live with the same OTA (no flag; visible only when a profile load fails or stalls)."
+    },
+    {
+      "pr": 577,
+      "commit": "25d8b8d8989a8aa3a60a3661f8430e5496dc5dc7",
+      "what": "Audit fix pack B: Duyurular one card per exam sitting, exact reposts hidden",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the live-snapshot groups in the vault AND the combined audit-fix Preview, and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
     }
   ]
 }

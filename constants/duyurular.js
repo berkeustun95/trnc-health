@@ -106,3 +106,101 @@ export function visibleCategories(items) {
   for (const it of items) n[it.category] = (n[it.category] || 0) + 1
   return DUY_CATEGORIES.filter(c => (n[c.key] || 0) >= MIN_ITEMS_FOR_CATEGORY).map(c => ({ ...c, count: n[c.key] }))
 }
+
+// ─── One card per exam sitting, and no exact reposts (audit D-04, Berke 2026-11-23) ─────────────
+// KHK posts every exam sitting in stages: YAPILIYOR (being held) → YAPILDI (held) → KESİNLEŞTİ
+// (results final), each as its own announcement, often from a different source page. The list shows
+// one card per sitting, carrying its LATEST stage; the earlier ones ride along as `earlier` and the
+// detail screen links them. A wrong merge would hide an official announcement, so anything unclear
+// stays its own card:
+//  - only titles with a stage word AND "SINAV" are stage cards; the exam is the title without the
+//    stage word, the "(25 Kasım 2026)" date and singular/plural endings (SINAVI/SINAVLARI, KADROSUNUN/
+//    KADROLARININ); written and oral exams stay apart because the words differ
+//  - a card joins the newest sitting exactly one stage behind it (1→2, 2→3), within STAGE_JOIN_DAYS of
+//    that sitting's last card; a YAPILDI also needs the same date as the YAPILIYOR (or one of them undated); a
+//    KESİNLEŞTİ's date is its posting date, so it is not compared
+//  - two cards of the same stage never join (two YAPILDI on one day are two post groups), except an
+//    exact repost
+// Exact repost: the same folded title. Only the newest copy is shown, from any source, any age.
+export const STAGE_JOIN_DAYS = 21
+const DAY_MS = 86400000
+
+export function foldTitle(title) {
+  return String(title || '')
+    .replace(/i̇/g, 'i').replace(/i/g, 'İ').replace(/ı/g, 'I')
+    .toUpperCase()
+    .replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
+    .replace(/[^A-Z0-9()]+/g, ' ')
+    .trim()
+}
+
+const STAGES = [[/\bYAPILIYOR\b/, 1], [/\bYAPILDI\b/, 2], [/\bKESINLES(TI|MISTIR)\b/, 3]]
+
+// { stage, exam, date } for a stage card, else null.
+export function stageOf(title) {
+  const f = foldTitle(title)
+  if (!/\bSINAV/.test(f)) return null
+  const hit = STAGES.find(([re]) => re.test(f))
+  if (!hit) return null
+  const m = f.match(/\((\d{1,2}) ([A-Z]+) (\d{4})\)/)
+  const exam = f
+    .replace(/\(\d{1,2} [A-Z]+ \d{4}\)/g, ' ')
+    .replace(/\(MULAKAT\)/g, ' ')
+    .replace(/\bYAPILIYOR\b|\bYAPILDI\b|\bKESINLES(TI|MISTIR)\b/g, ' ')
+    .replace(/\bSINAV(I|LARI)\b/g, 'SINAV')
+    .replace(/\bKADRO(SU|SUNUN|LARI|LARININ)\b/g, 'KADRO')
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return { stage: hit[1], exam, date: m ? `${Number(m[1])} ${m[2]} ${m[3]}` : null }
+}
+
+const byNewest = (a, b) => (new Date(b.published_at) - new Date(a.published_at)) || String(b.id).localeCompare(String(a.id))
+
+// rows: announcements in any order. Returns the cards to show, newest first, each with `earlier`
+// (the hidden rows of its group, newest first; [] when alone). Rows are not mutated.
+export function groupDuyurular(rows) {
+  // 1. Exact reposts: keep the newest copy of each folded title.
+  const byTitle = new Map()
+  for (const r of [...rows].sort(byNewest)) {
+    const k = foldTitle(r.title)
+    if (byTitle.has(k)) byTitle.get(k).hidden.push(r)
+    else byTitle.set(k, { head: r, hidden: [] })
+  }
+  const unique = [...byTitle.values()]
+
+  // 2. Stage chains, per exam, oldest first.
+  const out = []
+  const chains = new Map()
+  for (const u of unique) {
+    const st = stageOf(u.head.title)
+    if (!st || !st.exam) { out.push({ ...u.head, earlier: u.hidden }); continue }
+    if (!chains.has(st.exam)) chains.set(st.exam, [])
+    chains.get(st.exam).push({ ...u, st })
+  }
+  for (const list of chains.values()) {
+    list.sort((a, b) => -byNewest(a.head, b.head))
+    const sittings = []
+    for (const c of list) {
+      const t = new Date(c.head.published_at).getTime()
+      let last = null
+      for (let i = sittings.length - 1; i >= 0 && !last; i--) {
+        const s = sittings[i]
+        if (s.stage === c.st.stage - 1
+          && t - s.at <= STAGE_JOIN_DAYS * DAY_MS
+          && (c.st.stage === 3 || !c.st.date || !s.date || c.st.date === s.date)) last = s
+      }
+      if (last) {
+        last.cards.push(c); last.stage = c.st.stage; last.at = t
+        if (!last.date && c.st.stage === 2) last.date = c.st.date
+      } else {
+        sittings.push({ stage: c.st.stage, date: c.st.date, at: t, cards: [c] })
+      }
+    }
+    for (const s of sittings) {
+      const [latest, ...older] = [...s.cards].reverse()
+      out.push({ ...latest.head, earlier: [...latest.hidden, ...older.flatMap(o => [o.head, ...o.hidden])].sort(byNewest) })
+    }
+  }
+  return out.sort(byNewest)
+}
