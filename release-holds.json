@@ -227,6 +227,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after Berke has checked the live-snapshot groups in the vault AND the combined audit-fix Preview, and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 578,
+      "commit": "2b5b58d37c3d286c0156d5c7a53b35362d5cd34d",
+      "what": "Audit fix pack C: facility page translated + guarded; guide → assistant in hrWelcomeHeadline/welcomeTagline/shareAppMessage",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
     }
   ]
 }
