@@ -2331,6 +2331,9 @@ export default function App() {
         onStart={startAsGuest}
         onLogin={startLogin}
         onSignUp={startSignUp}
+        // start_choice_* = first-time phones only (the ones that get Screen 2); a returning phone's taps are
+        // deliberately not counted, they would inflate the Screen 2 reach denominator.
+        logChoices={armPending()}
       />
     )
   } else if (!session) {

@@ -223,3 +223,18 @@ test('design pass: outline edge is primary, short screens shrink the logo, reset
   const settings = fs.readFileSync(path.join(__dirname, '..', 'components', 'shell', 'Settings.js'), 'utf8')
   expect(settings).toContain("row('refresh-outline', 'health', 'devResetOnboarding', a.onResetOnboarding, { destructive: true, chevron: false })")
 })
+
+test('Start choices (start_choice_*) are logged only on first-time phones; start_shown stays unconditional', () => {
+  const start = fs.readFileSync(path.join(__dirname, '..', 'screens', 'StartScreen.js'), 'utf8')
+  expect(start).toMatch(/export default function StartScreen\(\{[^}]*\blogChoices\b[^}]*\}\)/)
+  expect(start).toMatch(/if \(logChoices\) logOnboardingEvent\(START_CHOICE_EVENTS\.signup\)/)
+  expect(start).toMatch(/if \(logChoices\) logOnboardingEvent\(START_CHOICE_EVENTS\.signin\)/)
+  expect(start).toMatch(/if \(logChoices\) logOnboardingEvent\(START_CHOICE_EVENTS\.guest\)/)
+  expect(start).not.toMatch(/\n\s*logOnboardingEvent\(START_CHOICE_EVENTS/)
+  expect(start).toContain('logOnboardingEvent(START_SHOWN_EVENT)')
+  expect(start).not.toMatch(/logChoices[^\n]*START_SHOWN_EVENT|START_SHOWN_EVENT[^\n]*logChoices/)
+  const m = src.match(/<StartScreen\b[\s\S]*?\/>/)
+  expect(m).not.toBeNull()
+  expect(m[0]).toContain('logChoices={armPending()}')
+  expect(at(src, 'const armPending = () => shouldArmPending(', 'armPending')).toBeLessThan(selectorStart)
+})
