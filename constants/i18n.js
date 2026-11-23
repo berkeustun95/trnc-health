@@ -13494,7 +13494,7 @@ const translations = {
     hrRowWorkWithAda: "Travailler avec ADA",
     // PLACEHOLDER copy — house banner content is parked (Berke 2026-11-22)
     adHouseTitle: "Cet espace pourrait être le vôtre",
-    adHouseLine: "Touchez ceux qui vous cherchent dans le nord de Chypre",
+    adHouseLine: "Touchez ceux qui vous cherchent à Chypre du Nord",
     adHouseCta: "Écrivez-nous",
     hrRowLegal: "Confidentialité et conditions",
     hrRowDelete: "Supprimer le compte",
@@ -21238,8 +21238,8 @@ const translations = {
     hrRowTutorial: "دیدن دوباره معرفی",
     hrRowWorkWithAda: "همکاری با ADA",
     // PLACEHOLDER copy — house banner content is parked (Berke 2026-11-22)
-    adHouseTitle: "این فضا می‌تواند مال شما باشد",
-    adHouseLine: "به کسانی که در قبرس شمالی دنبال شما هستند برسید",
+    adHouseTitle: "این فضا می‌تواند از آنِ شما باشد",
+    adHouseLine: "با کسانی که در قبرس شمالی دنبال شما هستند ارتباط بگیرید",
     adHouseCta: "به ما پیام دهید",
     hrRowLegal: "حریم خصوصی و شرایط",
     hrRowDelete: "حذف حساب",

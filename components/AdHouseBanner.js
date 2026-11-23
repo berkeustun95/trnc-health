@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native'
+import { useState } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { t } from '../constants/i18n'
-import { colors } from '../constants/theme'
+import { colors, font, type, press } from '../constants/theme'
 import { adRatioFor } from '../constants/ads'
 
 // ─── ADA's own banner, shown by AdSlot in the two AD_HOUSE_PLACEMENTS ───────
@@ -10,43 +10,73 @@ import { adRatioFor } from '../constants/ads'
 // label: it is not an advert, it is ADA. Only AdSlot may import this (check-ad-placement.mjs).
 // "Empty space" card (Berke 2026-11-23): deep teal, dashed white frame, headline + line left, pill right.
 // The whole card is the tap target; the pill is visual only.
-// Fit rule: when a locale or a large font makes the text column taller than the frame, the supporting line
-// is dropped first; only then may the headline shrink (adjustsFontSizeToFit). Nothing clips the frame.
+// Fit rule (Berke): headline and line max 2 lines each; when they do not fit the frame, drop the line first,
+// and only then shrink the headline. Nothing may clip. numberOfLines hides overflow from layout, so the
+// decision reads unclamped hidden copies of the two texts (same width, same styles).
 // boxRef: AdSlot measures this box to tell whether the banner is on screen (the margin sits outside it).
 export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
-  const { fontScale } = useWindowDimensions()
   const [room, setRoom] = useState(0)
-  const [need, setNeed] = useState(0)
-  const [showLine, setShowLine] = useState(true)
+  const [title, setTitle] = useState({ lines: 0, h: 0 })
+  const [line, setLine] = useState({ lines: 0, h: 0 })
 
-  useEffect(() => { setShowLine(true) }, [lang, fontScale])
-  useEffect(() => {
-    if (showLine && room > 0 && need > room) setShowLine(false)
-  }, [showLine, room, need])
+  const measured = room > 0 && title.h > 0 && line.h > 0
+  const titleFits = title.lines <= 2 && title.h <= room
+  const showLine = titleFits && line.lines <= 2 && title.h + TEXT_GAP + line.h <= room
 
-  const measured = room > 0 && need > 0
   return (
     <View ref={boxRef} collapsable={false} style={s.box}>
       <TouchableOpacity
         style={[s.slot, { aspectRatio: adRatioFor(position) }]}
         onPress={onPress}
-        activeOpacity={0.9}
+        activeOpacity={press.card}
         accessibilityRole="button"
         accessibilityLabel={`${t('adHouseTitle', lang)}. ${t('adHouseCta', lang)}`}
       >
         <View style={s.frame} onLayout={e => setRoom(e.nativeEvent.layout.height - 2 * (FRAME_BORDER + FRAME_PAD_V))}>
-          <View
-            style={[s.text, !measured && s.hidden]}
-            onLayout={e => setNeed(e.nativeEvent.layout.height)}
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Text style={s.title} numberOfLines={2} adjustsFontSizeToFit={!showLine} minimumFontScale={0.7}>
-              {t('adHouseTitle', lang)}
-            </Text>
-            {showLine && <Text style={s.line} numberOfLines={2}>{t('adHouseLine', lang)}</Text>}
+          <View style={s.text} importantForAccessibility="no-hide-descendants">
+            <View style={s.probe} pointerEvents="none">
+              <Text
+                style={s.title}
+                maxFontSizeMultiplier={TEXT_SCALE_CAP}
+                onTextLayout={e => { const n = e.nativeEvent.lines.length; setTitle(p => (p.lines === n ? p : { ...p, lines: n })) }}
+                onLayout={e => { const h = e.nativeEvent.layout.height; setTitle(p => (p.h === h ? p : { ...p, h })) }}
+              >
+                {t('adHouseTitle', lang)}
+              </Text>
+              <Text
+                style={s.line}
+                maxFontSizeMultiplier={TEXT_SCALE_CAP}
+                onTextLayout={e => { const n = e.nativeEvent.lines.length; setLine(p => (p.lines === n ? p : { ...p, lines: n })) }}
+                onLayout={e => { const h = e.nativeEvent.layout.height; setLine(p => (p.h === h ? p : { ...p, h })) }}
+              >
+                {t('adHouseLine', lang)}
+              </Text>
+            </View>
+            <View style={!measured && s.hidden}>
+              <Text
+                style={[s.title, room > 0 && { maxHeight: room }]}
+                numberOfLines={2}
+                adjustsFontSizeToFit={measured && !titleFits}
+                minimumFontScale={0.5}
+                maxFontSizeMultiplier={TEXT_SCALE_CAP}
+              >
+                {t('adHouseTitle', lang)}
+              </Text>
+              {showLine && (
+                <Text style={[s.line, s.lineGap]} numberOfLines={2} maxFontSizeMultiplier={TEXT_SCALE_CAP}>
+                  {t('adHouseLine', lang)}
+                </Text>
+              )}
+            </View>
           </View>
           <View style={s.pill} importantForAccessibility="no-hide-descendants">
-            <Text style={s.pillText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text
+              style={s.pillText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+              maxFontSizeMultiplier={PILL_SCALE_CAP}
+            >
               {t('adHouseCta', lang)}
             </Text>
           </View>
@@ -57,7 +87,10 @@ export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
 }
 
 const FRAME_BORDER = 1.5
-const FRAME_PAD_V = 6
+const FRAME_PAD_V = 4
+const TEXT_GAP = 2
+const TEXT_SCALE_CAP = 1.6
+const PILL_SCALE_CAP = 1.4
 
 const s = StyleSheet.create({
   box: { width: '100%', marginTop: 24 },
@@ -72,7 +105,7 @@ const s = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     borderWidth: FRAME_BORDER,
     borderStyle: 'dashed',
     borderColor: colors.onPrimary,
@@ -82,17 +115,19 @@ const s = StyleSheet.create({
     paddingVertical: FRAME_PAD_V,
     overflow: 'hidden',
   },
-  text: { flex: 1, gap: 3 },
+  text: { flex: 1 },
+  probe: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
   hidden: { opacity: 0 },
-  title: { fontSize: 15, lineHeight: 19, fontFamily: 'Inter_700Bold', color: colors.onPrimary },
-  line: { fontSize: 12, lineHeight: 16, fontFamily: 'Inter_400Regular', color: colors.onPrimary },
+  title: { ...type.rowTitle, fontFamily: font.bold, color: colors.onPrimary },
+  line: { ...type.meta, fontFamily: font.regular, color: colors.onPrimary },
+  lineGap: { marginTop: TEXT_GAP },
   pill: {
     flexShrink: 0,
-    maxWidth: '42%',
+    maxWidth: '50%',
     backgroundColor: colors.onPrimary,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  pillText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primaryDark, textAlign: 'center' },
+  pillText: { ...type.small, fontFamily: font.bold, color: colors.primaryDark, textAlign: 'center' },
 })
