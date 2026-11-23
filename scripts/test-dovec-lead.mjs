@@ -268,6 +268,20 @@ console.log('retry mode')
   await retryDue(deps(store, { fetchImpl: nofetch }))
   t('retry while NOT live settles a stuck pending lead as mock', [store.leads.find(l => l.id === 99).status, nofetch.calls.length], ['mock', 0])
 }
+{
+  // a store that IGNORES the statuses argument (as the edge function's did): retry rows still come back
+  const store = makeStore(); const f = stub(500)
+  await post(BODY, store, deps(store, { mode: 'live', live: true, fetchImpl: f }))
+  store.leads[0].next_attempt_at = '2026-11-23T00:00:00.000Z'
+  store.dueLeads = async (limit, nowIso) => store.leads.filter(l => ['retry', 'pending'].includes(l.status) && (l.next_attempt_at ?? '') <= nowIso).slice(0, limit)
+  const before = JSON.stringify(store.leads[0]); const nofetch = stub(202); const upd = store.updates.length
+  const r = await retryDue(deps(store, { fetchImpl: nofetch }))
+  t('a store ignoring statuses: a retry lead is untouched (not claimed, not mock) while not live', [r.body.processed, r.body.mock, JSON.stringify(store.leads[0]), store.claims, store.updates.length, nofetch.calls.length], [0, 0, before, 0, upd, 0])
+  t('deliver never finishes a retry lead as mock', [await deliver({ ...store.leads[0] }, deps(store, { fetchImpl: nofetch })), store.updates.length], ['retry', upd])
+  store.leads.push({ id: 98, external_id: 'ADA-98', status: 'pending', next_attempt_at: '2026-11-23T00:00:00.000Z', consent: true, attempts: 0 })
+  await retryDue(deps(store, { fetchImpl: nofetch }))
+  t('mock is written only to the pending lead, never the retry one', [store.updates.filter(p => p.status === 'mock').length, store.leads[0].status, store.leads.find(l => l.id === 98).status], [1, 'retry', 'mock'])
+}
 t('a user cannot trigger retry mode', (await post({ mode: 'retry' }, makeStore())).status, 403)
 t('a service caller with another mode is refused', (await post({ mode: 'send' }, makeStore(), undefined, { kind: 'service' })).status, 403)
 

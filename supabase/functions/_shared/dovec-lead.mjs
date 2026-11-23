@@ -108,6 +108,8 @@ export async function deliver(lead, deps) {
   const { store, env, fetchImpl = fetch, now = () => new Date(), log = () => {} } = deps
   const live = isLive(env.mode, deps.liveAllowed ?? LEADS_LIVE_ALLOWED) && !!env.apiKey
   const finish = async (patch) => { await store.updateLead(lead.id, patch); log(`dovec-lead ${lead.external_id} ${patch.status}${patch.last_http_status ? ` http=${patch.last_http_status}` : ''}`); return patch.status }
+  // A retry lead is a real enquiry that may still be sent live: never settle it as mock, whatever the store returned.
+  if (!live && lead.status === 'retry') return 'retry'
   if (!live) return finish({ status: 'mock' })
   if (!lead.name || !lead.phone) return finish({ status: 'failed' })
   const attempts = (lead.attempts ?? 0) + 1
@@ -205,6 +207,7 @@ export async function retryDue(deps) {
   const due = await store.dueLeads(RETRY_BATCH, now().toISOString(), live ? ['retry', 'pending'] : ['pending'])
   const counts = { processed: 0, sent: 0, retry: 0, failed: 0, rejected: 0, mock: 0 }
   for (const candidate of due) {
+    if (!live && candidate.status === 'retry') continue
     // Claim first: pushes next_attempt_at 15 minutes out, only if the row is still due. An overlapping run loses the claim.
     const lead = await store.claimLead(candidate.id, now().toISOString(), new Date(now().getTime() + CLAIM_MS).toISOString())
     if (!lead) continue

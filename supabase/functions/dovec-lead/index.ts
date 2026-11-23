@@ -80,8 +80,8 @@ Deno.serve(async (req) => {
       const { error } = await admin.from('dovec_leads').update(patch).eq('id', id)
       if (error) throw error
     },
-    async dueLeads(limit: number, nowIso: string) {
-      const { data, error } = await admin.from('dovec_leads').select(COLS).in('status', ['retry', 'pending'])
+    async dueLeads(limit: number, nowIso: string, statuses: string[]) {
+      const { data, error } = await admin.from('dovec_leads').select(COLS).in('status', statuses)
         .gt('created_at', new Date(new Date(nowIso).getTime() - STALE_LEAD_MS).toISOString())
         .or(dueFilter(nowIso)).order('created_at').limit(limit)
       if (error) throw error
