@@ -227,6 +227,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after Berke has checked the live-snapshot groups in the vault AND the combined audit-fix Preview, and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 579,
+      "commit": "5d2d4e94db8df83f493b46ad0e4e1c7affcdb6e7",
+      "what": "Audit fix pack B follow-up: Duyurular search reaches hidden stages; Home banner counts grouped cards, not rows",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
     }
   ]
 }
