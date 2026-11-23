@@ -260,6 +260,9 @@ test('load() reads are bounded: facilities / duty / reviews at 10 s with an abor
   const loc = body.slice(at(body, 'Location.getForegroundPermissionsAsync()', 'perm'))
   expect(loc.indexOf('}, 8000)')).toBeGreaterThan(loc.indexOf('passiveFix('))
   expect(loc.indexOf('}, 8000)')).toBeLessThan(loc.indexOf('} catch {'))
+
+  // a fix landing after the 8 s race (catch already set denied) must clear it
+  expect(loc).toContain('else { setUserLocation(loc.coords); setLocationDenied(false); resolvedCoords = loc.coords }')
 })
 
 test('weather invoke has a timeout and a failure still clears the key; weather does not hold loading', () => {

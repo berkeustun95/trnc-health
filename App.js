@@ -1944,7 +1944,7 @@ export default function App() {
             // Device location off → treated like denied; the app works without it.
             const loc = await passiveFix(Location.Accuracy.Balanced)
             if (!loc) setLocationDenied(true)
-            else { setUserLocation(loc.coords); resolvedCoords = loc.coords }
+            else { setUserLocation(loc.coords); setLocationDenied(false); resolvedCoords = loc.coords }
           }
         }, 8000)
       } catch {
