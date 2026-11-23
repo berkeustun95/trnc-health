@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, AppState, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, AppState, RefreshControl, useWindowDimensions,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { colors, type, radii, press, TAP } from '../constants/theme'
+import { colors, type, radii, press, spacing, TAP, listBottomPad, contrastRatio, readableOn } from '../constants/theme'
 import { t, dateLocale } from '../constants/i18n'
 import {
   ScreenHeader as UiHeader, FilterBar, ErrorState, EmptyState, CardSkeleton, Card, ModuleScreen, OnPhotoLabel,
 } from '../components/ui'
+import { CARD_BG, PILL_ALPHA } from '../components/ui/ModuleScreen'
 
 // Canlı Skor: TRNC football only (KTFF Süper Lig + 1. Lig). Reads Supabase tables that a
 // server-side sync fills from the KTFF API (ktff_leagues / ktff_standings / ktff_fixtures);
@@ -19,7 +20,8 @@ import {
 const LEAGUES = [1, 2]
 const LEAGUE_FALLBACK = { 1: 'lsLeagueSuper', 2: 'lsLeagueFirst' }
 const HEX = /^#[0-9A-Fa-f]{6}$/
-const OUR_LOGOS = '/storage/v1/object/public/team-logos/'
+const OUR_LOGOS = `${(process.env.EXPO_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/public/team-logos/`
+const WIDE_MIN = 380   // dp at fontScale 1: below it the G/B/M columns are dropped
 const isEn = lang => lang === 'English'
 const pick = (row, base, lang) => (isEn(lang) && row[`${base}_en`]) || row[`${base}_tr`] || row[`${base}_en`] || ''
 const fill = (s, vars) => Object.entries(vars).reduce((a, [k, v]) => a.replace(`{${k}}`, String(v)), s)
@@ -47,7 +49,7 @@ function useAppActive(onActive) {
 
 // Our team-logos bucket and nothing else: a phone never requests another host.
 function TeamLogo({ uri }) {
-  if (!uri || !uri.includes(OUR_LOGOS)) {
+  if (!uri || typeof uri !== 'string' || !uri.startsWith(OUR_LOGOS)) {
     return <View style={[s.logo, s.logoBlank]}><Ionicons name="shield-outline" size={14} color={colors.textSecondary} /></View>
   }
   return <Image source={{ uri }} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
@@ -68,7 +70,7 @@ function FixtureRow({ m, lang }) {
   const time = parseLocal(m.match_local)?.time
   return (
     <View style={s.row} accessible
-      accessibilityLabel={`${home} ${played ? `${m.home_score} – ${m.away_score}` : time || 'VS'} ${away}`}>
+      accessibilityLabel={`${home} ${played ? `${m.home_score}–${m.away_score}` : time ? `${time},` : '–'} ${away}`}>
       <View style={[s.side, s.sideHome]}>
         <Text style={[s.teamName, s.nameHome]} numberOfLines={2}>{home || '—'}</Text>
         <TeamLogo uri={m.home_logo_url} />
@@ -108,41 +110,47 @@ function FixtureList({ fixtures, lang }) {
   ))
 }
 
-function StandingRow({ r, lang }) {
+function StandingRow({ r, lang, wide, legend }) {
   const bar = HEX.test(r.marker_color || '') ? r.marker_color : null
-  const chipText = HEX.test(r.marker_text_color || '') ? r.marker_text_color : '#FFFFFF'
+  const supplied = HEX.test(r.marker_text_color || '') ? r.marker_text_color : null
+  const chipText = bar ? (supplied && contrastRatio(supplied, bar) >= 4.5 ? supplied : readableOn(bar)) : null
+  const mk = bar && legend.find(it => (it.color || '').toLowerCase() === bar.toLowerCase())
+  const team = pick(r, 'team', lang)
   return (
     <View style={s.stRow} accessible
-      accessibilityLabel={`${r.rank}. ${pick(r, 'team', lang)}, ${r.points}`}>
-      <View style={[s.bar, bar && { backgroundColor: bar }]} />
+      accessibilityLabel={`${r.rank}. ${team}, ${r.points} ${t('lsColPts', lang)}${mk ? `, ${pick({ label_tr: mk.label_tr, label_en: mk.label_en }, 'label', lang)}` : ''}`}>
       <View style={[s.rankChip, bar && { backgroundColor: bar }]}>
-        <Text style={[s.rankText, bar && { color: chipText }]}>{r.rank}</Text>
+        <Text style={[s.rankText, chipText && { color: chipText }]}>{r.rank}</Text>
       </View>
       <TeamLogo uri={r.logo_url} />
-      <Text style={s.stTeam} numberOfLines={1}>{pick(r, 'team', lang)}</Text>
-      <Text style={s.stNum}>{r.played}</Text>
-      <Text style={s.stNum}>{r.won}</Text>
-      <Text style={s.stNum}>{r.drawn}</Text>
-      <Text style={s.stNum}>{r.lost}</Text>
-      <Text style={s.stNumWide}>{r.goal_difference}</Text>
-      <Text style={[s.stNum, s.stPts]}>{r.points}</Text>
+      <Text style={s.stTeam} numberOfLines={1}>{team}</Text>
+      <Num style={s.stNum}>{r.played}</Num>
+      {wide && <Num style={s.stNum}>{r.won}</Num>}
+      {wide && <Num style={s.stNum}>{r.drawn}</Num>}
+      {wide && <Num style={s.stNum}>{r.lost}</Num>}
+      <Num style={s.stGd}>{r.goal_difference}</Num>
+      <Num style={[s.stPts]}>{r.points}</Num>
     </View>
   )
 }
 
-function StandingsHead({ lang }) {
+// Fixed column widths shared by header and rows; a 3-digit value shrinks instead of clipping.
+function Num({ style, children }) {
+  return <Text style={[s.stCell, style]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{children}</Text>
+}
+
+function StandingsHead({ lang, wide }) {
   return (
     <View style={s.stRow}>
-      <View style={s.bar} />
       <View style={s.rankChip} />
       <View style={s.logo} />
-      <Text style={[s.stTeam, s.stHead]} />
-      <Text style={[s.stNum, s.stHead]}>{t('lsColPlayed', lang)}</Text>
-      <Text style={[s.stNum, s.stHead]}>{t('lsColWon', lang)}</Text>
-      <Text style={[s.stNum, s.stHead]}>{t('lsColDrawn', lang)}</Text>
-      <Text style={[s.stNum, s.stHead]}>{t('lsColLost', lang)}</Text>
-      <Text style={[s.stNumWide, s.stHead]}>{t('lsColGD', lang)}</Text>
-      <Text style={[s.stNum, s.stHead]}>{t('lsColPts', lang)}</Text>
+      <Text style={s.stTeam} />
+      <Num style={[s.stNum, s.stHead]}>{t('lsColPlayed', lang)}</Num>
+      {wide && <Num style={[s.stNum, s.stHead]}>{t('lsColWon', lang)}</Num>}
+      {wide && <Num style={[s.stNum, s.stHead]}>{t('lsColDrawn', lang)}</Num>}
+      {wide && <Num style={[s.stNum, s.stHead]}>{t('lsColLost', lang)}</Num>}
+      <Num style={[s.stGd, s.stHead]}>{t('lsColGD', lang)}</Num>
+      <Num style={[s.stPts, s.stHead]}>{t('lsColPts', lang)}</Num>
     </View>
   )
 }
@@ -171,7 +179,9 @@ function WeekPicker({ weeks, week, onChange, lang }) {
         accessibilityRole="button" accessibilityLabel={t('lsWeekPrev', lang)}>
         <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
       </TouchableOpacity>
-      <Text style={s.weekLabel} accessibilityRole="header">{fill(t('lsWeekN', lang), { n: week })}</Text>
+      <View style={s.weekMid}>
+        <OnPhotoLabel accessibilityRole="header">{fill(t('lsWeekN', lang), { n: week })}</OnPhotoLabel>
+      </View>
       <TouchableOpacity style={[s.weekBtn, next == null && s.weekOff]} disabled={next == null}
         onPress={() => onChange(next)} activeOpacity={press.small}
         accessibilityRole="button" accessibilityLabel={t('lsWeekNext', lang)}>
@@ -190,9 +200,14 @@ export default function LiveScoresScreen({ lang, onBack }) {
   const [standings, setStandings] = useState([])
   const [week, setWeek] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
+  const [shownTab, setShownTab] = useState('fixtures')
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(false)
   const reqRef = useRef(0)
+  const insets = useSafeAreaInsets()
+  const { width, fontScale } = useWindowDimensions()
+  const wide = width / fontScale >= WIDE_MIN
 
   const load = useCallback(async () => {
     const req = ++reqRef.current
@@ -218,7 +233,7 @@ export default function LiveScoresScreen({ lang, onBack }) {
       st = r.data || []
     }
     if (req !== reqRef.current) return
-    setLeagues(lg.data || []); setWeek(w); setFixtures(fx); setStandings(st)
+    setLeagues(lg.data || []); setWeek(w); setFixtures(fx); setStandings(st); setShownTab(tab); setLoaded(true)
     setError(false); done()
   }, [leagueId, weekSel, tab])
 
@@ -234,12 +249,12 @@ export default function LiveScoresScreen({ lang, onBack }) {
   const legend = Array.isArray(cur?.legend) ? cur.legend : []
 
   const body = () => {
-    if (loading) return <View style={s.pad}><CardSkeleton /><CardSkeleton /><CardSkeleton /></View>
+    if (loading && !loaded) return <View style={s.pad}><CardSkeleton /><CardSkeleton /><CardSkeleton /></View>
     if (error) return <ErrorState lang={lang} onRetry={() => { setLoading(true); load() }} />
     return (
-      <ScrollView contentContainerStyle={s.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor="#FFFFFF" onRefresh={() => { setRefreshing(true); load() }} />}>
-        {tab === 'fixtures' ? (
+      <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: listBottomPad(insets) }, loading && !refreshing && s.dim]}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.onPrimary} colors={[colors.primary]} onRefresh={() => { setRefreshing(true); load() }} />}>
+        {shownTab === 'fixtures' ? (
           week == null || weeks.length === 0
             ? <EmptyState icon="football-outline" category="explore" title={t('lsNoFixturesTitle', lang)} message={t('lsNoFixturesBody', lang)} />
             : <>
@@ -253,11 +268,11 @@ export default function LiveScoresScreen({ lang, onBack }) {
             ? <EmptyState icon="list-outline" category="explore" title={t('lsNoStandingsTitle', lang)} message={t('lsNoStandingsBody', lang)} />
             : <>
                 <Card padding={0}>
-                  <StandingsHead lang={lang} />
+                  <StandingsHead lang={lang} wide={wide} />
                   {standings.map(r => (
                     <View key={r.team_id}>
                       <View style={s.hairline} />
-                      <StandingRow r={r} lang={lang} />
+                      <StandingRow r={r} lang={lang} wide={wide} legend={legend} />
                     </View>
                   ))}
                 </Card>
@@ -291,29 +306,29 @@ export default function LiveScoresScreen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe:        { flex: 1 },
-  pad:         { padding: 16, gap: 12 },
-  scroll:      { padding: 16, paddingBottom: 48, gap: 16 },
+  pad:         { padding: spacing.md, gap: 12 },
+  scroll:      { padding: spacing.md, gap: spacing.md },
+  dim:         { opacity: 0.6 },
   leagueBar:   { marginTop: -4 },
 
-  tab:         { minHeight: 36, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radii.pill,
-                 backgroundColor: 'rgba(0,0,0,0.45)' },
+  tab:         { minHeight: TAP, paddingHorizontal: spacing.md, justifyContent: 'center', borderRadius: radii.pill,
+                 backgroundColor: `rgba(0,0,0,${PILL_ALPHA})` },
   tabOn:       { backgroundColor: colors.card },
-  tabText:     { ...type.small, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  tabText:     { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.onPrimary },
   tabTextOn:   { color: colors.textPrimary },
 
-  weekBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  weekBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   weekBtn:     { width: TAP, height: TAP, borderRadius: TAP / 2, alignItems: 'center', justifyContent: 'center',
-                 backgroundColor: colors.card },
+                 backgroundColor: CARD_BG },
   weekOff:     { opacity: 0.4 },
-  weekLabel:   { ...type.rowTitle, color: '#FFFFFF', flex: 1, textAlign: 'center',
-                 textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
+  weekMid:     { flex: 1, alignItems: 'center' },
 
-  section:     { gap: 8 },
+  section:     { gap: spacing.sm },
   dayPill:     { maxWidth: '100%' },
   hairline:    { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider },
 
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, minHeight: TAP + 12 },
-  side:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  side:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sideHome:    { justifyContent: 'flex-end' },
   teamName:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, flexShrink: 1 },
   nameHome:    { textAlign: 'right' },
@@ -321,20 +336,20 @@ const s = StyleSheet.create({
   score:       { ...type.sheetTitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
   vs:          { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   kick:        { ...type.caption, color: colors.textSecondary, fontVariant: ['tabular-nums'] },
-  logo:        { width: 24, height: 24 },
-  logoBlank:   { alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.soft },
+  logo:        { width: 20, height: 20 },
+  logoBlank:   { alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.soft },
 
-  stRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingRight: 10, gap: 6, minHeight: 40 },
-  bar:         { width: 4, alignSelf: 'stretch', backgroundColor: 'transparent' },
+  stRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: 10, gap: spacing.xs, minHeight: 40 },
   rankChip:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
   rankText:    { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
   stTeam:      { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, flex: 1 },
-  stNum:       { ...type.small, color: colors.textPrimary, width: 24, textAlign: 'center', fontVariant: ['tabular-nums'] },
-  stNumWide:   { ...type.small, color: colors.textPrimary, width: 32, textAlign: 'center', fontVariant: ['tabular-nums'] },
-  stPts:       { width: 28, fontFamily: 'Inter_700Bold' },
+  stCell:      { ...type.small, color: colors.textPrimary, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  stNum:       { width: 22 },
+  stGd:        { width: 30 },
+  stPts:       { width: 30, fontFamily: 'Inter_700Bold' },
   stHead:      { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
-  legend:      { gap: 8 },
+  legend:      { gap: spacing.sm },
   legendRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   legendDot:   { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.soft },
   legendText:  { ...type.small, color: colors.textPrimary, flex: 1 },
