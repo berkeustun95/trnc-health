@@ -848,6 +848,9 @@ export default function App() {
   const [openedDorm, setOpenedDorm] = useState(null)
   // A North Houses apartment (Günlük Kiralık tab): the same overlay, the same reason it lives here.
   const [openedRental, setOpenedRental] = useState(null)
+  // Döveç projects (Emlak): overlay over Konaklama; its layers (project, form, thank-you) step back through dovecBackRef.
+  const [openedDovec, setOpenedDovec] = useState(false)
+  const dovecBackRef = useRef(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   // ─── Redesign Slice 2 (shell) ───────────────────────────────────────────────
@@ -1339,6 +1342,7 @@ export default function App() {
       if (gateHealthList) { setGateHealthList(false); return true }
       if (openedEvent) { if (eventFromHome) closeEvents(); else setOpenedEvent(null); return true }
       if (showEvents) { closeEvents(); return true }
+      if (openedDovec) { if (dovecBackRef.current?.()) return true; setOpenedDovec(false); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
       if (openedRental) { setOpenedRental(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
@@ -1404,7 +1408,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, openedDovec, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
 
   useEffect(() => {
     Promise.all([
@@ -2611,6 +2615,11 @@ export default function App() {
         onOpenRental={a => setOpenedRental(a)}
         selectedRental={openedRental}
         onCloseRental={() => setOpenedRental(null)}
+        dovecOpen={openedDovec}
+        onOpenDovec={() => setOpenedDovec(true)}
+        onCloseDovec={() => setOpenedDovec(false)}
+        dovecBackRef={dovecBackRef}
+        onRequireAccount={requireAccount}
       />
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />

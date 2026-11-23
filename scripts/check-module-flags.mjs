@@ -220,6 +220,7 @@ const EXPECTED_SCALARS = {
   // correct app. Same resolution as HOME_V2_LIVE and PROFILE_GATE_LIVE.
   AD_BANNERS_LIVE:       false,
   AD_HOUSE_BANNER_LIVE:  false,
+  DOVEC_PARTNER_LIVE:    false,
   WORK_WITH_ADA_ROW_LIVE: false,
   // Ev Hizmetleri partner preview (dev-only). It is dead-coded out of a release bundle by
   // `__DEV__ &&`, so unlike every scalar above it a flip cannot reach a user through the
