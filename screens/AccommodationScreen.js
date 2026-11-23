@@ -32,7 +32,7 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE } from '../constants/flags'
+import { DORMS_LIVE, DOVEC_PARTNER_LIVE } from '../constants/flags'
 import { NORTH_HOUSES } from '../constants/redesign'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
@@ -466,6 +466,7 @@ export default function AccommodationScreen({
   // Döveç projects: the entry card shows only when the module is visible (flag + published, or dev/Preview) AND projects exist.
   const [dovecReady, setDovecReady] = useState(false)
   useEffect(() => {
+    if (!DOVEC_PARTNER_LIVE && !DOVEC_PREVIEW) return undefined
     let on = true
     loadDovec().then(d => {
       if (on && dovecShown({ published: d.settings.published === true, preview: DOVEC_PREVIEW }) && d.projects.length > 0) setDovecReady(true)

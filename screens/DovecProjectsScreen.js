@@ -41,7 +41,8 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
 
   const back = () => { if (!backRef?.current?.()) onClose() }
   const project = layer.project
-  const title = layer.name === 'list' ? t(TITLE_KEY, lang) : (project?.name ?? t(TITLE_KEY, lang))
+  const title = layer.name === 'form' ? t('dovecEnquiryTitle', lang)
+    : layer.name === 'list' ? t(TITLE_KEY, lang) : (project?.name ?? t(TITLE_KEY, lang))
   const enquire = () => {
     if (onRequireAccount?.('dovecGateAccount')) return
     setLayer({ name: 'form', project })
@@ -58,7 +59,7 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
         onBack={() => setLayer({ name: 'detail', project })} />
     )
   } else if (loading) {
-    content = <View style={s.list}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={260} style={{ marginBottom: 12 }} />)}</View>
+    content = <View style={s.list}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={340} style={{ marginBottom: 12 }} />)}</View>
   } else if (loadError) {
     content = <ErrorState lang={lang} message={t('dovecLoadError', lang)} onRetry={load} style={{ marginTop: 40 }} />
   } else if (!data?.projects?.length) {

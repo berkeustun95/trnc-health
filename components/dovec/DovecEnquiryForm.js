@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import KeyboardAwareForm from '../KeyboardAwareForm'
 import SearchModal from '../SearchModal'
 import { Button, Card, InlineAlert } from '../ui'
-import { colors, type, radii, TAP } from '../../constants/theme'
+import { colors, type, radii, TAP, font, press } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { COUNTRY_CODES } from '../../constants/countryCodes'
 import {
@@ -82,7 +82,7 @@ export default function DovecEnquiryForm({ project, lang, onSent }) {
           <Text style={s.title} accessibilityRole="header">{t('dovecFormTitle', lang)}</Text>
 
           <Field label={t('dovecFormName', lang)} error={err('name', 'dovecErrName')}>
-            <TextInput style={s.input} value={name} onChangeText={setName} onBlur={() => touch('name')} maxLength={120}
+            <TextInput style={s.input} accessibilityLabel={t('dovecFormName', lang)} value={name} onChangeText={setName} onBlur={() => touch('name')} maxLength={120}
               autoCapitalize="words" autoCorrect={false} textContentType="name" returnKeyType="next"
               blurOnSubmit={false} onSubmitEditing={() => phoneRef.current?.focus()} />
           </Field>
@@ -90,17 +90,18 @@ export default function DovecEnquiryForm({ project, lang, onSent }) {
           <Field label={t('dovecFormPhone', lang)} error={err('phone', 'dovecErrPhone')}>
             <View style={s.phoneRow}>
               <TouchableOpacity style={s.ccBtn} onPress={() => setPicker(true)} accessibilityRole="button"
-                accessibilityLabel={t('dovecFormCodeTitle', lang)}>
+                activeOpacity={press.small}
+                accessibilityLabel={cc ? `${t('dovecFormCodeTitle', lang)}, ${cc}` : t('dovecFormCodeTitle', lang)}>
                 <Text style={[s.ccText, !cc && s.ccPlaceholder]} numberOfLines={1}>{cc || t('dovecFormCode', lang)}</Text>
                 <Ionicons name="chevron-down" size={14} color={colors.textSecondary} />
               </TouchableOpacity>
-              <TextInput ref={phoneRef} style={[s.input, s.phoneInput]} value={phone} onChangeText={setPhone}
+              <TextInput ref={phoneRef} style={[s.input, s.phoneInput]} accessibilityLabel={t('dovecFormPhone', lang)} value={phone} onChangeText={setPhone}
                 onBlur={() => touch('phone')} keyboardType="phone-pad" textContentType="telephoneNumber" maxLength={20} />
             </View>
           </Field>
 
           <Field label={t('dovecFormEmail', lang)} error={err('email', 'dovecErrEmail')}>
-            <TextInput ref={emailRef} style={s.input} value={email} onChangeText={setEmail} onBlur={() => touch('email')}
+            <TextInput ref={emailRef} style={s.input} accessibilityLabel={t('dovecFormEmail', lang)} value={email} onChangeText={setEmail} onBlur={() => touch('email')}
               keyboardType="email-address" autoCapitalize="none" autoCorrect={false} textContentType="emailAddress" maxLength={254} />
           </Field>
 
@@ -110,7 +111,7 @@ export default function DovecEnquiryForm({ project, lang, onSent }) {
                 {units.map(u => {
                   const on = unit === u.type
                   return (
-                    <TouchableOpacity key={u.type} style={[s.chip, on && s.chipOn]} onPress={() => setUnit(on ? null : u.type)}
+                    <TouchableOpacity key={u.type} style={[s.chip, on && s.chipOn]} onPress={() => setUnit(on ? null : u.type)} activeOpacity={press.small}
                       accessibilityRole="button" accessibilityState={{ selected: on }}>
                       <Text style={[s.chipText, on && s.chipTextOn]}>{u.type}</Text>
                     </TouchableOpacity>
@@ -121,12 +122,12 @@ export default function DovecEnquiryForm({ project, lang, onSent }) {
           )}
 
           <Field label={t('dovecFormMessage', lang)}>
-            <TextInput style={[s.input, s.multiline]} value={message} onChangeText={setMessage} multiline textAlignVertical="top"
+            <TextInput style={[s.input, s.multiline]} accessibilityLabel={t('dovecFormMessage', lang)} value={message} onChangeText={setMessage} multiline textAlignVertical="top"
               maxLength={DOVEC_MESSAGE_MAX} />
             <Text style={s.counter}>{message.length}/{DOVEC_MESSAGE_MAX}</Text>
           </Field>
 
-          <TouchableOpacity style={s.consent} onPress={() => setConsent(c => !c)} activeOpacity={0.7}
+          <TouchableOpacity style={s.consent} onPress={() => setConsent(c => !c)} activeOpacity={press.small}
             accessibilityRole="checkbox" accessibilityState={{ checked: consent }}>
             <View style={[s.box, consent && s.boxOn]}>
               {consent && <Ionicons name="checkmark" size={16} color={colors.onPrimary} />}
@@ -149,10 +150,10 @@ export default function DovecEnquiryForm({ project, lang, onSent }) {
 }
 
 const s = StyleSheet.create({
-  project:    { ...type.rowTitle, color: colors.textSecondary, marginBottom: 10 },
+  project:    { ...type.rowTitle, color: colors.textSecondary, marginBottom: 12 },
   card:       { borderRadius: radii.card },
   title:      { ...type.sectionHeading, color: colors.textPrimary, marginBottom: 12 },
-  field:      { marginBottom: 14 },
+  field:      { marginBottom: 16 },
   label:      { ...type.meta, color: colors.textSecondary, marginBottom: 6 },
   fieldError: { ...type.small, color: colors.dangerInk, marginTop: 4 },
   input:      { minHeight: 48, paddingHorizontal: 12, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
@@ -170,7 +171,7 @@ const s = StyleSheet.create({
                 backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   chipOn:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   chipText:   { ...type.body, color: colors.textPrimary },
-  chipTextOn: { color: colors.primaryDark, fontFamily: 'Inter_700Bold' },
+  chipTextOn: { color: colors.primaryDark, fontFamily: font.bold },
   consent:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: TAP, paddingVertical: 6, marginBottom: 12 },
   box:        { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.fieldBorder, backgroundColor: 'transparent',
                 alignItems: 'center', justifyContent: 'center', marginTop: 1 },

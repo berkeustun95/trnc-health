@@ -101,21 +101,22 @@ export function requestIdFor(prev, payload, makeId) {
 }
 
 // HTTP status + body of dovec-lead -> what the screen does.
-//   ok | rejected | invalid | consent | signin | unavailable | changed | rate | error
+//   ok | rejected | invalid | consent | signin | under18 | unavailable | changed | rate | error
 export function classifyLead(status, body) {
   if (status === 200 && body?.ok === true) return { kind: 'ok', externalId: body.external_id, status: body.status }
   if (status === 200 && body?.ok === false && body?.error === 'rejected') return { kind: 'rejected', externalId: body.external_id ?? null }
   if (status === 400 && body?.error === 'consent_required') return { kind: 'consent' }
   if (status === 400) return { kind: 'invalid', field: body?.field ?? null }
+  if (status === 403 && body?.error === 'under_18') return { kind: 'under18' }
   if (status === 403) return { kind: 'signin' }
   if (status === 404) return { kind: 'unavailable' }
   if (status === 409) return { kind: 'changed' }
-  if (status === 429) return { kind: 'rate' }
+  if (status === 429) return { kind: 'rate' }   // body { error: 'rate_limited' }; any 429 reads the same
   return { kind: 'error' }
 }
 
 export const OUTCOME_KEY = {
-  rejected: 'dovecErrRejected', invalid: 'dovecErrRejected', consent: 'dovecErrRejected', signin: 'dovecErrSignIn',
+  rejected: 'dovecErrRejected', invalid: 'dovecErrRejected', consent: 'dovecErrRejected', signin: 'dovecErrSignIn', under18: 'dovecErrUnder18',
   unavailable: 'dovecErrUnavailable', rate: 'dovecErrRate', changed: 'dovecErrGeneric', network: 'dovecErrNetwork', error: 'dovecErrGeneric',
 }
 

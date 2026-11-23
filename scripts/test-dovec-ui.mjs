@@ -117,6 +117,9 @@ eq('200 with a body that is neither -> error', classifyLead(200, { ok: false }).
 eq('400 consent_required', classifyLead(400, { error: 'consent_required' }).kind, 'consent')
 eq('400 invalid_request keeps the field name', classifyLead(400, { error: 'invalid_request', field: 'phone' }), { kind: 'invalid', field: 'phone' })
 eq('403 -> signin, 404 -> unavailable, 409 -> changed, 429 -> rate', [403, 404, 409, 429].map(s => classifyLead(s, {}).kind), ['signin', 'unavailable', 'changed', 'rate'])
+eq('403 sign_in_required -> signin', classifyLead(403, { error: 'sign_in_required' }).kind, 'signin')
+eq('403 under_18 -> under18, own message', [classifyLead(403, { error: 'under_18' }).kind, OUTCOME_KEY.under18], ['under18', 'dovecErrUnder18'])
+eq('429 rate_limited -> rate, own message', [classifyLead(429, { error: 'rate_limited' }).kind, OUTCOME_KEY.rate], ['rate', 'dovecErrRate'])
 eq('500 / no body -> error', [classifyLead(500, null).kind, classifyLead(502, undefined).kind], ['error', 'error'])
 check('every outcome kind the form can show has a message key', ['rejected', 'invalid', 'consent', 'signin', 'unavailable', 'rate', 'changed', 'network', 'error'].every(k => OUTCOME_KEY[k]))
 

@@ -42,8 +42,9 @@ export default function DovecProjectCard({ project, lang, width, onPress }) {
   const place = placeLine(project)
   const price = fromPriceText(project, lang)
   const units = unitsText(project, lang)
+  const label = [project.name, t(project.status === 'on_sale' ? 'dovecStatusSale' : 'dovecStatusBuilding', lang), place, price, units].filter(Boolean).join(', ')
   return (
-    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={press.card} accessibilityRole="button" accessibilityLabel={project.name}>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={press.card} accessibilityRole="button" accessibilityLabel={label}>
       <Cover url={project.cover_url} width={width} />
       <View style={s.body}>
         <StatusChip status={project.status} lang={lang} />

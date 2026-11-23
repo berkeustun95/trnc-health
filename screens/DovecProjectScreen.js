@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Button, Card, RemoteImage } from '../components/ui'
 import { Cover, StatusChip, fromPriceText, unitsText } from '../components/dovec/DovecProjectCard'
-import { colors, type, radii } from '../constants/theme'
+import { colors, type, radii, press } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { DOVEC_LOGO, formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes } from '../constants/dovec'
 
@@ -79,7 +79,7 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
             </View>
           )}
 
-          <TouchableOpacity style={s.web} onPress={() => Linking.openURL(project.website_url).catch(() => {})} activeOpacity={0.6}
+          <TouchableOpacity style={s.web} onPress={() => Linking.openURL(project.website_url).catch(() => {})} activeOpacity={press.small}
             accessibilityRole="link" accessibilityLabel={t('dovecWebsite', lang)}>
             <Ionicons name="open-outline" size={18} color={colors.primary} />
             <Text style={s.webText}>{t('dovecWebsite', lang)}</Text>
