@@ -69,6 +69,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // The surfaces this guard covers. Adding a file here widens the scope deliberately.
 const SURFACES = [
+  // Facility page (audit 2026-11-14, D-07): six review/Q&A strings were English in 7 locales.
+  'screens/FacilityProfileScreen.js',
   // Araçlar (S2, 2026-11-07): guarded while MODULE_FLAGS.cars is still false, before the flip. The enum labels
   // reach the screens through label-key maps and are pulled in from constants/cars.js under viaVariable.
   'screens/CarsScreen.js',
@@ -374,6 +376,8 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // FacilityProfileScreen (2026-11-23): the French word is spelled exactly like the English one.
+  'qualificationsLabel': { French: 'the French word is "Qualifications" too' },
   // ─── Bandabuliya (marketplace), 2026-11-09: a proper name, not translated ──────────
   'menuMarketplace': Object.fromEntries(['Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
     .map(l => [l, 'Bandabuliya is the brand name in every language (Berke, 2026-11-09); mkTagline says what it is'])),

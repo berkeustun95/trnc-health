@@ -14,6 +14,7 @@ import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   DUY_CATEGORY, DUY_DISTRICTS, DUY_COLUMNS, DUY_PAGE, daysLeft, isClosingSoon, matchesQuery, matchesDistrict, formatDuyDate,
   visibleCategories, DUY_PHOTO_CREDIT,
+  groupDuyurular,
 } from '../constants/duyurular'
 import DuyuruDetailScreen from './DuyuruDetailScreen'
 import HeroCreditSheet from '../components/home/HeroCreditSheet'
@@ -142,7 +143,7 @@ export default function DuyurularScreen({ lang, onBack, backRef = null }) {
 
   const load = useCallback(async () => {
     setLoading(true); setError(false)
-    try { setItems(await fetchAll()) } catch { setError(true) }
+    try { setItems(groupDuyurular(await fetchAll())) } catch { setError(true) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
