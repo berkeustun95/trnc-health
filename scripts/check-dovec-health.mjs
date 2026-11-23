@@ -11,42 +11,41 @@
 //   stuck                an enquiry has waited for a send (retry / pending) for over an hour
 //   rejected             an enquiry was rejected by Döveç or failed for good in the last 24 hours
 // The one agreed test enquiry (is_test) is never read here: it has its own report (workflow dovec-test-lead).
-// Map pins (informational, NEVER red): prints dovec_coord_status() (seeded pins not attached, attached projects renamed since,
-// live projects without a pin). Public marketing names and Döveç project ids only, no user data; a missing function (20261229
-// not applied) or a read error is printed, not failed.
+// Map pins (informational, NEVER red): prints the COUNTS from dovec_coord_status() (seeded pins not attached, attached projects
+// renamed since, live projects without a pin), never a project name (the log is public); a missing function (20261229 not
+// applied) or a read error is printed, not failed. The names are read in the admin screen or by dovec_coord_status() itself.
 // NOT ARMED until the first sync has ever run (last_run_at is null): the workflow lands with the code, the cron lands later
 // (20261230), and an hourly red before go-live would teach everyone to ignore it. Arming is the first sync run itself.
-import { createClient } from '@supabase/supabase-js'
-import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
-
-prodWriteGuard({ wouldWrite: false, workflow: 'dovec-health' })
+import { pathToFileURL } from 'node:url'
 
 const STALE_MIN = 30
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL
-if (!url) { console.error('EXPO_PUBLIC_SUPABASE_URL missing'); process.exit(2) }
-const sb = createClient(url, serviceRoleKey(), { auth: { persistSession: false, autoRefreshToken: false } })
 
-const { data: s, error } = await sb.from('dovec_settings')
-  .select('published, suspended, last_good_sync_at, last_run_at, last_run_status').eq('id', 1).maybeSingle()
-if (error) { console.error('read failed:', error.message); process.exit(2) }
-if (!s) { console.error('::error::dovec_settings has no row (is 20261229 applied?)'); process.exit(1) }
+// Returns the exit code. sb, log, err and now are injected so a test can capture everything this prints.
+export async function run({ sb, log = console.log, err = console.error, now = () => Date.now() }) {
+  const { data: s, error } = await sb.from('dovec_settings')
+    .select('published, suspended, last_good_sync_at, last_run_at, last_run_status').eq('id', 1).maybeSingle()
+  if (error) { err('read failed:', error.message); return 2 }
+  if (!s) { err('::error::dovec_settings has no row (is 20261229 applied?)'); return 1 }
 
-const exists = async (build) => {
-  const { data, error: e } = await build(sb.from('dovec_leads').select('id').eq('is_test', false).limit(1))
-  if (e) { console.error('read failed:', e.message); process.exit(2) }
-  return (data ?? []).length > 0
-}
-const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
+  let readFailed = false
+  const exists = async (build) => {
+    const { data, error: e } = await build(sb.from('dovec_leads').select('id').eq('is_test', false).limit(1))
+    if (e) { err('read failed:', e.message); readFailed = true; return false }
+    return (data ?? []).length > 0
+  }
+  const ago = (min) => new Date(now() - min * 60000).toISOString()
 
-if (s.last_run_at === null) {
-  console.log('\n── dovec health ──\n  not armed: the sync has never run (monitoring starts with its first run)\n')
-  process.exit(0)
-}
-const ageMin = s.last_good_sync_at ? (Date.now() - new Date(s.last_good_sync_at).getTime()) / 60000 : null
-const stuck = await exists(q => q.in('status', ['retry', 'pending']).lt('created_at', ago(60)))
-const rejected = await exists(q => q.in('status', ['rejected', 'failed']).gte('created_at', ago(24 * 60)))
+  if (s.last_run_at === null) {
+    log('\n── dovec health ──\n  not armed: the sync has never run (monitoring starts with its first run)\n')
+    return 0
+  }
+  const ageMin = s.last_good_sync_at ? (now() - new Date(s.last_good_sync_at).getTime()) / 60000 : null
+  const stuck = await exists(q => q.in('status', ['retry', 'pending']).lt('created_at', ago(60)))
+  if (readFailed) return 2
+  const rejected = await exists(q => q.in('status', ['rejected', 'failed']).gte('created_at', ago(24 * 60)))
+  if (readFailed) return 2
 
-console.log(`\n── dovec health ──
+  log(`\n── dovec health ──
   published        : ${s.published}
   suspended        : ${s.suspended}
   last run status  : ${s.last_run_status}
@@ -55,22 +54,33 @@ console.log(`\n── dovec health ──
   rejected/failed 24 h : ${rejected}
 `)
 
-const coords = await sb.rpc('dovec_coord_status')
-if (coords.error) console.log(`  pins             : not readable (${coords.error.code ?? 'error'})`)
-else {
-  const c = coords.data ?? {}
-  const list = (a, f) => (Array.isArray(a) && a.length ? a.map(f).join('; ') : 'none')
-  console.log(`  pins unmatched   : ${list(c.unmatched, x => `${x.seed} (${x.reason})`)}
-  pins renamed     : ${list(c.renamed, x => `${x.seed} -> ${x.name}`)}
-  live without pin : ${list(c.live_without_coords, x => x.name)}
+  const coords = await sb.rpc('dovec_coord_status')
+  if (coords.error) log(`  pins             : not readable (${coords.error.code ?? 'error'})`)
+  else {
+    const c = coords.data ?? {}
+    const n = (a) => (Array.isArray(a) ? a.length : 0)
+    log(`  pins unmatched   : ${n(c.unmatched)}
+  pins renamed     : ${n(c.renamed)}
+  live without pin : ${n(c.live_without_coords)}
 `)
+  }
+
+  const reds = []
+  if (s.suspended) reds.push('The Döveç partner key was rejected (suspended): the app hides every project. Check the key with Döveç.')
+  if (s.last_run_status !== 'ok') reds.push(`The last sync run was "${s.last_run_status}", not ok. Function logs: Dashboard, Edge Functions, sync-dovec.`)
+  if (ageMin === null || ageMin > STALE_MIN) reds.push(`No good sync within ${STALE_MIN} minutes. Is the dovec-sync cron job running (admin Jobs screen)?`)
+  if (stuck) reds.push('An enquiry has waited more than an hour to be sent. Check dovec-lead logs and the dovec-lead-retry cron job.')
+  if (rejected) reds.push('An enquiry was rejected or failed for good in the last 24 hours. Check dovec-lead logs (external ids only).')
+  for (const r of reds) err(`::error::${r}`)
+  return reds.length ? 1 : 0
 }
 
-const reds = []
-if (s.suspended) reds.push('The Döveç partner key was rejected (suspended): the app hides every project. Check the key with Döveç.')
-if (s.last_run_status !== 'ok') reds.push(`The last sync run was "${s.last_run_status}", not ok. Function logs: Dashboard, Edge Functions, sync-dovec.`)
-if (ageMin === null || ageMin > STALE_MIN) reds.push(`No good sync within ${STALE_MIN} minutes. Is the dovec-sync cron job running (admin Jobs screen)?`)
-if (stuck) reds.push('An enquiry has waited more than an hour to be sent. Check dovec-lead logs and the dovec-lead-retry cron job.')
-if (rejected) reds.push('An enquiry was rejected or failed for good in the last 24 hours. Check dovec-lead logs (external ids only).')
-for (const r of reds) console.error(`::error::${r}`)
-process.exit(reds.length ? 1 : 0)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { createClient } = await import('@supabase/supabase-js')
+  const { prodWriteGuard, serviceRoleKey } = await import('./lib/prod-write-guard.mjs')
+  prodWriteGuard({ wouldWrite: false, workflow: 'dovec-health' })
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL
+  if (!url) { console.error('EXPO_PUBLIC_SUPABASE_URL missing'); process.exit(2) }
+  const sb = createClient(url, serviceRoleKey(), { auth: { persistSession: false, autoRefreshToken: false } })
+  process.exit(await run({ sb }))
+}
