@@ -3,7 +3,6 @@
   "functions": {
     "admin-push":            { "verify_jwt": true },
     "apple-token":            { "verify_jwt": false },
-    "dovec-lead":             { "verify_jwt": true },
     "google-places":          { "verify_jwt": true },
     "live-scores-basketball": { "verify_jwt": true },
     "live-scores-f1":         { "verify_jwt": true },
@@ -13,7 +12,6 @@
     "marketplace-photo-review": { "verify_jwt": true },
     "send-duty-notification": { "verify_jwt": true },
     "send-weekend-digest":    { "verify_jwt": true },
-    "sync-dovec":             { "verify_jwt": true },
     "sync-novest":            { "verify_jwt": true },
     "vehicle-photo":          { "verify_jwt": true },
     "walk-leg":               { "verify_jwt": false },
