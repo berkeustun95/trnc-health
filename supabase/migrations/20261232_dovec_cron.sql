@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261230 — Döveç projects: the three scheduled jobs
+-- 20261232 — Döveç projects: the three scheduled jobs
 -- ═══════════════════════════════════════════════════════════════════════════
 --
--- Applied LATER than 20261229, as its own go, AFTER the sync-dovec and dovec-lead functions are deployed and the
+-- Applied LATER than 20261229 and 20261231 (the read gate: Döveç data readable by admins only until published), as its own go, AFTER the sync-dovec and dovec-lead functions are deployed and the
 -- Vault secret `novest_sync_key` exists. It is the service key already used by the weekend-digest, duty-push and
 -- marketplace jobs (20261177, 20261185); the cron jobs read it by name, never inline, and both functions accept it
 -- through the same serviceCaller as those. No new Vault secret is needed. The file refuses to run if it is missing.
@@ -30,6 +30,9 @@ DO $$
 BEGIN
   IF to_regclass('public.dovec_settings') IS NULL OR to_regprocedure('public.dovec_leads_wipe_pii()') IS NULL THEN
     RAISE EXCEPTION '20261229 is not applied: apply it before this file';
+  END IF;
+  IF to_regprocedure('public.dovec_projects_visible()') IS NULL THEN
+    RAISE EXCEPTION '20261231 (read gate) is not applied: apply it before this file';
   END IF;
   IF (SELECT count(*) FROM vault.secrets WHERE name = 'novest_sync_key') IS DISTINCT FROM 1 THEN
     RAISE EXCEPTION 'Vault secret novest_sync_key is missing or duplicated — the jobs would POST without a key';
@@ -126,7 +129,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261230_dovec_cron.sql', 'a366baec74c667392ada9613e38c34d0e16b61d462cbc9a4135eb967028a934d')
+VALUES ('20261232_dovec_cron.sql', 'c8e505bf28a2f1b4cea8e56434fee3789b43b993bdd937386b69e50c01b385f5')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
