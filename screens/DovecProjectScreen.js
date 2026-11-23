@@ -5,7 +5,7 @@ import { Button, Card, RemoteImage } from '../components/ui'
 import { Cover, StatusChip, fromPriceText, unitsText } from '../components/dovec/DovecProjectCard'
 import { colors, type, radii, press } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { DOVEC_LOGO, formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes } from '../constants/dovec'
+import { DOVEC_LOGO, formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, dovecMapsUrl } from '../constants/dovec'
 
 // One Döveç project. ADA owns the frame; the project's name, photos, text and prices are Döveç's own data, shown as synced.
 // Deliberately NO Call / WhatsApp here: contact starts with the enquiry form (WhatsApp appears on its thank-you screen).
@@ -20,6 +20,7 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
   const delivery = deliveryLabel(project.planned_delivery_month, lang)
   const types = unitTypes(project)
   const gallery = galleryUrls(project.gallery)
+  const mapsUrl = dovecMapsUrl(project)
   const description = typeof project.description === 'string' ? project.description.trim() : ''
 
   return (
@@ -79,6 +80,13 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
             </View>
           )}
 
+          {!!mapsUrl && (
+            <TouchableOpacity style={s.web} onPress={() => Linking.openURL(mapsUrl).catch(() => {})} activeOpacity={press.small}
+              accessibilityRole="link" accessibilityLabel={t('dovecOpenMaps', lang)}>
+              <Ionicons name="map-outline" size={18} color={colors.primary} />
+              <Text style={s.webText}>{t('dovecOpenMaps', lang)}</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={s.web} onPress={() => Linking.openURL(project.website_url).catch(() => {})} activeOpacity={press.small}
             accessibilityRole="link" accessibilityLabel={t('dovecWebsite', lang)}>
             <Ionicons name="open-outline" size={18} color={colors.primary} />

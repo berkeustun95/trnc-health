@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   dovecShown, formatGbp, deliveryLabel, placeLine, galleryUrls, unitTypes, composePhone, validateEnquiry,
-  buildLeadPayload, requestIdFor, classifyLead, OUTCOME_KEY, dovecWaUrl, dovecWaText, DOVEC_CONSENT_VERSION, DOVEC_LOGO,
+  buildLeadPayload, requestIdFor, classifyLead, OUTCOME_KEY, dovecWaUrl, dovecWaText, dovecMapsUrl, DOVEC_CONSENT_VERSION, DOVEC_LOGO,
 } from '../constants/dovec.js'
+import { mapsUrlForBranch } from '../constants/ehliyet.js'
 import { DOVEC_PARTNER_LIVE } from '../constants/flags.js'
 import { validateLead } from '../supabase/functions/_shared/dovec-lead.mjs'
 
@@ -21,7 +22,7 @@ const read = p => readFileSync(fileURLToPath(new URL(p, root)), 'utf8')
 const ROWS = JSON.parse(read('supabase/functions/sync-dovec/fixtures/projects.json')).projects.map(p => ({
   id: p.id, entity_uuid: '00000000-0000-4000-8000-000000000001', name: p.name, city: p.city, area: p.area || null, status: p.status,
   planned_delivery_month: p.planned_delivery_month ? `${p.planned_delivery_month}-01` : null, from_price: p.from_price, currency: 'GBP',
-  available_units: p.available_units, unit_types: p.unit_types, cover_url: p.cover_image_url, website_url: p.website_url, description: null, gallery: null,
+  available_units: p.available_units, unit_types: p.unit_types, cover_url: p.cover_image_url, website_url: p.website_url, description: null, gallery: null, latitude: null, longitude: null,
 }))
 check('fixture has rows incl. one with no price and one with no area', ROWS.length >= 3 && ROWS.some(r => r.from_price === null) && ROWS.some(r => !r.area), ROWS.length)
 
@@ -126,8 +127,22 @@ check('every outcome kind the form can show has a message key', ['rejected', 'in
 // WhatsApp (thank-you only)
 eq('wa.me takes digits only, text encoded', dovecWaUrl('+357 99 000 111', 'Hi & bye'), 'https://wa.me/35799000111?text=Hi%20%26%20bye')
 eq('no number -> no link (button hidden)', [dovecWaUrl(null, 'x'), dovecWaUrl('', 'x')], [null, null])
-eq('wa text fills project and reference', dovecWaText('About {project}, ref {ref}.', 'Fictional Pine Court', 'ADA-12'), 'About Fictional Pine Court, ref ADA-12.')
-eq('a "$&" in a project name is not special', dovecWaText('{project}', 'A $& B', 'r'), 'A $& B')
+const WA_TR = 'Merhaba, ADA uygulamasından yazıyorum. D-Point hakkında bilgi almak istiyorum. (Ref: ADA-7)'
+eq('wa text is Döveç\'s exact Turkish template (D-Point, ADA-7), whatever the app language', dovecWaText('D-Point', 'ADA-7'), WA_TR)
+eq('wa link for +905338880515 carries that text', dovecWaUrl('+905338880515', dovecWaText('D-Point', 'ADA-7')), `https://wa.me/905338880515?text=${encodeURIComponent(WA_TR)}`)
+check('template is a constant, no i18n key', !/dovecWaMessage/.test(read('constants/i18n.js')) && !/dovecWaText\(t\(/.test(read('components/dovec/DovecThankYou.js')))
+check('$& name survives verbatim', dovecWaText('A $& B', 'r').includes('A $& B'))
+
+// Maps (detail page): only with two numeric coordinates, the hotels' https form
+const at = { latitude: 35.1856, longitude: 33.3823 }
+eq('maps url equals the hotels form (mapsUrlForBranch)', dovecMapsUrl(at), mapsUrlForBranch({ lat: 35.1856, lng: 33.3823 }))
+eq('maps url shape', dovecMapsUrl(at), 'https://www.google.com/maps/search/?api=1&query=35.1856,33.3823')
+eq('no maps button when either coordinate is null / missing / non-number',
+  [{ latitude: null, longitude: 33.3 }, { latitude: 35.1, longitude: null }, { latitude: null, longitude: null }, {}, { latitude: '35.1', longitude: '33.3' }, { latitude: NaN, longitude: 33.3 }, null].map(dovecMapsUrl),
+  [null, null, null, null, null, null, null])
+eq('coordinate 0 is a number, kept', dovecMapsUrl({ latitude: 0, longitude: 0 }), 'https://www.google.com/maps/search/?api=1&query=0,0')
+check('detail screen gates the maps button on dovecMapsUrl', /dovecMapsUrl\(project\)/.test(read('screens/DovecProjectScreen.js')) && /!!mapsUrl &&/.test(read('screens/DovecProjectScreen.js')))
+check('loadDovec selects latitude and longitude', /latitude, longitude/.test(read('utils/loadDovec.js')))
 
 // source guards: no contact before the form; the logo slot is empty until delivered
 const detail = read('screens/DovecProjectScreen.js'), list = read('screens/DovecProjectsScreen.js')

@@ -11,7 +11,7 @@ import { logContactEvent } from '../../utils/logContactEvent'
 // (module 'dovec', entity = the project's entity_uuid) on the line before the handoff.
 export default function DovecThankYou({ project, reference, whatsapp, lang, onBack }) {
   const insets = useSafeAreaInsets()
-  const waUrl = whatsapp ? dovecWaUrl(whatsapp, dovecWaText(t('dovecWaMessage', lang), project.name, reference)) : null
+  const waUrl = whatsapp ? dovecWaUrl(whatsapp, dovecWaText(project.name, reference)) : null
   const openWa = () => {
     logContactEvent('dovec', project.entity_uuid, 'whatsapp')
     Linking.openURL(waUrl).catch(() => {})

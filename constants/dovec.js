@@ -125,5 +125,18 @@ export const dovecWaUrl = (e164, text) => {
   const digits = String(e164 ?? '').replace(/\D/g, '')
   return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null
 }
-export const dovecWaText = (template, projectName, ref) =>
-  template.replace('{project}', () => projectName).replace('{ref}', () => ref)
+// Döveç's own Turkish text, sent in EVERY app language (not translated, so not in i18n).
+export const DOVEC_WA_TEMPLATE = 'Merhaba, ADA uygulamasından yazıyorum. {project} hakkında bilgi almak istiyorum. (Ref: {ref})'
+export const dovecWaText = (projectName, ref) =>
+  DOVEC_WA_TEMPLATE.replace('{project}', () => projectName).replace('{ref}', () => ref)
+
+// ─── Maps (detail page; only when both coordinates are numbers) ───────────────────────────────
+// The hotels' https Google Maps form (HotelsTab fallback, constants/ehliyet.js mapsUrlForBranch), never the pharmacy/Apple path.
+export const dovecCoords = (project) => {
+  const { latitude: lat, longitude: lng } = project || {}
+  return typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
+}
+export const dovecMapsUrl = (project) => {
+  const c = dovecCoords(project)
+  return c ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}` : null
+}
