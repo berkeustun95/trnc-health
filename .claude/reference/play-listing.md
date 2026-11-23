@@ -6,8 +6,8 @@ Moved out of `CLAUDE.md` (2026-11-16) to cut per-message context; still binding.
 - Titles match the ad: `ADA – North Cyprus Assistant` / `ADA – Kuzey Kıbrıs Asistanı`, "ADA" first
   in all; es-ES uses `ADA: …` (length). Never "Guide". Paragraph 2 says "assistant" once.
 - Limits: title ≤ 30, short ≤ 80, full ≤ 4000 code points. Title files have NO trailing newline.
-- No health, pharmacy, duty, clinic or doctor wording in any language; no "eSIM" while
-  `CONNECTIVITY_LIVE` is false (remove that guard pattern the day Connectivity goes live).
+- No health, pharmacy, duty, clinic or doctor wording in any language. ("eSIM" is allowed since
+  Mobil Hat went live; the guard pattern was removed.)
 - Paragraph 1 = independence disclaimer; description carries official source links. The guard reads
   URLs from `fastlane/metadata-backup/android/en-GB`. el-GR names no state. Bullets name LIVE modules only.
 - `npm run store:check` enforces all of the above on every folder. `npm run store:listing` = check +

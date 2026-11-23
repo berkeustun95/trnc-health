@@ -8,12 +8,11 @@
 //
 // 1. Play's length limits — title ≤ 30, short ≤ 80, full ≤ 4000, counted in code points.
 //
-// 2. HEALTH, PHARMACY OR eSIM WORDS, in any of the nine languages. On Play, ADA is NOT a
+// 2. HEALTH OR PHARMACY WORDS, in any of the nine languages. On Play, ADA is NOT a
 //    health app, and that is deliberate: declaring health features forces an Organization
 //    developer account, and that combination is what got the app rejected on 2026-07-06
 //    (CLAUDE.md → Compliance). The duty roster stays in the app; the listing never names
-//    it. eSIM is here because CONNECTIVITY_LIVE is false, so the listing must not promise it
-//    — drop that word from this list on the day the module goes live, not before.
+//    it. (eSIM was banned here until Mobil Hat went live; CONNECTIVITY_LIVE is true now.)
 //
 // 3. A description WITHOUT the independence disclaimer or the official source links. Both are
 //    the fix for the 2026-08-14 Misleading Claims rejection ("Missing Source Link for
@@ -48,7 +47,6 @@ const SOURCE_URLS = existsSync(SNAPSHOT) ? [...new Set(readFileSync(SNAPSHOT, 'u
 
 // Vets are not health content: the lookbehinds keep Tierärzte / دامپزشکان / أطباء بيطريون.
 const FORBIDDEN = [
-  /\be-?sim\b/iu,   // bounded: Turkish resim / kesim contain 'esim'
   /pharma|health|hospital|clinic|medic|doctor|duty/iu,
   /eczane|nöbetçi|sağlık|hastane|klinik|doktor|ilaç/iu,
   /аптек|дежурн|здоров|больниц|клиник|врач|лекарств/iu,
@@ -60,9 +58,9 @@ const FORBIDDEN = [
   /داروخانه|کشیک|سلامت|بیمارستان|درمانگاه|(?<!دام)پزشک|دارو/u,
 ]
 
-// Bullets 1 (duty pharmacies) and 6 (eSIM) as they stood in the draft, one per language.
+// Bullet 1 (duty pharmacies) as it stood in the draft, one per language.
 const MUST_CATCH = [
-  'Nöbetçi eczaneler – bugün hangi eczane açık', 'eSIM – Kıbrıs\'a gelmeden internetini hazırla',
+  'Nöbetçi eczaneler – bugün hangi eczane açık',
   'Duty pharmacies – which pharmacy is open today',
   'Дежурные аптеки — какая аптека открыта сегодня',
   'الصيدليات المناوبة – أي صيدلية مفتوحة اليوم',
@@ -72,7 +70,7 @@ const MUST_CATCH = [
   'Notdienst-Apotheken – welche Apotheke heute geöffnet hat',
   'داروخانه‌های کشیک – امروز کدام داروخانه باز است',
 ]
-const MUST_PASS = ['Haustiere – Tierärzte und Tierpensionen', 'حیوانات خانگی – دامپزشکان', 'أطباء بيطريون', 'resimler ve kesim']
+const MUST_PASS = ['Haustiere – Tierärzte und Tierpensionen', 'حیوانات خانگی – دامپزشکان', 'أطباء بيطريون']
 
 // İ lowercases to i + U+0307 and would slip past /i; fold it before matching.
 const hit = s => FORBIDDEN.find(re => re.test(s.replaceAll('İ', 'i')))
@@ -145,4 +143,4 @@ if (fails.length) {
   console.error(`\n✗ store listing check FAILED (${fails.length}):\n  ` + fails.join('\n  '))
   process.exit(1)
 }
-console.log(`✓ store listing OK — ${present.length} languages, disclaimer + ${SOURCE_URLS.length} source URLs in each, no health/pharmacy/eSIM words in listing or ${changelogs} changelog(s) (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)
+console.log(`✓ store listing OK — ${present.length} languages, disclaimer + ${SOURCE_URLS.length} source URLs in each, no health/pharmacy words in listing or ${changelogs} changelog(s) (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)
