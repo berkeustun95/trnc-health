@@ -4,12 +4,12 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
 import { t, tCount } from '../../../constants/i18n'
 import { press, colors, radii, space, type, font } from '../../../constants/theme'
-import { closingSoonRange } from '../../../constants/duyurular'
+import { closingSoonRange, closingSoonCount } from '../../../constants/duyurular'
 
 // ─── Home: Duyurular banner (Berke 2026-10-11) ──────────────────────────────
 // Full width, under the Nöbetçi Eczaneler + Acil Numaralar row. Shown only while DUYURULAR is
 // on (HomeScreen decides): production users see nothing until the flag flips. The pill counts
-// published, open items whose deadline falls in the next 7 TRNC days (RLS already limits the
+// published, open cards (reposts once, as the list groups them) whose deadline falls in the next 7 TRNC days (RLS already limits the
 // read to published, unexpired rows) and hides at 0 — and on a failed read, rather than
 // showing a number it does not have.
 
@@ -25,9 +25,13 @@ export default function DuyurularBanner({ lang, onPress }) {
   useEffect(() => {
     let alive = true
     const { from, to } = closingSoonRange()
-    supabase.from('announcements').select('id', { count: 'exact', head: true })
+    // Rows, not a head count: the list groups reposts, and the pill must match the list.
+    supabase.from('announcements').select('id, title, institution, published_at', { count: 'exact' })
       .eq('kind', 'open').gte('deadline_at', from).lte('deadline_at', to)
-      .then(({ count, error }) => { if (alive && !error) setClosing(count || 0) })
+      .then(({ data, count, error }) => {
+        // A truncated read would undercount: show nothing rather than a wrong number.
+        if (alive && !error && data && data.length === count) setClosing(closingSoonCount(data))
+      })
     return () => { alive = false }
   }, [])
 

@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import { groupDuyurular, stageOf, foldTitle } from '../constants/duyurular'
+import { groupDuyurular, stageOf, foldTitle, matchesQuery, closingSoonCount } from '../constants/duyurular'
+import { pushRoute } from '../utils/pushRoute'
 
 let n = 0
 const row = (title, day, extra = {}) => ({ id: `r${++n}`, title, published_at: `${day}T08:00:00+00:00`, official_url: `https://x/${n}`, ...extra })
@@ -103,6 +104,46 @@ describe('groupDuyurular', () => {
     expect(shown(out)).toEqual(['Başka bir duyuru', 'Üçüncü', 'Bir duyuru'])
     expect(out.every(c => c.earlier.length === 0)).toBe(true)
     expect(JSON.stringify(rows)).toBe(before)
+  })
+})
+
+describe('what grouping must not break (Berke, hold point 1)', () => {
+  const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')
+  it('search: a word only a hidden stage carries still finds the shown card', () => {
+    const [card] = groupDuyurular([
+      row('DIŞİŞLERİ DAİRESİ MÜNHAL KADROLARININ YAZILI SINAVI YAPILIYOR (21 Ekim 2026)', '2026-10-14'),
+      row('DIŞİŞLERİ DAİRESİ MÜNHAL KADROLARININ YAZILI SINAVI YAPILDI', '2026-10-21'),
+      row('DIŞİŞLERİ DAİRESİ MÜNHAL KADROLARININ YAZILI SINAVI KESİNLEŞTİ (27 Ekim 2026)', '2026-10-27', { institution: 'Kamu Hizmeti Komisyonu' }),
+    ])
+    expect(card.earlier).toHaveLength(2)
+    expect(card.title).toMatch(/KESİNLEŞTİ/)
+    expect(matchesQuery(card, 'yapılıyor')).toBe(true)
+    expect(matchesQuery(card, '21 ekim')).toBe(true)
+    expect(matchesQuery(card, 'tapu')).toBe(false)
+    const [rep] = groupDuyurular([
+      row('Ustalık Belgesi Kayıtları', '2026-10-01', { institution: 'Mesleki Teknik Öğretim Dairesi' }),
+      row('Ustalık Belgesi Kayıtları', '2026-10-02', { institution: 'Esnaf ve Zanaatkârlar Odası' }),
+    ])
+    expect(matchesQuery(rep, 'mesleki teknik')).toBe(true)
+  })
+  it('banner: counts cards as the list shows them, a repost once', () => {
+    const rows = [
+      row('Burs Müracaatları Devam Ediyor', '2026-09-30'),
+      row('Burs Müracaatları Devam Ediyor', '2026-10-22'),
+      row('Başka bir ilan', '2026-10-20'),
+    ]
+    expect(closingSoonCount(rows)).toBe(2)
+    expect(closingSoonCount([])).toBe(0)
+    const b = read('components/home/redesign/DuyurularBanner.js')
+    expect(b).toMatch(/setClosing\(closingSoonCount\(data\)\)/)
+    expect(b).not.toMatch(/head: true/)
+    expect(b).toMatch(/data\.length === count/)
+  })
+  it('push: no push opens a single announcement, so a hidden row cannot be a push target', () => {
+    // If a per-announcement push is ever added, it must resolve a hidden row to its shown card: this test is the reminder.
+    for (const screen of ['duyurular', 'duyuru', 'announcement', 'announcements']) expect(pushRoute({ screen, id: 'x' })).toBeNull()
+    expect(read('utils/pushRoute.js')).not.toMatch(/duyuru|announcement/i)
+    expect(read('screens/DuyurularScreen.js')).toMatch(/export default function DuyurularScreen\(\{ lang, onBack, backRef = null \}\)/)
   })
 })
 
