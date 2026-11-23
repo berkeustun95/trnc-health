@@ -6,7 +6,7 @@
 //   node scripts/check-novest-relay.mjs
 //   node scripts/check-novest-relay.mjs --relay <alt.mjs>   # red-first: run against a broken copy
 //   node scripts/check-novest-relay.mjs --client <alt.mjs>  # red-first: client cases against a broken copy of the client
-//   node scripts/check-novest-relay.mjs --policy <alt.mjs>  # red-first: retry/gap cases against a broken copy of novest-fetch-policy
+//   node scripts/check-novest-relay.mjs --policy <alt.mjs>  # red-first: retry/rate-limit cases against a broken copy of novest-fetch-policy
 
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -666,25 +666,26 @@ console.log('systemd unit hardening (static)')
   t('unit has no ProcSubset (Node/libuv read /proc/meminfo, /proc/stat; unverified under pid)', /ProcSubset/.test(unit), false)
 }
 
-console.log('fetch policy: media gap resolution')
+console.log('fetch policy: rate limit resolution')
 if (P.loadError) t('novest-fetch-policy.mjs loads', P.loadError, 'loaded')
 else {
-  const g = (v, route) => { try { return P.resolveMediaGapMs(v === undefined ? {} : { NOVEST_MEDIA_GAP_MS: v }, route) } catch { return 'THROWS' } }
-  t('unset on relay -> 10000 default', g(undefined, 'relay'), { ms: 10000, source: 'default' })
-  t('empty on relay -> 10000 default', g('', 'relay'), { ms: 10000, source: 'default' })
-  t('unset on direct -> 0 default', g(undefined, 'direct'), { ms: 0, source: 'default' })
-  t('empty on direct -> 0 default', g('', 'direct'), { ms: 0, source: 'default' })
-  t('5000 ok on relay', g('5000', 'relay'), { ms: 5000, source: 'env' })
-  t('0 ok on relay (explicit no gap)', g('0', 'relay'), { ms: 0, source: 'env' })
-  t('60000 ok on direct', g('60000', 'direct'), { ms: 60000, source: 'env' })
-  for (const bad of ['-1', '60001', '1.5', 'abc', ' 5', '5 ', '1e3', '0x10', '007', '+5', '100000']) t(`NOVEST_MEDIA_GAP_MS=${JSON.stringify(bad)} throws`, g(bad, 'relay'), 'THROWS')
+  const g = (env, route = 'relay') => { try { return P.resolveRateLimit(env, route) } catch { return 'THROWS' } }
+  t('relay, nothing set -> 4 per 65 s, downloads counted, default', g({}), { calls: 4, windowMs: 65000, countDownloads: true, source: 'default' })
+  t('relay, empty strings -> default', g({ NOVEST_RATE_CALLS: '', NOVEST_RATE_WINDOW_S: '', NOVEST_RATE_COUNT_DOWNLOADS: '' }), { calls: 4, windowMs: 65000, countDownloads: true, source: 'default' })
+  t('direct -> off (null) even with settings', [g({}, 'direct'), g({ NOVEST_RATE_CALLS: '2' }, 'direct')], [null, null])
+  t('relay 3 per 90 s from env', g({ NOVEST_RATE_CALLS: '3', NOVEST_RATE_WINDOW_S: '90' }), { calls: 3, windowMs: 90000, countDownloads: true, source: 'env' })
+  t('relay downloads switched off', g({ NOVEST_RATE_COUNT_DOWNLOADS: 'false' }), { calls: 4, windowMs: 65000, countDownloads: false, source: 'env' })
+  t('bounds ok: calls 1 and 10, window 10 and 600', [g({ NOVEST_RATE_CALLS: '1' }).calls, g({ NOVEST_RATE_CALLS: '10' }).calls, g({ NOVEST_RATE_WINDOW_S: '10' }).windowMs, g({ NOVEST_RATE_WINDOW_S: '600' }).windowMs], [1, 10, 10000, 600000])
+  for (const bad of ['0', '11', '-1', '1.5', 'abc', ' 4', '4 ', '04', '+4', '1e1', '0x4']) t(`NOVEST_RATE_CALLS=${JSON.stringify(bad)} throws`, g({ NOVEST_RATE_CALLS: bad }), 'THROWS')
+  for (const bad of ['9', '601', '65.5', '065', 'abc', '65s']) t(`NOVEST_RATE_WINDOW_S=${JSON.stringify(bad)} throws`, g({ NOVEST_RATE_WINDOW_S: bad }), 'THROWS')
+  for (const bad of ['yes', 'TRUE', '0', '1', 'no']) t(`NOVEST_RATE_COUNT_DOWNLOADS=${JSON.stringify(bad)} throws`, g({ NOVEST_RATE_COUNT_DOWNLOADS: bad }), 'THROWS')
 }
 
 console.log('fetch policy: retry rules, budget, waits, log')
 if (P.loadError) t('novest-fetch-policy.mjs loads', P.loadError, 'loaded')
 else {
   const SECRET_URL = 'https://203.0.113.9:8443/'
-  const mkPolicy = (script, { route = 'relay', gap = 0 } = {}) => {
+  const mkPolicy = (script, { route = 'relay', rate = null } = {}) => {
     const st = { calls: [], sleeps: [], logs: [], clock: Date.UTC(2026, 10, 21, 12, 0, 0) }
     let i = 0
     const base = async (url, init) => {
@@ -694,7 +695,7 @@ else {
       if (step instanceof Response) return step
       return new Response('x', { status: step })
     }
-    const f = P.createRetryingFetch({ fetch: base, route, mediaGapMs: gap, sleep: async ms => { st.sleeps.push(ms); st.clock += ms }, now: () => st.clock, log: l => st.logs.push(l) })
+    const f = P.createRetryingFetch({ fetch: base, route, rate, sleep: async ms => { st.sleeps.push(ms); st.clock += ms }, now: () => st.clock, log: l => st.logs.push(l) })
     return { f, st }
   }
   const r429 = (h = {}) => new Response('x', { status: 429, headers: h })
@@ -779,22 +780,42 @@ else {
   const ee = await ev.f(MEDIA, {}).then(() => null, e => e)
   t('budget error carries no query either', [ee?.message.includes('include'), ee?.message.includes('?')], [false, false])
 
-  const gp = mkPolicy([200, 200, 200, 200, 200], { gap: 10000 })
-  await gp.f(MEDIA, {})
-  t('gap: the first /media request does not wait', gp.st.sleeps, [])
-  await gp.f(MEDIA, {})
-  t('gap: a second /media request right after waits the full gap', gp.st.sleeps, [10000])
-  gp.st.clock += 4000
-  await gp.f(MEDIA, {})
-  t('gap: only the remaining time is waited (4 s already passed)', gp.st.sleeps, [10000, 6000])
-  gp.st.clock += 15000
-  await gp.f(MEDIA, {})
-  t('gap: nothing to wait once the gap has passed', gp.st.sleeps, [10000, 6000])
-  await gp.f(PROPS, {}); await gp.f(IMG, {})
-  t('gap: /properties and image downloads never wait', gp.st.sleeps, [10000, 6000])
-  const g0 = mkPolicy([200, 200, 200], { gap: 0 })
-  await g0.f(MEDIA, {}); await g0.f(MEDIA, {})
-  t('gap 0 -> no wait at all (direct today)', g0.st.sleeps, [])
+  const R = { calls: 4, windowMs: 65000, countDownloads: true }
+  const T0 = Date.UTC(2026, 10, 21, 12, 0, 0)
+  const lm = mkPolicy(() => 200, { rate: R })
+  for (const u of [PROPS, MEDIA, MEDIA, MEDIA, MEDIA, MEDIA, MEDIA, MEDIA, MEDIA]) await lm.f(u, {})
+  const at = lm.st.calls.map(c => (c.at - T0) / 1000)
+  t('limiter: feed + 8 lookups -> 4 at once, then each slot only once 65 s have passed', at, [0, 0, 0, 0, 65, 65, 65, 65, 130])
+  const maxIn = (xs, w) => Math.max(...xs.map(x => xs.filter(y => y >= x && y < x + w).length))
+  t('limiter: never more than 4 calls in any rolling 65 s (and so never 5 in 60 s)', [maxIn(at, 65), maxIn(at, 60)], [4, 4])
+  t('limiter: summary counts calls and wall-clock wait', lm.f.summary(), 'novest calls: route=relay limiter=4/65s downloads counted calls=9 (api 9, downloads 0) limiter-wait=130s 429s: api 0, downloads 0, relay-busy 0 retries 0/3 | downloads: no downloads this run (no evidence)')
+
+  const lc = mkPolicy(() => 200, { rate: R })
+  await Promise.all(Array.from({ length: 10 }, (_, i) => lc.f(`https://coldwellbankernovest.com/wp-content/uploads/${i}.jpg`, {})))
+  const atc = lc.st.calls.map(c => (c.at - T0) / 1000)
+  t('limiter: 10 concurrent downloads (4 workers or more) are paced the same', [atc, maxIn(atc, 65)], [[0, 0, 0, 0, 65, 65, 65, 65, 130, 130], 4])
+  t('  wait is wall-clock (130 s), not the sum of overlapping waits', lc.f.summary().includes('limiter-wait=130s'), true)
+  t('  summary: downloads counted, no 429 -> says it is no evidence', lc.f.summary().endsWith('| downloads: 10, no 429 (paced by the limiter, so no evidence either way)'), true)
+
+  const lr = mkPolicy(n => (n === 2 ? r429({ 'retry-after': '60' }) : 200), { rate: R })
+  for (const u of [PROPS, MEDIA, MEDIA, MEDIA]) await lr.f(u, {})
+  const atr = lr.st.calls.map(c => (c.at - T0) / 1000)
+  t('limiter: a retry is a call too and waits for a slot as well', [atr, lr.st.sleeps], [[0, 0, 60, 60, 65], [60000, 5000]])
+  t('  429 counted as api, retry used', lr.f.summary().includes('429s: api 1, downloads 0, relay-busy 0 retries 1/3'), true)
+
+  const lu = mkPolicy(u => 200, { rate: { ...R, countDownloads: false } })
+  for (const u of [PROPS, MEDIA, MEDIA, MEDIA, IMG, IMG, IMG, IMG, IMG, MEDIA]) await lu.f(u, {})
+  const atu = lu.st.calls.map(c => (c.at - T0) / 1000)
+  t('downloads not counted: they skip the limiter and do not use its slots', atu, [0, 0, 0, 0, 0, 0, 0, 0, 0, 65])
+  t('  summary for unpaced downloads with no 429', lu.f.summary().endsWith('| downloads: 5, no 429 (unpaced: downloads do not seem to count)'), true)
+  const ld = mkPolicy((n, u) => (u.includes('/uploads/') && n === 2 ? 429 : 200), { rate: { ...R, countDownloads: false } })
+  await ld.f(PROPS, {}); await ld.f(IMG, {}); await ld.f(IMG, {})
+  t('  a download 429 is reported as downloads DO count', [ld.f.summary().includes('429s: api 0, downloads 1'), ld.f.summary().endsWith('| downloads: 1 of 3 got a Novest 429 (downloads DO count)')], [true, true])
+
+  const ln = mkPolicy(() => 200, { route: 'direct' })
+  for (let i = 0; i < 9; i++) await ln.f(MEDIA, {})
+  t('direct route: no limiter, no wait (unchanged)', [ln.st.sleeps, ln.f.summary().startsWith('novest calls: route=direct limiter=off calls=9 (api 9, downloads 0) limiter-wait=0s')], [[], true])
+  t('summary carries no query string or relay address', /[?&]|203\.0\.113|8443/.test([lm, lc, lr, lu, ld, ln].map(x => x.f.summary()).join('\n')), false)
 
   const wired = readFileSync(policyPath, 'utf8')
   t('policy lib uses Node built-ins only', /^\s*import\b(?![^\n]*node:)/m.test(wired), false)
@@ -821,9 +842,11 @@ console.log('client wiring in the sources')
   t('mirror: empty-feed guard right after the feed read', /await getAll\('\/properties'[^\n]*\nif \(feed\.length === 0\) fail\('feed returned 0 listings: refusing to report clean'\)/.test(mirror), true)
   t('mirror: route resolved, printed, relay installed and size line on exit', [/resolveNovestRoute\(process\.env\)/.test(mirror), mirror.includes('console.log(`route: ${route}`)'), mirror.includes('setNovestFetch(novestFetch)'), /process\.on\('exit'[^\n]*largest relay response: \$\{largestResponseBytes\(\)\} bytes \(cap \$\{RELAY_RESPONSE_CAP\}\)/.test(mirror)], [true, true, true, true])
   t('mirror: images use the routed fetch with the unchanged User-Agent', [mirror.includes(`const MIRROR_UA = '${UA2}'`), mirror.includes('await novestFetch(url, { headers: { \'User-Agent\': MIRROR_UA } })')], [true, true])
-  t('mirror: ONE retrying instance over the route fetch serves feed, media and images; gap resolved after the route and printed',
-    [mirror.includes("const baseFetch = route === 'relay' ? relayFetch : (u, i) => fetch(u, i)"), (mirror.match(/createRetryingFetch\(/g) ?? []).length, /resolveNovestRoute\(process\.env\)[\s\S]*?resolveMediaGapMs\(process\.env, route\)/.test(mirror), mirror.includes('media lookup gap: ${gap.ms} ms (${gap.source})'), /resolveMediaGapMs\(process\.env, route\)[^\n]*::error::/.test(mirror), mirror.includes('imageFetch')],
-    [true, 1, true, true, true, false])
+  t('mirror: ONE retrying instance over the route fetch serves feed, media and images; rate resolved after the route, printed, summary on exit',
+    [mirror.includes("const baseFetch = route === 'relay' ? relayFetch : (u, i) => fetch(u, i)"), (mirror.match(/createRetryingFetch\(/g) ?? []).length, /resolveNovestRoute\(process\.env\)[\s\S]*?resolveRateLimit\(process\.env, route\)/.test(mirror), mirror.includes('createRetryingFetch({ fetch: baseFetch, route, rate })'), /resolveRateLimit\(process\.env, route\)[^\n]*::error::/.test(mirror), mirror.includes("process.on('exit', () => console.log(novestFetch.summary()))"), /MediaGap|imageFetch/.test(mirror)],
+    [true, 1, true, true, true, true, false])
+  const wf = read('.github/workflows/novest-images.yml')
+  t('workflow passes the three rate settings from repo variables', ['NOVEST_RATE_CALLS', 'NOVEST_RATE_WINDOW_S', 'NOVEST_RATE_COUNT_DOWNLOADS'].map(v => wf.includes(`${v}: \${{ vars.${v} }}`)), [true, true, true])
   t('shared feed: UA unchanged, hook defaults to global fetch, no node: import', [feedSrc.includes(`const UA = '${UA1}'`), feedSrc.includes('let fetchImpl = (u, i) => fetch(u, i)'), /^\s*import .*node:/m.test(feedSrc)], [true, true, false])
   t('mirror: prune refused on the relay route, after pruneRefusal and before prodWriteGuard', /pruneRefusal\(\{ prune, env: process\.env \}\)[\s\S]*?pruneRouteRefusal\(\{ prune, route \}\)[\s\S]*?prodWriteGuard\(\{/.test(mirror), true)
   t('provision.sh sends both User-Agents and expects 400 for curl default', [setup.includes(`FEED_UA='${UA1}'`), setup.includes(`IMG_UA='${UA2}'`), /curl's default User-Agent with key" 400/.test(setup)], [true, true, true])
