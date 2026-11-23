@@ -429,5 +429,34 @@ console.log('B1: no enquiry while the module is unpublished (admins excepted)')
   t('customer + published: proceeds (positive control), one insert, isAdmin not asked', [r.status, r.body.status, store.calls.insertLead, store.calls.isAdmin], [200, 'mock', 1, 0])
 }
 
+console.log('T9: lead locks as shipped')
+{
+  t('LEADS_LIVE_ALLOWED and TEST_LEAD_ALLOWED are both false (imported constants)', [LEADS_LIVE_ALLOWED, TEST_LEAD_ALLOWED], [false, false])
+  const store = makeStore(); const f = stub()
+  const lead = { id: 1, external_id: 'ADA-1', status: 'pending', name: 'A', phone: '+441234567890', consent: true, language_code: 'en', attempts: 0 }
+  store.leads.push(lead)
+  const st = await deliver(lead, { store, env: { mode: 'live', apiKey: 'k' }, fetchImpl: f, now: () => T0, log: () => {} })   // no liveAllowed override
+  t('deliver with env live + a key and NO override: mock, 0 fetch calls', [st, f.calls.length], ['mock', 0])
+  const store2 = makeStore(); const f2 = stub()
+  store2.leads.push({ id: 1, external_id: 'ADA-1', status: 'retry', name: 'A', phone: '+441234567890', consent: true, language_code: 'en', attempts: 1, next_attempt_at: '2026-11-23T09:00:00.000Z' })
+  const rr = await retryDue({ store: store2, env: { mode: 'live', apiKey: 'k' }, fetchImpl: f2, now: () => T0, log: () => {} })
+  t('retryDue with env live + a key and NO override: 0 fetch calls, retry lead untouched', [f2.calls.length, rr.body.processed, store2.leads[0].status], [0, 0, 'retry'])
+  const store3 = makeStore(); const f3 = stub()
+  const ap = await handleTestLead({ body: { mode: 'test_lead', dry: false }, deps: { store: store3, env: { mode: 'test_once', apiKey: 'k', testPhone: '+441234567899' }, fetchImpl: f3, now: () => T0, log: () => {} } })
+  t('handleTestLead apply with the shipped constants: 403 locked, nothing written or sent', [ap.status, ap.body.error, store3.leads.length, f3.calls.length], [403, 'locked', 0, 0])
+}
+
+console.log('T10: who may call which mode')
+{
+  const svcNoMode = await post({ ...clone(BODY) }, makeStore(), undefined, { kind: 'service' })
+  t('a service caller whose body has no mode is 403', [svcNoMode.status, svcNoMode.body], [403, { error: 'forbidden' }])
+  const ur = await post({ mode: 'retry' }, makeStore()); const ut = await post({ mode: 'test_lead', dry: true }, makeStore())
+  t('a user caller with mode retry / test_lead is 403', [ur.status, ut.status, ur.body, ut.body], [403, 403, { error: 'forbidden' }, { error: 'forbidden' }])
+  const src = readFileSync(new URL('../supabase/functions/dovec-lead/index.ts', import.meta.url), 'utf8')
+  const guest = src.indexOf("user.is_anonymous === true) return json(403"), parse = src.indexOf('req.json()')
+  console.log(`    index.ts: is_anonymous 403 at ${guest}, req.json() at ${parse}`)
+  t('index.ts refuses a guest (403) before it reads the body', [guest > 0, parse > 0, guest < parse], [true, true, true])
+}
+
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

@@ -17,6 +17,18 @@ const SQL = readFileSync(FILE, 'utf8')
 const ADMIN = '00000000-0000-4000-8000-000000000001', CUSTOMER = '00000000-0000-4000-8000-000000000002'
 const SVC = '00000000-0000-4000-8000-0000000000f1'   // service_role calls carry a role claim, as PostgREST does
 const OTHER = '00000000-0000-4000-8000-000000000003'
+const GUEST = '00000000-0000-4000-8000-000000000004'
+// A guest is an authenticated JWT with is_anonymous: true. asRole() cannot set that claim, so this sets the same claims
+// string PostgREST would hand over and prints it, so the test names the claim it really ran with.
+const GUEST_CLAIMS = JSON.stringify({ sub: GUEST, role: 'authenticated', is_anonymous: true })
+async function asGuest(db, sql) {
+  await db.exec('RESET ROLE;')
+  await db.query("SELECT set_config('request.jwt.claims', $1, false)", [GUEST_CLAIMS])
+  await db.exec('SET ROLE authenticated;')
+  try { return { ok: true, rows: (await db.query(sql)).rows } }
+  catch (e) { return { ok: false, msg: String(e.message || e).split('\n')[0] } }
+  finally { await db.exec('RESET ROLE;') }
+}
 
 const MODS18 = ['accommodation','events','explore','garages','grooming','homeServices','hotels','insurance','jobs','pets','studentHub','towing','transport','ehliyet','connectivity','eatery','cars','news']
 const CE = (mods = MODS18) => `
@@ -219,7 +231,7 @@ console.log('20261229 — real file')
   const nOf = async (who, uid) => (await asRole(d, who, uid, ALL)).rows[0].n
   await d.exec(`UPDATE public.dovec_settings SET published = false, suspended = false`)
   t('unpublished + fresh: anon / guest / customer read 0 rows, admin reads the row',
-    [await nOf('anon', null), await nOf('authenticated', OTHER), await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [0, 0, 0, 1])
+    [await nOf('anon', null), (await asGuest(d, ALL)).rows[0].n, await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [0, 0, 0, 1])
   await d.exec(`UPDATE public.dovec_settings SET published = true`)
   t('published + fresh: anon / customer / admin read the row (positive control)',
     [await nOf('anon', null), await nOf('authenticated', CUSTOMER), await nOf('authenticated', ADMIN)], [1, 1, 1])
@@ -238,6 +250,23 @@ console.log('20261229 — real file')
   t('leads are unreadable to anon', (await asRole(d, 'anon', null, `SELECT 1 FROM public.dovec_leads`)).ok, false)
   t('leads are unreadable to a signed-in user', (await asRole(d, 'authenticated', ADMIN, `SELECT 1 FROM public.dovec_leads`)).ok, false)
   t('leads are readable to service_role (positive control)', (await asRole(d, 'service_role', null, `SELECT count(*)::int n FROM public.dovec_leads`)).ok, true)
+  {
+    const claims = (await asGuest(d, `SELECT current_setting('request.jwt.claims') AS c, public.is_anonymous_session() AS g`)).rows[0]
+    t('the guest helper really runs with the is_anonymous claim', [JSON.parse(claims.c).is_anonymous, claims.g], [true, true])
+    console.log(`    guest claims: ${claims.c}`)
+    const plain = (await asRole(d, 'authenticated', CUSTOMER, `SELECT public.is_anonymous_session() AS g`)).rows[0].g
+    t('positive control: a plain customer JWT is NOT a guest', plain, false)
+    const sel = `SELECT 1 FROM public.dovec_leads`
+    const denies = { anon: await asRole(d, 'anon', null, sel), guest: await asGuest(d, sel), customer: await asRole(d, 'authenticated', CUSTOMER, sel) }
+    t('dovec_leads SELECT: anon, guest and customer are all denied', Object.values(denies).map(r => [r.ok, /permission denied/.test(r.msg || '')]), [[false, true], [false, true], [false, true]])
+    console.log(`    SELECT denied with: ${Object.entries(denies).map(([k, r]) => `${k}="${r.msg}"`).join(' | ')}`)
+    const insDenies = { anon: await asRole(d, 'anon', null, ins(null)), guest: await asGuest(d, ins(GUEST)), customer: await asRole(d, 'authenticated', CUSTOMER, ins(CUSTOMER)) }
+    t('dovec_leads INSERT: anon, guest and customer are all denied', Object.values(insDenies).map(r => [r.ok, /permission denied/.test(r.msg || '')]), [[false, true], [false, true], [false, true]])
+    console.log(`    INSERT denied with: ${Object.entries(insDenies).map(([k, r]) => `${k}="${r.msg}"`).join(' | ')}`)
+    const pos = await asRole(d, 'service_role', SVC, ins(null, { name: "'T11 Probe'" }))
+    t('positive control: service_role can INSERT, then SELECT the row', [pos.ok, (await asRole(d, 'service_role', SVC, `SELECT count(*)::int n FROM public.dovec_leads WHERE name = 'T11 Probe'`)).rows[0].n], [true, 1])
+    await d.exec(`DELETE FROM public.dovec_leads WHERE name = 'T11 Probe'`)
+  }
   await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now() - interval '25 hours'`)
   t('25 h after the last good sync the project is gone for anon', (await asRole(d, 'anon', null, `SELECT count(*)::int n FROM public.dovec_projects`)).rows[0].n, 0)
   t('counts: a customer is refused', (await asRole(d, 'authenticated', OTHER, `SELECT * FROM public.dovec_lead_counts()`)).msg, 'ADMIN_ONLY')
@@ -321,6 +350,9 @@ const pinOf = async (d, id) => (await d.query(`SELECT latitude::float8 la, longi
     const u = await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_coord_status() AS s`)
     const ad = await asRole(d, 'authenticated', ADMIN, `SELECT public.dovec_coord_status() AS s`)
     t('anon / signed-in non-admin cannot run the pin status; an admin can (positive control)', [a.ok, u.ok, ad.ok], [false, false, true])
+    const gu = await asGuest(d, `SELECT public.dovec_coord_status() AS s`)
+    t('dovec_coord_status: a customer and a guest are refused with DOVEC_NOT_PUBLIC; an admin gets the report (positive control)',
+      [u.msg, gu.msg, ad.ok, Object.keys(ad.rows?.[0]?.s ?? {}).length], ['DOVEC_NOT_PUBLIC', 'DOVEC_NOT_PUBLIC', true, 3])
     const s = ad.rows?.[0]?.s
     t('the status has exactly the three lists and nothing else', s && Object.keys(s).sort(), ['live_without_coords', 'renamed', 'unmatched'])
     t('every status entry carries only names, ids and a status word', s && Object.values(s).flat().every(e => Object.keys(e).every(k => ['seed', 'reason', 'project_id', 'name', 'id'].includes(k))), true)
