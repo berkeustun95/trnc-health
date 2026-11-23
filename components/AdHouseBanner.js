@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { t } from '../constants/i18n'
 import { colors, font, type, press } from '../constants/theme'
@@ -12,16 +12,29 @@ import { adRatioFor } from '../constants/ads'
 // The whole card is the tap target; the pill is visual only.
 // Fit rule (Berke): headline and line max 2 lines each; when they do not fit the frame, drop the line first,
 // and only then shrink the headline. Nothing may clip. numberOfLines hides overflow from layout, so the
-// decision reads unclamped hidden copies of the two texts (same width, same styles).
+// decision reads unclamped hidden copies of the two texts (same width, same styles). The headline shrinks in
+// steps of font size AND line height together (adjustsFontSizeToFit keeps the line height, leaving a gap).
 // boxRef: AdSlot measures this box to tell whether the banner is on screen (the margin sits outside it).
 export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
   const [room, setRoom] = useState(0)
-  const [title, setTitle] = useState({ lines: 0, h: 0 })
+  const [k, setK] = useState(1)
+  const [title, setTitle] = useState({ lines: 0, lk: 0, h: 0, hk: 0 })
   const [line, setLine] = useState({ lines: 0, h: 0 })
 
-  const measured = room > 0 && title.h > 0 && line.h > 0
+  useEffect(() => { setK(1) }, [lang])
+
+  const titleMeasured = title.lk === k && title.hk === k && title.h > 0
+  const measured = room > 0 && titleMeasured && line.h > 0
   const titleFits = title.lines <= 2 && title.h <= room
-  const showLine = titleFits && line.lines <= 2 && title.h + TEXT_GAP + line.h <= room
+  const showLine = k === 1 && titleFits && line.lines <= 2 && title.h + TEXT_GAP + line.h <= room
+  const canShrink = k > MIN_TITLE_SCALE + 0.001
+  const settled = measured && (titleFits || !canShrink)
+
+  useEffect(() => {
+    if (measured && !titleFits && canShrink) setK(Math.round((k - TITLE_STEP) * 100) / 100)
+  }, [measured, titleFits, canShrink, k])
+
+  const titleScaled = [s.title, { fontSize: s.title.fontSize * k, lineHeight: s.title.lineHeight * k }]
 
   return (
     <View ref={boxRef} collapsable={false} style={s.box}>
@@ -36,10 +49,10 @@ export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
           <View style={s.text} importantForAccessibility="no-hide-descendants">
             <View style={s.probe} pointerEvents="none">
               <Text
-                style={s.title}
+                style={titleScaled}
                 maxFontSizeMultiplier={TEXT_SCALE_CAP}
-                onTextLayout={e => { const n = e.nativeEvent.lines.length; setTitle(p => (p.lines === n ? p : { ...p, lines: n })) }}
-                onLayout={e => { const h = e.nativeEvent.layout.height; setTitle(p => (p.h === h ? p : { ...p, h })) }}
+                onTextLayout={e => { const n = e.nativeEvent.lines.length; setTitle(p => (p.lines === n && p.lk === k ? p : { ...p, lines: n, lk: k })) }}
+                onLayout={e => { const h = e.nativeEvent.layout.height; setTitle(p => (p.h === h && p.hk === k ? p : { ...p, h, hk: k })) }}
               >
                 {t('adHouseTitle', lang)}
               </Text>
@@ -52,12 +65,12 @@ export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
                 {t('adHouseLine', lang)}
               </Text>
             </View>
-            <View style={!measured && s.hidden}>
+            <View style={!settled && s.hidden}>
               <Text
-                style={[s.title, room > 0 && { maxHeight: room }]}
+                style={[titleScaled, room > 0 && { maxHeight: room }]}
                 numberOfLines={2}
-                adjustsFontSizeToFit={measured && !titleFits}
-                minimumFontScale={0.5}
+                adjustsFontSizeToFit={settled && !titleFits}
+                minimumFontScale={0.8}
                 maxFontSizeMultiplier={TEXT_SCALE_CAP}
               >
                 {t('adHouseTitle', lang)}
@@ -90,6 +103,8 @@ const FRAME_BORDER = 1.5
 const FRAME_PAD_V = 4
 const TEXT_GAP = 2
 const TEXT_SCALE_CAP = 1.6
+const TITLE_STEP = 0.05
+const MIN_TITLE_SCALE = 0.6
 const PILL_SCALE_CAP = 1.4
 
 const s = StyleSheet.create({
