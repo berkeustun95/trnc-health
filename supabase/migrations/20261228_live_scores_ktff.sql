@@ -2,7 +2,7 @@
 -- 20261228 — Live Scores relaunch as TRNC football, from KTFF's official "Sitene Ekle" API
 -- ═══════════════════════════════════════════════════════════════════════════
 --
--- Four NEW tables (ktff_leagues, ktff_standings, ktff_fixtures, ktff_sync_state), one gate function
+-- Five NEW tables (ktff_leagues, ktff_standings, ktff_fixtures, ktff_sync_state, ktff_logo_failures), one gate function
 -- (ktff_sync_due) and one cron job (live-scores-ktff). The old API-Sports tables, the six
 -- live-scores-* jobs (paused by 20261090) and is_score_editor() are untouched.
 --
@@ -13,9 +13,11 @@
 --     WRITE  nobody through the API. There is no INSERT/UPDATE/DELETE policy, and the privileges are revoked
 --            from anon and authenticated as well (a second lock). Only the live-scores-ktff Edge Function
 --            writes, as service_role, which bypasses RLS.
---   ktff_sync_state
+--   ktff_sync_state, ktff_logo_failures
 --     READ / WRITE  service_role only. RLS is on, there is NO policy, and every privilege is revoked from anon
---            and authenticated. It holds the ETag and back-off clock of the KTFF calls: nothing the app needs.
+--            and authenticated. sync_state holds the ETag and back-off clock of the KTFF calls; logo_failures holds
+--            the source URL, time and count of a logo copy that failed, so the sync retries it at most once per 24 h.
+--            Nothing the app needs.
 --   ktff_sync_due()
 --     EXECUTE  the table owner (the cron job runs as postgres) and service_role only; revoked from PUBLIC,
 --            anon and authenticated. SECURITY INVOKER on purpose: even if a grant ever slipped, a caller
@@ -140,6 +142,15 @@ CREATE TABLE IF NOT EXISTS public.ktff_sync_state (
   CONSTRAINT ktff_sync_state_fail_count_check CHECK (fail_count >= 0)
 );
 
+CREATE TABLE IF NOT EXISTS public.ktff_logo_failures (
+  source_url  text        NOT NULL,
+  failed_at   timestamptz NOT NULL DEFAULT now(),
+  fail_count  int         NOT NULL DEFAULT 1,
+  CONSTRAINT ktff_logo_failures_pkey PRIMARY KEY (source_url),
+  CONSTRAINT ktff_logo_failures_source_check CHECK (source_url ~ '^https://' AND length(source_url) <= 500),
+  CONSTRAINT ktff_logo_failures_count_check CHECK (fail_count >= 1)
+);
+
 COMMENT ON TABLE public.ktff_leagues IS
   'KTFF leagues 1 and 2 (20261228). Public read; written only by the live-scores-ktff Edge Function (service_role). logo_url = our copy in the public team-logos bucket (ktff/ prefix); source_logo_url = KTFF''s URL, read only by the sync.';
 COMMENT ON TABLE public.ktff_standings IS
@@ -149,17 +160,21 @@ COMMENT ON TABLE public.ktff_fixtures IS
 COMMENT ON TABLE public.ktff_sync_state IS
   'ETag and back-off clock per KTFF endpoint (20261228). RLS on, NO policy, no client privilege: service_role only. The standings row is the global gate read by ktff_sync_due().';
 
+COMMENT ON TABLE public.ktff_logo_failures IS
+  'KTFF logo sources whose copy failed (20261228): a failed source is retried at most once per 24 h. RLS on, NO policy, no client privilege: service_role only.';
+
 -- ─── 2. RLS and privileges ──────────────────────────────────────────────────
 ALTER TABLE public.ktff_leagues     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ktff_standings   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ktff_fixtures    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ktff_sync_state  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ktff_logo_failures ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.ktff_leagues, public.ktff_standings, public.ktff_fixtures, public.ktff_sync_state
+REVOKE ALL ON TABLE public.ktff_leagues, public.ktff_standings, public.ktff_fixtures, public.ktff_sync_state, public.ktff_logo_failures
   FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.ktff_leagues, public.ktff_standings, public.ktff_fixtures TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-  public.ktff_leagues, public.ktff_standings, public.ktff_fixtures, public.ktff_sync_state TO service_role;
+  public.ktff_leagues, public.ktff_standings, public.ktff_fixtures, public.ktff_sync_state, public.ktff_logo_failures TO service_role;
 
 DO $$
 DECLARE t text;
@@ -201,6 +216,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'live-scores-ktff') THEN PERFORM cron.unschedule('live-scores-ktff'); END IF;
 END $$;
 
+-- The function bounds its own run at 90 s (RUN_DEADLINE_MS in _shared/ktff.mjs), under this 120 s pg_net timeout.
 SELECT cron.schedule('live-scores-ktff', '7,22,37,52 * * * *', $job$
   SELECT net.http_post(
     url     := 'https://jeihxnwqytnxtytgkzgf.supabase.co/functions/v1/live-scores-ktff',
@@ -225,19 +241,19 @@ DECLARE
   v_names  text;
   v_bad    text;
 BEGIN
-  -- RLS on, all four.
+  -- RLS on, all five.
   SELECT count(*), string_agg(c.relname, ', ' ORDER BY c.relname) INTO v_n, v_names
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
    WHERE n.nspname = 'public' AND c.relrowsecurity
-     AND c.relname IN ('ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state');
-  IF v_n IS DISTINCT FROM 4 THEN RAISE EXCEPTION 'RLS is on for % of 4 ktff tables: %', v_n, v_names; END IF;
+     AND c.relname IN ('ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state','ktff_logo_failures');
+  IF v_n IS DISTINCT FROM 5 THEN RAISE EXCEPTION 'RLS is on for % of 5 ktff tables: %', v_n, v_names; END IF;
   RAISE NOTICE 'RLS on: %', v_names;
 
   -- The FULL policy set reaching these tables (RLS is permissive-OR: mine proves nothing about theirs).
   SELECT count(*), string_agg(tablename || '.' || policyname || '[' || cmd || ' ' || roles::text || ' ' || coalesce(qual, '-') || ']', '; ' ORDER BY tablename)
     INTO v_n, v_names
     FROM pg_policies WHERE schemaname = 'public'
-     AND tablename IN ('ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state');
+     AND tablename IN ('ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state','ktff_logo_failures');
   IF v_n IS DISTINCT FROM 3 THEN RAISE EXCEPTION 'ktff tables carry % policies, expected exactly 3: %', v_n, v_names; END IF;
   RAISE NOTICE 'policies (%): %', v_n, v_names;
 
@@ -248,8 +264,8 @@ BEGIN
       RAISE EXCEPTION '% is not exactly one permissive SELECT policy for anon + authenticated USING (true)', t;
     END IF;
   END LOOP;
-  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ktff_sync_state') THEN
-    RAISE EXCEPTION 'ktff_sync_state must have no policy';
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('ktff_sync_state','ktff_logo_failures')) THEN
+    RAISE EXCEPTION 'ktff_sync_state and ktff_logo_failures must have no policy';
   END IF;
 
   -- Grants. Denials are asserted beside their positive control (the legitimate path still works).
@@ -260,16 +276,18 @@ BEGIN
   END LOOP;
   SELECT string_agg(gr.n || ':' || tb.n || ':' || pr.n, ', ') INTO v_bad
     FROM unnest(ARRAY['anon','authenticated']) gr(n),
-         unnest(ARRAY['ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state']) tb(n),
+         unnest(ARRAY['ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state','ktff_logo_failures']) tb(n),
          unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) pr(n)
    WHERE has_table_privilege(gr.n, 'public.' || tb.n, pr.n);
   IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'client role holds a write-class privilege: %', v_bad; END IF;
-  SELECT string_agg(gr.n, ', ') INTO v_bad FROM unnest(ARRAY['anon','authenticated']) gr(n)
-   WHERE has_table_privilege(gr.n, 'public.ktff_sync_state', 'SELECT')
-      OR EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = 'public.ktff_sync_state'::regclass AND a.attnum > 0
-                   AND NOT a.attisdropped AND has_column_privilege(gr.n, a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'));
-  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'ktff_sync_state readable or writable by: %', v_bad; END IF;
-  FOREACH t IN ARRAY ARRAY['ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state'] LOOP
+  FOREACH t IN ARRAY ARRAY['ktff_sync_state','ktff_logo_failures'] LOOP
+    SELECT string_agg(gr.n, ', ') INTO v_bad FROM unnest(ARRAY['anon','authenticated']) gr(n)
+     WHERE has_table_privilege(gr.n, 'public.' || t, 'SELECT')
+        OR EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = ('public.' || t)::regclass AND a.attnum > 0
+                     AND NOT a.attisdropped AND has_column_privilege(gr.n, a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'));
+    IF v_bad IS NOT NULL THEN RAISE EXCEPTION '% readable or writable by: %', t, v_bad; END IF;
+  END LOOP;
+  FOREACH t IN ARRAY ARRAY['ktff_leagues','ktff_standings','ktff_fixtures','ktff_sync_state','ktff_logo_failures'] LOOP
     IF NOT has_table_privilege('service_role', 'public.' || t, 'SELECT,INSERT,UPDATE,DELETE') THEN
       RAISE EXCEPTION 'positive control: service_role cannot write %', t;
     END IF;
@@ -317,7 +335,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261228_live_scores_ktff.sql', '6d01a562430e9528e12acefdf9b424438806371303cbf0facbb3760fb136b403')
+VALUES ('20261228_live_scores_ktff.sql', '655e1126d08ed91e2caa34bdcf7dc82cb0752cd34dc0d17026d94ea9a31eaf1d')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

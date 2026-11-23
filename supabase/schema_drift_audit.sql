@@ -1225,6 +1225,9 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('ktff_sync_state', 'last_success_at', false, NULL, 'timestamp with time zone'),
     ('ktff_sync_state', 'next_allowed_at', false, NULL, 'timestamp with time zone'),
     ('ktff_sync_state', 'fail_count', true, '0', 'integer'),
+    ('ktff_logo_failures', 'source_url', true, NULL, 'text'),
+    ('ktff_logo_failures', 'failed_at', true, 'now()', 'timestamp with time zone'),
+    ('ktff_logo_failures', 'fail_count', true, '1', 'integer'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1599,6 +1602,9 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ktff_leagues_logo_check', '9|^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/team-logos/[a-z0-9/_.-]+$', 'logo_url'),
     ('ktff_leagues_pkey', '', 'league_id'),
     ('ktff_leagues_source_logo_check', '^https://', 'source_logo_url'),
+    ('ktff_logo_failures_count_check', '1', 'fail_count'),
+    ('ktff_logo_failures_pkey', '', 'source_url'),
+    ('ktff_logo_failures_source_check', '500|^https://', 'source_url'),
     ('ktff_standings_league_fkey', '', 'league_id'),
     ('ktff_standings_logo_check', '9|^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/team-logos/[a-z0-9/_.-]+$', 'logo_url'),
     ('ktff_standings_marker_color_check', '0|6|^#[0-9A-Fa-f]{6}$', 'marker_color'),

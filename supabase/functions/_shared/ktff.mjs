@@ -8,8 +8,8 @@
 //   * KTFF asked for server-side fetching, no frequent polling: the cron job calls this only when ktff_sync_due() says so,
 //     and one run spends at most REQUEST_BUDGET requests.
 //   * Origin https://getadaapp.com is how KTFF recognises us (403 until they approve it). No key.
-//   * Data is NEVER deleted because a request failed. The only delete is a league's stale standings rows, and only
-//     when that league's response held rows.
+//   * Data is NEVER deleted because a request failed. The only deletes are a league's stale standings rows and a
+//     league+week's stale fixtures, each only when that 200 response held rows.
 //   * KTFF's logo URLs come from API data: only https on ktff.org or a subdomain is ever fetched (SSRF guard), only
 //     png / jpeg / webp (no SVG), and only OUR copy in the public team-logos bucket is stored in *_logo_url.
 import { serviceCaller } from './caller-auth.mjs'
@@ -35,6 +35,11 @@ const RETRY_AFTER_MAX_MS = 24 * HOUR
 export const LOGO_MAX_BYTES = 524288
 export const LOGO_COPIES_PER_RUN = 40
 export const LOGO_TIME_BUDGET_MS = 45000
+export const LOGO_RETRY_MS = 24 * HOUR
+// Whole-run wall clock. No new KTFF request starts after RUN_DEADLINE_MS - TIMEOUT_MS and no logo fetch after
+// RUN_DEADLINE_MS - TIMEOUT_MS, so a started call still ends by ~RUN_DEADLINE_MS: below the cron's 120 s pg_net timeout.
+export const RUN_DEADLINE_MS = 90000
+export const MAX_WEEK = 999 // the sync-state endpoint CHECK allows 1-3 digit weeks
 
 // ─── Sanitising ─────────────────────────────────────────────────────────────
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g
@@ -65,6 +70,8 @@ export function ktffLogoSource(v) {
   if (h !== 'ktff.org' && !h.endsWith('.ktff.org')) return null
   return u.toString()
 }
+
+const cleanWeek = v => (Number.isInteger(v) && v >= 1 && v <= MAX_WEEK ? v : null)
 
 const arr = v => (Array.isArray(v) ? v : [])
 const obj = v => (v !== null && typeof v === 'object' && !Array.isArray(v) ? v : null)
@@ -202,9 +209,9 @@ export function parseFixtures(json, requestedLeague, requestedWeek) {
   const j = obj(json) ?? {}
   const respLeague = cleanInt(j.league_id)
   const league_id = respLeague !== null && LEAGUES.includes(respLeague) ? respLeague : requestedLeague
-  const selected_week = cleanInt(j.selected_week)
-  const available_weeks = [...new Set(arr(j.available_weeks).map(cleanInt).filter(w => w !== null && w > 0))].sort((a, b) => a - b)
-  const week = selected_week ?? (Number.isInteger(requestedWeek) ? requestedWeek : null)
+  const selected_week = cleanWeek(j.selected_week)
+  const available_weeks = [...new Set(arr(j.available_weeks).map(cleanWeek).filter(w => w !== null))].sort((a, b) => a - b)
+  const week = selected_week ?? cleanWeek(requestedWeek)
   const trRows = arr(j.data_tr).map(obj).filter(Boolean)
   const enRows = arr(j.data_en).map(obj).filter(Boolean)
   const enById = new Map(enRows.map(r => [cleanInt(r.match_id), r]))
@@ -374,35 +381,44 @@ export async function runKtff(store, { fetchImpl, copyLogo, nowFn = () => Date.n
   }
   const leagues = await store.loadLeagues()
   const logoCache = await store.loadLogoCache()
+  const requestCutoff = startMs + RUN_DEADLINE_MS - TIMEOUT_MS
   const logoFor = src => (src ? logoCache.get(src) ?? null : null)
 
   const endpoints = []
   let budget = REQUEST_BUDGET
   let stopped = false
   let gateUntil = null
+  let deadlineHit = false
+  let succeeded = 0
   const note = (endpoint, status, extra) => endpoints.push({ endpoint, status, ...(extra ? { note: extra } : {}) })
 
   const fail = async (endpoint, r) => {
     const prev = states.get(endpoint)
     const plan = planBackoff({ outcome: r.outcome, status: r.status, retryAfterHeader: r.retryAfter, failCount: prev?.fail_count ?? 0, nowMs: nowFn() })
-    await store.saveState(endpoint, { last_status: r.status, last_attempt_at: nowIso(), fail_count: plan.failCount, next_allowed_at: plan.nextAllowedAt })
     if (gateUntil === null || plan.nextAllowedAt > gateUntil) gateUntil = plan.nextAllowedAt
     if (plan.stop) stopped = true
+    try {
+      await store.saveState(endpoint, { last_status: r.status, last_attempt_at: nowIso(), fail_count: plan.failCount, next_allowed_at: plan.nextAllowedAt })
+    } catch (e) { say(`${endpoint}: state not saved ${String(e?.message || e).slice(0, 120)}`) }
     note(endpoint, r.status, r.outcome === 'http' ? `back off to ${plan.nextAllowedAt}` : r.outcome)
     say(`${endpoint}: ${r.outcome} ${r.status}, next ${plan.nextAllowedAt}`)
   }
   const succeed = async (endpoint, r) => {
     const prev = states.get(endpoint)
-    await store.saveState(endpoint, {
-      etag: r.outcome === 'ok' ? (r.etag ?? null) : (prev?.etag ?? null),
-      last_status: r.status, last_attempt_at: nowIso(), last_success_at: nowIso(), next_allowed_at: null, fail_count: 0,
-    })
+    succeeded++
+    try {
+      await store.saveState(endpoint, {
+        etag: r.outcome === 'ok' ? (r.etag ?? null) : (prev?.etag ?? null),
+        last_status: r.status, last_attempt_at: nowIso(), last_success_at: nowIso(), next_allowed_at: null, fail_count: 0,
+      })
+    } catch (e) { say(`${endpoint}: state not saved ${String(e?.message || e).slice(0, 120)}`) }
     states.set(endpoint, { ...(prev ?? {}), last_success_at: nowIso() })
     note(endpoint, r.status)
   }
   // Request + persist + record. persist(r) runs only for a 200; a store error counts as a failure and leaves the ETag alone.
   const step = async (endpoint, path, params, persist) => {
     if (stopped || budget <= 0) return null
+    if (nowFn() >= requestCutoff) { deadlineHit = true; return null }
     budget--
     const r = await ktffGet(fetchImpl, path, params, states.get(endpoint)?.etag ?? null)
     if (r.outcome !== 'ok' && r.outcome !== 'not_modified') { await fail(endpoint, r); return null }
@@ -417,7 +433,7 @@ export async function runKtff(store, { fetchImpl, copyLogo, nowFn = () => Date.n
     return r
   }
 
-  const summary = { standings: { leagues: 0, rows: 0 }, fixtures: { requests: 0, rows: 0 }, logos: { copied: 0, failed: 0, pending: 0 } }
+  const summary = { standings: { leagues: 0, rows: 0 }, fixtures: { requests: 0, rows: 0 }, logos: { copied: 0, failed: 0, held: 0, pending: 0 } }
   const sel = new Map()
   const avail = new Map()
   for (const L of LEAGUES) { const row = leagues.get(L); sel.set(L, row?.current_week ?? null); avail.set(L, row?.available_weeks ?? []) }
@@ -462,6 +478,9 @@ export async function runKtff(store, { fetchImpl, copyLogo, nowFn = () => Date.n
         ...r, home_logo_url: logoFor(r.home_source_logo_url), away_logo_url: logoFor(r.away_source_logo_url), updated_at: nowIso(),
       })))
     }
+    // A 200 with matches replaces that league+week's match list: a rescheduled / re-id'd match must not linger. Never on an
+    // empty response, and not when some row was unreadable (it might be one we already hold).
+    if (p.rows.length && p.skipped === 0) await store.pruneFixtures(p.rows[0].league_id, p.rows[0].week, p.rows.map(r => r.match_id))
     summary.fixtures.rows += p.rows.length
   }
   const fixturesStep = async (L, week, isNow) => {
@@ -494,24 +513,43 @@ export async function runKtff(store, { fetchImpl, copyLogo, nowFn = () => Date.n
   }
 
   // 5. the global gate: the standings row is what ktff_sync_due() reads
-  if (gateUntil !== null) await store.saveState('standings', { next_allowed_at: gateUntil })
+  if (gateUntil !== null) {
+    try { await store.saveState('standings', { next_allowed_at: gateUntil }) } catch (e) { say(`gate not saved ${String(e?.message || e).slice(0, 120)}`) }
+  }
 
-  // 6. logos: copy what is still missing; a failed copy never fails the run
-  try {
-    const pending = [...(await store.pendingLogoSources())]
-    summary.logos.pending = pending.length
-    const deadline = nowFn() + LOGO_TIME_BUDGET_MS
-    for (const src of pending.slice(0, LOGO_COPIES_PER_RUN)) {
-      if (nowFn() > deadline) break
-      const url = logoCache.get(src) ?? await copyLogo(src)
-      if (!url) { summary.logos.failed++; continue }
-      logoCache.set(src, url)
-      try { await store.setLogo(src, url); summary.logos.copied++ } catch { summary.logos.failed++ }
-    }
-  } catch (e) { say(`logos: ${String(e?.message || e).slice(0, 120)}`) }
+  // 6. logos: copy what is still missing; a failed copy never fails the run. Skipped after a 403 / 429 stop, and when no KTFF
+  // request succeeded this run (KTFF unhealthy). A source that failed is retried at most once per LOGO_RETRY_MS (persisted).
+  if (!stopped && succeeded > 0) {
+    try {
+      const failures = await store.loadLogoFailures()
+      const pending = [...(await store.pendingLogoSources())]
+      summary.logos.pending = pending.length
+      const logoDeadline = Math.min(nowFn() + LOGO_TIME_BUDGET_MS, requestCutoff)
+      let fetches = 0
+      for (const src of pending) {
+        const cached = logoCache.get(src)
+        const f = failures.get(src)
+        if (!cached && f && Date.parse(f.failed_at) > nowFn() - LOGO_RETRY_MS) { summary.logos.held++; continue }
+        if (!cached) {
+          if (fetches >= LOGO_COPIES_PER_RUN) break
+          if (nowFn() > logoDeadline) break
+          fetches++
+        }
+        const url = cached ?? await copyLogo(src)
+        if (!url) {
+          summary.logos.failed++
+          try { await store.recordLogoFailure(src, nowIso(), (f?.fail_count ?? 0) + 1) } catch (e) { say(`logo failure not saved ${String(e?.message || e).slice(0, 80)}`) }
+          continue
+        }
+        logoCache.set(src, url)
+        try { await store.setLogo(src, url); summary.logos.copied++ } catch { summary.logos.failed++ }
+        if (f) { try { await store.clearLogoFailure(src) } catch { /* a stale row only delays nothing: the logo is set */ } }
+      }
+    } catch (e) { say(`logos: ${String(e?.message || e).slice(0, 120)}`) }
+  }
 
   const ok = endpoints.every(e => e.status === 200 || e.status === 304)
-  return { ok, skipped: null, requests: REQUEST_BUDGET - budget, stopped, next_allowed_at: gateUntil, endpoints, ...summary, ms: nowFn() - startMs }
+  return { ok, skipped: null, requests: REQUEST_BUDGET - budget, stopped, deadline: deadlineHit, next_allowed_at: gateUntil, endpoints, ...summary, ms: nowFn() - startMs }
 }
 
 // ─── The Supabase side ──────────────────────────────────────────────────────
@@ -560,6 +598,18 @@ export function supabaseStore(sb) {
     },
     async upsertFixtures(rows) {
       for (const c of chunks(rows)) must(await sb.from('ktff_fixtures').upsert(c, { onConflict: 'match_id' }), 'ktff_fixtures upsert')
+    },
+    async pruneFixtures(leagueId, week, keepIds) {
+      must(await sb.from('ktff_fixtures').delete().eq('league_id', leagueId).eq('week', week).not('match_id', 'in', `(${keepIds.join(',')})`), 'ktff_fixtures prune')
+    },
+    async loadLogoFailures() {
+      return new Map((await all('ktff_logo_failures', 'source_url, failed_at, fail_count')).map(r => [r.source_url, r]))
+    },
+    async recordLogoFailure(source, failedAtIso, failCount) {
+      must(await sb.from('ktff_logo_failures').upsert({ source_url: source, failed_at: failedAtIso, fail_count: failCount }, { onConflict: 'source_url' }), 'ktff_logo_failures upsert')
+    },
+    async clearLogoFailure(source) {
+      must(await sb.from('ktff_logo_failures').delete().eq('source_url', source), 'ktff_logo_failures delete')
     },
     async fixtureWeeks(leagueId) {
       return new Set((await all('ktff_fixtures', 'week', q => q.eq('league_id', leagueId))).map(r => r.week))

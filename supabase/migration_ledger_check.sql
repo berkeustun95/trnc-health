@@ -329,7 +329,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261225_contact_events_news.sql', '6bef39657e3f067967abfd657cb2919f1da9d52129043b1e84071bdc311a2b6a'),
   ('20261226_crunchy_express_hotdog_sausage_extras.sql', '483e3d342aa5dbf50b3d4a6cc471c9bb0bacb5c6079606fbe2e6ee7579e501a9'),
   ('20261227_ad_house_daily.sql', '0b6d763ccf4e782cf4c9bfeec6da00583eb0f2c982d61bc6c9ad1288d3d8610e'),
-  ('20261228_live_scores_ktff.sql', '6d01a562430e9528e12acefdf9b424438806371303cbf0facbb3760fb136b403')
+  ('20261228_live_scores_ktff.sql', '655e1126d08ed91e2caa34bdcf7dc82cb0752cd34dc0d17026d94ea9a31eaf1d')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

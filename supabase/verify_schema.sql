@@ -168,7 +168,8 @@ WITH report AS (
     ('20261228_live_scores_ktff','ktff_leagues'),
     ('20261228_live_scores_ktff','ktff_standings'),
     ('20261228_live_scores_ktff','ktff_fixtures'),
-    ('20261228_live_scores_ktff','ktff_sync_state')
+    ('20261228_live_scores_ktff','ktff_sync_state'),
+    ('20261228_live_scores_ktff','ktff_logo_failures')
   ) e(m,o)
 
   UNION ALL
@@ -697,7 +698,10 @@ WITH report AS (
     ('20261228_live_scores_ktff','ktff_sync_state','last_attempt_at'),
     ('20261228_live_scores_ktff','ktff_sync_state','last_success_at'),
     ('20261228_live_scores_ktff','ktff_sync_state','next_allowed_at'),
-    ('20261228_live_scores_ktff','ktff_sync_state','fail_count')
+    ('20261228_live_scores_ktff','ktff_sync_state','fail_count'),
+    ('20261228_live_scores_ktff','ktff_logo_failures','source_url'),
+    ('20261228_live_scores_ktff','ktff_logo_failures','failed_at'),
+    ('20261228_live_scores_ktff','ktff_logo_failures','fail_count')
 
   ) e(m,t,c)
 
@@ -1592,7 +1596,10 @@ WITH report AS (
     ('20261228_live_scores_ktff','ktff_fixtures_away_source_logo_check'),
     ('20261228_live_scores_ktff','ktff_sync_state_pkey'),
     ('20261228_live_scores_ktff','ktff_sync_state_endpoint_check'),
-    ('20261228_live_scores_ktff','ktff_sync_state_fail_count_check')
+    ('20261228_live_scores_ktff','ktff_sync_state_fail_count_check'),
+    ('20261228_live_scores_ktff','ktff_logo_failures_pkey'),
+    ('20261228_live_scores_ktff','ktff_logo_failures_source_check'),
+    ('20261228_live_scores_ktff','ktff_logo_failures_count_check')
 
   ) e(m,o)
 

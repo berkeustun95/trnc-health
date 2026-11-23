@@ -156,17 +156,21 @@ eq(await makeLogoCopier({ fetchImpl: async () => imgRes(PNG, 'image/png'), stora
 
 // whole runs: in-memory store, scripted KTFF
 function memStore() {
-  const s = { states: new Map(), leagues: new Map(), standings: new Map(), fixtures: new Map(), deletes: 0, failOn: null }
+  const s = { states: new Map(), leagues: new Map(), standings: new Map(), fixtures: new Map(), deletes: 0, failOn: null, logoFail: new Map(), saveFailOnce: false }
   const key = (l, t) => `${l}:${t}`
   return {
     s,
     async loadStates() { return new Map(s.states) },
-    async saveState(ep, patch) { s.states.set(ep, { ...(s.states.get(ep) ?? { endpoint: ep, fail_count: 0 }), ...patch }) },
+    async saveState(ep, patch) { if (s.saveFailOnce) { s.saveFailOnce = false; throw new Error('state db down') } s.states.set(ep, { ...(s.states.get(ep) ?? { endpoint: ep, fail_count: 0 }), ...patch }) },
     async loadLeagues() { return new Map(s.leagues) },
     async loadLogoCache() { const c = new Map(); for (const x of [...s.leagues.values(), ...s.standings.values()]) if (x.source_logo_url && x.logo_url) c.set(x.source_logo_url, x.logo_url); return c },
     async upsertLeague(rw) { s.leagues.set(rw.league_id, { ...(s.leagues.get(rw.league_id) ?? { legend: [], available_weeks: [] }), ...rw }) },
     async upsertStandings(rows) { if (s.failOn === 'standings') throw new Error('db down'); for (const x of rows) s.standings.set(key(x.league_id, x.team_id), { ...(s.standings.get(key(x.league_id, x.team_id)) ?? {}), ...x }) },
     async pruneStandings(l, keep) { for (const k of [...s.standings.keys()]) { const [kl, kt] = k.split(':').map(Number); if (kl === l && !keep.includes(kt)) { s.standings.delete(k); s.deletes++ } } },
+    async pruneFixtures(l, w, keep) { for (const [id, x] of [...s.fixtures]) if (x.league_id === l && x.week === w && !keep.includes(id)) { s.fixtures.delete(id); s.deletes++ } },
+    async loadLogoFailures() { return new Map(s.logoFail) },
+    async recordLogoFailure(src, at, n) { s.logoFail.set(src, { source_url: src, failed_at: at, fail_count: n }) },
+    async clearLogoFailure(src) { s.logoFail.delete(src) },
     async upsertFixtures(rows) { for (const x of rows) s.fixtures.set(x.match_id, { ...(s.fixtures.get(x.match_id) ?? {}), ...x }) },
     async fixtureWeeks(l) { return new Set([...s.fixtures.values()].filter(x => x.league_id === l).map(x => x.week)) },
     async pendingLogoSources() {
@@ -183,16 +187,17 @@ function memStore() {
 }
 const weekJson = (L, w) => ({ league_id: L, name_tr: `L${L}`, name_en: `L${L}en`, logo: '', selected_week: w, available_weeks: Array.from({ length: 12 }, (_, i) => i + 1),
   data_tr: [m(L * 1000 + w, 'H', 'A', '1', '0', '2026-11-22 15:00')], data_en: [m(L * 1000 + w, 'H', 'A', '1', '0', '2026-11-22 15:00')] })
-function scriptedFetch(script) {
+function scriptedFetch(script, logoScript) {
   const calls = []
   const fx = async (url, init) => {
-    if (!url.startsWith(KTFF_BASE)) return imgRes(PNG, 'image/png')
+    if (!url.startsWith(KTFF_BASE)) { fx.logoCalls++; return logoScript ? logoScript(url) : imgRes(PNG, 'image/png') }
     const u = new URL(url)
     const k = u.pathname.endsWith('puan-durumu') ? 'standings' : `fixtures:${u.searchParams.get('league_id')}:${u.searchParams.get('week')}`
     calls.push({ k, inm: init.headers['If-None-Match'] ?? null, origin: init.headers.Origin })
     return script(k, init)
   }
   fx.calls = calls
+  fx.logoCalls = 0
   return fx
 }
 const okScript = k => {
@@ -276,6 +281,71 @@ const runWith = (st, fx) => runKtff(st, { fetchImpl: fx, copyLogo: cp(fx), nowFn
   const st = memStore()
   const out = await runWith(st, scriptedFetch(() => res(200, '<html>maintenance</html>')))
   eq([st.s.states.get('standings').last_status, st.s.states.get('standings').fail_count, out.ok], [-1, 1, false], 'non-JSON recorded as status -1')
+}
+
+// review fixes: weeks 1-999, state-save failures, fixtures prune, logo failures, deadline
+eq([parseFixtures({ league_id: 1, selected_week: 1000, available_weeks: [0, 5, 999, 1000, 12345], data_tr: [m(1, 'A', 'B', '', '', '')] }, 1, null).selected_week,
+  parseFixtures({ league_id: 1, selected_week: 1000, available_weeks: [0, 5, 999, 1000, 12345], data_tr: [] }, 1, null).available_weeks], [null, [5, 999]], 'weeks outside 1-999 dropped')
+eq(parseFixtures({ league_id: 1, selected_week: 1000, data_tr: [m(1, 'A', 'B', '', '', '')] }, 1, 1000).rows, [], 'a 1000 week yields no rows (no week to store)')
+{
+  nowT = Date.UTC(2026, 10, 23, 9, 0, 0)
+  const st = memStore(); st.s.saveFailOnce = true
+  const fx = scriptedFetch(k => (k === 'standings' ? res(500, '') : okScript(k)))
+  let out; let threw = false
+  try { out = await runWith(st, fx) } catch { threw = true }
+  eq([threw, st.s.states.get('standings')?.next_allowed_at], [false, new Date(nowT + 15 * MIN).toISOString()], 'a failed state save does not skip the standings gate')
+}
+{
+  nowT = Date.UTC(2026, 10, 23, 9, 0, 0)
+  const st = memStore(); await runWith(st, scriptedFetch(okScript))
+  st.s.fixtures.set(9999, { match_id: 9999, league_id: 1, week: 5 }); st.s.fixtures.set(9998, { match_id: 9998, league_id: 1, week: 4 }); st.s.fixtures.set(9997, { match_id: 9997, league_id: 2, week: 11 })
+  nowT += 7 * HOUR
+  await runWith(st, scriptedFetch((k, init) => (init.headers['If-None-Match'] ? res(304, '') : k.startsWith('fixtures:') ? res(500, '') : okScript(k))))
+  eq([st.s.fixtures.has(9999), st.s.fixtures.has(9998), st.s.fixtures.has(9997)], [true, true, true], '304 / error never prune fixtures')
+  nowT += 7 * HOUR
+  await runWith(st, scriptedFetch(k => (k.startsWith('fixtures:') ? res(200, { league_id: +k.split(':')[1], selected_week: 5, available_weeks: [5], data_tr: [], data_en: [] }) : okScript(k))))
+  eq([st.s.fixtures.has(9999), st.s.fixtures.has(9997)], [true, true], 'an empty 200 never prunes fixtures')
+  nowT += 7 * HOUR
+  await runWith(st, scriptedFetch(okScript))
+  eq([st.s.fixtures.has(9999), st.s.fixtures.has(9998), st.s.fixtures.has(9997), st.s.fixtures.has(1005)], [false, false, true, true],
+    'a non-empty 200 for (league, week) drops that week\'s match ids it no longer lists; other weeks / leagues untouched')
+}
+{
+  nowT = Date.UTC(2026, 10, 23, 9, 0, 0)
+  const st = memStore(); const bad = () => ({ status: 404, ok: false, headers: hdrs({}), body: { cancel: async () => {} } })
+  const f1 = scriptedFetch(okScript, bad)
+  const o1 = await runWith(st, f1)
+  const first = f1.logoCalls
+  check(first > 0 && first <= 40, `first run tries logos within the cap, tried ${first}`)
+  eq([st.s.logoFail.size > 0, o1.logos.copied], [true, 0], 'failures are persisted')
+  nowT += 7 * HOUR
+  const f2 = scriptedFetch(okScript, bad)
+  await runWith(st, f2)
+  eq(f2.logoCalls, 0, 'a source that failed under 24 h ago is not refetched')
+  nowT += 18 * HOUR
+  const f3 = scriptedFetch(okScript, bad)
+  await runWith(st, f3)
+  eq(f3.logoCalls, first, 'after 24 h each failed source is retried once')
+  eq([...st.s.logoFail.values()].every(x => x.fail_count === 2), true, 'fail_count grows')
+  const st2 = memStore(); const f4 = scriptedFetch(() => res(403, { message: 'x' }))
+  st2.s.standings.set('1:1', { league_id: 1, team_id: 1, source_logo_url: 'https://ktff.org/l/1.png' })
+  await runWith(st2, f4)
+  eq(f4.logoCalls, 0, 'no logo fetch after a 403 stop')
+  const st3 = memStore(); const f5 = scriptedFetch(() => res(500, ''))
+  st3.s.standings.set('1:1', { league_id: 1, team_id: 1, source_logo_url: 'https://ktff.org/l/1.png' })
+  await runWith(st3, f5)
+  eq(f5.logoCalls, 0, 'no logo fetch when no KTFF request succeeded')
+}
+{
+  nowT = Date.UTC(2026, 10, 23, 9, 0, 0)
+  const t0 = nowT
+  const st = memStore()
+  const fx = scriptedFetch(k => { nowT += 40000; return okScript(k) })
+  const out = await runWith(st, fx)
+  check(fx.calls.length >= 1 && fx.calls.length <= 2, `deadline stops new requests (spent ${fx.calls.length})`)
+  eq(out.deadline, true, 'summary says the deadline was hit')
+  check(nowT - t0 <= 90000 + 40000, 'run ends near the deadline')
+  eq(st.s.states.get('standings').last_status, 200, 'state of what ran is saved')
 }
 
 // the handler gate
