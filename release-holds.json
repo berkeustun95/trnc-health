@@ -141,10 +141,18 @@
     {
       "pr": 546,
       "commit": "778c83cb28a321e6432cc73934923b00f798975b",
-      "what": "House banner (Home bottom + Events top, flag AD_HOUSE_BANNER_LIVE off) and the ungated 'ADA ile çalışın' Settings row, merged to main 2026-11-22",
+      "what": "House banner (Home bottom + Events top, flag AD_HOUSE_BANNER_LIVE off) and the 'ADA ile çalışın' Settings row (ungated in #546; behind WORK_WITH_ADA_ROW_LIVE since #551), merged to main 2026-11-22",
       "since": "2026-11-22",
       "cleared": false,
       "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before the flag flips. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 551,
+      "commit": "38f43d4e26921721d66eaa102fbe1b5ac2818a0b",
+      "what": "House banner counted only when seen + Settings row behind WORK_WITH_ADA_ROW_LIVE (false; on in Preview and dev only), 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has seen it on Preview (video) and says go in chat, with Play 'Contains ads' ticked before AD_HOUSE_BANNER_LIVE flips. Then set cleared to true in a PR. The commit is this PR's first commit, so every main that carries any of #551 is held."
     }
   ]
 }
