@@ -173,7 +173,8 @@ WITH report AS (
     -- Döveç projects (20261229): registered ahead of the apply; red until it runs.
     ('20261229_dovec_projects','dovec_settings'),
     ('20261229_dovec_projects','dovec_projects'),
-    ('20261229_dovec_projects','dovec_leads')
+    ('20261229_dovec_projects','dovec_leads'),
+    ('20261229_dovec_projects','dovec_project_coords')
   ) e(m,o)
 
   UNION ALL
@@ -735,6 +736,15 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_projects','description'),
     ('20261229_dovec_projects','dovec_projects','gallery'),
     ('20261229_dovec_projects','dovec_projects','entity_uuid'),
+    ('20261229_dovec_projects','dovec_projects','latitude'),
+    ('20261229_dovec_projects','dovec_projects','longitude'),
+    ('20261229_dovec_projects','dovec_project_coords','seed_name'),
+    ('20261229_dovec_projects','dovec_project_coords','latitude'),
+    ('20261229_dovec_projects','dovec_project_coords','longitude'),
+    ('20261229_dovec_projects','dovec_project_coords','project_id'),
+    ('20261229_dovec_projects','dovec_project_coords','matched_at'),
+    ('20261229_dovec_projects','dovec_project_coords','last_status'),
+    ('20261229_dovec_projects','dovec_leads','is_test'),
     ('20261229_dovec_projects','dovec_leads','id'),
     ('20261229_dovec_projects','dovec_leads','external_id'),
     ('20261229_dovec_projects','dovec_leads','user_id'),
@@ -779,6 +789,8 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_leads_wipe_pii'),
     ('20261229_dovec_projects','dovec_leads_enforce_limits'),
     ('20261229_dovec_projects','dovec_lead_counts'),
+    ('20261229_dovec_projects','dovec_sync_coords'),
+    ('20261229_dovec_projects','dovec_coord_status'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
@@ -1705,7 +1717,16 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_leads_email_check'),
     ('20261229_dovec_projects','dovec_leads_message_check'),
     ('20261229_dovec_projects','dovec_leads_unit_type_check'),
-    ('20261229_dovec_projects','dovec_leads_pii_wiped_check')
+    ('20261229_dovec_projects','dovec_leads_pii_wiped_check'),
+    ('20261229_dovec_projects','dovec_leads_project_check'),
+    ('20261229_dovec_projects','dovec_projects_coords_check'),
+    ('20261229_dovec_projects','dovec_project_coords_pkey'),
+    ('20261229_dovec_projects','dovec_project_coords_project_key'),
+    ('20261229_dovec_projects','dovec_project_coords_project_fkey'),
+    ('20261229_dovec_projects','dovec_project_coords_name_check'),
+    ('20261229_dovec_projects','dovec_project_coords_range_check'),
+    ('20261229_dovec_projects','dovec_project_coords_status_check'),
+    ('20261229_dovec_projects','dovec_project_coords_matched_check')
 
   ) e(m,o)
 
@@ -1723,6 +1744,7 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_leads_user_created_idx'),
     ('20261229_dovec_projects','dovec_leads_created_idx'),
     ('20261229_dovec_projects','dovec_leads_due_idx'),
+    ('20261229_dovec_projects','dovec_leads_one_test_idx'),
     -- Ask Oli chat history (20261163): one user's thread, newest first.
     ('20261163_oli_messages','oli_messages_user_created_idx'),
     -- Araçlar (20261165): the browse list, an owner's listings, a dealer page, the expiry job, photo order.
@@ -2444,6 +2466,49 @@ WITH report AS (
                        AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
                        AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_forget_user()')), false)
+    UNION ALL SELECT '20261229_dovec_projects','dovec_project_coords: RLS on with ZERO policies; anon and authenticated hold no privilege of any kind (table or column); service_role SELECT only (the DEFINER function writes); no PUBLIC; exactly the five agreed seeds with their exact coordinates; dovec_settings.whatsapp_e164 is the agreed sales line. dovec_sync_coords(): DEFINER, search_path pinned, service_role only, byte-exact name match (COLLATE "C"), never clears a coordinate. dovec_coord_status(): DEFINER, STABLE, service_role only',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_project_coords')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_project_coords') = 0
+      AND COALESCE((SELECT bool_and(NOT has_table_privilege(r.n, to_regclass('public.dovec_project_coords'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                    AND NOT has_any_column_privilege(r.n, to_regclass('public.dovec_project_coords'), 'SELECT,INSERT,UPDATE,REFERENCES'))
+                      FROM (VALUES ('anon'), ('authenticated')) r(n)), false)
+      AND COALESCE(has_table_privilege('service_role', to_regclass('public.dovec_project_coords'), 'SELECT')
+                   AND NOT has_table_privilege('service_role', to_regclass('public.dovec_project_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+      AND NOT EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = to_regclass('public.dovec_project_coords') AND a.grantee = 0)
+      AND COALESCE((SELECT count(*) = 5 AND count(*) FILTER (WHERE (c.seed_name, c.latitude, c.longitude) IN (
+                        ('D-Point', 35.2695453, 33.9016350), ('Natulux', 35.3632832, 33.6722565), ('Courtyard Platinum', 35.3261494, 33.9589785),
+                        ('Querencia Long Beach', 35.2656637, 33.9091918), ('Long Beach Panorama', 35.2572000, 33.8945000))) = 5
+                      FROM public.dovec_project_coords c), false)
+      AND COALESCE((SELECT s.whatsapp_e164 = '+905338880515' FROM public.dovec_settings s WHERE s.id = 1), false)
+      AND COALESCE((SELECT p.prosecdef AND p.proacl IS NOT NULL
+                       AND p.proconfig IS NOT NULL AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+                       AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                       AND strpos(pg_get_functiondef(p.oid), 'COLLATE "C"') > 0
+                       AND strpos(pg_get_functiondef(p.oid), 'IS DISTINCT FROM') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_sync_coords()')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_sync_coords') = 1
+      AND COALESCE((SELECT p.prosecdef AND p.provolatile = 's' AND p.proacl IS NOT NULL
+                       AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                       AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_coord_status()')), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'dovec_coord_status') = 1
+    UNION ALL SELECT '20261229_dovec_projects','the single test enquiry: dovec_leads.is_test is NOT NULL DEFAULT false; the external_id CHECK allows only ADA-<n> for real rows and TEST-1 for is_test; project_id may be NULL only for is_test; at most one is_test row (partial unique index); dovec_lead_counts() and the rate-limit trigger function both exclude is_test',
+      COALESCE((SELECT a.attnotnull AND pg_get_expr(d.adbin, d.adrelid) = 'false'
+                  FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                 WHERE a.attrelid = to_regclass('public.dovec_leads') AND a.attname = 'is_test'), false)
+      AND COALESCE((SELECT strpos(pg_get_constraintdef(k.oid), 'TEST-1') > 0 AND strpos(pg_get_constraintdef(k.oid), 'is_test') > 0
+                  FROM pg_constraint k WHERE k.conrelid = to_regclass('public.dovec_leads') AND k.conname = 'dovec_leads_external_id_check'), false)
+      AND COALESCE((SELECT strpos(pg_get_constraintdef(k.oid), 'project_id IS NOT NULL') > 0 AND strpos(pg_get_constraintdef(k.oid), 'is_test') > 0
+                  FROM pg_constraint k WHERE k.conrelid = to_regclass('public.dovec_leads') AND k.conname = 'dovec_leads_project_check'), false)
+      AND COALESCE((SELECT strpos(i.indexdef, 'UNIQUE') > 0 AND strpos(i.indexdef, 'WHERE is_test') > 0
+                  FROM pg_indexes i WHERE i.schemaname = 'public' AND i.indexname = 'dovec_leads_one_test_idx'), false)
+      AND COALESCE((SELECT strpos(pg_get_functiondef(p.oid), 'NOT l.is_test') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_lead_counts()')), false)
+      AND COALESCE((SELECT strpos(pg_get_functiondef(p.oid), 'NEW.is_test') > 0 AND strpos(pg_get_functiondef(p.oid), 'AND NOT is_test') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()')), false)
     -- 1229-END
     -- 1202-BEGIN
     -- 20261202 onboarding_events: red until applied, never an error (to_regclass / catalogs / COALESCE).
@@ -7387,12 +7452,12 @@ SELECT '20261228_live_scores_ktff', 'live-scores-ktff: schedule 7,22,37,52 * * *
 
 UNION ALL
 -- ─── 20261230: dovec-sync every 10 minutes, POSTs the function with the Vault key (no inline key) ───
-SELECT '20261230_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key dovec_sync_key, 60 s timeout, no inline key',
+SELECT '20261230_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key novest_sync_key, 60 s timeout, no inline key',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync') THEN 'MISSING'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync' AND active
                     AND schedule = '*/10 * * * *'
                     AND command LIKE '%/functions/v1/sync-dovec%'
-                    AND command LIKE '%name = ''dovec_sync_key''%'
+                    AND command LIKE '%name = ''novest_sync_key''%'
                     AND command LIKE '%timeout_milliseconds := 60000%'
                     AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
               THEN 'OK'
@@ -7405,9 +7470,10 @@ SELECT '20261230_dovec_cron', 'dovec-lead-retry: schedule 5,15,25,35,45,55 * * *
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-lead-retry' AND active
                     AND schedule = '5,15,25,35,45,55 * * * *'
                     AND command LIKE '%/functions/v1/dovec-lead%'
-                    AND command LIKE '%name = ''dovec_sync_key''%'
+                    AND command LIKE '%name = ''novest_sync_key''%'
                     AND command LIKE '%"mode":"retry"%'
                     AND command LIKE '%WHERE EXISTS (SELECT 1 FROM public.dovec_leads l%'
+                    AND command LIKE '%WHERE NOT l.is_test%'
                     AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END

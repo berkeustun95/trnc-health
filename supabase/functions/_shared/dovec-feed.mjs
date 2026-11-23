@@ -135,7 +135,10 @@ const describe = (skipped, extra) => {
 //   store.upsert(rows, nowIso)               idempotent upsert, listed = true, delisted_at = null
 //   store.delist(ids, nowIso)
 //   store.setState(patch)                    patch of dovec_settings status columns
-// Returns { status, detail, valid, skipped, delisted }. Never throws on a Döveç-side problem.
+//   store.syncCoords()                       OPTIONAL: dovec_sync_coords() -> the pin status jsonb (see 20261229). Called after a
+//                                            good sync; a failure here is reported ({ error }) and never fails or blocks the sync.
+// Returns { status, detail, valid, skipped, delisted, coords? }. Never throws on a Döveç-side problem.
+// The feed carries no coordinates and mapProject never names latitude / longitude, so the upsert cannot clear a pin.
 export async function runSync({ apiKey, fetchImpl, store, now = () => new Date() }) {
   const nowIso = now().toISOString()
   const finish = async (status, detail, patch = {}, extra = {}) => {
@@ -156,6 +159,10 @@ export async function runSync({ apiKey, fetchImpl, store, now = () => new Date()
     if (plan.delist.length) await store.delist(plan.delist, nowIso)
   } catch { return finish('write_error', 'writing projects failed; nothing marked good') }
   const detail = describe(mapped.skipped, `projects ${plan.rows.length} valid of ${mapped.total}, delisted ${plan.delist.length}`)
-  return finish('ok', detail, { suspended: false, last_good_sync_at: nowIso },
+  const done = await finish('ok', detail, { suspended: false, last_good_sync_at: nowIso },
     { valid: plan.rows.length, skipped: mapped.skipped.length, delisted: plan.delist.length })
+  if (typeof store.syncCoords === 'function') {
+    try { done.coords = await store.syncCoords() } catch { done.coords = { error: 'coords_sync_failed' } }
+  }
+  return done
 }

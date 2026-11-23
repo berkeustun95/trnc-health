@@ -99,7 +99,7 @@ const ready = async (file = FILE) => {
 const mutant = (from, to) => {
   if (!SQL.includes(from)) { bad++; console.log(`  ✗ mutant anchor missing: ${from.slice(0, 50)}`); return null }
   const p = join(mkdtempSync(join(tmpdir(), 'dovec-')), 'm.sql')
-  writeFileSync(p, SQL.replace(from, to))
+  writeFileSync(p, SQL.replace(from, () => to))
   return p
 }
 
@@ -168,7 +168,7 @@ console.log('20261229 — real file')
       [...cols].filter(c => c.startsWith('dovec_') && !three.some(([tb, col]) => `${tb}.${col}` === c)), [])
     const h = vs.slice(vs.indexOf('-- 1229-BEGIN'), vs.indexOf('-- 1229-END'))
     const tok = await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`).then(r => r.rows, e => ({ err: e.message }))
-    t('H tokens run and are all true', Array.isArray(tok) ? [tok.length, tok.every(r => r.ok === true)] : tok, [4, true])
+    t('H tokens run and are all true', Array.isArray(tok) ? [tok.length, tok.every(r => r.ok === true)] : tok, [6, true])
     const bad2 = await d.query(`GRANT DELETE ON public.dovec_leads TO service_role`).then(async () =>
       (await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`)).rows.filter(r => r.ok !== true).length)
     t('red-first: a DELETE grant on leads turns an H token red', bad2, 1)
@@ -204,7 +204,7 @@ console.log('20261229 — real file')
   t('anon reads the project while fresh (positive control)', (await asRole(d, 'anon', null, `SELECT count(*)::int n FROM public.dovec_projects`)).rows[0].n, 1)
   t('guest/customer reads settings: only the five columns',
     (await asRole(d, 'authenticated', OTHER, `SELECT published, suspended, whatsapp_e164, last_good_sync_at IS NOT NULL AS synced FROM public.dovec_settings`)).rows,
-    [{ published: false, suspended: false, whatsapp_e164: null, synced: true }])
+    [{ published: false, suspended: false, whatsapp_e164: '+905338880515', synced: true }])
   t('run-status columns are not readable by an app role',
     (await asRole(d, 'authenticated', OTHER, `SELECT last_run_detail FROM public.dovec_settings`)).ok, false)
   t('leads are unreadable to anon', (await asRole(d, 'anon', null, `SELECT 1 FROM public.dovec_leads`)).ok, false)
@@ -216,6 +216,114 @@ console.log('20261229 — real file')
   t('counts: anon has no EXECUTE', /permission denied/.test((await asRole(d, 'anon', null, `SELECT * FROM public.dovec_lead_counts()`)).msg), true)
   const c = await asRole(d, 'authenticated', ADMIN, `SELECT * FROM public.dovec_lead_counts()`)
   t('counts: admin gets counts and no personal column', [c.ok, Object.keys(c.rows[0] || {}).sort()], [true, ['month', 'n', 'project_id', 'project_name', 'status']])
+}
+
+
+console.log('20261229 — map pins (dovec_project_coords) and the single test enquiry')
+const PIN = { 'D-Point': [35.2695453, 33.901635], Natulux: [35.3632832, 33.6722565] }
+const svcq = (d, sql) => asRole(d, 'service_role', null, sql)
+const addP = (id, name, extra = '') => `INSERT INTO public.dovec_projects (id, name, city, status, website_url${extra ? ', ' + extra.split('=')[0] : ''}) VALUES ('${id}', '${name}', 'Testville', 'on_sale', 'https://example.com/${id}'${extra ? ', ' + extra.split('=')[1] : ''})`
+const stat = async (d) => Object.fromEntries((await d.query(`SELECT seed_name, last_status, project_id FROM public.dovec_project_coords ORDER BY 1`)).rows.map(r => [r.seed_name, [r.last_status, r.project_id]]))
+const pinOf = async (d, id) => (await d.query(`SELECT latitude::float8 la, longitude::float8 lo FROM public.dovec_projects WHERE id = '${id}'`)).rows[0]
+{
+  const { d, r } = await ready()
+  if (!r.ok) { console.log(r.msg); process.exit(1) }
+  const seeds = (await d.query(`SELECT seed_name, latitude::float8 la, longitude::float8 lo FROM public.dovec_project_coords ORDER BY 1`)).rows
+  t('seeds: exactly the five agreed pins', seeds.map(x => [x.seed_name, x.la, x.lo]), [
+    ['Courtyard Platinum', 35.3261494, 33.9589785], ['D-Point', 35.2695453, 33.901635], ['Long Beach Panorama', 35.2572, 33.8945],
+    ['Natulux', 35.3632832, 33.6722565], ['Querencia Long Beach', 35.2656637, 33.9091918]])
+  t('settings: the WhatsApp line is the agreed one', (await d.query(`SELECT whatsapp_e164 w FROM public.dovec_settings`)).rows[0].w, '+905338880515')
+
+  // near-misses never attach (no trim, no case folding)
+  await d.exec([addP('n1', 'D-point'), addP('n2', 'D-Point '), addP('n3', ' D-Point'), addP('n4', 'natulux')].join(';\n'))
+  let c = await svcq(d, `SELECT public.dovec_sync_coords() AS s`)
+  t('near-miss (D-point / trailing space / leading space / natulux): service_role runs it', c.ok, true)
+  const st0 = await stat(d)
+  t('near-misses stay unmatched and report no_match', [st0['D-Point'], st0['Natulux']], [['no_match', null], ['no_match', null]])
+  t('near-miss projects carry no pin', [await pinOf(d, 'n1'), await pinOf(d, 'n2'), await pinOf(d, 'n3'), await pinOf(d, 'n4')], Array(4).fill({ la: null, lo: null }))
+  t('the status lists them as live without coordinates (reported, not hidden)',
+    c.rows[0].s.live_without_coords.map(x => x.id).sort(), ['n1', 'n2', 'n3', 'n4'])
+  t('the status lists the five seeds as unmatched, reason no_match',
+    [c.rows[0].s.unmatched.length, [...new Set(c.rows[0].s.unmatched.map(x => x.reason))]], [5, ['no_match']])
+
+  // exact match (positive control for the above)
+  await d.exec(addP('x1', 'D-Point'))
+  c = await svcq(d, `SELECT public.dovec_sync_coords() AS s`)
+  t('exact byte match attaches (positive control)', [(await stat(d))['D-Point'], await pinOf(d, 'x1')], [['matched', 'x1'], { la: PIN['D-Point'][0], lo: PIN['D-Point'][1] }])
+  t('the near-misses still carry nothing after an exact match exists', (await pinOf(d, 'n1')).la, null)
+  t('status: D-Point no longer unmatched', c.rows[0].s.unmatched.some(x => x.seed === 'D-Point'), false)
+
+  // duplicates: two live projects with the same exact name -> none attached
+  await d.exec([addP('d1', 'Natulux'), addP('d2', 'Natulux')].join(';\n'))
+  c = await svcq(d, `SELECT public.dovec_sync_coords() AS s`)
+  t('two exact matches: not attached, status ambiguous', [(await stat(d)).Natulux, await pinOf(d, 'd1'), await pinOf(d, 'd2')], [['ambiguous', null], { la: null, lo: null }, { la: null, lo: null }])
+  t('ambiguity is reported', c.rows[0].s.unmatched.filter(x => x.seed === 'Natulux'), [{ seed: 'Natulux', reason: 'ambiguous' }])
+  await d.exec(`UPDATE public.dovec_projects SET listed = false, delisted_at = now() WHERE id = 'd2'`)
+  await svcq(d, `SELECT public.dovec_sync_coords()`)
+  t('once the duplicate is delisted the one live match attaches', [(await stat(d)).Natulux, await pinOf(d, 'd1')], [['matched', 'd1'], { la: PIN.Natulux[0], lo: PIN.Natulux[1] }])
+
+  // rename keeps the pin and reports it; a new project with the old name is NOT attached to the seed
+  await d.exec(`UPDATE public.dovec_projects SET name = 'D-Point Residences' WHERE id = 'x1'`)
+  c = await svcq(d, `SELECT public.dovec_sync_coords() AS s`)
+  t('rename: the pin stays with the project id and the status becomes renamed', [(await stat(d))['D-Point'], await pinOf(d, 'x1')], [['renamed', 'x1'], { la: PIN['D-Point'][0], lo: PIN['D-Point'][1] }])
+  t('rename is reported with the new name', c.rows[0].s.renamed.filter(x => x.seed === 'D-Point'), [{ name: 'D-Point Residences', seed: 'D-Point', project_id: 'x1' }])
+  await d.exec(addP('x2', 'D-Point'))
+  await svcq(d, `SELECT public.dovec_sync_coords()`)
+  t('a different project that takes the old name does not steal the pin', [(await stat(d))['D-Point'], await pinOf(d, 'x2')], [['renamed', 'x1'], { la: null, lo: null }])
+
+  // the sync upsert never clears a pin (it does not name latitude/longitude)
+  const upsert = `INSERT INTO public.dovec_projects (id, name, city, status, website_url, listed, delisted_at, last_seen_at, updated_at)
+    VALUES ('x1', 'D-Point Residences', 'Testville', 'on_sale', 'https://example.com/x1', true, NULL, now(), now())
+    ON CONFLICT (id) DO UPDATE SET name = excluded.name, city = excluded.city, status = excluded.status, website_url = excluded.website_url,
+      listed = excluded.listed, delisted_at = excluded.delisted_at, last_seen_at = excluded.last_seen_at, updated_at = excluded.updated_at`
+  t('sync upsert runs as service_role', (await svcq(d, upsert)).ok, true)
+  t('the upsert did not clear the pin', await pinOf(d, 'x1'), { la: PIN['D-Point'][0], lo: PIN['D-Point'][1] })
+  await d.exec(`UPDATE public.dovec_projects SET listed = false, delisted_at = now() WHERE id = 'x1'`)
+  await svcq(d, `SELECT public.dovec_sync_coords()`)
+  t('a delisted project keeps its pin and its attachment', [await pinOf(d, 'x1'), (await stat(d))['D-Point'][1]], [{ la: PIN['D-Point'][0], lo: PIN['D-Point'][1] }, 'x1'])
+  t('sync source: the feed mapping never names latitude/longitude',
+    ['../supabase/functions/sync-dovec/index.ts', '../supabase/functions/_shared/dovec-feed.mjs'].map(f => /\b(latitude|longitude)\b/.test(readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, ''))), [false, false])
+
+  // who may call what (every denial beside a positive control)
+  t('anon cannot run the pin sync', (await asRole(d, 'anon', null, `SELECT public.dovec_sync_coords()`)).ok, false)
+  t('a signed-in user cannot run the pin sync', (await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_sync_coords()`)).ok, false)
+  t('anon / signed-in cannot read the status or the table', [(await asRole(d, 'anon', null, `SELECT public.dovec_coord_status()`)).ok, (await asRole(d, 'authenticated', OTHER, `SELECT public.dovec_coord_status()`)).ok,
+    (await asRole(d, 'anon', null, `SELECT 1 FROM public.dovec_project_coords`)).ok, (await asRole(d, 'authenticated', OTHER, `SELECT 1 FROM public.dovec_project_coords`)).ok], [false, false, false, false])
+  t('service_role can read both (positive control)', [(await svcq(d, `SELECT public.dovec_coord_status()`)).ok, (await svcq(d, `SELECT 1 FROM public.dovec_project_coords`)).ok], [true, true])
+  t('service_role cannot write the table directly', (await svcq(d, `UPDATE public.dovec_project_coords SET latitude = 1`)).ok, false)
+  t('anon reads the pin through the project row once the feed is fresh (positive control)', await (async () => {
+    await d.exec(`UPDATE public.dovec_settings SET last_good_sync_at = now(); UPDATE public.dovec_projects SET listed = true, delisted_at = NULL WHERE id = 'x1'`)
+    return (await asRole(d, 'anon', null, `SELECT latitude::float8 la FROM public.dovec_projects WHERE id = 'x1'`)).rows
+  })(), [{ la: PIN['D-Point'][0] }])
+
+  // the test enquiry: exactly one, fixed shape, outside every count and limit
+  await d.exec(`DELETE FROM public.dovec_leads; UPDATE public.dovec_settings SET last_good_sync_at = now()`)
+  const tl = (extra = {}) => ins(null, { project_id: 'NULL', name: "'ADA TEST'", message: "'Test talebidir, işlem yapmayın'", external_id: "'TEST-1'", is_test: 'true', language: "'Turkish'", language_code: "'tr'", status: "'pending'", ...extra })
+  t('test enquiry: the agreed shape is accepted (positive control)', (await svcq(d, tl())).ok, true)
+  t('test enquiry: a second one is refused (unique)', [(await svcq(d, tl({ client_request_id: 'gen_random_uuid()' }))).ok], [false])
+  await d.exec(`DELETE FROM public.dovec_leads WHERE is_test`)
+  t('test enquiry: after removal the single slot is free again', (await svcq(d, tl())).ok, true)
+  t('CHECK: external id TEST-2 is refused', /dovec_leads_external_id_check/.test((await svcq(d, tl({ external_id: "'TEST-2'" }))).msg || ''), true)
+  t('CHECK: TEST-1 on a row that is not is_test is refused', /dovec_leads_external_id_check/.test((await svcq(d, ins(null, { external_id: "'TEST-1'", project_id: "'p1'" }))).msg || ''), true)
+  t('CHECK: a real enquiry without a project is refused', /dovec_leads_project_check/.test((await svcq(d, ins(null, { project_id: 'NULL' }))).msg || ''), true)
+  t('CHECK: an is_test row with an ADA- id is refused', /dovec_leads_external_id_check/.test((await svcq(d, tl({ external_id: "'ADA-77'", client_request_id: 'gen_random_uuid()' }))).msg || ''), true)
+  t('is_test defaults to false and is NOT NULL', (await d.query(`SELECT is_nullable n, column_default df FROM information_schema.columns WHERE table_name = 'dovec_leads' AND column_name = 'is_test'`)).rows, [{ n: 'NO', df: 'false' }])
+  await d.exec(`INSERT INTO public.dovec_projects (id, name, city, status, website_url) VALUES ('p1', 'Fictional Heights', 'Testville', 'on_sale', 'https://example.com/p1') ON CONFLICT DO NOTHING`)
+  const cn = async who => (await asRole(d, 'authenticated', ADMIN, `SELECT project_id, n FROM public.dovec_lead_counts()`)).rows
+  t('counts: the test enquiry is not counted', await cn(), [])
+  await d.exec(ins(LU))
+  t('counts: a real enquiry is counted (positive control)', await cn(), [{ project_id: 'p1', n: 1 }])
+  // limits: a user at the hourly limit is not blocked by, and the day total is not moved by, the test row
+  await d.exec(`DELETE FROM public.dovec_leads WHERE NOT is_test`)
+  await d.exec(`INSERT INTO public.dovec_leads (client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status)
+    SELECT gen_random_uuid(), repeat('e', 64), 'p1', 'x', '+441234567890', 'English', 'en', true, 'v', 'sent' FROM generate_series(1, 200)`)
+  t('limits: 200 real enquiries today refuse the next real one (positive control)', /dovec_rate_limited/.test((await svcq(d, ins(LV))).msg || ''), true)
+  await d.exec(`DELETE FROM public.dovec_leads`)
+  await d.exec(`INSERT INTO public.dovec_leads (client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status)
+    SELECT gen_random_uuid(), repeat('e', 64), 'p1', 'x', '+441234567890', 'English', 'en', true, 'v', 'sent' FROM generate_series(1, 199)`)
+  t('limits: 199 real + the test enquiry is accepted (the test row is outside the day count)', (await svcq(d, tl())).ok, true)
+  t('limits: and the 200th real one is still accepted', (await svcq(d, ins(LU))).ok, true)
+  await d.exec(`DELETE FROM public.dovec_leads`)
 }
 
 console.log('20261229 — red-first mutants (each must be refused by the migration itself)')
@@ -233,6 +341,16 @@ for (const [name, from, to, re] of [
   FOR EACH ROW EXECUTE FUNCTION public.dovec_leads_enforce_limits();`, `SELECT 1;`, /dovec_leads_rate_limit trigger missing or wrong/],
   ['limit function executable by an app role', `REVOKE ALL ON FUNCTION public.dovec_leads_enforce_limits() FROM PUBLIC, anon, authenticated;`, `GRANT EXECUTE ON FUNCTION public.dovec_leads_enforce_limits() TO authenticated;`, /dovec_leads_enforce_limits is executable/],
   ['counts open to non-admins', `IF NOT is_admin() THEN`, `IF false THEN`, /not refused with ADMIN_ONLY/],
+  ['pin match folds case and trims', `WHERE p.listed AND p.name COLLATE "C" = s.seed_name COLLATE "C"`, `WHERE p.listed AND lower(btrim(p.name)) = lower(s.seed_name)`, /near-miss was attached or mis-reported/],
+  ['pins readable by anon', `GRANT SELECT ON TABLE public.dovec_project_coords TO service_role;`, `GRANT SELECT ON TABLE public.dovec_project_coords TO service_role, anon;`, /holds a privilege on dovec_project_coords/],
+  ['pin sync executable by anon', `GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role;`, `GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role, anon;`, /dovec_sync_coords\(\) is executable by an app role/],
+  ['a policy appears on the pins table', `ALTER TABLE public.dovec_project_coords ENABLE ROW LEVEL SECURITY;`, `ALTER TABLE public.dovec_project_coords ENABLE ROW LEVEL SECURITY;\nCREATE POLICY leak ON public.dovec_project_coords FOR SELECT TO anon USING (true);`, /carries 1 policies/],
+  ['a sixth pin is seeded', `('Long Beach Panorama', 35.2572000, 33.8945000)\nON CONFLICT`, `('Long Beach Panorama', 35.2572000, 33.8945000), ('Extra', 35.0, 33.0)\nON CONFLICT`, /not exactly the five agreed pins|seeds: 6/],
+  ['a seeded coordinate is off by one digit', `('D-Point',            35.2695453,`, `('D-Point',            35.2695454,`, /not exactly the five agreed pins/],
+  ['the sales line is wrong', `VALUES (1, '+905338880515')`, `VALUES (1, '+905338880516')`, /whatsapp_e164 is not the agreed sales line/],
+  ['external id TEST-2 allowed', `OR (is_test AND external_id = 'TEST-1')`, `OR (is_test)`, /external id TEST-2 was accepted/],
+  ['TEST-1 allowed on a real row', `(NOT is_test AND external_id ~ '^ADA-[0-9]+$')`, `(external_id ~ '^ADA-[0-9]+$' OR external_id = 'TEST-1')`, /TEST-1 was accepted on a row that is not is_test/],
+  ['a real enquiry may have no project', `CHECK (project_id IS NOT NULL OR is_test)`, `CHECK (true)`, /non-test enquiry without a project was accepted/],
 ]) {
   const p = mutant(from, to)
   if (!p) continue
@@ -240,6 +358,25 @@ for (const [name, from, to, re] of [
   const r = await applyFile(d, p)
   t(`${name}: refused`, [r.ok, re.test(r.msg || '')], [false, true])
   if (r.ok === false && !re.test(r.msg || '')) console.log('    refused for a different reason:', r.msg)
+}
+
+console.log('20261229 — red-first: counts and limits that include the test enquiry turn the H token red')
+{
+  const vs = readFileSync(new URL('../supabase/verify_schema.sql', import.meta.url), 'utf8')
+  const h = vs.slice(vs.indexOf('-- 1229-BEGIN'), vs.indexOf('-- 1229-END'))
+  const q = `SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`
+  for (const [name, from, to] of [
+    ['counts include the test row', `WHERE NOT l.is_test`, `WHERE true`],
+    ['the limit trigger does not skip the test row', `IF NEW.is_test THEN RETURN NEW; END IF;`, `NULL;`],
+    ['the test index is not unique', `CREATE UNIQUE INDEX IF NOT EXISTS dovec_leads_one_test_idx`, `CREATE INDEX IF NOT EXISTS dovec_leads_one_test_idx`],
+  ]) {
+    const p = mutant(from, to)
+    if (!p) continue
+    const d = await freshDb(FIXTURE)
+    const r = await applyFile(d, p)
+    const red = r.ok ? (await d.query(q)).rows.filter(x => x.ok !== true).length : -1
+    t(`${name}: the migration applies and the H token is red`, [r.ok, red], [true, 1])
+  }
 }
 
 console.log('20261229 — red-first: a weakened limit lets the 4th lead through')
@@ -297,14 +434,14 @@ CREATE TABLE public.data_jobs (key text PRIMARY KEY, runner text NOT NULL, kind 
 `
   const build = async (withSecret) => {
     const d = await freshDb(FIXTURE + SEED_B)
-    if (withSecret) await d.exec(`INSERT INTO vault.secrets (name, secret) VALUES ('dovec_sync_key', 'test-not-a-real-key')`)
+    if (withSecret) await d.exec(`INSERT INTO vault.secrets (name, secret) VALUES ('novest_sync_key', 'test-not-a-real-key')`)
     return d
   }
   {
     const d = await build(false)
     t('A applies', (await applyFile(d, FILE)).ok, true)
     const r = await applyFile(d, FILE_B)
-    t('B refuses without the Vault secret', [r.ok, /dovec_sync_key is missing/.test(r.msg || '')], [false, true])
+    t('B refuses without the Vault secret', [r.ok, /novest_sync_key is missing/.test(r.msg || '')], [false, true])
     await d.exec('ROLLBACK; RESET ROLE;')
     t('and leaves no job behind', (await d.query(`SELECT count(*)::int n FROM cron.job`)).rows[0].n, 0)
   }

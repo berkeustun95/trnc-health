@@ -5,6 +5,8 @@
 //
 // Who: the service key only (cron through Vault, or a hand call). Any other caller gets 401.
 // Secrets: DOVEC_PARTNER_KEY (Bearer for Döveç; set in prod, never printed).
+// Response: includes `coords` (dovec_sync_coords status: unmatched pins, renamed projects, live projects without a pin;
+// public marketing names and Döveç ids only). A pin problem never fails the sync.
 // Logs: project-level words and counts only. Never the partner key, never a response body.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
@@ -45,6 +47,11 @@ Deno.serve(async (req) => {
         .update({ listed: false, delisted_at: nowIso, updated_at: nowIso }).in('id', ids).eq('listed', true)
       if (error) throw new Error('delist failed')
     },
+    async syncCoords() {
+      const { data, error } = await supabase.rpc('dovec_sync_coords')
+      if (error) throw new Error('coords failed')
+      return data
+    },
     async setState(patch: Record<string, unknown>) {
       const { error } = await supabase.from('dovec_settings').update(patch).eq('id', 1)
       if (error) throw new Error('state write failed')
@@ -59,7 +66,9 @@ Deno.serve(async (req) => {
     console.log(`sync-dovec: ${res.status} valid=${res.valid} skipped=${res.skipped} delisted=${res.delisted}`)
     const good = res.status === 'ok'
     await recordDataJobRun(cfg, JOB, good ? 'ok' : 'failed', good ? null : res.status, started)
-    return json(200, { ok: good, status: res.status, valid: res.valid, skipped: res.skipped, delisted: res.delisted })
+    const c = res.coords as { unmatched?: unknown[]; renamed?: unknown[]; live_without_coords?: unknown[]; error?: string } | undefined
+    if (c) console.log(`sync-dovec: coords ${c.error ?? `unmatched=${c.unmatched?.length ?? '?'} renamed=${c.renamed?.length ?? '?'} live_without=${c.live_without_coords?.length ?? '?'}`}`)
+    return json(200, { ok: good, status: res.status, valid: res.valid, skipped: res.skipped, delisted: res.delisted, ...(c ? { coords: c } : {}) })
   } catch {
     console.error('sync-dovec: state write failed')
     await recordDataJobRun(cfg, JOB, 'failed', 'state_write_failed', started)

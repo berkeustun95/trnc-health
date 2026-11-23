@@ -9,7 +9,10 @@
 -- WHAT THIS FILE ADDS
 --   dovec_settings   exactly one row (id = 1): the go-live gate, the kill switch, the WhatsApp number, sync state.
 --   dovec_projects   one row per Döveç project id. Projects are never deleted, only delisted (listed = false).
---   dovec_leads      one row per enquiry. No policy and no grant for any app role: edge functions only.
+--   dovec_leads      one row per enquiry. No policy and no grant for any app role: edge functions only. At most ONE row may be
+--                    the agreed test enquiry (is_test, external_id 'TEST-1'); see "THE TEST ENQUIRY" below.
+--   dovec_project_coords  five seeded map pins (the feed carries no coordinates) and their attachment state; edge functions only.
+--   dovec_sync_coords() / dovec_coord_status()  attach a pin to a project by EXACT name and report what is unmatched; service role only.
 --   dovec_feed_is_fresh()       STABLE helper the dovec_projects read policy calls.
 --   dovec_lead_counts()         admin-only counts per project / month / status. No personal field.
 --   dovec_leads_wipe_pii()      90-day retention (service role / cron only).
@@ -37,6 +40,30 @@
 --   dovec_lead_counts()
 --     Executable by signed-in users, but it raises ADMIN_ONLY unless is_admin(). Returns project, month, status
 --     and a count. No name, phone, e-mail, message or user id leaves it. anon cannot execute it.
+--
+--   dovec_project_coords
+--     RLS is on and there are ZERO policies; anon and authenticated hold no privilege. The service role may SELECT only; the
+--     rows change through dovec_sync_coords() (SECURITY DEFINER, EXECUTE service_role only), never by a client write.
+--     dovec_coord_status() (service_role only) lists unmatched seeds, renamed projects and live projects without a pin: public
+--     marketing names and Döveç ids, no user data. The latitude / longitude that the app reads are copied onto
+--     dovec_projects, which the existing read policy already covers.
+--
+-- COORDINATES (the feed has none)
+--   dovec_project_coords is seeded below with exactly five pins. After each good feed sync, sync-dovec calls
+--   dovec_sync_coords(). A seed with project_id NULL attaches ONLY when exactly ONE listed project has
+--   name = seed_name BYTE FOR BYTE (compared COLLATE "C": no trim, no case folding, no Unicode normalisation: 'D-point',
+--   'D-Point ' and an NFD spelling are all different). Zero matches ('no_match') or two or more ('ambiguous') or a project
+--   already pinned by another seed ('claimed') attach nothing and are reported. Once attached the pin stays with that
+--   project id forever: if the project is later renamed the pin is kept and reported ('renamed'); a delisted project keeps its
+--   pin. Latitude and longitude are copied onto dovec_projects for attached ids only and are never written anywhere else, never
+--   guessed and never cleared (the sync upsert does not name the columns). NOTE: sync-dovec stores the feed name after
+--   trimming leading / trailing whitespace (mapProject, unchanged), so the byte comparison is against that stored name.
+--
+-- THE TEST ENQUIRY (prepared here, never sent by this file)
+--   Döveç asked for exactly one agreed test enquiry (name "ADA TEST", external id TEST-1, no project). dovec_leads.is_test marks
+--   it. CHECKs: is_test <=> external_id = 'TEST-1' (every other row must be ADA-n); project_id may be NULL only when is_test;
+--   a partial unique index allows exactly one is_test row, ever. dovec_lead_counts() and the rate limits ignore it. The send is
+--   a separate service-only mode of dovec-lead behind its own two locks (see supabase/functions/sync-dovec/PLUG-IN.md).
 --
 -- WHY `published` IS NOT IN THE dovec_projects READ POLICY (a decision, written down on purpose)
 --   `published` is the production go-live gate: the app reads it and hides the whole module while it is false.
@@ -94,7 +121,9 @@ CREATE TABLE IF NOT EXISTS public.dovec_settings (
 COMMENT ON TABLE public.dovec_settings IS
   'Single row (id = 1). published = production go-live gate (default false, read by the app); suspended = kill switch set by sync-dovec on a 401; whatsapp_e164 and published change only by migration; the run columns are written by sync-dovec (service role). Readable columns for app roles: id, published, suspended, whatsapp_e164, last_good_sync_at. 20261229.';
 
-INSERT INTO public.dovec_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+-- whatsapp_e164 is Döveç's public sales line (Berke, 2026-11-23); it changes only by a migration, so this re-asserts it.
+INSERT INTO public.dovec_settings (id, whatsapp_e164) VALUES (1, '+905338880515')
+ON CONFLICT (id) DO UPDATE SET whatsapp_e164 = excluded.whatsapp_e164;
 
 ALTER TABLE public.dovec_settings ENABLE ROW LEVEL SECURITY;
 
@@ -129,6 +158,8 @@ CREATE TABLE IF NOT EXISTS public.dovec_projects (
   description            text,
   gallery                jsonb,
   entity_uuid            uuid        NOT NULL DEFAULT gen_random_uuid(),
+  latitude               numeric(10,7),
+  longitude              numeric(10,7),
   CONSTRAINT dovec_projects_pkey PRIMARY KEY (id),
   CONSTRAINT dovec_projects_entity_uuid_key UNIQUE (entity_uuid),
   CONSTRAINT dovec_projects_id_check CHECK (char_length(id) BETWEEN 1 AND 100),
@@ -143,11 +174,13 @@ CREATE TABLE IF NOT EXISTS public.dovec_projects (
   CONSTRAINT dovec_projects_gallery_check CHECK (gallery IS NULL OR jsonb_typeof(gallery) = 'array'),
   CONSTRAINT dovec_projects_cover_check CHECK (cover_url IS NULL OR cover_url ~ '^https://'),
   CONSTRAINT dovec_projects_website_check CHECK (website_url ~ '^https://'),
-  CONSTRAINT dovec_projects_delisted_check CHECK (listed OR delisted_at IS NOT NULL)
+  CONSTRAINT dovec_projects_delisted_check CHECK (listed OR delisted_at IS NOT NULL),
+  CONSTRAINT dovec_projects_coords_check CHECK ((latitude IS NULL) = (longitude IS NULL)
+    AND (latitude IS NULL OR (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)))
 );
 
 COMMENT ON TABLE public.dovec_projects IS
-  'Mirror of the Döveç partner feed (GET /api/partner/projects), written by sync-dovec only. Never deleted: a project that leaves the feed is delisted (listed = false). RLS read: listed AND dovec_feed_is_fresh() (not suspended, last good sync under 24 h). description and gallery are empty on purpose until Döveç supplies them. `published` is deliberately not in the policy (see 20261229 header). 20261229.';
+  'Mirror of the Döveç partner feed (GET /api/partner/projects), written by sync-dovec only. Never deleted: a project that leaves the feed is delisted (listed = false). RLS read: listed AND dovec_feed_is_fresh() (not suspended, last good sync under 24 h). description and gallery are empty on purpose until Döveç supplies them. latitude / longitude are NULL until dovec_sync_coords() attaches a seeded pin by exact name (the feed has none). `published` is deliberately not in the policy (see 20261229 header). 20261229.';
 
 CREATE INDEX IF NOT EXISTS dovec_projects_listed_idx ON public.dovec_projects (listed, name);
 
@@ -182,6 +215,107 @@ DROP POLICY IF EXISTS dovec_projects_read ON public.dovec_projects;
 CREATE POLICY dovec_projects_read ON public.dovec_projects FOR SELECT TO anon, authenticated
   USING (listed AND public.dovec_feed_is_fresh());
 
+-- ─── 2b. Map pins: the seed table, and the exact-name attach ─────────────────
+CREATE TABLE IF NOT EXISTS public.dovec_project_coords (
+  seed_name   text          NOT NULL,
+  latitude    numeric(10,7) NOT NULL,
+  longitude   numeric(10,7) NOT NULL,
+  project_id  text,
+  matched_at  timestamptz,
+  last_status text          NOT NULL DEFAULT 'pending',
+  CONSTRAINT dovec_project_coords_pkey PRIMARY KEY (seed_name),
+  CONSTRAINT dovec_project_coords_project_key UNIQUE (project_id),
+  CONSTRAINT dovec_project_coords_project_fkey FOREIGN KEY (project_id) REFERENCES public.dovec_projects (id),
+  CONSTRAINT dovec_project_coords_name_check CHECK (char_length(seed_name) BETWEEN 1 AND 200),
+  CONSTRAINT dovec_project_coords_range_check CHECK (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180),
+  CONSTRAINT dovec_project_coords_status_check CHECK (last_status = ANY (ARRAY['pending','matched','renamed','no_match','ambiguous','claimed']::text[])),
+  CONSTRAINT dovec_project_coords_matched_check CHECK ((project_id IS NULL) = (matched_at IS NULL))
+);
+
+COMMENT ON TABLE public.dovec_project_coords IS
+  'Five seeded map pins (the Döveç feed has no coordinates). dovec_sync_coords() attaches a seed to a project ONLY when exactly one listed project has name = seed_name byte for byte; once attached it stays. RLS on, zero policies, service_role SELECT only. 20261229.';
+
+ALTER TABLE public.dovec_project_coords ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.dovec_project_coords FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.dovec_project_coords TO service_role;
+
+INSERT INTO public.dovec_project_coords (seed_name, latitude, longitude) VALUES
+  ('D-Point',            35.2695453, 33.9016350),
+  ('Natulux',            35.3632832, 33.6722565),
+  ('Courtyard Platinum', 35.3261494, 33.9589785),
+  ('Querencia Long Beach', 35.2656637, 33.9091918),
+  ('Long Beach Panorama', 35.2572000, 33.8945000)
+ON CONFLICT (seed_name) DO NOTHING;
+
+-- What is not pinned: public marketing names and Döveç ids only, no user data.
+CREATE OR REPLACE FUNCTION public.dovec_coord_status()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'unmatched', COALESCE((SELECT jsonb_agg(jsonb_build_object('seed', c.seed_name, 'reason', c.last_status) ORDER BY c.seed_name)
+                             FROM public.dovec_project_coords c WHERE c.project_id IS NULL), '[]'::jsonb),
+    'renamed', COALESCE((SELECT jsonb_agg(jsonb_build_object('seed', c.seed_name, 'project_id', p.id, 'name', p.name) ORDER BY c.seed_name)
+                           FROM public.dovec_project_coords c JOIN public.dovec_projects p ON p.id = c.project_id
+                          WHERE p.name COLLATE "C" <> c.seed_name COLLATE "C"), '[]'::jsonb),
+    'live_without_coords', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name) ORDER BY p.name, p.id)
+                                       FROM public.dovec_projects p
+                                      WHERE p.listed AND (p.latitude IS NULL OR p.longitude IS NULL)), '[]'::jsonb));
+$function$;
+
+-- Called by sync-dovec after a good sync. Idempotent. Writes dovec_project_coords (attach + status) and copies latitude /
+-- longitude onto dovec_projects for attached ids; it never clears a coordinate and never writes any other project column.
+CREATE OR REPLACE FUNCTION public.dovec_sync_coords()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  s    record;
+  v_n  int;
+  v_id text;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('dovec_coords:sync', 0));
+  FOR s IN SELECT * FROM public.dovec_project_coords ORDER BY seed_name LOOP
+    IF s.project_id IS NOT NULL THEN
+      UPDATE public.dovec_project_coords c
+         SET last_status = CASE WHEN EXISTS (SELECT 1 FROM public.dovec_projects p
+                                              WHERE p.id = s.project_id AND p.name COLLATE "C" = s.seed_name COLLATE "C")
+                                THEN 'matched' ELSE 'renamed' END
+       WHERE c.seed_name = s.seed_name;
+    ELSE
+      SELECT count(*), min(p.id) INTO v_n, v_id
+        FROM public.dovec_projects p WHERE p.listed AND p.name COLLATE "C" = s.seed_name COLLATE "C";
+      IF v_n = 0 THEN
+        UPDATE public.dovec_project_coords c SET last_status = 'no_match' WHERE c.seed_name = s.seed_name;
+      ELSIF v_n > 1 THEN
+        UPDATE public.dovec_project_coords c SET last_status = 'ambiguous' WHERE c.seed_name = s.seed_name;
+      ELSIF EXISTS (SELECT 1 FROM public.dovec_project_coords c WHERE c.project_id = v_id) THEN
+        UPDATE public.dovec_project_coords c SET last_status = 'claimed' WHERE c.seed_name = s.seed_name;
+      ELSE
+        UPDATE public.dovec_project_coords c SET project_id = v_id, matched_at = now(), last_status = 'matched' WHERE c.seed_name = s.seed_name;
+      END IF;
+    END IF;
+  END LOOP;
+
+  UPDATE public.dovec_projects p SET latitude = c.latitude, longitude = c.longitude
+    FROM public.dovec_project_coords c
+   WHERE c.project_id = p.id AND (p.latitude IS DISTINCT FROM c.latitude OR p.longitude IS DISTINCT FROM c.longitude);
+
+  RETURN public.dovec_coord_status();
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.dovec_coord_status() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.dovec_sync_coords() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.dovec_coord_status() TO service_role;
+GRANT EXECUTE ON FUNCTION public.dovec_sync_coords() TO service_role;
+
 -- ─── 3. dovec_leads ────────────────────────────────────────────────────────
 CREATE SEQUENCE IF NOT EXISTS public.dovec_lead_external_seq START 1;
 
@@ -191,7 +325,7 @@ CREATE TABLE IF NOT EXISTS public.dovec_leads (
   user_id             uuid,
   client_request_id   uuid        NOT NULL,
   payload_hash        text        NOT NULL,
-  project_id          text        NOT NULL,
+  project_id          text,
   project_name        text,
   unit_type           text,
   name                text,
@@ -210,11 +344,13 @@ CREATE TABLE IF NOT EXISTS public.dovec_leads (
   sent_at             timestamptz,
   created_at          timestamptz NOT NULL DEFAULT now(),
   pii_wiped_at        timestamptz,
+  is_test             boolean     NOT NULL DEFAULT false,
   CONSTRAINT dovec_leads_pkey PRIMARY KEY (id),
   CONSTRAINT dovec_leads_external_id_key UNIQUE (external_id),
   CONSTRAINT dovec_leads_request_key UNIQUE (user_id, client_request_id),
   CONSTRAINT dovec_leads_project_fkey FOREIGN KEY (project_id) REFERENCES public.dovec_projects (id),
-  CONSTRAINT dovec_leads_external_id_check CHECK (external_id ~ '^ADA-[0-9]+$'),
+  CONSTRAINT dovec_leads_external_id_check CHECK ((NOT is_test AND external_id ~ '^ADA-[0-9]+$') OR (is_test AND external_id = 'TEST-1')),
+  CONSTRAINT dovec_leads_project_check CHECK (project_id IS NOT NULL OR is_test),
   CONSTRAINT dovec_leads_hash_check CHECK (payload_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT dovec_leads_consent_check CHECK (consent = true),
   CONSTRAINT dovec_leads_consent_version_check CHECK (char_length(consent_text_version) BETWEEN 1 AND 100),
@@ -232,8 +368,9 @@ CREATE TABLE IF NOT EXISTS public.dovec_leads (
 );
 
 COMMENT ON TABLE public.dovec_leads IS
-  'Enquiries sent to Döveç through the dovec-lead edge function. RLS on, ZERO policies, no privilege for anon / authenticated: service role only. user_id has NO foreign key on purpose: an AFTER DELETE trigger on profiles wipes the PII and user_id of a deleted user and keeps the row (counts survive); dovec_leads_wipe_pii() wipes it at 90 days. 20261229.';
+  'Enquiries sent to Döveç through the dovec-lead edge function (plus at most one is_test row, external_id TEST-1, no project, excluded from counts and limits). RLS on, ZERO policies, no privilege for anon / authenticated: service role only. user_id has NO foreign key on purpose: an AFTER DELETE trigger on profiles wipes the PII and user_id of a deleted user and keeps the row (counts survive); dovec_leads_wipe_pii() wipes it at 90 days. 20261229.';
 
+CREATE UNIQUE INDEX IF NOT EXISTS dovec_leads_one_test_idx ON public.dovec_leads ((true)) WHERE is_test;
 CREATE INDEX IF NOT EXISTS dovec_leads_user_created_idx ON public.dovec_leads (user_id, created_at) WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS dovec_leads_created_idx ON public.dovec_leads (created_at);
 CREATE INDEX IF NOT EXISTS dovec_leads_due_idx ON public.dovec_leads (status, next_attempt_at) WHERE status IN ('pending', 'retry');
@@ -255,13 +392,14 @@ CREATE OR REPLACE FUNCTION public.dovec_leads_enforce_limits()
  SET search_path TO 'public'
 AS $function$
 BEGIN
+  IF NEW.is_test THEN RETURN NEW; END IF;   -- the one agreed test enquiry neither counts against nor is stopped by the limits
   PERFORM pg_advisory_xact_lock(hashtextextended('dovec_leads:insert', 0));
-  IF (SELECT count(*) FROM public.dovec_leads WHERE created_at >= now() - interval '1 day') >= 200 THEN
+  IF (SELECT count(*) FROM public.dovec_leads WHERE NOT is_test AND created_at >= now() - interval '1 day') >= 200 THEN
     RAISE EXCEPTION 'dovec_rate_limited' USING ERRCODE = 'DV429';
   END IF;
   IF NEW.user_id IS NOT NULL THEN
-    IF (SELECT count(*) FROM public.dovec_leads WHERE user_id = NEW.user_id AND created_at >= now() - interval '1 hour') >= 3
-       OR (SELECT count(*) FROM public.dovec_leads WHERE user_id = NEW.user_id AND created_at >= now() - interval '1 day') >= 10 THEN
+    IF (SELECT count(*) FROM public.dovec_leads WHERE user_id = NEW.user_id AND NOT is_test AND created_at >= now() - interval '1 hour') >= 3
+       OR (SELECT count(*) FROM public.dovec_leads WHERE user_id = NEW.user_id AND NOT is_test AND created_at >= now() - interval '1 day') >= 10 THEN
       RAISE EXCEPTION 'dovec_rate_limited' USING ERRCODE = 'DV429';
     END IF;
   END IF;
@@ -349,6 +487,7 @@ BEGIN
            date_trunc('month', l.created_at AT TIME ZONE 'Europe/Nicosia')::date,
            l.status, count(*)
       FROM public.dovec_leads l
+     WHERE NOT l.is_test
      GROUP BY l.project_id, l.project_name, date_trunc('month', l.created_at AT TIME ZONE 'Europe/Nicosia')::date, l.status
      ORDER BY 3 DESC, 1, 4;
 END;
@@ -370,7 +509,7 @@ DECLARE
   v_priv     text;
 BEGIN
   -- 7a. RLS on, owner postgres, and the FULL policy set of every table (permissive policies OR together).
-  FOREACH v_t IN ARRAY ARRAY['dovec_settings','dovec_projects','dovec_leads'] LOOP
+  FOREACH v_t IN ARRAY ARRAY['dovec_settings','dovec_projects','dovec_leads','dovec_project_coords'] LOOP
     v_oid := to_regclass('public.' || v_t);
     IF v_oid IS NULL THEN RAISE EXCEPTION '% is not visible to this block', v_t; END IF;
     IF (SELECT relowner::regrole::text FROM pg_class WHERE oid = v_oid) IS DISTINCT FROM 'postgres' THEN
@@ -382,7 +521,7 @@ BEGIN
     SELECT count(*), coalesce(string_agg(policyname || ':' || cmd || ':' || array_to_string(roles, '+'), ', ' ORDER BY policyname), '(none)')
       INTO v_n, v_names FROM pg_policies WHERE schemaname = 'public' AND tablename = v_t;
     RAISE NOTICE '% policies: % (%)', v_t, v_n, v_names;
-    IF v_n IS DISTINCT FROM (CASE v_t WHEN 'dovec_leads' THEN 0 ELSE 1 END) THEN
+    IF v_n IS DISTINCT FROM (CASE WHEN v_t IN ('dovec_leads','dovec_project_coords') THEN 0 ELSE 1 END) THEN
       RAISE EXCEPTION '% carries % policies (%)', v_t, v_n, v_names;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = v_t AND cmd IS DISTINCT FROM 'SELECT') THEN
@@ -445,7 +584,31 @@ BEGIN
   END IF;
   IF NOT has_table_privilege('service_role', 'public.dovec_projects', 'INSERT,UPDATE') THEN RAISE EXCEPTION 'service_role cannot write dovec_projects'; END IF;
 
+  -- 7c2. dovec_project_coords: no privilege of any kind for an app role (table or column); service_role may only SELECT.
+  v_oid := to_regclass('public.dovec_project_coords');
+  FOREACH v_role IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF has_table_privilege(v_role, v_oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+       OR EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = v_oid AND a.attnum > 0 AND NOT a.attisdropped
+                   AND has_column_privilege(v_role, v_oid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')) THEN
+      RAISE EXCEPTION '% holds a privilege on dovec_project_coords', v_role;
+    END IF;
+  END LOOP;
+  IF NOT has_table_privilege('service_role', v_oid, 'SELECT') OR has_table_privilege('service_role', v_oid, 'INSERT,UPDATE,DELETE,TRUNCATE') THEN
+    RAISE EXCEPTION 'service_role must SELECT and nothing else on dovec_project_coords';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a WHERE c.oid = v_oid AND a.grantee = 0) THEN
+    RAISE EXCEPTION 'dovec_project_coords carries a PUBLIC grant';
+  END IF;
+
   -- 7d. Function grants (aclexplode, so a missing grant reads as absent).
+  FOREACH v_t IN ARRAY ARRAY['public.dovec_sync_coords()','public.dovec_coord_status()'] LOOP
+    IF to_regprocedure(v_t) IS NULL THEN RAISE EXCEPTION '% is missing', v_t; END IF;
+    IF has_function_privilege('anon', v_t, 'EXECUTE') OR has_function_privilege('authenticated', v_t, 'EXECUTE')
+       OR EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = to_regprocedure(v_t) AND a.grantee = 0) THEN
+      RAISE EXCEPTION '% is executable by an app role or PUBLIC', v_t;
+    END IF;
+    IF NOT has_function_privilege('service_role', v_t, 'EXECUTE') THEN RAISE EXCEPTION 'service_role lost EXECUTE on %', v_t; END IF;
+  END LOOP;
   IF has_function_privilege('anon', 'public.dovec_lead_counts()', 'EXECUTE') THEN RAISE EXCEPTION 'anon can EXECUTE dovec_lead_counts'; END IF;
   IF NOT has_function_privilege('authenticated', 'public.dovec_lead_counts()', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated lost EXECUTE on dovec_lead_counts'; END IF;
   FOREACH v_t IN ARRAY ARRAY['public.dovec_leads_wipe_pii()','public.dovec_leads_forget_user()'] LOOP
@@ -464,6 +627,19 @@ BEGIN
   IF (SELECT pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
        WHERE d.adrelid = 'public.dovec_settings'::regclass AND a.attname = 'published') IS DISTINCT FROM 'false' THEN
     RAISE EXCEPTION 'dovec_settings.published DEFAULT is not false';
+  END IF;
+
+  -- 7e2. The WhatsApp line and the five seeded pins are exactly what was agreed (derived from the table, printed).
+  IF (SELECT whatsapp_e164 FROM public.dovec_settings WHERE id = 1) IS DISTINCT FROM '+905338880515' THEN
+    RAISE EXCEPTION 'dovec_settings.whatsapp_e164 is not the agreed sales line';
+  END IF;
+  SELECT count(*), string_agg(seed_name, ', ' ORDER BY seed_name) INTO v_n, v_names FROM public.dovec_project_coords;
+  RAISE NOTICE 'dovec_project_coords seeds: % (%)', v_n, v_names;
+  IF v_n IS DISTINCT FROM 5 OR (SELECT count(*) FROM public.dovec_project_coords c JOIN (VALUES
+       ('D-Point', 35.2695453, 33.901635), ('Natulux', 35.3632832, 33.6722565), ('Courtyard Platinum', 35.3261494, 33.9589785),
+       ('Querencia Long Beach', 35.2656637, 33.9091918), ('Long Beach Panorama', 35.2572, 33.8945)) e(n, la, lo)
+       ON e.n = c.seed_name AND e.la = c.latitude AND e.lo = c.longitude) IS DISTINCT FROM 5 THEN
+    RAISE EXCEPTION 'dovec_project_coords is not exactly the five agreed pins';
   END IF;
 
   -- 7f. No foreign key from dovec_leads to anything that account deletion touches (only the project FK exists).
@@ -628,6 +804,91 @@ BEGIN
   RAISE NOTICE 'dovec: read path hides stale / suspended / delisted, leads closed to app roles, wipe works, probe rolled back';
 END $$;
 
+-- 7i. Pins and the test enquiry, measured as the roles that matter, in a block that ends in a deliberate exception.
+DO $$
+DECLARE
+  v_anon  text := 'unset';
+  v_att   int  := -1;
+  v_lat   numeric;
+  v_near  text;
+  v_stat  jsonb;
+  v_t1    text := 'skipped';
+  v_dup   text := 'unset';
+  v_t2    text := 'unset';
+  v_nt    text := 'unset';
+  v_np    text := 'unset';
+  v_skip  boolean := EXISTS (SELECT 1 FROM public.dovec_leads WHERE is_test);
+BEGIN
+  BEGIN
+    INSERT INTO public.dovec_projects (id, name, city, status, website_url) VALUES
+      ('zz-coord-1', 'D-Point', 'Probe city', 'on_sale', 'https://example.com/c1'),
+      ('zz-coord-2', 'natulux', 'Probe city', 'on_sale', 'https://example.com/c2');
+    SET LOCAL ROLE anon;
+    BEGIN PERFORM public.dovec_sync_coords(); v_anon := 'ALLOWED'; EXCEPTION WHEN insufficient_privilege THEN v_anon := 'denied'; END;
+    RESET ROLE;
+    SET LOCAL ROLE service_role;
+    v_stat := public.dovec_sync_coords();                                              -- positive control for the denial above
+    RESET ROLE;
+    SELECT latitude INTO v_lat FROM public.dovec_projects WHERE id = 'zz-coord-1';
+    SELECT count(*) INTO v_att FROM public.dovec_project_coords WHERE seed_name = 'D-Point' AND project_id = 'zz-coord-1' AND last_status = 'matched';
+    SELECT last_status INTO v_near FROM public.dovec_project_coords WHERE seed_name = 'Natulux';
+
+    IF NOT v_skip THEN
+      SET LOCAL ROLE service_role;
+      -- first, while no test row exists, so only the CHECK can refuse it (not the one-row index)
+      BEGIN
+        INSERT INTO public.dovec_leads (client_request_id, payload_hash, name, phone, language, language_code, consent, consent_text_version, status, external_id, is_test)
+        VALUES (gen_random_uuid(), repeat('a', 64), 'ADA TEST', '+441234567890', 'Turkish', 'tr', true, 'probe', 'pending', 'TEST-2', true);
+        v_t2 := 'ACCEPTED';
+      EXCEPTION WHEN check_violation THEN v_t2 := 'rejected'; END;
+      IF v_t2 IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'external id TEST-2 was accepted'; END IF;
+      -- before the real TEST-1 exists, so only the CHECK can refuse it (not the unique external_id)
+      BEGIN
+        INSERT INTO public.dovec_leads (client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status, external_id)
+        VALUES (gen_random_uuid(), repeat('a', 64), 'zz-coord-1', 'Probe Person', '+441234567890', 'English', 'en', true, 'probe', 'pending', 'TEST-1');
+        v_nt := 'ACCEPTED';
+      EXCEPTION WHEN check_violation THEN v_nt := 'rejected'; END;
+      IF v_nt IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'TEST-1 was accepted on a row that is not is_test'; END IF;
+      INSERT INTO public.dovec_leads (client_request_id, payload_hash, name, phone, language, language_code, consent, consent_text_version, status, external_id, is_test)
+      VALUES (gen_random_uuid(), repeat('a', 64), 'ADA TEST', '+441234567890', 'Turkish', 'tr', true, 'probe', 'pending', 'TEST-1', true);
+      v_t1 := 'accepted';
+      BEGIN
+        INSERT INTO public.dovec_leads (client_request_id, payload_hash, name, phone, language, language_code, consent, consent_text_version, status, external_id, is_test)
+        VALUES (gen_random_uuid(), repeat('a', 64), 'ADA TEST', '+441234567890', 'Turkish', 'tr', true, 'probe', 'pending', 'TEST-1', true);
+        v_dup := 'ACCEPTED';
+      EXCEPTION WHEN unique_violation THEN v_dup := 'rejected'; END;
+      BEGIN
+        INSERT INTO public.dovec_leads (client_request_id, payload_hash, name, phone, language, language_code, consent, consent_text_version, status)
+        VALUES (gen_random_uuid(), repeat('a', 64), 'Probe Person', '+441234567890', 'English', 'en', true, 'probe', 'pending');
+        v_np := 'ACCEPTED';
+      EXCEPTION WHEN check_violation THEN v_np := 'rejected'; END;
+      RESET ROLE;
+    END IF;
+    RAISE EXCEPTION 'probe_rollback';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM IS DISTINCT FROM 'probe_rollback' THEN RAISE; END IF;
+  END;
+  RESET ROLE;
+
+  RAISE NOTICE 'pins: anon exec=%, exact name attached=%, near-miss status=%; test enquiry: first=%, second=%, TEST-2=%, TEST-1 without is_test=%, no project without is_test=%',
+    v_anon, v_att, v_near, v_t1, v_dup, v_t2, v_nt, v_np;
+  IF v_anon IS DISTINCT FROM 'denied' THEN RAISE EXCEPTION 'an app role could run dovec_sync_coords'; END IF;
+  IF v_att IS DISTINCT FROM 1 OR v_lat IS DISTINCT FROM 35.2695453 THEN RAISE EXCEPTION 'positive control failed: an exact-name project was not pinned (att=%, lat=%)', v_att, v_lat; END IF;
+  IF v_near IS DISTINCT FROM 'no_match' THEN RAISE EXCEPTION 'a lower-case near-miss was attached or mis-reported (%)', v_near; END IF;
+  IF jsonb_typeof(v_stat -> 'unmatched') IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'dovec_coord_status has no unmatched list'; END IF;
+  IF NOT v_skip THEN
+    IF v_t1 IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'positive control failed: the test enquiry shape was not accepted'; END IF;
+    IF v_dup IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'a second test enquiry was accepted'; END IF;
+    IF v_t2 IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'external id TEST-2 was accepted'; END IF;
+    IF v_nt IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'TEST-1 was accepted on a row that is not is_test'; END IF;
+    IF v_np IS DISTINCT FROM 'rejected' THEN RAISE EXCEPTION 'a non-test enquiry without a project was accepted'; END IF;
+  END IF;
+  IF (SELECT count(*) FROM public.dovec_projects WHERE id LIKE 'zz-coord-%') IS DISTINCT FROM 0
+     OR (SELECT count(*) FROM public.dovec_project_coords WHERE project_id LIKE 'zz-coord-%') IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'the pin probe left rows behind';
+  END IF;
+END $$;
+
 -- ─── 5. contact_events: module 'dovec' (WhatsApp taps on the thank-you screen) ───
 -- contact_events.entity_id is uuid and dovec_projects.id is Döveç's text id, so each project carries its own
 -- entity_uuid (above): generated here, never written by sync-dovec (its upsert does not name the column), readable
@@ -728,7 +989,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261229_dovec_projects.sql', '0aa928b9a909b0221183df784327a535ba4c8a8726b8a076337cb6664967d5fb')
+VALUES ('20261229_dovec_projects.sql', '0550d478e1279be063b1230233b24624e3aa2523d9f77e2cf45cf73538503f47')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

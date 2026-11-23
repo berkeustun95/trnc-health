@@ -6,10 +6,13 @@
 //     -> 400 invalid_request{field} / consent_required · 403 sign_in_required / under_18 · 404 project_unavailable
 //        409 request_changed · 429 rate_limited
 //   POST { mode: 'retry' }                                         (service key only: cron 20261230)
+//   POST { mode: 'test_lead', dry?: boolean }                      (service key only: workflow dovec-test-lead; dry by default)
 //
 // Deploy:  scripts/fn-deploy.sh dovec-lead --go   (after Berke's go; verify_jwt true, deploy-config.json)
 // Secrets: DOVEC_PARTNER_KEY (Bearer for Döveç), DOVEC_LEADS_MODE ('live' = lock 2 of 2; with the code constant
 //          LEADS_LIVE_ALLOWED in ../_shared/dovec-lead.mjs = lock 1). Unless BOTH, nothing leaves: status 'mock'.
+//          The one test enquiry has its OWN locks: constant TEST_LEAD_ALLOWED AND DOVEC_LEADS_MODE === 'test_once';
+//          its phone is DOVEC_TEST_LEAD_PHONE (E.164). Under test_once user enquiries stay 'mock'.
 // Who: the caller's id comes from auth.getUser() on THAT JWT, never from the body. Guests are refused. dovec_leads has no
 //      policy and no grant for an app role: this function (service role) is the only way in and never returns another
 //      person's lead.
@@ -22,7 +25,7 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const ONE_JWT = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/
 const PENDING_GRACE_MS = 10 * 60000
-const COLS = 'id,external_id,status,payload_hash,attempts,project_id,unit_type,name,phone,email,message,language_code,consent,created_at,next_attempt_at'
+const COLS = 'id,external_id,status,payload_hash,attempts,project_id,unit_type,name,phone,email,message,language_code,consent,created_at,next_attempt_at,is_test'
 
 const dueFilter = (nowIso: string) =>
   `next_attempt_at.lte.${nowIso},and(next_attempt_at.is.null,created_at.lte.${new Date(new Date(nowIso).getTime() - PENDING_GRACE_MS).toISOString()})`
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
       return data
     },
     async countLeads({ userId, sinceIso }: { userId?: string; sinceIso: string }) {
-      let q = admin.from('dovec_leads').select('id', { count: 'exact', head: true }).gte('created_at', sinceIso)
+      let q = admin.from('dovec_leads').select('id', { count: 'exact', head: true }).eq('is_test', false).gte('created_at', sinceIso)
       if (userId) q = q.eq('user_id', userId)
       const { count, error } = await q
       if (error) throw error
@@ -81,11 +84,16 @@ Deno.serve(async (req) => {
       if (error) throw error
     },
     async dueLeads(limit: number, nowIso: string, statuses: string[]) {
-      const { data, error } = await admin.from('dovec_leads').select(COLS).in('status', statuses)
+      const { data, error } = await admin.from('dovec_leads').select(COLS).eq('is_test', false).in('status', statuses)
         .gt('created_at', new Date(new Date(nowIso).getTime() - STALE_LEAD_MS).toISOString())
         .or(dueFilter(nowIso)).order('created_at').limit(limit)
       if (error) throw error
       return data ?? []
+    },
+    async findTestLead() {
+      const { data, error } = await admin.from('dovec_leads').select(COLS).eq('is_test', true).maybeSingle()
+      if (error) throw error
+      return data
     },
     async claimLead(id: number, nowIso: string, untilIso: string) {
       const { data, error } = await admin.from('dovec_leads').update({ next_attempt_at: untilIso }).eq('id', id)
@@ -105,7 +113,7 @@ Deno.serve(async (req) => {
       caller, body,
       deps: {
         store, log: (s: string) => console.log(s),
-        env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY') },
+        env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY'), testPhone: Deno.env.get('DOVEC_TEST_LEAD_PHONE') },
       },
     })
     return json(res.status, res.body)

@@ -10,6 +10,9 @@
 //   stale                no good sync for more than 30 minutes (the cron runs every 10)
 //   stuck                an enquiry has waited for a send (retry / pending) for over an hour
 //   rejected             an enquiry was rejected by Döveç or failed for good in the last 24 hours
+// Map pins (informational, NEVER red): prints dovec_coord_status() (seeded pins not attached, attached projects renamed since,
+// live projects without a pin). Public marketing names and Döveç project ids only, no user data; a missing function (20261229
+// not applied) or a read error is printed, not failed.
 // NOT ARMED until the first sync has ever run (last_run_at is null): the workflow lands with the code, the cron lands later
 // (20261230), and an hourly red before go-live would teach everyone to ignore it. Arming is the first sync run itself.
 import { createClient } from '@supabase/supabase-js'
@@ -50,6 +53,17 @@ console.log(`\n── dovec health ──
   lead stuck > 1 h : ${stuck}
   rejected/failed 24 h : ${rejected}
 `)
+
+const coords = await sb.rpc('dovec_coord_status')
+if (coords.error) console.log(`  pins             : not readable (${coords.error.code ?? 'error'})`)
+else {
+  const c = coords.data ?? {}
+  const list = (a, f) => (Array.isArray(a) && a.length ? a.map(f).join('; ') : 'none')
+  console.log(`  pins unmatched   : ${list(c.unmatched, x => `${x.seed} (${x.reason})`)}
+  pins renamed     : ${list(c.renamed, x => `${x.seed} -> ${x.name}`)}
+  live without pin : ${list(c.live_without_coords, x => x.name)}
+`)
+}
 
 const reds = []
 if (s.suspended) reds.push('The Döveç partner key was rejected (suspended): the app hides every project. Check the key with Döveç.')

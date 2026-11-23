@@ -3,8 +3,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Applied LATER than 20261229, as its own go, AFTER the sync-dovec and dovec-lead functions are deployed and the
--- Vault secret `dovec_sync_key` exists (it is the service key the function accepts; the cron job reads it by name,
--- the key is never in this file). The file refuses to run if the secret is missing.
+-- Vault secret `novest_sync_key` exists. It is the service key already used by the weekend-digest, duty-push and
+-- marketplace jobs (20261177, 20261185); the cron jobs read it by name, never inline, and both functions accept it
+-- through the same serviceCaller as those. No new Vault secret is needed. The file refuses to run if it is missing.
 --
 --   dovec-sync         every 10 minutes: POST sync-dovec (the function pulls the Döveç projects feed).
 --   dovec-lead-retry   every 10 minutes: POST dovec-lead {"mode":"retry"}, ONLY when a lead is waiting (status 'retry'
@@ -30,8 +31,8 @@ BEGIN
   IF to_regclass('public.dovec_settings') IS NULL OR to_regprocedure('public.dovec_leads_wipe_pii()') IS NULL THEN
     RAISE EXCEPTION '20261229 is not applied: apply it before this file';
   END IF;
-  IF (SELECT count(*) FROM vault.secrets WHERE name = 'dovec_sync_key') IS DISTINCT FROM 1 THEN
-    RAISE EXCEPTION 'Vault secret dovec_sync_key is missing or duplicated — the jobs would POST without a key';
+  IF (SELECT count(*) FROM vault.secrets WHERE name = 'novest_sync_key') IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'Vault secret novest_sync_key is missing or duplicated — the jobs would POST without a key';
   END IF;
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync') THEN PERFORM cron.unschedule('dovec-sync'); END IF;
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-lead-retry') THEN PERFORM cron.unschedule('dovec-lead-retry'); END IF;
@@ -43,7 +44,7 @@ SELECT cron.schedule('dovec-sync', '*/10 * * * *', $job$
   SELECT net.http_post(
     url     := 'https://jeihxnwqytnxtytgkzgf.supabase.co/functions/v1/sync-dovec',
     headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' ||
-                 (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'dovec_sync_key')),
+                 (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'novest_sync_key')),
     body    := '{}'::jsonb,
     timeout_milliseconds := 60000);
 $job$);
@@ -52,11 +53,12 @@ SELECT cron.schedule('dovec-lead-retry', '5,15,25,35,45,55 * * * *', $job$
   SELECT net.http_post(
     url     := 'https://jeihxnwqytnxtytgkzgf.supabase.co/functions/v1/dovec-lead',
     headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' ||
-                 (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'dovec_sync_key')),
+                 (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'novest_sync_key')),
     body    := '{"mode":"retry"}'::jsonb,
     timeout_milliseconds := 60000)
   WHERE EXISTS (SELECT 1 FROM public.dovec_leads l
-                 WHERE l.status = ANY (ARRAY['retry','pending']::text[])
+                 WHERE NOT l.is_test
+                   AND l.status = ANY (ARRAY['retry','pending']::text[])
                    AND l.created_at > now() - interval '7 days'
                    AND COALESCE(l.next_attempt_at, l.created_at + interval '10 minutes') <= now());
 $job$);
@@ -85,15 +87,16 @@ BEGIN
 
   SELECT count(*) INTO v_n FROM cron.job WHERE jobname = 'dovec-sync' AND active AND schedule = '*/10 * * * *'
      AND command LIKE '%/functions/v1/sync-dovec%'
-     AND command LIKE '%vault.decrypted_secrets WHERE name = ''dovec_sync_key''%'
+     AND command LIKE '%vault.decrypted_secrets WHERE name = ''novest_sync_key''%'
      AND command LIKE '%timeout_milliseconds := 60000%'
      AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%';
   IF v_n IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'dovec-sync is not exactly one active, Vault-keyed job'; END IF;
 
   SELECT count(*) INTO v_n FROM cron.job WHERE jobname = 'dovec-lead-retry' AND active AND schedule = '5,15,25,35,45,55 * * * *'
      AND command LIKE '%/functions/v1/dovec-lead%' AND command LIKE '%"mode":"retry"%'
-     AND command LIKE '%vault.decrypted_secrets WHERE name = ''dovec_sync_key''%'
+     AND command LIKE '%vault.decrypted_secrets WHERE name = ''novest_sync_key''%'
      AND command LIKE '%WHERE EXISTS (SELECT 1 FROM public.dovec_leads l%'
+     AND command LIKE '%WHERE NOT l.is_test%'
      AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%';
   IF v_n IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'dovec-lead-retry is not exactly one active, gated, Vault-keyed job'; END IF;
 
@@ -123,7 +126,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261230_dovec_cron.sql', '0de88bcdc61a893438a88f2ea7fd9e2b01b5341c3e1275abe3da39eac848bba4')
+VALUES ('20261230_dovec_cron.sql', 'a366baec74c667392ada9613e38c34d0e16b61d462cbc9a4135eb967028a934d')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

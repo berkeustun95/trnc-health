@@ -330,8 +330,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261226_crunchy_express_hotdog_sausage_extras.sql', '483e3d342aa5dbf50b3d4a6cc471c9bb0bacb5c6079606fbe2e6ee7579e501a9'),
   ('20261227_ad_house_daily.sql', '0b6d763ccf4e782cf4c9bfeec6da00583eb0f2c982d61bc6c9ad1288d3d8610e'),
   ('20261228_live_scores_ktff.sql', '655e1126d08ed91e2caa34bdcf7dc82cb0752cd34dc0d17026d94ea9a31eaf1d'),
-  ('20261229_dovec_projects.sql', '0aa928b9a909b0221183df784327a535ba4c8a8726b8a076337cb6664967d5fb'),
-  ('20261230_dovec_cron.sql', '0de88bcdc61a893438a88f2ea7fd9e2b01b5341c3e1275abe3da39eac848bba4')
+  ('20261229_dovec_projects.sql', '0550d478e1279be063b1230233b24624e3aa2523d9f77e2cf45cf73538503f47'),
+  ('20261230_dovec_cron.sql', 'a366baec74c667392ada9613e38c34d0e16b61d462cbc9a4135eb967028a934d')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

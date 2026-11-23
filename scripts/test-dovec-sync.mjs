@@ -145,6 +145,27 @@ for (const [label, resp, status] of [
   t('a failed write is write_error and the stamp is not advanced', [r.status, 'last_good_sync_at' in store.states.at(-1)], ['write_error', false])
 }
 
+console.log('pin status rides along (store.syncCoords) and never blocks the sync')
+{
+  const status = { unmatched: [{ seed: 'Natulux', reason: 'no_match' }], renamed: [], live_without_coords: [{ id: 'fx-1', name: 'Fictional Heights' }] }
+  const store = fakeStore(IDS); let calls = 0
+  store.syncCoords = async () => { calls++; return status }
+  const r = await run(reply(200, FX), store)
+  t('a good run calls syncCoords once, after the state is written, and returns its status', [r.status, calls, r.coords, store.states.length], ['ok', 1, status, 1])
+  const bad2 = fakeStore(IDS); bad2.syncCoords = async () => { throw new Error('boom') }
+  const r2 = await run(reply(200, FX), bad2)
+  t('a failing pin sync is reported and the sync is still ok and stamped', [r2.status, r2.coords, bad2.states.at(-1).last_run_status, bad2.states.at(-1).last_good_sync_at], ['ok', { error: 'coords_sync_failed' }, 'ok', '2026-11-23T10:00:00.000Z'])
+  const noCoords = fakeStore(IDS)
+  t('a store without syncCoords is fine and returns no coords', 'coords' in (await run(reply(200, FX), noCoords)), false)
+  const failed = fakeStore(IDS); let c3 = 0; failed.syncCoords = async () => { c3++; return status }
+  const r4 = await run(reply(503, { error: 'not_provisioned' }), failed)
+  t('a failed fetch does not touch the pins', [r4.status === 'ok', c3, 'coords' in r4], [false, 0, false])
+  const failU = fakeStore(IDS, { failUpsert: true }); let c4 = 0; failU.syncCoords = async () => { c4++; return status }
+  const r5 = await run(reply(200, FX), failU)
+  t('a failed write does not touch the pins', [r5.status, c4], ['write_error', 0])
+  t('the upsert never carries latitude or longitude (so it cannot clear a pin)', store.upserts.some(u => 'latitude' in u || 'longitude' in u), false)
+}
+
 console.log('request shape (mocked fetch records it)')
 {
   let seen
