@@ -14,6 +14,8 @@ import { adRatioFor } from '../constants/ads'
 // and only then shrink the headline. Nothing may clip. numberOfLines hides overflow from layout, so the
 // decision reads unclamped hidden copies of the two texts (same width, same styles). The headline shrinks in
 // steps of font size AND line height together (adjustsFontSizeToFit keeps the line height, leaving a gap).
+// The title probe is keyed on k: onLayout fires only when a size changes, so a step landing on the same height
+// would otherwise never re-tag hk and leave the card hidden.
 // boxRef: AdSlot measures this box to tell whether the banner is on screen (the margin sits outside it).
 export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
   const [room, setRoom] = useState(0)
@@ -49,6 +51,7 @@ export default function AdHouseBanner({ boxRef, position, lang, onPress }) {
           <View style={s.text} importantForAccessibility="no-hide-descendants">
             <View style={s.probe} pointerEvents="none">
               <Text
+                key={k}
                 style={titleScaled}
                 maxFontSizeMultiplier={TEXT_SCALE_CAP}
                 onTextLayout={e => { const n = e.nativeEvent.lines.length; setTitle(p => (p.lines === n && p.lk === k ? p : { ...p, lines: n, lk: k })) }}
