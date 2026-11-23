@@ -773,10 +773,11 @@ WITH report AS (
     ('20261227_ad_house_daily','bump_house_ad_counter'),
     -- 20261228: the cron's due-gate; service_role only, so there is deliberately NO G row (G lists authenticated EXECUTE) - the H token owns the grants.
     ('20261228_live_scores_ktff','ktff_sync_due'),
-    -- 20261229 Döveç: the freshness helper inside the read policy, the two retention / erasure functions and the admin counts; red until applied.
+    -- 20261229 Döveç: the freshness helper inside the read policy, the two retention / erasure functions, the atomic enquiry-limit trigger function and the admin counts; red until applied.
     ('20261229_dovec_projects','dovec_feed_is_fresh'),
     ('20261229_dovec_projects','dovec_leads_forget_user'),
     ('20261229_dovec_projects','dovec_leads_wipe_pii'),
+    ('20261229_dovec_projects','dovec_leads_enforce_limits'),
     ('20261229_dovec_projects','dovec_lead_counts'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
@@ -1021,8 +1022,9 @@ WITH report AS (
   FROM (VALUES
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','profiles_age_confirmed_stamp'),
-    -- 20261229 Döveç: wipes a deleted user's enquiry PII (AFTER DELETE on profiles); registered ahead of the apply; red until it runs.
+    -- 20261229 Döveç: wipes a deleted user's enquiry PII (AFTER DELETE on profiles) and the atomic enquiry limits (BEFORE INSERT on dovec_leads, advisory lock); registered ahead of the apply; red until it runs.
     ('20261229_dovec_projects','dovec_leads_forget_user'),
+    ('20261229_dovec_projects','dovec_leads_rate_limit'),
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages_rate_guard'),
     -- Araçlar (20261165/20261166): registered ahead of the apply; red until it runs.

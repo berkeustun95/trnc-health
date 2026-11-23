@@ -3,7 +3,7 @@
 //   POST { client_request_id, project_id, unit_type?, name, phone, email?, message?, consent: true,
 //          consent_text_version, language }                      (a signed-in, non-guest user)
 //     -> 200 { ok: true, external_id, status }  | 200 { ok: false, error: 'rejected', external_id }
-//     -> 400 invalid_request{field} / consent_required · 403 sign_in_required · 404 project_unavailable
+//     -> 400 invalid_request{field} / consent_required · 403 sign_in_required / under_18 · 404 project_unavailable
 //        409 request_changed · 429 rate_limited
 //   POST { mode: 'retry' }                                         (service key only: cron 20261230)
 //
@@ -16,13 +16,16 @@
 // PRIVACY: logs hold external_id, a status word and an HTTP code. Never a name, phone, e-mail, message or user id.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
-import { handleLead } from '../_shared/dovec-lead.mjs'
+import { handleLead, STALE_LEAD_MS } from '../_shared/dovec-lead.mjs'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const ONE_JWT = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/
 const PENDING_GRACE_MS = 10 * 60000
 const COLS = 'id,external_id,status,payload_hash,attempts,project_id,unit_type,name,phone,email,message,language_code,consent,created_at,next_attempt_at'
+
+const dueFilter = (nowIso: string) =>
+  `next_attempt_at.lte.${nowIso},and(next_attempt_at.is.null,created_at.lte.${new Date(new Date(nowIso).getTime() - PENDING_GRACE_MS).toISOString()})`
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
@@ -79,11 +82,21 @@ Deno.serve(async (req) => {
     },
     async dueLeads(limit: number, nowIso: string) {
       const { data, error } = await admin.from('dovec_leads').select(COLS).in('status', ['retry', 'pending'])
-        .order('created_at').limit(200)
+        .gt('created_at', new Date(new Date(nowIso).getTime() - STALE_LEAD_MS).toISOString())
+        .or(dueFilter(nowIso)).order('created_at').limit(limit)
       if (error) throw error
-      const t = new Date(nowIso).getTime()
-      return (data ?? []).filter((l: { next_attempt_at: string | null; created_at: string }) =>
-        (l.next_attempt_at ? new Date(l.next_attempt_at).getTime() : new Date(l.created_at).getTime() + PENDING_GRACE_MS) <= t).slice(0, limit)
+      return data ?? []
+    },
+    async claimLead(id: number, nowIso: string, untilIso: string) {
+      const { data, error } = await admin.from('dovec_leads').update({ next_attempt_at: untilIso }).eq('id', id)
+        .in('status', ['retry', 'pending']).or(dueFilter(nowIso)).select(COLS).maybeSingle()
+      if (error) throw error
+      return data
+    },
+    async getDateOfBirth(userId: string) {
+      const { data, error } = await admin.from('profiles').select('date_of_birth').eq('id', userId).maybeSingle()
+      if (error) throw error
+      return data?.date_of_birth ?? null
     },
   }
 
@@ -92,7 +105,7 @@ Deno.serve(async (req) => {
       caller, body,
       deps: {
         store, log: (s: string) => console.log(s),
-        env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY'), baseUrl: Deno.env.get('DOVEC_API_BASE_URL') },
+        env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY') },
       },
     })
     return json(res.status, res.body)

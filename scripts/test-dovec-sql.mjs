@@ -36,6 +36,56 @@ INSERT INTO auth.users (id) VALUES ('${ADMIN}'), ('${CUSTOMER}'), ('${OTHER}');
 INSERT INTO public.profiles (id, role) VALUES ('${ADMIN}', 'admin'), ('${CUSTOMER}', 'customer'), ('${OTHER}', 'customer');
 `
 
+
+const LU = '00000000-0000-4000-8000-0000000000b1', LV = '00000000-0000-4000-8000-0000000000b2', LW = '00000000-0000-4000-8000-0000000000b3'
+const ins = (user, extra = {}) => {
+  const cols = { client_request_id: 'gen_random_uuid()', payload_hash: "repeat('d', 64)", project_id: "'p1'", name: "'Probe Person'", phone: "'+441234567890'",
+    language: "'English'", language_code: "'en'", consent: 'true', consent_text_version: "'v'", status: "'sent'", user_id: user ? `'${user}'` : 'NULL', ...extra }
+  return `INSERT INTO public.dovec_leads (${Object.keys(cols).join(',')}) VALUES (${Object.values(cols).join(',')})`
+}
+async function limitChecks(d) {
+  await d.exec(`DELETE FROM public.dovec_leads`)
+  const svc = sql => asRole(d, 'service_role', null, sql)
+  const first = []
+  for (let i = 0; i < 4; i++) first.push((await svc(ins(LU))).ok)
+  t('limit: 3 an hour per user, the 4th insert is refused', first, [true, true, true, false])
+  t('limit: the refusal is the limit trigger', /dovec_rate_limited/.test((await svc(ins(LU))).msg || ''), true)
+  t('limit: nothing was stored by the refusal', (await d.query(`SELECT count(*)::int n FROM public.dovec_leads WHERE user_id = '${LU}'`)).rows[0].n, 3)
+  t('limit: another user is accepted (positive control)', (await svc(ins(LV))).ok, true)
+  const code = await d.query(ins(LU)).then(() => null, e => e.code ?? e.sqlState ?? null)
+  t('limit: SQLSTATE is DV429 (what the edge function maps to 429)', code, 'DV429')
+  t('limit: trigger function takes the advisory lock', /pg_advisory_xact_lock/.test((await d.query(`SELECT pg_get_functiondef('public.dovec_leads_enforce_limits()'::regprocedure) AS d`)).rows[0].d), true)
+  t('limit: an app role cannot execute the trigger function', [(await asRole(d, 'authenticated', LU, `SELECT public.dovec_leads_enforce_limits()`)).ok, (await asRole(d, 'anon', null, `SELECT public.dovec_leads_enforce_limits()`)).ok], [false, false])
+  // day limit: 10 in the last day, none in the last hour
+  const old = (n, ago) => Array.from({ length: n }, () => ins(LW, { created_at: `now() - interval '${ago}'` })).join(';\n')
+  await d.exec(old(10, '5 hours'))
+  t('limit: 10 a day per user (older than an hour): the 11th is refused', (await svc(ins(LW))).ok, false)
+  await d.exec(`DELETE FROM public.dovec_leads WHERE user_id = '${LW}'`)
+  await d.exec(old(10, '2 days'))
+  t('limit: rows older than a day do not count (positive control)', (await svc(ins(LW))).ok, true)
+  // global: fill to 200 in the last day with wiped (user_id NULL) rows
+  await d.exec(`DELETE FROM public.dovec_leads`)
+  await d.exec(`INSERT INTO public.dovec_leads (client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status)
+    SELECT gen_random_uuid(), repeat('e', 64), 'p1', 'x', '+441234567890', 'English', 'en', true, 'v', 'sent' FROM generate_series(1, 199)`)
+  t('limit: the 200th lead of the day is accepted', (await svc(ins(LU))).ok, true)
+  t('limit: the 201st is refused for everyone', [(await svc(ins(LV))).ok, /dovec_rate_limited/.test((await svc(ins(LV))).msg || '')], [false, true])
+  await d.exec(`DELETE FROM public.dovec_leads WHERE id = (SELECT min(id) FROM public.dovec_leads)`)
+  t('limit: one slot freed, accepted again (positive control)', (await svc(ins(LV))).ok, true)
+
+  // 7-day settle in the wipe function
+  await d.exec(`DELETE FROM public.dovec_leads`)
+  await d.exec([ins(LU, { status: "'retry'", created_at: "now() - interval '8 days'", next_attempt_at: "now() + interval '1 hour'" }),
+    ins(LV, { status: "'pending'", created_at: "now() - interval '8 days'" }),
+    ins(LW, { status: "'retry'", created_at: "now() - interval '2 days'", next_attempt_at: "now() + interval '1 hour'" }),
+    ins(LU, { status: "'retry'", created_at: "now() - interval '91 days'" })].join(';\n'))
+  const w = await asRole(d, 'service_role', null, `SELECT public.dovec_leads_wipe_pii() AS n`)
+  t('wipe: runs as service_role and returns the wiped count', [w.ok, w.rows?.[0]?.n], [true, 1])
+  t('wipe: retry/pending older than 7 days are failed, the 2-day retry is untouched',
+    (await d.query(`SELECT status, next_attempt_at IS NULL AS na, name IS NULL AS wiped FROM public.dovec_leads ORDER BY created_at`)).rows,
+    [{ status: 'failed', na: true, wiped: true }, { status: 'failed', na: true, wiped: false }, { status: 'failed', na: true, wiped: false }, { status: 'retry', na: false, wiped: false }])
+  await d.exec(`DELETE FROM public.dovec_leads; ${ins(null)}`)   // leave one row for the admin-counts check below
+}
+
 let bad = 0
 const t = (name, got, want) => {
   const ok = JSON.stringify(got) === JSON.stringify(want)
@@ -147,6 +197,9 @@ console.log('20261229 — real file')
     await d.query(`DELETE FROM public.profiles WHERE id = '${OTHER}'`).then(() => 'deleted', e => e.message), 'deleted')
   t('and wipes that user too', (await d.query(`SELECT count(*)::int n FROM public.dovec_leads WHERE name IS NOT NULL`)).rows[0].n, 0)
 
+  // Atomic enquiry limits (BEFORE INSERT trigger) and the 7-day settle in the wipe function.
+  await limitChecks(d)
+
   // Reads as the app roles, with controls.
   t('anon reads the project while fresh (positive control)', (await asRole(d, 'anon', null, `SELECT count(*)::int n FROM public.dovec_projects`)).rows[0].n, 1)
   t('guest/customer reads settings: only the five columns',
@@ -176,6 +229,9 @@ for (const [name, from, to, re] of [
   ['dovec_leads user_id gets an FK', `user_id             uuid,`, `user_id             uuid REFERENCES auth.users(id) ON DELETE SET NULL,`, /foreign keys are/],
   ['published defaults to true', `published         boolean     NOT NULL DEFAULT false`, `published         boolean     NOT NULL DEFAULT true`, /published is not false/],
   ['app role may update projects', `GRANT SELECT ON TABLE public.dovec_projects TO anon, authenticated;`, `GRANT SELECT, UPDATE ON TABLE public.dovec_projects TO anon, authenticated;`, /holds UPDATE on dovec_projects/],
+  ['limit trigger not created', `CREATE TRIGGER dovec_leads_rate_limit BEFORE INSERT ON public.dovec_leads
+  FOR EACH ROW EXECUTE FUNCTION public.dovec_leads_enforce_limits();`, `SELECT 1;`, /dovec_leads_rate_limit trigger missing or wrong/],
+  ['limit function executable by an app role', `REVOKE ALL ON FUNCTION public.dovec_leads_enforce_limits() FROM PUBLIC, anon, authenticated;`, `GRANT EXECUTE ON FUNCTION public.dovec_leads_enforce_limits() TO authenticated;`, /dovec_leads_enforce_limits is executable/],
   ['counts open to non-admins', `IF NOT is_admin() THEN`, `IF false THEN`, /not refused with ADMIN_ONLY/],
 ]) {
   const p = mutant(from, to)
@@ -184,6 +240,19 @@ for (const [name, from, to, re] of [
   const r = await applyFile(d, p)
   t(`${name}: refused`, [r.ok, re.test(r.msg || '')], [false, true])
   if (r.ok === false && !re.test(r.msg || '')) console.log('    refused for a different reason:', r.msg)
+}
+
+console.log('20261229 — red-first: a weakened limit lets the 4th lead through')
+{
+  const p = mutant(`>= 3\n       OR`, `>= 30\n       OR`)
+  if (p) {
+    const d = await freshDb(FIXTURE)
+    t('mutant applies', (await applyFile(d, p)).ok, true)
+    await d.exec(`INSERT INTO public.dovec_projects (id, name, city, status, website_url) VALUES ('p1', 'Fictional Heights', 'Testville', 'on_sale', 'https://example.com/p1')`)
+    const r = []
+    for (let i = 0; i < 4; i++) r.push((await asRole(d, 'service_role', null, ins(LU))).ok)
+    t('with >= 30 the 4th insert is NOT refused (the test above can fail)', r, [true, true, true, true])
+  }
 }
 
 console.log('20261229 — contact_events pre-state and post-state guards')
@@ -248,6 +317,7 @@ CREATE TABLE public.data_jobs (key text PRIMARY KEY, runner text NOT NULL, kind 
     t('B applies with the secret', await applyFile(d, FILE_B), { ok: true, msg: null })
     t('three jobs, one registry row each', (await d.query(`SELECT j.jobname, (SELECT count(*)::int FROM public.data_jobs x WHERE j.jobname = ANY (x.cron_jobnames)) AS rows FROM cron.job j ORDER BY 1`)).rows,
       [{ jobname: 'dovec-lead-retry', rows: 1 }, { jobname: 'dovec-leads-wipe', rows: 1 }, { jobname: 'dovec-sync', rows: 1 }])
+    t('the retry job ignores leads older than 7 days (they are settled by the wipe job)', (await d.query(`SELECT command LIKE '%l.created_at > now() - interval ''7 days''%' AS ok FROM cron.job WHERE jobname = 'dovec-lead-retry'`)).rows, [{ ok: true }])
     t('re-applying B is idempotent', [(await applyFile(d, FILE_B)).ok, (await d.query(`SELECT count(*)::int n FROM cron.job`)).rows[0].n, (await d.query(`SELECT count(*)::int n FROM public.data_jobs`)).rows[0].n], [true, 3, 3])
   }
 }

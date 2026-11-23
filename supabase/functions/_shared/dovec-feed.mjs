@@ -10,6 +10,8 @@
 // Partner rule (Berke, 2026-11-10): an EMPTY field is on purpose. A null from_price / available_units / delivery month /
 // cover is stored as NULL, never skipped, never invented. Only a project with no identity, or a value that is present
 // but unreadable, is skipped (and reported, never fixed silently).
+// The ONLY host the partner key is ever sent to: a fixed constant, no environment override (a changed secret must not
+// be able to redirect the Bearer key).
 export const DEFAULT_BASE_URL = 'https://atlas.dovecgroup.com'
 export const FETCH_TIMEOUT_MS = 20000
 export const MASS_DELIST_FRACTION = 0.5
@@ -105,11 +107,11 @@ export function planRun(mapped, listedIds) {
 }
 
 // One GET. Returns { kind: 'ok', body } or { kind: <last_run_status vocabulary>, detail }.
-export async function fetchProjects({ baseUrl = DEFAULT_BASE_URL, apiKey, fetchImpl = fetch, timeoutMs = FETCH_TIMEOUT_MS }) {
+export async function fetchProjects({ apiKey, fetchImpl = fetch, timeoutMs = FETCH_TIMEOUT_MS }) {
   if (!apiKey) return { kind: 'http_error', detail: 'DOVEC_PARTNER_KEY is not set' }
   let res
   try {
-    res = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/api/partner/projects`, {
+    res = await fetchImpl(`${DEFAULT_BASE_URL}/api/partner/projects`, {
       method: 'GET', headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -134,13 +136,13 @@ const describe = (skipped, extra) => {
 //   store.delist(ids, nowIso)
 //   store.setState(patch)                    patch of dovec_settings status columns
 // Returns { status, detail, valid, skipped, delisted }. Never throws on a Döveç-side problem.
-export async function runSync({ apiKey, baseUrl, fetchImpl, store, now = () => new Date() }) {
+export async function runSync({ apiKey, fetchImpl, store, now = () => new Date() }) {
   const nowIso = now().toISOString()
   const finish = async (status, detail, patch = {}, extra = {}) => {
     await store.setState({ last_run_at: nowIso, last_run_status: status, last_run_detail: detail.slice(0, 1000), ...patch })
     return { status, detail, valid: 0, skipped: 0, delisted: 0, ...extra }
   }
-  const got = await fetchProjects({ baseUrl, apiKey, fetchImpl })
+  const got = await fetchProjects({ apiKey, fetchImpl })
   if (got.kind === 'http_401') return finish('http_401', got.detail, { suspended: true })
   if (got.kind !== 'ok') return finish(got.kind, got.detail)
   const mapped = mapFeed(got.body)

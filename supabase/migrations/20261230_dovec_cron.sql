@@ -8,8 +8,9 @@
 --
 --   dovec-sync         every 10 minutes: POST sync-dovec (the function pulls the Döveç projects feed).
 --   dovec-lead-retry   every 10 minutes: POST dovec-lead {"mode":"retry"}, ONLY when a lead is waiting (status 'retry'
---                      or an unsent 'pending' older than 10 minutes), so an idle system makes no calls.
---   dovec-leads-wipe   daily 03:30 UTC, pure SQL: dovec_leads_wipe_pii() (90-day PII retention).
+--                      or an unsent 'pending' older than 10 minutes, none older than 7 days), so an idle system makes no calls.
+--   dovec-leads-wipe   daily 03:30 UTC, pure SQL: dovec_leads_wipe_pii() (leads still retry/pending after 7 days become
+--                      'failed'; 90-day PII retention).
 --
 -- WHO CAN READ / WRITE WHAT: this file adds no table, policy or grant. The jobs run as postgres inside the database
 -- and reach the functions with the service key; no app role is involved. Each job has exactly one data_jobs row
@@ -56,6 +57,7 @@ SELECT cron.schedule('dovec-lead-retry', '5,15,25,35,45,55 * * * *', $job$
     timeout_milliseconds := 60000)
   WHERE EXISTS (SELECT 1 FROM public.dovec_leads l
                  WHERE l.status = ANY (ARRAY['retry','pending']::text[])
+                   AND l.created_at > now() - interval '7 days'
                    AND COALESCE(l.next_attempt_at, l.created_at + interval '10 minutes') <= now());
 $job$);
 
@@ -121,7 +123,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261230_dovec_cron.sql', '93656097d849f0a64f712b3384cc1819e40e06f47561900c3c2c8e628c4e1c09')
+VALUES ('20261230_dovec_cron.sql', '0de88bcdc61a893438a88f2ea7fd9e2b01b5341c3e1275abe3da39eac848bba4')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

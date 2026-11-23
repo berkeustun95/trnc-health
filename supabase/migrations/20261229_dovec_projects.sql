@@ -245,6 +245,36 @@ GRANT SELECT, INSERT, UPDATE ON TABLE public.dovec_leads TO service_role;
 REVOKE ALL ON SEQUENCE public.dovec_lead_external_seq FROM PUBLIC, anon, authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.dovec_lead_external_seq TO service_role;
 
+-- ─── 3b. Enquiry limits, enforced where the rows are made ───────────────────
+-- 3 per person per hour, 10 per person per day, 200 in all per day. One transaction-level advisory lock serialises every
+-- insert, so two simultaneous requests cannot both pass the count (a count-then-insert in the edge function could).
+-- The edge function maps SQLSTATE DV429 to HTTP 429. Rows whose user_id was wiped still count towards the global limit.
+CREATE OR REPLACE FUNCTION public.dovec_leads_enforce_limits()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('dovec_leads:insert', 0));
+  IF (SELECT count(*) FROM public.dovec_leads WHERE created_at >= now() - interval '1 day') >= 200 THEN
+    RAISE EXCEPTION 'dovec_rate_limited' USING ERRCODE = 'DV429';
+  END IF;
+  IF NEW.user_id IS NOT NULL THEN
+    IF (SELECT count(*) FROM public.dovec_leads WHERE user_id = NEW.user_id AND created_at >= now() - interval '1 hour') >= 3
+       OR (SELECT count(*) FROM public.dovec_leads WHERE user_id = NEW.user_id AND created_at >= now() - interval '1 day') >= 10 THEN
+      RAISE EXCEPTION 'dovec_rate_limited' USING ERRCODE = 'DV429';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.dovec_leads_enforce_limits() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS dovec_leads_rate_limit ON public.dovec_leads;
+CREATE TRIGGER dovec_leads_rate_limit BEFORE INSERT ON public.dovec_leads
+  FOR EACH ROW EXECUTE FUNCTION public.dovec_leads_enforce_limits();
+
 -- ─── 4. Account deletion: wipe the person, keep the row ────────────────────
 CREATE OR REPLACE FUNCTION public.dovec_leads_forget_user()
  RETURNS trigger
@@ -282,6 +312,12 @@ AS $function$
 DECLARE
   v_n integer;
 BEGIN
+  -- A lead still 'retry' / 'pending' after 7 days will never be sent: settle it so the 90-day wipe below covers it.
+  UPDATE public.dovec_leads
+     SET status = 'failed', next_attempt_at = NULL
+   WHERE status = ANY (ARRAY['pending','retry']::text[])
+     AND created_at < now() - interval '7 days';
+
   UPDATE public.dovec_leads
      SET name = NULL, phone = NULL, email = NULL, message = NULL, user_id = NULL,
          pii_wiped_at = now()
@@ -436,6 +472,16 @@ BEGIN
   RAISE NOTICE 'dovec_leads foreign keys: %', v_names;
   IF v_names IS DISTINCT FROM 'dovec_leads_project_fkey->dovec_projects' THEN RAISE EXCEPTION 'dovec_leads foreign keys are %', v_names; END IF;
 
+  -- 7g0. The limit trigger: one BEFORE INSERT row trigger on dovec_leads, function not executable by an app role.
+  IF (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.dovec_leads'::regclass AND tgname = 'dovec_leads_rate_limit' AND NOT tgisinternal) IS DISTINCT FROM 1
+     OR (SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'public.dovec_leads'::regclass AND tgname = 'dovec_leads_rate_limit')
+        NOT LIKE '%BEFORE INSERT ON public.dovec_leads FOR EACH ROW EXECUTE FUNCTION dovec_leads_enforce_limits()%' THEN
+    RAISE EXCEPTION 'dovec_leads_rate_limit trigger missing or wrong';
+  END IF;
+  IF has_function_privilege('anon', 'public.dovec_leads_enforce_limits()', 'EXECUTE') OR has_function_privilege('authenticated', 'public.dovec_leads_enforce_limits()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'dovec_leads_enforce_limits is executable by an app role';
+  END IF;
+
   -- 7g. The deletion trigger exists, is a row trigger AFTER DELETE on profiles, and its function wipes user_id and the four PII columns.
   IF (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.profiles'::regclass AND tgname = 'dovec_leads_forget_user' AND NOT tgisinternal) IS DISTINCT FROM 1
      OR (SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'public.profiles'::regclass AND tgname = 'dovec_leads_forget_user')
@@ -545,7 +591,7 @@ BEGIN
     -- retention: an old final lead is wiped (and loses user_id), a young one is not
     UPDATE public.dovec_leads SET created_at = now() - interval '91 days' WHERE external_id = v_ext;
     INSERT INTO public.dovec_leads (user_id, client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status, created_at)
-    VALUES (v_admin, '00000000-0000-4000-8000-0000000000f3', repeat('c', 64), v_probe, 'Young Person', '+441234567891', 'English', 'en', true, 'probe', 'retry', now() - interval '120 days');
+    VALUES (v_admin, '00000000-0000-4000-8000-0000000000f3', repeat('c', 64), v_probe, 'Young Person', '+441234567891', 'English', 'en', true, 'probe', 'retry', now() - interval '2 days');
     SELECT public.dovec_leads_wipe_pii() INTO v_wipe;
     SELECT count(*) INTO v_pii_left FROM public.dovec_leads WHERE project_id = v_probe AND name IS NOT NULL;
 
@@ -682,7 +728,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261229_dovec_projects.sql', 'e931763ac99b08aa01907978d6720716ba9a533e75f84260a0c71eed0db56f54')
+VALUES ('20261229_dovec_projects.sql', '0aa928b9a909b0221183df784327a535ba4c8a8726b8a076337cb6664967d5fb')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

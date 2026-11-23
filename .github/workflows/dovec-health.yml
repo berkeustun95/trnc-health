@@ -4,6 +4,7 @@
 # an enquiry stuck over an hour, an enquiry rejected or failed in 24 h. Booleans only in the log: this repo is public.
 # NOT ARMED until the first sync has run (see scripts/check-dovec-health.mjs). A schedule only runs once this file is on
 # main; until then `gh workflow run dovec-health` is the only trigger.
+# The service key is scoped to the one health step only (not job-level), so `npm ci` and its install scripts never see it.
 # Not in the data_jobs heartbeat registry on purpose (scripts/check-data-job-heartbeats.mjs UNRECORDED): its own red run
 # IS the alert, and it reads one table.
 #
@@ -28,18 +29,17 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-    env:
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with: { node-version: '24', cache: npm }
       - run: npm ci
-      - name: Secrets present
+      - name: dovec health
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
         run: |
           for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
             [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
           done
-      - name: dovec health
-        run: node scripts/check-dovec-health.mjs
+          node scripts/check-dovec-health.mjs

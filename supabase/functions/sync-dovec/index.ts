@@ -4,13 +4,13 @@
 // Order and the secrets it needs: PLUG-IN.md. ALL API KNOWLEDGE is in ../_shared/dovec-feed.mjs; this file only moves rows.
 //
 // Who: the service key only (cron through Vault, or a hand call). Any other caller gets 401.
-// Secrets: DOVEC_PARTNER_KEY (Bearer for Döveç; set in prod, never printed). DOVEC_API_BASE_URL is optional.
+// Secrets: DOVEC_PARTNER_KEY (Bearer for Döveç; set in prod, never printed).
 // Logs: project-level words and counts only. Never the partner key, never a response body.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { readAllResult } from '../_shared/read-all-rows.mjs'
 import { recordDataJobRun } from '../_shared/data-jobs.mjs'
-import { runSync, DEFAULT_BASE_URL } from '../_shared/dovec-feed.mjs'
+import { runSync } from '../_shared/dovec-feed.mjs'
 
 const JOB = 'dovec-sync'
 const json = (status: number, body: unknown) =>
@@ -54,7 +54,6 @@ Deno.serve(async (req) => {
   try {
     const res = await runSync({
       apiKey: Deno.env.get('DOVEC_PARTNER_KEY'),
-      baseUrl: Deno.env.get('DOVEC_API_BASE_URL') || DEFAULT_BASE_URL,
       store,
     })
     console.log(`sync-dovec: ${res.status} valid=${res.valid} skipped=${res.skipped} delisted=${res.delisted}`)

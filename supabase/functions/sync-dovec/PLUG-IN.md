@@ -26,16 +26,42 @@ waits for Berke's go, one at a time.
    from `vault.decrypted_secrets`, never in a file). Done by Berke in the Supabase dashboard Vault, not from here.
 5. **Dry run, then apply `20261230_dovec_cron.sql`.** It refuses unless 20261229 is applied and the Vault secret exists
    exactly once. Schedules `dovec-sync` (every 10 min), `dovec-lead-retry` (every 10 min, only when a lead is waiting)
-   and `dovec-leads-wipe` (03:30 UTC), with one `data_jobs` row each.
+   and `dovec-leads-wipe` (03:30 UTC; it also settles any lead still `retry` or `pending` after 7 days as `failed`, so
+   the 90-day wipe covers it), with one `data_jobs` row each.
 6. **The first good sync arms monitoring.** `dovec-health` (hourly) stays green and idle while `dovec_settings.last_run_at`
    is null, so a not-yet-live feed does not page anyone. After the first run it goes red on: suspended, a last status
    other than `ok`, a good sync older than 30 min, a lead stuck over 1 h, or a rejected or failed lead in the last 24 h.
 7. **Check what the sync wrote** from the admin screen or a read-only probe (no user data lives in this table, but print
-   counts only). Then decide the go-live: `dovec_settings.published` flips by a migration, never from the dashboard.
-8. **Real leads, later, a separate go.** Two locks, both needed: the code constant `LEADS_LIVE_ALLOWED` in
-   `_shared/dovec-lead.mjs` (a reviewed commit + a deploy of `dovec-lead`) AND the secret `DOVEC_LEADS_MODE=live`
-   (`scripts/sb.sh secrets set --env-file <600 file>`, checked by digest). Until both are set every enquiry is stored
-   with status `mock` and nothing is sent.
+   counts only). Do NOT go live yet.
+8. **Open BOTH lead locks first, and prove one real lead reaches Döveç.** Two locks, both needed: the code constant
+   `LEADS_LIVE_ALLOWED` in `_shared/dovec-lead.mjs` (a reviewed commit + a deploy of `dovec-lead`) AND the secret
+   `DOVEC_LEADS_MODE=live` (`scripts/sb.sh secrets set --env-file <600 file>`, checked by digest). Agree a real test lead
+   with Döveç beforehand (who sends it, what name to expect, that they will confirm receipt), send it, and get their
+   confirmation. Until both locks are open every enquiry is stored with status `mock`, and the user still sees the
+   thank-you screen while nothing reaches Döveç.
+9. **Only then go live: `dovec_settings.published` (a migration, never the dashboard) and `DOVEC_PARTNER_LIVE` (flag).**
+   Never before step 8: with the locks shut, a visible module accepts enquiries from real people, shows them a
+   thank-you, and sends nothing. If a lock is ever closed again after launch, treat it as taking the module down.
+
+## `dovec-lead` response contract
+
+`POST { client_request_id, project_id, unit_type?, name, phone, email?, message?, consent: true, consent_text_version, language }`
+from a signed-in, non-guest user.
+
+| Status | Body | Meaning |
+| --- | --- | --- |
+| 200 | `{ ok: true, external_id, status }` | stored (`mock`, `sent`, `retry`, `pending`); a replay of the same request returns the same row |
+| 200 | `{ ok: false, error: 'rejected', external_id }` | Döveç rejected the enquiry (4xx) |
+| 400 | `{ error: 'invalid_request', field }` / `{ error: 'consent_required' }` | validation (field name only, never a value) |
+| 403 | `{ error: 'sign_in_required' }` | guest or unknown caller |
+| 403 | `{ error: 'under_18' }` | the profile's date of birth, when one is on file, says under 18 today (the 18th birthday itself is allowed); nothing is saved. With no date of birth on file the 18+ consent tick stands. |
+| 404 | `{ error: 'project_unavailable' }` | unlisted, suspended or stale feed |
+| 409 | `{ error: 'request_changed' }` | same `client_request_id`, different payload |
+| 429 | `{ error: 'rate_limited' }` | 3 an hour and 10 a day per user, 200 a day overall; enforced atomically by the BEFORE INSERT trigger on `dovec_leads` (SQLSTATE `DV429`) |
+| 500 | `{ error: 'server_error' }` | unexpected |
+
+The outgoing host is the fixed constant `https://atlas.dovecgroup.com` in both shared modules; there is no environment
+override, so the partner key cannot be redirected by changing a secret.
 
 ## Behaviour worth knowing
 

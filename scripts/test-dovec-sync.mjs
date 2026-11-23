@@ -27,7 +27,7 @@ const fakeStore = (listed = [], { failUpsert = false } = {}) => {
   s.setState = async p => { s.states.push(p) }
   return s
 }
-const run = (fetchImpl, store) => runSync({ apiKey: 'test-key-not-real', baseUrl: 'https://example.invalid', fetchImpl, store, now: () => new Date('2026-11-23T10:00:00Z') })
+const run = (fetchImpl, store) => runSync({ apiKey: 'test-key-not-real', fetchImpl, store, now: () => new Date('2026-11-23T10:00:00Z') })
 const IDS = FX.projects.map(p => p.id)
 
 console.log('mapping (real shape, fictional data)')
@@ -148,8 +148,8 @@ for (const [label, resp, status] of [
 console.log('request shape (mocked fetch records it)')
 {
   let seen
-  await fetchProjects({ baseUrl: 'https://example.invalid/', apiKey: 'k-test', fetchImpl: async (u, o) => { seen = { u, o }; return reply(200, FX)() } })
-  t('GET to /api/partner/projects, Bearer, no body, no double slash', [seen.u, seen.o.method, seen.o.headers.Authorization, seen.o.body], ['https://example.invalid/api/partner/projects', 'GET', 'Bearer k-test', undefined])
+  await fetchProjects({ baseUrl: 'https://evil.example/', apiKey: 'k-test', fetchImpl: async (u, o) => { seen = { u, o }; return reply(200, FX)() } })
+  t('GET to /api/partner/projects, Bearer, no body; a passed baseUrl is ignored (fixed Döveç origin)', [seen.u, seen.o.method, seen.o.headers.Authorization, seen.o.body], ['https://atlas.dovecgroup.com/api/partner/projects', 'GET', 'Bearer k-test', undefined])
   t('no key: no request at all', (await fetchProjects({ apiKey: undefined, fetchImpl: async () => { throw new Error('called') } })).kind, 'http_error')
 }
 

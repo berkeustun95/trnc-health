@@ -9,6 +9,7 @@
 //
 // PRIVACY: a lead is personal data. Nothing here logs a name, phone, e-mail, message or user id: a log line holds the
 // external_id (ADA-n), the status word and an HTTP code.
+// The ONLY host the partner key is ever sent to: a fixed constant, no environment override.
 export const DEFAULT_BASE_URL = 'https://atlas.dovecgroup.com'
 export const CONSENT_TEXT_VERSIONS = ['dovec-consent-2026-11-23']
 
@@ -19,12 +20,17 @@ export const isLive = (mode, allowed = LEADS_LIVE_ALLOWED) => allowed === true &
 
 export const LIMITS = { perUserHour: 3, perUserDay: 10, globalDay: 200 }
 export const MAX_ATTEMPTS = 5
+export const CLAIM_MS = 15 * 60000
+export const STALE_LEAD_MS = 7 * 86400000
+export const MIN_AGE = 18
+export const RATE_LIMIT_CODE = 'DV429'
 export const RETRY_BATCH = 20
 export const SEND_TIMEOUT_MS = 15000
 
 const LANG = { English: 'en', Turkish: 'tr', Arabic: 'ar', Russian: 'ru', Greek: 'el', French: 'fr', Spanish: 'es', German: 'de', Persian: 'fa' }
-export const languageCode = name => LANG[name] ?? 'en'
-const languageName = name => (name in LANG ? name : 'English')
+const knownLang = name => typeof name === 'string' && Object.hasOwn(LANG, name)
+export const languageCode = name => (knownLang(name) ? LANG[name] : 'en')
+const languageName = name => (knownLang(name) ? name : 'English')
 
 const BODY_KEYS = ['client_request_id', 'project_id', 'unit_type', 'name', 'phone', 'email', 'message', 'consent', 'consent_text_version', 'language']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -32,6 +38,15 @@ const PHONE = /^\+[1-9][0-9]{6,14}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v)
 const opt = v => (v === undefined || v === null || (typeof v === 'string' && v.trim() === '') ? null : v)
+
+// Under 18 today, by the profile's date of birth ('YYYY-MM-DD'); no date on file = not blocked here (the 18+ tick stands).
+// Today is the Nicosia calendar day; the 18th birthday itself is allowed.
+export function isUnder18(dob, nowDate) {
+  if (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(dob)) return false
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Nicosia', year: 'numeric', month: '2-digit', day: '2-digit' }).format(nowDate)
+  const cutoff = `${String(Number(today.slice(0, 4)) - MIN_AGE).padStart(4, '0')}${today.slice(4)}`
+  return dob.slice(0, 10) > cutoff
+}
 
 // -> { ok:true, value } | { ok:false, status, error, field? }. Field NAMES only, never values.
 export function validateLead(body) {
@@ -88,7 +103,7 @@ function retryAfterMs(res) {
 }
 
 // Sends one stored lead and writes the outcome. Returns the new status.
-//   deps: { store, env: { mode, apiKey, baseUrl }, fetchImpl, now, log, liveAllowed }
+//   deps: { store, env: { mode, apiKey }, fetchImpl, now, log, liveAllowed }
 export async function deliver(lead, deps) {
   const { store, env, fetchImpl = fetch, now = () => new Date(), log = () => {} } = deps
   const live = isLive(env.mode, deps.liveAllowed ?? LEADS_LIVE_ALLOWED) && !!env.apiKey
@@ -98,7 +113,7 @@ export async function deliver(lead, deps) {
   const attempts = (lead.attempts ?? 0) + 1
   let res
   try {
-    res = await fetchImpl(`${(env.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/api/partner/leads`, {
+    res = await fetchImpl(`${DEFAULT_BASE_URL}/api/partner/leads`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${env.apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(buildOutgoing(lead)),
@@ -124,8 +139,10 @@ const publicResult = lead => lead.status === 'rejected'
   : { status: 200, body: { ok: true, external_id: lead.external_id, status: lead.status === 'failed' ? 'retry' : lead.status } }
 
 // caller: { kind: 'user', id } | { kind: 'service' }  (the edge function resolves it; guests never get here)
-// store: findByRequest(userId, crid) · getVisibleProject(id) · countLeads({ userId?, sinceIso }) · insertLead(row)
-//        updateLead(id, patch) · dueLeads(limit, nowIso)
+// store: findByRequest(userId, crid) · getVisibleProject(id) · getDateOfBirth(userId) · countLeads({ userId?, sinceIso })
+//        insertLead(row) · updateLead(id, patch) · dueLeads(limit, nowIso, statuses) · claimLead(id, nowIso, untilIso) -> row | null
+// The count below is only a courtesy pre-check; the limits are enforced atomically by the BEFORE INSERT trigger on
+// dovec_leads (20261229, SQLSTATE DV429), which insertLead surfaces and this function maps to 429.
 // -> { status, body } for the HTTP response.
 export async function handleLead({ caller, body, deps }) {
   const { store, now = () => new Date() } = deps
@@ -136,6 +153,8 @@ export async function handleLead({ caller, body, deps }) {
   if (caller.kind !== 'user') return { status: 403, body: { error: 'forbidden' } }
   const v = validateLead(body)
   if (!v.ok) return { status: v.status, body: { error: v.error, ...(v.field ? { field: v.field } : {}) } }
+  const dob = await store.getDateOfBirth(caller.id)
+  if (isUnder18(dob, now())) return { status: 403, body: { error: 'under_18' } }
   const hash = await payloadHash(v.value)
 
   const replay = async existing => existing.payload_hash === hash
@@ -167,6 +186,7 @@ export async function handleLead({ caller, body, deps }) {
       consent: true, consent_text_version: v.value.consent_text_version, status: 'pending',
     })
   } catch (e) {
+    if (e?.code === RATE_LIMIT_CODE || e?.message === 'dovec_rate_limited') return { status: 429, body: { error: 'rate_limited' } }
     if (e?.code === '23505') {
       const again = await store.findByRequest(caller.id, v.value.client_request_id)
       if (again) return replay(again)
@@ -182,10 +202,12 @@ export async function handleLead({ caller, body, deps }) {
 export async function retryDue(deps) {
   const { store, env, now = () => new Date() } = deps
   const live = isLive(env.mode, deps.liveAllowed ?? LEADS_LIVE_ALLOWED) && !!env.apiKey
-  const due = await store.dueLeads(RETRY_BATCH, now().toISOString())
+  const due = await store.dueLeads(RETRY_BATCH, now().toISOString(), live ? ['retry', 'pending'] : ['pending'])
   const counts = { processed: 0, sent: 0, retry: 0, failed: 0, rejected: 0, mock: 0 }
-  for (const lead of due) {
-    if (!live && lead.status === 'retry') continue
+  for (const candidate of due) {
+    // Claim first: pushes next_attempt_at 15 minutes out, only if the row is still due. An overlapping run loses the claim.
+    const lead = await store.claimLead(candidate.id, now().toISOString(), new Date(now().getTime() + CLAIM_MS).toISOString())
+    if (!lead) continue
     const status = await deliver(lead, deps)
     counts.processed++
     counts[status] = (counts[status] ?? 0) + 1

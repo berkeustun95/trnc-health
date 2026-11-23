@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   validateLead, payloadHash, buildOutgoing, deliver, handleLead, retryDue, languageCode, isLive,
-  LEADS_LIVE_ALLOWED, LIMITS, MAX_ATTEMPTS,
+  LEADS_LIVE_ALLOWED, LIMITS, MAX_ATTEMPTS, isUnder18, DEFAULT_BASE_URL,
 } from '../supabase/functions/_shared/dovec-lead.mjs'
 
 const dir = new URL('../supabase/functions/sync-dovec/fixtures/', import.meta.url)
@@ -23,23 +23,34 @@ const t = (name, got, want) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
 }
 
-const makeStore = ({ visible = true, preload = [] } = {}) => {
+const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false } = {}) => {
   const s = { leads: [...preload], seq: preload.length, updates: [] }
+  s.getDateOfBirth = async () => dob
   s.findByRequest = async (u, c) => s.leads.find(l => l.user_id === u && l.client_request_id === c) ?? null
   s.getVisibleProject = async id => (visible ? PROJECTS.find(p => p.id === id) ?? null : null)
   s.countLeads = async ({ userId, sinceIso }) => s.leads.filter(l => (!userId || l.user_id === userId) && l.created_at >= sinceIso).length
   s.insertLead = async row => {
+    if (dbLimits) {   // what the BEFORE INSERT trigger does, serialised
+      const n = f => s.leads.filter(f).length
+      if (n(() => true) >= LIMITS.globalDay || n(l => l.user_id === row.user_id) >= LIMITS.perUserHour) throw Object.assign(new Error('dovec_rate_limited'), { code: 'DV429' })
+    }
     if (s.leads.some(l => l.user_id === row.user_id && l.client_request_id === row.client_request_id)) throw Object.assign(new Error('dup'), { code: '23505' })
     const lead = { id: ++s.seq, external_id: `ADA-${s.seq}`, attempts: 0, created_at: T0.toISOString(), ...row }
     s.leads.push(lead); return { ...lead }
   }
   s.updateLead = async (id, patch) => { s.updates.push(patch); Object.assign(s.leads.find(l => l.id === id), patch) }
-  s.dueLeads = async (limit, nowIso) => s.leads.filter(l => ['retry', 'pending'].includes(l.status) && (l.next_attempt_at ?? '') <= nowIso).slice(0, limit)
+  s.dueLeads = async (limit, nowIso, statuses) => s.leads.filter(l => statuses.includes(l.status) && (l.next_attempt_at ?? '') <= nowIso).slice(0, limit)
+  s.claims = 0
+  s.claimLead = async (id, nowIso, untilIso) => {
+    const l = s.leads.find(x => x.id === id)
+    if (!l || !['retry', 'pending'].includes(l.status) || (l.next_attempt_at ?? '') > nowIso) return null
+    s.claims++; l.next_attempt_at = untilIso; return { ...l }
+  }
   return s
 }
 const stub = (status = 202, headers = {}) => { const f = async (u, o) => { f.calls.push({ u, o }); return { status, headers: { get: k => headers[k.toLowerCase()] ?? null } } }; f.calls = []; return f }
 const deps = (store, { mode = undefined, live = undefined, fetchImpl = stub(), apiKey = 'test-key-not-real' } = {}) => ({
-  store, fetchImpl, now: () => T0, log: () => {}, liveAllowed: live, env: { mode, apiKey, baseUrl: 'https://example.invalid' },
+  store, fetchImpl, now: () => T0, log: () => {}, liveAllowed: live, env: { mode, apiKey },
 })
 const post = (body, store, d, caller = USER) => handleLead({ caller, body, deps: d ?? deps(store) })
 
@@ -66,7 +77,7 @@ for (const [label, allowed, mode, want] of [['code false, secret unset', false, 
   const sent = JSON.parse(f.calls[0].o.body)
   t('only the allowed keys, in the Döveç names', Object.keys(sent).sort(), ['consent', 'email', 'external_id', 'language', 'message', 'name', 'phone', 'project', 'unit_type'])
   t('values: normalised phone, de, project id, server external_id, consent true', [sent.phone, sent.language, sent.project, sent.external_id, sent.consent], ['+441234567890', 'de', 'fx-harbour-view', 'ADA-1', true])
-  t('POST to /api/partner/leads with Bearer', [f.calls[0].u, f.calls[0].o.method, f.calls[0].o.headers.Authorization], ['https://example.invalid/api/partner/leads', 'POST', 'Bearer test-key-not-real'])
+  t('POST to /api/partner/leads with Bearer', [f.calls[0].u, f.calls[0].o.method, f.calls[0].o.headers.Authorization], ['https://atlas.dovecgroup.com/api/partner/leads', 'POST', 'Bearer test-key-not-real'])
   t('202: stored sent, user gets ok + external id', [store.leads[0].status, r.body], ['sent', { ok: true, external_id: 'ADA-1', status: 'sent' }])
 }
 {
@@ -145,6 +156,53 @@ console.log('rate limits')
   t(`global ${LIMITS.globalDay} a day: refused`, (await post(BODY, makeStore({ preload: global }))).status, 429)
 }
 
+console.log('atomic limits (the DB trigger raises DV429)')
+{
+  const store = makeStore({ dbLimits: true }); const d = deps(store); const rid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const pre = store.countLeads; store.countLeads = async () => 0   // the JS pre-check sees nothing: the race
+  const codes = await Promise.all([1, 2, 3, 4, 5].map(i => post({ ...clone(BODY), client_request_id: rid(i) }, store, d).then(r => r.status)))
+  t('pre-check blind, DB limit still holds: 3 accepted, 2 refused 429', [codes.filter(c => c === 200).length, codes.filter(c => c === 429).length, store.leads.length], [3, 2, 3])
+  store.countLeads = pre
+  t('429 body is rate_limited, nothing saved for the refused', (await post({ ...clone(BODY), client_request_id: rid(7) }, store, d)).body, { error: 'rate_limited' })
+  t('another user is accepted (positive control)', (await post({ ...clone(BODY), client_request_id: rid(8) }, store, d, { kind: 'user', id: 'user-b' })).status, 200)
+}
+
+console.log('outgoing host is fixed')
+{
+  const f = stub(); const store = makeStore()
+  const d = { ...deps(store, { mode: 'live', live: true, fetchImpl: f }), env: { mode: 'live', apiKey: 'k', baseUrl: 'https://evil.example', DOVEC_API_BASE_URL: 'https://evil.example' } }
+  await post(BODY, store, d)
+  t('an env/base override cannot redirect the key', [f.calls.length, new URL(f.calls[0].u).origin, f.calls[0].u], [1, 'https://atlas.dovecgroup.com', 'https://atlas.dovecgroup.com/api/partner/leads'])
+  t('the constant is the Döveç origin', new URL(DEFAULT_BASE_URL).origin, 'https://atlas.dovecgroup.com')
+}
+
+console.log('under 18 (profile date of birth)')
+{
+  const d = new Date('2026-11-23T10:00:00Z')   // Nicosia day 2026-11-23
+  t('born 2008-11-24: 17 until tomorrow -> under', isUnder18('2008-11-24', d), true)
+  t('born 2008-11-23: 18th birthday today -> allowed', isUnder18('2008-11-23', d), false)
+  t('born 2008-11-22 -> allowed', isUnder18('2008-11-22', d), false)
+  t('no date on file -> not blocked here', [isUnder18(null, d), isUnder18(undefined, d)], [false, false])
+  t('Nicosia day, not UTC: 22:30 UTC on 11-22 is already 11-23 locally', isUnder18('2008-11-23', new Date('2026-11-22T22:30:00Z')), false)
+  const rid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const minor = makeStore({ dob: '2008-11-24' })
+  t('a minor: 403 under_18, nothing saved, nothing sent', [(await post(BODY, minor, deps(minor, { mode: 'live', live: true }))).body, minor.leads.length], [{ error: 'under_18' }, 0])
+  const turning = makeStore({ dob: '2008-11-23' })
+  t('18 today: accepted (positive control)', [(await post(BODY, turning)).status, turning.leads.length], [200, 1])
+  const none = makeStore({ dob: null })
+  t('no DOB: accepted on the tick', (await post({ ...clone(BODY), client_request_id: rid(3) }, none)).status, 200)
+}
+
+console.log('prototype keys in language')
+for (const k of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+  const v = validateLead({ ...clone(BODY), language: k })
+  t(`${k}: validates as English, code en`, [v.ok, v.value.language, languageCode(v.value.language), languageCode(k)], [true, 'English', 'en', 'en'])
+}
+{
+  const store = makeStore(); const r = await post({ ...clone(BODY), language: 'constructor' }, store)
+  t('end to end: 200 and stored English/en, no 500', [r.status, store.leads[0].language, store.leads[0].language_code], [200, 'English', 'en'])
+}
+
 console.log('delivery outcomes (both locks open, mocked fetch)')
 const live = (status, headers) => async () => { const store = makeStore(); const f = stub(status, headers); const r = await post(BODY, store, deps(store, { mode: 'live', live: true, fetchImpl: f })); return { r, l: store.leads[0], f } }
 for (const [code, headers, status] of [[202, {}, 'sent'], [200, {}, 'sent'], [400, {}, 'rejected'], [422, {}, 'rejected'], [404, {}, 'rejected'], [500, {}, 'retry'], [503, {}, 'retry'], [429, { 'retry-after': '120' }, 'retry'], [401, {}, 'retry']]) {
@@ -171,6 +229,18 @@ console.log('retry mode')
   t('retry resends the SAME external id and stored payload', [JSON.parse(ok.calls[0].o.body).external_id, JSON.parse(ok.calls[0].o.body).phone], ['ADA-1', '+441234567890'])
   t('retry result is counts only', [res.body.ok, res.body.processed, res.body.sent, lead.status], [true, 1, 1, 'sent'])
   t('a sent lead is not picked up again', (await retryDue(later)).body.processed, 0)
+}
+{
+  const store = makeStore(); const f = stub(500)
+  await post(BODY, store, deps(store, { mode: 'live', live: true, fetchImpl: f }))
+  const ok = stub(202); const at = new Date('2026-11-23T10:06:00Z')
+  const run = () => retryDue({ ...deps(store, { mode: 'live', live: true, fetchImpl: ok }), now: () => at })
+  const [a, b] = await Promise.all([run(), run()])
+  t('two overlapping runs send the lead exactly once', [ok.calls.length, a.body.processed + b.body.processed, store.claims], [1, 1, 1])
+  const store2 = makeStore(); await post(BODY, store2, deps(store2, { mode: 'live', live: true, fetchImpl: stub(500) }))
+  store2.leads[0].status = 'retry'; store2.leads[0].next_attempt_at = '2026-11-23T10:00:00.000Z'
+  const claimed = await store2.claimLead(1, '2026-11-23T10:06:00.000Z', '2026-11-23T10:21:00.000Z')
+  t('a claimed lead is not due again for 15 minutes', [claimed.next_attempt_at, (await store2.dueLeads(20, '2026-11-23T10:10:00.000Z', ['retry'])).length, (await store2.dueLeads(20, '2026-11-23T10:21:00.000Z', ['retry'])).length], ['2026-11-23T10:21:00.000Z', 0, 1])
 }
 {
   const store = makeStore(); const f = stub(500)
