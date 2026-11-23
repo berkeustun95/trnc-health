@@ -14,7 +14,7 @@ const t = (name, got, want) => {
   if (!ok) fail++
   console.log(`  ${ok ? '✓' : '✗'} ${name}: ${JSON.stringify(got)}${ok ? '' : `  WANT ${JSON.stringify(want)}`}`)
 }
-const db = await freshDb('')
+let db = await freshDb('')
 await applyFile(db, rel('../supabase/migrations/20261202_onboarding_events.sql'))
 await applyFile(db, rel('../supabase/migrations/20261204_onboarding_events_start_choice.sql'))
 
@@ -27,6 +27,8 @@ const run = async ftfAgo => {
   const sql = ftfAgo === null ? SQL : SQL.replace(ANCHOR, `date '${await dayStr(ftfAgo)}'`)
   return Object.fromEntries((await db.query(sql)).rows.map(r => [r.metric, r]))
 }
+const addAt = (event, atSql, n) => db.exec(`INSERT INTO public.onboarding_events (event, platform, created_at)
+  SELECT '${event}', 'android', ${atSql} FROM generate_series(1, ${n})`)
 const add = (event, ago, n, platform = 'android') => db.exec(`INSERT INTO public.onboarding_events (event, platform, created_at)
   SELECT '${event}', '${platform}', ((((now() at time zone 'Asia/Famagusta')::date - ${ago}) + time '12:00') at time zone 'Asia/Famagusta')
   FROM generate_series(1, ${n})`)
@@ -74,10 +76,28 @@ t('sample flag on reach: 2 taps = small', (await run(3)).screen2_reach_first_tim
 await add('start_choice_guest', 2, 20); await add('offer_shown', 2, 10)
 t('sample flag on reach: 22 taps = ok', (await run(3)).screen2_reach_first_time_guest.sample, 'ok')
 
+// 3b. window edges, on reoffer_existing (before: 1 of 2 = 50%)
+await add('reoffer_existing_shown', 7, 2)                                   // oldest day in the window: counted
+await add('reoffer_existing_shown', 8, 6)                                   // one day before: not counted
+r = await run(null)
+t('window start: ago=7 counted, ago=8 not (1 of 4)', r.reoffer_existing_allowed.value, '25%')
+await addAt('reoffer_existing_granted', `((now() at time zone 'Asia/Famagusta')::date)::timestamp at time zone 'Asia/Famagusta'`, 3)
+r = await run(null)
+t('window end: a row exactly at Famagusta midnight today is excluded (still 1 of 4)', r.reoffer_existing_allowed.value, '25%')
+
 // 4. no count can leak
 for (const ftf of [null, 8, 3, 1, 0]) {
   const rows = Object.values(await run(ftf))
   t(`no count leaks (literal ${ftf})`, rows.every(x => pattern.test(x.value) && (pattern.test(x.sample) || x.sample === 'n/a')), true)
 }
+// 5. sample threshold on a fresh table: den 19 = small, den 20 = ok
+db = await freshDb('')
+await applyFile(db, rel('../supabase/migrations/20261202_onboarding_events.sql'))
+await applyFile(db, rel('../supabase/migrations/20261204_onboarding_events_start_choice.sql'))
+await add('reoffer_shown', 3, 19)
+t('sample: den 19 = small (<20)', (await run(null)).reoffer_later_allowed.sample, 'small (<20)')
+await add('reoffer_shown', 3, 1)
+t('sample: den 20 = ok', (await run(null)).reoffer_later_allowed.sample, 'ok')
+
 console.log(fail ? `FAIL (${fail})` : 'ALL PASS')
 process.exit(fail ? 1 : 0)
