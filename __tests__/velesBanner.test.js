@@ -83,3 +83,14 @@ test('the site is "Velesbit Postası" everywhere a user can see it: banner title
   const visible = [...i18n.matchAll(/veles\w*:\s*"([^"]*)"/g)].map(m => m[1])
   for (const v of visible) expect([v, /Veles(?!bit)/.test(v)]).toEqual([v, false])
 })
+
+test('banner brand: #0A5688, the slogan untranslated in every language, trimmed logo', () => {
+  const fs = require('fs')
+  const src = fs.readFileSync(require.resolve('../components/home/redesign/VelesBanner.js'), 'utf8')
+  expect(src).toContain("export const VELES_BRAND = '#0A5688'")
+  const slogan = src.match(/export const VELES_SLOGAN = '([^']*)'/)[1]
+  expect([slogan, [...slogan].length]).toEqual(['Adanın bütün haberleri tek sepette.', 35])
+  expect(src).not.toMatch(/velesBannerSub/)
+  expect(src).toContain("require('../../../assets/veles/veles-logo-trimmed.png')")
+  expect(fs.readFileSync(require.resolve('../constants/i18n.js'), 'utf8')).not.toMatch(/velesBannerSub/)
+})
