@@ -189,6 +189,14 @@
       "clear": "Only after Berke has seen it on Preview and says go in chat, together with #541/#546/#551/#552/#553. Then set cleared to true in a PR.",
       "clearedOn": "2026-11-23",
       "clearedBy": "Berke, in chat 2026-11-23: \"Decision 1: revert #558 before go-live. Keep this release to the Velesbit banner only. ... Decision 2: go for steps 1 and 2. Make the go-live PR (VELES_LIVE on, holds cleared, #546 and #551 cleared as \"ships switched off\", #558 reverted) ... Do not publish to production until I give a second go.\" Goes live with VELES_LIVE = true in this PR."
+    },
+    {
+      "pr": 565,
+      "commit": "3e843ef484ff07548e0382d10c1837fc06136051",
+      "what": "Velesbit Postası go-live: VELES_LIVE = true (banner on Home for every 1.4.3 user) + #558 app files reverted, 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the Preview built from this PR's merge commit and gives his SECOND go in chat for the exact commit (his first go covered the PR and Preview only). Then set cleared to true in a PR; production = the previewed merge commit plus that hold-clear commit only."
     }
   ]
 }
