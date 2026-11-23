@@ -197,6 +197,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after Berke has checked the Preview built from this PR's merge commit and gives his SECOND go in chat for the exact commit (his first go covered the PR and Preview only). Then set cleared to true in a PR; production = the previewed merge commit plus that hold-clear commit only."
+    },
+    {
+      "pr": 566,
+      "commit": "86e5e39fd5dabf3eabfb83d5fddce65343043d9a",
+      "what": "House banner 'empty space' card content (9 locales) + fit fix + check-ad-placement .js guard, merged to main 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has seen the content on Preview (video 2026-11-23) and says go in chat for the house-banner go-live. Then set cleared to true in a PR."
     }
   ]
 }
