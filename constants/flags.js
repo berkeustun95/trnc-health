@@ -761,7 +761,7 @@ export const EATERY_LIVE = true
 // Requires EATERY_LIVE: a live partner in a dark section is a guard failure (eatery:check).
 export const CRUNCHY_EXPRESS_LIVE = true
 
-// Velesbit Postası news banner on Home (Berke, 2026-11-22). false = production Home is unchanged. NOT a MODULE_FLAGS key:
+// Velesbit Postası news banner on Home (Berke, 2026-11-22). false = production Home has no banner. NOT a MODULE_FLAGS key:
 // no screen, no waitlist, no notify path (the HOTELS_LIVE reasoning); it is one Home card that opens an external site.
 // Dev bundles and ADA Preview show it through VELES in constants/redesign.js.
-export const VELES_LIVE = false
+export const VELES_LIVE = true   // true from the go-live PR; production waits on its release hold (Berke's second go)

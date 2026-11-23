@@ -162,8 +162,8 @@ const WAITLIST_BLAST_DONE = new Set([
 
 const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
-  // Velesbit Postası Home banner: a working-tree true would show it to every production user.
-  VELES_LIVE:            false,
+  // Velesbit Postası Home banner: on since the go-live PR (2026-11-23); production publish gated by its release hold.
+  VELES_LIVE:            true,
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
   // Both lived as local constants in App.js until 2026-10-11, outside this guard.
