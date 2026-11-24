@@ -590,6 +590,12 @@ console.log('20261233 / 20261234 — mock-lead cleanup and admin language, on to
     { const d = await fresh2([MOCK(ADMIN), ins(null, { status: "'sent'", sent_at: 'now()', is_test: 'true', external_id: "'TEST-1'", project_id: 'NULL' })].join(';\n'))
       const r = await run(d, file)
       o['red: a TEST-1 row that was sent aborts'] = abortedWith(r, MSG_ROW) && await nleads(d) === 2 }
+    { const d = await fresh2([MOCK(ADMIN), ins(null, { status: "'pending'", is_test: 'true', external_id: "'TEST-1'", project_id: 'NULL' })].join(';\n'))
+      const r = await run(d, file)
+      o['red: a pending TEST-1 row (attempts 0) aborts, nothing changed'] = abortedWith(r, MSG_ROW) && await nleads(d) === 2 && await nleads(d, `status = 'mock'`) === 1 && await lang(d) === 'Turkish' }
+    { const d = await fresh2([MOCK(ADMIN), ins(ADMIN, { status: "'mock'", next_attempt_at: 'now()' })].join(';\n'))
+      const r = await run(d, file)
+      o['red: a mock row with next_attempt_at set aborts'] = abortedWith(r, MSG_ROW) && await nleads(d) === 2 && await lang(d) === 'Turkish' }
     { const d = await fresh2([MOCK(ADMIN), MOCK(CUSTOMER)].join(';\n'))
       const r = await run(d, file)
       o['red: a mock row owned by a customer aborts, nothing deleted'] = abortedWith(r, MSG_ROW) && await nleads(d) === 2 && await lang(d) === 'Turkish' }
@@ -615,13 +621,21 @@ console.log('20261233 / 20261234 — mock-lead cleanup and admin language, on to
   const real = await scenarios(CLEAN)
   for (const [k, v] of Object.entries(real)) t(k, v, true)
 
+  {
+    const i = CSQL.indexOf('LOCK TABLE public.dovec_leads IN SHARE ROW EXCLUSIVE MODE;')
+    t('file text: LOCK TABLE ... SHARE ROW EXCLUSIVE MODE sits before the DO block, after lock_timeout',
+      i > CSQL.indexOf("SET LOCAL lock_timeout = '5s';") && CSQL.indexOf("SET LOCAL lock_timeout = '5s';") > 0 && i < CSQL.indexOf('DO $$'), true)
+  }
+
   console.log('  red-first: each mutant must turn the named scenario red (the scenario can fail)')
   for (const [name, from, to, scenario] of [
     ['precondition dropped', /IF EXISTS \(\n    SELECT 1 FROM public\.dovec_leads l/, 'IF false AND EXISTS (\n    SELECT 1 FROM public.dovec_leads l', 'red: a sent row aborts; mock row and language untouched'],
     ['precondition dropped', /IF EXISTS \(\n    SELECT 1 FROM public\.dovec_leads l/, 'IF false AND EXISTS (\n    SELECT 1 FROM public.dovec_leads l', 'red: a TEST-1 row that was sent aborts'],
     ['admin-owner clause loosened', `p.id = l.user_id AND p.role = 'admin'`, `p.id = l.user_id`, 'red: a mock row owned by a customer aborts, nothing deleted'],
     ['unowned non-test row accepted', `(l.is_test AND l.user_id IS NULL)\n            OR`, `(l.user_id IS NULL)\n            OR`, 'red: a non-test mock row with no owner (deleted user) aborts'],
-    ['HTTP-evidence clause dropped', ` AND l.last_http_status IS NULL)`, `)`, 'red: a mock row with HTTP evidence aborts'],
+    ['looser test-row clause restored', `       AND l.status = 'mock'\n`, `       AND (l.status = 'mock' OR l.is_test)\n       AND (NOT l.is_test OR l.status NOT IN ('sent', 'rejected'))\n`, 'red: a pending TEST-1 row (attempts 0) aborts, nothing changed'],
+    ['next_attempt_at clause dropped', ` AND l.next_attempt_at IS NULL)`, `)`, 'red: a mock row with next_attempt_at set aborts'],
+    ['HTTP-evidence clause dropped', ` AND l.last_http_status IS NULL`, ``, 'red: a mock row with HTTP evidence aborts'],
     ['admin count check dropped', `IF (SELECT count(*) FROM public.profiles WHERE role = 'admin') IS DISTINCT FROM 1 THEN`, `IF false THEN`, 'red: two admins abort, mock row and language untouched'],
     ['Turkish precondition dropped', `IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin' AND preferred_language IS NOT DISTINCT FROM 'Turkish') THEN`, `IF false THEN`, 'red: admin already English aborts, mock row untouched'],
     ['sequence reset added', `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;`, `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;\n  ALTER SEQUENCE public.dovec_lead_external_seq RESTART;`, 'positive: admin mock rows + TEST-1 removed, sequence untouched, language English'],

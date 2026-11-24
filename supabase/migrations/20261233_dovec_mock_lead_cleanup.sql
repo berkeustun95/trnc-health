@@ -14,13 +14,15 @@
 -- ─── PART 1: dovec_leads ───────────────────────────────────────────────────
 -- What goes: every row with status 'mock' (the dovec-lead function settles an enquiry as 'mock' when the live send is
 -- switched off: no attempt, no HTTP status, no sent_at) and the one is_test row (external_id TEST-1, written only by
--- the service-only test send, user_id always NULL).
+-- the service-only test send, user_id always NULL) ONLY when it settled as 'mock' (never sent). A pending, retry, sent,
+-- rejected or failed TEST-1 aborts the file: 'pending' with attempts = 0 can be an in-flight or crashed send (deliver()
+-- writes attempts / sent_at only after the POST returns), so it is no proof that Döveç never got it.
 --
 -- The precondition aborts the whole file unless EVERY row in the table passes all three clauses below. It is stricter
 -- than "delete mock and test": a real, sent, retrying, rejected, failed or other-user enquiry means STOP and ask
 -- Berke; nothing is deleted.
---   1. No send evidence: sent_at IS NULL AND attempts = 0 AND last_http_status IS NULL. Döveç never received it.
---   2. It is a mock or a test row: status = 'mock' OR is_test; and a test row additionally is not 'sent' / 'rejected'.
+--   1. No send evidence: sent_at IS NULL AND attempts = 0 AND last_http_status IS NULL AND next_attempt_at IS NULL.
+--   2. It settled as a mock: status = 'mock', test row or not.
 --   3. Its owner is proven an admin: (is_test AND user_id IS NULL) -- the test row has no owner by design -- OR user_id
 --      belongs to a profile whose role is 'admin'. A non-test row with user_id NULL (a deleted user whose row was
 --      wiped by the AFTER DELETE trigger) is NOT proven admin, so it aborts.
@@ -54,6 +56,9 @@ BEGIN;
 
 SET LOCAL lock_timeout = '5s';
 
+-- Writers block until COMMIT (reads still work), so no send can land between the check and the DELETE; lock_timeout bounds the wait.
+LOCK TABLE public.dovec_leads IN SHARE ROW EXCLUSIVE MODE;
+
 DO $$
 DECLARE
   v_rows int;
@@ -65,9 +70,8 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.dovec_leads l
      WHERE NOT (
-           (l.sent_at IS NULL AND l.attempts = 0 AND l.last_http_status IS NULL)
-       AND (l.status = 'mock' OR l.is_test)
-       AND (NOT l.is_test OR l.status NOT IN ('sent', 'rejected'))
+           (l.sent_at IS NULL AND l.attempts = 0 AND l.last_http_status IS NULL AND l.next_attempt_at IS NULL)
+       AND l.status = 'mock'
        AND ((l.is_test AND l.user_id IS NULL)
             OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = l.user_id AND p.role = 'admin'))
      )
@@ -106,7 +110,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261233_dovec_mock_lead_cleanup.sql', 'e2b0849511cc747954709fb71bfa3f0b030f0886114c8b55b4154f2b20f6b101')
+VALUES ('20261233_dovec_mock_lead_cleanup.sql', '23e7f920d4239e12e25f0d2191b082e7ce4b529f6d2bf0375b0b1130e9ed5e2c')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

@@ -333,7 +333,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261229_dovec_projects.sql', '0f2521d32106d8a20cad0e0f5ebeed6b4a43accbcad4d819d21a50bfff53477b'),
   ('20261231_dovec_read_gate.sql', '1e6ecdd3dc61ec793a23026e560fa43ab70a373c06695770b2dabbbfa91a937b'),
   ('20261232_dovec_cron.sql', 'c8e505bf28a2f1b4cea8e56434fee3789b43b993bdd937386b69e50c01b385f5'),
-  ('20261233_dovec_mock_lead_cleanup.sql', 'e2b0849511cc747954709fb71bfa3f0b030f0886114c8b55b4154f2b20f6b101'),
+  ('20261233_dovec_mock_lead_cleanup.sql', '23e7f920d4239e12e25f0d2191b082e7ce4b529f6d2bf0375b0b1130e9ed5e2c'),
   ('20261234_admin_language_revert.sql', '9abce0b2131e708fec1cfde72a7e4a276efecba9dbbd6673688801c373697d7d')
 )
 SELECT * FROM (
