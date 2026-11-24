@@ -259,6 +259,14 @@
       "since": "2026-11-24",
       "cleared": false,
       "clear": "Only after Döveç has approved the mockup and Berke has seen Döveç on Preview and says go in chat. Then set cleared to true in a PR."
+    },
+    {
+      "pr": 567,
+      "commit": "aa2437a6fea947c681d4ca1314f724188461d0fd",
+      "what": "KTFF Live Scores app files (TRNC football screen, editor removed), RE-LANDED on main (revert of #565 app revert 4f55bf8f), PR #567",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after KTFF approves our Origin, real data has landed, Berke has seen Canlı Skor on Preview with his editor account and says go in chat (Berke 2026-11-23). Then set cleared to true in a PR. The commit is this PR first commit, so every main carrying any of #567 is held (merge commit, not squash)."
     }
   ]
 }
