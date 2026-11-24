@@ -251,6 +251,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 569,
+      "commit": "3a4454b0b325205bfa241540d6ad49e8ad82d6a3",
+      "what": "Döveç projects feed + enquiry form (dark: DOVEC_PARTNER_LIVE false, published false; reachable only through the admin preview), merged to main 2026-11-24",
+      "since": "2026-11-24",
+      "cleared": false,
+      "clear": "Only after Döveç has approved the mockup and Berke has seen Döveç on Preview and says go in chat. Then set cleared to true in a PR."
     }
   ]
 }
