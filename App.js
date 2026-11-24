@@ -125,6 +125,7 @@ import {
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent, isTestDeviceLink, markTestDevice } from './utils/onboardingEvents'
 import { loadWithRetry, isNetworkError } from './utils/profileLoad'
+import { plog, errKind, startHeartbeat, PROFILE_LOAD_LOG_ON } from './utils/profileLoadLog'
 import { withTimeout } from './utils/withTimeout'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
@@ -1258,8 +1259,14 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
+    const gsT0 = Date.now()
+    if (PROFILE_LOAD_LOG_ON) plog('getsession-start', { src: 'mount' })
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (PROFILE_LOAD_LOG_ON) plog('getsession-ok', { src: 'mount', ms: Date.now() - gsT0, has: !!session })
+      setSession(session)
+    })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (PROFILE_LOAD_LOG_ON) plog('auth-event', { ev: event, has: !!session })
       setSession(session)
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { menuAnim.setValue(260); setShowMenu(false) }
       // A normal sign-out returns to the entry screen; a gate-driven one is on its way
@@ -1618,25 +1625,55 @@ export default function App() {
       setProfileLoadOffline(isNetworkError(err))
       setProfileLoadFailedUid(uid)
     }
+    const loadT0 = Date.now()
+    let attemptNo = 0
+    if (PROFILE_LOAD_LOG_ON) {
+      plog('getsession-start', { src: 'load' })
+      const gsT0 = Date.now()
+      supabase.auth.getSession()
+        .then(({ data: gs }) => plog('getsession-ok', { src: 'load', ms: Date.now() - gsT0, has: !!gs?.session }))
+        .catch(e => plog('getsession-fail', { src: 'load', kind: errKind(e) }))
+    }
+    const fetchProfileOnce = signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single()
+    const fetchProfile = !PROFILE_LOAD_LOG_ON ? fetchProfileOnce : signal => {
+      const n = ++attemptNo
+      const t0 = Date.now()
+      plog('attempt-start', { n, seq })
+      // The builder runs its request on every .then, so settle through ONE promise and return that.
+      const p = Promise.resolve(fetchProfileOnce(signal))
+      p.then(r => plog('attempt-settled', { n, ok: !r?.error && r?.data != null, ms: Date.now() - t0 }), () => plog('attempt-settled', { n, ok: false, ms: Date.now() - t0 }))
+      return p
+    }
     const { data, error } = await loadWithRetry(
-      signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single(),
+      fetchProfile,
       {
         isCurrent,
+        ...(PROFILE_LOAD_LOG_ON ? { sleep: ms => new Promise(resolve => {
+          const t0 = Date.now()
+          plog('retry-sleep', { ms })
+          setTimeout(() => { plog('retry-wake', { ms, late: Date.now() - t0 }); resolve() }, ms)
+        }) } : {}),
         // No network: say so at once instead of ~40 s of grey cards; the retries go on behind the screen.
         onAttemptFailed: err => {
+          plog('attempt-fail', { n: attemptNo, kind: errKind(err) })
           if (!isNetworkError(err) || !isCurrent() || seq !== profileLoadSeqRef.current) return
           if (heldProfileUidRef.current === uid) return
           offlineShownRef.current = true
+          plog('offline-shown')
           showFailed(err)
         },
       },
     )
+    if (PROFILE_LOAD_LOG_ON && (!isCurrent() || seq !== profileLoadSeqRef.current)) plog('stale-drop', { seq })
     if (!isCurrent() || seq !== profileLoadSeqRef.current) return
     // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
+    if (PROFILE_LOAD_LOG_ON && (error || !data)) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
     if (error || !data) { if (heldProfileUidRef.current !== uid) showFailed(error); return }
+    plog('success', { attempts: attemptNo, ms: Date.now() - loadT0 })
     setProfileLoadFailedUid(null)
     setLoadStalledUid(null)
     // Recovered behind the offline screen: Home's own reads (facilities, duty, ratings) failed too, so run them again.
+    if (offlineShownRef.current) plog('offline-recovered')
     if (offlineShownRef.current) { offlineShownRef.current = false; setRetryCount(c => c + 1) }
     setProfile(data ?? null)
     setProfileUid(session.user.id)
@@ -1724,13 +1761,16 @@ export default function App() {
     const key = `${wLat},${wLon}`
     if (weatherKeyRef.current === key) return
     weatherKeyRef.current = key
+    const wT0 = Date.now()
+    plog('read-start', { name: 'weather' })
     try {
-      const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon }, timeout: 8000 })
+      const { data: weatherJson, error: wErr } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon }, timeout: 8000 })
+      plog(wErr ? 'read-fail' : 'read-ok', { name: 'weather', ms: Date.now() - wT0, kind: wErr ? errKind(wErr) : null })
       // Latest request wins: a home-city change can overtake a slower earlier fetch.
       if (weatherKeyRef.current !== key) return
       if (weatherJson?.current) setWeatherData(weatherJson)
       else weatherKeyRef.current = null
-    } catch { if (weatherKeyRef.current === key) weatherKeyRef.current = null }
+    } catch (e) { plog('read-fail', { name: 'weather', ms: Date.now() - wT0, kind: errKind(e) }); if (weatherKeyRef.current === key) weatherKeyRef.current = null }
   }
 
   // Which district is this device in, as far as the DEVICE knows.
@@ -1916,6 +1956,8 @@ export default function App() {
   useEffect(() => {
     setFacilityLoadError(false)
     async function load() {
+      const homeT0 = Date.now()
+      plog('home-load-start', { retry: retryCount })
       try {
       const favVal = await AsyncStorage.getItem('ada_favorites')
       if (favVal) setFavorites(new Set(JSON.parse(favVal)))
@@ -1923,24 +1965,33 @@ export default function App() {
       if (placeFavVal) setPlaceFavorites(new Set(JSON.parse(placeFavVal).map(id => MERGED_PLACE_IDS[id] || id)))
 
       // A hung request never settles on RN (no OkHttp timeout): every read is bounded, a timeout counts as an error.
+      plog('read-start', { name: 'facilities' })
+      const facT0 = Date.now()
       const { data, error } = await withTimeout(s => supabase.from('facilities').select('*').order('name').abortSignal(s), 10000)
         .catch(e => ({ data: null, error: e }))
       if (error) setFacilityLoadError(true)
       else setFacilities(data ?? [])
+      plog(error ? 'read-fail' : 'read-ok', { name: 'facilities', ms: Date.now() - facT0, kind: error ? errKind(error) : null })
 
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
       // and 03:00 the UTC date is still YESTERDAY — exactly the hours someone needs this.
       const today = localDateKey()
-      const { data: duty } = await withTimeout(s => supabase
+      plog('read-start', { name: 'duty_schedule' })
+      const dutyT0 = Date.now()
+      const { data: duty, error: dutyErr } = await withTimeout(s => supabase
         .from('duty_schedule').select('facility_id').eq('date', today).abortSignal(s).maybeSingle(), 10000)
-        .catch(() => ({ data: null }))
+        .catch(e => ({ data: null, error: e }))
+      plog(dutyErr ? 'read-fail' : 'read-ok', { name: 'duty_schedule', ms: Date.now() - dutyT0, kind: dutyErr ? errKind(dutyErr) : null })
       if (duty) setDutyFacilityId(duty.facility_id)
 
 
       // TODO: replace with a computed avg_rating + review_count column on facilities
       // once review volume grows, to avoid fetching every row on startup.
-      const { data: reviewsData } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
-        .catch(() => ({ data: null }))
+      plog('read-start', { name: 'reviews' })
+      const revT0 = Date.now()
+      const { data: reviewsData, error: revErr } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
+        .catch(e => ({ data: null, error: e }))
+      plog(revErr ? 'read-fail' : 'read-ok', { name: 'reviews', ms: Date.now() - revT0, kind: revErr ? errKind(revErr) : null })
       if (reviewsData?.length) {
         const map = {}
         for (const r of reviewsData) {
@@ -1959,6 +2010,8 @@ export default function App() {
       // Onboarding v2: launch never asks. Location is asked in context only (Screen 2's "Konumumu kullan",
       // "near me", the map); a permission already granted is still read silently. locationDenied /
       // locationCanAsk are set as before, so distance sort and the "turn on location" offers still work.
+      plog('read-start', { name: 'location' })
+      const locT0 = Date.now()
       try {
         // Raced at 8 s: a timeout throws into the catch below, the same as no fix.
         await withTimeout(async () => {
@@ -1974,7 +2027,9 @@ export default function App() {
             else { setUserLocation(loc.coords); setLocationDenied(false); resolvedCoords = loc.coords }
           }
         }, 8000)
+        plog('read-ok', { name: 'location', ms: Date.now() - locT0 })
       } catch {
+        plog('read-fail', { name: 'location', ms: Date.now() - locT0 })
         setLocationDenied(true)
       }
 
@@ -1989,20 +2044,42 @@ export default function App() {
       } finally {
         // A throw anywhere above (e.g. JSON.parse of a corrupt favourites value) must not leave the skeleton up.
         setLoading(false)
+        plog('home-load-end', { ms: Date.now() - homeT0 })
       }
     }
     load()
   }, [retryCount])
 
   // Safety net: a session whose profile has not arrived after 45 s gets the Retry screen, not a skeleton forever.
+  const netArmedAtRef = useRef(0)
   useEffect(() => {
     const uid = session?.user?.id
     if (!uid || !(loading || !profile)) { setLoadStalledUid(null); return }
+    netArmedAtRef.current = Date.now()
+    plog('net-arm')
     const timer = setTimeout(() => setLoadStalledUid(uid), 45000)
     return () => clearTimeout(timer)
   }, [session?.user?.id, loading, profile, retryCount])
 
+  // Preview-only diagnostics (utils/profileLoadLog.js): app state, the heartbeat, and every state change that decides the skeleton.
+  const stuckRef = useRef(false)
+  stuckRef.current = !!session && (loading || !profile)
+  useEffect(() => {
+    if (!PROFILE_LOAD_LOG_ON) return
+    const sub = AppState.addEventListener('change', next => plog('appstate', { s: next }))
+    return () => sub.remove()
+  }, [])
+  useEffect(() => startHeartbeat(() => stuckRef.current), [])
+  const dbgUid = session?.user?.id
+  const dbgFailed = !!dbgUid && profileLoadFailedUid === dbgUid
+  const dbgStalled = !!dbgUid && loadStalledUid === dbgUid
+  useEffect(() => {
+    if (dbgStalled) plog('net-fire', { elapsed: Date.now() - netArmedAtRef.current })
+    plog('state', { session: !!session, loading, profile: !!profile, failed: dbgFailed, stalled: dbgStalled, offline: profileLoadOffline })
+  }, [!!session, loading, !!profile, dbgFailed, dbgStalled, profileLoadOffline])
+
   function retryProfileLoad() {
+    plog('retry-call')
     const sess = sessionRef.current
     if (!sess) return
     offlineShownRef.current = false
@@ -2043,6 +2120,8 @@ export default function App() {
     if (!session) return
     let cancelled = false
     async function loadRosterHealth() {
+      const rosterT0 = Date.now()
+      plog('roster-start')
       const today = localDateKey()
       // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
       // head request returns no rows to count them from. It is ~13 rows a day.
@@ -2051,7 +2130,8 @@ export default function App() {
         supabase.from('duty_list').select('name, region, open_from, open_until').eq('duty_date', today),
         supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
       ])
-      if (cancelled) return
+      if (cancelled) { plog('roster-cancelled', { ms: Date.now() - rosterT0 }); return }
+      plog('roster-end', { ok: !(todayErr || newestErr), ms: Date.now() - rosterT0 })
       // A failed read is NOT an empty roster. Before this, an error left both arrays null,
       // which scored as ABSENT and blamed the roster for a network problem.
       if (todayErr || newestErr) {
