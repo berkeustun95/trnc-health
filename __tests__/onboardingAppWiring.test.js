@@ -286,7 +286,7 @@ test('45 s safety net: a held (loading || !profile) routes to ProfileLoadFailedS
   expect(retry).toContain('onRetry={retryProfileLoad}')
   const fnStart = at(src, 'function retryProfileLoad() {', 'retryProfileLoad')
   const rp = src.slice(fnStart, fnStart + src.slice(fnStart).indexOf('\n  }\n') )
-  expect(rp).toContain('loadProfile(sess)')
+  expect(rp).toContain('profileRecoveryRef.current.load(sess)')
   expect(rp).toContain('setLoading(true)')
   expect(rp).toContain('setRetryCount(c => c + 1)')
   expect(src.indexOf('const [loadStalledUid')).toBeLessThan(selectorStart)
