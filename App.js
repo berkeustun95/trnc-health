@@ -1634,18 +1634,18 @@ export default function App() {
         .then(({ data: gs }) => plog('getsession-ok', { src: 'load', ms: Date.now() - gsT0, has: !!gs?.session }))
         .catch(e => plog('getsession-fail', { src: 'load', kind: errKind(e) }))
     }
+    const fetchProfileOnce = signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single()
+    const fetchProfile = !PROFILE_LOAD_LOG_ON ? fetchProfileOnce : signal => {
+      const n = ++attemptNo
+      const t0 = Date.now()
+      plog('attempt-start', { n, seq })
+      // The builder runs its request on every .then, so settle through ONE promise and return that.
+      const p = Promise.resolve(fetchProfileOnce(signal))
+      p.then(r => plog('attempt-settled', { n, ok: !r?.error && r?.data != null, ms: Date.now() - t0 }), () => plog('attempt-settled', { n, ok: false, ms: Date.now() - t0 }))
+      return p
+    }
     const { data, error } = await loadWithRetry(
-      signal => {
-        const n = ++attemptNo
-        const t0 = Date.now()
-        plog('attempt-start', { n, seq })
-        const q = supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single()
-        if (!PROFILE_LOAD_LOG_ON) return q
-        // The builder runs its request on every .then, so settle through ONE promise and return that.
-        const p = Promise.resolve(q)
-        p.then(r => plog('attempt-settled', { n, ok: !r?.error && r?.data != null, ms: Date.now() - t0 }), () => plog('attempt-settled', { n, ok: false, ms: Date.now() - t0 }))
-        return p
-      },
+      fetchProfile,
       {
         isCurrent,
         ...(PROFILE_LOAD_LOG_ON ? { sleep: ms => new Promise(resolve => {
@@ -1654,8 +1654,8 @@ export default function App() {
           setTimeout(() => { plog('retry-wake', { ms, late: Date.now() - t0 }); resolve() }, ms)
         }) } : {}),
         // No network: say so at once instead of ~40 s of grey cards; the retries go on behind the screen.
-        onAttemptFailed: (err, n) => {
-          plog('attempt-fail', { n, kind: errKind(err) })
+        onAttemptFailed: err => {
+          plog('attempt-fail', { n: attemptNo, kind: errKind(err) })
           if (!isNetworkError(err) || !isCurrent() || seq !== profileLoadSeqRef.current) return
           if (heldProfileUidRef.current === uid) return
           offlineShownRef.current = true
@@ -1664,14 +1664,17 @@ export default function App() {
         },
       },
     )
-    if (!isCurrent() || seq !== profileLoadSeqRef.current) { plog('stale-drop', { seq }); return }
+    if (PROFILE_LOAD_LOG_ON && (!isCurrent() || seq !== profileLoadSeqRef.current)) plog('stale-drop', { seq })
+    if (!isCurrent() || seq !== profileLoadSeqRef.current) return
     // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
-    if (error || !data) { plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid }); if (heldProfileUidRef.current !== uid) showFailed(error); return }
+    if (PROFILE_LOAD_LOG_ON && (error || !data)) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
+    if (error || !data) { if (heldProfileUidRef.current !== uid) showFailed(error); return }
     plog('success', { attempts: attemptNo, ms: Date.now() - loadT0 })
     setProfileLoadFailedUid(null)
     setLoadStalledUid(null)
     // Recovered behind the offline screen: Home's own reads (facilities, duty, ratings) failed too, so run them again.
-    if (offlineShownRef.current) { offlineShownRef.current = false; plog('offline-recovered'); setRetryCount(c => c + 1) }
+    if (offlineShownRef.current) plog('offline-recovered')
+    if (offlineShownRef.current) { offlineShownRef.current = false; setRetryCount(c => c + 1) }
     setProfile(data ?? null)
     setProfileUid(session.user.id)
     heldProfileUidRef.current = session.user.id
@@ -1966,19 +1969,19 @@ export default function App() {
       const facT0 = Date.now()
       const { data, error } = await withTimeout(s => supabase.from('facilities').select('*').order('name').abortSignal(s), 10000)
         .catch(e => ({ data: null, error: e }))
-      plog(error ? 'read-fail' : 'read-ok', { name: 'facilities', ms: Date.now() - facT0, kind: error ? errKind(error) : null })
       if (error) setFacilityLoadError(true)
       else setFacilities(data ?? [])
+      plog(error ? 'read-fail' : 'read-ok', { name: 'facilities', ms: Date.now() - facT0, kind: error ? errKind(error) : null })
 
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
       // and 03:00 the UTC date is still YESTERDAY — exactly the hours someone needs this.
       const today = localDateKey()
       plog('read-start', { name: 'duty_schedule' })
       const dutyT0 = Date.now()
-      const { data: duty } = await withTimeout(s => supabase
+      const { data: duty, error: dutyErr } = await withTimeout(s => supabase
         .from('duty_schedule').select('facility_id').eq('date', today).abortSignal(s).maybeSingle(), 10000)
-        .then(r => { plog(r?.error ? 'read-fail' : 'read-ok', { name: 'duty_schedule', ms: Date.now() - dutyT0, kind: r?.error ? errKind(r.error) : null }); return r })
-        .catch(e => { plog('read-fail', { name: 'duty_schedule', ms: Date.now() - dutyT0, kind: errKind(e) }); return { data: null } })
+        .catch(e => ({ data: null, error: e }))
+      plog(dutyErr ? 'read-fail' : 'read-ok', { name: 'duty_schedule', ms: Date.now() - dutyT0, kind: dutyErr ? errKind(dutyErr) : null })
       if (duty) setDutyFacilityId(duty.facility_id)
 
 
@@ -1986,9 +1989,9 @@ export default function App() {
       // once review volume grows, to avoid fetching every row on startup.
       plog('read-start', { name: 'reviews' })
       const revT0 = Date.now()
-      const { data: reviewsData } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
-        .then(r => { plog(r?.error ? 'read-fail' : 'read-ok', { name: 'reviews', ms: Date.now() - revT0, kind: r?.error ? errKind(r.error) : null }); return r })
-        .catch(e => { plog('read-fail', { name: 'reviews', ms: Date.now() - revT0, kind: errKind(e) }); return { data: null } })
+      const { data: reviewsData, error: revErr } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
+        .catch(e => ({ data: null, error: e }))
+      plog(revErr ? 'read-fail' : 'read-ok', { name: 'reviews', ms: Date.now() - revT0, kind: revErr ? errKind(revErr) : null })
       if (reviewsData?.length) {
         const map = {}
         for (const r of reviewsData) {
@@ -2025,8 +2028,8 @@ export default function App() {
           }
         }, 8000)
         plog('read-ok', { name: 'location', ms: Date.now() - locT0 })
-      } catch (e) {
-        plog('read-fail', { name: 'location', ms: Date.now() - locT0, kind: errKind(e) })
+      } catch {
+        plog('read-fail', { name: 'location', ms: Date.now() - locT0 })
         setLocationDenied(true)
       }
 
@@ -2048,13 +2051,14 @@ export default function App() {
   }, [retryCount])
 
   // Safety net: a session whose profile has not arrived after 45 s gets the Retry screen, not a skeleton forever.
+  const netArmedAtRef = useRef(0)
   useEffect(() => {
     const uid = session?.user?.id
     if (!uid || !(loading || !profile)) { setLoadStalledUid(null); return }
-    const armedAt = Date.now()
+    netArmedAtRef.current = Date.now()
     plog('net-arm')
-    const timer = setTimeout(() => { plog('net-fire', { elapsed: Date.now() - armedAt }); setLoadStalledUid(uid) }, 45000)
-    return () => { plog('net-clear', { elapsed: Date.now() - armedAt }); clearTimeout(timer) }
+    const timer = setTimeout(() => setLoadStalledUid(uid), 45000)
+    return () => clearTimeout(timer)
   }, [session?.user?.id, loading, profile, retryCount])
 
   // Preview-only diagnostics (utils/profileLoadLog.js): app state, the heartbeat, and every state change that decides the skeleton.
@@ -2070,6 +2074,7 @@ export default function App() {
   const dbgFailed = !!dbgUid && profileLoadFailedUid === dbgUid
   const dbgStalled = !!dbgUid && loadStalledUid === dbgUid
   useEffect(() => {
+    if (dbgStalled) plog('net-fire', { elapsed: Date.now() - netArmedAtRef.current })
     plog('state', { session: !!session, loading, profile: !!profile, failed: dbgFailed, stalled: dbgStalled, offline: profileLoadOffline })
   }, [!!session, loading, !!profile, dbgFailed, dbgStalled, profileLoadOffline])
 
