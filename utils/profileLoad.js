@@ -9,7 +9,16 @@ export const PROFILE_ATTEMPT_TIMEOUT_MS = 8000
 
 const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-export async function loadWithRetry(fetchFn, { sleep = defaultSleep, isCurrent = () => true } = {}) {
+// A timeout, an abort or a failed fetch: the device cannot reach the server (offline, dead Wi-Fi, captive portal).
+export function isNetworkError(e) {
+  if (!e) return false
+  if (e.name === 'TimeoutError' || e.name === 'AbortError') return true
+  return /network request failed|failed to fetch|network ?error|timed out|aborted/i.test(String(e.message || ''))
+}
+
+// onAttemptFailed(error, attempt) runs after every failed attempt, so the caller can show an offline
+// screen at once while the remaining retries continue behind it.
+export async function loadWithRetry(fetchFn, { sleep = defaultSleep, isCurrent = () => true, onAttemptFailed = () => {} } = {}) {
   let lastError = null
   for (let attempt = 0; attempt <= PROFILE_RETRY_DELAYS.length; attempt++) {
     try {
@@ -19,6 +28,7 @@ export async function loadWithRetry(fetchFn, { sleep = defaultSleep, isCurrent =
     } catch (e) {
       lastError = e
     }
+    try { onAttemptFailed(lastError, attempt) } catch {}
     if (attempt === PROFILE_RETRY_DELAYS.length) break
     await sleep(PROFILE_RETRY_DELAYS[attempt])
     if (!isCurrent()) break

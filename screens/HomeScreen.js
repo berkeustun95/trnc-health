@@ -56,7 +56,7 @@ import { openVeles } from '../utils/velesLink'
 import TourChip from '../components/home/redesign/TourChip'
 import { useTabBarFootprint, RemoteImage, PageCanvas, ScreenHeader } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
-import { unplacedLiveModules, duplicatePlacements, visibleServiceIds, moduleById } from '../constants/homeGroups'
+import { unplacedLiveModules, duplicatePlacements, visibleServiceIds, moduleById, ON_HOME_TOP } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
 import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar, ModuleScreen, OnPhotoLabel } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
@@ -1111,7 +1111,7 @@ export default function HomeScreen({
             )}
             <ServicesHeader lang={lang} onEdit={() => setFavEditOpen(true)} onSeeAll={() => setAllServicesOpen(true)} />
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
-            <AllServicesButton lang={lang} count={visibleIds.length} onPress={() => setAllServicesOpen(true)} />
+            <AllServicesButton lang={lang} count={visibleIds.filter(id => !ON_HOME_TOP.has(id)).length} onPress={() => setAllServicesOpen(true)} />
 
             {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
                 (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after the AllServicesButton. */}
