@@ -2115,7 +2115,8 @@ export default function App() {
 
   // JS timers pause with the screen off and a hung fetch never fails, so the automatic retries can give up with nothing
   // left to ask again. While the screen is up, ask every 15 s when the profile is missing (the screen stays until it loads, no flicker to the skeleton).
-  // With the profile already held (Home's own load stuck) the tick does nothing; Retry and foregrounding still work.
+  // A load still running after 10 s counts as hung and the tick supersedes it; a younger one is left alone. With the profile
+  // already held (Home's own load stuck) the tick does nothing; Retry and foregrounding still work.
   useEffect(() => {
     if (!profileFailedHere) return
     const id = setInterval(() => {

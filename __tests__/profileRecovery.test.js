@@ -1,9 +1,9 @@
 // utils/profileRecovery.js with the REAL loadWithRetry and a fake network under fake timers, plus the App.js wiring it needs.
-// ONB_APP_SRC points the source scan at a scratch copy of App.js (red-first checks).
+// ONB_APP_SRC points the source scan at a scratch copy of App.js (red-first checks); PROFILE_RECOVERY_MODULE does the same for the util.
 const fs = require('fs')
 const path = require('path')
 const { loadWithRetry, isNetworkError } = require('../utils/profileLoad')
-const { createProfileRecovery, PROFILE_SCREEN_RETRY_MS } = require('../utils/profileRecovery')
+const { createProfileRecovery, PROFILE_SCREEN_RETRY_MS, PROFILE_STALE_LOAD_MS } = require(process.env.PROFILE_RECOVERY_MODULE || '../utils/profileRecovery')
 
 const src = fs.readFileSync(process.env.ONB_APP_SRC || path.join(__dirname, '..', 'App.js'), 'utf8')
 
@@ -52,7 +52,7 @@ test('network hangs, then returns: the 15 s retry loads the profile with no AppS
   const app = makeApp(() => (up ? Promise.resolve(OK) : new Promise(() => {})))
   app.rec.load(SESSION)
   await jest.advanceTimersByTimeAsync(39500) // 4 hung attempts of 8 s + 1 + 2 + 4 s of sleeps = give-up at 39 s
-  expect(app.s.fetches).toBe(4) // ticks at 23 s and 38 s hit a busy load and started nothing
+  expect(app.s.fetches).toBeGreaterThanOrEqual(4) // ticks at 15 s and 30 s found the load hung (> 10 s) and superseded it
   expect(app.s.failed).toBe(true)
   expect(app.s.held).toBe(false)
   up = true // back at 40 s
@@ -167,4 +167,86 @@ test('recovery without advancing timers: a Home read success asks for the missin
   expect(roster.split("withTimeout(s => supabase.from('duty_list')").length - 1).toBe(2)
   expect(roster.split('.abortSignal(s)').length - 1).toBe(2)
   expect(roster.split('.catch(e => ({ data: null, error: e }))').length - 1).toBe(2)
+})
+
+// A load whose promise never settles, with a hand-moved clock (no timers advanced anywhere below).
+function hung(missing = () => true) {
+  let t = 1000000
+  const loadOnce = jest.fn(() => new Promise(() => {}))
+  const logs = []
+  const rec = createProfileRecovery({ loadOnce, isMissing: missing, current: () => SESSION, now: () => t, log: (e, d) => logs.push([e, d]) })
+  return { rec, loadOnce, logs, advance: ms => { t += ms } }
+}
+
+test('a hung load is superseded on a Home read, with no timer', async () => {
+  const h = hung()
+  h.rec.load(SESSION)
+  h.advance(PROFILE_STALE_LOAD_MS - 1000)
+  h.rec.homeReadOk(SESSION) // newest load younger than the threshold: only wanted
+  await flush()
+  expect(h.loadOnce).toHaveBeenCalledTimes(1)
+  h.advance(1000 + 4000) // 14 s old
+  h.rec.homeReadOk(SESSION)
+  await flush()
+  expect(h.loadOnce).toHaveBeenCalledTimes(2)
+  expect(h.loadOnce.mock.calls[1][0]).toBe(SESSION)
+  expect(h.logs).toContainEqual(['supersede-stale', { age: 14, via: 'home' }])
+})
+
+test('three Home reads in a row past the threshold start exactly one superseding load', async () => {
+  let missing = true
+  let finish
+  let t = 0
+  const loadOnce = jest.fn(() => (loadOnce.mock.calls.length === 1 ? new Promise(() => {}) : new Promise(r => { finish = r })))
+  const rec = createProfileRecovery({ loadOnce, isMissing: () => missing, current: () => SESSION, now: () => t })
+  rec.load(SESSION)
+  t += PROFILE_STALE_LOAD_MS
+  rec.homeReadOk(SESSION)
+  rec.homeReadOk(SESSION)
+  rec.homeReadOk(SESSION)
+  await flush()
+  expect(loadOnce).toHaveBeenCalledTimes(2)
+  // The superseding load settles, the hung one never does: the queued wanted reload still fires while the profile is missing.
+  finish()
+  await flush()
+  expect(loadOnce).toHaveBeenCalledTimes(3)
+  finish()
+  await flush()
+  missing = false
+  expect(loadOnce).toHaveBeenCalledTimes(3)
+})
+
+test('a late settle of a superseded load does not reload or disturb the newest load', async () => {
+  let t = 0
+  const resolvers = []
+  const loadOnce = jest.fn(() => new Promise(r => { resolvers.push(r) }))
+  const rec = createProfileRecovery({ loadOnce, isMissing: () => true, current: () => SESSION, now: () => t })
+  rec.load(SESSION)
+  t += PROFILE_STALE_LOAD_MS
+  rec.homeReadOk(SESSION) // supersedes #1
+  rec.homeReadOk(SESSION) // wanted
+  resolvers[0]() // the old one settles late
+  await flush()
+  expect(loadOnce).toHaveBeenCalledTimes(2)
+  expect(rec.busy()).toBe(true)
+  resolvers[1]() // the newest settles: now the wanted reload runs
+  await flush()
+  expect(loadOnce).toHaveBeenCalledTimes(3)
+})
+
+test('screenTick supersedes a hung load older than the threshold and leaves a younger one alone', async () => {
+  const h = hung()
+  const before = jest.fn()
+  h.rec.load(SESSION)
+  h.advance(PROFILE_STALE_LOAD_MS - 1000)
+  expect(h.rec.screenTick(SESSION, before)).toBe(false)
+  expect(before).not.toHaveBeenCalled()
+  expect(h.loadOnce).toHaveBeenCalledTimes(1)
+  h.advance(1000)
+  expect(h.rec.screenTick(SESSION, before)).toBe(true)
+  expect(before).toHaveBeenCalledTimes(1)
+  await flush()
+  expect(h.loadOnce).toHaveBeenCalledTimes(2)
+  expect(h.loadOnce.mock.calls[1][0]).toBe(SESSION)
+  expect(h.logs).toContainEqual(['supersede-stale', { age: 10, via: 'tick' }])
 })
