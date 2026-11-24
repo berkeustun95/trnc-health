@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-11-23T10:00:00Z",
+  "partner": "ada-test",
+  "currency": "GBP",
+  "count": 4,
+  "projects": [
+    {
+      "id": "fx-harbour-view",
+      "name": "Fictional Harbour View",
+      "city": "Testville",
+      "area": "Old Quay",
+      "status": "on_sale",
+      "planned_delivery_month": "2027-06",
+      "from_price": 185000,
+      "currency": "GBP",
+      "available_units": 12,
+      "unit_types": [{ "type": "1+1", "from_price": 185000 }, { "type": "2+1", "from_price": 245000 }],
+      "cover_image_url": "https://example.com/img/harbour-view.jpg",
+      "website_url": "https://example.com/projects/harbour-view"
+    },
+    {
+      "id": "fx-pine-court",
+      "name": "Fictional Pine Court",
+      "city": "Sampletown",
+      "area": "",
+      "status": "under_construction",
+      "planned_delivery_month": null,
+      "from_price": null,
+      "currency": "GBP",
+      "available_units": null,
+      "unit_types": [{ "type": "Villa", "from_price": null }],
+      "cover_image_url": null,
+      "website_url": "https://example.com/projects/pine-court"
+    },
+    {
+      "id": "fx-sun-terraces",
+      "name": "Fictional Sun Terraces",
+      "city": "Testville",
+      "area": "Hill Road",
+      "status": "on_sale",
+      "planned_delivery_month": "2026-12",
+      "from_price": 99500,
+      "currency": "GBP",
+      "available_units": 0,
+      "unit_types": [],
+      "cover_image_url": "https://example.com/img/sun-terraces.jpg",
+      "website_url": "https://example.com/projects/sun-terraces"
+    },
+    {
+      "id": "fx-lake-lofts",
+      "name": "Fictional Lake Lofts",
+      "city": "Sampletown",
+      "area": "Lakeside",
+      "status": "under_construction",
+      "planned_delivery_month": "2028-03",
+      "from_price": 310000,
+      "currency": "GBP",
+      "available_units": 30,
+      "unit_types": [{ "type": "Loft", "from_price": 310000 }],
+      "cover_image_url": "https://example.com/img/lake-lofts.jpg",
+      "website_url": "https://example.com/projects/lake-lofts"
+    }
+  ]
+}

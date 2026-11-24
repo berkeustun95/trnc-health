@@ -1,0 +1,52 @@
+# ─── Döveç: the one test enquiry (dry by default) ─────────────────────────────
+#
+# Why a workflow: the function is called with the production service key, and this Mac holds no service key; production
+# secrets live only in the GitHub `production` environment (main only). Runs from main, so it lands in its own PR AFTER the
+# database PR and the function deploy. Independent of the DB files: it only calls the deployed dovec-lead function.
+#
+#   gh workflow run dovec-test-lead                 # DRY: reports locks, phone state, earlier test row, the fixed payload
+#   gh workflow run dovec-test-lead -f apply=true   # SENDS the single test enquiry (needs both test locks open)
+#
+# The function refuses unless BOTH locks are open: the code constant TEST_LEAD_ALLOWED (a reviewed commit + deploy of
+# dovec-lead) AND the function secret DOVEC_LEADS_MODE=test_once. The phone comes from the function secret
+# DOVEC_TEST_LEAD_PHONE, never from an input here. It sends exactly once: a second run is refused, and a send that
+# failed is resent only through the normal claimed retry path. The log carries status words only (public repo).
+# Engine: scripts/dovec-test-lead.mjs. Procedure: supabase/functions/sync-dovec/PLUG-IN.md.
+
+name: dovec-test-lead
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'true = send the test enquiry for real; anything else = dry report only'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: dovec-test-lead
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: dovec test lead
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          if [ "$APPLY" = "true" ]; then node scripts/dovec-test-lead.mjs --apply; else node scripts/dovec-test-lead.mjs; fi

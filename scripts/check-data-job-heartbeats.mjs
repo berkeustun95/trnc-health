@@ -228,6 +228,9 @@ export function inspectWorkflow(src, expect = EXPECT, file = '') {
   return out
 }
 
+// Scheduled workflows whose own red run is the alert and that read one table: no heartbeat record, no registry row.
+export const UNRECORDED = new Set(['dovec-health'])
+
 export function check({ workflows, seedSql, allowlist, expect = EXPECT }) {
   const problems = [], found = []
   const reg = registryKeys(seedSql)
@@ -238,6 +241,11 @@ export function check({ workflows, seedSql, allowlist, expect = EXPECT }) {
     if (w.parseError) { problems.push(`${file}: ${w.problems[0]}`); continue }
     if (!w.scheduled) {
       if (w.calls) problems.push(`${file}: calls the record script but has no schedule:`)
+      continue
+    }
+    if (UNRECORDED.has(w.name)) {
+      if (w.calls) problems.push(`${file}: '${w.name}' is exempt from the heartbeat record but calls the record script`)
+      found.push({ file, name: w.name, registered: false, calls: w.calls, step: null, nProblems: 0, exempt: true })
       continue
     }
     scheduledNames.push(w.name)

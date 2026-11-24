@@ -18,13 +18,13 @@ let db = await freshDb('')
 await applyFile(db, rel('../supabase/migrations/20261202_onboarding_events.sql'))
 await applyFile(db, rel('../supabase/migrations/20261204_onboarding_events_start_choice.sql'))
 
-const ANCHOR = "date '2099-01-01'"
+const ANCHOR = "date '2026-11-24'"
 const count = SQL.split(ANCHOR).length - 1
 if (count !== 1) throw new Error(`first_time_from anchor found ${count} times, want 1`)
 const today = async () => (await db.query(`select (now() at time zone 'Asia/Famagusta')::date as d`)).rows[0].d
 const dayStr = async ago => (await db.query(`select ((now() at time zone 'Asia/Famagusta')::date - ${ago})::text as d`)).rows[0].d
 const run = async ftfAgo => {
-  const sql = ftfAgo === null ? SQL : SQL.replace(ANCHOR, `date '${await dayStr(ftfAgo)}'`)
+  const sql = ftfAgo === null ? SQL.replace(ANCHOR, "date '2099-01-01'") : SQL.replace(ANCHOR, `date '${await dayStr(ftfAgo)}'`)
   return Object.fromEntries((await db.query(sql)).rows.map(r => [r.metric, r]))
 }
 const addAt = (event, atSql, n) => db.exec(`INSERT INTO public.onboarding_events (event, platform, created_at)

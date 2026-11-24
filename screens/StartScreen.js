@@ -15,8 +15,8 @@ const LOGO = require('../assets/brand/v2/ada-logo-keyline.png')
 // Onboarding v2, the entry screen: a choice. Kayıt ol (primary), Giriş yap, and the guest path as a
 // clearly visible link (App Store 5.1.1: using the app without an account stays a real option).
 // Replaces Welcome and is where sign-out lands. App owns every storage write; onStart resolves to
-// the guest sign-in's { error }. Each tap is logged before it acts.
-export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSignUp }) {
+// the guest sign-in's { error }. Each tap is logged (when logChoices) before it acts.
+export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSignUp, logChoices = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [showLang, setShowLang] = useState(false)
@@ -26,16 +26,16 @@ export default function StartScreen({ lang, onLangChange, onStart, onLogin, onSi
   useEffect(() => { logOnboardingEvent(START_SHOWN_EVENT) }, [])
 
   function signUp() {
-    logOnboardingEvent(START_CHOICE_EVENTS.signup)
+    if (logChoices) logOnboardingEvent(START_CHOICE_EVENTS.signup)
     onSignUp()
   }
   function logIn() {
-    logOnboardingEvent(START_CHOICE_EVENTS.signin)
+    if (logChoices) logOnboardingEvent(START_CHOICE_EVENTS.signin)
     onLogin()
   }
   async function start() {
     if (busy) return
-    logOnboardingEvent(START_CHOICE_EVENTS.guest)
+    if (logChoices) logOnboardingEvent(START_CHOICE_EVENTS.guest)
     setBusy(true)
     setError(null)
     let failed = true

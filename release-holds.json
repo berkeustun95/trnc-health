@@ -195,8 +195,70 @@
       "commit": "3e843ef484ff07548e0382d10c1837fc06136051",
       "what": "Velesbit Postası go-live: VELES_LIVE = true (banner on Home for every 1.4.3 user) + #558 app files reverted, 2026-11-23",
       "since": "2026-11-23",
+      "cleared": true,
+      "clear": "Only after Berke has checked the Preview built from this PR's merge commit and gives his SECOND go in chat for the exact commit (his first go covered the PR and Preview only). Then set cleared to true in a PR; production = the previewed merge commit plus that hold-clear commit only.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Second go: publish to production from main 20dafc03 plus the one commit that clears the release holds. Nothing else.\" Goes live: VELES_LIVE = true (Velesbit Postası banner)."
+    },
+    {
+      "pr": 566,
+      "commit": "86e5e39fd5dabf3eabfb83d5fddce65343043d9a",
+      "what": "House banner 'empty space' card content (9 locales) + fit fix + check-ad-placement .js guard, merged to main 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": true,
+      "clear": "Only after Berke has seen the content on Preview (video 2026-11-23) and says go in chat for the house-banner go-live. Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Second go: publish to production from main 20dafc03 plus the one commit that clears the release holds. Nothing else.\" Ships switched off: AD_HOUSE_BANNER_LIVE stays false; the house-banner go-live needs its own go."
+    },
+    {
+      "pr": 561,
+      "commit": "4fe14b454e8fe8cce33feea9e9c49e6e4716c175",
+      "what": "Onboarding v2 follow-ups: profile-read retry + Retry screen, profile-load timeouts (no endless skeleton), onboarding events from production builds and first-time phones only, 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": true,
+      "clear": "Only after Berke has checked the combined Preview built from main with this PR and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
+      "clearedOn": "2026-11-23",
+      "clearedBy": "Berke, in chat 2026-11-23: \"Second go: publish to production from main 20dafc03 plus the one commit that clears the release holds. Nothing else.\" Goes live with the same OTA (no flag; visible only when a profile load fails or stalls)."
+    },
+    {
+      "pr": 577,
+      "commit": "25d8b8d8989a8aa3a60a3661f8430e5496dc5dc7",
+      "what": "Audit fix pack B: Duyurular one card per exam sitting, exact reposts hidden",
+      "since": "2026-11-23",
       "cleared": false,
-      "clear": "Only after Berke has checked the Preview built from this PR's merge commit and gives his SECOND go in chat for the exact commit (his first go covered the PR and Preview only). Then set cleared to true in a PR; production = the previewed merge commit plus that hold-clear commit only."
+      "clear": "Only after Berke has checked the live-snapshot groups in the vault AND the combined audit-fix Preview, and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 579,
+      "commit": "5d2d4e94db8df83f493b46ad0e4e1c7affcdb6e7",
+      "what": "Audit fix pack B follow-up: Duyurular search reaches hidden stages; Home banner counts grouped cards, not rows",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 578,
+      "commit": "2b5b58d37c3d286c0156d5c7a53b35362d5cd34d",
+      "what": "Audit fix pack C: facility page translated + guarded; guide → assistant in hrWelcomeHeadline/welcomeTagline/shareAppMessage",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 575,
+      "commit": "87685109b057ac9bdbc9cbc6dea674c52bed1d5a",
+      "what": "Audit fix pack A: Home offline screen from the first failed read + Tüm hizmetler without Nöbetçi/Acil, 2026-11-23",
+      "since": "2026-11-23",
+      "cleared": false,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+    },
+    {
+      "pr": 569,
+      "commit": "3a4454b0b325205bfa241540d6ad49e8ad82d6a3",
+      "what": "Döveç projects feed + enquiry form (dark: DOVEC_PARTNER_LIVE false, published false; reachable only through the admin preview), merged to main 2026-11-24",
+      "since": "2026-11-24",
+      "cleared": false,
+      "clear": "Only after Döveç has approved the mockup and Berke has seen Döveç on Preview and says go in chat. Then set cleared to true in a PR."
     },
     {
       "pr": 567,
