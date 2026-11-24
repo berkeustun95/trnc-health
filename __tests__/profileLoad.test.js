@@ -130,7 +130,7 @@ test('the session effect reads the profile through loadWithRetry, not a bare .si
   const effectStart = at(src, '  useEffect(() => {\n    sessionRef.current = session', 'session effect')
   const effectEnd = at(src, '\n  }, [session])', 'session effect end')
   const effect = src.slice(effectStart, effectEnd)
-  expect(effect).toContain('loadProfile(')
+  expect(effect).toContain('profileRecoveryRef.current.load(session)')
   expect(effect).not.toContain(".from('profiles').select(PROFILE_COLUMNS)")
   const fn = src.slice(at(src, 'function loadProfile(', 'loadProfile'), effectStart)
   expect(fn).toContain('loadWithRetry(')
