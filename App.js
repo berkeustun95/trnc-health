@@ -125,6 +125,7 @@ import {
 import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent, isTestDeviceLink, markTestDevice } from './utils/onboardingEvents'
 import { loadWithRetry, isNetworkError } from './utils/profileLoad'
+import { createProfileRecovery, PROFILE_SCREEN_RETRY_MS } from './utils/profileRecovery'
 import { plog, errKind, startHeartbeat, PROFILE_LOAD_LOG_ON } from './utils/profileLoadLog'
 import { withTimeout } from './utils/withTimeout'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
@@ -936,6 +937,8 @@ export default function App() {
   const sessionRef = useRef(null)
   const profileLoadSeqRef = useRef(0)
   const heldProfileUidRef = useRef(null)
+  const profileRecoveryRef = useRef(null)
+  const loadProfileRef = useRef(null)
   const offlineShownRef = useRef(false)   // the offline screen was up for this load: reload Home's data when it recovers
   const toSignUpRef = useRef(false)
   // The onboarding step as last rendered (the back chain reads it; it is derived below that hook), and the
@@ -1664,11 +1667,19 @@ export default function App() {
         },
       },
     )
-    if (PROFILE_LOAD_LOG_ON && (!isCurrent() || seq !== profileLoadSeqRef.current)) plog('stale-drop', { seq })
-    if (!isCurrent() || seq !== profileLoadSeqRef.current) return
-    // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
-    if (PROFILE_LOAD_LOG_ON && (error || !data)) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
-    if (error || !data) { if (heldProfileUidRef.current !== uid) showFailed(error); return }
+    const superseded = seq !== profileLoadSeqRef.current
+    if (!isCurrent()) { plog('stale-drop', { seq }); return }
+    // A failure from a superseded load is dropped. A SUCCESS from one is still applied while no profile is held
+    // for this uid (a tick may supersede a load that is only retrying normally); heldProfileUidRef is set below with no await before it.
+    if (error || !data) {
+      if (superseded) { plog('stale-drop', { seq }); return }
+      // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
+      if (PROFILE_LOAD_LOG_ON) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
+      if (heldProfileUidRef.current !== uid) showFailed(error)
+      return
+    }
+    if (superseded && heldProfileUidRef.current === uid) { plog('stale-drop', { seq }); return }
+    if (superseded) plog('stale-apply', { seq })
     plog('success', { attempts: attemptNo, ms: Date.now() - loadT0 })
     setProfileLoadFailedUid(null)
     setLoadStalledUid(null)
@@ -1714,6 +1725,16 @@ export default function App() {
     }
   }
 
+  loadProfileRef.current = loadProfile
+  if (!profileRecoveryRef.current) {
+    profileRecoveryRef.current = createProfileRecovery({
+      loadOnce: s => loadProfileRef.current(s),
+      isMissing: () => !!sessionRef.current && heldProfileUidRef.current !== sessionRef.current.user.id,
+      current: () => sessionRef.current,
+      log: plog,
+    })
+  }
+
   useEffect(() => {
     sessionRef.current = session
     // Reset the UI only when the USER changes. Every TOKEN_REFRESHED is a new session object,
@@ -1729,7 +1750,7 @@ export default function App() {
       setProfile(null); setProfileUid(null); heldProfileUidRef.current = null; setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
     setProfileLoadFailedUid(null)
-    loadProfile(session)
+    profileRecoveryRef.current.load(session)
     setNotifsLoading(true)
     fetchNotifications(supabase, session.user.id, { guest: isGuest(session) })
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
@@ -1970,7 +1991,7 @@ export default function App() {
       const { data, error } = await withTimeout(s => supabase.from('facilities').select('*').order('name').abortSignal(s), 10000)
         .catch(e => ({ data: null, error: e }))
       if (error) setFacilityLoadError(true)
-      else setFacilities(data ?? [])
+      else { setFacilities(data ?? []); profileRecoveryRef.current.homeReadOk(sessionRef.current) }
       plog(error ? 'read-fail' : 'read-ok', { name: 'facilities', ms: Date.now() - facT0, kind: error ? errKind(error) : null })
 
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
@@ -1983,6 +2004,7 @@ export default function App() {
         .catch(e => ({ data: null, error: e }))
       plog(dutyErr ? 'read-fail' : 'read-ok', { name: 'duty_schedule', ms: Date.now() - dutyT0, kind: dutyErr ? errKind(dutyErr) : null })
       if (duty) setDutyFacilityId(duty.facility_id)
+      if (!dutyErr) profileRecoveryRef.current.homeReadOk(sessionRef.current)
 
 
       // TODO: replace with a computed avg_rating + review_count column on facilities
@@ -1992,6 +2014,7 @@ export default function App() {
       const { data: reviewsData, error: revErr } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
         .catch(e => ({ data: null, error: e }))
       plog(revErr ? 'read-fail' : 'read-ok', { name: 'reviews', ms: Date.now() - revT0, kind: revErr ? errKind(revErr) : null })
+      if (!revErr) profileRecoveryRef.current.homeReadOk(sessionRef.current)
       if (reviewsData?.length) {
         const map = {}
         for (const r of reviewsData) {
@@ -2087,7 +2110,7 @@ export default function App() {
     setLoadStalledUid(null)
     setLoading(true)
     setRetryCount(c => c + 1)
-    loadProfile(sess)
+    profileRecoveryRef.current.load(sess)
   }
 
   // On the failed/offline screen, coming back to the app retries by itself (the network is often back by then).
@@ -2096,6 +2119,18 @@ export default function App() {
     if (!profileFailedHere) return
     const sub = AppState.addEventListener('change', next => { if (next === 'active') retryProfileLoad() })
     return () => sub.remove()
+  }, [profileFailedHere])
+
+  // JS timers pause with the screen off and a hung fetch never fails, so the automatic retries can give up with nothing
+  // left to ask again. While the screen is up, ask every 15 s when the profile is missing (the screen stays until it loads, no flicker to the skeleton).
+  // A load still running after 10 s counts as hung and the tick supersedes it; a younger one is left alone. With the profile
+  // already held (Home's own load stuck) the tick does nothing; Retry and foregrounding still work.
+  useEffect(() => {
+    if (!profileFailedHere) return
+    const id = setInterval(() => {
+      profileRecoveryRef.current.screenTick(sessionRef.current, () => { offlineShownRef.current = true })
+    }, PROFILE_SCREEN_RETRY_MS)
+    return () => clearInterval(id)
   }, [profileFailedHere])
 
   // ─── Roster health — SESSION-GATED, and that is the whole point ────────────
@@ -2127,8 +2162,10 @@ export default function App() {
       // head request returns no rows to count them from. It is ~13 rows a day.
       const [{ data: dutyToday, error: todayErr }, { data: dutyNewest, error: newestErr }] = await Promise.all([
         // name + open_from too: dutyWindows matches each row to its facility (Şimdi açık).
-        supabase.from('duty_list').select('name, region, open_from, open_until').eq('duty_date', today),
-        supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
+        withTimeout(s => supabase.from('duty_list').select('name, region, open_from, open_until').eq('duty_date', today).abortSignal(s), 10000)
+          .catch(e => ({ data: null, error: e })),
+        withTimeout(s => supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1).abortSignal(s), 10000)
+          .catch(e => ({ data: null, error: e })),
       ])
       if (cancelled) { plog('roster-cancelled', { ms: Date.now() - rosterT0 }); return }
       plog('roster-end', { ok: !(todayErr || newestErr), ms: Date.now() - rosterT0 })
@@ -2138,6 +2175,7 @@ export default function App() {
         setDutyToday({ loaded: true, error: true, rows: [], date: today })
         return
       }
+      profileRecoveryRef.current.homeReadOk(sessionRef.current)
       setDutyToday({ loaded: true, error: false, rows: dutyToday ?? [], date: today })
       setDutyRosterStatus(dutyStatus({
         todayCount: dutyToday?.length ?? 0,

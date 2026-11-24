@@ -275,6 +275,14 @@
       "since": "2026-11-24",
       "cleared": false,
       "clear": "Preview-only diagnostics, not for production. To be removed, or cleared after Berke's go in chat, with the stuck-skeleton fix PR. The commit is this PR's first commit (merge commit, not squash)."
+    },
+    {
+      "pr": 589,
+      "commit": "55ee511384ebdaaa221a2db4abaa2ebac9479ffe",
+      "what": "Stuck-load recovery: profile reload after a Home read, 15 s retry while the failed screen is up, duty_list read timeouts",
+      "since": "2026-11-24",
+      "cleared": false,
+      "clear": "Only after Berke's Preview device check and his go in chat. The commit is this PR's first commit (merge commit, not squash). #588's Preview-only logging stays held until it is removed in a follow-up."
     }
   ]
 }
