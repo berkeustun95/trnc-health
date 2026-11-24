@@ -4,18 +4,18 @@
 // A counter, not a flag: a superseded older load can still be running next to the newest one.
 export const PROFILE_SCREEN_RETRY_MS = 15000
 
-export function createProfileRecovery({ loadOnce, isMissing, log = () => {} }) {
+export function createProfileRecovery({ loadOnce, isMissing, current, log = () => {} }) {
   let inFlight = 0
-  let wantedSession = null
+  let wanted = false
 
   function load(session) {
     inFlight++
     const settle = () => {
       inFlight--
-      if (inFlight > 0 || !wantedSession) return
-      const s = wantedSession
-      wantedSession = null // cleared first: a reload that fails again must not loop
-      if (isMissing()) { log('wanted-reload'); load(s) }
+      if (inFlight > 0 || !wanted) return
+      wanted = false // cleared first: a reload that fails again must not loop
+      const s = current() // the session NOW, not the one that asked: it may have signed out since
+      if (s && isMissing()) { log('wanted-reload'); load(s) }
     }
     let p
     try { p = Promise.resolve(loadOnce(session)) } catch (e) { p = Promise.reject(e) }
@@ -27,7 +27,7 @@ export function createProfileRecovery({ loadOnce, isMissing, log = () => {} }) {
   // A Home read just succeeded, so the network works: a profile that is still missing gets asked for again now.
   function homeReadOk(session) {
     if (!session || !isMissing()) return
-    if (busy()) { wantedSession = session; log('reload-wanted'); return }
+    if (busy()) { wanted = true; log('reload-wanted'); return }
     log('home-ok-reload')
     load(session)
   }

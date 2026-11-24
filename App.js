@@ -1722,6 +1722,7 @@ export default function App() {
     profileRecoveryRef.current = createProfileRecovery({
       loadOnce: s => loadProfileRef.current(s),
       isMissing: () => !!sessionRef.current && heldProfileUidRef.current !== sessionRef.current.user.id,
+      current: () => sessionRef.current,
       log: plog,
     })
   }
@@ -2113,7 +2114,8 @@ export default function App() {
   }, [profileFailedHere])
 
   // JS timers pause with the screen off and a hung fetch never fails, so the automatic retries can give up with nothing
-  // left to ask again. While the screen is up, ask every 15 s; the screen stays until the load succeeds (no flicker to the skeleton).
+  // left to ask again. While the screen is up, ask every 15 s when the profile is missing (the screen stays until it loads, no flicker to the skeleton).
+  // With the profile already held (Home's own load stuck) the tick does nothing; Retry and foregrounding still work.
   useEffect(() => {
     if (!profileFailedHere) return
     const id = setInterval(() => {

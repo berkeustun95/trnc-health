@@ -40,7 +40,7 @@ function makeApp(fetchProfile) {
     if (s.offlineShown) { s.offlineShown = false; s.retryCount++ }
     s.held = true
   }
-  const rec = createProfileRecovery({ loadOnce, isMissing: () => !s.held })
+  const rec = createProfileRecovery({ loadOnce, isMissing: () => !s.held, current: () => SESSION })
   return { s, rec, stop: () => { if (intervalId) clearInterval(intervalId) } }
 }
 
@@ -98,6 +98,33 @@ test('network returns after the 4th attempt, app still open: recovered by the 15
   expect(src).toContain('loadProfileRef.current = loadProfile')
 })
 
+test('a queued reload uses the CURRENT session, never the one that asked (A signs out, B signs in)', async () => {
+  const A = { user: { id: 'a' } }
+  const B = { user: { id: 'b' } }
+  let cur = A
+  let finish
+  const loadOnce = jest.fn(() => (loadOnce.mock.calls.length === 1 ? new Promise(r => { finish = r }) : Promise.resolve()))
+  const rec = createProfileRecovery({ loadOnce, isMissing: () => true, current: () => cur })
+  rec.load(A)
+  rec.homeReadOk(A)
+  cur = B
+  finish()
+  await flush()
+  expect(loadOnce).toHaveBeenCalledTimes(2)
+  expect(loadOnce.mock.calls[1][0]).toBe(B)
+
+  // Signed out by then: nothing to reload.
+  let fin2
+  const load2 = jest.fn(() => (load2.mock.calls.length === 1 ? new Promise(r => { fin2 = r }) : Promise.resolve()))
+  const rec2 = createProfileRecovery({ loadOnce: load2, isMissing: () => true, current: () => cur })
+  rec2.load(B)
+  rec2.homeReadOk(B)
+  cur = null
+  fin2()
+  await flush()
+  expect(load2).toHaveBeenCalledTimes(1)
+})
+
 test('recovery without advancing timers: a Home read success asks for the missing profile at once', async () => {
   // Fake timers are installed and no advanceTimers* is ever called; only microtasks are flushed (await Promise.resolve).
   const app = makeApp(() => Promise.resolve(OK))
@@ -109,7 +136,7 @@ test('recovery without advancing timers: a Home read success asks for the missin
   let finish
   let missing = true
   const loadOnce = jest.fn(() => (loadOnce.mock.calls.length === 1 ? new Promise(r => { finish = r }) : Promise.resolve()))
-  const rec = createProfileRecovery({ loadOnce, isMissing: () => missing })
+  const rec = createProfileRecovery({ loadOnce, isMissing: () => missing, current: () => SESSION })
   rec.load(SESSION)
   rec.homeReadOk(SESSION)
   rec.homeReadOk(SESSION)
