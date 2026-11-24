@@ -1667,11 +1667,19 @@ export default function App() {
         },
       },
     )
-    if (PROFILE_LOAD_LOG_ON && (!isCurrent() || seq !== profileLoadSeqRef.current)) plog('stale-drop', { seq })
-    if (!isCurrent() || seq !== profileLoadSeqRef.current) return
-    // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
-    if (PROFILE_LOAD_LOG_ON && (error || !data)) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
-    if (error || !data) { if (heldProfileUidRef.current !== uid) showFailed(error); return }
+    const superseded = seq !== profileLoadSeqRef.current
+    if (!isCurrent()) { plog('stale-drop', { seq }); return }
+    // A failure from a superseded load is dropped. A SUCCESS from one is still applied while no profile is held
+    // for this uid (a tick may supersede a load that is only retrying normally); heldProfileUidRef is set below with no await before it.
+    if (error || !data) {
+      if (superseded) { plog('stale-drop', { seq }); return }
+      // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
+      if (PROFILE_LOAD_LOG_ON) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
+      if (heldProfileUidRef.current !== uid) showFailed(error)
+      return
+    }
+    if (superseded && heldProfileUidRef.current === uid) { plog('stale-drop', { seq }); return }
+    if (superseded) plog('stale-apply', { seq })
     plog('success', { attempts: attemptNo, ms: Date.now() - loadT0 })
     setProfileLoadFailedUid(null)
     setLoadStalledUid(null)

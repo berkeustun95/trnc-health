@@ -31,7 +31,10 @@ export function createProfileRecovery({ loadOnce, isMissing, current, log = () =
 
   const busy = () => !newestSettled // busy = the newest load has not settled yet
   const staleAge = () => now() - newestStart
-  const isStale = () => busy() && staleAge() >= PROFILE_STALE_LOAD_MS
+  const isStale = () => {
+    const age = staleAge()
+    return busy() && (age < 0 || age >= PROFILE_STALE_LOAD_MS) // a negative age = the clock went backwards: treat as stale
+  }
   const ageSec = () => Math.floor(staleAge() / 1000)
 
   // A Home read just succeeded, so the network works: a profile that is still missing gets asked for again now.

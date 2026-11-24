@@ -52,7 +52,11 @@ test('network hangs, then returns: the 15 s retry loads the profile with no AppS
   const app = makeApp(() => (up ? Promise.resolve(OK) : new Promise(() => {})))
   app.rec.load(SESSION)
   await jest.advanceTimersByTimeAsync(39500) // 4 hung attempts of 8 s + 1 + 2 + 4 s of sleeps = give-up at 39 s
-  expect(app.s.fetches).toBeGreaterThanOrEqual(4) // ticks at 15 s and 30 s found the load hung (> 10 s) and superseded it
+  // Exactly 7, from the fake-timer timeline. The failed flag (and so the 15 s interval) starts at the FIRST timeout, 8 s, so ticks fall at 23 s and 38 s.
+  // Chain 1 (0 s): attempts at 0, 9, 19, 31 = 4 (hung 8 s each, sleeps 1, 2, 4 s; it is superseded but its retries run on, no isCurrent here).
+  // Chain 2 (23 s, tick found chain 1 hung 23 s): attempts at 23, 32 = 2 (the third would be at 41 s, after the 39.5 s window).
+  // Chain 3 (38 s, tick found chain 2 15 s old): attempt at 38 = 1.
+  expect(app.s.fetches).toBe(7)
   expect(app.s.failed).toBe(true)
   expect(app.s.held).toBe(false)
   up = true // back at 40 s
@@ -191,6 +195,15 @@ test('a hung load is superseded on a Home read, with no timer', async () => {
   expect(h.loadOnce).toHaveBeenCalledTimes(2)
   expect(h.loadOnce.mock.calls[1][0]).toBe(SESSION)
   expect(h.logs).toContainEqual(['supersede-stale', { age: 14, via: 'home' }])
+})
+
+test('a clock that went backwards counts as stale: the hung load is superseded', async () => {
+  const h = hung()
+  h.rec.load(SESSION)
+  h.advance(-5000)
+  h.rec.homeReadOk(SESSION)
+  await flush()
+  expect(h.loadOnce).toHaveBeenCalledTimes(2)
 })
 
 test('three Home reads in a row past the threshold start exactly one superseding load', async () => {
