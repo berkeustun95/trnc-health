@@ -267,6 +267,14 @@
       "since": "2026-11-23",
       "cleared": false,
       "clear": "Only after KTFF approves our Origin, real data has landed, Berke has seen Canlı Skor on Preview with his editor account and says go in chat (Berke 2026-11-23). Then set cleared to true in a PR. The commit is this PR first commit, so every main carrying any of #567 is held (merge commit, not squash)."
+    },
+    {
+      "pr": 588,
+      "commit": "f5079d6ddf663d36f749214a5fe123cdb5f1f3ec",
+      "what": "Preview-only diagnostics: [profile-load] breadcrumbs for the stuck Home skeleton (gated on the Preview channel + variant), PR #588",
+      "since": "2026-11-24",
+      "cleared": false,
+      "clear": "Preview-only diagnostics, not for production. To be removed, or cleared after Berke's go in chat, with the stuck-skeleton fix PR. The commit is this PR's first commit (merge commit, not squash)."
     }
   ]
 }
