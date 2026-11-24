@@ -136,6 +136,7 @@ import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import LiveScoresScreen from './screens/LiveScoresScreen'
 import LiveScoresEditorScreen from './screens/LiveScoresEditorScreen'
+import DovecProjectsScreen from './screens/DovecProjectsScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
@@ -756,7 +757,7 @@ export default function App() {
   // Session state is right here, unlike the flag path: the account no longer exists, so
   // there is nothing a relaunch could escape back into.
   const [ageDeletedNotice, setAgeDeletedNotice] = useState(false)
-  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'exploreMap' (dev review) | 'studentHub'. Admins never reach HomeScreen /
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'exploreMap' (dev review) | 'studentHub' | 'dovec'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
@@ -868,6 +869,9 @@ export default function App() {
   const [openedDorm, setOpenedDorm] = useState(null)
   // A North Houses apartment (Günlük Kiralık tab): the same overlay, the same reason it lives here.
   const [openedRental, setOpenedRental] = useState(null)
+  // Döveç projects (Emlak): overlay over Konaklama; its layers (project, form, thank-you) step back through dovecBackRef.
+  const [openedDovec, setOpenedDovec] = useState(false)
+  const dovecBackRef = useRef(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   // ─── Redesign Slice 2 (shell) ───────────────────────────────────────────────
@@ -1267,6 +1271,7 @@ export default function App() {
         // Every sign-out path in the app lands here, so this one line covers them all.
         signOutGoogle()
         setAdminOpen(null)
+        setAdminPreview(null)
         // A sign-out ends any onboarding hand-off: Screen 2 belongs to the session that armed it.
         setOnbPending(null)
         setSigninPerm(null)
@@ -1369,6 +1374,7 @@ export default function App() {
       if (gateHealthList) { setGateHealthList(false); return true }
       if (openedEvent) { if (eventFromHome) closeEvents(); else setOpenedEvent(null); return true }
       if (showEvents) { closeEvents(); return true }
+      if (openedDovec) { if (dovecBackRef.current?.()) return true; setOpenedDovec(false); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
       if (openedRental) { setOpenedRental(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
@@ -1422,6 +1428,7 @@ export default function App() {
       // (they render earlier in the content chain), so Back must pop them before the hub.
       if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
       if (adminPreview === 'liveScoresEditor' && liveScoresEditorBackRef.current?.()) return true
+      if (adminPreview === 'dovec' && dovecBackRef.current?.()) return true
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
@@ -1435,7 +1442,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, openedDovec, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
 
   useEffect(() => {
     Promise.all([
@@ -2561,6 +2568,7 @@ export default function App() {
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
       onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
+      onShowDovec={() => setAdminPreview('dovec')}
       onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined}
       openRequest={adminOpen} onOpenRequestHandled={() => setAdminOpen(null)} />
   } else if (profile.role === 'provider') {
@@ -2720,6 +2728,11 @@ export default function App() {
         onOpenRental={a => setOpenedRental(a)}
         selectedRental={openedRental}
         onCloseRental={() => setOpenedRental(null)}
+        dovecOpen={openedDovec}
+        onOpenDovec={() => setOpenedDovec(true)}
+        onCloseDovec={() => setOpenedDovec(false)}
+        dovecBackRef={dovecBackRef}
+        onRequireAccount={requireAccount}
       />
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />
@@ -2848,6 +2861,11 @@ export default function App() {
     // Admins enter KTFF fixtures from here (they never reach Home). Not flag-gated: fixtures
     // are entered before LIVE_SCORES_LIVE flips.
     content = <LiveScoresEditorScreen lang={lang} onBack={() => setAdminPreview(null)} backRef={liveScoresEditorBackRef} />
+  } else if (adminPreview === 'dovec') {
+    // Döveç projects, as a customer sees them (feed, project, enquiry form). Only AdminScreen's button sets this; it skips the Emlak
+    // entry gate (flag + published) and nothing else: the rows come from RLS, which lets an admin read them while published = false.
+    // No admin chrome here on purpose. Lead sending is still mocked server-side (dovec-lead locks).
+    content = <DovecProjectsScreen lang={lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} />
   } else if (showLiveScores) {
     content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and

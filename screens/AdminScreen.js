@@ -5200,7 +5200,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, openRequest, onOpenRequestHandled }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, onShowDovec, openRequest, onOpenRequestHandled }) {
   const adminLang = ADMIN_LANG
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -5292,6 +5292,14 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowStudentHub} activeOpacity={0.85}>
             <Ionicons name="school-outline" size={16} color={colors.primary} />
             <Text style={s.explorePreviewText}>Open Student Hub (preview)</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Döveç projects (partner, dark until Döveç approves): the customer feed -> project -> enquiry screens, for an admin only. */}
+        {onShowDovec && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowDovec} activeOpacity={0.85}>
+            <Ionicons name="business-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Open Döveç projects (preview)</Text>
           </TouchableOpacity>
         )}
 

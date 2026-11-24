@@ -1,0 +1,12 @@
+{
+  "client_request_id": "11111111-2222-4333-8444-555555555555",
+  "project_id": "fx-harbour-view",
+  "unit_type": "2+1",
+  "name": "Test Person",
+  "phone": "+44 1234 567890",
+  "email": "test.person@example.com",
+  "message": "Fictional enquiry text.",
+  "consent": true,
+  "consent_text_version": "dovec-consent-2026-11-23",
+  "language": "German"
+}
