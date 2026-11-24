@@ -126,5 +126,12 @@ check('T1 DOVEC_PARTNER_LIVE is false (imported)', DOVEC_PARTNER_LIVE === false,
   check('T8 no dovec (any case) in deep-link handler, push routing, Home, Explore, search_content migrations', total === 0, `${total} matches in: ${regions.map(r => r[0].replace(migDir, 'mig/')).join(', ')}`)
 }
 
+// ── T6b a sign-out clears the admin preview, so a later customer session never lands on it
+{
+  const i = APP.indexOf("if (event === 'SIGNED_OUT') {"), j = APP.indexOf("if (event === 'PASSWORD_RECOVERY')", i + 1)
+  const block = i > -1 && j > i ? APP.slice(i, j) : ''
+  check('T6b SIGNED_OUT block found and contains setAdminPreview(null)', block.includes('setAdminOpen(null)') && block.includes('setAdminPreview(null)'), `${block.length} chars, setAdminPreview(null) x${(block.match(/setAdminPreview\(null\)/g) || []).length}`)
+}
+
 console.log(bad ? `\n${bad} FAILED` : '\nall PASS')
 process.exit(bad ? 1 : 0)
