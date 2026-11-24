@@ -532,11 +532,10 @@ CREATE TABLE public.data_jobs (key text PRIMARY KEY, runner text NOT NULL, kind 
   }
 }
 
-console.log('20261233 / 20261234 — mock-lead cleanup and admin language, on top of 20261229 + 20261231')
+console.log('20261233 — mock-lead cleanup, on top of 20261229 + 20261231 (writes no profile)')
 {
   const CLEAN = fileURLToPath(new URL('../supabase/migrations/20261233_dovec_mock_lead_cleanup.sql', import.meta.url))
-  const REVERT = fileURLToPath(new URL('../supabase/migrations/20261234_admin_language_revert.sql', import.meta.url))
-  const CSQL = readFileSync(CLEAN, 'utf8'), RSQL = readFileSync(REVERT, 'utf8')
+  const CSQL = readFileSync(CLEAN, 'utf8')
   const ADMIN2 = '00000000-0000-4000-8000-000000000005'
   const FIX2 = FIXTURE.replace(`role text NOT NULL DEFAULT 'customer')`, `role text NOT NULL DEFAULT 'customer', preferred_language text)`)
     + `UPDATE public.profiles SET preferred_language = 'Turkish' WHERE id = '${ADMIN}';\n`
@@ -573,11 +572,11 @@ console.log('20261233 / 20261234 — mock-lead cleanup and admin language, on to
     const o = {}
     { const d = await fresh2([MOCK(ADMIN), MOCK(ADMIN), MOCK(ADMIN), TEST1].join(';\n'))
       const before = await seq(d); const r = await run(d, file)
-      o['positive: admin mock rows + TEST-1 removed, sequence untouched, language English'] =
-        r.ok === true && await nleads(d) === 0 && await seq(d) === before && await lang(d) === 'English'
+      o['positive: admin mock rows + TEST-1 removed, sequence untouched, language untouched'] =
+        r.ok === true && await nleads(d) === 0 && await seq(d) === before && await lang(d) === 'Turkish'
       console.log(`    (positive-case sequence before ${before}, after ${await seq(d)})`) }
     { const d = await fresh2(); const r = await run(d, file)
-      o['positive: no leads at all, the language part still runs'] = r.ok === true && await lang(d) === 'English' }
+      o['positive: no leads at all applies cleanly'] = r.ok === true && await nleads(d) === 0 }
     { const d = await fresh2([MOCK(ADMIN), ins(ADMIN, { status: "'sent'", sent_at: 'now()', attempts: '1' })].join(';\n'))
       const r = await run(d, file)
       o['red: a sent row aborts; mock row and language untouched'] = abortedWith(r, MSG_ROW) && await nleads(d, `status = 'mock'`) === 1 && await nleads(d) === 2 && await lang(d) === 'Turkish' }
@@ -602,18 +601,13 @@ console.log('20261233 / 20261234 — mock-lead cleanup and admin language, on to
     { const d = await fresh2([MOCK(ADMIN), MOCK(null)].join(';\n'))
       const r = await run(d, file)
       o['red: a non-test mock row with no owner (deleted user) aborts'] = abortedWith(r, MSG_ROW) && await nleads(d) === 2 }
-    { const d = await fresh2([MOCK(ADMIN)].join(';\n'))
+    { const d = await fresh2([MOCK(ADMIN), MOCK(ADMIN2)].join(';\n'))
       await d.exec(`UPDATE public.profiles SET role = 'admin' WHERE id = '${ADMIN2}'`)
       const r = await run(d, file)
-      o['red: two admins abort, mock row and language untouched'] = abortedWith(r, /not exactly one admin profile/) && await nleads(d) === 1 && await lang(d) === 'Turkish' }
+      o['positive: two admins, each with a mock row: both removed, no profile changed'] = r.ok === true && await nleads(d) === 0 && await lang(d) === 'Turkish' }
     { const d = await fresh2([MOCK(ADMIN)].join(';\n'))
-      await d.exec(`UPDATE public.profiles SET preferred_language = 'English' WHERE id = '${ADMIN}'`)
       const r = await run(d, file)
-      o['red: admin already English aborts, mock row untouched'] = abortedWith(r, /admin saved language is not Turkish/) && await nleads(d) === 1 }
-    { const d = await fresh2([MOCK(ADMIN)].join(';\n'))
-      await d.exec(`UPDATE public.profiles SET preferred_language = NULL WHERE id = '${ADMIN}'`)
-      const r = await run(d, file)
-      o['red: admin language NULL aborts (NULL is not Turkish)'] = abortedWith(r, /admin saved language is not Turkish/) && await nleads(d) === 1 }
+      o['file writes no profile'] = r.ok === true && !/UPDATE\s+public\.profiles/i.test(readFileSync(file, 'utf8')) }
     return o
   }
 
@@ -636,37 +630,13 @@ console.log('20261233 / 20261234 — mock-lead cleanup and admin language, on to
     ['looser test-row clause restored', `       AND l.status = 'mock'\n`, `       AND (l.status = 'mock' OR l.is_test)\n       AND (NOT l.is_test OR l.status NOT IN ('sent', 'rejected'))\n`, 'red: a pending TEST-1 row (attempts 0) aborts, nothing changed'],
     ['next_attempt_at clause dropped', ` AND l.next_attempt_at IS NULL)`, `)`, 'red: a mock row with next_attempt_at set aborts'],
     ['HTTP-evidence clause dropped', ` AND l.last_http_status IS NULL`, ``, 'red: a mock row with HTTP evidence aborts'],
-    ['admin count check dropped', `IF (SELECT count(*) FROM public.profiles WHERE role = 'admin') IS DISTINCT FROM 1 THEN`, `IF false THEN`, 'red: two admins abort, mock row and language untouched'],
-    ['Turkish precondition dropped', `IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin' AND preferred_language IS NOT DISTINCT FROM 'Turkish') THEN`, `IF false THEN`, 'red: admin already English aborts, mock row untouched'],
-    ['sequence reset added', `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;`, `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;\n  ALTER SEQUENCE public.dovec_lead_external_seq RESTART;`, 'positive: admin mock rows + TEST-1 removed, sequence untouched, language English'],
-    ['language written as an ISO code', `SET preferred_language = 'English'`, `SET preferred_language = 'en'`, 'positive: no leads at all, the language part still runs'],
+    ['single-admin check re-added', `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;`, `IF (SELECT count(*) FROM public.profiles WHERE role = 'admin') IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'x'; END IF;\n  DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;`, 'positive: two admins, each with a mock row: both removed, no profile changed'],
+    ['profile write re-added', `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;`, `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;\n  UPDATE public.profiles SET preferred_language = 'English' WHERE role = 'admin';`, 'file writes no profile'],
+    ['sequence reset added', `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;`, `DELETE FROM public.dovec_leads WHERE status = 'mock' OR is_test;\n  ALTER SEQUENCE public.dovec_lead_external_seq RESTART;`, 'positive: admin mock rows + TEST-1 removed, sequence untouched, language untouched'],
   ]) {
     const p = mut(CSQL, from, to); if (!p) continue
     const got = (await scenarios(p))[scenario]
     t(`mutant "${name}": "${scenario}" goes red`, got, false)
-  }
-
-  console.log('  20261234 (revert), after 20261233')
-  {
-    const d = await fresh2([MOCK(ADMIN)].join(';\n'))
-    t('revert before 20261233 (admin still Turkish) aborts', abortedWith(await run(d, REVERT), /admin saved language is not English/), true)
-    t('  and the language is unchanged', await lang(d), 'Turkish')
-    t('20261233 applies', (await run(d, CLEAN)).ok, true)
-    t('  language is English', await lang(d), 'English')
-    t('20261234 applies', (await run(d, REVERT)).ok, true)
-    t('  language is back to Turkish', await lang(d), 'Turkish')
-    t('20261234 run again aborts (now Turkish)', abortedWith(await run(d, REVERT), /admin saved language is not English/), true)
-    await d.exec(`UPDATE public.profiles SET role = 'admin' WHERE id = '${ADMIN2}'; UPDATE public.profiles SET preferred_language = 'English' WHERE id = '${ADMIN}'`)
-    t('20261234 with two admins aborts', abortedWith(await run(d, REVERT), /not exactly one admin profile/), true)
-    t('  and the language is unchanged', await lang(d), 'English')
-  }
-  {
-    const p = mut(RSQL, `AND preferred_language IS NOT DISTINCT FROM 'English'`, `AND true`)
-    if (p) {
-      const d = await fresh2()
-      const r = await run(d, p)
-      t('mutant "English precondition dropped": reverting an already-Turkish admin goes un-refused (the revert case can fail)', r.ok, true)
-    }
   }
 }
 

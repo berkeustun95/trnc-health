@@ -1,17 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261233 — Döveç: remove admin mock/test enquiries, and put the admin account on English for one recording
+-- 20261233 — Döveç: remove admin mock/test enquiries
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Data only. No table, column, policy, grant, trigger or function is created or changed. Berke's go: "delete every
 -- mock/test row in dovec_leads through the approved route, so lead counts start clean ... The reference number can
--- carry on from where it is." and "switch my admin account's saved language to English ... then switch it back to
--- Turkish. You have my go for that one write and its revert." The revert is 20261234, a SEPARATE file applied in a
--- LATER supabase-migrate run, after the phone recording. Never dispatch the two together.
+-- carry on from where it is." The admin-language part an earlier draft of this file carried (and its revert, 20261234)
+-- was dropped by Berke on 2026-11-24 before it ever applied: no profile is written by this file.
 --
 -- WHY NO IDS OR NUMBERS: supabase-migrate prints this file to a PUBLIC Actions log. Rows are chosen by predicate
--- (status / is_test / role) and every message is fixed text; nothing here names a user, an id, an email or a count.
+-- (status / is_test / owner role) and every message is fixed text; nothing here names a user, an id, an email or a count.
 --
--- ─── PART 1: dovec_leads ───────────────────────────────────────────────────
 -- What goes: every row with status 'mock' (the dovec-lead function settles an enquiry as 'mock' when the live send is
 -- switched off: no attempt, no HTTP status, no sent_at) and the one is_test row (external_id TEST-1, written only by
 -- the service-only test send, user_id always NULL) ONLY when it settled as 'mock' (never sent). A pending, retry, sent,
@@ -36,19 +34,11 @@
 -- Removing the TEST-1 row also frees the "one is_test row ever" partial unique index (dovec_leads_one_test_idx). That is
 -- fine because the precondition proves it was never sent; the agreed test enquiry can still be sent once later.
 --
--- ─── PART 2: the admin account's saved language ────────────────────────────
--- Exactly one profile has role = 'admin' (asserted); it must be 'Turkish' now (asserted); it becomes 'English' (a full
--- English name, never an ISO code). The BEFORE UPDATE triggers on profiles (check_profile_name_content latest body 20261016,
--- guard_profile_ban, guard_checkin_notice_columns, guard_marketplace_notice_columns, profiles_age_confirmed_stamp) neither
--- raise nor rewrite anything on a preferred_language-only change run as postgres with no auth.uid() (read in the repo
--- files; the one unguarded raise is UNDERAGE on a stored under-13 date of birth, which an admin does not have; if it
--- did, the file would roll back whole).
---
 -- WHO CAN READ / WRITE WHAT: unchanged. dovec_leads keeps RLS on with zero policies and no privilege for any app role;
 -- this file only deletes rows as the owner. No policy or grant is added, changed or removed.
 --
--- Re-runnable: after it applies, a second run is refused by the ledger, and by the language assertion if forced.
--- Not reversible for the deleted rows (they were mock/test by proof); the language is reverted by 20261234.
+-- Re-runnable: after it applies, a second run is refused by the ledger; forced, it deletes nothing new unless the same
+-- proof holds again. Not reversible for the deleted rows (they were mock/test by proof).
 
 SET ROLE postgres;
 
@@ -60,8 +50,6 @@ SET LOCAL lock_timeout = '5s';
 LOCK TABLE public.dovec_leads IN SHARE ROW EXCLUSIVE MODE;
 
 DO $$
-DECLARE
-  v_rows int;
 BEGIN
   IF to_regclass('public.dovec_leads') IS NULL THEN
     RAISE EXCEPTION '20261229 is not applied: apply it before this file';
@@ -85,18 +73,6 @@ BEGIN
     RAISE EXCEPTION 'a mock or test enquiry is still in dovec_leads after the delete';
   END IF;
 
-  IF (SELECT count(*) FROM public.profiles WHERE role = 'admin') IS DISTINCT FROM 1 THEN
-    RAISE EXCEPTION 'there is not exactly one admin profile: stop and ask Berke';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin' AND preferred_language IS NOT DISTINCT FROM 'Turkish') THEN
-    RAISE EXCEPTION 'the admin saved language is not Turkish: stop and ask Berke';
-  END IF;
-
-  UPDATE public.profiles SET preferred_language = 'English' WHERE role = 'admin';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows IS DISTINCT FROM 1 THEN
-    RAISE EXCEPTION 'the admin language update did not touch exactly one profile';
-  END IF;
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -110,7 +86,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261233_dovec_mock_lead_cleanup.sql', '23e7f920d4239e12e25f0d2191b082e7ce4b529f6d2bf0375b0b1130e9ed5e2c')
+VALUES ('20261233_dovec_mock_lead_cleanup.sql', '23aaa0069e0fb45e843dbf73ccc2530488468faf2977be41822fef3affd4feb5')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
