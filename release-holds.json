@@ -299,6 +299,14 @@
       "since": "2026-11-25",
       "cleared": false,
       "clear": "Only after Berke's own Preview device check of this PR and his go in chat (not part of the current Preview pack). The commit is this PR's fix commit (merge commit, not squash)."
+    },
+    {
+      "pr": 592,
+      "commit": "5243e6fa84b8a2026111f0d56f579b5c0b5976f3",
+      "what": "Duty tile blank after offline recovery: card keeps borderWidth 0 (Android NaN clip)",
+      "since": "2026-11-25",
+      "cleared": false,
+      "clear": "Only after Berke has seen the duty tile recover on Preview and says go in chat. Then set cleared to true in a PR."
     }
   ]
 }

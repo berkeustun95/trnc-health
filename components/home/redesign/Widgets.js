@@ -382,7 +382,7 @@ export function StripSlider({ slides, loading, lang, onPress, onDismiss, paused 
 }
 
 const s = StyleSheet.create({
-  card:        { borderRadius: radii.widget, overflow: 'hidden' },
+  card:        { borderRadius: radii.widget, overflow: 'hidden', borderWidth: 0 },
   alertBorder: { borderWidth: 1.5, borderColor: colors.dangerInk },
   photo:       { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   badge:       { position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 14,
