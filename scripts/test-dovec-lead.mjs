@@ -507,9 +507,9 @@ console.log('T10: who may call which mode')
 console.log('T11: secret-key service caller')
 {
   const mk = (ret) => { const p = async (k) => { p.calls++; p.keys.push(k); if (ret === 'throw') throw new Error('net'); return ret }; p.calls = 0; p.keys = []; return p }
-  const H = 'Bearer sb_secret_abc_DEF-1'
+  const H = 'Bearer sb_secret_aB_-1'
   const ok = mk(true)
-  t('secret header + probe true: secret, probe got exactly the key', [await secretKeyCaller(H, ok), ok.calls, ok.keys], ['secret', 1, ['sb_secret_abc_DEF-1']])
+  t('secret header + probe true: secret, probe got exactly the key', [await secretKeyCaller(H, ok), ok.calls, ok.keys], ['secret', 1, ['sb_secret_aB_-1']])
   for (const [label, ret] of [['false', false], ['throws', 'throw'], ['"yes"', 'yes'], ['1', 1], ['{}', {}], ['undefined', undefined]]) {
     const p = mk(ret)
     t(`secret header + probe ${label}: null`, await secretKeyCaller(H, p), null)
