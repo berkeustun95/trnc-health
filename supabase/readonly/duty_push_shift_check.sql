@@ -4,7 +4,7 @@
 -- and none of duty_push_runs' notified / push_* columns; error_kinds is read as KEYS only (jsonb_object_keys, never the values).
 --
 -- BEFORE the apply: 'ledger_20261221' is [] (no row), duty-push reads '0,30 * * * *', the gate has_3min_shift is false.
--- AFTER the apply: ledger_20261221 holds one row, duty-push reads '27,57 * * * *', has_3min_shift true, weekend-digest still '0,30 * * * 5,6'.
+-- AFTER the apply: ledger_20261221 holds one row, duty-push reads '27,57 * * * *', has_3min_shift true, weekend-digest '0,30 * * * 5,6' until 20261238 (the weekend digest shift) is applied, '3,33 * * * 5,6' after it.
 --
 -- HOW TO READ "one run per day, none skipped, none twice":
 --   cron_per_day      every local day with ticks: 'ticks' = cron starts that day, 'minutes_seen' must be {27,57} (a tick at :00 / :30
