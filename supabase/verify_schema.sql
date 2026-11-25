@@ -7662,6 +7662,7 @@ SELECT '20261221_duty_push_shift_3min', 'duty-push: exactly one job, active, sch
                     AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
               THEN 'OK'
             ELSE 'duty-push IS NOT THE ACTIVE JOB AT 27,57 * * * * WITH ITS ORIGINAL COMMAND ← FIX (20261221)' END
+
 ORDER BY status ASC, migration;
 
 
