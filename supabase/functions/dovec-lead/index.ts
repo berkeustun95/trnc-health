@@ -7,6 +7,7 @@
 //        409 request_changed · 429 rate_limited
 //   POST { mode: 'retry' }                                         (service key only: cron 20261230)
 //   POST { mode: 'test_lead', dry?: boolean }                      (service key only: workflow dovec-test-lead; dry by default)
+//   Service modes accept the runtime key, a service_role JWT (cron) or an sb_secret_ key the database accepts as service_role.
 //
 // Deploy:  scripts/fn-deploy.sh dovec-lead --go   (after Berke's go; verify_jwt true, deploy-config.json)
 // Secrets: DOVEC_PARTNER_KEY (Bearer for Döveç), DOVEC_LEADS_MODE ('live' = lock 2 of 2; with the code constant
@@ -18,7 +19,7 @@
 //      person's lead.
 // PRIVACY: logs hold external_id, a status word and an HTTP code. Never a name, phone, e-mail, message or user id.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { serviceCaller } from '../_shared/caller-auth.mjs'
+import { serviceCaller, secretKeyCaller } from '../_shared/caller-auth.mjs'
 import { handleLead, STALE_LEAD_MS, TEST_PROJECT_SEED } from '../_shared/dovec-lead.mjs'
 
 const json = (status: number, body: unknown) =>
@@ -36,9 +37,14 @@ Deno.serve(async (req) => {
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
   const authz = req.headers.get('Authorization')
+  const holdsServiceKey = async (k: string) => {
+    const r = await fetch(`${url}/rest/v1/dovec_leads?select=id&limit=0`, { headers: { apikey: k }, signal: AbortSignal.timeout(10000) })
+    await r.body?.cancel()
+    return r.status === 200
+  }
 
   let caller: { kind: 'user'; id: string } | { kind: 'service' }
-  if (await serviceCaller(authz, key)) {
+  if (await serviceCaller(authz, key) || await secretKeyCaller(authz, holdsServiceKey)) {
     caller = { kind: 'service' }
   } else {
     const jwt = ONE_JWT.exec(authz ?? '')?.[1]

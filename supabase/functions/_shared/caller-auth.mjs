@@ -28,6 +28,17 @@ export async function serviceCaller(authorizationHeader, serviceKey) {
   return one && jwtRole(one[1]) === 'service_role' ? 'role' : null
 }
 
+// A new-format secret API key (sb_secret_...): not a JWT and not the runtime key, so serviceCaller cannot see it. The
+// format check only decides whether to ask; the DATABASE decides: probe(key) must prove the key reads a table only
+// service_role can read (as apple-token's holdsServiceKey does). A probe error or any answer but true = null (fails closed).
+const SECRET_KEY = /^Bearer (sb_secret_[A-Za-z0-9_-]+)$/
+
+export async function secretKeyCaller(authorizationHeader, probe) {
+  const m = SECRET_KEY.exec(authorizationHeader ?? '')
+  if (!m) return null
+  try { return (await probe(m[1])) === true ? 'secret' : null } catch { return null }
+}
+
 // An admin's own session, for the functions the app calls with supabase.functions.invoke. Pure, deps injected:
 //   getUser(jwt)  = the service client's auth.getUser(jwt) -> { data: { user }, error }  (verifies the token with Auth;
 //                   the service key itself is not a user token, so it is refused here, not waved through)
