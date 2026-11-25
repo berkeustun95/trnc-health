@@ -238,7 +238,7 @@ export default function LiveStrip({
 
 const s = StyleSheet.create({
   row:           { flexDirection: 'row', gap: 10 },
-  card:          { flex: 1, height: STRIP_CARD_H, borderRadius: 18, overflow: 'hidden',
+  card:          { flex: 1, height: STRIP_CARD_H, borderRadius: 18, overflow: 'hidden', borderWidth: 0,
                    backgroundColor: colors.border, ...shadow },
   // A danger border as the fifth signal — the one that still reads when a screenshot is
   // scaled to a thumbnail and the band's text is illegible.
