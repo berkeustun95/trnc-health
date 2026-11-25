@@ -142,17 +142,19 @@ export async function deliver(lead, deps) {
     return retryOrFail(attempts, null, backoffMs(attempts), finish)
   }
   const code = res.status
-  if (test) log(`dovec-lead ${lead.external_id} response http=${code} body=${await answerText(res, lead.phone)}`)
+  if (test) log(`dovec-lead ${lead.external_id} response http=${code} body=${await answerText(res, lead.phone, env.apiKey)}`)
   if (code >= 200 && code < 300) return finish({ status: 'sent', attempts, last_http_status: code, sent_at: now().toISOString(), next_attempt_at: null })
   if (code === 429 || code === 401 || code >= 500) return retryOrFail(attempts, code, retryAfterMs(res) ?? backoffMs(attempts), finish, now)
   return finish({ status: 'rejected', attempts, last_http_status: code, next_attempt_at: null })
 }
 
-// Döveç's raw answer to the test enquiry, for the private function log only: capped, one line, the phone masked.
-async function answerText(res, phone) {
+// Döveç's raw answer to the test enquiry, for the private function log only: capped, one line, the phone and key
+// masked. Any run of 7+ digits is masked too, so the phone cannot slip through in another format (no '+', spaced, 00…).
+async function answerText(res, phone, apiKey) {
   let text = ''
   try { text = typeof res.text === 'function' ? String(await res.text()) : '' } catch { return '<unreadable>' }
-  if (phone) text = text.split(phone).join('<phone>')
+  for (const secret of [apiKey, phone, phone?.replace(/^\+/, '')]) if (secret) text = text.split(secret).join('<masked>')
+  text = text.replace(/\d(?:[\s.-]?\d){6,}/g, '<digits>')
   return JSON.stringify(text.replace(/\s+/g, ' ').slice(0, 500))
 }
 
@@ -266,17 +268,19 @@ export async function handleTestLead({ body, deps }) {
   const phoneState = phone === '' ? 'missing' : PHONE.test(phone) ? 'set' : 'invalid'
   const project = await store.getTestProject()
   const projectState = project?.id ? 'resolved' : 'missing'
+  const keyState = env.apiKey ? 'set' : 'missing'
   const existing = await store.findTestLead()
   const state = existing ? existing.status : 'none'
   const resumable = existing && (existing.status === 'pending' || existing.status === 'retry')
   const refusal = !(locks.code && locks.secret) ? 'locked'
+    : keyState !== 'set' ? 'key_missing'
     : phoneState !== 'set' ? `phone_${phoneState}`
     : projectState !== 'resolved' && !resumable ? 'project_missing'
     : existing && TEST_FINAL.includes(existing.status) ? 'already_used'
     : null
   const would = refusal ? `refuse:${refusal}` : resumable ? 'resend_claimed' : 'insert_and_send'
   if (dry) {
-    return { status: 200, body: { ok: true, dry: true, locks, phone: phoneState, project: projectState, existing: state, would,
+    return { status: 200, body: { ok: true, dry: true, locks, key: keyState, phone: phoneState, project: projectState, existing: state, would,
       payload: { name: TEST_LEAD.name, message: TEST_LEAD.message, consent: true, language: TEST_LEAD.language, external_id: TEST_LEAD.external_id, phone: phoneState === 'set' ? '<secret>' : null, project: projectState === 'resolved' ? '<D-Point id>' : null } } }
   }
   if (refusal) return { status: refusal === 'already_used' ? 409 : 403, body: { ok: false, error: refusal } }

@@ -319,6 +319,9 @@ console.log('the test enquiry: user leads stay mock under test_once')
   const store = makeStore(); const f = stub()
   const r = await post(BODY, store, deps(store, { mode: 'test_once', testAllowed: true, testPhone: TP, fetchImpl: f }))
   t('a user lead under test_once is stored mock and nothing is sent', [r.body.status, store.leads[0].status, f.calls.length], ['mock', 'mock', 0])
+  const sL = makeStore(); const fL = stub()
+  const rL = await post(BODY, sL, deps(sL, { mode: 'test_once', live: true, testAllowed: true, testPhone: TP, fetchImpl: fL }))
+  t('... even with the user-lead constant open, test_once never sends a user lead', [rL.body.status, fL.calls.length], ['mock', 0])
   const st2 = makeStore({ preload: [
     { id: 97, user_id: 'user-b', client_request_id: 'c1', status: 'pending', consent: true, name: 'A', phone: '+441234567890', language_code: 'en', external_id: 'ADA-97', attempts: 0, created_at: T0.toISOString() },
     { id: 98, user_id: 'user-c', client_request_id: 'c2', status: 'retry', consent: true, name: 'B', phone: '+441234567891', language_code: 'en', external_id: 'ADA-98', attempts: 1, created_at: T0.toISOString(), next_attempt_at: new Date(T0.getTime() - 60000).toISOString() }] })
@@ -338,6 +341,11 @@ console.log('the test enquiry: dry run (the default)')
   t('dry output shows the fixed payload and never the phone or the project id', [JSON.stringify(r2.body).includes('4412'), JSON.stringify(r2.body).includes(DPOINT.id), r2.body.payload], [false, false, { name: 'ADA TEST', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr', external_id: 'TEST-1', phone: '<secret>', project: '<D-Point id>' }])
   const r3 = await tl(makeStore(), {}, { mode: 'test_lead', dry: true })
   t('dry with the shipped constant and the secret unset reports locked', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: undefined, apiKey: 'k', testPhone: TP } } })).body.would, 'refuse:locked')
+  const nk = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: '', testPhone: TP } } })
+  t('dry with the partner key missing reports key missing and refuses', [nk.body.key, nk.body.would], ['missing', 'refuse:key_missing'])
+  const nkStore = makeStore(); const nkF = stub()
+  const nka = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { store: nkStore, fetchImpl: nkF, now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: undefined, testPhone: TP } } })
+  t('apply with the partner key missing refuses: no row, nothing sent', [nka.status, nka.body.error, nkStore.leads.length, nkF.calls.length], [403, 'key_missing', 0, 0])
   t('dry with the shipped constant and the secret test_once would send', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } })).body.would, 'insert_and_send')
   t('dry with no phone says phone_missing', (await tl(makeStore(), { testPhone: undefined }, { mode: 'test_lead' })).body.would, 'refuse:phone_missing')
 }
@@ -412,7 +420,15 @@ t('a user cannot trigger the test enquiry', (await handleLead({ caller: USER, bo
   t('the log line holds the external id, status and http code, never the phone', [lines, lines.some(l => l.includes('4412'))], [['dovec-lead TEST-1 response http=202 body=""', 'dovec-lead TEST-1 sent http=202'], false])
   const l2 = []; const d2 = { ...d, log: s => l2.push(s), fetchImpl: stub(202, {}, `{"ok":true,"status":"received","echo":"${TP}"}`) }
   await deliver({ id: 1, is_test: true, external_id: 'TEST-1', status: 'pending', name: 'ADA TEST', phone: TP, consent: true, language_code: 'tr', attempts: 0 }, d2)
-  t("Döveç's raw answer to the test is logged (private function log), the phone masked", l2[0], 'dovec-lead TEST-1 response http=202 body="{\\"ok\\":true,\\"status\\":\\"received\\",\\"echo\\":\\"<phone>\\"}"')
+  t("Döveç's raw answer to the test is logged (private function log), the phone masked", l2[0], 'dovec-lead TEST-1 response http=202 body="{\\"ok\\":true,\\"status\\":\\"received\\",\\"echo\\":\\"<masked>\\"}"')
+  const d9 = TP.replace(/^\+/, '')
+  const echoes = [d9, `00${d9}`, `${d9.slice(0, 2)} ${d9.slice(2, 5)} ${d9.slice(5, 8)} ${d9.slice(8)}`, `${d9.slice(0, 5)}-${d9.slice(5)}`, JSON.stringify(TP).slice(1, -1).replace('+', '\\u002b')]
+  const l4 = []
+  for (const echo of echoes) await deliver({ id: 1, is_test: true, external_id: 'TEST-1', status: 'pending', name: 'ADA TEST', phone: TP, consent: true, language_code: 'tr', attempts: 0 },
+    { ...d, log: s => l4.push(s), fetchImpl: stub(202, {}, `{"phone":"${echo}","key":"test-key-not-real","lead":"L-42"}`) })
+  const bodies = l4.filter(l => l.includes(' response '))
+  t('the phone in any echoed format (no +, 00, spaced, dashed, escaped) never reaches the log', [bodies.length, bodies.some(l => /\d(?:[\s.-]?\d){6,}/.test(l))], [echoes.length, false])
+  t('the partner key echoed back is masked too, a short lead reference kept', [bodies.some(l => l.includes('test-key-not-real')), bodies.every(l => l.includes('L-42'))], [false, true])
   const l3 = []; const boom = async () => { throw Object.assign(new Error('x'), { name: 'TimeoutError' }) }
   await deliver({ id: 1, is_test: true, external_id: 'TEST-1', status: 'pending', name: 'ADA TEST', phone: TP, consent: true, language_code: 'tr', attempts: 0 }, { ...d, log: s => l3.push(s), fetchImpl: boom })
   t('a network error on the test is logged by name only', l3, ['dovec-lead TEST-1 network_error TimeoutError', 'dovec-lead TEST-1 retry'])
