@@ -314,7 +314,7 @@ async function readNewPlace(now, lang) {
 // Not a "fallback" in the sense of something that might also fail: it reads no table, has
 // no session and its image is a bundled require(). It carries KEYS rather than resolved
 // strings because its copy is ours, unlike an event title which is a database row.
-function genericEventsItem() {
+export function genericEventsItem() {
   return {
     kind: 'event', id: 'generic', generic: true,
     titleKey: 'stripEventsTitle', subtitleKey: 'stripEventsSub',

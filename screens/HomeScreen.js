@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { searchMatch } from '../utils/searchFold'
@@ -30,7 +30,8 @@ import FavouritesRow from '../components/home/FavouritesRow'
 import FavouritesEditSheet from '../components/home/FavouritesEditSheet'
 import HomeListBottomSlot from '../components/ads/HomeListBottomSlot'
 import { HOME_MODULES } from '../constants/homeModules'
-import { resolveStripItem, resolveStripSlides } from '../utils/homeStripResolver'
+import { resolveStripItem, resolveStripSlides, genericEventsItem } from '../utils/homeStripResolver'
+import { withTimeout } from '../utils/withTimeout'
 import { nextStripRotation } from '../utils/stripSlides'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { readStripDismissals, addStripDismissal } from '../utils/stripDismissals'
@@ -212,6 +213,7 @@ export default function HomeScreen({
   backRef = null,
   tabResetRef = null,          // App calls it when the Ana Sayfa tab is tapped while Home is showing
   hideHeaderActions = false,   // no menu / notifications while gated
+  retryCount = 0,              // App's Home retry/recovery counter: re-runs the strip only after it fell back
   onExitFacilityList,          // back leaves the screen instead of revealing the hub
   lang,
   facilities,
@@ -327,6 +329,16 @@ export default function HomeScreen({
   // two dismissals in one session must both trigger, and a boolean can only flip once.
   const [stripDismissTick, setStripDismissTick] = useState(0)
   const [stripLoading, setStripLoading] = useState(true)
+  // The strip's last run ended on the timeout/error fallback card; a retry re-resolves only then.
+  const stripFellBack = useRef(false)
+  const stripRun = useRef(0)
+  const lastRetry = useRef(retryCount)
+  const [stripReload, setStripReload] = useState(0)
+  useEffect(() => {
+    if (lastRetry.current === retryCount) return
+    lastRetry.current = retryCount
+    if (stripFellBack.current) setStripReload(n => n + 1)
+  }, [retryCount])
 
   // ─── Sık kullandıkların ───────────────────────────────────────────────────
   // `favIds` is the RESOLVED row and is written in exactly two places: once when this
@@ -407,18 +419,22 @@ export default function HomeScreen({
   // Also skipped in facility-list mode: that is what the profile gate renders, and a
   // gated user must not have Home's content resolved on their behalf.
   //
-  // No cleanup flag is needed — resolveStripItem never rejects (every rank catches, and
-  // rank 6 is a local constant) — but an unmounted setState is still a warning, so the
-  // effect tracks liveness the ordinary way.
+  // The ladder's ranks never reject, but its READS can hang (RN's OkHttp has no timeout), so the whole
+  // chain runs under a 10 s withTimeout and ends on the generic card on a timeout or error. A hung read
+  // that lands later is still applied (real content beats the fallback) unless a newer run started or
+  // the screen unmounted; `stripRun` tells the runs apart.
   useEffect(() => {
     if (!HOME_V2_LIVE || showFacilityList) return
     let alive = true
-    setStripLoading(true)
+    const run = ++stripRun.current
+    const current = () => alive && run === stripRun.current
+    // A re-fetch after a fallback keeps the generic card up and swaps in place: the Bone is only for a load with nothing to show yet.
+    if (!stripFellBack.current) setStripLoading(true)
     // Dismissals are read on EVERY resolve rather than once per mount: dismissing writes
     // the key and bumps `stripDismissTick`, and the ladder then re-runs and lands on
     // whatever rank comes next. That is what makes the slot fill again instead of going
     // blank — the card is not hidden, the item is re-resolved without it.
-    readStripDismissals()
+    withTimeout(() => readStripDismissals()
       .then(async dismissedIds => {
         if (!REDESIGN) return { item: await resolveStripItem({ lang, promosEligible, dismissedIds }) }
         // Partner slides are editorial: read for EVERY user on a build that has Yeme-İçme (EATERY); slim columns plus ONE embed, the
@@ -434,12 +450,21 @@ export default function HomeScreen({
         return { slides }
       })
       .then(r => {
-        if (!alive) return
+        if (!current()) return
+        stripFellBack.current = false
         if (r.slides) { setStripSlides(r.slides); setStripItem(r.slides[0] ?? null) } else setStripItem(r.item)
+        setStripLoading(false)
+      }), 10000)
+      .catch(() => {
+        if (!current()) return
+        const item = genericEventsItem()
+        stripFellBack.current = true
+        if (REDESIGN) setStripSlides([item])
+        setStripItem(item)
         setStripLoading(false)
       })
     return () => { alive = false }
-  }, [lang, promosEligible, showFacilityList, stripDismissTick])
+  }, [lang, promosEligible, showFacilityList, stripDismissTick, stripReload])
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
