@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, FlatList, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenHeader, PageCanvas, CardSkeleton, EmptyState, ErrorState } from '../components/ui'
+import DovecLogo from '../components/dovec/DovecLogo'
 import DovecProjectCard from '../components/dovec/DovecProjectCard'
 import DovecEnquiryForm from '../components/dovec/DovecEnquiryForm'
 import DovecThankYou from '../components/dovec/DovecThankYou'
@@ -72,6 +73,7 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
         contentContainerStyle={[s.list, { paddingBottom: listBottomPad(insets) }]}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={Gap}
+        ListHeaderComponent={LogoHeader}
         renderItem={({ item }) => (
           <DovecProjectCard project={item} lang={lang} width={width - 32} onPress={() => setLayer({ name: 'detail', project: item })} />
         )}
@@ -90,6 +92,7 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
 }
 
 const Gap = () => <View style={{ height: 12 }} />
+const LogoHeader = () => <DovecLogo variant="navy" height={32} />
 
 const s = StyleSheet.create({
   safe: { flex: 1 },

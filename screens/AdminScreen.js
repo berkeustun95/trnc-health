@@ -10,7 +10,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { signOutThisDevice } from '../utils/signOut'
-import { colors, placeColors, shadow, type as typeScale, radii, elevation } from '../constants/theme'
+import { colors, placeColors, shadow, type as typeScale, radii, elevation, TAP } from '../constants/theme'
 import { t, LANGUAGES } from '../constants/i18n'
 import { ADMIN_LANG } from '../constants/adminLang'
 import { storageObjectPath } from '../utils/facilityUtils'
@@ -5389,8 +5389,8 @@ const s = StyleSheet.create({
                         marginHorizontal: 16, marginTop: 10, paddingVertical: 12, borderRadius: 12,
                         borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary,
                         backgroundColor: colors.primaryLight },
-  dovecLangRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  dovecLangChip:      { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  dovecLangRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6, marginHorizontal: 16 },
+  dovecLangChip:      { minHeight: TAP, paddingHorizontal: 12, borderRadius: TAP / 2, borderWidth: 1, borderColor: colors.border, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   dovecLangChipOn:    { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   dovecLangText:      { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
   dovecLangTextOn:    { color: colors.primaryDark },

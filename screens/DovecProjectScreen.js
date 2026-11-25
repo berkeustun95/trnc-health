@@ -1,11 +1,12 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, Linking, StyleSheet, useWindowDimensions } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Button, Card, RemoteImage } from '../components/ui'
+import DovecLogo from '../components/dovec/DovecLogo'
 import { Cover, StatusChip, fromPriceText, unitsText } from '../components/dovec/DovecProjectCard'
 import { colors, type, radii, press } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { DOVEC_LOGO, formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, unitTypeLabel, dovecMapsUrl } from '../constants/dovec'
+import { formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, unitTypeLabel, dovecMapsUrl } from '../constants/dovec'
 
 // One Döveç project. ADA owns the frame; the project's name, photos, text and prices are Döveç's own data, shown as synced.
 // Deliberately NO Call / WhatsApp here: contact starts with the enquiry form (WhatsApp appears on its thank-you screen).
@@ -28,8 +29,7 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}>
         <Cover url={project.cover_url} width={width} />
         <View style={s.body}>
-          {/* Logo hook: DOVEC_LOGO (constants/dovec.js) is null until Döveç delivers it; navy on this light ground. */}
-          {!!DOVEC_LOGO && <Image source={DOVEC_LOGO.light} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />}
+          <DovecLogo variant="navy" height={36} />
           <StatusChip status={project.status} lang={lang} />
           <Text style={s.title} accessibilityRole="header">{project.name}</Text>
           {!!place && (
@@ -105,7 +105,6 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
 const s = StyleSheet.create({
   root:       { flex: 1 },
   body:       { padding: 16, gap: 8 },
-  logo:       { width: 120, height: 36, marginBottom: 4 },
   title:      { ...type.detailTitle, color: colors.textPrimary },
   row:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
   meta:       { ...type.small, color: colors.textSecondary, flexShrink: 1 },
