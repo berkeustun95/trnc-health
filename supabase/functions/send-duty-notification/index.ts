@@ -4,7 +4,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { profileReadKinds, readAllById } from './page.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from './push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendGroups, sharedTokenIds } from './push.ts'
 
 const DUTY_TITLES: Record<string, string> = {
   English: "💊 Today's Duty Pharmacy",
@@ -190,15 +190,11 @@ serve(async (req) => {
     errorKinds[key] = (errorKinds[key] ?? 0) + n
   }
 
-  let batchesAccepted = 0
-  let batchesFailed = 0
-  for (let i = 0; i < messages.length; i += 100) {
-    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch, diag: { group: i / 100, runStartMs } })
-    pushOk += r.ok
-    if (r.accepted) batchesAccepted++
-    else batchesFailed++
-    for (const [kind, n] of Object.entries(r.kinds)) bump(kind, n)
-  }
+  const sent = await sendGroups(messages, { fetchFn: fetch, runStartMs, diag: { runStartMs } })
+  pushOk += sent.ok
+  const batchesAccepted = sent.groupsAccepted
+  const batchesFailed = sent.groupsFailed
+  for (const [kind, n] of Object.entries(sent.kinds)) bump(kind, n)
 
   // Batch-level, not ticket-level: error tickets (dead tokens) are not delivery failures.
   const outcome = pushOutcome(messages.length, batchesAccepted, batchesFailed)

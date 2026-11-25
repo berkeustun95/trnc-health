@@ -34,6 +34,7 @@ function rig(o: {
     },
     async insertNotifications(rows) { r.trace.push('notif'); r.notifs.push(...rows); return o.notifFail !== true },
     async getLastSignIn() { return null },
+    sleep: () => Promise.resolve(),
     async fetchFn(_u, init) {
       r.trace.push('push'); const b = JSON.parse(String(init.body)); r.pushes.push(b)
       if (o.expo) return o.expo(b.length)
@@ -170,14 +171,14 @@ Deno.test('in-app rows: type admin_message for every recipient (with or without 
   eq(res.body.pushed, 2)
 })
 
-Deno.test('every Expo batch is sent exactly once, 100 per batch; outcomes', async () => {
+Deno.test('every Expo group is sent exactly once, 25 per group; outcomes', async () => {
   const profiles = Array.from({ length: 250 }, (_, i) => prof(i + 1, 'English'))
   const r = rig({ profiles })
   const res = await handle(bcReq(), ADMIN, r.d)
-  eq(r.pushes.map((b) => b.length), [100, 100, 50]); eq([res.status, res.body.outcome, res.body.pushed], [200, 'sent', 250])
+  eq(r.pushes.map((b) => b.length), Array(10).fill(25)); eq([res.status, res.body.outcome, res.body.pushed], [200, 'sent', 250])
   eq(r.notifs.length, 250)
   const r2 = rig({ profiles, failBatches: 1 })
-  eq((await handle(bcReq(), ADMIN, r2.d)).body.outcome, 'partial'); eq(r2.pushes.length, 3, 'a failed batch is not re-sent')
+  eq((await handle(bcReq(), ADMIN, r2.d)).body.outcome, 'partial'); eq(r2.pushes.length, 10, 'a failed batch is not re-sent')
   const r3 = rig({ profiles: profiles.slice(0, 5), failBatches: 9 })
   const res3 = await handle(bcReq(), ADMIN, r3.d)
   eq([res3.status, res3.body], [502, { ok: false, error: 'push_failed', test: false, recipients: 5 }]); eq(r3.notifs.length, 5, 'in-app rows still written')

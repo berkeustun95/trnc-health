@@ -14,7 +14,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { readAllById } from '../send-duty-notification/page.ts'
-import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendGroups, sharedTokenIds } from '../send-duty-notification/push.ts'
 import { weekendWindow, inWindow, weekPick, digestMessage, type DigestEvent, type DigestPlace } from './digest.ts'
 
 const MAX_ERROR_KINDS = 20
@@ -33,6 +33,7 @@ async function finishRun(supabase: any, id: number | null, fields: Record<string
 }
 
 serve(async (req) => {
+  const runStartMs = Date.now()
   const caller = await serviceCaller(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
   if (!caller) {
     console.error('send-weekend-digest: caller refused')
@@ -114,17 +115,14 @@ serve(async (req) => {
     to: p.push_token, ...msgOf(p.preferred_language),
     data: { screen: 'weekend' }, sound: 'default', channelId: 'default',
   }))
-  let pushOk = 0, pushErrors = 0, batchesAccepted = 0, batchesFailed = 0
+  let pushErrors = 0
   const errorKinds: Record<string, number> = Object.create(null)
-  for (let i = 0; i < messages.length; i += 100) {
-    const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: fetch })
-    pushOk += r.ok
-    if (r.accepted) batchesAccepted++; else batchesFailed++
-    for (const [kind, n] of Object.entries(r.kinds)) {
-      pushErrors += n
-      const key = kind in errorKinds || Object.keys(errorKinds).length < MAX_ERROR_KINDS ? kind : 'other'
-      errorKinds[key] = (errorKinds[key] ?? 0) + n
-    }
+  const sent = await sendGroups(messages, { fetchFn: fetch, runStartMs, diag: { runStartMs, job: 'weekend' } })
+  const pushOk = sent.ok, batchesAccepted = sent.groupsAccepted, batchesFailed = sent.groupsFailed
+  for (const [kind, n] of Object.entries(sent.kinds)) {
+    pushErrors += n
+    const key = kind in errorKinds || Object.keys(errorKinds).length < MAX_ERROR_KINDS ? kind : 'other'
+    errorKinds[key] = (errorKinds[key] ?? 0) + n
   }
 
   const outcome = pushOutcome(messages.length, batchesAccepted, batchesFailed)

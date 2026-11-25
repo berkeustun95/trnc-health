@@ -94,7 +94,10 @@ Deno.test('console output never carries tokens or Expo messages', async () => {
 })
 
 Deno.test('no retry machinery is left in push.ts', async () => {
-  const src = await Deno.readTextFile(new URL('./push.ts', import.meta.url))
+  const all = await Deno.readTextFile(new URL('./push.ts', import.meta.url))
+  const cut = all.indexOf('export const GROUP_SIZE')   // sendGroups paces between groups on purpose; sendBatch never waits
+  if (cut < 0) throw new Error('GROUP_SIZE marker missing')
+  const src = all.slice(0, cut)
   for (const w of ['RETRY_BASE_DELAYS_MS', 'retry-after', 'sleep', 'deadlineAt']) {
     if (src.includes(w)) throw new Error('push.ts still contains ' + w)
   }

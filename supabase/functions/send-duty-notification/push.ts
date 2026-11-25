@@ -5,6 +5,9 @@
 // token, no second app) got the duty push twice on 16 Nov: Expo can deliver a batch it answered 503/429 for. A batch
 // that is not accepted is counted (`http_<code>`, `timeout`, `fetch_failed`, `bad_response`) and that day's push is
 // missed for its phones; the in-app row still lands. A missed push is recoverable, a double push to everyone is not.
+// GROUPS OF 25 (S3a, 2026-11-25): every multi-recipient caller sends through sendGroups: groups of 25, ~0.5 s apart,
+// sequential, each group once (no resend, same rule as above), so one 503 touches at most 25 phones. sendBatch is
+// unchanged and still serves single-message callers.
 // Nothing here logs or returns Expo's body or messages (for DeviceNotRegistered they embed the push token). The one
 // exception is opt-in `diag` (push-diag.ts): a NOT-accepted answer's body, redacted and capped, never an accepted one.
 
@@ -129,5 +132,63 @@ export async function sendBatch(batch: unknown[], d: SendDeps): Promise<BatchRes
     fail('bad_response', batch.length)
   }
   dx?.accepted(res)
+  return out
+}
+
+export const GROUP_SIZE = 25
+export const GROUP_GAP_MS = 500
+// Supabase edge wall clock is 150 s (free) / 400 s (paid), https://supabase.com/docs/guides/functions/limits (read 2026-11-25).
+// 90 s stops new groups with room for one in-flight group (10 s abort) and finishRun before even the 150 s limit.
+export const RUN_DEADLINE_MS = 90_000
+
+export interface GroupsDeps {
+  fetchFn: SendDeps['fetchFn']
+  makeSignal?: SendDeps['makeSignal']
+  size?: number
+  gapMs?: number
+  sleep?: (ms: number) => Promise<void>
+  now?: () => number
+  deadlineMs?: number
+  runStartMs?: number
+  diag?: Omit<DiagDeps, 'group' | 'size'>
+}
+
+export interface GroupsResult {
+  ok: number
+  errors: number
+  kinds: Record<string, number>
+  groupsAccepted: number
+  groupsFailed: number
+}
+
+export async function sendGroups(messages: unknown[], d: GroupsDeps): Promise<GroupsResult> {
+  const size = d.size ?? GROUP_SIZE
+  const gapMs = d.gapMs ?? GROUP_GAP_MS
+  const sleep = d.sleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)))
+  const now = d.now ?? Date.now
+  const deadlineMs = d.deadlineMs ?? RUN_DEADLINE_MS
+  const runStartMs = d.runStartMs ?? now()
+  const out: GroupsResult = { ok: 0, errors: 0, kinds: Object.create(null), groupsAccepted: 0, groupsFailed: 0 }
+  const add = (kind: string, n: number) => {
+    out.errors += n
+    out.kinds[kind] = (out.kinds[kind] ?? 0) + n
+  }
+  for (let i = 0, g = 0; i < messages.length; i += size, g++) {
+    const group = messages.slice(i, i + size)
+    if (now() - runStartMs >= deadlineMs) {
+      for (let j = i; j < messages.length; j += size) out.groupsFailed++
+      add('run_deadline', messages.length - i)
+      break
+    }
+    if (g > 0) await sleep(gapMs)
+    const r = await sendBatch(group, {
+      fetchFn: d.fetchFn, makeSignal: d.makeSignal,
+      diag: d.diag && { ...d.diag, group: g, size: group.length },
+    })
+    out.ok += r.ok
+    if (r.accepted) out.groupsAccepted++
+    else out.groupsFailed++
+    for (const [kind, n] of Object.entries(r.kinds)) add(kind, n)
+  }
   return out
 }
