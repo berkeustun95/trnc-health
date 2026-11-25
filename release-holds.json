@@ -285,6 +285,22 @@
       "clear": "Only after Berke's Preview device check and his go in chat. The commit is this PR's first commit (merge commit, not squash). #588's Preview-only logging stays held until it is removed in a follow-up."
     },
     {
+      "pr": 590,
+      "commit": "1a888b61a73f0ca08feb65b107cb961c18b693ee",
+      "what": "Removes the Preview-only profile-load logging (#588 and #589 breadcrumbs); no behaviour change",
+      "since": "2026-11-25",
+      "cleared": false,
+      "clear": "Only after Berke's go in chat. Must be on main before any production OTA that carries #589. The commit is this PR's first commit (merge commit, not squash)."
+    },
+    {
+      "pr": 591,
+      "commit": "30f29b9c6114f92f38efda96e751b2d0d370fb94",
+      "what": "Home strip: 10 s time limit on the events loader, generic card on timeout/error, re-fetch on retry, PR #591",
+      "since": "2026-11-25",
+      "cleared": false,
+      "clear": "Only after Berke's own Preview device check of this PR and his go in chat (not part of the current Preview pack). The commit is this PR's fix commit (merge commit, not squash)."
+    },
+    {
       "pr": 592,
       "commit": "5243e6fa84b8a2026111f0d56f579b5c0b5976f3",
       "what": "Duty tile blank after offline recovery: card keeps borderWidth 0 (Android NaN clip)",

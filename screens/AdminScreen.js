@@ -5200,7 +5200,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowDovec, openRequest, onOpenRequestHandled }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, openRequest, onOpenRequestHandled }) {
   const adminLang = ADMIN_LANG
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -5295,11 +5295,12 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           </TouchableOpacity>
         )}
 
-        {/* Döveç projects (partner, dark until Döveç approves): the customer feed -> project -> enquiry screens, for an admin only. */}
-        {onShowDovec && (
-          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowDovec} activeOpacity={0.85}>
-            <Ionicons name="business-outline" size={16} color={colors.primary} />
-            <Text style={s.explorePreviewText}>Open Döveç projects (preview)</Text>
+        {/* KTFF fixtures and live scores are entered by hand (no API covers TRNC football).
+            Admins never reach the Live Scores screen's pencil, so the editor opens from here. */}
+        {onShowLiveScoresEditor && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowLiveScoresEditor} activeOpacity={0.85}>
+            <Ionicons name="football-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Live scores: KTFF score editor</Text>
           </TouchableOpacity>
         )}
 

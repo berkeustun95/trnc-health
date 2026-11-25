@@ -126,7 +126,6 @@ import { KEY_HOME as KEY_CITY_HOME } from './utils/cityWelcomeRules'
 import { logOnboardingEvent, isTestDeviceLink, markTestDevice } from './utils/onboardingEvents'
 import { loadWithRetry, isNetworkError } from './utils/profileLoad'
 import { createProfileRecovery, PROFILE_SCREEN_RETRY_MS } from './utils/profileRecovery'
-import { plog, errKind, startHeartbeat, PROFILE_LOAD_LOG_ON } from './utils/profileLoadLog'
 import { withTimeout } from './utils/withTimeout'
 import { CAN_RESET_ONBOARDING, confirmResetOnboarding } from './utils/previewTools'
 import { signOutGoogle } from './utils/socialAuth'
@@ -137,7 +136,7 @@ import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import LiveScoresScreen from './screens/LiveScoresScreen'
-import DovecProjectsScreen from './screens/DovecProjectsScreen'
+import LiveScoresEditorScreen from './screens/LiveScoresEditorScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
@@ -758,7 +757,7 @@ export default function App() {
   // Session state is right here, unlike the flag path: the account no longer exists, so
   // there is nothing a relaunch could escape back into.
   const [ageDeletedNotice, setAgeDeletedNotice] = useState(false)
-  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'exploreMap' (dev review) | 'studentHub' | 'dovec'. Admins never reach HomeScreen /
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'exploreMap' (dev review) | 'studentHub'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
@@ -870,9 +869,6 @@ export default function App() {
   const [openedDorm, setOpenedDorm] = useState(null)
   // A North Houses apartment (Günlük Kiralık tab): the same overlay, the same reason it lives here.
   const [openedRental, setOpenedRental] = useState(null)
-  // Döveç projects (Emlak): overlay over Konaklama; its layers (project, form, thank-you) step back through dovecBackRef.
-  const [openedDovec, setOpenedDovec] = useState(false)
-  const dovecBackRef = useRef(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   // ─── Redesign Slice 2 (shell) ───────────────────────────────────────────────
@@ -908,6 +904,8 @@ export default function App() {
   const facilityBackRef = useRef(null)
   const towingBackRef = useRef(null)
   const carPostBackRef = useRef(null)
+  const liveScoresBackRef = useRef(null)          // LiveScoresScreen: its editor layer
+  const liveScoresEditorBackRef = useRef(null)    // admin's editor: fixture/new → list
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -1262,14 +1260,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const gsT0 = Date.now()
-    if (PROFILE_LOAD_LOG_ON) plog('getsession-start', { src: 'mount' })
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (PROFILE_LOAD_LOG_ON) plog('getsession-ok', { src: 'mount', ms: Date.now() - gsT0, has: !!session })
       setSession(session)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (PROFILE_LOAD_LOG_ON) plog('auth-event', { ev: event, has: !!session })
       setSession(session)
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { menuAnim.setValue(260); setShowMenu(false) }
       // A normal sign-out returns to the entry screen; a gate-driven one is on its way
@@ -1381,7 +1375,6 @@ export default function App() {
       if (gateHealthList) { setGateHealthList(false); return true }
       if (openedEvent) { if (eventFromHome) closeEvents(); else setOpenedEvent(null); return true }
       if (showEvents) { closeEvents(); return true }
-      if (openedDovec) { if (dovecBackRef.current?.()) return true; setOpenedDovec(false); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
       if (openedRental) { setOpenedRental(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
@@ -1429,12 +1422,12 @@ export default function App() {
       if (showExplore)          { setShowExplore(false); return true }
       if (showCheckinFeed)      { if (checkinFeedBackRef.current?.()) return true; setShowCheckinFeed(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
-      if (showLiveScores) { setShowLiveScores(false); return true }
+      if (showLiveScores) { if (liveScoresBackRef.current?.()) return true; setShowLiveScores(false); return true }
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
       if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
-      if (adminPreview === 'dovec' && dovecBackRef.current?.()) return true
+      if (adminPreview === 'liveScoresEditor' && liveScoresEditorBackRef.current?.()) return true
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
@@ -1448,7 +1441,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, openedDovec, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, showHotels, openedProperty, openedDorm, openedRental, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showDuyurular, showInsurance, showGrooming, showGarages, showTowing, showEhliyet, showCars, carsStack, showMarketplace, showEatery, eateryPartner, eateryFromMap, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen, dutyReoffer])
 
   useEffect(() => {
     Promise.all([
@@ -1628,63 +1621,34 @@ export default function App() {
       setProfileLoadOffline(isNetworkError(err))
       setProfileLoadFailedUid(uid)
     }
-    const loadT0 = Date.now()
-    let attemptNo = 0
-    if (PROFILE_LOAD_LOG_ON) {
-      plog('getsession-start', { src: 'load' })
-      const gsT0 = Date.now()
-      supabase.auth.getSession()
-        .then(({ data: gs }) => plog('getsession-ok', { src: 'load', ms: Date.now() - gsT0, has: !!gs?.session }))
-        .catch(e => plog('getsession-fail', { src: 'load', kind: errKind(e) }))
-    }
-    const fetchProfileOnce = signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single()
-    const fetchProfile = !PROFILE_LOAD_LOG_ON ? fetchProfileOnce : signal => {
-      const n = ++attemptNo
-      const t0 = Date.now()
-      plog('attempt-start', { n, seq })
-      // The builder runs its request on every .then, so settle through ONE promise and return that.
-      const p = Promise.resolve(fetchProfileOnce(signal))
-      p.then(r => plog('attempt-settled', { n, ok: !r?.error && r?.data != null, ms: Date.now() - t0 }), () => plog('attempt-settled', { n, ok: false, ms: Date.now() - t0 }))
-      return p
-    }
+    const fetchProfile = signal => supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', uid).abortSignal(signal).single()
     const { data, error } = await loadWithRetry(
       fetchProfile,
       {
         isCurrent,
-        ...(PROFILE_LOAD_LOG_ON ? { sleep: ms => new Promise(resolve => {
-          const t0 = Date.now()
-          plog('retry-sleep', { ms })
-          setTimeout(() => { plog('retry-wake', { ms, late: Date.now() - t0 }); resolve() }, ms)
-        }) } : {}),
         // No network: say so at once instead of ~40 s of grey cards; the retries go on behind the screen.
         onAttemptFailed: err => {
-          plog('attempt-fail', { n: attemptNo, kind: errKind(err) })
           if (!isNetworkError(err) || !isCurrent() || seq !== profileLoadSeqRef.current) return
           if (heldProfileUidRef.current === uid) return
           offlineShownRef.current = true
-          plog('offline-shown')
           showFailed(err)
         },
       },
     )
     const superseded = seq !== profileLoadSeqRef.current
-    if (!isCurrent()) { plog('stale-drop', { seq }); return }
+    if (!isCurrent()) return
     // A failure from a superseded load is dropped. A SUCCESS from one is still applied while no profile is held
     // for this uid (a tick may supersede a load that is only retrying normally); heldProfileUidRef is set below with no await before it.
     if (error || !data) {
-      if (superseded) { plog('stale-drop', { seq }); return }
+      if (superseded) return
       // A failed refresh-time reload must not replace a working app: keep the row already held for this uid.
-      if (PROFILE_LOAD_LOG_ON) plog('give-up', { kind: errKind(error), held: heldProfileUidRef.current === uid })
       if (heldProfileUidRef.current !== uid) showFailed(error)
       return
     }
-    if (superseded && heldProfileUidRef.current === uid) { plog('stale-drop', { seq }); return }
-    if (superseded) plog('stale-apply', { seq })
-    plog('success', { attempts: attemptNo, ms: Date.now() - loadT0 })
+    if (superseded && heldProfileUidRef.current === uid) return
     setProfileLoadFailedUid(null)
     setLoadStalledUid(null)
     // Recovered behind the offline screen: Home's own reads (facilities, duty, ratings) failed too, so run them again.
-    if (offlineShownRef.current) plog('offline-recovered')
     if (offlineShownRef.current) { offlineShownRef.current = false; setRetryCount(c => c + 1) }
     setProfile(data ?? null)
     setProfileUid(session.user.id)
@@ -1731,7 +1695,6 @@ export default function App() {
       loadOnce: s => loadProfileRef.current(s),
       isMissing: () => !!sessionRef.current && heldProfileUidRef.current !== sessionRef.current.user.id,
       current: () => sessionRef.current,
-      log: plog,
     })
   }
 
@@ -1782,16 +1745,13 @@ export default function App() {
     const key = `${wLat},${wLon}`
     if (weatherKeyRef.current === key) return
     weatherKeyRef.current = key
-    const wT0 = Date.now()
-    plog('read-start', { name: 'weather' })
     try {
       const { data: weatherJson, error: wErr } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon }, timeout: 8000 })
-      plog(wErr ? 'read-fail' : 'read-ok', { name: 'weather', ms: Date.now() - wT0, kind: wErr ? errKind(wErr) : null })
       // Latest request wins: a home-city change can overtake a slower earlier fetch.
       if (weatherKeyRef.current !== key) return
       if (weatherJson?.current) setWeatherData(weatherJson)
       else weatherKeyRef.current = null
-    } catch (e) { plog('read-fail', { name: 'weather', ms: Date.now() - wT0, kind: errKind(e) }); if (weatherKeyRef.current === key) weatherKeyRef.current = null }
+    } catch { if (weatherKeyRef.current === key) weatherKeyRef.current = null }
   }
 
   // Which district is this device in, as far as the DEVICE knows.
@@ -1977,8 +1937,6 @@ export default function App() {
   useEffect(() => {
     setFacilityLoadError(false)
     async function load() {
-      const homeT0 = Date.now()
-      plog('home-load-start', { retry: retryCount })
       try {
       const favVal = await AsyncStorage.getItem('ada_favorites')
       if (favVal) setFavorites(new Set(JSON.parse(favVal)))
@@ -1986,34 +1944,25 @@ export default function App() {
       if (placeFavVal) setPlaceFavorites(new Set(JSON.parse(placeFavVal).map(id => MERGED_PLACE_IDS[id] || id)))
 
       // A hung request never settles on RN (no OkHttp timeout): every read is bounded, a timeout counts as an error.
-      plog('read-start', { name: 'facilities' })
-      const facT0 = Date.now()
       const { data, error } = await withTimeout(s => supabase.from('facilities').select('*').order('name').abortSignal(s), 10000)
         .catch(e => ({ data: null, error: e }))
       if (error) setFacilityLoadError(true)
       else { setFacilities(data ?? []); profileRecoveryRef.current.homeReadOk(sessionRef.current) }
-      plog(error ? 'read-fail' : 'read-ok', { name: 'facilities', ms: Date.now() - facT0, kind: error ? errKind(error) : null })
 
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
       // and 03:00 the UTC date is still YESTERDAY — exactly the hours someone needs this.
       const today = localDateKey()
-      plog('read-start', { name: 'duty_schedule' })
-      const dutyT0 = Date.now()
       const { data: duty, error: dutyErr } = await withTimeout(s => supabase
         .from('duty_schedule').select('facility_id').eq('date', today).abortSignal(s).maybeSingle(), 10000)
         .catch(e => ({ data: null, error: e }))
-      plog(dutyErr ? 'read-fail' : 'read-ok', { name: 'duty_schedule', ms: Date.now() - dutyT0, kind: dutyErr ? errKind(dutyErr) : null })
       if (duty) setDutyFacilityId(duty.facility_id)
       if (!dutyErr) profileRecoveryRef.current.homeReadOk(sessionRef.current)
 
 
       // TODO: replace with a computed avg_rating + review_count column on facilities
       // once review volume grows, to avoid fetching every row on startup.
-      plog('read-start', { name: 'reviews' })
-      const revT0 = Date.now()
       const { data: reviewsData, error: revErr } = await withTimeout(s => supabase.from('reviews').select('facility_id, rating').limit(2000).abortSignal(s), 10000)
         .catch(e => ({ data: null, error: e }))
-      plog(revErr ? 'read-fail' : 'read-ok', { name: 'reviews', ms: Date.now() - revT0, kind: revErr ? errKind(revErr) : null })
       if (!revErr) profileRecoveryRef.current.homeReadOk(sessionRef.current)
       if (reviewsData?.length) {
         const map = {}
@@ -2033,8 +1982,6 @@ export default function App() {
       // Onboarding v2: launch never asks. Location is asked in context only (Screen 2's "Konumumu kullan",
       // "near me", the map); a permission already granted is still read silently. locationDenied /
       // locationCanAsk are set as before, so distance sort and the "turn on location" offers still work.
-      plog('read-start', { name: 'location' })
-      const locT0 = Date.now()
       try {
         // Raced at 8 s: a timeout throws into the catch below, the same as no fix.
         await withTimeout(async () => {
@@ -2050,9 +1997,7 @@ export default function App() {
             else { setUserLocation(loc.coords); setLocationDenied(false); resolvedCoords = loc.coords }
           }
         }, 8000)
-        plog('read-ok', { name: 'location', ms: Date.now() - locT0 })
       } catch {
-        plog('read-fail', { name: 'location', ms: Date.now() - locT0 })
         setLocationDenied(true)
       }
 
@@ -2067,42 +2012,20 @@ export default function App() {
       } finally {
         // A throw anywhere above (e.g. JSON.parse of a corrupt favourites value) must not leave the skeleton up.
         setLoading(false)
-        plog('home-load-end', { ms: Date.now() - homeT0 })
       }
     }
     load()
   }, [retryCount])
 
   // Safety net: a session whose profile has not arrived after 45 s gets the Retry screen, not a skeleton forever.
-  const netArmedAtRef = useRef(0)
   useEffect(() => {
     const uid = session?.user?.id
     if (!uid || !(loading || !profile)) { setLoadStalledUid(null); return }
-    netArmedAtRef.current = Date.now()
-    plog('net-arm')
     const timer = setTimeout(() => setLoadStalledUid(uid), 45000)
     return () => clearTimeout(timer)
   }, [session?.user?.id, loading, profile, retryCount])
 
-  // Preview-only diagnostics (utils/profileLoadLog.js): app state, the heartbeat, and every state change that decides the skeleton.
-  const stuckRef = useRef(false)
-  stuckRef.current = !!session && (loading || !profile)
-  useEffect(() => {
-    if (!PROFILE_LOAD_LOG_ON) return
-    const sub = AppState.addEventListener('change', next => plog('appstate', { s: next }))
-    return () => sub.remove()
-  }, [])
-  useEffect(() => startHeartbeat(() => stuckRef.current), [])
-  const dbgUid = session?.user?.id
-  const dbgFailed = !!dbgUid && profileLoadFailedUid === dbgUid
-  const dbgStalled = !!dbgUid && loadStalledUid === dbgUid
-  useEffect(() => {
-    if (dbgStalled) plog('net-fire', { elapsed: Date.now() - netArmedAtRef.current })
-    plog('state', { session: !!session, loading, profile: !!profile, failed: dbgFailed, stalled: dbgStalled, offline: profileLoadOffline })
-  }, [!!session, loading, !!profile, dbgFailed, dbgStalled, profileLoadOffline])
-
   function retryProfileLoad() {
-    plog('retry-call')
     const sess = sessionRef.current
     if (!sess) return
     offlineShownRef.current = false
@@ -2155,8 +2078,6 @@ export default function App() {
     if (!session) return
     let cancelled = false
     async function loadRosterHealth() {
-      const rosterT0 = Date.now()
-      plog('roster-start')
       const today = localDateKey()
       // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
       // head request returns no rows to count them from. It is ~13 rows a day.
@@ -2167,8 +2088,7 @@ export default function App() {
         withTimeout(s => supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1).abortSignal(s), 10000)
           .catch(e => ({ data: null, error: e })),
       ])
-      if (cancelled) { plog('roster-cancelled', { ms: Date.now() - rosterT0 }); return }
-      plog('roster-end', { ok: !(todayErr || newestErr), ms: Date.now() - rosterT0 })
+      if (cancelled) return
       // A failed read is NOT an empty roster. Before this, an error left both arrays null,
       // which scored as ABSENT and blamed the roster for a network problem.
       if (todayErr || newestErr) {
@@ -2681,7 +2601,7 @@ export default function App() {
     }
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
-      onShowDovec={() => setAdminPreview('dovec')}
+      onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
       onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined}
       openRequest={adminOpen} onOpenRequestHandled={() => setAdminOpen(null)} />
   } else if (profile.role === 'provider') {
@@ -2841,11 +2761,6 @@ export default function App() {
         onOpenRental={a => setOpenedRental(a)}
         selectedRental={openedRental}
         onCloseRental={() => setOpenedRental(null)}
-        dovecOpen={openedDovec}
-        onOpenDovec={() => setOpenedDovec(true)}
-        onCloseDovec={() => setOpenedDovec(false)}
-        dovecBackRef={dovecBackRef}
-        onRequireAccount={requireAccount}
       />
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccomTile" session={session} onBack={() => setShowAccommodation(false)} />
@@ -2970,13 +2885,12 @@ export default function App() {
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
-  } else if (adminPreview === 'dovec') {
-    // Döveç projects, as a customer sees them (feed, project, enquiry form). Only AdminScreen's button sets this; it skips the Emlak
-    // entry gate (flag + published) and nothing else: the rows come from RLS, which lets an admin read them while published = false.
-    // No admin chrome here on purpose. Lead sending is still mocked server-side (dovec-lead locks).
-    content = <DovecProjectsScreen lang={lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} />
+  } else if (adminPreview === 'liveScoresEditor') {
+    // Admins enter KTFF fixtures from here (they never reach Home). Not flag-gated: fixtures
+    // are entered before LIVE_SCORES_LIVE flips.
+    content = <LiveScoresEditorScreen lang={lang} onBack={() => setAdminPreview(null)} backRef={liveScoresEditorBackRef} />
   } else if (showLiveScores) {
-    content = <LiveScoresScreen lang={lang} onBack={() => setShowLiveScores(false)} />
+    content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and
   // back returns to the guide (slice 8). Opened alone (Home), it is unaffected.
   } else if (showExchangeRates) {
@@ -3318,6 +3232,7 @@ export default function App() {
 
         {activeTab === 'home' && (
           <HomeScreen
+            retryCount={retryCount}
             dutyWindows={dutyWindows}
             backRef={homeBackRef}
             tabResetRef={homeTabResetRef}
