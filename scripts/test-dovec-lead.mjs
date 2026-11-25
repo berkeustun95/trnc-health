@@ -9,6 +9,8 @@ import {
   TEST_LEAD_ALLOWED, TEST_LEAD, isTestOpen, handleTestLead, TEST_PROJECT_SEED,
   LEADS_LIVE_ALLOWED, LIMITS, MAX_ATTEMPTS, isUnder18, DEFAULT_BASE_URL,
 } from '../supabase/functions/_shared/dovec-lead.mjs'
+import { secretKeyCaller } from '../supabase/functions/_shared/caller-auth.mjs'
+import { readdirSync } from 'node:fs'
 
 const dir = new URL('../supabase/functions/sync-dovec/fixtures/', import.meta.url)
 const BODY = JSON.parse(readFileSync(fileURLToPath(new URL('lead-body.json', dir)), 'utf8'))
@@ -500,6 +502,46 @@ console.log('T10: who may call which mode')
   const guest = src.indexOf("user.is_anonymous === true) return json(403"), parse = src.indexOf('req.json()')
   console.log(`    index.ts: is_anonymous 403 at ${guest}, req.json() at ${parse}`)
   t('index.ts refuses a guest (403) before it reads the body', [guest > 0, parse > 0, guest < parse], [true, true, true])
+}
+
+console.log('T11: secret-key service caller')
+{
+  const mk = (ret) => { const p = async (k) => { p.calls++; p.keys.push(k); if (ret === 'throw') throw new Error('net'); return ret }; p.calls = 0; p.keys = []; return p }
+  const H = 'Bearer sb_secret_abc_DEF-1'
+  const ok = mk(true)
+  t('secret header + probe true: secret, probe got exactly the key', [await secretKeyCaller(H, ok), ok.calls, ok.keys], ['secret', 1, ['sb_secret_abc_DEF-1']])
+  for (const [label, ret] of [['false', false], ['throws', 'throw'], ['"yes"', 'yes'], ['1', 1], ['{}', {}], ['undefined', undefined]]) {
+    const p = mk(ret)
+    t(`secret header + probe ${label}: null`, await secretKeyCaller(H, p), null)
+  }
+  const JWT = 'Bearer ' + Buffer.from('{"alg":"HS256"}').toString('base64url') + '.' + Buffer.from('{"role":"service_role"}').toString('base64url') + '.sig'
+  const never = [null, undefined, '', 'Bearer ', 'Bearer sb_secret_', JWT, 'Bearer sb_publishable_abc', 'bearer sb_secret_abc',
+    'Bearer  sb_secret_abc', 'Bearer sb_secret_abc ', 'Bearer sb_secret_a.b.c', 'Bearer sb_secret_abc, Bearer sb_secret_def',
+    'sb_secret_abc', 'Bearer xsb_secret_abc']
+  for (const h of never) {
+    const p = mk(true)
+    t(`probe never called, null: ${JSON.stringify(h)}`, [await secretKeyCaller(h, p), p.calls], [null, 0])
+  }
+  const src = readFileSync(new URL('../supabase/functions/dovec-lead/index.ts', import.meta.url), 'utf8')
+  const body = src.slice(src.indexOf('const holdsServiceKey'), src.indexOf('let caller'))
+  const gate = src.indexOf('if (await serviceCaller(authz, key) || await secretKeyCaller(authz, holdsServiceKey)) {')
+  t('gate line is the combined serviceCaller || secretKeyCaller form', gate > 0, true)
+  t('gate comes before req.json()', gate < src.indexOf('req.json()'), true)
+  t('serviceCaller occurs exactly twice (import + call)', src.split('serviceCaller').length - 1, 2)
+  t('probe URL is dovec_leads select=id&limit=0', body.includes('`${url}/rest/v1/dovec_leads?select=id&limit=0`'), true)
+  t('probe headers are { apikey: k } with no Authorization', [body.includes('headers: { apikey: k }'), /authorization/i.test(body)], [true, false])
+  t('probe returns r.status === 200 (not r.ok)', [body.includes('return r.status === 200'), body.includes('r.ok')], [true, false])
+  const mdir = new URL('../supabase/migrations/', import.meta.url)
+  const files = readdirSync(mdir).filter(f => f.endsWith('.sql'))
+  const sqls = files.map(f => [f, readFileSync(new URL(f, mdir), 'utf8')])
+  console.log(`    scanned ${files.length} migrations`)
+  const m29 = sqls.find(([f]) => f === '20261229_dovec_projects.sql')?.[1] ?? ''
+  t('20261229: RLS on dovec_leads', m29.includes('ALTER TABLE public.dovec_leads ENABLE ROW LEVEL SECURITY;'), true)
+  t('20261229: REVOKE ALL incl. service_role', m29.includes('REVOKE ALL ON TABLE public.dovec_leads FROM PUBLIC, anon, authenticated, service_role;'), true)
+  const grants = sqls.flatMap(([f, x]) => [...x.matchAll(/\bGRANT\b[^;]*?\bON\s+(?:TABLE\s+)?public\.dovec_leads\s+TO\s+([^;]*);/gi)].filter(g => /\b(anon|authenticated|public)\b/i.test(g[1])).map(g => f + ': ' + g[0]))
+  t('no GRANT on dovec_leads to anon/authenticated/public in any migration', grants, [])
+  const pols = sqls.filter(([, x]) => /CREATE\s+POLICY[^;]*ON\s+(?:ONLY\s+)?(?:public\.)?dovec_leads\b/i.test(x)).map(([f]) => f)
+  t('no CREATE POLICY on dovec_leads in any migration', pols, [])
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
