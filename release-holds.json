@@ -253,6 +253,14 @@
       "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
     },
     {
+      "pr": 595,
+      "commit": "421edb14dd1db9c9af38698042d361f29d544897",
+      "what": "Döveç round 2: re-land of the Döveç app files (still dark: DOVEC_PARTNER_LIVE false, published false) plus fixes, PR #595",
+      "since": "2026-11-25",
+      "cleared": false,
+      "clear": "Only after Döveç has approved and Berke has seen Döveç round 2 on Preview and says go in chat. Then set cleared to true in a PR."
+    },
+    {
       "pr": 569,
       "commit": "3a4454b0b325205bfa241540d6ad49e8ad82d6a3",
       "what": "Döveç projects feed + enquiry form (dark: DOVEC_PARTNER_LIVE false, published false; reachable only through the admin preview), merged to main 2026-11-24",
