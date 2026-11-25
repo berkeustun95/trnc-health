@@ -5,8 +5,8 @@ import { DOVEC_PARTNER_LIVE } from './flags.js'
 import { monthNames } from './months.js'
 
 // Logo height in dp per screen (components/dovec/DovecLogo.js); tune on device. The bundled files are 3x the largest one.
-export const DOVEC_LOGO_HEIGHT_LIST = 32
-export const DOVEC_LOGO_HEIGHT_DETAIL = 36
+export const DOVEC_LOGO_HEIGHT_LIST = 44
+export const DOVEC_LOGO_HEIGHT_DETAIL = 48
 
 export const DOVEC_CONSENT_VERSION = 'dovec-consent-2026-11-23'
 export const DOVEC_MESSAGE_MAX = 2000
