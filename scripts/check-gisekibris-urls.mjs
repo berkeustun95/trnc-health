@@ -15,9 +15,10 @@
 // Their site is mid-vendor-handover, so a stale or unpublished event page is a
 // realistic failure mode regardless of the URLs coming from the partner directly.
 //
-// SOFT-404s: verified this site does NOT serve them — an unknown id returns a real
-// 404 and redirects to /gisekibris.com/404 — so the status code is trustworthy. The
-// final-URL check below is belt-and-braces in case that changes after the handover.
+// SOFT-404s: an unknown id returns a real 404, but on 2026-11-25 a removed event's bare
+// slug answered HTTP 200 with the "404 - Sayfa Bulunamadı" page (and 404 minutes later).
+// So the status code is not enough on its own: the rendered not-found page counts as
+// dead too (lib/gisekibris-page.mjs), alongside the /404 final-URL check.
 //
 // ─── A LINK THAT OPENS ANOTHER EVENT (2026-11-25) ────────────────────────────
 //
@@ -76,6 +77,7 @@ import { tmpdir } from 'node:os'
 import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
+import { isNotFoundPage } from './lib/gisekibris-page.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const seedArg = process.argv.indexOf('--seed')
@@ -156,7 +158,8 @@ async function probe(ev) {
       const r = await once(url, 'GET')
 
       const landedOn404 = /\/404(\/|$|\?)/.test(r.finalUrl ?? '')
-      const ok = r.status >= 200 && r.status < 300 && !landedOn404
+      const softNotFound = isNotFoundPage(r.body)
+      const ok = r.status >= 200 && r.status < 300 && !landedOn404 && !softNotFound
       const landedId = ok ? pageId(r.body) : null
       const wrongSlug = ok && slugOf(r.finalUrl) !== slugOf(url)
       const wrongId = ok && landedId !== null && `gk-${landedId}` !== ev.external_id
@@ -170,7 +173,8 @@ async function probe(ev) {
         // Only meaningful on a page that actually resolved. A 404 body has no flag,
         // and reading one off it would be an answer from the wrong document.
         cancelled: ok ? cancelledFlag(r.body) : null,
-        note: landedOn404 ? `redirected to ${r.finalUrl}` : null,
+        note: landedOn404 ? `redirected to ${r.finalUrl}`
+          : softNotFound && r.status < 300 ? `HTTP ${r.status} rendering "404 - Sayfa Bulunamadı"` : null,
       }
     } catch (e) {
       last = e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : `${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''} · ${url}`
@@ -272,7 +276,9 @@ if (selftest) {
       if (p === `/renamed--${ID_C}`) { res.writeHead(307, { location: '/new-name' }); return res.end() }
       res.writeHead(200, { 'content-type': 'text/html' })
       if (p === '/kabare-3') return res.end(`{"isCancelled":false,"id":"${ID_A}"}`)
-      if (p === '/kabare-7aralik') return res.end(`{"isCancelled":false,"id":"${ID_B}"}`)
+      // A real page carries the not-found text in its i18n dictionary; only the rendered one is dead.
+      if (p === '/kabare-7aralik') return res.end(`{"notFound404":"404 - Sayfa Bulunamadı","isCancelled":false,"id":"${ID_B}"}`)
+      if (p === '/stand-up') return res.end('<span class="css-x">404 - Sayfa Bulunamadı</span>')
       if (p === '/new-name') return res.end(`{"isCancelled":false,"id":"${ID_C}"}`)
       if (p === '/not-okay-2') return res.end(`{"isCancelled":false,"id":"${ID_A}"}`)
       res.end('{"isCancelled":false}')
@@ -287,6 +293,7 @@ if (selftest) {
       { external_id: `gk-${ID_B}`, title: 'RIGHT', start_date: '2026-12-07', ticket_url: `${base}/kabare-7aralik?code=AF1` },
       { external_id: `gk-${ID_C}`, title: 'SLUG RENAMED', start_date: '2026-12-08', ticket_url: `${base}/renamed--${ID_C}` },
       { external_id: 'gk-NoIdOnPage123456789', title: 'NO ID ON PAGE', start_date: '2026-12-09', ticket_url: `${base}/plain` },
+      { external_id: 'gk-Xz2PcM8zcsO4M9GmZFCb', title: 'SOFT 404', start_date: '2026-12-19', ticket_url: `${base}/stand-up` },
     ] }))
     const ap = await new Promise(done => execFile(process.execPath,
       [fileURLToPath(import.meta.url), '--apply', '--seed', file], (err, stdout) => done({ code: err ? err.code : 0, stdout })))
@@ -304,6 +311,8 @@ if (selftest) {
     // so the slug decides; a genuine rename shows up in the issue for a human.
     t3('renamed slug, own id → still nulled', link('SLUG RENAMED'), null)
     t3('no id on page, own slug → kept', link('NO ID ON PAGE'), `${base}/plain`)
+    // 2026-11-25: yusuf-bilal-altintas-stand-up served "404 - Sayfa Bulunamadı" with HTTP 200.
+    t3('200 rendering the 404 page → nulled', link('SOFT 404'), null)
     srv.close(); rmSync(dir, { recursive: true, force: true })
   }
 
