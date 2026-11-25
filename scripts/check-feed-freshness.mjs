@@ -20,12 +20,12 @@ import { execFileSync } from 'node:child_process'
 
 export const MAX_AGE_H = 48
 // `filter` narrows which runs count, so a run that did not sync cannot pass for one:
-//   gisekibris-feed: every run (schedule or dispatch) is a real sync; main only.
+//   gisekibris-feed: a manual dispatch may be DRY (input `dry`), so only scheduled runs count.
 //   duyurular-fetch: the chain re-dispatches itself (workflow_dispatch), so no event filter; main
 //     only. duyurular:health question 1 (a successful fetch < 2 h, from the DB) is the real guard.
 //   novest-images: a manual dispatch is DRY by default, so only scheduled runs count.
 export const FEEDS = [
-  { name: 'Gişe Kıbrıs events', workflow: 'gisekibris-feed.yml', status: 'success',   filter: '&branch=main' },
+  { name: 'Gişe Kıbrıs events', workflow: 'gisekibris-feed.yml', status: 'success',   filter: '&branch=main&event=schedule' },
   { name: 'Duyurular',          workflow: 'duyurular-fetch.yml', status: 'success',   filter: '&branch=main' },
   { name: 'Novest photos',      workflow: 'novest-images.yml',   status: 'success',   filter: '&branch=main&event=schedule' },
   { name: 'daily-health ran',   workflow: 'daily-health.yml',    status: 'completed', filter: '&branch=main' },
@@ -54,6 +54,7 @@ if (process.argv.includes('--self')) {
   t('never ran → stale            ', one(null).stale, true)
   t('unreadable → stale, not fresh', assess([{ name: 'x', status: 'success', error: 'HTTP 403' }], now)[0].stale, true)
   t('daily-health counts any completion', FEEDS.find(f => f.workflow === 'daily-health.yml').status, 'completed')
+  t('Gişe Kıbrıs: a dry manual dispatch does not count', FEEDS.find(f => f.workflow === 'gisekibris-feed.yml').filter.includes('event=schedule'), true)
   t('Novest: a dry manual dispatch does not count', FEEDS.find(f => f.workflow === 'novest-images.yml').filter.includes('event=schedule'), true)
   t('every feed is read from main only', FEEDS.every(f => f.filter.includes('branch=main')), true)
   console.log(bad ? `\nSELF-TEST FAILED (${bad})\n` : '\nself-test clean\n')

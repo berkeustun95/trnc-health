@@ -749,11 +749,20 @@ if (imageFailures.length) {
   }
 }
 
+// Partner data only (public event links and dates), so the values can go into a public log.
+if (inserts.length) {
+  console.log('\n  New rows:')
+  for (const r of inserts) console.log(`    ${r.external_id}  ${r.start_date}  ${r.title}\n      ticket_url: ${r.ticket_url ?? '(none)'}`)
+}
+
 if (updates.length) {
   console.log('\n  Changed fields:')
   for (const u of updates) {
     console.log(`    ${u.row.external_id}  ${u.row.title}`)
     console.log(`      ${u.diff.join(', ')}`)
+    for (const f of ['start_date', 'ticket_url']) {
+      if (u.diff.includes(f)) console.log(`      ${f}: ${u.prev[f] ?? '(none)'}  →  ${u.row[f] ?? '(none)'}`)
+    }
   }
 }
 
