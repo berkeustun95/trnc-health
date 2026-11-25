@@ -63,7 +63,7 @@ import { createOutbox } from './contactOutbox'
 // Bounds one SEND, never the user. A send that times out stays queued and is retried later.
 const TIMEOUT_MS = 4000
 
-export function newId() {
+function newId() {
   try {
     const Crypto = require('expo-crypto')
     if (typeof Crypto?.randomUUID === 'function') return Crypto.randomUUID()
