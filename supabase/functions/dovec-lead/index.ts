@@ -19,7 +19,7 @@
 // PRIVACY: logs hold external_id, a status word and an HTTP code. Never a name, phone, e-mail, message or user id.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serviceCaller } from '../_shared/caller-auth.mjs'
-import { handleLead, STALE_LEAD_MS } from '../_shared/dovec-lead.mjs'
+import { handleLead, STALE_LEAD_MS, TEST_PROJECT_SEED } from '../_shared/dovec-lead.mjs'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -102,6 +102,14 @@ Deno.serve(async (req) => {
     },
     async findTestLead() {
       const { data, error } = await admin.from('dovec_leads').select(COLS).eq('is_test', true).maybeSingle()
+      if (error) throw error
+      return data
+    },
+    async getTestProject() {
+      const seed = await admin.from('dovec_project_coords').select('project_id').eq('seed_name', TEST_PROJECT_SEED).maybeSingle()
+      if (seed.error) throw seed.error
+      if (!seed.data?.project_id) return null
+      const { data, error } = await admin.from('dovec_projects').select('id,name').eq('id', seed.data.project_id).eq('listed', true).maybeSingle()
       if (error) throw error
       return data
     },

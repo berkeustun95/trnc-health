@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   validateLead, payloadHash, buildOutgoing, deliver, handleLead, retryDue, languageCode, isLive,
-  TEST_LEAD_ALLOWED, TEST_LEAD, isTestOpen, handleTestLead,
+  TEST_LEAD_ALLOWED, TEST_LEAD, isTestOpen, handleTestLead, TEST_PROJECT_SEED,
   LEADS_LIVE_ALLOWED, LIMITS, MAX_ATTEMPTS, isUnder18, DEFAULT_BASE_URL,
 } from '../supabase/functions/_shared/dovec-lead.mjs'
 
@@ -24,7 +24,8 @@ const t = (name, got, want) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
 }
 
-const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false, published = true, admin = false } = {}) => {
+const DPOINT = { id: 'dp-fixture-1', name: 'D-Point' }
+const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false, published = true, admin = false, testProject = DPOINT } = {}) => {
   const s = { leads: [...preload], seq: preload.length, updates: [], calls: { isPublished: 0, isAdmin: 0, getVisibleProject: 0, insertLead: 0 } }
   s.isPublished = async () => { s.calls.isPublished++; return published }
   s.isAdmin = async () => { s.calls.isAdmin++; return admin }
@@ -44,6 +45,7 @@ const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false,
     s.leads.push(lead); return { ...lead }
   }
   s.updateLead = async (id, patch) => { s.updates.push(patch); Object.assign(s.leads.find(l => l.id === id), patch) }
+  s.getTestProject = async () => testProject
   s.findTestLead = async () => { const l = s.leads.find(x => x.is_test); return l ? { ...l } : null }
   s.dueLeads = async (limit, nowIso, statuses) => s.leads.filter(l => !l.is_test && statuses.includes(l.status) && (l.next_attempt_at ?? '') <= nowIso).slice(0, limit)
   s.claims = 0
@@ -54,7 +56,7 @@ const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false,
   }
   return s
 }
-const stub = (status = 202, headers = {}) => { const f = async (u, o) => { f.calls.push({ u, o }); return { status, headers: { get: k => headers[k.toLowerCase()] ?? null } } }; f.calls = []; return f }
+const stub = (status = 202, headers = {}, text = undefined) => { const f = async (u, o) => { f.calls.push({ u, o }); return { status, headers: { get: k => headers[k.toLowerCase()] ?? null }, ...(text === undefined ? {} : { text: async () => text }) } }; f.calls = []; return f }
 const deps = (store, { mode = undefined, live = undefined, fetchImpl = stub(), apiKey = 'test-key-not-real', testAllowed = undefined, testPhone = undefined } = {}) => ({
   store, fetchImpl, now: () => T0, log: () => {}, liveAllowed: live, testAllowed, env: { mode, apiKey, testPhone },
 })
@@ -296,18 +298,20 @@ console.log('the test enquiry: its own locks')
 const TP = '+441234567899'
 const SVC = { kind: 'service' }
 const tl = (store, o = {}, body = { mode: 'test_lead', dry: false }) => handleLead({ caller: SVC, body, deps: deps(store, { mode: 'test_once', testAllowed: true, testPhone: TP, ...o }) })
-t('TEST_LEAD_ALLOWED ships false', TEST_LEAD_ALLOWED, false)
-t('the test lock is separate from the user-lead lock', [LEADS_LIVE_ALLOWED, TEST_LEAD_ALLOWED].every(v => v === false), true)
+t('TEST_LEAD_ALLOWED is open for the agreed test; LEADS_LIVE_ALLOWED stays false', [TEST_LEAD_ALLOWED, LEADS_LIVE_ALLOWED], [true, false])
+t('the test project is the D-Point seed', TEST_PROJECT_SEED, 'D-Point')
 for (const [label, allowed, mode, want] of [['code false, secret test_once', false, 'test_once', false], ['code true, secret unset', true, undefined, false],
   ['code true, secret live', true, 'live', false], ['code true, secret TEST_ONCE', true, 'TEST_ONCE', false], ['code true, secret test_once', true, 'test_once', true]]) {
   t(`isTestOpen: ${label}`, isTestOpen(mode, allowed), want)
 }
 t('test_once does not open user-lead sending (both flags true)', [isLive('test_once', true), isLive('live', true)], [false, true])
-t('with the shipped constants nothing opens: apply is refused as locked and writes nothing', await (async () => {
-  const store = makeStore(); const f = stub()
-  const r = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { store, fetchImpl: f, now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } })
-  return [r.status, r.body.error, store.leads.length, f.calls.length]
-})(), [403, 'locked', 0, 0])
+for (const [label, mode] of [['unset', undefined], ['live', 'live'], ['TEST_ONCE', 'TEST_ONCE'], ['empty', '']]) {
+  t(`shipped constants, secret ${label}: apply refused as locked, nothing written or sent`, await (async () => {
+    const store = makeStore(); const f = stub()
+    const r = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { store, fetchImpl: f, now: () => T0, log: () => {}, env: { mode, apiKey: 'k', testPhone: TP } } })
+    return [r.status, r.body.error, store.leads.length, f.calls.length]
+  })(), [403, 'locked', 0, 0])
+}
 t('constant open but secret live: refused as locked', await (async () => { const store = makeStore(); const r = await tl(store, { mode: 'live' }); return [r.status, r.body.error, store.leads.length] })(), [403, 'locked', 0])
 
 console.log('the test enquiry: user leads stay mock under test_once')
@@ -330,10 +334,11 @@ console.log('the test enquiry: dry run (the default)')
   const r2 = await tl(store, { fetchImpl: f }, { mode: 'test_lead', dry: true })
   t('dry is the default when "dry" is omitted', [r1.body.dry, r2.body.dry], [true, true])
   t('dry writes nothing and sends nothing', [store.leads.length, f.calls.length], [0, 0])
-  t('dry reports locks, phone state, existing and what it would do', [r2.body.locks, r2.body.phone, r2.body.existing, r2.body.would], [{ code: true, secret: true }, 'set', 'none', 'insert_and_send'])
-  t('dry output shows the fixed payload and never the phone', [JSON.stringify(r2.body).includes('4412'), r2.body.payload], [false, { name: 'ADA TEST', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr', external_id: 'TEST-1', phone: '<secret>' }])
+  t('dry reports locks, phone state, project, existing and what it would do', [r2.body.locks, r2.body.phone, r2.body.project, r2.body.existing, r2.body.would], [{ code: true, secret: true }, 'set', 'resolved', 'none', 'insert_and_send'])
+  t('dry output shows the fixed payload and never the phone or the project id', [JSON.stringify(r2.body).includes('4412'), JSON.stringify(r2.body).includes(DPOINT.id), r2.body.payload], [false, false, { name: 'ADA TEST', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr', external_id: 'TEST-1', phone: '<secret>', project: '<D-Point id>' }])
   const r3 = await tl(makeStore(), {}, { mode: 'test_lead', dry: true })
-  t('dry with the real shipped locks reports locked (no secret values)', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } })).body.would, 'refuse:locked')
+  t('dry with the shipped constant and the secret unset reports locked', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: undefined, apiKey: 'k', testPhone: TP } } })).body.would, 'refuse:locked')
+  t('dry with the shipped constant and the secret test_once would send', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } })).body.would, 'insert_and_send')
   t('dry with no phone says phone_missing', (await tl(makeStore(), { testPhone: undefined }, { mode: 'test_lead' })).body.would, 'refuse:phone_missing')
 }
 
@@ -343,10 +348,10 @@ console.log('the test enquiry: the exact payload, exactly once')
   const r = await tl(store, { fetchImpl: f })
   t('apply: stored first, then sent, status sent', [r.status, r.body.status, store.leads.length, store.leads[0].is_test, store.leads[0].external_id], [200, 'sent', 1, true, 'TEST-1'])
   const sent = JSON.parse(f.calls[0].o.body)
-  t('the outgoing body has exactly the allowed keys', Object.keys(sent).sort(), ['consent', 'external_id', 'language', 'message', 'name', 'phone'])
-  t('with the fixed values, the phone from the secret and no project', [sent.name, sent.external_id, sent.message, sent.consent, sent.language, sent.phone, 'project' in sent], [TEST_LEAD.name, 'TEST-1', 'Test talebidir, işlem yapmayın', true, 'tr', TP, false])
+  t('the outgoing body is exactly the agreed JSON, in this key order', f.calls[0].o.body, JSON.stringify({ name: 'ADA TEST', phone: TP, consent: true, message: 'Test talebidir, işlem yapmayın', project: DPOINT.id, language: 'tr', external_id: 'TEST-1' }))
+  t('with the fixed values, the phone from the secret and the D-Point id', [sent.name, sent.external_id, sent.message, sent.consent, sent.language, sent.phone, sent.project], [TEST_LEAD.name, 'TEST-1', 'Test talebidir, işlem yapmayın', true, 'tr', TP, DPOINT.id])
   t('it goes to the fixed host only, with the partner key', [f.calls.length, f.calls[0].u, f.calls[0].o.headers.Authorization], [1, `${DEFAULT_BASE_URL}/api/partner/leads`, 'Bearer test-key-not-real'])
-  t('the stored row has no user, no project, language Turkish', [store.leads[0].user_id, store.leads[0].project_id, store.leads[0].language, store.leads[0].language_code], [null, null, 'Turkish', 'tr'])
+  t('the stored row has no user, the D-Point project, language Turkish', [store.leads[0].user_id, store.leads[0].project_id, store.leads[0].project_name, store.leads[0].language, store.leads[0].language_code], [null, DPOINT.id, 'D-Point', 'Turkish', 'tr'])
   const again = await tl(store, { fetchImpl: f })
   t('a second run is refused and sends nothing', [again.status, again.body.error, f.calls.length, store.leads.length], [409, 'already_used', 1, 1])
   t('the dry run after a send says so', (await tl(store, { fetchImpl: f }, { mode: 'test_lead', dry: true })).body.would, 'refuse:already_used')
@@ -360,6 +365,11 @@ for (const st of ['rejected', 'failed', 'mock']) {
 for (const [label, ph] of [['missing', undefined], ['empty', '  '], ['not E.164', '0533 888 0000'], ['no plus', '441234567899']]) {
   const store = makeStore(); const f = stub(); const r = await tl(store, { fetchImpl: f, testPhone: ph })
   t(`phone ${label}: refused, no row, nothing sent`, [r.status, /^phone_/.test(r.body.error), store.leads.length, f.calls.length], [403, true, 0, 0])
+}
+for (const [label, tp] of [['no D-Point seed attached', null], ['a project without an id', { name: 'D-Point' }]]) {
+  const store = makeStore({ testProject: tp }); const f = stub(); const r = await tl(store, { fetchImpl: f })
+  t(`${label}: refused project_missing, no row, nothing sent`, [r.status, r.body.error, store.leads.length, f.calls.length], [403, 'project_missing', 0, 0])
+  t(`... and its dry run says so`, [(await tl(store, {}, { mode: 'test_lead' })).body.project, (await tl(store, {}, { mode: 'test_lead' })).body.would], ['missing', 'refuse:project_missing'])
 }
 t('a request body cannot carry a phone', (await tl(makeStore(), {}, { mode: 'test_lead', dry: false, phone: '+441234567000' })).status, 400)
 t('dry must be a boolean', (await tl(makeStore(), {}, { mode: 'test_lead', dry: 'false' })).status, 400)
@@ -386,13 +396,26 @@ t('a user cannot trigger the test enquiry', (await handleLead({ caller: USER, bo
   t('a test row whose lock is closed is NOT settled as mock (that would burn the one send)', [closed, store.updates.length, f.calls.length], ['pending', 0, 0])
   const rr = await handleLead({ caller: SVC, body: { mode: 'retry' }, deps: deps(store, { mode: 'live', live: true, testAllowed: true, fetchImpl: f }) })
   t('the cron retry path never picks up the test row, even with every lock open', [rr.body.processed, f.calls.length, store.leads[0].status], [0, 0, 'pending'])
+  const leaky = makeStore({ preload: [{ ...store.leads[0], status: 'pending', attempts: 0, next_attempt_at: null }] })
+  leaky.dueLeads = async () => leaky.leads.map(l => ({ ...l }))   // as if the SQL is_test filter were lost
+  const f5 = stub(); const r5 = await handleLead({ caller: SVC, body: { mode: 'retry' }, deps: deps(leaky, { mode: 'test_once', testAllowed: true, live: true, fetchImpl: f5 }) })
+  t('... and retryDue itself skips a test row even if the query returned one', [r5.body.processed, f5.calls.length, leaky.claims], [0, 0, 0])
+  const src = readFileSync(new URL('../supabase/functions/dovec-lead/index.ts', import.meta.url), 'utf8')
+  const dueSrc = src.slice(src.indexOf('async dueLeads('), src.indexOf('async findTestLead('))
+  t("index.ts dueLeads filters is_test = false", dueSrc.includes(".eq('is_test', false)"), true)
 }
 {
   const lines = []; const store = makeStore()
   await tl(store, { fetchImpl: stub(202) })
   const d = { ...deps(store, { mode: 'test_once', testAllowed: true, testPhone: TP }), log: s => lines.push(s) }
   await deliver({ id: 1, is_test: true, external_id: 'TEST-1', status: 'pending', name: 'ADA TEST', phone: TP, consent: true, language_code: 'tr', attempts: 0 }, { ...d, fetchImpl: stub(202) })
-  t('the log line holds the external id, status and http code, never the phone', [lines, lines.some(l => l.includes('4412'))], [['dovec-lead TEST-1 sent http=202'], false])
+  t('the log line holds the external id, status and http code, never the phone', [lines, lines.some(l => l.includes('4412'))], [['dovec-lead TEST-1 response http=202 body=""', 'dovec-lead TEST-1 sent http=202'], false])
+  const l2 = []; const d2 = { ...d, log: s => l2.push(s), fetchImpl: stub(202, {}, `{"ok":true,"status":"received","echo":"${TP}"}`) }
+  await deliver({ id: 1, is_test: true, external_id: 'TEST-1', status: 'pending', name: 'ADA TEST', phone: TP, consent: true, language_code: 'tr', attempts: 0 }, d2)
+  t("Döveç's raw answer to the test is logged (private function log), the phone masked", l2[0], 'dovec-lead TEST-1 response http=202 body="{\\"ok\\":true,\\"status\\":\\"received\\",\\"echo\\":\\"<phone>\\"}"')
+  const l3 = []; const boom = async () => { throw Object.assign(new Error('x'), { name: 'TimeoutError' }) }
+  await deliver({ id: 1, is_test: true, external_id: 'TEST-1', status: 'pending', name: 'ADA TEST', phone: TP, consent: true, language_code: 'tr', attempts: 0 }, { ...d, log: s => l3.push(s), fetchImpl: boom })
+  t('a network error on the test is logged by name only', l3, ['dovec-lead TEST-1 network_error TimeoutError', 'dovec-lead TEST-1 retry'])
 }
 t('the two function sources never print the phone secret', ['../supabase/functions/dovec-lead/index.ts', '../supabase/functions/_shared/dovec-lead.mjs'].map(f =>
   /console\.(log|error|warn)\([^)]*testPhone|log\([^)]*testPhone/.test(readFileSync(new URL(f, import.meta.url), 'utf8'))), [false, false])
@@ -431,7 +454,7 @@ console.log('B1: no enquiry while the module is unpublished (admins excepted)')
 
 console.log('T9: lead locks as shipped')
 {
-  t('LEADS_LIVE_ALLOWED and TEST_LEAD_ALLOWED are both false (imported constants)', [LEADS_LIVE_ALLOWED, TEST_LEAD_ALLOWED], [false, false])
+  t('LEADS_LIVE_ALLOWED is false (imported constant)', LEADS_LIVE_ALLOWED, false)
   const store = makeStore(); const f = stub()
   const lead = { id: 1, external_id: 'ADA-1', status: 'pending', name: 'A', phone: '+441234567890', consent: true, language_code: 'en', attempts: 0 }
   store.leads.push(lead)
@@ -442,8 +465,13 @@ console.log('T9: lead locks as shipped')
   const rr = await retryDue({ store: store2, env: { mode: 'live', apiKey: 'k' }, fetchImpl: f2, now: () => T0, log: () => {} })
   t('retryDue with env live + a key and NO override: 0 fetch calls, retry lead untouched', [f2.calls.length, rr.body.processed, store2.leads[0].status], [0, 0, 'retry'])
   const store3 = makeStore(); const f3 = stub()
-  const ap = await handleTestLead({ body: { mode: 'test_lead', dry: false }, deps: { store: store3, env: { mode: 'test_once', apiKey: 'k', testPhone: '+441234567899' }, fetchImpl: f3, now: () => T0, log: () => {} } })
-  t('handleTestLead apply with the shipped constants: 403 locked, nothing written or sent', [ap.status, ap.body.error, store3.leads.length, f3.calls.length], [403, 'locked', 0, 0])
+  const ap = await handleTestLead({ body: { mode: 'test_lead', dry: false }, deps: { store: store3, env: { mode: undefined, apiKey: 'k', testPhone: '+441234567899' }, fetchImpl: f3, now: () => T0, log: () => {} } })
+  t('handleTestLead apply with the shipped constants and the secret unset: 403 locked, nothing written or sent', [ap.status, ap.body.error, store3.leads.length, f3.calls.length], [403, 'locked', 0, 0])
+  for (const mode of ['test_once', 'live']) {
+    const st4 = makeStore(); const f4 = stub()
+    const r4 = await post(BODY, st4, { store: st4, env: { mode, apiKey: 'k', testPhone: '+441234567899' }, fetchImpl: f4, now: () => T0, log: () => {} })
+    t(`a user lead with the SHIPPED constants and the secret ${mode}: mock, 0 fetch calls`, [r4.body.status, st4.leads[0].status, f4.calls.length], ['mock', 'mock', 0])
+  }
 }
 
 console.log('T10: who may call which mode')

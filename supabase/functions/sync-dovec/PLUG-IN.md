@@ -88,12 +88,14 @@ After the first sync, read the match with `select public.dovec_coord_report();` 
 ## The test enquiry (prepared here, never sent by any of these steps)
 
 Döveç asked for exactly one agreed test enquiry: name "ADA TEST", external id `TEST-1`, message "Test talebidir, işlem yapmayın",
-consent true, language `tr`, no project. The phone comes from a function secret, never from an input or a file.
+consent true, language `tr`, project = D-Point's id (Berke, 2026-11-25: the `dovec_projects` row the `D-Point` seed in
+`dovec_project_coords` is attached to, and still listed; missing refuses `project_missing`). The phone comes from a function secret,
+never from an input or a file.
 
 - **Schema (20261229):** `dovec_leads.is_test`; `external_id` must be `ADA-<n>` unless `is_test` and then exactly `TEST-1`; a project is
   required unless `is_test`; at most one `is_test` row ever; `dovec_lead_counts()` and the rate-limit trigger ignore it.
 - **Function:** `dovec-lead` accepts `{ "mode": "test_lead", "dry": true|false }` from the service key only (dry unless `dry` is
-  literally `false`). Two locks, separate from the user-lead locks: the code constant `TEST_LEAD_ALLOWED` (ships `false`) AND the secret
+  literally `false`). Two locks, separate from the user-lead locks: the code constant `TEST_LEAD_ALLOWED` (`true` only for the agreed test, then back to `false`) AND the secret
   `DOVEC_LEADS_MODE === 'test_once'`. Under `test_once` every user enquiry stays `mock`, `LEADS_LIVE_ALLOWED` stays false, and the retry
   path sends nothing for user leads. The phone is `DOVEC_TEST_LEAD_PHONE` (E.164, never logged); missing or invalid refuses.
 - **Exactly once:** an existing `TEST-1` in `sent`, `rejected`, `failed` or `mock` refuses. A `TEST-1` still `pending` or `retry` is resent
@@ -102,7 +104,9 @@ consent true, language `tr`, no project. The phone comes from a function secret,
   `-f apply=true` sends; `prodWriteGuard`; the production service key like the other workflows; engine `scripts/dovec-test-lead.mjs`).
   Why a workflow: this Mac has no service key and production secrets live only in the GitHub production environment, which runs from
   main, so it is a separate, later PR. The dry run reports lock states, phone set/missing, the earlier row's status word and what it
-  would send, never a secret value. The log is public: status words only.
+  would send, never a secret value. The log is public: status words only (`project: resolved`, never the id). Döveç's raw answer to
+  the test goes to the function's private log only (`dovec-lead TEST-1 response http=… body=…`, phone masked).
+- **Cron never sends it:** `dueLeads` filters `is_test = false`, and `retryDue` skips a test row even if one came back.
 - **Needs, each with Berke's explicit go:** the code (set `TEST_LEAD_ALLOWED = true` in a reviewed commit and deploy `dovec-lead`), the
   secrets `DOVEC_LEADS_MODE=test_once` and `DOVEC_TEST_LEAD_PHONE` (set by digest), the phone number, and the time (Döveç must expect it).
   Afterwards close both locks again (constant false + redeploy, mode secret back to its previous value).

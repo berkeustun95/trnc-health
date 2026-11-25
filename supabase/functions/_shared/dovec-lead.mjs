@@ -23,10 +23,13 @@ export const isLive = (mode, allowed = LEADS_LIVE_ALLOWED) => allowed === true &
 // LOCK B is the secret DOVEC_LEADS_MODE === 'test_once' ('live' does NOT open it). The phone number comes only from the
 // secret DOVEC_TEST_LEAD_PHONE (never a body field, never logged). Triggered only by { mode: 'test_lead' } from the service
 // key; the workflow .github/workflows/dovec-test-lead.yml is the only caller.
-export const TEST_LEAD_ALLOWED = false
+// Open for the one agreed test (2026-11-26): the secret stays the lock until Berke's go, and both go back closed after the send.
+export const TEST_LEAD_ALLOWED = true
 export const isTestOpen = (mode, allowed = TEST_LEAD_ALLOWED) => allowed === true && mode === 'test_once'
 export const TEST_LEAD = Object.freeze({ name: 'ADA TEST', external_id: 'TEST-1', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr' })
 export const TEST_FINAL = ['sent', 'rejected', 'failed', 'mock']
+// The project Döveç asked the test to name: the dovec_projects row the 'D-Point' seed is attached to (and still listed).
+export const TEST_PROJECT_SEED = 'D-Point'
 
 export const LIMITS = { perUserHour: 3, perUserDay: 10, globalDay: 200 }
 export const MAX_ATTEMPTS = 5
@@ -135,12 +138,22 @@ export async function deliver(lead, deps) {
     })
   } catch (e) {
     if (e?.message === 'refusing to send without consent') throw e
+    if (test) log(`dovec-lead ${lead.external_id} network_error ${e?.name ?? 'Error'}`)
     return retryOrFail(attempts, null, backoffMs(attempts), finish)
   }
   const code = res.status
+  if (test) log(`dovec-lead ${lead.external_id} response http=${code} body=${await answerText(res, lead.phone)}`)
   if (code >= 200 && code < 300) return finish({ status: 'sent', attempts, last_http_status: code, sent_at: now().toISOString(), next_attempt_at: null })
   if (code === 429 || code === 401 || code >= 500) return retryOrFail(attempts, code, retryAfterMs(res) ?? backoffMs(attempts), finish, now)
   return finish({ status: 'rejected', attempts, last_http_status: code, next_attempt_at: null })
+}
+
+// Döveç's raw answer to the test enquiry, for the private function log only: capped, one line, the phone masked.
+async function answerText(res, phone) {
+  let text = ''
+  try { text = typeof res.text === 'function' ? String(await res.text()) : '' } catch { return '<unreadable>' }
+  if (phone) text = text.split(phone).join('<phone>')
+  return JSON.stringify(text.replace(/\s+/g, ' ').slice(0, 500))
 }
 
 function retryOrFail(attempts, code, waitMs, finish, now = () => new Date()) {
@@ -224,6 +237,7 @@ export async function retryDue(deps) {
   const due = await store.dueLeads(RETRY_BATCH, now().toISOString(), live ? ['retry', 'pending'] : ['pending'])
   const counts = { processed: 0, sent: 0, retry: 0, failed: 0, rejected: 0, mock: 0 }
   for (const candidate of due) {
+    if (candidate.is_test === true) continue   // the test enquiry is sent only by its own run, never by the cron
     if (!live && candidate.status === 'retry') continue
     // Claim first: pushes next_attempt_at 15 minutes out, only if the row is still due. An overlapping run loses the claim.
     const lead = await store.claimLead(candidate.id, now().toISOString(), new Date(now().getTime() + CLAIM_MS).toISOString())
@@ -236,7 +250,8 @@ export async function retryDue(deps) {
 }
 
 // { mode: 'test_lead', dry?: boolean } (service key only). Dry is the DEFAULT: it reports what would happen (lock states, the
-// phone as set/missing/invalid, the existing row's status word, the payload with fixed values and the phone masked) and
+// phone as set/missing/invalid, the D-Point project as resolved/missing, the existing row's status word, the payload with
+// fixed values, the phone and project id masked) and
 // writes and sends nothing. Apply (dry === false): both test locks open, a valid phone, no earlier TEST-1 in a final
 // state; the row is INSERTED first, then sent (insert-then-send, one row ever: a unique index + external_id unique).
 // An earlier TEST-1 still 'pending' or 'retry' is resent only through the normal claimed retry path.
@@ -249,17 +264,20 @@ export async function handleTestLead({ body, deps }) {
   const locks = { code: (deps.testAllowed ?? TEST_LEAD_ALLOWED) === true, secret: env.mode === 'test_once' }
   const phone = typeof env.testPhone === 'string' ? env.testPhone.trim() : ''
   const phoneState = phone === '' ? 'missing' : PHONE.test(phone) ? 'set' : 'invalid'
+  const project = await store.getTestProject()
+  const projectState = project?.id ? 'resolved' : 'missing'
   const existing = await store.findTestLead()
   const state = existing ? existing.status : 'none'
   const resumable = existing && (existing.status === 'pending' || existing.status === 'retry')
   const refusal = !(locks.code && locks.secret) ? 'locked'
     : phoneState !== 'set' ? `phone_${phoneState}`
+    : projectState !== 'resolved' && !resumable ? 'project_missing'
     : existing && TEST_FINAL.includes(existing.status) ? 'already_used'
     : null
   const would = refusal ? `refuse:${refusal}` : resumable ? 'resend_claimed' : 'insert_and_send'
   if (dry) {
-    return { status: 200, body: { ok: true, dry: true, locks, phone: phoneState, existing: state, would,
-      payload: { name: TEST_LEAD.name, message: TEST_LEAD.message, consent: true, language: TEST_LEAD.language, external_id: TEST_LEAD.external_id, phone: phoneState === 'set' ? '<secret>' : null } } }
+    return { status: 200, body: { ok: true, dry: true, locks, phone: phoneState, project: projectState, existing: state, would,
+      payload: { name: TEST_LEAD.name, message: TEST_LEAD.message, consent: true, language: TEST_LEAD.language, external_id: TEST_LEAD.external_id, phone: phoneState === 'set' ? '<secret>' : null, project: projectState === 'resolved' ? '<D-Point id>' : null } } }
   }
   if (refusal) return { status: refusal === 'already_used' ? 409 : 403, body: { ok: false, error: refusal } }
   if (resumable) {
@@ -267,12 +285,12 @@ export async function handleTestLead({ body, deps }) {
     if (!claimed) return { status: 200, body: { ok: false, error: 'not_due', existing: state } }
     return { status: 200, body: { ok: true, status: await deliver(claimed, deps) } }
   }
-  const v = { project_id: null, unit_type: null, name: TEST_LEAD.name, phone, email: null, message: TEST_LEAD.message, consent: true,
+  const v = { project_id: project.id, unit_type: null, name: TEST_LEAD.name, phone, email: null, message: TEST_LEAD.message, consent: true,
     consent_text_version: CONSENT_TEXT_VERSIONS[0], language: 'Turkish' }
   let lead
   try {
     lead = await store.insertLead({
-      user_id: null, client_request_id: crypto.randomUUID(), payload_hash: await payloadHash(v), project_id: null, project_name: null,
+      user_id: null, client_request_id: crypto.randomUUID(), payload_hash: await payloadHash(v), project_id: project.id, project_name: project.name ?? null,
       unit_type: null, name: v.name, phone: v.phone, email: null, message: v.message, language: 'Turkish', language_code: TEST_LEAD.language,
       consent: true, consent_text_version: v.consent_text_version, status: 'pending', external_id: TEST_LEAD.external_id, is_test: true,
     })
