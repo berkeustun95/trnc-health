@@ -4,6 +4,21 @@
 //   node scripts/sweep-gisekibris-cancellations.mjs --dry    # decide, write nothing
 //   node scripts/sweep-gisekibris-cancellations.mjs          # apply
 //   node scripts/sweep-gisekibris-cancellations.mjs --selftest
+//   … --null-dead-links   also set ticket_url = null on rows whose page is dead
+//
+// ─── DEAD LINKS (2026-11-25, issue #601) ────────────────────────────────────
+//
+// check-gisekibris-urls.mjs only probes rows IN today's feed. Two stand-up shows left
+// the feed on 19 Nov and their pages went 404; this sweep probed them every day, filed
+// the 404 under UNKNOWN in its log, and nothing else saw it: the Buy Ticket button
+// opened a 404 for a week. Now every upcoming approved row absent from the feed (held
+// rows included) gets a link verdict too, and dead ones go in --report (dead_links),
+// which the workflow lists in the "rows need a decision" issue.
+// A dead link NEVER cancels: decide() is unchanged and a 404 is still 'unknown' there.
+// --null-dead-links hides the button (ticket_url only, never status), capped at
+// MAX_NULL; without it the scheduled run only reports.
+// Limit: only rows with start_date >= now are read, so a row that has started but is
+// still listed (tonight's show, a multi-day run with end_date ahead) is not link-checked.
 //
 // Runs LAST in the daily pipeline, after fetch → prepare → check-urls → import.
 //
@@ -57,6 +72,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+import { isNotFoundPage } from './lib/gisekibris-page.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SEED = resolve(ROOT, 'supabase/seed/gisekibris-events-clean.json')
@@ -89,6 +105,7 @@ const MAX_SHARE = 0.25
 const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 const selftest = args.includes('--selftest')
+const nullDead = args.includes('--null-dead-links')
 prodWriteGuard({ wouldWrite: !dry && !selftest, workflow: 'gisekibris-feed',
   dryHint: 'node scripts/sweep-gisekibris-cancellations.mjs --dry' })
 
@@ -112,6 +129,23 @@ export function decide(row, probe) {
   if (probe.flag === true)            return { verdict: 'cancel',  why: 'isCancelled reads literally TRUE' }
   if (probe.flag === false)           return { verdict: 'live',    why: 'isCancelled reads false' }
   return { verdict: 'unknown', why: 'isCancelled absent or contradictory on the page' }
+}
+
+// Dead = the partner says the page is not there: 404/410, a /404 landing, or HTTP 200
+// rendering their 404 page. A 5xx, timeout or network error is their box or ours,
+// never a verdict on the event.
+const MAX_NULL = 5
+export function mayNullDead({ nullDead, dry, deadCount }) {
+  return nullDead === true && !dry && deadCount <= MAX_NULL
+}
+
+export function linkHealth(probe) {
+  if (!probe) return { verdict: 'skip', why: 'no ticket_url' }
+  if (probe.status === 404 || probe.status === 410) return { verdict: 'dead', why: `HTTP ${probe.status}` }
+  if (/\/404(\/|$|\?)/.test(probe.finalUrl ?? '')) return { verdict: 'dead', why: `redirected to ${probe.finalUrl}` }
+  if (probe.notFound) return { verdict: 'dead', why: `HTTP ${probe.status} rendering "404 - Sayfa Bulunamadı"` }
+  if (probe.ok === true) return { verdict: 'ok', why: `HTTP ${probe.status}` }
+  return { verdict: 'unknown', why: probe.error ?? `HTTP ${probe.status ?? '?'}` }
 }
 
 // Rows this run deliberately left OUT of the seed: prepare's skipped rows (when their
@@ -169,6 +203,57 @@ if (selftest) {
     if (!ok) FAILS++
     console.log(`    ${ok ? '✓' : '✗'} ${String(n).padStart(2)} of ${String(eligible).padEnd(3)} eligible`.padEnd(56) + `${got}${ok ? '' : `  wanted ${want}`}`)
   }
+  console.log('\n  link health (a dead link is reported; it never cancels — see "page 404" above)')
+  const L = (label, probe, want) => {
+    const got = linkHealth(probe).verdict
+    const ok = got === want
+    if (!ok) FAILS++
+    console.log(`    ${ok ? '✓' : '✗'} ${label.padEnd(52)} ${got}${ok ? '' : `  wanted ${want}`}`)
+  }
+  L('HTTP 404',                         {ok:false,status:404,flag:null},                       'dead')
+  L('HTTP 410',                         {ok:false,status:410,flag:null},                       'dead')
+  L('HTTP 200 that renders the 404 page', {ok:true,status:200,flag:null,notFound:true},       'dead')
+  L('redirected to /404',               {ok:true,status:200,flag:null,finalUrl:'https://x/404'}, 'dead')
+  L('real page',                        {ok:true,status:200,flag:false,notFound:false},        'ok')
+  L('HTTP 500 (their box, not a verdict)', {ok:false,status:500,flag:null},                    'unknown')
+  L('network error',                    {ok:false,status:null,flag:null,error:'ECONNRESET'},   'unknown')
+  L('not probed (no ticket_url)',       null,                                                  'skip')
+  for (const [label, args, want] of [
+    [`${MAX_NULL} dead, flag on → nulls`,         { nullDead: true,  dry: false, deadCount: MAX_NULL },     true],
+    [`${MAX_NULL + 1} dead, flag on → refused`,   { nullDead: true,  dry: false, deadCount: MAX_NULL + 1 }, false],
+    ['dry → never writes',                        { nullDead: true,  dry: true,  deadCount: 1 },            false],
+    ['flag off (scheduled run) → never writes',   { nullDead: false, dry: false, deadCount: 1 },            false],
+  ]) {
+    const got = mayNullDead(args), ok = got === want
+    if (!ok) FAILS++
+    console.log(`    ${ok ? '✓' : '✗'} ${`null cap: ${label}`.padEnd(52)} got ${got}`)
+  }
+
+  console.log('\n  the probe reads the page (localhost)')
+  {
+    const { createServer } = await import('node:http')
+    // A real event page carries the not-found text too, inside its i18n dictionary.
+    const dict = '"notFound404":"404 - Sayfa Bulunamadı"'
+    const srv = createServer((req, res) => {
+      const shell = `<html>${dict}<span class="css-x">404 - Sayfa Bulunamadı</span></html>`
+      if (req.url === '/gone') { res.writeHead(404); res.end(shell); return }
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end(req.url === '/soft' ? shell : `<html>${dict}{"isCancelled":false}</html>`)
+    })
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+    const origin = `http://127.0.0.1:${srv.address().port}`
+    for (const [path, want] of [['/gone', 'dead'], ['/soft', 'dead'], ['/live', 'ok']]) {
+      const got = linkHealth(await readFlag(origin + path)).verdict
+      const ok = got === want
+      if (!ok) FAILS++
+      console.log(`    ${ok ? '✓' : '✗'} ${path.padEnd(52)} ${got}${ok ? '' : `  wanted ${want}`}`)
+    }
+    srv.close()
+    const refused = linkHealth(await readFlag('http://127.0.0.1:1/x')).verdict
+    if (refused !== 'unknown') FAILS++
+    console.log(`    ${refused === 'unknown' ? '✓' : '✗'} ${'connection refused'.padEnd(52)} ${refused}`)
+  }
+
   console.log(FAILS ? `\n  ${FAILS} self-test failure(s).\n` : '\n  Self-test clean.\n')
   process.exit(FAILS ? 1 : 0)
 }
@@ -216,7 +301,9 @@ async function readFlag(url) {
     const seen = new Set([...body.matchAll(/"isCancelled"\s*:\s*(true|false)/g)].map(m => m[1] === 'true'))
     // size !== 1 is absent (0) or self-contradictory (2). Both unknown: taking the
     // first of two disagreeing values would invent a definite answer.
-    return { ok: res.status === 200, status: res.status, flag: seen.size === 1 ? [...seen][0] : null }
+    const notFound = isNotFoundPage(body)
+    return { ok: res.status === 200 && !notFound, status: res.status, finalUrl: res.url, notFound,
+             flag: seen.size === 1 ? [...seen][0] : null }
   } catch (e) {
     return { ok:false, status:null, flag:null, error: e.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : `${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.name}: ${e.cause.message})` : ''} · ${url}` }
   } finally { clearTimeout(timer) }
@@ -231,6 +318,7 @@ if (error) fail(`read failed: ${error.message}`)
 // Held rows: which are LIVE in the app right now (approved and not over by the app's own
 // rule), so the issue can say so. Read separately: a live event may have started already.
 const reportArg = args.indexOf('--report')
+let report
 if (held.size) {
   const { isEventOver } = await import('../utils/eventVisibility.js')
   // unpaged-ok: .in() over this run's held ids, at most the feed's own size (tens of rows)
@@ -240,34 +328,40 @@ if (held.size) {
   const byId = new Map((heldRows ?? []).map(r => [r.external_id, r]))
   const tag = r => { const d = byId.get(r.external_id)
     return { ...r, in_app: !!d && d.status === 'approved' && !isEventOver(d), db_status: d?.status ?? null } }
-  const report = { skipped: (seedJson.meta?.skipped ?? []).map(r => r.external_id ? tag(r) : { ...r, in_app: false, db_status: null }),
+  report = { skipped: (seedJson.meta?.skipped ?? []).map(r => r.external_id ? tag(r) : { ...r, in_app: false, db_status: null }),
                    feed_cancelled: (seedJson.meta?.feed_cancelled ?? []).map(tag) }
   console.log(`\n  held (never swept): ${held.size}`)
   for (const r of [...report.skipped, ...report.feed_cancelled].filter(r => r.external_id))
     console.log(`    ${r.in_app ? 'LIVE IN APP' : 'not in app '}  ${r.external_id}  ${r.title.slice(0, 44)}`)
-  if (reportArg !== -1) writeFileSync(resolve(args[reportArg + 1]), JSON.stringify(report, null, 2) + '\n')
-} else if (reportArg !== -1) {
-  writeFileSync(resolve(args[reportArg + 1]), JSON.stringify({ skipped: seedJson.meta?.skipped ?? [], feed_cancelled: [] }, null, 2) + '\n')
+} else {
+  report = { skipped: seedJson.meta?.skipped ?? [], feed_cancelled: [] }
 }
+report.dead_links = []
+// Written on every exit, the cap's STOP and fail() included, so the issue still lists dead links.
+if (reportArg !== -1) process.on('exit', () =>
+  writeFileSync(resolve(args[reportArg + 1]), JSON.stringify(report, null, 2) + '\n'))
 
-const eligible = rows.filter(r => !feedIds.has(r.external_id) && !held.has(r.external_id))
+// Held rows are probed for link health but still never swept (decide() skips them).
+const absent = rows.filter(r => !feedIds.has(r.external_id))
+const eligible = absent.filter(r => !held.has(r.external_id))
 console.log('')
 console.log(`Gişe Kıbrıs cancellation sweep${dry ? '  (DRY RUN — nothing written)' : ''}`)
 console.log(`  feed: ${feedIds.size} events · approved & future-dated in DB: ${rows.length}`)
-console.log(`  candidates (absent from the feed, not held): ${eligible.length}`)
-if (!eligible.length) { console.log('\n  Nothing to consider.\n'); process.exit(0) }
+console.log(`  candidates (absent from the feed, not held): ${eligible.length} · link-checked (held included): ${absent.length}`)
+if (!absent.length) { console.log('\n  Nothing to consider.\n'); process.exit(0) }
 
 // probe with a small pool
-const probes = new Array(eligible.length)
+const probes = new Array(absent.length)
 let cursor = 0
-await Promise.all(Array.from({length: Math.min(CONCURRENCY, eligible.length)}, async () => {
-  while (cursor < eligible.length) {
+await Promise.all(Array.from({length: Math.min(CONCURRENCY, absent.length)}, async () => {
+  while (cursor < absent.length) {
     const i = cursor++
-    probes[i] = eligible[i].ticket_url ? await readFlag(eligible[i].ticket_url) : null
+    probes[i] = absent[i].ticket_url ? await readFlag(absent[i].ticket_url) : null
   }
 }))
 
-const decided = eligible.map((r, i) => ({ row: r, probe: probes[i], ...decide({...r, inFeed:false, now: nowIso}, probes[i]) }))
+const decided = absent.map((r, i) => ({ row: r, probe: probes[i],
+  ...decide({...r, inFeed:false, held: held.has(r.external_id), now: nowIso}, probes[i]) }))
 const toCancel = decided.filter(d => d.verdict === 'cancel')
 const unknown  = decided.filter(d => d.verdict === 'unknown')
 const live     = decided.filter(d => d.verdict === 'live')
@@ -288,13 +382,51 @@ if (unknown.length) {
   for (const d of unknown) console.log(`      ${d.row.external_id}  ${d.row.title.slice(0,44)}  (${d.why})`)
 }
 
+// ─── Dead links ─────────────────────────────────────────────────────────────
+const dead = decided.map(d => ({ d, h: linkHealth(d.probe) })).filter(x => x.h.verdict === 'dead')
+console.log(`\n  ── Buy Ticket links (absent from the feed) ──`)
+console.log(`    dead ${dead.length}  (404 / not-found page; a 5xx or timeout is not dead)`)
+const mayNull = mayNullDead({ nullDead, dry, deadCount: dead.length })
+for (const { d, h } of dead) {
+  const entry = { external_id: d.row.external_id, title: d.row.title, start_date: d.row.start_date,
+                  ticket_url: d.row.ticket_url, why: h.why, nulled: false }
+  let action = 'button still showing'
+  // One GET is one moment: their pages flipped 200 → 404 within minutes on 2026-11-25.
+  // A second dead verdict right before the write, or the link stays.
+  const again = mayNull ? linkHealth(await readFlag(d.row.ticket_url)) : null
+  if (mayNull && again.verdict !== 'dead') {
+    action = `NOT nulled: second probe says ${again.verdict} (${again.why})`
+  } else if (mayNull) {
+    // ticket_url only. Matching the probed URL means a link changed since the read is left alone.
+    const { data, error: nErr } = await sb.from('events')
+      .update({ ticket_url: null, updated_at: new Date().toISOString() })
+      .eq('external_id', d.row.external_id).eq('source', SOURCE).eq('status', 'approved')
+      .eq('ticket_url', d.row.ticket_url).select('external_id')
+    if (nErr) fail(`nulling ticket_url failed for ${d.row.external_id}: ${nErr.message}`)
+    entry.nulled = data.length === 1
+    action = entry.nulled ? 'ticket_url → null (button hidden)' : 'NOT nulled: row changed since the read'
+  } else if (nullDead && dry) action = 'would set ticket_url → null'
+  report.dead_links.push(entry)
+  console.log(`\n    DEAD  ${d.row.external_id}  ${d.row.title.slice(0, 44)}  ${d.row.start_date.slice(0, 10)}`)
+  console.log(`          ${h.why}`)
+  console.log(`          before: ${d.row.ticket_url}`)
+  console.log(`          ${action}`)
+}
+if (nullDead && dead.length > MAX_NULL)
+  console.log(`\n    ⛔ ${dead.length} dead links is over the cap of ${MAX_NULL}: NOTHING nulled. A wave this size is\n` +
+              `       more likely their site than ${dead.length} removed events. Listed in the issue.`)
+else if (dead.length && !nullDead)
+  console.log('\n    Reported only. Hide them with --null-dead-links (workflow input null_dead_links).')
+
 if (!toCancel.length) { console.log('\n  Nothing to cancel.\n'); process.exit(0) }
 
 // ─── The cap ────────────────────────────────────────────────────────────────
 const share = toCancel.length / Math.max(rows.length, 1)
 if (toCancel.length > MAX_CANCEL || share > MAX_SHARE) {
   console.error('')
-  console.error(`  ⛔ STOPPING — the cap refused this run. NOTHING WAS WRITTEN.`)
+  const nulled = report.dead_links.filter(e => e.nulled).length
+  console.error(`  ⛔ STOPPING — the cap refused this run. NO ROW WAS CANCELLED` +
+                (nulled ? ` (the ${nulled} dead-link null(s) above were written).` : '.'))
   console.error(`     would cancel ${toCancel.length} row(s); cap is ${MAX_CANCEL} absolute and ${Math.round(MAX_SHARE*100)}% of the`)
   console.error(`     ${rows.length} approved future-dated rows (this run: ${Math.round(share*100)}%).`)
   console.error('')
