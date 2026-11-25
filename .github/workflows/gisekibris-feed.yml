@@ -47,10 +47,15 @@ name: gisekibris-feed
 
 on:
   schedule:
-    # 04:15 UTC = 07:15 in TRNC (UTC+3). After the partner's overnight edits and
-    # before anyone is using the app. Cron here is always UTC.
+    # 04:15 UTC = 06:15 in TRNC in winter (EET, UTC+2), 07:15 in summer. After the
+    # partner's overnight edits and before anyone is using the app. Cron here is always UTC.
     - cron: '15 4 * * *'
-  workflow_dispatch: {}      # manual trigger, so a human can force a sync
+  workflow_dispatch:         # manual trigger, so a human can force a sync
+    inputs:
+      dry:
+        description: 'Dry run: fetch, prepare, probe links, import --dry (reads the DB, writes nothing, opens no issue)'
+        type: boolean
+        default: false
 
 concurrency:
   # Two overlapping runs would both upsert and both mirror images. Harmless but
@@ -66,7 +71,7 @@ jobs:
   # continue-on-error: true and the job has none (a job-level one is forbidden by scripts/check-dispatcher-actor.mjs);
   # only the exact output `false` stops it. See scripts/data-job-gate.mjs.
   gate:
-    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main')) }}
+    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main' && inputs.dry == false)) }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 5
@@ -98,7 +103,7 @@ jobs:
     # sharp's native binary, and Node 24 from setup-node on the new image.
     runs-on: ubuntu-24.04
     needs: gate
-    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main')) && (!cancelled() && needs.gate.outputs.run != 'false') }}
+    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main' && inputs.dry == false)) && (!cancelled() && needs.gate.outputs.run != 'false') }}
     environment: production
     # Setting this block zeroes every scope it does not list, so contents: read is
     # what keeps checkout working. issues: write is for the three issue steps
@@ -114,6 +119,8 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      # A schedule has no inputs, so it always resolves to a real sync.
+      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry == true && 'true' || 'false' }}
     steps:
       # ─── Actions are pinned to COMMIT SHAs, not to a moving tag ─────────
       # A major tag is MUTABLE: whoever controls it can change what runs here
@@ -203,6 +210,7 @@ jobs:
       # The raw value is partner-controlled text: it only ever travels as a quoted
       # argument or a jq --arg, never interpolated into shell source.
       - name: Report unmapped categories
+        if: env.DRY != 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -236,12 +244,19 @@ jobs:
         run: node scripts/check-gisekibris-urls.mjs --apply
 
       - name: Import
-        run: node scripts/import-gisekibris-events.mjs
+        run: |
+          echo "event=$GITHUB_EVENT_NAME dry=$DRY"
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$DRY" != "false" ]; then
+            echo "::error::a scheduled run resolved to a dry run; the DRY input is broken"; exit 1
+          fi
+          if [ "$DRY" = "true" ]; then node scripts/import-gisekibris-events.mjs --dry
+          else node scripts/import-gisekibris-events.mjs; fi
 
       # Runs LAST: it decides on absence from the feed just imported.
       # Leaves rows prepare skipped and rows cancelled in the feed alone (held for
       # Berke), and writes which of them are live in the app for the next step.
       - name: Sweep cancellations
+        if: env.DRY != 'true'
         run: node scripts/sweep-gisekibris-cancellations.mjs --report "$RUNNER_TEMP/gk-held.json"
 
       # The content question the exit codes above cannot answer.
@@ -256,7 +271,7 @@ jobs:
       # Only after THIS run's prepare succeeded: otherwise the seed on disk is the committed
       # one, which carries no skipped rows, and the step would close the issue on a red sync.
       - name: Report rows that need a decision
-        if: always() && steps.prepare.outcome == 'success'
+        if: always() && steps.prepare.outcome == 'success' && env.DRY != 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -297,7 +312,7 @@ jobs:
       # A red sync used to email at best (finding 1 of the 2026-11 audit: six red days,
       # no issue). One issue stays open while the sync is red; it closes on green.
       - name: Alert on a red sync
-        if: always()
+        if: always() && env.DRY != 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -330,7 +345,7 @@ jobs:
       # One heartbeat row per sync run (schedule and dispatch are both real syncs). Never the
       # weekly-heartbeat job below. Non-fatal: a failure to record is one warning (data jobs, slice 2).
       - name: Record the run (data_job_runs)
-        if: always()
+        if: always() && env.DRY != 'true'
         timeout-minutes: 2
         env:
           JOB_STATUS: ${{ job.status }}
@@ -360,7 +375,7 @@ jobs:
   #   `npm run gisekibris:health` no longer runs locally: it needs the service key,
   #   and no Mac holds one since 2026-10-01.
   weekly-heartbeat:
-    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main')) && (github.event_name == 'schedule') }}
+    if: ${{ (!(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') || (github.event_name == 'workflow_dispatch' && github.run_attempt == '1' && github.ref == 'refs/heads/main' && inputs.dry == false)) && (github.event_name == 'schedule') }}
     runs-on: ubuntu-24.04   # pinned with sync — see the note there
     environment: production
     timeout-minutes: 10
