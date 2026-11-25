@@ -3938,6 +3938,7 @@ export default function App() {
       <AccountRequiredSheet
         visible={!!gateKey}
         messageKey={gateKey}
+        ctaKey={gateKey === 'dovecGateAccount' ? 'dovecGateSignup' : undefined}
         lang={lang}
         onSignUp={gateSignUp}
         onClose={() => setGateKey(null)}

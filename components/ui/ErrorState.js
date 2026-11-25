@@ -9,7 +9,7 @@ import { CARD_BG } from './ModuleScreen'
 // A fetch failed. Icon + message + "Tekrar dene", plus an optional fallback action for
 // the cases where retrying is not enough (the duty list's "call KTEB" is the model).
 // `compact` fits inside a widget tile.
-export default function ErrorState({ message, onRetry, fallback, lang, compact = false, style }) {
+export default function ErrorState({ message, onRetry, fallback, lang, compact = false, style, retryLabel }) {
   const onPhoto = useOnPhoto()   // on a module photo: inside a 93% white card
   return (
     <View style={[compact ? s.compact : s.wrap, onPhoto && !compact && s.card, style]} accessibilityRole="alert">
@@ -18,7 +18,7 @@ export default function ErrorState({ message, onRetry, fallback, lang, compact =
       </View>
       <Text style={[s.msg, compact && s.msgSmall]}>{message || t('uiLoadFailed', lang)}</Text>
       {!!onRetry && (
-        <Button variant={compact ? 'text' : 'secondary'} icon="refresh" title={t('uiRetry', lang)} onPress={onRetry} />
+        <Button variant={compact ? 'text' : 'secondary'} icon="refresh" title={retryLabel || t('uiRetry', lang)} onPress={onRetry} />
       )}
       {!!fallback && (
         <Button variant="text" icon={fallback.icon} title={fallback.label} onPress={fallback.onPress} />

@@ -152,7 +152,7 @@ export default function DovecEnquiryForm({ project, lang, settings, onSent }) {
       </View>
 
       <SearchModal lang={lang} visible={picker === true} searchable title={t('dovecFormCodeTitle', lang)}
-        searchPlaceholder={t('pgNationalitySearch', lang)} options={countryCodeOptions(lang)} value={cc}
+        searchPlaceholder={t('dovecFormCodeSearch', lang)} closeLabel={t('dovecClose', lang)} options={countryCodeOptions(lang)} value={cc}
         onSelect={v2 => { setCc(v2); setPicker(false) }} onClose={() => setPicker(false)} />
     </KeyboardAwareForm>
   )
