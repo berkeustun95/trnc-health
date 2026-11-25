@@ -260,7 +260,9 @@ jobs:
         run: node scripts/sweep-gisekibris-cancellations.mjs --report "$RUNNER_TEMP/gk-held.json"
 
       # The content question the exit codes above cannot answer.
+      # Skipped on a dry run: it signs in (and deletes) one guest, and would read a DB this run did not update.
       - name: Content health
+        if: env.DRY != 'true'
         run: node scripts/check-gisekibris-staleness.mjs
 
       # One issue, "Gişe Kıbrıs: rows need a decision", for every row this run left
