@@ -53,7 +53,7 @@ on:
   workflow_dispatch:         # manual trigger, so a human can force a sync
     inputs:
       dry:
-        description: 'Dry run: fetch, prepare, probe links, import --dry, sweep --dry (reads the DB, writes nothing, opens no issue)'
+        description: 'Dry run: fetch, prepare, probe links, import --dry, sweep --dry (reads the DB, writes nothing, opens no issue; exits red if the cancel cap would refuse)'
         type: boolean
         default: false
       null_dead_links:
@@ -313,7 +313,7 @@ jobs:
             echo "Nothing held."; exit 0
           fi
           body=$(printf '%s\n\n%s\n\n%s\n' \
-            "The latest sync left these rows out or hid their link. Nothing was cancelled automatically: a row marked LIVE IN APP is still showing and needs a decision. A WRONG LINK row is imported without its Buy Ticket button because its link opened another event. A DEAD LINK row is approved, upcoming and no longer in the feed, and its ticket page is gone (404 or their not-found page): cancel it, or dispatch with null_dead_links to hide the button." \
+            "The latest sync left these rows out or hid their link. Nothing was cancelled automatically: a row marked LIVE IN APP is still showing and needs a decision. A WRONG LINK row is imported without its Buy Ticket button because its link opened another event. A DEAD LINK row is approved, upcoming and no longer in the feed (rows already held above included), and its ticket page is gone (404 or their not-found page): cancel it, or dispatch with null_dead_links to hide the button." \
             "$list" \
             "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
           printf '%s\n' "$list" >> "$GITHUB_STEP_SUMMARY"

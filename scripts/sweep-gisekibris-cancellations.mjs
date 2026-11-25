@@ -135,6 +135,10 @@ export function decide(row, probe) {
 // rendering their 404 page. A 5xx, timeout or network error is their box or ours,
 // never a verdict on the event.
 const MAX_NULL = 5
+export function mayNullDead({ nullDead, dry, deadCount }) {
+  return nullDead === true && !dry && deadCount <= MAX_NULL
+}
+
 export function linkHealth(probe) {
   if (!probe) return { verdict: 'skip', why: 'no ticket_url' }
   if (probe.status === 404 || probe.status === 410) return { verdict: 'dead', why: `HTTP ${probe.status}` }
@@ -214,10 +218,15 @@ if (selftest) {
   L('HTTP 500 (their box, not a verdict)', {ok:false,status:500,flag:null},                    'unknown')
   L('network error',                    {ok:false,status:null,flag:null,error:'ECONNRESET'},   'unknown')
   L('not probed (no ticket_url)',       null,                                                  'skip')
-  for (const [n, want] of [[MAX_NULL, false], [MAX_NULL + 1, true]]) {
-    const ok = (n > MAX_NULL) === want
+  for (const [label, args, want] of [
+    [`${MAX_NULL} dead, flag on → nulls`,         { nullDead: true,  dry: false, deadCount: MAX_NULL },     true],
+    [`${MAX_NULL + 1} dead, flag on → refused`,   { nullDead: true,  dry: false, deadCount: MAX_NULL + 1 }, false],
+    ['dry → never writes',                        { nullDead: true,  dry: true,  deadCount: 1 },            false],
+    ['flag off (scheduled run) → never writes',   { nullDead: false, dry: false, deadCount: 1 },            false],
+  ]) {
+    const got = mayNullDead(args), ok = got === want
     if (!ok) FAILS++
-    console.log(`    ${ok ? '✓' : '✗'} ${`null cap: ${n} dead link(s) ${want ? 'refused' : 'allowed'}`.padEnd(52)}`)
+    console.log(`    ${ok ? '✓' : '✗'} ${`null cap: ${label}`.padEnd(52)} got ${got}`)
   }
 
   console.log('\n  the probe reads the page (localhost)')
@@ -377,12 +386,17 @@ if (unknown.length) {
 const dead = decided.map(d => ({ d, h: linkHealth(d.probe) })).filter(x => x.h.verdict === 'dead')
 console.log(`\n  ── Buy Ticket links (absent from the feed) ──`)
 console.log(`    dead ${dead.length}  (404 / not-found page; a 5xx or timeout is not dead)`)
-const mayNull = nullDead && !dry && dead.length <= MAX_NULL
+const mayNull = mayNullDead({ nullDead, dry, deadCount: dead.length })
 for (const { d, h } of dead) {
   const entry = { external_id: d.row.external_id, title: d.row.title, start_date: d.row.start_date,
                   ticket_url: d.row.ticket_url, why: h.why, nulled: false }
   let action = 'button still showing'
-  if (mayNull) {
+  // One GET is one moment: their pages flipped 200 → 404 within minutes on 2026-11-25.
+  // A second dead verdict right before the write, or the link stays.
+  const again = mayNull ? linkHealth(await readFlag(d.row.ticket_url)) : null
+  if (mayNull && again.verdict !== 'dead') {
+    action = `NOT nulled: second probe says ${again.verdict} (${again.why})`
+  } else if (mayNull) {
     // ticket_url only. Matching the probed URL means a link changed since the read is left alone.
     const { data, error: nErr } = await sb.from('events')
       .update({ ticket_url: null, updated_at: new Date().toISOString() })

@@ -87,6 +87,7 @@ const SEED_PATH = seedArg !== -1 ? resolve(process.argv[seedArg + 1])
 const CONCURRENCY = 6          // polite: their box, not ours
 const TIMEOUT_MS = 20000
 const RETRIES = 1              // one retry — distinguishes a flaky hop from a dead page
+const MAX_SOFT_NULL = 3        // more rendered not-found pages than this in one run: keep their links, say so
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
            '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
@@ -169,7 +170,7 @@ async function probe(ev) {
             (wrongSlug && wrongId ? '; ' : '') +
             (wrongId ? `page id gk-${landedId} is not this row's ${ev.external_id}` : '')
           : null,
-        ev, status: r.status, finalUrl: r.finalUrl, ok,
+        ev, status: r.status, finalUrl: r.finalUrl, ok, softNotFound: softNotFound && !landedOn404 && r.status < 300,
         // Only meaningful on a page that actually resolved. A 404 body has no flag,
         // and reading one off it would be an answer from the wrong document.
         cancelled: ok ? cancelledFlag(r.body) : null,
@@ -316,6 +317,36 @@ if (selftest) {
     srv.close(); rmSync(dir, { recursive: true, force: true })
   }
 
+  // Feed rows are the partner saying the event exists, so a WAVE of rendered not-found
+  // pages is more likely their site (or our marker) than many removed events: over
+  // MAX_SOFT_NULL the soft ones keep their links; a hard 404 is still nulled.
+  console.log('\n  a wave of soft 404s is not nulled; a hard 404 still is (localhost)')
+  {
+    const srv = createServer((req, res) => {
+      if (req.url === '/hard') { res.writeHead(404); return res.end() }
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<h1>404 - Sayfa Bulunamadı</h1>')
+    })
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+    const base = `http://127.0.0.1:${srv.address().port}`
+    const dir = mkdtempSync(join(tmpdir(), 'gk-urls-'))
+    const file = join(dir, 'seed.json')
+    const n = MAX_SOFT_NULL + 1
+    writeFileSync(file, JSON.stringify({ meta: { notes: [] }, events: [
+      ...Array.from({ length: n }, (_, i) => ({ external_id: `gk-Soft${i}`, title: `SOFT ${i}`, start_date: '2026-12-10', ticket_url: `${base}/s${i}` })),
+      { external_id: 'gk-Hard1', title: 'HARD', start_date: '2026-12-11', ticket_url: `${base}/hard` },
+    ] }))
+    const ap = await new Promise(done => execFile(process.execPath,
+      [fileURLToPath(import.meta.url), '--apply', '--seed', file], (err, stdout) => done({ code: err ? err.code : 0, stdout })))
+    const after = JSON.parse(readFileSync(file, 'utf8'))
+    const t4 = (label, got, want) => { const ok = got === want; if (!ok) bad++
+      console.log(`    ${ok ? '✓' : '✗'} ${label.padEnd(36)} got ${JSON.stringify(got)}${ok ? '' : `, want ${JSON.stringify(want)}`}`) }
+    t4('--apply: exit 0', ap.code, 0)
+    t4(`${n} soft 404s → all links kept`, after.events.filter(e => e.title.startsWith('SOFT') && e.ticket_url).length, n)
+    t4('hard 404 → nulled', after.events.find(e => e.title === 'HARD')?.ticket_url, null)
+    srv.close(); rmSync(dir, { recursive: true, force: true })
+  }
+
   console.log(`\n  Live control — ${CANCELLED_CONTROL.label}`)
   const r = await probe({ title: CANCELLED_CONTROL.label, external_id: 'control',
                           ticket_url: CANCELLED_CONTROL.url })
@@ -366,6 +397,15 @@ if (failures.length) {
 }
 
 console.log(`\n  ${passed.length}/${events.length} resolve.`)
+
+const soft = failures.filter(f => f.softNotFound)
+const softOverCap = soft.length > MAX_SOFT_NULL
+const toNull = softOverCap ? failures.filter(f => !f.softNotFound) : failures
+if (softOverCap) {
+  console.log(`\n  ⛔ ${soft.length} feed rows render the not-found page — over the cap of ${MAX_SOFT_NULL}. Their links are`)
+  console.log('     KEPT: the feed says these events exist, so a wave is more likely their site or our')
+  console.log('     marker (scripts/lib/gisekibris-page.mjs) than removed events. Check by hand.')
+}
 
 // ─── Cancellation ────────────────────────────────────────────────────────────
 // Three buckets, printed even when empty, because "0 cancelled" is a result and a
@@ -432,11 +472,12 @@ if (apply && cancelled.length) {
 if (apply) {
   seed.meta.slug_mismatch = mismatched.map(m => ({ external_id: m.ev.external_id, title: m.ev.title,
     start_date: m.ev.start_date, ticket_url: m.ev.ticket_url, landed: m.finalUrl, why: m.mismatch }))
-  if (!failures.length && !mismatched.length) {
+  if (!toNull.length && !mismatched.length) {
     writeFileSync(SEED_PATH, JSON.stringify(seed, null, 2) + '\n')
-    console.log('  Nothing to null — every URL resolves to its own event.\n')
+    console.log(softOverCap ? '  Nothing nulled (soft 404s over the cap, kept above).\n'
+                            : '  Nothing to null — every URL resolves to its own event.\n')
   } else {
-    const bad = new Set([...failures, ...mismatched].map(f => f.ev.external_id))
+    const bad = new Set([...toNull, ...mismatched].map(f => f.ev.external_id))
     let nulled = 0
     for (const e of seed.events) {
       if (bad.has(e.external_id) && e.ticket_url !== null) { e.ticket_url = null; nulled++ }
