@@ -5,7 +5,7 @@ import { Button, Card, RemoteImage } from '../components/ui'
 import { Cover, StatusChip, fromPriceText, unitsText } from '../components/dovec/DovecProjectCard'
 import { colors, type, radii, press } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { DOVEC_LOGO, formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, dovecMapsUrl } from '../constants/dovec'
+import { DOVEC_LOGO, formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, unitTypeLabel, dovecMapsUrl } from '../constants/dovec'
 
 // One Döveç project. ADA owns the frame; the project's name, photos, text and prices are Döveç's own data, shown as synced.
 // Deliberately NO Call / WhatsApp here: contact starts with the enquiry form (WhatsApp appears on its thank-you screen).
@@ -54,7 +54,7 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
                 const p = formatGbp(u.from_price)
                 return (
                   <View key={`${u.type}-${i}`} style={[s.unit, i > 0 && s.unitSep]}>
-                    <Text style={s.unitType} numberOfLines={2}>{u.type}</Text>
+                    <Text style={s.unitType} numberOfLines={2}>{unitTypeLabel(u.type, lang, t)}</Text>
                     {!!p && <Text style={s.unitPrice}>{t('dovecFrom', lang).replace('{price}', () => p)}</Text>}
                   </View>
                 )

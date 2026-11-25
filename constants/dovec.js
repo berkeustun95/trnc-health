@@ -48,6 +48,20 @@ export function galleryUrls(gallery) {
 
 export const unitTypes = p => (Array.isArray(p?.unit_types) ? p.unit_types.filter(u => u && typeof u.type === 'string' && u.type.trim()) : [])
 
+// Unit types are shown translated for the three the feed is expected to send (English or Turkish form, any case); anything
+// else (1+1, Villa, Penthouse...) is shown exactly as given. DISPLAY ONLY: state and the lead payload keep the feed's own string.
+const UNIT_TYPE_KEY = {
+  studio: 'dovecUnitStudio', 'stüdyo': 'dovecUnitStudio', studyo: 'dovecUnitStudio',
+  office: 'dovecUnitOffice', ofis: 'dovecUnitOffice',
+  shop: 'dovecUnitShop', 'dükkan': 'dovecUnitShop', dukkan: 'dovecUnitShop',
+}
+export const unitTypeKey = type =>
+  UNIT_TYPE_KEY[String(type ?? '').trim().toLowerCase().replace(/\u0307/g, '')] ?? null
+export const unitTypeLabel = (type, lang, tr) => {
+  const key = unitTypeKey(type)
+  return key ? tr(key, lang) : type
+}
+
 // ─── enquiry ────────────────────────────────────────────────────────────────
 const PHONE = /^\+[1-9][0-9]{6,14}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -131,6 +145,12 @@ export const DOVEC_WA_TEMPLATE = 'Merhaba, ADA uygulamasından yazıyorum. {proj
 export const dovecWaText = (projectName, ref) =>
   DOVEC_WA_TEMPLATE.replace('{project}', () => projectName).replace('{ref}', () => ref)
 
+// The app-to-app link (opens WhatsApp directly); the caller falls back to dovecWaUrl when openURL rejects.
+export const dovecWaAppUrl = (e164, text) => {
+  const digits = String(e164 ?? '').replace(/\D/g, '')
+  return digits ? `whatsapp://send?phone=${digits}&text=${encodeURIComponent(text)}` : null
+}
+
 // ─── Maps (detail page; only when both coordinates are numbers) ───────────────────────────────
 // The hotels' https Google Maps form (HotelsTab fallback, constants/ehliyet.js mapsUrlForBranch), never the pharmacy/Apple path.
 export const dovecCoords = (project) => {
@@ -141,3 +161,15 @@ export const dovecMapsUrl = (project) => {
   const c = dovecCoords(project)
   return c ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}` : null
 }
+
+// ─── Privacy notice (dovec_settings.privacy_url_tr / _en) ─────────────────────────────────────
+// Turkish app language -> the TR notice, every other language -> EN; TR falls back to EN when missing. Only https is accepted.
+const httpsUrl = u => (typeof u === 'string' && u.trim().startsWith('https://') ? u.trim() : null)
+export function privacyUrlFor(settings, lang) {
+  const tr = httpsUrl(settings?.privacy_url_tr)
+  const en = httpsUrl(settings?.privacy_url_en)
+  return lang === 'Turkish' ? tr || en : en
+}
+// Fail closed: the client cannot tell mock mode from live (the lead function's mode is a server secret), so with no valid
+// privacy URL the form is not submittable in any mode.
+export const dovecCanSend = (valid, privacyUrl) => valid === true && !!privacyUrl

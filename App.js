@@ -762,6 +762,13 @@ export default function App() {
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
+  // Döveç admin preview only: null = follow the app language. Preview-local (never written to a profile, storage or the DB); reset when the preview closes.
+  const [dovecPreviewLang, setDovecPreviewLang] = useState(null)
+  const prevAdminPreview = useRef(null)
+  useEffect(() => {
+    if (prevAdminPreview.current === 'dovec' && adminPreview !== 'dovec') setDovecPreviewLang(null)
+    prevAdminPreview.current = adminPreview
+  }, [adminPreview])
   const [adminOpen, setAdminOpen] = useState(null)                       // admin push → AdminScreen tab/view; `at` makes a repeat tap re-fire
   const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — sole place-profile state (frozen beaches flow removed in Slice 5 pt B)
   const [showTransport, setShowTransport] = useState(false)
@@ -2608,7 +2615,7 @@ export default function App() {
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
       onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
-      onShowDovec={() => setAdminPreview('dovec')}
+      onShowDovec={() => setAdminPreview('dovec')} dovecPreviewLang={dovecPreviewLang} onDovecPreviewLang={setDovecPreviewLang}
       onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined}
       openRequest={adminOpen} onOpenRequestHandled={() => setAdminOpen(null)} />
   } else if (profile.role === 'provider') {
@@ -2905,7 +2912,7 @@ export default function App() {
     // Döveç projects, as a customer sees them (feed, project, enquiry form). Only AdminScreen's button sets this; it skips the Emlak
     // entry gate (flag + published) and nothing else: the rows come from RLS, which lets an admin read them while published = false.
     // No admin chrome here on purpose. Lead sending is still mocked server-side (dovec-lead locks).
-    content = <DovecProjectsScreen lang={lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} />
+    content = <DovecProjectsScreen lang={dovecPreviewLang || lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} />
   } else if (showLiveScores) {
     content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and

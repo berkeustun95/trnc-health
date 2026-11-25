@@ -52,7 +52,7 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
   if (layer.name === 'detail') {
     content = <DovecProjectScreen project={project} lang={lang} onEnquire={enquire} />
   } else if (layer.name === 'form') {
-    content = <DovecEnquiryForm project={project} lang={lang} onSent={ref => setLayer({ name: 'thanks', project, reference: ref })} />
+    content = <DovecEnquiryForm project={project} lang={lang} settings={data?.settings} onSent={ref => setLayer({ name: 'thanks', project, reference: ref })} />
   } else if (layer.name === 'thanks') {
     content = (
       <DovecThankYou project={project} reference={layer.reference} whatsapp={data?.settings?.whatsapp_e164 ?? null} lang={lang}

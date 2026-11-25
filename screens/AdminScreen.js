@@ -11,7 +11,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { signOutThisDevice } from '../utils/signOut'
 import { colors, placeColors, shadow, type as typeScale, radii, elevation } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { t, LANGUAGES } from '../constants/i18n'
 import { ADMIN_LANG } from '../constants/adminLang'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { addBackListener } from '../utils/backHandler'
@@ -5200,7 +5200,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, onShowDovec, openRequest, onOpenRequestHandled }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor, onShowDovec, dovecPreviewLang, onDovecPreviewLang, openRequest, onOpenRequestHandled }) {
   const adminLang = ADMIN_LANG
   const [tab, setTab] = useState('Dashboard')
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -5296,6 +5296,19 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
         )}
 
         {/* Döveç projects (partner, dark until Döveç approves): the customer feed -> project -> enquiry screens, for an admin only. */}
+        {onShowDovec && !!onDovecPreviewLang && (
+          <View style={s.dovecLangRow}>
+            {[{ key: null, label: 'Follow app language' }, ...LANGUAGES].map(l => {
+              const on = (dovecPreviewLang ?? null) === l.key
+              return (
+                <TouchableOpacity key={l.key ?? 'follow'} style={[s.dovecLangChip, on && s.dovecLangChipOn]} onPress={() => onDovecPreviewLang(l.key)}
+                  activeOpacity={0.85} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                  <Text style={[s.dovecLangText, on && s.dovecLangTextOn]}>{l.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        )}
         {onShowDovec && (
           <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowDovec} activeOpacity={0.85}>
             <Ionicons name="business-outline" size={16} color={colors.primary} />
@@ -5376,6 +5389,11 @@ const s = StyleSheet.create({
                         marginHorizontal: 16, marginTop: 10, paddingVertical: 12, borderRadius: 12,
                         borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary,
                         backgroundColor: colors.primaryLight },
+  dovecLangRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  dovecLangChip:      { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  dovecLangChipOn:    { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  dovecLangText:      { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
+  dovecLangTextOn:    { color: colors.primaryDark },
   explorePreviewText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   tabBar:             { flexGrow: 0, marginBottom: 16 },

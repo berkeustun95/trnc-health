@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { RemoteImage } from '../ui'
@@ -8,16 +9,24 @@ import { formatGbp, placeLine } from '../../constants/dovec'
 export const COVER_ASPECT = 16 / 9
 const fill = (text, k, v) => text.replace(`{${k}}`, () => String(v))
 
+// The list card and the detail page hand Cover the SAME url string (project.cover_url, never re-encoded or rebuilt), so both ask
+// expo-image for the same cache key. The grey box under the image is the loading placeholder on every path (expo-image and the
+// legacy RN Image); a url that fails to load falls back to the no-cover icon instead of a blank box.
 export function Cover({ url, width }) {
+  const [failedUrl, setFailedUrl] = useState(null)
   const box = { width, height: Math.round(width / COVER_ASPECT) }
-  if (!url) {
+  if (!url || failedUrl === url) {
     return (
       <View style={[box, s.noCover]}>
         <Ionicons name="business-outline" size={36} color={colors.textSecondary} />
       </View>
     )
   }
-  return <RemoteImage source={{ uri: url }} style={box} resizeMode="cover" accessibilityIgnoresInvertColors />
+  return (
+    <View style={[box, s.noCover]}>
+      <RemoteImage source={{ uri: url }} style={box} resizeMode="cover" onError={() => setFailedUrl(url)} accessibilityIgnoresInvertColors />
+    </View>
+  )
 }
 
 export function StatusChip({ status, lang }) {

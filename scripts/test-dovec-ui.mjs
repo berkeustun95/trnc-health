@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url'
 import {
   dovecShown, formatGbp, deliveryLabel, placeLine, galleryUrls, unitTypes, composePhone, validateEnquiry,
   buildLeadPayload, requestIdFor, classifyLead, OUTCOME_KEY, dovecWaUrl, dovecWaText, dovecMapsUrl, DOVEC_CONSENT_VERSION, DOVEC_LOGO,
+  unitTypeKey, unitTypeLabel, dovecWaAppUrl, privacyUrlFor, dovecCanSend,
 } from '../constants/dovec.js'
+import { t } from '../constants/i18n.js'
+import { COUNTRY_CODES, countryCodeOptions } from '../constants/countryCodes.js'
 import { mapsUrlForBranch } from '../constants/ehliyet.js'
 import { DOVEC_PARTNER_LIVE } from '../constants/flags.js'
 import { validateLead } from '../supabase/functions/_shared/dovec-lead.mjs'
@@ -149,6 +152,71 @@ const detail = read('screens/DovecProjectScreen.js'), list = read('screens/Dovec
 check('no call / WhatsApp / contact logging on the list or project screens', ![detail, list].some(s => /wa\.me|tel:|logContactEvent|dovecWa|Linking\.openURL\(`/.test(s)))
 check('WhatsApp only on the thank-you component, behind whatsapp_e164', /logContactEvent\('dovec', project\.entity_uuid, 'whatsapp'\)/.test(read('components/dovec/DovecThankYou.js')) && /whatsapp \? dovecWaUrl/.test(read('components/dovec/DovecThankYou.js')))
 check('logo hook is empty (no asset yet)', DOVEC_LOGO === null)
+
+// ─── round 2 ─────────────────────────────────────────────────────────────────
+// unit type labels: display only, the payload keeps the feed's own string
+eq('Turkish labels exactly: Stüdyo, Ofis, Dükkan', ['Studio', 'Office', 'Shop'].map(u => unitTypeLabel(u, 'Turkish', t)), ['Stüdyo', 'Ofis', 'Dükkan'])
+eq('Turkish forms map too, any case and padding', ['stüdyo', ' STÜDYO ', 'OFİS', 'ofis', 'Dükkan', 'DÜKKAN', 'shop', 'OFFICE'].map(unitTypeKey),
+  ['dovecUnitStudio', 'dovecUnitStudio', 'dovecUnitOffice', 'dovecUnitOffice', 'dovecUnitShop', 'dovecUnitShop', 'dovecUnitShop', 'dovecUnitOffice'])
+eq('anything else is shown exactly as given', ['1+1', '2+1', 'Villa', 'Penthouse', ' Villa '].map(u => unitTypeLabel(u, 'Turkish', t)), ['1+1', '2+1', 'Villa', 'Penthouse', ' Villa '])
+check('all 9 languages carry the three labels, non-empty', ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+  .every(l => ['dovecUnitStudio', 'dovecUnitOffice', 'dovecUnitShop', 'dovecPrivacyLink', 'dovecFormPrivacyMissing'].every(k => t(k, l) && t(k, l) !== k)))
+{
+  const raw = ' Studio '
+  const pl = buildLeadPayload({ ...base, unitType: raw })
+  check('payload unit_type stays the raw feed string, whatever the label', pl.unit_type === raw && unitTypeLabel(raw, 'Turkish', t) === 'Stüdyo', pl.unit_type)
+  const form = read('components/dovec/DovecEnquiryForm.js')
+  check('form chips: label shown, raw value stored', /setUnit\(on \? null : u\.type\)/.test(form) && /unitTypeLabel\(u\.type, lang, t\)/.test(form))
+}
+
+// phone code picker: names in the app language, values untouched
+{
+  const tr = countryCodeOptions('Turkish'), en = countryCodeOptions('English'), xx = countryCodeOptions('Klingon')
+  eq('same order and values as COUNTRY_CODES in every language', [tr, en, xx].map(o => o.map(x => x.value)), [COUNTRY_CODES, COUNTRY_CODES, COUNTRY_CODES].map(c => c.map(x => x.code)))
+  eq('Turkish names', [tr[0].label, tr[1].label, tr[3].label], ['+90  Türkiye', '+357  Kıbrıs', '+1  Amerika Birleşik Devletleri / Kanada'])
+  eq('Greek and Persian', [countryCodeOptions('Greek')[1].label, countryCodeOptions('Persian')[0].label], ['+357  Κύπρος', '+90  ترکیه'])
+  eq('English keeps the existing labels; unknown language falls back to English', [en[0].label, en[3].label, xx[0].label], ['+90  Turkey', '+1  USA / Canada', '+90  Turkey'])
+  check('every entry has an ISO region', COUNTRY_CODES.every(c => [].concat(c.region).every(r => /^[A-Z]{2}$/.test(r))))
+}
+
+// privacy notice: language pick, https only, fail closed
+{
+  const S = { privacy_url_tr: 'https://example.test/tr', privacy_url_en: 'https://example.test/en' }
+  eq('Turkish -> TR, every other language -> EN', [privacyUrlFor(S, 'Turkish'), privacyUrlFor(S, 'English'), privacyUrlFor(S, 'Greek'), privacyUrlFor(S, 'Persian')],
+    ['https://example.test/tr', 'https://example.test/en', 'https://example.test/en', 'https://example.test/en'])
+  eq('TR missing -> falls back to EN; EN missing -> none for other languages', [privacyUrlFor({ privacy_url_en: S.privacy_url_en }, 'Turkish'), privacyUrlFor({ privacy_url_tr: S.privacy_url_tr }, 'English')], ['https://example.test/en', null])
+  eq('http / junk / empty / no settings are refused', [{ privacy_url_en: 'http://x.test' }, { privacy_url_en: 'javascript:alert(1)' }, { privacy_url_en: '' }, { privacy_url_en: 5 }, {}, null, undefined].map(x => privacyUrlFor(x, 'English')), [null, null, null, null, null, null, null])
+  eq('an invalid TR url falls back to EN', privacyUrlFor({ privacy_url_tr: 'http://x.test', privacy_url_en: S.privacy_url_en }, 'Turkish'), 'https://example.test/en')
+  eq('send needs a valid form AND a privacy url (any mode)', [dovecCanSend(true, 'https://x.test'), dovecCanSend(true, null), dovecCanSend(false, 'https://x.test'), dovecCanSend(undefined, 'https://x.test')], [true, false, false, false])
+  const form = read('components/dovec/DovecEnquiryForm.js')
+  check('form: submit and Send disabled follow canSend; the link opens the url, not the consent toggle', /if \(busy \|\| !canSend\) return/.test(form) && /disabled=\{!canSend\}/.test(form) && /accessibilityRole="link"/.test(form) && /minHeight: TAP/.test(form.match(/privacy:\s+\{[^}]*\}/)[0]))
+  check('loadDovec selects both privacy columns; both in REQUIRED with the migration name', /privacy_url_tr, privacy_url_en/.test(read('utils/loadDovec.js')) && /'privacy_url_tr', '20261235_dovec_privacy_url\.sql'/.test(read('scripts/check-required-columns.mjs')) && /'privacy_url_en', '20261235_dovec_privacy_url\.sql'/.test(read('scripts/check-required-columns.mjs')))
+  check('the projects screen hands settings to the form', /settings=\{data\?\.settings\}/.test(read('screens/DovecProjectsScreen.js')))
+}
+
+// WhatsApp: app link first, wa.me on rejection, text and reference unchanged
+{
+  const text = dovecWaText('D-Point', 'ADA-7')
+  eq('app link: digits only, text encoded like wa.me', dovecWaAppUrl('+357 99 000 111', text), `whatsapp://send?phone=35799000111&text=${encodeURIComponent(text)}`)
+  eq('same encoded text as the wa.me link', dovecWaAppUrl('+35799000111', text).split('&text=')[1], dovecWaUrl('+35799000111', text).split('?text=')[1])
+  eq('no number -> no link', [dovecWaAppUrl(null, 'x'), dovecWaAppUrl('', 'x')], [null, null])
+  const ty = read('components/dovec/DovecThankYou.js')
+  check('thank-you: one log per tap, app link then wa.me fallback, no canOpenURL', (ty.match(/logContactEvent\('dovec'/g) || []).length === 1 && /openURL\(dovecWaAppUrl\(whatsapp, text\)\)\.catch\(\(\) => Linking\.openURL\(waUrl\)/.test(ty) && !/canOpenURL/.test(ty))
+}
+
+// cover: same url string on card and detail, error falls back to the icon
+{
+  const card = read('components/dovec/DovecProjectCard.js')
+  check('detail and card both pass project.cover_url straight to Cover', /<Cover url=\{project\.cover_url\}/.test(card) && /<Cover url=\{project\.cover_url\}/.test(detail))
+  check('Cover: source uri is the url as given, error falls back to the no-cover icon', /source=\{\{ uri: url \}\}/.test(card) && /onError=\{\(\) => setFailedUrl\(url\)\}/.test(card) && /failedUrl === url/.test(card))
+}
+
+// admin preview language: preview-local only
+{
+  const app = read('App.js'), admin = read('screens/AdminScreen.js')
+  check('App: preview language passed to the Döveç screen only, state is plain useState (no storage, no profile write)', /lang=\{dovecPreviewLang \|\| lang\} onClose/.test(app) && /useState\(null\)/.test(app.match(/const \[dovecPreviewLang[^\n]*/)[0]) && !/dovecPreviewLang[^\n]*(AsyncStorage|preferred_language|from\('profiles'\))/.test(app))
+  check('AdminScreen: the language choice only calls the setter', /onDovecPreviewLang\(l\.key\)/.test(admin) && !/dovecPreviewLang[^\n]*(AsyncStorage|supabase)/.test(admin))
+}
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

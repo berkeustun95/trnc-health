@@ -58,7 +58,7 @@ import LegalLinkedText from '../components/LegalLinkedText'
 import { t, LANGUAGES, LANG_CODES } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { NATIONALITIES, NATIONALITY_CODES, getNatLabel } from '../constants/nationalityTranslations'
-import { COUNTRY_CODES } from '../constants/countryCodes'
+import { COUNTRY_CODES, countryCodeOptions } from '../constants/countryCodes'
 import { monthNames } from '../constants/months'
 import PageCanvas from '../components/ui/PageCanvas'
 import {
@@ -807,7 +807,7 @@ export default function ProfileSetupScreen({
   const natOptions = NATIONALITIES.map(v => ({ value: v, label: getNatLabel(v, lang) }))
     .sort((a, b) => a.label.localeCompare(b.label))
   const instOptions = (instList.rows ?? []).map(i => ({ value: i.id, label: institutionLabel(i) }))
-  const ccOptions = COUNTRY_CODES.map(c => ({ value: c.code, label: `${c.code}  ${c.label}` }))
+  const ccOptions = countryCodeOptions(lang)
   // NATIVE names, never translated ones: somebody who cannot read the current language
   // has to be able to find their own in this list.
   const langOptions = LANGUAGES.map(l => ({ value: l.key, label: l.label }))

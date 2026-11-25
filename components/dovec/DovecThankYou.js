@@ -4,17 +4,20 @@ import { Ionicons } from '@expo/vector-icons'
 import { Button, Card } from '../ui'
 import { colors, type, radii } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { dovecWaUrl, dovecWaText } from '../../constants/dovec'
+import { dovecWaUrl, dovecWaAppUrl, dovecWaText } from '../../constants/dovec'
 import { logContactEvent } from '../../utils/logContactEvent'
 
 // After an accepted enquiry. WhatsApp shows only when dovec_settings.whatsapp_e164 is set; each tap is counted
 // (module 'dovec', entity = the project's entity_uuid) on the line before the handoff.
 export default function DovecThankYou({ project, reference, whatsapp, lang, onBack }) {
   const insets = useSafeAreaInsets()
-  const waUrl = whatsapp ? dovecWaUrl(whatsapp, dovecWaText(project.name, reference)) : null
+  const text = dovecWaText(project.name, reference)
+  const waUrl = whatsapp ? dovecWaUrl(whatsapp, text) : null
   const openWa = () => {
     logContactEvent('dovec', project.entity_uuid, 'whatsapp')
-    Linking.openURL(waUrl).catch(() => {})
+    // The app link first (opens WhatsApp itself, no browser hop); wa.me when it rejects (no WhatsApp installed). A plain openURL
+    // needs no Android package-visibility query or iOS LSApplicationQueriesSchemes entry; only a can-open probe does, and none is used.
+    Linking.openURL(dovecWaAppUrl(whatsapp, text)).catch(() => Linking.openURL(waUrl).catch(() => {}))
   }
   return (
     <ScrollView contentContainerStyle={[s.page, { paddingBottom: 32 + insets.bottom }]}>
