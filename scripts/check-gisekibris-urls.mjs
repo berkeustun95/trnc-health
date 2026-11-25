@@ -19,8 +19,19 @@
 // 404 and redirects to /gisekibris.com/404 — so the status code is trustworthy. The
 // final-URL check below is belt-and-braces in case that changes after the handover.
 //
-// Only the id half after the final '--' routes; a wrong slug still resolves 200.
-// That is why a title edit on their side cannot break a stored link.
+// ─── A LINK THAT OPENS ANOTHER EVENT (2026-11-25) ────────────────────────────
+//
+// 200 and isCancelled=false do not mean "this row's page". /etkinlikler/<slug>--<id>
+// routes on the id and redirects to THAT id's slug, so a wrong id opens another event:
+// bir-ihtimal-kabare-7aralik--pTvx… (pTvx borrowed from a repeat session's banner)
+// landed on bir-ihtimal-kabare-3. Two checks on a page that resolved:
+//   • the landing slug must equal the slug the row's ticket_url names;
+//   • if the page carries exactly one id, it must equal the row's external_id.
+// The slug check is the one that caught the live case (that page's id WAS the row's
+// wrong external_id). Either mismatch is recorded in meta.slug_mismatch, the link is
+// nulled under --apply (a wrong ticket page is worse than no button), and the workflow
+// lists it in the issue. A genuine slug rename on their side reads the same way and is
+// reported the same way; a human decides.
 //
 // ─── CANCELLATION, AND WHY THE STATUS CODE CANNOT SEE IT ────────────────────
 //
@@ -112,6 +123,19 @@ async function once(url, method) {
 // Every match in the page is collected rather than the first one — if a page ever
 // carried two and they disagreed, taking the first would invent a definite answer out
 // of an ambiguous one. Disagreement reads as unknown.
+const slugOf = u => {
+  try {
+    const seg = new URL(u).pathname.replace(/\/+$/, '').split('/').pop() ?? ''
+    return decodeURIComponent(seg).split('--')[0].toLowerCase()
+  } catch { return null }
+}
+// Same rule as idFromPage in prepare-gisekibris-feed.mjs: exactly one distinct id, else unknown.
+function pageId(body) {
+  if (typeof body !== 'string') return null
+  const ids = new Set([...body.replace(/\\"/g, '"').matchAll(/"(?:id|eventId)":"([A-Za-z0-9]{15,30})"/g)].map(m => m[1]))
+  return ids.size === 1 ? [...ids][0] : null
+}
+
 const CANCEL_RE = /"isCancelled"\s*:\s*(true|false)/g
 function cancelledFlag(body) {
   if (typeof body !== 'string' || !body) return null
@@ -133,7 +157,15 @@ async function probe(ev) {
 
       const landedOn404 = /\/404(\/|$|\?)/.test(r.finalUrl ?? '')
       const ok = r.status >= 200 && r.status < 300 && !landedOn404
+      const landedId = ok ? pageId(r.body) : null
+      const wrongSlug = ok && slugOf(r.finalUrl) !== slugOf(url)
+      const wrongId = ok && landedId !== null && `gk-${landedId}` !== ev.external_id
       return {
+        mismatch: wrongSlug || wrongId
+          ? (wrongSlug ? `landed on slug "${slugOf(r.finalUrl)}", row's link names "${slugOf(url)}"` : '') +
+            (wrongSlug && wrongId ? '; ' : '') +
+            (wrongId ? `page id gk-${landedId} is not this row's ${ev.external_id}` : '')
+          : null,
         ev, status: r.status, finalUrl: r.finalUrl, ok,
         // Only meaningful on a page that actually resolved. A 404 body has no flag,
         // and reading one off it would be an answer from the wrong document.
@@ -229,6 +261,52 @@ if (selftest) {
     srv.close(); rmSync(dir, { recursive: true, force: true })
   }
 
+  // 2026-11-25: bir-ihtimal-kabare-7aralik--pTvx… (a borrowed id) redirected to, and
+  // opened, bir-ihtimal-kabare-3. 200 and isCancelled=false: only the landing slug shows it.
+  console.log('\n  a link that lands on ANOTHER event is reported and nulled (localhost)')
+  {
+    const ID_A = 'pTvxB7NxtGCRMjLNyMc9', ID_B = 'cmwncx16f009ecxtvh9z9n1mm', ID_C = 'MatchId1234567890abc'
+    const srv = createServer((req, res) => {
+      const p = req.url.split('?')[0]
+      if (p === `/kabare-7aralik--${ID_A}`) { res.writeHead(307, { location: '/kabare-3' }); return res.end() }
+      if (p === `/renamed--${ID_C}`) { res.writeHead(307, { location: '/new-name' }); return res.end() }
+      res.writeHead(200, { 'content-type': 'text/html' })
+      if (p === '/kabare-3') return res.end(`{"isCancelled":false,"id":"${ID_A}"}`)
+      if (p === '/kabare-7aralik') return res.end(`{"isCancelled":false,"id":"${ID_B}"}`)
+      if (p === '/new-name') return res.end(`{"isCancelled":false,"id":"${ID_C}"}`)
+      if (p === '/not-okay-2') return res.end(`{"isCancelled":false,"id":"${ID_A}"}`)
+      res.end('{"isCancelled":false}')
+    })
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+    const base = `http://127.0.0.1:${srv.address().port}`
+    const dir = mkdtempSync(join(tmpdir(), 'gk-urls-'))
+    const file = join(dir, 'seed.json')
+    writeFileSync(file, JSON.stringify({ meta: { notes: [] }, events: [
+      { external_id: `gk-${ID_A}`, title: 'WRONG SLUG', start_date: '2026-12-07', ticket_url: `${base}/kabare-7aralik--${ID_A}?code=AF1` },
+      { external_id: 'gk-cmwt52g9b026ecxhtlg66sd1l', title: 'WRONG ID', start_date: '2026-12-02', ticket_url: `${base}/not-okay-2?code=AF1` },
+      { external_id: `gk-${ID_B}`, title: 'RIGHT', start_date: '2026-12-07', ticket_url: `${base}/kabare-7aralik?code=AF1` },
+      { external_id: `gk-${ID_C}`, title: 'SLUG RENAMED', start_date: '2026-12-08', ticket_url: `${base}/renamed--${ID_C}` },
+      { external_id: 'gk-NoIdOnPage123456789', title: 'NO ID ON PAGE', start_date: '2026-12-09', ticket_url: `${base}/plain` },
+    ] }))
+    const ap = await new Promise(done => execFile(process.execPath,
+      [fileURLToPath(import.meta.url), '--apply', '--seed', file], (err, stdout) => done({ code: err ? err.code : 0, stdout })))
+    const after = JSON.parse(readFileSync(file, 'utf8'))
+    const link = title => after.events.find(e => e.title === title)?.ticket_url
+    const t3 = (label, got, want) => { const ok = got === want; if (!ok) bad++
+      console.log(`    ${ok ? '✓' : '✗'} ${label.padEnd(36)} got ${JSON.stringify(got)}${ok ? '' : `, want ${JSON.stringify(want)}`}`) }
+    t3('--apply: exit 0', ap.code, 0)
+    t3('lands on another slug → listed', after.meta.slug_mismatch?.map(m => m.title).join(','), 'WRONG SLUG,WRONG ID,SLUG RENAMED')
+    t3('…with where it landed', after.meta.slug_mismatch?.[0]?.landed, `${base}/kabare-3`)
+    t3('lands on another slug → nulled', link('WRONG SLUG'), null)
+    t3('page id ≠ row id → nulled', link('WRONG ID'), null)
+    t3('own slug + own id → kept as sent', link('RIGHT'), `${base}/kabare-7aralik?code=AF1`)
+    // Indistinguishable from the live bug (kabare-7's page id WAS its borrowed external_id),
+    // so the slug decides; a genuine rename shows up in the issue for a human.
+    t3('renamed slug, own id → still nulled', link('SLUG RENAMED'), null)
+    t3('no id on page, own slug → kept', link('NO ID ON PAGE'), `${base}/plain`)
+    srv.close(); rmSync(dir, { recursive: true, force: true })
+  }
+
   console.log(`\n  Live control — ${CANCELLED_CONTROL.label}`)
   const r = await probe({ title: CANCELLED_CONTROL.label, external_id: 'control',
                           ticket_url: CANCELLED_CONTROL.url })
@@ -311,6 +389,22 @@ if (cancelled.length) {
     : '\n    DO NOT IMPORT. Re-run with --apply to take them out of the seed.')
 }
 
+// ─── Wrong event ─────────────────────────────────────────────────────────────
+// Cancelled rows are left to the cancellation path above; everything else that opens
+// another event's page is listed (printed even when empty: "0" is a result).
+const mismatched = results.filter(r => r.mismatch && r.cancelled !== true)
+console.log(`\n  Link opens THIS row's event (landing slug and page id)`)
+console.log(`    wrong event ${String(mismatched.length).padStart(3)}`)
+for (const m of mismatched) {
+  console.log(`\n    ${m.ev.title}  ${m.ev.start_date}`)
+  console.log(`      ${m.ev.external_id}  ${m.mismatch}`)
+  console.log(`      ${m.ev.ticket_url}\n      → ${m.finalUrl}`)
+}
+if (mismatched.length) {
+  console.log(apply ? '\n    Nulled below and recorded in meta.slug_mismatch (listed in the issue).'
+                    : '\n    DO NOT IMPORT. Re-run with --apply to null them.')
+}
+
 // ─── Apply ───────────────────────────────────────────────────────────────────
 
 if (apply && cancelled.length) {
@@ -327,22 +421,25 @@ if (apply && cancelled.length) {
 }
 
 if (apply) {
-  if (!failures.length) {
-    console.log('  Nothing to null — every URL resolves. Seed left untouched.\n')
+  seed.meta.slug_mismatch = mismatched.map(m => ({ external_id: m.ev.external_id, title: m.ev.title,
+    start_date: m.ev.start_date, ticket_url: m.ev.ticket_url, landed: m.finalUrl, why: m.mismatch }))
+  if (!failures.length && !mismatched.length) {
+    writeFileSync(SEED_PATH, JSON.stringify(seed, null, 2) + '\n')
+    console.log('  Nothing to null — every URL resolves to its own event.\n')
   } else {
-    const bad = new Set(failures.map(f => f.ev.external_id))
+    const bad = new Set([...failures, ...mismatched].map(f => f.ev.external_id))
     let nulled = 0
     for (const e of seed.events) {
       if (bad.has(e.external_id) && e.ticket_url !== null) { e.ticket_url = null; nulled++ }
     }
     seed.meta.notes = seed.meta.notes.filter(n => !n.startsWith('URL probe'))
     seed.meta.notes.push(
-      `URL probe: ${nulled} ticket_url(s) set to null because the page did not resolve ` +
-      `(${failures.map(f => f.ev.external_id).join(', ')}). The Buy Ticket button is hidden for these.`)
+      `URL probe: ${nulled} ticket_url(s) set to null because the page did not resolve or opened another event ` +
+      `(${[...bad].join(', ')}). The Buy Ticket button is hidden for these.`)
     writeFileSync(SEED_PATH, JSON.stringify(seed, null, 2) + '\n')
     console.log(`  ✓ ${nulled} ticket_url(s) set to null in ${SEED_PATH.replace(ROOT + '/', '')}\n`)
   }
-} else if (failures.length) {
+} else if (failures.length || mismatched.length) {
   console.log('  Re-run with --apply to null these in the seed.\n')
 } else {
   console.log('')
@@ -350,4 +447,4 @@ if (apply) {
 
 // --apply: cancelled rows are already out of the seed, so the chain continues.
 // Report mode: non-zero on a cancelled event, as before.
-process.exit(cancelled.length && !apply ? 1 : 0)
+process.exit((cancelled.length || mismatched.length) && !apply ? 1 : 0)

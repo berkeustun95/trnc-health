@@ -3,8 +3,8 @@
 //
 // Transforms the partner's raw export into supabase/seed/gisekibris-events-clean.json.
 // Reads a file, writes a file, touches no database. The network is used for ONE thing
-// only: a row whose url AND image both lack the partner's id gets its event page fetched
-// to read the id from there (see resolvePageIds). GK_PREPARE_OFFLINE=1 turns that off.
+// only: a row whose url lacks the partner's id gets its event page fetched to read the
+// id from there (see fetchPageId). GK_PREPARE_OFFLINE=1 turns that off.
 //
 //   node scripts/prepare-gisekibris-feed.mjs ~/Downloads/upcoming-events.json
 //   node scripts/prepare-gisekibris-feed.mjs <raw.json> --out <path>
@@ -22,8 +22,9 @@
 //   image  .../o/events-v2%2FuHqm0skWkAIxoFk91MpC%2Fbanner.png
 // The ID is NOT fixed-width — 71 of 72 are 20-char Firestore ids, one is a 25-char
 // cuid — so extraction splits on the LAST '--' and never assumes a length. Order:
-// url, then image path, then the event's own page. If none yields an id, or url and
-// image disagree, THAT ROW IS SKIPPED and reported — never given a synthetic key (that
+// url; for a slug-only url, the event's own page (the image id is only cross-checked:
+// repeat sessions borrow the first session's banner); image path only for a row with
+// no url. If none yields an id, or url and image disagree, THAT ROW IS SKIPPED and reported — never given a synthetic key (that
 // would reintroduce the content-hash identity this whole change exists to remove).
 //
 // ONE BAD ROW SKIPS ONE ROW (Berke, 2026-11-14). Every per-row problem below (no id,
@@ -201,6 +202,14 @@ const eventSlug = u => {
   return m ? m[1].split('--')[0].toLowerCase() : null
 }
 async function fetchPageId(url) {
+  // --selftest only: a JSON map of url → page html (null = 404), so the identity rules run
+  // against fixed pages with no network.
+  if (process.env.GK_PREPARE_SELFTEST_PAGES) {
+    const html = JSON.parse(readFileSync(process.env.GK_PREPARE_SELFTEST_PAGES, 'utf8'))[url]
+    if (html == null) return { id: null, why: 'page HTTP 404' }
+    const id = idFromPage(html)
+    return { id, why: id ? null : 'page carries no single id' }
+  }
   if (process.env.GK_PREPARE_OFFLINE === '1') return { id: null, why: 'offline' }
   const slug = eventSlug(url)
   if (!slug) return { id: null, why: 'url is not a gisekibris.com event page' }
@@ -226,39 +235,14 @@ async function fetchPageId(url) {
 
 const stripToken = url => (typeof url === 'string' ? url.split('?')[0] : null)
 
-// ─── Rebuild a ticket url the feed sent WITHOUT its id ──────────────────────
+// ─── ticket_url is stored AS SENT (2026-11-25) ──────────────────────────────
 //
-// The live feed emits one row whose url is slug-only, and THAT URL 404s:
-//   feed sends  /etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915   -> 404
-//   canonical   /etkinlikler/sener-sen-zengin-mutfagi--cmrxgkhys00006dpe19d8kiuh
-//                                                                            -> 200
-// Measured 2026-09-24, both forms, with and without the affiliate code.
-//
-// Storing what the partner sent would put a DEAD link on a LIVE event: the page
-// resolves fine by its canonical url and reports isCancelled=false. The next step
-// in the pipeline would then null it, and the row would LOSE a Buy Ticket link it
-// has today — a regression produced by trusting a field we can see is broken.
-//
-// So when the url carries no id and we have one from the image path, the id is
-// appended in the partner's own canonical form. This is reconstruction, not
-// invention: the slug and the id are both theirs, and only the id half routes on
-// their site (a wrong slug still resolves), which is the same property that makes
-// a stored link survive a title edit.
-//
-// The query string is preserved — that is where the affiliate code lives.
-//
-// ⚠ Nothing here is trusted on its own: check-gisekibris-urls.mjs probes every url
-//   afterwards and nulls whatever does not resolve, so a reconstruction that
-//   guessed wrong is caught rather than shipped.
-function canonicalTicketUrl(rawUrl, id) {
-  if (typeof rawUrl !== 'string' || !rawUrl || !id) return rawUrl ?? null
-  let u
-  try { u = new URL(rawUrl) } catch { return rawUrl }
-  const seg = u.pathname.replace(/\/+$/, '').split('/').pop() ?? ''
-  if (seg.includes('--')) return rawUrl                       // already canonical
-  u.pathname = `${u.pathname.replace(/\/+$/, '')}--${id}`
-  return u.toString()
-}
+// This used to append '--<id>' to a slug-only url (ŞENER ŞEN, 2026-09-24, whose slug-only
+// url 404'd then). That id came from the image path, and repeat sessions reuse the first
+// session's banner, so the link it built opened the OLDER session. Slug-only urls now
+// resolve 200 on their site and are kept exactly as sent, ?code= affiliate param included.
+// A slug-only url that 404s is nulled by check-gisekibris-urls.mjs (no Buy Ticket button),
+// never repaired with a guessed id.
 
 // ─── Turkish-aware case fold, for the CATEGORY lookup only ──────────────────
 //
@@ -341,8 +325,9 @@ if (selftest) {
   t('Firebase events-v2%2F',  idFromImage('https://firebasestorage.googleapis.com/v0/b/x/o/events-v2%2FKuUoVfqsF3pXjQNzYszB%2Fbanner.png?alt=media'), 'KuUoVfqsF3pXjQNzYszB')
   t('url with --ID and ?code', idFromUrl('https://www.gisekibris.com/etkinlikler/x--AbC123?code=AF1'), 'AbC123')
   t('url WITHOUT an id (ŞENER ŞEN)', idFromUrl('https://www.gisekibris.com/etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915'), null)
-  // The row that forced the fallback must land on its EXISTING external_id.
-  t('ŞENER ŞEN falls back to the stored id',
+  // Image ids are still extracted (cross-check, and the hold on a skipped row), but a
+  // slug-only url is identified by its page: see the borrowed-banner cases below.
+  t('image id extracted (cuid form)',
     'gk-' + idFromImage('https://img-cdn.gisekibris.com/event/cmrxgkhys00006dpe19d8kiuh/banner.jpg'),
     'gk-cmrxgkhys00006dpe19d8kiuh')
 
@@ -393,15 +378,62 @@ if (selftest) {
     rmSync(dir, { recursive: true, force: true })
   }
 
-  console.log('\n  ticket url reconstruction')
-  t('slug-only url gains the id, keeps ?code',
-    canonicalTicketUrl('https://www.gisekibris.com/etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915', 'cmrxgkhys00006dpe19d8kiuh'),
-    'https://www.gisekibris.com/etkinlikler/sener-sen-zengin-mutfagi--cmrxgkhys00006dpe19d8kiuh?code=AF1727004770915')
-  t('a url that already has an id is untouched',
-    canonicalTicketUrl('https://www.gisekibris.com/etkinlikler/x--AbC123?code=AF1', 'AbC123'),
-    'https://www.gisekibris.com/etkinlikler/x--AbC123?code=AF1')
-  t('affiliate code survives reconstruction',
-    canonicalTicketUrl('https://www.gisekibris.com/etkinlikler/y?code=AF1727004770915', 'ZZZ').includes('code=AF1727004770915'), true)
+  // 2026-11-25: repeat sessions reuse the FIRST session's banner, so /event/<id>/ in the
+  // image names another session. Live: bir-ihtimal-kabare-7aralik (page id cmwncx16f…)
+  // carried bir-ihtimal-kabare-3's banner (pTvx…), took over that row and linked to it.
+  console.log('\n  repeat sessions with a borrowed banner (page id wins, link as sent)')
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'gk-prepare-'))
+    const rawFile = join(dir, 'raw.json'), outFile = join(dir, 'clean.json'), pagesFile = join(dir, 'pages.json')
+    const P = 'https://www.gisekibris.com/etkinlikler/'
+    const BANNER = 'https://img-cdn.gisekibris.com/event/pTvxB7NxtGCRMjLNyMc9/banner-1.jpg'
+    const row = (o) => ({ venue: 'Cage Club', city: 'Girne', category: 'Sahne',
+      startdate: '2026-12-07T18:00:00.000Z', enddate: null, description: { tr: 'x' }, ...o })
+    writeFileSync(pagesFile, JSON.stringify({
+      [`${P}bir-ihtimal-kabare-3?code=AF1`]:       '{"slug":"bir-ihtimal-kabare-3","id":"pTvxB7NxtGCRMjLNyMc9"}',
+      [`${P}bir-ihtimal-kabare-7aralik?code=AF1`]: '{"slug":"bir-ihtimal-kabare-7aralik","id":"cmwncx16f009ecxtvh9z9n1mm"}',
+      [`${P}i-m-not-okay-2-aralik?code=AF1`]:      '{"slug":"i-m-not-okay-2-aralik","id":"cmwt52g9b026ecxhtlg66sd1l"}',
+      [`${P}page-down?code=AF1`]:                  null,
+    }))
+    writeFileSync(rawFile, JSON.stringify([
+      row({ name: 'KABARE 3',   image: BANNER, url: `${P}bir-ihtimal-kabare-3?code=AF1`, startdate: '2026-11-23T18:00:00.000Z' }),
+      row({ name: 'KABARE 7',   image: BANNER, url: `${P}bir-ihtimal-kabare-7aralik?code=AF1` }),
+      // Lone borrowed banner: the session that owns it has already left the feed.
+      row({ name: 'NOT OKAY 2', image: 'https://img-cdn.gisekibris.com/event/cmwkl4z0d013qecqb8aweqe2y/banner-2.jpg', url: `${P}i-m-not-okay-2-aralik?code=AF1` }),
+      row({ name: 'PAGE DOWN',  image: 'https://img-cdn.gisekibris.com/event/Lone2222222222222222/banner-3.jpg', url: `${P}page-down?code=AF1` }),
+    ]))
+    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), rawFile, '--out', outFile],
+      { encoding: 'utf8', env: { ...process.env, GK_PREPARE_OFFLINE: '1', GK_PREPARE_SELFTEST_PAGES: pagesFile } })
+    const out = existsSync(outFile) ? JSON.parse(readFileSync(outFile, 'utf8')) : null
+    const ev = name => out?.events?.find(e => e.title === name)
+    t('exit 0',                                   r.status, 0)
+    t('first session keeps its own id',           ev('KABARE 3')?.external_id, 'gk-pTvxB7NxtGCRMjLNyMc9')
+    t('repeat session: page id, not banner id',   ev('KABARE 7')?.external_id, 'gk-cmwncx16f009ecxtvh9z9n1mm')
+    t('repeat session is not a "duplicate"',      out?.meta?.skipped?.some(s => s.title === 'KABARE 7'), false)
+    t('repeat session link: as sent, no id added', ev('KABARE 7')?.ticket_url, `${P}bir-ihtimal-kabare-7aralik?code=AF1`)
+    t('lone borrowed banner: page id wins',       ev('NOT OKAY 2')?.external_id, 'gk-cmwt52g9b026ecxhtlg66sd1l')
+    t('lone borrowed banner: link as sent',       ev('NOT OKAY 2')?.ticket_url, `${P}i-m-not-okay-2-aralik?code=AF1`)
+    t('no row carries a borrowed id',             out?.events?.some(e => e.external_id === 'gk-cmwkl4z0d013qecqb8aweqe2y'), false)
+    const down = out?.meta?.skipped?.find(s => s.title === 'PAGE DOWN')
+    t('page lookup fails: row skipped',           !!down && !ev('PAGE DOWN'), true)
+    t('…never keyed on the banner id',            down?.external_id ?? null, null)
+    t('…banner id kept only as a hold',           down?.also_external_id, 'gk-Lone2222222222222222')
+    if (r.status !== 0) console.log(r.stderr)
+    rmSync(dir, { recursive: true, force: true })
+  }
+
+  console.log('\n  ticket url: as sent')
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'gk-prepare-'))
+    const rawFile = join(dir, 'raw.json'), outFile = join(dir, 'clean.json')
+    const U = 'https://www.gisekibris.com/etkinlikler/x--AbC1234567890123456?code=AF1'
+    writeFileSync(rawFile, JSON.stringify([{ name: 'AS SENT', venue: 'Cage Club', city: 'Girne', category: 'Konser',
+      startdate: '2026-12-01T18:00:00.000Z', enddate: null, description: { tr: 'x' },
+      image: 'https://img-cdn.gisekibris.com/event/AbC1234567890123456/banner.jpg', url: U }]))
+    spawnSync(process.execPath, [fileURLToPath(import.meta.url), rawFile, '--out', outFile], { encoding: 'utf8', env: { ...process.env, GK_PREPARE_OFFLINE: '1' } })
+    t('url with an id is stored byte-for-byte', existsSync(outFile) && JSON.parse(readFileSync(outFile, 'utf8')).events[0].ticket_url, U)
+    rmSync(dir, { recursive: true, force: true })
+  }
 
   console.log('\n  whitespace')
   t('six trailing tabs are trimmed', nfc('Grand Opera Hotel Girne\t\t\t\t\t\t').trim(), 'Grand Opera Hotel Girne')
@@ -422,10 +454,12 @@ if (!Array.isArray(feed) || !feed.length) {
   fail(`${rawPath}: expected a non-empty array of events (or {events:[…]}).`)
 }
 
-// Page lookups first, only for rows with no id in url or image (few; 4 at a time).
+// Page lookups first, for EVERY row whose url carries no id (4 at a time). The image id
+// is not enough on its own there: repeat sessions reuse the first session's banner.
+const slugOnly = ev => ev && typeof ev === 'object' && !Array.isArray(ev) && !idFromUrl(ev.url) && !!ev.url
 const pageIds = new Map()
 {
-  const need = feed.map((ev, i) => ({ ev, i })).filter(({ ev }) => ev && typeof ev === 'object' && !idFromUrl(ev.url) && !idFromImage(ev.image) && ev.url)
+  const need = feed.map((ev, i) => ({ ev, i })).filter(({ ev }) => slugOnly(ev))
   for (let k = 0; k < need.length; k += 4) {
     const batch = need.slice(k, k + 4)
     const got = await Promise.all(batch.map(({ ev }) => fetchPageId(ev.url)))
@@ -439,10 +473,9 @@ const unmapped = new Map()
 const idSources = []
 const seenId = new Map()
 
-// Two passes: rows identified by url/image first, then rows identified only by their page.
-// A page id that collides with any other row loses (skipped), never the url/image row.
-const fromPageOnly = ev => ev && typeof ev === 'object' && !idFromUrl(ev.url) && !idFromImage(ev.image)
-const order = [...feed.keys()].sort((a, b) => fromPageOnly(feed[a]) - fromPageOnly(feed[b]))
+// Two passes: rows whose url carries the id first, then rows identified by their page.
+// A page id that collides with a url-identified row loses (skipped), never the url row.
+const order = [...feed.keys()].sort((a, b) => slugOnly(feed[a]) - slugOnly(feed[b]))
 order.forEach(i => {
   const ev = feed[i]
   if (!ev || typeof ev !== 'object' || Array.isArray(ev)) {
@@ -455,47 +488,54 @@ order.forEach(i => {
   const skip = (reason, externalId = null, extra = {}) =>
     skipped.push({ external_id: externalId, title: cleanTitle(ev.name) || '(untitled)', position: i + 1, reason, ...extra })
 
-  // ── IDENTITY, AND THE ONE ROW THAT FORCED A FALLBACK ──────────────────────
+  // ── IDENTITY ───────────────────────────────────────────────────────────────
   //
-  // url → image path → event page. The image path became a fallback because the
-  // live feed had a row whose url carries no id at all:
+  // url id → (slug-only url) the event page's id → (no url at all) the image id.
+  // An id invented for a row (a slug, a hash, a counter) would mint a NEW external_id
+  // and insert a duplicate beside the original: the content-hash identity 20260831
+  // removed. Where url and image both carry an id they must agree, else the row is
+  // skipped. The run prints the per-row id source so a drift across many rows shows.
   //
-  //   ŞENER ŞEN - ZENGİN MUTFAĞI
-  //     url   .../etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915
-  //     image .../event/cmrxgkhys00006dpe19d8kiuh/banner.jpg
+  // History: 2026-09-24 the image id became the fallback for a slug-only url (ŞENER ŞEN,
+  // whose image carried its own id). 2026-11-14 new images (event_images/banner-<ts>-…)
+  // stopped carrying ids, so the page lookup was added for rows with neither.
   //
-  // WHY THE IMAGE PATH IS THE RIGHT FALLBACK, AND HOW THAT WAS VERIFIED RATHER
-  // THAN ASSUMED: that row already exists in the database as
-  // `gk-cmrxgkhys00006dpe19d8kiuh`, because the FILE DROP's url did carry
-  // `--cmrxgkhys00006dpe19d8kiuh`. The partner dropped the suffix from the url and
-  // kept the same object id in the image path, so deriving from the image
-  // reproduces the stored external_id byte-for-byte and the row UPDATES.
-  //
-  // An id invented for this row — a slug, a hash, a counter — would mint a NEW
-  // external_id, insert a duplicate alongside the original, and (for anything
-  // derived from mutable content) mint a different one again on the next fetch.
-  // That is the content-hash identity 20260831 removed; it is not coming back.
-  //
-  // Where url and image both carry an id they must agree, else the row is skipped.
-  // The run prints the per-row id source so a drift across many rows is visible.
-  // 2026-11-14: new images (event_images/banner-<ts>-<hash>.jpg) carry no id, so a
-  // url-only row is now normal, and a row with neither is looked up on its own page.
+  // 2026-11-25: A SLUG-ONLY URL IS IDENTIFIED BY ITS PAGE, NEVER BY THE IMAGE ALONE.
+  // Repeat sessions reuse the FIRST session's banner, so /event/<id>/ names another
+  // session (bir-ihtimal-kabare-7aralik carried bir-ihtimal-kabare-3's id). Trusting it
+  // took over that row's date and link, and the sessions sharing a banner collided as
+  // "duplicates". The page wins; a failed lookup skips the row and keeps the image id
+  // only as a hold (also_external_id), so the sweep leaves the existing row alone.
   if (urlId && imgId && urlId !== imgId) {
     // Both ids are kept so the sweep holds either row (heldIds reads also_external_id).
     return skip(`id disagreement — url says "${urlId}", image path says "${imgId}"`, `gk-${urlId}`, { also_external_id: `gk-${imgId}` })
   }
-  const rawId = urlId ?? imgId ?? page?.id ?? null
-  if (!rawId) {
-    return skip(`no event id in url, image path or event page (${page?.why ?? 'no url to look up'})`)
+  let rawId, idSource
+  if (urlId) {
+    rawId = urlId
+    idSource = imgId ? 'url+image' : 'url-only'
+  } else if (ev.url) {
+    if (!page?.id) {
+      return skip(`url carries no id and its event page gave none (${page?.why ?? 'not looked up'})`, null,
+        imgId ? { also_external_id: `gk-${imgId}` } : {})
+    }
+    rawId = page.id
+    idSource = imgId && imgId !== page.id ? 'page, banner borrowed' : 'page'
+  } else {
+    rawId = imgId
+    idSource = 'image-only'
   }
-  const idSource = urlId && imgId ? 'url+image' : urlId ? 'url-only' : imgId ? 'image-only' : 'page'
+  if (!rawId) {
+    return skip('no event id in url or image path, and no url to look up')
+  }
   if (!/^[A-Za-z0-9]+$/.test(rawId)) {
     return skip(`id is not alphanumeric: ${JSON.stringify(rawId)}`)
   }
 
   const externalId = `gk-${rawId}`
   if (seenId.has(externalId)) {
-    return skip(`duplicate id — also used by "${seenId.get(externalId)}"${idSource === 'page' ? ' (the event-page lookup loses)' : ''}`, idSource === 'page' ? null : externalId)
+    const fromPage = idSource.startsWith('page')
+    return skip(`duplicate id — also used by "${seenId.get(externalId)}"${fromPage ? ' (the event-page lookup loses)' : ''}`, fromPage ? null : externalId)
   }
   seenId.set(externalId, cleanTitle(ev.name))
 
@@ -548,10 +588,10 @@ order.forEach(i => {
     description_en:   descEn || null,
     is_tba:           descTr === 'TBA',
     source_image_url: stripToken(ev.image),
-    // The full URL. Only the id half after '--' routes on their site — a wrong slug
-    // still resolves — so a later title edit on their side cannot break this link.
-    // check-gisekibris-urls.mjs probes every one of these and NULLs any that fail.
-    ticket_url:       canonicalTicketUrl(ev.url, rawId),
+    // Stored exactly as the partner sent it (?code= affiliate param included). Never an id
+    // appended: for a slug-only url that id came from the image and could be another
+    // session's. check-gisekibris-urls.mjs probes every one and NULLs any that fail.
+    ticket_url:       ev.url || null,
     latitude:         null,   // filled at import from scripts/gisekibris-venues.json
     longitude:        null,
     source:           SOURCE,
@@ -592,10 +632,10 @@ const seed = {
     skipped,
     notes: [
       'Generated by scripts/prepare-gisekibris-feed.mjs — do not hand-edit.',
-      "external_id = 'gk-' + the partner's own event id: the last '--' segment of their url, else the /event/<id>/ (or events-v2/<id>/) image path, else the single id embedded in the event's own page. url and image are cross-checked where both exist. Ids are not fixed-width (20-char Firestore, 25-char cuid), so no length is assumed.",
+      "external_id = 'gk-' + the partner's own event id: the last '--' segment of their url; for a slug-only url, the single id embedded in the event's own page (never the image id: repeat sessions reuse the first session's banner); the /event/<id>/ (or events-v2/<id>/) image path only for a row with no url. url and image are cross-checked where both carry an id. Ids are not fixed-width (20-char Firestore, 25-char cuid), so no length is assumed.",
       'Titles are NFC-normalised with internal whitespace runs collapsed; 20 of the raw names carry doubled or trailing spaces.',
       'Descriptions stripped from HTML to plain text, NFC-normalised. Paragraph breaks kept as blank lines.',
-      'ticket_url is the partner event page. Only the id half after the final \'--\' routes on their site, so a title edit on their side does not break the link. Any URL that failed to resolve was set to null by scripts/check-gisekibris-urls.mjs — the app hides the Buy Ticket button when it is null.',
+      'ticket_url is the partner event page exactly as the feed sent it (affiliate ?code= kept); no id is ever appended. Any URL that failed to resolve was set to null by scripts/check-gisekibris-urls.mjs — the app hides the Buy Ticket button when it is null.',
       'latitude/longitude are null here; the import fills them from scripts/gisekibris-venues.json.',
       'start_date/end_date are true UTC. TRNC is UTC+3 (EEST). Render in device locale.',
       'source_image_url query strings (?alt=media&token=) stripped — this repo is public and those are Gise Kibris access tokens. The stripped path is still re-fetchable: their bucket allows public reads, and the import appends ?alt=media before downloading (without it Firebase returns object metadata JSON, not the image). Rows imported before this seed existed still hold the full tokenised URL in the database; the import will not downgrade them.',
@@ -635,8 +675,10 @@ for (const u of unmapped.values()) {
 // before it is the whole feed.
 const bySource = s => idSources.filter(r => r.source === s)
 console.log(`  external_id source: ${bySource('url+image').length} url+image (cross-checked), ` +
-  `${bySource('url-only').length} url-only, ${bySource('image-only').length} image-only, ${bySource('page').length} from event page`)
-for (const r of [...bySource('image-only'), ...bySource('page')]) console.log(`      ${r.source}: ${r.external_id}  ${r.title}`)
+  `${bySource('url-only').length} url-only, ${bySource('image-only').length} image-only, ` +
+  `${bySource('page').length + bySource('page, banner borrowed').length} from event page ` +
+  `(${bySource('page, banner borrowed').length} with another session's banner)`)
+for (const r of [...bySource('image-only'), ...bySource('page'), ...bySource('page, banner borrowed')]) console.log(`      ${r.source}: ${r.external_id}  ${r.title}`)
 console.log(`  ${String(skipped.length).padStart(4)}  skipped (see ::warning:: lines above)`)
 console.log('')
 console.log('  Next: node scripts/check-gisekibris-urls.mjs --apply')

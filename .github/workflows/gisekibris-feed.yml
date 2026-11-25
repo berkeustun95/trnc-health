@@ -267,19 +267,22 @@ jobs:
             jq '{skipped: (.meta.skipped // []), feed_cancelled: (.meta.feed_cancelled // [])}' "$seed" > "$rep"
           fi
           # gsub defuses @mentions in partner titles (a zero-width space after the @).
-          list=$(jq -r '
+          # WRONG LINK rows stay imported with ticket_url nulled; read from the seed, since
+          # check-gisekibris-urls.mjs --apply writes meta.slug_mismatch there.
+          list=$(jq -r --slurpfile s "$seed" '
             def live: if .in_app == true then " — **LIVE IN APP**" elif .in_app == false then "" else " — (live status not read)" end;
             ([.feed_cancelled[] | "- CANCELLED on Gişe Kıbrıs: \(.title) (`\(.external_id)`, \(.start_date[0:10]))" + live]
-             + [.skipped[] | "- SKIPPED: \(.title)" + (if .external_id then " (`\(.external_id)`)" else "" end) + " — \(.reason)" + live])
+             + [.skipped[] | "- SKIPPED: \(.title)" + (if .external_id then " (`\(.external_id)`)" else "" end) + " — \(.reason)" + live]
+             + [($s[0].meta.slug_mismatch // [])[] | "- WRONG LINK (Buy Ticket hidden): \(.title) (`\(.external_id)`, \(.start_date[0:10])) — \(.why); opened \(.landed)"])
             | join("\n") | gsub("@"; "@\u200b")' "$rep")
           title='Gişe Kıbrıs: rows need a decision'
           num=$(gh issue list --state open --limit 200 --json number,title,author | jq -r --arg t "$title" '[.[] | select(.title == $t and .author.login == "app/github-actions")][0].number // empty')
           if [ -z "$list" ]; then
-            [ -z "$num" ] || gh issue close "$num" --comment 'No skipped or cancelled rows in the latest sync.'
+            [ -z "$num" ] || gh issue close "$num" --comment 'No skipped, cancelled or wrong-link rows in the latest sync.'
             echo "Nothing held."; exit 0
           fi
           body=$(printf '%s\n\n%s\n\n%s\n' \
-            "The latest sync left these rows out. Nothing was cancelled automatically: a row marked LIVE IN APP is still showing and needs a decision." \
+            "The latest sync left these rows out or hid their link. Nothing was cancelled automatically: a row marked LIVE IN APP is still showing and needs a decision. A WRONG LINK row is imported without its Buy Ticket button because its link opened another event." \
             "$list" \
             "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
           printf '%s\n' "$list" >> "$GITHUB_STEP_SUMMARY"
