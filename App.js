@@ -3318,6 +3318,7 @@ export default function App() {
 
         {activeTab === 'home' && (
           <HomeScreen
+            retryCount={retryCount}
             dutyWindows={dutyWindows}
             backRef={homeBackRef}
             tabResetRef={homeTabResetRef}
