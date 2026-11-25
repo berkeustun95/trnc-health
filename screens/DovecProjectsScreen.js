@@ -3,6 +3,7 @@ import { View, FlatList, StyleSheet, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenHeader, PageCanvas, CardSkeleton, EmptyState, ErrorState } from '../components/ui'
 import DovecLogo from '../components/dovec/DovecLogo'
+import { DOVEC_LOGO_HEIGHT_LIST } from '../constants/dovec'
 import DovecProjectCard from '../components/dovec/DovecProjectCard'
 import DovecEnquiryForm from '../components/dovec/DovecEnquiryForm'
 import DovecThankYou from '../components/dovec/DovecThankYou'
@@ -92,7 +93,7 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
 }
 
 const Gap = () => <View style={{ height: 12 }} />
-const LogoHeader = () => <DovecLogo variant="navy" height={32} />
+const LogoHeader = () => <DovecLogo variant="navy" height={DOVEC_LOGO_HEIGHT_LIST} />
 
 const s = StyleSheet.create({
   safe: { flex: 1 },

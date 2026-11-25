@@ -88,7 +88,7 @@ export default function SearchModal({
     // searchMatch folds BOTH sides, so "turkiye" finds Türkiye and "Kıbrıs" typed on a
     // Turkish keyboard finds an entry stored as "Kibris". Folding one side only matches
     // in one direction, which is worse than not folding because it looks like it works.
-    return options.filter(o => searchMatch(o.label, q))
+    return options.filter(o => searchMatch(o.search ?? o.label, q))
   }, [options, q, searchable])
 
   // ─── POSITION FIRST, THEN HEIGHT ──────────────────────────────────────────

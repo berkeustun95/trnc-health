@@ -9,6 +9,7 @@
 //   for every user of an app whose whole purpose is helping newcomers is exactly the
 //   wrong default.
 import { COUNTRY_NAMES } from './countryNames.js'
+import { searchMatch } from '../utils/searchFold.js'
 
 export const COUNTRY_CODES = [
   { code: '+90',  region: 'TR', label: 'Turkey' },
@@ -39,12 +40,18 @@ export const COUNTRY_CODES = [
   { code: '+61',  region: 'AU', label: 'Australia' },
 ]
 
+const trNames = c => [].concat(c.region).map(r => COUNTRY_NAMES.Turkish?.[r] ?? '').join(' ')
+
 // Picker options in the app language: '<code>  <name>'. Only the label is translated (names from the generated static table,
 // scripts/gen-country-names.mjs; no Intl at runtime). English and any language without a table keep the English label.
 export function countryCodeOptions(lang) {
   const names = COUNTRY_NAMES[lang]
   return COUNTRY_CODES.map(c => {
     const name = names ? [].concat(c.region).map(r => names[r]).join(' / ') : c.label
-    return { value: c.code, label: `${c.code}  ${name}` }
+    return { value: c.code, label: `${c.code}  ${name}`, search: `${c.code} ${c.code.slice(1)} ${name} ${c.label} ${trNames(c)}` }
   })
 }
+
+// Phone-code picker search: the dial code with or without '+', the name in the app language, the English name and the Turkish name, folded for
+// case and diacritics (utils/searchFold). SearchModal reads option.search when present; other pickers still match the label.
+export const countryCodeMatches = (option, query) => searchMatch(option.search ?? option.label, query)

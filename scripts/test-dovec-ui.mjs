@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   dovecShown, formatGbp, deliveryLabel, placeLine, galleryUrls, unitTypes, composePhone, validateEnquiry,
-  buildLeadPayload, requestIdFor, classifyLead, OUTCOME_KEY, dovecWaUrl, dovecWaText, dovecMapsUrl, DOVEC_CONSENT_VERSION, DOVEC_LOGO,
+  buildLeadPayload, requestIdFor, classifyLead, OUTCOME_KEY, dovecWaUrl, dovecWaText, dovecMapsUrl, DOVEC_CONSENT_VERSION, DOVEC_LOGO_HEIGHT_LIST, DOVEC_LOGO_HEIGHT_DETAIL,
   unitTypeKey, unitTypeLabel, dovecWaAppUrl, privacyUrlFor, dovecCanSend,
 } from '../constants/dovec.js'
 import { t } from '../constants/i18n.js'
@@ -147,11 +147,11 @@ eq('coordinate 0 is a number, kept', dovecMapsUrl({ latitude: 0, longitude: 0 })
 check('detail screen gates the maps button on dovecMapsUrl', /dovecMapsUrl\(project\)/.test(read('screens/DovecProjectScreen.js')) && /!!mapsUrl &&/.test(read('screens/DovecProjectScreen.js')))
 check('loadDovec selects latitude and longitude', /latitude, longitude/.test(read('utils/loadDovec.js')))
 
-// source guards: no contact before the form; the logo slot is empty until delivered
+// source guards: no contact before the form; logo heights come from constants
 const detail = read('screens/DovecProjectScreen.js'), list = read('screens/DovecProjectsScreen.js')
 check('no call / WhatsApp / contact logging on the list or project screens', ![detail, list].some(s => /wa\.me|tel:|logContactEvent|dovecWa|Linking\.openURL\(`/.test(s)))
 check('WhatsApp only on the thank-you component, behind whatsapp_e164', /logContactEvent\('dovec', project\.entity_uuid, 'whatsapp'\)/.test(read('components/dovec/DovecThankYou.js')) && /whatsapp \? dovecWaUrl/.test(read('components/dovec/DovecThankYou.js')))
-check('logo hook is empty (no asset yet)', DOVEC_LOGO === null)
+check('logo heights are set per screen and used by both screens', DOVEC_LOGO_HEIGHT_LIST > 0 && DOVEC_LOGO_HEIGHT_DETAIL > 0 && /DOVEC_LOGO_HEIGHT_LIST/.test(list) && /DOVEC_LOGO_HEIGHT_DETAIL/.test(detail))
 
 // ─── round 2 ─────────────────────────────────────────────────────────────────
 // unit type labels: display only, the payload keeps the feed's own string

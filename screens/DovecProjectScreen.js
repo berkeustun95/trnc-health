@@ -6,7 +6,7 @@ import DovecLogo from '../components/dovec/DovecLogo'
 import { Cover, StatusChip, fromPriceText, unitsText } from '../components/dovec/DovecProjectCard'
 import { colors, type, radii, press } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, unitTypeLabel, dovecMapsUrl } from '../constants/dovec'
+import { formatGbp, placeLine, deliveryLabel, galleryUrls, unitTypes, unitTypeLabel, dovecMapsUrl, DOVEC_LOGO_HEIGHT_DETAIL } from '../constants/dovec'
 
 // One Döveç project. ADA owns the frame; the project's name, photos, text and prices are Döveç's own data, shown as synced.
 // Deliberately NO Call / WhatsApp here: contact starts with the enquiry form (WhatsApp appears on its thank-you screen).
@@ -29,7 +29,7 @@ export default function DovecProjectScreen({ project, lang, onEnquire }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}>
         <Cover url={project.cover_url} width={width} />
         <View style={s.body}>
-          <DovecLogo variant="navy" height={36} />
+          <DovecLogo variant="navy" height={DOVEC_LOGO_HEIGHT_DETAIL} />
           <StatusChip status={project.status} lang={lang} />
           <Text style={s.title} accessibilityRole="header">{project.name}</Text>
           {!!place && (
