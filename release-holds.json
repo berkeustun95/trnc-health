@@ -291,6 +291,14 @@
       "since": "2026-11-25",
       "cleared": false,
       "clear": "Only after Berke's go in chat. Must be on main before any production OTA that carries #589. The commit is this PR's first commit (merge commit, not squash)."
+    },
+    {
+      "pr": 594,
+      "commit": "0649b26f814dd1d5034e51760669292b1dc894b1",
+      "what": "LiveStrip duty card keeps borderWidth 0 (Android NaN clip, same bug as #592); V2 Home strip",
+      "since": "2026-11-25",
+      "cleared": false,
+      "clear": "Only after Berke's go in chat for the combined audit-fix Preview. Then set cleared to true in a PR. The commit is this PR's first commit (merge commit, not squash)."
     }
   ]
 }
