@@ -30,6 +30,9 @@ const REQUIRED = [
   ['vehicle_images', 'storage_path', '20261165_vehicles.sql'],
   // 20261219 — App.js PROFILE_COLUMNS + ProfileScreen select: the age tick
   ['profiles', 'age_confirmed_at', '20261219_age_confirmed_at.sql'],
+  // 20261235 — utils/loadDovec.js: the privacy notice links (a missing column fails the whole dovec_settings select)
+  ['dovec_settings', 'privacy_url_tr', '20261235_dovec_privacy_url.sql'],
+  ['dovec_settings', 'privacy_url_en', '20261235_dovec_privacy_url.sql'],
 ]
 const PROD_REF = 'jeihxnwqytnxtytgkzgf'
 

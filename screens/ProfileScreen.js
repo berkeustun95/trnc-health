@@ -19,7 +19,7 @@ import { Button, ConfirmDialog, useTabBarFootprint, PageCanvas } from '../compon
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { t, dateLocale } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
-import { COUNTRY_CODES } from '../constants/countryCodes'
+import { COUNTRY_CODES, countryCodeOptions } from '../constants/countryCodes'
 import { monthNames } from '../constants/months'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import SearchModal from '../components/SearchModal'
@@ -834,7 +834,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const months = monthNames(lang)
   const natOptions = NATIONALITIES.map(v => ({ value: v, label: getNatLabel(v, lang) }))
     .sort((a, b) => a.label.localeCompare(b.label))
-  const ccOptions = COUNTRY_CODES.map(c => ({ value: c.code, label: `${c.code}  ${c.label}` }))
+  const ccOptions = countryCodeOptions(lang)
   const regionOptions = REGIONS.map(v => ({ value: v, label: t(REGION_LABEL_KEY[v], lang) }))
   const statusOptions = RESIDENT_STATUSES.map(v => ({ value: v, label: t(RESIDENT_STATUS_LABEL_KEY[v], lang) }))
   const levelOptions = STUDENT_LEVELS.map(v => ({ value: v, label: t(STUDENT_LEVEL_LABEL_KEY[v], lang) }))

@@ -48,6 +48,7 @@ import { t } from '../constants/i18n'
 export default function SearchModal({
   lang,   // only for the close button's accessibilityLabel
   visible, title, searchPlaceholder, options, value, searchable, onSelect, onClose,
+  closeLabel,   // optional: overrides the close button's accessibilityLabel
   onClear,   // optional: adds a "Temizle" row above the list while a value is set (optional fields only)
 }) {
   const [q, setQ] = useState('')
@@ -87,7 +88,7 @@ export default function SearchModal({
     // searchMatch folds BOTH sides, so "turkiye" finds Türkiye and "Kıbrıs" typed on a
     // Turkish keyboard finds an entry stored as "Kibris". Folding one side only matches
     // in one direction, which is worse than not folding because it looks like it works.
-    return options.filter(o => searchMatch(o.label, q))
+    return options.filter(o => searchMatch(o.search ?? o.label, q))
   }, [options, q, searchable])
 
   // ─── POSITION FIRST, THEN HEIGHT ──────────────────────────────────────────
@@ -158,7 +159,7 @@ export default function SearchModal({
         <View style={[s.modalCard, { maxHeight: cardMaxHeight }]}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>{title}</Text>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => { Keyboard.dismiss(); onClose() }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={closeLabel || t('uiClose', lang)} onPress={() => { Keyboard.dismiss(); onClose() }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="x" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
