@@ -33,12 +33,12 @@ async function finishRun(supabase: any, id: number | null, fields: Record<string
 }
 
 serve(async (req) => {
-  const runStartMs = Date.now()
   const caller = await serviceCaller(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
   if (!caller) {
     console.error('send-weekend-digest: caller refused')
     return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
   }
+  const runStartMs = Date.now()
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   let testersOnly = false
   try { testersOnly = (await req.json())?.testers_only === true } catch { /* empty body = the weekly run */ }
