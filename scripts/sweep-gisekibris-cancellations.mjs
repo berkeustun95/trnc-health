@@ -17,6 +17,8 @@
 // A dead link NEVER cancels: decide() is unchanged and a 404 is still 'unknown' there.
 // --null-dead-links hides the button (ticket_url only, never status), capped at
 // MAX_NULL; without it the scheduled run only reports.
+// Limit: only rows with start_date >= now are read, so a row that has started but is
+// still listed (tonight's show, a multi-day run with end_date ahead) is not link-checked.
 //
 // Runs LAST in the daily pipeline, after fetch → prepare → check-urls → import.
 //
@@ -408,7 +410,9 @@ if (!toCancel.length) { console.log('\n  Nothing to cancel.\n'); process.exit(0)
 const share = toCancel.length / Math.max(rows.length, 1)
 if (toCancel.length > MAX_CANCEL || share > MAX_SHARE) {
   console.error('')
-  console.error(`  ⛔ STOPPING — the cap refused this run. NOTHING WAS WRITTEN.`)
+  const nulled = report.dead_links.filter(e => e.nulled).length
+  console.error(`  ⛔ STOPPING — the cap refused this run. NO ROW WAS CANCELLED` +
+                (nulled ? ` (the ${nulled} dead-link null(s) above were written).` : '.'))
   console.error(`     would cancel ${toCancel.length} row(s); cap is ${MAX_CANCEL} absolute and ${Math.round(MAX_SHARE*100)}% of the`)
   console.error(`     ${rows.length} approved future-dated rows (this run: ${Math.round(share*100)}%).`)
   console.error('')
