@@ -156,8 +156,8 @@ test('loadProfile applies a result only for the newest call (sequence guard)', (
   expect(fn).toContain('const seq = ++profileLoadSeqRef.current')
   expect(fn).toContain('seq !== profileLoadSeqRef.current')
   // Final result: a session change drops everything; a superseded FAILURE is dropped before the failure is shown.
-  const sessionGuard = fn.indexOf("if (!isCurrent()) { plog('stale-drop', { seq }); return }")
-  const failGuard = fn.indexOf("if (superseded) { plog('stale-drop', { seq }); return }")
+  const sessionGuard = fn.indexOf('if (!isCurrent()) return')
+  const failGuard = fn.indexOf('if (superseded) return')
   expect(fn).toContain('const superseded = seq !== profileLoadSeqRef.current')
   expect(sessionGuard).toBeGreaterThan(-1)
   expect(failGuard).toBeGreaterThan(sessionGuard)
@@ -171,14 +171,12 @@ test('loadProfile applies a result only for the newest call (sequence guard)', (
 test('a superseded success is applied unless a profile is already held for that uid', () => {
   const start = at(src, 'async function loadProfile(', 'loadProfile')
   const fn = src.slice(start, at(src, '// Language self-heal', 'self-heal'))
-  const dropHeld = fn.indexOf("if (superseded && heldProfileUidRef.current === uid) { plog('stale-drop', { seq }); return }")
-  const apply = fn.indexOf("if (superseded) plog('stale-apply', { seq })")
-  const success = fn.indexOf("plog('success'")
+  const dropHeld = fn.indexOf('if (superseded && heldProfileUidRef.current === uid) return')
+  const apply = fn.indexOf('setProfileLoadFailedUid(null)')
   const setHeld = fn.indexOf('heldProfileUidRef.current = session.user.id')
   expect(dropHeld).toBeGreaterThan(fn.indexOf('showFailed(error)'))
   expect(apply).toBeGreaterThan(dropHeld)
-  expect(success).toBeGreaterThan(apply)
-  expect(setHeld).toBeGreaterThan(success)
+  expect(setHeld).toBeGreaterThan(apply)
   // No await between the held check and the held write, so a second success for the uid cannot run the writes twice.
   expect(fn.slice(dropHeld, setHeld)).not.toContain('await')
 })

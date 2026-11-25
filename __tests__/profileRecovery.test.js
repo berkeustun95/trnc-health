@@ -158,11 +158,12 @@ test('recovery without advancing timers: a Home read success asks for the missin
   await flush()
   expect(loadOnce).toHaveBeenCalledTimes(2)
 
-  const home = src.slice(at(src, "plog('read-start', { name: 'facilities' })", 'facilities'), at(src, 'let resolvedCoords = null', 'resolvedCoords'))
+  const home = src.slice(at(src, "from('facilities').select('*').order('name')", 'facilities'), at(src, 'let resolvedCoords = null', 'resolvedCoords'))
   const names = ['facilities', 'duty_schedule', 'reviews']
+  const anchors = ["from('facilities').select('*')", "from('duty_schedule').select('facility_id')", "from('reviews').select('facility_id, rating')"]
   names.forEach((name, i) => {
-    const from = at(home, `name: '${name}' })`, name)
-    const to = i + 1 < names.length ? at(home, `name: '${names[i + 1]}' })`, names[i + 1]) : home.length
+    const from = at(home, anchors[i], name)
+    const to = i + 1 < names.length ? at(home, anchors[i + 1], names[i + 1]) : home.length
     const part = home.slice(from, to)
     expect(part).toContain('profileRecoveryRef.current.homeReadOk(sessionRef.current)')
   })
