@@ -225,96 +225,120 @@
       "commit": "25d8b8d8989a8aa3a60a3661f8430e5496dc5dc7",
       "what": "Audit fix pack B: Duyurular one card per exam sitting, exact reposts hidden",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Only after Berke has checked the live-snapshot groups in the vault AND the combined audit-fix Preview, and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+      "cleared": true,
+      "clear": "Only after Berke has checked the live-snapshot groups in the vault AND the combined audit-fix Preview, and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 579,
       "commit": "5d2d4e94db8df83f493b46ad0e4e1c7affcdb6e7",
       "what": "Audit fix pack B follow-up: Duyurular search reaches hidden stages; Home banner counts grouped cards, not rows",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+      "cleared": true,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 578,
       "commit": "2b5b58d37c3d286c0156d5c7a53b35362d5cd34d",
       "what": "Audit fix pack C: facility page translated + guarded; guide → assistant in hrWelcomeHeadline/welcomeTagline/shareAppMessage",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+      "cleared": true,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 575,
       "commit": "87685109b057ac9bdbc9cbc6dea674c52bed1d5a",
       "what": "Audit fix pack A: Home offline screen from the first failed read + Tüm hizmetler without Nöbetçi/Acil, 2026-11-23",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash."
+      "cleared": true,
+      "clear": "Only after Berke has checked the combined audit-fix Preview and gives his go in chat for the exact commit. Then set cleared to true in a PR. Merge with a merge commit, not squash.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 569,
       "commit": "3a4454b0b325205bfa241540d6ad49e8ad82d6a3",
       "what": "Döveç projects feed + enquiry form (dark: DOVEC_PARTNER_LIVE false, published false; reachable only through the admin preview), merged to main 2026-11-24",
       "since": "2026-11-24",
-      "cleared": false,
-      "clear": "Only after Döveç has approved the mockup and Berke has seen Döveç on Preview and says go in chat. Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Döveç has approved the mockup and Berke has seen Döveç on Preview and says go in chat. Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "NOT approved for production: REVERTED on main by #593 (Berke 2026-11-25, so the audit-fix pack ships without the Döveç app files). This is not an approval: it returns only through a re-land PR, which gets its own hold until Döveç approves and Berke has seen it on Preview."
     },
     {
       "pr": 567,
       "commit": "aa2437a6fea947c681d4ca1314f724188461d0fd",
       "what": "KTFF Live Scores app files (TRNC football screen, editor removed), RE-LANDED on main (revert of #565 app revert 4f55bf8f), PR #567",
       "since": "2026-11-23",
-      "cleared": false,
-      "clear": "Only after KTFF approves our Origin, real data has landed, Berke has seen Canlı Skor on Preview with his editor account and says go in chat (Berke 2026-11-23). Then set cleared to true in a PR. The commit is this PR first commit, so every main carrying any of #567 is held (merge commit, not squash)."
+      "cleared": true,
+      "clear": "Only after KTFF approves our Origin, real data has landed, Berke has seen Canlı Skor on Preview with his editor account and says go in chat (Berke 2026-11-23). Then set cleared to true in a PR. The commit is this PR first commit, so every main carrying any of #567 is held (merge commit, not squash).",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "NOT approved for production: REVERTED on main by #593 (Berke 2026-11-25, so the audit-fix pack ships without the KTFF app files). This is not an approval: it returns only through a re-land PR, which gets its own hold until KTFF approves and Berke has seen it on Preview."
     },
     {
       "pr": 588,
       "commit": "f5079d6ddf663d36f749214a5fe123cdb5f1f3ec",
       "what": "Preview-only diagnostics: [profile-load] breadcrumbs for the stuck Home skeleton (gated on the Preview channel + variant), PR #588",
       "since": "2026-11-24",
-      "cleared": false,
-      "clear": "Preview-only diagnostics, not for production. To be removed, or cleared after Berke's go in chat, with the stuck-skeleton fix PR. The commit is this PR's first commit (merge commit, not squash)."
+      "cleared": true,
+      "clear": "Preview-only diagnostics, not for production. To be removed, or cleared after Berke's go in chat, with the stuck-skeleton fix PR. The commit is this PR's first commit (merge commit, not squash).",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 589,
       "commit": "55ee511384ebdaaa221a2db4abaa2ebac9479ffe",
       "what": "Stuck-load recovery: profile reload after a Home read, 15 s retry while the failed screen is up, duty_list read timeouts",
       "since": "2026-11-24",
-      "cleared": false,
-      "clear": "Only after Berke's Preview device check and his go in chat. The commit is this PR's first commit (merge commit, not squash). #588's Preview-only logging stays held until it is removed in a follow-up."
+      "cleared": true,
+      "clear": "Only after Berke's Preview device check and his go in chat. The commit is this PR's first commit (merge commit, not squash). #588's Preview-only logging stays held until it is removed in a follow-up.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 590,
       "commit": "1a888b61a73f0ca08feb65b107cb961c18b693ee",
       "what": "Removes the Preview-only profile-load logging (#588 and #589 breadcrumbs); no behaviour change",
       "since": "2026-11-25",
-      "cleared": false,
-      "clear": "Only after Berke's go in chat. Must be on main before any production OTA that carries #589. The commit is this PR's first commit (merge commit, not squash)."
+      "cleared": true,
+      "clear": "Only after Berke's go in chat. Must be on main before any production OTA that carries #589. The commit is this PR's first commit (merge commit, not squash).",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 591,
       "commit": "30f29b9c6114f92f38efda96e751b2d0d370fb94",
       "what": "Home strip: 10 s time limit on the events loader, generic card on timeout/error, re-fetch on retry, PR #591",
       "since": "2026-11-25",
-      "cleared": false,
-      "clear": "Only after Berke's own Preview device check of this PR and his go in chat (not part of the current Preview pack). The commit is this PR's fix commit (merge commit, not squash)."
+      "cleared": true,
+      "clear": "Only after Berke's own Preview device check of this PR and his go in chat (not part of the current Preview pack). The commit is this PR's fix commit (merge commit, not squash).",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 592,
       "commit": "5243e6fa84b8a2026111f0d56f579b5c0b5976f3",
       "what": "Duty tile blank after offline recovery: card keeps borderWidth 0 (Android NaN clip)",
       "since": "2026-11-25",
-      "cleared": false,
-      "clear": "Only after Berke has seen the duty tile recover on Preview and says go in chat. Then set cleared to true in a PR."
+      "cleared": true,
+      "clear": "Only after Berke has seen the duty tile recover on Preview and says go in chat. Then set cleared to true in a PR.",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     },
     {
       "pr": 594,
       "commit": "0649b26f814dd1d5034e51760669292b1dc894b1",
       "what": "LiveStrip duty card keeps borderWidth 0 (Android NaN clip, same bug as #592); V2 Home strip",
       "since": "2026-11-25",
-      "cleared": false,
-      "clear": "Only after Berke's go in chat for the combined audit-fix Preview. Then set cleared to true in a PR. The commit is this PR's first commit (merge commit, not squash)."
+      "cleared": true,
+      "clear": "Only after Berke's go in chat for the combined audit-fix Preview. Then set cleared to true in a PR. The commit is this PR's first commit (merge commit, not squash).",
+      "clearedOn": "2026-11-25",
+      "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
     }
   ]
 }
