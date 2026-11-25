@@ -1,4 +1,4 @@
-// 20261229 (dovec_projects) against the PGlite harness (PostgreSQL 18; prod is older, see supabase/CLAUDE.md).
+// 20261229 (dovec_projects), 20261233 and 20261235 (privacy URLs) against the PGlite harness (PostgreSQL 18; prod is older, see supabase/CLAUDE.md).
 // Seeds: auth.users, profiles (cascading from auth.users, as in prod), is_admin(). Says nothing about PostgREST or the real
 // profiles table's other triggers. The migration's own DO blocks are the policy assertions; this file adds what they cannot:
 // account deletion through the cascade, and red-first mutants proving the assertions can fail.
@@ -637,6 +637,86 @@ console.log('20261233 — mock-lead cleanup, on top of 20261229 + 20261231 (writ
     const p = mut(CSQL, from, to); if (!p) continue
     const got = (await scenarios(p))[scenario]
     t(`mutant "${name}": "${scenario}" goes red`, got, false)
+  }
+}
+
+console.log('20261235 — privacy notice URLs on dovec_settings, on top of 20261229 + 20261231')
+{
+  const PRIV = fileURLToPath(new URL('../supabase/migrations/20261235_dovec_privacy_url.sql', import.meta.url))
+  const PSQL = readFileSync(PRIV, 'utf8')
+  const TR = 'https://www.dovecgroup.com/tr/privacy-policy', EN = 'https://www.dovecgroup.com/en/privacy-policy'
+  const SEL = 'SELECT privacy_url_tr AS tr, privacy_url_en AS en FROM public.dovec_settings'
+  const vs = readFileSync(new URL('../supabase/verify_schema.sql', import.meta.url), 'utf8')
+  const h35 = vs.slice(vs.indexOf('-- 1235-BEGIN'), vs.indexOf('-- 1235-END'))
+  assertAnchor(h35.includes('20261235_dovec_privacy_url'), 'verify_schema 1235 token slice')
+  const tok35 = async d => (await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h35}`)).rows
+  const mutP = (from, to) => {
+    if (!PSQL.includes(from)) { bad++; console.log(`  ✗ mutant anchor missing: ${from.slice(0, 60)}`); return null }
+    const p = join(mkdtempSync(join(tmpdir(), 'dovec-')), 'm.sql')
+    writeFileSync(p, PSQL.replace(from, () => to))
+    return p
+  }
+
+  const { d, r: r0 } = await ready()
+  t('before: 20261229 + gate apply', r0.ok, true)
+  t('before: the 20261235 token is red until the file runs (control)', (await tok35(d)).map(r => r.ok), [false])
+  const r = await applyFile(d, PRIV)
+  t('applies, including its own assertions', r, { ok: true, msg: null })
+  if (!r.ok) { console.log(r.msg); process.exit(1) }
+  t('the 20261235 token is green after the file (one row)', (await tok35(d)).map(r => r.ok), [true])
+  t('the 20261229 token still green (its wording no longer claims the exact set)',
+    (await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${vs.slice(vs.indexOf('-- 1229-BEGIN'), vs.indexOf('-- 1229-END'))}`)).rows.map(r => r.ok === true), [true, true, true, true, true, true])
+
+  t('postgres: the row holds exactly the two values', (await d.query(SEL)).rows, [{ tr: TR, en: EN }])
+  t('published is still false', (await d.query(`SELECT published FROM public.dovec_settings`)).rows, [{ published: false }])
+  t('anon reads both URLs (positive control)', (await asRole(d, 'anon', null, SEL)).rows, [{ tr: TR, en: EN }])
+  t('authenticated reads both URLs (positive control)', (await asRole(d, 'authenticated', OTHER, SEL)).rows, [{ tr: TR, en: EN }])
+  t('a guest (authenticated, is_anonymous) reads both URLs (positive control)', (await asGuest(d, SEL)).rows, [{ tr: TR, en: EN }])
+  t('anon still cannot read a run column (denial; the reads above are its positive control)', (await asRole(d, 'anon', null, 'SELECT last_run_detail FROM public.dovec_settings')).ok, false)
+  for (const [who, uid] of [['anon', null], ['authenticated', OTHER]]) {
+    const w = await asRole(d, who, uid, `UPDATE public.dovec_settings SET privacy_url_en = 'https://evil.example/x'`)
+    t(`${who} cannot UPDATE a privacy URL (denial)`, [w.ok, /permission denied/.test(w.msg || '')], [false, true])
+  }
+  const gw = await asGuest(d, `UPDATE public.dovec_settings SET privacy_url_tr = 'https://evil.example/x'`)
+  t('a guest cannot UPDATE a privacy URL (denial)', [gw.ok, /permission denied/.test(gw.msg || '')], [false, true])
+  const sw = await asRole(d, 'service_role', SVC, `UPDATE public.dovec_settings SET privacy_url_en = 'https://evil.example/x'`)
+  t('service_role cannot UPDATE a privacy URL (denial)', [sw.ok, /permission denied/.test(sw.msg || '')], [false, true])
+  t('service_role can still UPDATE its run columns (positive control)', (await asRole(d, 'service_role', SVC, `UPDATE public.dovec_settings SET last_run_status = 'ok'`)).ok, true)
+  t('the URLs are unchanged after every denied write', (await d.query(SEL)).rows, [{ tr: TR, en: EN }])
+
+  const setUrl = v => d.query(`UPDATE public.dovec_settings SET privacy_url_en = ${v}`).then(() => 'ok', e => (/privacy_url_en_check/.test(e.message) ? 'check' : e.message))
+  t('CHECK: an http:// value is rejected', await setUrl(`'http://www.dovecgroup.com/en/privacy-policy'`), 'check')
+  t('CHECK: a value with whitespace is rejected', await setUrl(`'https://www.dovecgroup.com/en/privacy policy'`), 'check')
+  t('CHECK: a value over 500 characters is rejected', await setUrl(`'https://' || repeat('a', 493)`), 'check')
+  t('CHECK: exactly 500 characters is accepted (positive control)', await setUrl(`'https://' || repeat('a', 492)`), 'ok')
+  t('CHECK: NULL is accepted (positive control)', await setUrl('NULL'), 'ok')
+  t('CHECK: the agreed https URL is accepted (positive control)', await setUrl(`'${EN}'`), 'ok')
+  const trBad = await d.query(`UPDATE public.dovec_settings SET privacy_url_tr = 'ftp://x'`).then(() => 'ok', e => (/privacy_url_tr_check/.test(e.message) ? 'check' : e.message))
+  t('CHECK: the Turkish column is guarded too', trBad, 'check')
+
+  t('re-applying the file is clean (re-runnable)', (await applyFile(d, PRIV)).ok, true)
+  t('... and leaves the same two values', (await d.query(SEL)).rows, [{ tr: TR, en: EN }])
+  t('the file touches no policy, function, trigger or other table',
+    [/CREATE\s+(OR\s+REPLACE\s+)?(POLICY|FUNCTION|TRIGGER|TABLE)|DROP\s+POLICY|ALTER\s+POLICY|cron\./i.test(PSQL.replace(/--.*$/gm, ''))], [false])
+
+  console.log('  red-first: each mutant must be refused by the migration itself')
+  const fresh = async () => (await ready()).d
+  for (const [name, from, to, re] of [
+    ['grant also opens a run column', 'GRANT SELECT (privacy_url_tr, privacy_url_en) ON', 'GRANT SELECT (privacy_url_tr, privacy_url_en, last_run_detail) ON', /readable columns for anon/],
+    ['grant forgets one URL column', 'GRANT SELECT (privacy_url_tr, privacy_url_en) ON', 'GRANT SELECT (privacy_url_tr) ON', /readable columns for anon/],
+    ['an UPDATE grant slips in for anon', "GRANT SELECT (privacy_url_tr, privacy_url_en) ON public.dovec_settings TO anon, authenticated;", "GRANT SELECT (privacy_url_tr, privacy_url_en) ON public.dovec_settings TO anon, authenticated;\nGRANT UPDATE (privacy_url_en) ON public.dovec_settings TO anon;", /writable by anon/],
+    ['service_role gains UPDATE on a URL', "GRANT SELECT (privacy_url_tr, privacy_url_en) ON public.dovec_settings TO anon, authenticated;", "GRANT SELECT (privacy_url_tr, privacy_url_en) ON public.dovec_settings TO anon, authenticated;\nGRANT UPDATE (privacy_url_en) ON public.dovec_settings TO service_role;", /service_role UPDATE columns/],
+    ['the update hits no row', 'WHERE id = 1;\n  GET DIAGNOSTICS', 'WHERE id = 2;\n  GET DIAGNOSTICS', /changed 0 rows, expected exactly 1/],
+    ['a wrong value is written', "privacy_url_tr = 'https://www.dovecgroup.com/tr/privacy-policy'", "privacy_url_tr = 'https://www.dovecgroup.com/tr/other'", /not the agreed values/],
+    ['a constraint is not created', 'ALTER TABLE public.dovec_settings ADD CONSTRAINT dovec_settings_privacy_url_en_check', 'ALTER TABLE public.dovec_settings ADD CONSTRAINT dovec_settings_privacy_url_en_check_x', /expected both privacy URL CHECK/],
+  ]) {
+    const p = mutP(from, to); if (!p) continue
+    const dd = await fresh()
+    const rr = await applyFile(dd, p)
+    if (!rr.ok) await dd.exec('ROLLBACK; RESET ROLE;')
+    t(`mutant "${name}" is refused`, [rr.ok, re.test(rr.msg || '')], [false, true])
+    t(`mutant "${name}": nothing committed (no privacy column survives the rollback)`,
+      (await dd.query(`SELECT count(*)::int n FROM information_schema.columns WHERE table_name = 'dovec_settings' AND column_name LIKE 'privacy_url_%'`)).rows[0].n, 0)
   }
 }
 

@@ -744,6 +744,9 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_project_coords','project_id'),
     ('20261229_dovec_projects','dovec_project_coords','matched_at'),
     ('20261229_dovec_projects','dovec_project_coords','last_status'),
+    -- Döveç privacy notice URLs (20261235): public marketing URLs read by app roles; red until it runs.
+    ('20261235_dovec_privacy_url','dovec_settings','privacy_url_tr'),
+    ('20261235_dovec_privacy_url','dovec_settings','privacy_url_en'),
     ('20261229_dovec_projects','dovec_leads','is_test'),
     ('20261229_dovec_projects','dovec_leads','id'),
     ('20261229_dovec_projects','dovec_leads','external_id'),
@@ -1729,7 +1732,9 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_project_coords_name_check'),
     ('20261229_dovec_projects','dovec_project_coords_range_check'),
     ('20261229_dovec_projects','dovec_project_coords_status_check'),
-    ('20261229_dovec_projects','dovec_project_coords_matched_check')
+    ('20261229_dovec_projects','dovec_project_coords_matched_check'),
+    ('20261235_dovec_privacy_url','dovec_settings_privacy_url_tr_check'),
+    ('20261235_dovec_privacy_url','dovec_settings_privacy_url_en_check')
 
   ) e(m,o)
 
@@ -2390,7 +2395,7 @@ WITH report AS (
     -- 1228-END
     -- 1229-BEGIN
     -- 20261229 Döveç projects: red until applied, never an error (to_regclass / catalogs / COALESCE).
-    UNION ALL SELECT '20261229_dovec_projects','dovec_settings: RLS on; exactly one policy dovec_settings_read (SELECT, PERMISSIVE, anon + authenticated, USING true); exactly one row (id = 1) with published DEFAULT false; anon/authenticated read exactly id, published, suspended, whatsapp_e164, last_good_sync_at (no run column, no table-level SELECT) and write nothing; service_role UPDATEs only suspended, last_good_sync_at and the three run columns (never published or whatsapp_e164) and cannot INSERT or DELETE; no PUBLIC',
+    UNION ALL SELECT '20261229_dovec_projects','dovec_settings: RLS on; exactly one policy dovec_settings_read (SELECT, PERMISSIVE, anon + authenticated, USING true); exactly one row (id = 1) with published DEFAULT false; anon/authenticated read id, published, suspended, whatsapp_e164, last_good_sync_at and no run column, no table-level SELECT (the EXACT readable set moved to the 20261235 token, which owns it since it adds two public URL columns) and write nothing; service_role UPDATEs only suspended, last_good_sync_at and the three run columns (never published or whatsapp_e164) and cannot INSERT or DELETE; no PUBLIC',
       COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_settings')), false)
       AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_settings') = 1
       AND (SELECT count(*) FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'dovec_settings'
@@ -2515,6 +2520,31 @@ WITH report AS (
       AND COALESCE((SELECT strpos(pg_get_functiondef(p.oid), 'NEW.is_test') > 0 AND strpos(pg_get_functiondef(p.oid), 'AND NOT is_test') > 0
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()')), false)
     -- 1229-END
+    -- 1235-BEGIN
+    -- 20261235 Döveç privacy URLs: owns the exact readable column set of dovec_settings (one count, one owner; the 20261229 token no longer says "exactly"). Red until applied, never an error: the URL values are read through to_jsonb(s) because a bare s.privacy_url_tr would kill QUERY 1 (42703) before the column exists.
+    UNION ALL SELECT '20261235_dovec_privacy_url','dovec_settings privacy URLs: anon and authenticated read EXACTLY id, last_good_sync_at, privacy_url_en, privacy_url_tr, published, suspended, whatsapp_e164 (no run column) and write no column; service_role UPDATEs exactly suspended, last_good_sync_at, last_run_at, last_run_status, last_run_detail (no privacy_url_*); both URL columns are NULL or https with no whitespace, at most 500 chars (named CHECKs dovec_settings_privacy_url_{tr,en}_check); the single row holds exactly https://www.dovecgroup.com/tr/privacy-policy and https://www.dovecgroup.com/en/privacy-policy; published is NOT asserted here (go-live flips it; the 20261229 token owns its DEFAULT false)',
+      COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) = 'id,last_good_sync_at,privacy_url_en,privacy_url_tr,published,suspended,whatsapp_e164'
+                  FROM pg_attribute a, (VALUES ('anon')) r(n)
+                 WHERE a.attrelid = to_regclass('public.dovec_settings') AND a.attnum > 0 AND NOT a.attisdropped
+                   AND has_column_privilege(r.n, a.attrelid, a.attnum, 'SELECT')), false)
+      AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) = 'id,last_good_sync_at,privacy_url_en,privacy_url_tr,published,suspended,whatsapp_e164'
+                  FROM pg_attribute a, (VALUES ('authenticated')) r(n)
+                 WHERE a.attrelid = to_regclass('public.dovec_settings') AND a.attnum > 0 AND NOT a.attisdropped
+                   AND has_column_privilege(r.n, a.attrelid, a.attnum, 'SELECT')), false)
+      AND COALESCE((SELECT NOT bool_or(has_column_privilege(r.n, a.attrelid, a.attnum, 'INSERT,UPDATE,REFERENCES'))
+                  FROM pg_attribute a, (VALUES ('anon'), ('authenticated')) r(n)
+                 WHERE a.attrelid = to_regclass('public.dovec_settings') AND a.attnum > 0 AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT string_agg(a.attname, ',' ORDER BY a.attname) = 'last_good_sync_at,last_run_at,last_run_detail,last_run_status,suspended'
+                  FROM pg_attribute a
+                 WHERE a.attrelid = to_regclass('public.dovec_settings') AND a.attnum > 0 AND NOT a.attisdropped
+                   AND has_column_privilege('service_role', a.attrelid, a.attnum, 'UPDATE')), false)
+      AND (SELECT count(*) FROM pg_constraint WHERE conrelid = to_regclass('public.dovec_settings') AND contype = 'c'
+              AND conname IN ('dovec_settings_privacy_url_tr_check', 'dovec_settings_privacy_url_en_check')
+              AND pg_get_constraintdef(oid) LIKE '%https://%' AND pg_get_constraintdef(oid) LIKE '%500%') = 2
+      AND COALESCE((SELECT count(*) = 1 AND bool_and(to_jsonb(s) ->> 'privacy_url_tr' = 'https://www.dovecgroup.com/tr/privacy-policy'
+                                                  AND to_jsonb(s) ->> 'privacy_url_en' = 'https://www.dovecgroup.com/en/privacy-policy')
+                      FROM public.dovec_settings s WHERE s.id = 1), false)
+    -- 1235-END
     -- 1231-BEGIN
     -- 20261231 Dovec read gate: red until applied, never an error (to_regclass / catalogs / COALESCE).
     UNION ALL SELECT '20261231_dovec_read_gate','dovec_projects read gate: exactly one policy dovec_projects_read whose USING reads listed AND dovec_projects_visible() (not the 20261229 dovec_feed_is_fresh() expression); dovec_projects_visible(): one overload, DEFINER, STABLE, boolean, search_path pinned, EXECUTE anon + authenticated + service_role, no PUBLIC, body = is_admin() OR (published AND dovec_feed_is_fresh()); dovec_settings.published is false and its DEFAULT is false',
