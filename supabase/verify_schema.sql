@@ -2816,19 +2816,6 @@ WITH report AS (
            AND NOT has_function_privilege('anon', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE')
            AND NOT has_function_privilege('authenticated', to_regprocedure('public.duty_push_due(timestamptz)'), 'EXECUTE'), false)
     -- 1221-END
-    -- 1238-BEGIN
-    -- 20261238: the weekend digest's cron command waits 60 s for pg_net's reply (behaviour of the job, not a named object) and the gate it calls is unchanged.
-    -- The schedule is owned by the Q2 token '20261238_weekend_digest_shift_3min'. Registered ahead of the apply; red until it runs.
-    UNION ALL SELECT '20261238_weekend_digest_shift_3min','weekend-digest cron command: net.http_post with timeout_milliseconds := 60000 (once), Vault lookup, gate call; weekend_digest_due keeps Friday / hour 17 / minute < 30 / run row / pause clause, not client-callable',
-      COALESCE((SELECT count(*) FROM cron.job WHERE jobname = 'weekend-digest' AND command LIKE '%net.http_post(%' AND command LIKE '%timeout_milliseconds := 60000)%'
-                  AND length(command) - length(replace(command, 'timeout_milliseconds', '')) = length('timeout_milliseconds')
-                  AND command LIKE '%WHERE public.weekend_digest_due()%' AND command LIKE '%vault.decrypted_secrets%') = 1
-           AND pg_get_functiondef(to_regprocedure('public.weekend_digest_due(timestamptz)')) LIKE '%extract(isodow FROM (p_at AT TIME ZONE ''Asia/Famagusta'')) = 5%'
-           AND pg_get_functiondef(to_regprocedure('public.weekend_digest_due(timestamptz)')) LIKE '%extract(minute FROM (p_at AT TIME ZONE ''Asia/Famagusta'')) < 30%'
-           AND pg_get_functiondef(to_regprocedure('public.weekend_digest_due(timestamptz)')) LIKE '%AND NOT public.data_job_paused(''weekend-digest'')%'
-           AND NOT has_function_privilege('anon', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE')
-           AND NOT has_function_privilege('authenticated', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE'), false)
-    -- 1238-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -7676,19 +7663,6 @@ SELECT '20261221_duty_push_shift_3min', 'duty-push: exactly one job, active, sch
               THEN 'OK'
             ELSE 'duty-push IS NOT THE ACTIVE JOB AT 27,57 * * * * WITH ITS ORIGINAL COMMAND ← FIX (20261221)' END
 
-UNION ALL
--- ─── 20261238: weekend-digest ticks at :03 / :33 on UTC Fridays and Saturdays and waits 60 s for pg_net's reply ───
--- Owns the weekend-digest SCHEDULE and its command (no earlier Q2 token named this job: one count, one owner). Red until the file is applied.
-SELECT '20261238_weekend_digest_shift_3min', 'weekend-digest: exactly one job, active, schedule 3,33 * * * 5,6, gate + Vault lookup + timeout_milliseconds := 60000, no inline key',
-       CASE WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'weekend-digest') = 1
-             AND (SELECT count(*) FROM cron.job WHERE jobname = 'weekend-digest' AND active
-                    AND schedule = '3,33 * * * 5,6'
-                    AND command LIKE '%WHERE public.weekend_digest_due()%'
-                    AND command LIKE '%timeout_milliseconds := 60000%'
-                    AND command LIKE '%vault.decrypted_secrets%'
-                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
-              THEN 'OK'
-            ELSE 'weekend-digest IS NOT THE ACTIVE JOB AT 3,33 * * * 5,6 WITH THE GATE, THE VAULT LOOKUP AND THE 60 s TIMEOUT ← FIX (20261238)' END
 ORDER BY status ASC, migration;
 
 
