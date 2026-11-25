@@ -17,12 +17,8 @@ import NorthHousesTab from './NorthHousesTab'
 import NorthHousesApartmentScreen from './NorthHousesApartmentScreen'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
-import DovecEntryCard from '../components/dovec/DovecEntryCard'
-import DovecProjectsScreen from './DovecProjectsScreen'
-import { loadDovec } from '../utils/loadDovec'
-import { dovecShown } from '../constants/dovec'
 import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../constants/theme'
-import { REDESIGN, DOVEC_PREVIEW } from '../constants/redesign'
+import { REDESIGN } from '../constants/redesign'
 import { OnPhotoContext } from '../components/ui/onPhoto'
 import {
   ScreenHeader as RScreenHeader, FilterBar, CardSkeleton, EmptyState, ErrorState, ModuleScreen,
@@ -32,7 +28,7 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE, DOVEC_PARTNER_LIVE } from '../constants/flags'
+import { DORMS_LIVE } from '../constants/flags'
 import { NORTH_HOUSES } from '../constants/redesign'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
@@ -435,7 +431,6 @@ export default function AccommodationScreen({
   onOpenProperty, selectedProperty, onCloseProperty,
   onOpenDorm, selectedDorm, onCloseDorm,
   onOpenRental, selectedRental, onCloseRental,
-  dovecOpen, onOpenDovec, onCloseDovec, dovecBackRef, onRequireAccount,
 }) {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
@@ -463,19 +458,6 @@ export default function AccommodationScreen({
   const [period, setPeriod]     = useState(null)     // rent only
 
   const [sheet, setSheet] = useState(null)           // which picker is open
-  // Döveç projects: the entry card shows only when the module is visible (flag + published, or dev/Preview) AND projects exist.
-  // Until published, RLS returns 0 rows to non-admins, so the card stays hidden for them even in Preview.
-  const [dovecReady, setDovecReady] = useState(false)
-  useEffect(() => {
-    if (!DOVEC_PARTNER_LIVE && !DOVEC_PREVIEW) return undefined
-    let on = true
-    loadDovec().then(d => {
-      if (on && dovecShown({ published: d.settings.published === true, preview: DOVEC_PREVIEW }) && d.projects.length > 0) setDovecReady(true)
-    }, () => {})
-    return () => { on = false }
-  }, [])
-  // The overlay state lives in App.js (back chain); leaving Konaklama by another route must not leave it open.
-  useEffect(() => () => onCloseDovec?.(), [])
   const [pendingArea, setPendingArea] = useState(false)  // came via the area pill
 
   const isSale = intent === 'sale'
@@ -754,10 +736,9 @@ export default function AccommodationScreen({
             // would make it sticky, and a permanently visible ad is a different product.
             // GATED ON A NON-EMPTY LIST: an ad above "no results" is worse than no ad,
             // and this list's filters intersect to zero routinely.
-            <>
-              {dovecReady && !isDorm && (intent === 'sale' || intent === 'all') && <DovecEntryCard lang={lang} onPress={onOpenDovec} />}
-              {items.length > 0 ? <AccommodationListTopSlot lang={lang} onNavigate={onAdNavigate} /> : null}
-            </>
+            items.length > 0
+              ? <AccommodationListTopSlot lang={lang} onNavigate={onAdNavigate} />
+              : null
           }
           showsVerticalScrollIndicator={false}
           onEndReached={loadMore}
@@ -891,14 +872,6 @@ export default function AccommodationScreen({
         <View style={cs.detailOverlay}>
           <OffPhoto>
             <NorthHousesApartmentScreen apartment={selectedRental} lang={lang} onBack={onCloseRental} />
-          </OffPhoto>
-        </View>
-      )}
-
-      {dovecOpen === true && (
-        <View style={cs.detailOverlay}>
-          <OffPhoto>
-            <DovecProjectsScreen lang={lang} onClose={onCloseDovec} onRequireAccount={onRequireAccount} backRef={dovecBackRef} />
           </OffPhoto>
         </View>
       )}
