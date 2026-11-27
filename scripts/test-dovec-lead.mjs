@@ -300,7 +300,7 @@ console.log('the test enquiry: its own locks')
 const TP = '+441234567899'
 const SVC = { kind: 'service' }
 const tl = (store, o = {}, body = { mode: 'test_lead', dry: false }) => handleLead({ caller: SVC, body, deps: deps(store, { mode: 'test_once', testAllowed: true, testPhone: TP, ...o }) })
-t('TEST_LEAD_ALLOWED is open for the agreed test; LEADS_LIVE_ALLOWED stays false', [TEST_LEAD_ALLOWED, LEADS_LIVE_ALLOWED], [true, false])
+t('TEST_LEAD_ALLOWED is closed again after the one agreed test (sent 2026-11-27); LEADS_LIVE_ALLOWED stays false', [TEST_LEAD_ALLOWED, LEADS_LIVE_ALLOWED], [false, false])
 t('the test project is the D-Point seed', TEST_PROJECT_SEED, 'D-Point')
 for (const [label, allowed, mode, want] of [['code false, secret test_once', false, 'test_once', false], ['code true, secret unset', true, undefined, false],
   ['code true, secret live', true, 'live', false], ['code true, secret TEST_ONCE', true, 'TEST_ONCE', false], ['code true, secret test_once', true, 'test_once', true]]) {
@@ -343,12 +343,13 @@ console.log('the test enquiry: dry run (the default)')
   t('dry output shows the fixed payload and never the phone or the project id', [JSON.stringify(r2.body).includes('4412'), JSON.stringify(r2.body).includes(DPOINT.id), r2.body.payload], [false, false, { name: 'TEST ADA – please ignore', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr', external_id: 'TEST-1', phone: '<secret>', project: '<D-Point id>' }])
   const r3 = await tl(makeStore(), {}, { mode: 'test_lead', dry: true })
   t('dry with the shipped constant and the secret unset reports locked', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: undefined, apiKey: 'k', testPhone: TP } } })).body.would, 'refuse:locked')
-  const nk = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: '', testPhone: TP } } })
+  const nk = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { testAllowed: true, store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: '', testPhone: TP } } })
   t('dry with the partner key missing reports key missing and refuses', [nk.body.key, nk.body.would], ['missing', 'refuse:key_missing'])
   const nkStore = makeStore(); const nkF = stub()
-  const nka = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { store: nkStore, fetchImpl: nkF, now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: undefined, testPhone: TP } } })
+  const nka = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { testAllowed: true, store: nkStore, fetchImpl: nkF, now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: undefined, testPhone: TP } } })
   t('apply with the partner key missing refuses: no row, nothing sent', [nka.status, nka.body.error, nkStore.leads.length, nkF.calls.length], [403, 'key_missing', 0, 0])
-  t('dry with the shipped constant and the secret test_once would send', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } })).body.would, 'insert_and_send')
+  t('dry with the shipped (closed) constant and the secret test_once still reports locked', (await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: true }, deps: { store: makeStore(), now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } })).body.would, 'refuse:locked')
+  t('apply with the shipped (closed) constant and the secret test_once: 403 locked, nothing written or sent', await (async () => { const st = makeStore(); const ff = stub(); const r = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { store: st, fetchImpl: ff, now: () => T0, log: () => {}, env: { mode: 'test_once', apiKey: 'k', testPhone: TP } } }); return [r.status, r.body.error, st.leads.length, ff.calls.length] })(), [403, 'locked', 0, 0])
   t('dry with no phone says phone_missing', (await tl(makeStore(), { testPhone: undefined }, { mode: 'test_lead' })).body.would, 'refuse:phone_missing')
 }
 

@@ -23,8 +23,8 @@ export const isLive = (mode, allowed = LEADS_LIVE_ALLOWED) => allowed === true &
 // LOCK B is the secret DOVEC_LEADS_MODE === 'test_once' ('live' does NOT open it). The phone number comes only from the
 // secret DOVEC_TEST_LEAD_PHONE (never a body field, never logged). Triggered only by { mode: 'test_lead' } from the service
 // key; the workflow .github/workflows/dovec-test-lead.yml is the only caller.
-// Open for the one agreed test (2026-11-26): the secret stays the lock until Berke's go, and both go back closed after the send.
-export const TEST_LEAD_ALLOWED = true
+// Closed again after the one agreed test (TEST-1 sent 2026-11-27 15:41 Famagusta, HTTP 202). Reopening needs a new PR and Berke's deploy go.
+export const TEST_LEAD_ALLOWED = false
 export const isTestOpen = (mode, allowed = TEST_LEAD_ALLOWED) => allowed === true && mode === 'test_once'
 export const TEST_LEAD = Object.freeze({ name: 'TEST ADA – please ignore', external_id: 'TEST-1', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr' })
 export const TEST_FINAL = ['sent', 'rejected', 'failed', 'mock']
