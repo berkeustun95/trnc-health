@@ -155,10 +155,10 @@ Deno.test('accepted group: status and timings only, never the body, size or coun
   const res = okTickets(100, ['DeviceNotRegistered'])
   const origText = res.text.bind(res)
   res.text = () => { readCalled = true; return origText() }
-  await sendBatch(batch, { ...rig(() => res).deps, diag: diagFor(lines) })
+  await sendBatch(batch, { ...rig(() => res).deps, diag: diagFor(lines, { size: 100 }) })
   eq(readCalled, false, 'diag did not read the body')
-  eq(Object.keys(JSON.parse(lines[0].slice('duty-push-diag '.length))), ['g', 'status', 'ms_headers', 'ms_total', 'run_ms'], 'keys')
-  for (const w of ['secret', 'ExponentPushToken', 'DeviceNotRegistered', 'size', 'body', 'ok']) {
+  eq(Object.keys(JSON.parse(lines[0].slice('duty-push-diag '.length))), ['g', 'size', 'status', 'ms_headers', 'ms_total', 'run_ms'], 'keys')
+  for (const w of ['secret', 'ExponentPushToken', 'DeviceNotRegistered', 'body', 'ok']) {
     if (lines[0].toLowerCase().includes(w.toLowerCase()) && w !== 'ok') throw new Error('accepted line has ' + w + ': ' + lines[0])
   }
 })
@@ -205,10 +205,11 @@ Deno.test('with diag the existing console.error lines are unchanged', async () =
   eq(errs, ['Expo push batch failed: HTTP 503', 'Expo push batch threw: TimeoutError'], 'console.error')
 })
 
-Deno.test('wiring: only send-duty-notification passes diag; push.ts has no header allow-list', async () => {
+Deno.test('wiring: duty and weekend digest pass diag (weekend with job); photo review and admin-push do not', async () => {
   const rd = (p: string) => Deno.readTextFile(new URL(p, import.meta.url))
-  if (!(await rd('./index.ts')).includes('diag: { group: i / 100, runStartMs }')) throw new Error('index.ts does not pass diag')
-  for (const p of ['../send-weekend-digest/index.ts', '../marketplace-photo-review/index.ts', '../admin-push/send.ts']) {
+  if (!(await rd('./index.ts')).includes('diag: { runStartMs }')) throw new Error('index.ts does not pass diag')
+  if (!(await rd('../send-weekend-digest/index.ts')).includes("diag: { runStartMs, job: 'weekend' }")) throw new Error('weekend digest does not pass diag with job')
+  for (const p of ['../marketplace-photo-review/index.ts', '../admin-push/send.ts']) {
     if ((await rd(p)).includes('diag')) throw new Error(p + ' must not pass diag')
   }
 })

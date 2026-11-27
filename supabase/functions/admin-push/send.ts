@@ -3,10 +3,10 @@
 //
 // SEND ONCE: the request id is claimed in admin_push_sends BEFORE any recipient is read or written; a repeat of the same
 // id sends nothing, and a claim that cannot be written sends nothing. A crash after the claim means that id never sends
-// again: a missed push is recoverable, a double push to everyone is not. Every Expo batch is sent exactly once (push.ts).
+// again: a missed push is recoverable, a double push to everyone is not. Every Expo group of 25 is sent exactly once (push.ts).
 // Nothing here logs or returns a user id, token, title/body, the allowlist or an Expo message: codes only.
 import { readAllById, profileReadKinds, type PageFetcher } from '../send-duty-notification/page.ts'
-import { lastSignIns, onePerToken, pushOutcome, sendBatch, sharedTokenIds } from '../send-duty-notification/push.ts'
+import { lastSignIns, onePerToken, pushOutcome, sendGroups, sharedTokenIds } from '../send-duty-notification/push.ts'
 import { dutySwapText } from './strings.mjs'
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -30,6 +30,8 @@ export interface Deps {
   insertNotifications(rows: { user_id: string; title: string; body: string; type: string }[]): Promise<boolean>
   getLastSignIn(id: string): Promise<string | null | undefined>
   fetchFn: (url: string, init: RequestInit) => Promise<Response>
+  sleep?: (ms: number) => Promise<void>   // tests only: skips the 0.5 s gaps between groups
+  now?: () => number
   log(code: string): void
 }
 
@@ -142,16 +144,13 @@ export async function handle(input: unknown, adminId: string, d: Deps): Promise<
     const messages = onePerToken(profiles, signIns).map((p) => ({
       to: p.push_token, ...textFor(p.preferred_language), sound: 'default', data,
     }))
-    let pushOk = 0, pushErrors = 0, accepted = 0, failed = 0
-    for (let i = 0; i < messages.length; i += 100) {
-      const r = await sendBatch(messages.slice(i, i + 100), { fetchFn: d.fetchFn })
-      pushOk += r.ok
-      if (r.accepted) accepted++; else failed++
-      for (const [kind, n] of Object.entries(r.kinds)) {
-        pushErrors += n
-        const key = kind in errorKinds || Object.keys(errorKinds).length < MAX_ERROR_KINDS ? kind : 'other'
-        errorKinds[key] = (errorKinds[key] ?? 0) + n
-      }
+    let pushErrors = 0
+    const sent = await sendGroups(messages, { fetchFn: d.fetchFn, sleep: d.sleep, now: d.now })
+    const pushOk = sent.ok, accepted = sent.groupsAccepted, failed = sent.groupsFailed
+    for (const [kind, n] of Object.entries(sent.kinds)) {
+      pushErrors += n
+      const key = kind in errorKinds || Object.keys(errorKinds).length < MAX_ERROR_KINDS ? kind : 'other'
+      errorKinds[key] = (errorKinds[key] ?? 0) + n
     }
 
     const outcome = pushOutcome(messages.length, accepted, failed)

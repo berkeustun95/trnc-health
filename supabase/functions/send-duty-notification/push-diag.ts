@@ -13,6 +13,8 @@ export const HEADER_ALLOW = ['via', 'server', 'date', 'retry-after', 'content-ty
 export interface DiagDeps {
   group: number
   runStartMs: number
+  size?: number   // group size, set by sendGroups; on every line
+  job?: string    // e.g. 'weekend'; emitted only when set
   log?: (line: string) => void
   now?: () => number
   bodyTimeoutMs?: number
@@ -102,17 +104,17 @@ export function startDiag(dg: DiagDeps | undefined): Tracker | null {
         try {
           body = clean(await readBodyBounded(res, dg.bodyTimeoutMs ?? BODY_READ_TIMEOUT_MS, dg.bodyMaxBytes ?? BODY_MAX_BYTES), BODY_CAP_CHARS)
         } catch { body = '[unreadable]' }
-        emit({ g: dg.group, size, status: res.status, ms_headers: msHeaders, ms_total: since(t0), run_ms: since(dg.runStartMs),
+        emit({ g: dg.group, size, job: dg.job, status: res.status, ms_headers: msHeaders, ms_total: since(t0), run_ms: since(dg.runStartMs),
           headers: allowedHeaders(res.headers), body })
       } catch { /* */ }
     },
     accepted(res) {
-      try { emit({ g: dg.group, status: res.status, ms_headers: msHeaders, ms_total: since(t0), run_ms: since(dg.runStartMs) }) } catch { /* */ }
+      try { emit({ g: dg.group, size: dg.size, job: dg.job, status: res.status, ms_headers: msHeaders, ms_total: since(t0), run_ms: since(dg.runStartMs) }) } catch { /* */ }
     },
     thrown(e, size) {
       try {
         const name = e instanceof Error && KIND_RE.test(e.name) ? e.name : 'other'
-        emit({ g: dg.group, size, error: name, ms_total: since(t0), run_ms: since(dg.runStartMs) })
+        emit({ g: dg.group, size, job: dg.job, error: name, ms_total: since(t0), run_ms: since(dg.runStartMs) })
       } catch { /* */ }
     },
   }
