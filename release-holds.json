@@ -347,6 +347,14 @@
       "clear": "Only after Berke's go in chat for the combined audit-fix Preview. Then set cleared to true in a PR. The commit is this PR's first commit (merge commit, not squash).",
       "clearedOn": "2026-11-25",
       "clearedBy": "Berke 2026-11-25: production go for the audit-fix pack after the combined Preview 01a211c2 (main 4c72d7ff) phone test video; go covers main 2eed2387 (#596) plus this hold PR."
+    },
+    {
+      "pr": 620,
+      "commit": "e234cda525bf135b39401d1c0b677736a70ac410",
+      "what": "Döveç WhatsApp text: Turkish when the app is in Turkish, English for every other language (still dark: DOVEC_PARTNER_LIVE false, published false), PR #620",
+      "since": "2026-11-27",
+      "cleared": false,
+      "clear": "Only after Berke has seen it on Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's only commit (merge commit, not squash)."
     }
   ]
 }
