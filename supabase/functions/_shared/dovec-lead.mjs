@@ -26,7 +26,7 @@ export const isLive = (mode, allowed = LEADS_LIVE_ALLOWED) => allowed === true &
 // Open for the one agreed test (2026-11-26): the secret stays the lock until Berke's go, and both go back closed after the send.
 export const TEST_LEAD_ALLOWED = true
 export const isTestOpen = (mode, allowed = TEST_LEAD_ALLOWED) => allowed === true && mode === 'test_once'
-export const TEST_LEAD = Object.freeze({ name: 'ADA TEST', external_id: 'TEST-1', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr' })
+export const TEST_LEAD = Object.freeze({ name: 'TEST ADA – please ignore', external_id: 'TEST-1', message: 'Test talebidir, işlem yapmayın', consent: true, language: 'tr' })
 export const TEST_FINAL = ['sent', 'rejected', 'failed', 'mock']
 // The project Döveç asked the test to name: the dovec_projects row the 'D-Point' seed is attached to (and still listed).
 export const TEST_PROJECT_SEED = 'D-Point'

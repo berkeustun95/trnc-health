@@ -87,7 +87,7 @@ After the first sync, read the match with `select public.dovec_coord_report();` 
 
 ## The test enquiry (prepared here, never sent by any of these steps)
 
-Döveç asked for exactly one agreed test enquiry: name "ADA TEST", external id `TEST-1`, message "Test talebidir, işlem yapmayın",
+Döveç asked for exactly one agreed test enquiry: name "TEST ADA – please ignore" (en dash U+2013; Döveç's choice 2026-11-27), external id `TEST-1`, message "Test talebidir, işlem yapmayın",
 consent true, language `tr`, project = D-Point's id (Berke, 2026-11-25: the `dovec_projects` row the `D-Point` seed in
 `dovec_project_coords` is attached to, and still listed; missing refuses `project_missing`). The phone comes from a function secret,
 never from an input or a file.
