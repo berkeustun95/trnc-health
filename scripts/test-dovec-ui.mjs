@@ -131,10 +131,13 @@ check('every outcome kind the form can show has a message key', ['rejected', 'in
 eq('wa.me takes digits only, text encoded', dovecWaUrl('+357 99 000 111', 'Hi & bye'), 'https://wa.me/35799000111?text=Hi%20%26%20bye')
 eq('no number -> no link (button hidden)', [dovecWaUrl(null, 'x'), dovecWaUrl('', 'x')], [null, null])
 const WA_TR = 'Merhaba, ADA uygulamasından yazıyorum. D-Point hakkında bilgi almak istiyorum. (Ref: ADA-7)'
-eq('wa text is Döveç\'s exact Turkish template (D-Point, ADA-7), whatever the app language', dovecWaText('D-Point', 'ADA-7'), WA_TR)
-eq('wa link for +905338880515 carries that text', dovecWaUrl('+905338880515', dovecWaText('D-Point', 'ADA-7')), `https://wa.me/905338880515?text=${encodeURIComponent(WA_TR)}`)
-check('template is a constant, no i18n key', !/dovecWaMessage/.test(read('constants/i18n.js')) && !/dovecWaText\(t\(/.test(read('components/dovec/DovecThankYou.js')))
-check('$& name survives verbatim', dovecWaText('A $& B', 'r').includes('A $& B'))
+const WA_EN = "Hello, I'm writing from the ADA app. I'd like information about D-Point. (Ref: ADA-7)"
+eq('wa text: Döveç\'s exact Turkish template when the app is in Turkish', dovecWaText('D-Point', 'ADA-7', 'Turkish'), WA_TR)
+eq('wa text: the exact English template for every other app language', ['English', 'German', 'Russian', 'Arabic', 'Persian', 'Greek', 'French', 'Spanish', undefined, 'tr'].map(l => dovecWaText('D-Point', 'ADA-7', l)), Array(10).fill(WA_EN))
+eq('wa link for +905338880515 carries that text', dovecWaUrl('+905338880515', dovecWaText('D-Point', 'ADA-7', 'Turkish')), `https://wa.me/905338880515?text=${encodeURIComponent(WA_TR)}`)
+check('templates are constants, no i18n key', !/dovecWaMessage/.test(read('constants/i18n.js')) && !/dovecWaText\(t\(/.test(read('components/dovec/DovecThankYou.js')))
+check('thank-you passes the app language to the WhatsApp text', /dovecWaText\(project\.name, reference, lang\)/.test(read('components/dovec/DovecThankYou.js')))
+check('$& name survives verbatim in both languages', dovecWaText('A $& B', 'r', 'Turkish').includes('A $& B') && dovecWaText('A $& B', 'r', 'English').includes('A $& B'))
 
 // Maps (detail page): only with two numeric coordinates, the hotels' https form
 const at = { latitude: 35.1856, longitude: 33.3823 }

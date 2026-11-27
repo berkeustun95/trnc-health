@@ -140,10 +140,14 @@ export const dovecWaUrl = (e164, text) => {
   const digits = String(e164 ?? '').replace(/\D/g, '')
   return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null
 }
-// Döveç's own Turkish text, sent in EVERY app language (not translated, so not in i18n).
-export const DOVEC_WA_TEMPLATE = 'Merhaba, ADA uygulamasından yazıyorum. {project} hakkında bilgi almak istiyorum. (Ref: {ref})'
-export const dovecWaText = (projectName, ref) =>
-  DOVEC_WA_TEMPLATE.replace('{project}', () => projectName).replace('{ref}', () => ref)
+// Döveç's own wording (Berke, 2026-11-27): Turkish when the app is in Turkish, English for every other language.
+// Kept here, not in i18n, so Döveç can change the text in one place.
+export const DOVEC_WA_TEMPLATES = Object.freeze({
+  tr: 'Merhaba, ADA uygulamasından yazıyorum. {project} hakkında bilgi almak istiyorum. (Ref: {ref})',
+  en: "Hello, I'm writing from the ADA app. I'd like information about {project}. (Ref: {ref})",
+})
+export const dovecWaText = (projectName, ref, lang) =>
+  DOVEC_WA_TEMPLATES[lang === 'Turkish' ? 'tr' : 'en'].replace('{project}', () => projectName).replace('{ref}', () => ref)
 
 // The app-to-app link (opens WhatsApp directly); the caller falls back to dovecWaUrl when openURL rejects.
 export const dovecWaAppUrl = (e164, text) => {
