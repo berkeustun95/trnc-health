@@ -7688,6 +7688,11 @@ UNION ALL
 -- 'dovec-sync-resume' that switches it back on and removes itself. So an INACTIVE dovec-sync reads OK ONLY while exactly one active
 -- dovec-sync-resume job with the re-activate + self-unschedule command exists. When that fallback is gone (it fired, or 20261246
 -- removed it) the leniency ends by itself: an inactive dovec-sync with no resume job is red again.
+-- The leniency also has a clock: the resume job fires 2-3 hours after 20261245 was applied, so a pause is only believed while
+-- schema_migrations_applied says 20261245 was applied less than 3 h 30 min ago (30 min margin). If the job missed its minute
+-- (pg_cron does not catch up) or its command errored and rolled back, the job stays and dovec-sync stays off: that now reads red
+-- after the window instead of OK for a year. A missing ledger row gives NULL, which counts as "not recent" (red, never OK).
+-- cron.job_run_details is not read here (QUERY 2 does not use it elsewhere), so a failed run is caught by the clock, not by status.
 SELECT '20261232_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key novest_sync_key, 60 s timeout, no inline key (active, or paused with its one-shot dovec-sync-resume still waiting)',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync') THEN 'MISSING'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync'
@@ -7701,17 +7706,25 @@ SELECT '20261232_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, 
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync-resume' AND active
                     AND command LIKE '%cron.alter_job(job_id := (SELECT jobid FROM cron.job WHERE jobname = ''dovec-sync''), active := true)%'
                     AND command LIKE '%cron.unschedule(''dovec-sync-resume'')%') = 1
+                 AND COALESCE((SELECT applied_at FROM public.schema_migrations_applied WHERE filename = '20261245_dovec_sync_pause.sql')
+                              > now() - interval '3 hours 30 minutes', false)
               THEN 'OK'
-            ELSE 'dovec-sync IS OFF AND NOTHING WILL RESTART IT (apply 20261246) ← FIX' END
+            ELSE 'dovec-sync IS OFF AND NOTHING WILL RESTART IT, OR ITS PAUSE WINDOW HAS PASSED (apply 20261246) ← FIX' END
 
 UNION ALL
 -- ─── 20261245: a dovec-sync-resume job may exist ONLY while dovec-sync is switched off ───
 -- A resume job next to an ACTIVE dovec-sync is a leftover (its schedule names a day and month, so it would fire again in a year).
+-- A resume job still present more than 3 h 30 min after 20261245 was applied did not fire (or errored and rolled back): red as STALE.
+-- A missing ledger row gives NULL, which counts as past the window (red, never OK).
 SELECT '20261245_dovec_sync_pause', 'dovec-sync-resume exists only while dovec-sync is inactive (a leftover next to an active dovec-sync is red)',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync-resume') THEN 'OK'
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync-resume') = 1
                  AND (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync' AND NOT active) = 1
+                 AND COALESCE((SELECT applied_at FROM public.schema_migrations_applied WHERE filename = '20261245_dovec_sync_pause.sql')
+                              > now() - interval '3 hours 30 minutes', false)
               THEN 'OK'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync' AND NOT active) = 1
+              THEN 'STALE dovec-sync-resume (did not fire) ← apply 20261246'
             ELSE 'LEFTOVER dovec-sync-resume ← apply 20261246' END
 
 UNION ALL
