@@ -87,9 +87,25 @@ check('T1 DOVEC_PARTNER_LIVE is false (imported)', DOVEC_PARTNER_LIVE === false,
   const o = count(APP, 'setOpenedDovec(true)')
   check('T6 setOpenedDovec(true) once in App.js', o === 1, `x${o} @L${lineOf(APP, APP.indexOf('setOpenedDovec(true)'))}`)
   const appFiles = [...['App.js'], ...['screens', 'components', 'components/dovec', 'utils', 'constants'].flatMap(d => readdirSync(fileURLToPath(new URL(d + '/', root))).filter(f => /\.(js|jsx)$/.test(f)).map(f => `${d}/${f}`))]
+  // isAdmin may only drive the admin-only diagnostic timing line; it never gates layers, content or loads
+  const APP_MOUNT = 'content = <DovecProjectsScreen lang={dovecPreviewLang || lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} isAdmin={isAdmin} />'
+  const DPS = read('screens/DovecProjectsScreen.js')
+  const DPS_PROP = 'export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, backRef, isAdmin }) {'
+  const DPS_TIMING = 'timing={isAdmin === true ? layer.timing : null}'
+  const allowed = new Set(['App.js', 'screens/DovecProjectsScreen.js'])
   const hits = appFiles.flatMap(f => read(f).split('\n').map((l, i) => [f, i + 1, l]).filter(([, , l]) => /dovec/i.test(l) && /isAdmin/.test(l)))
+  const stray = hits.filter(([f, , l]) => !allowed.has(f) || (f === 'App.js' && norm(l) !== APP_MOUNT) || (f !== 'App.js' && !l.includes(DPS_PROP) && !l.includes(DPS_TIMING)))
   const mentions = appFiles.reduce((n, f) => n + read(f).split('\n').filter(l => /dovec/i.test(l)).length, 0)
-  check('T6 no isAdmin on any line mentioning dovec (app code)', hits.length === 0 && mentions > 20, `${hits.length} hits (${hits.map(h => h.slice(0, 2).join(':')).join(',')}) over ${appFiles.length} files, ${mentions} dovec lines scanned`)
+  check('T6 no isAdmin on any dovec line (app code) except the two display-only uses below', stray.length === 0 && mentions > 20, `${hits.length} hits, ${stray.length} stray (${stray.map(h => h.slice(0, 2).join(':')).join(',')}) over ${appFiles.length} files, ${mentions} dovec lines scanned`)
+  const appIsAdmin = APP.split('\n').filter(l => /dovec/i.test(l) && /isAdmin/.test(l))
+  check('T6 App.js: exactly one dovec+isAdmin line, the adminPreview <DovecProjectsScreen ... isAdmin={isAdmin} /> mount', appIsAdmin.length === 1 && norm(appIsAdmin[0]) === APP_MOUNT, `x${appIsAdmin.length}: ${appIsAdmin.map(norm).join(' | ')}`)
+  const dpsLines = DPS.split('\n').map((l, i) => [i + 1, l]).filter(([, l]) => /isAdmin/.test(l))
+  const dpsRest = DPS.split('isAdmin').length - 1
+  check('T6 DovecProjectsScreen.js: isAdmin only in the prop destructure and the timing={isAdmin === true ? layer.timing : null} expression', dpsRest === 2 && count(DPS, DPS_PROP) === 1 && count(DPS, DPS_TIMING) === 1 && dpsLines.length === 2, `${dpsRest} occurrences on lines ${dpsLines.map(l => l[0]).join(',')}`)
+  const deep = ['utils/loadDovec.js', ...readdirSync(fileURLToPath(new URL('components/dovec/', root))).map(f => `components/dovec/${f}`)].filter(f => /isAdmin/.test(read(f)))
+  check('T6 no isAdmin anywhere in components/dovec/* or utils/loadDovec.js', deep.length === 0, `files with isAdmin: [${deep.join(', ')}]`)
+  const accMount = ACC.split('\n').filter(l => l.includes('<DovecProjectsScreen'))
+  check('T6 AccommodationScreen.js <DovecProjectsScreen mount passes no isAdmin', accMount.length === 1 && !/isAdmin/.test(accMount[0]), `x${accMount.length}: ${accMount.map(norm).join(' | ')}`)
 }
 
 // ── T7 import graph
