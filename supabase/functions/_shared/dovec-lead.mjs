@@ -209,7 +209,12 @@ export async function handleLead({ caller, body, deps }) {
     store.countLeads({ userId: caller.id, sinceIso: iso(86400000) }),
     store.countLeads({ sinceIso: iso(86400000) }),
   ])
-  if (hour >= LIMITS.perUserHour || day >= LIMITS.perUserDay || all >= LIMITS.globalDay) return { status: 429, body: { error: 'rate_limited' } }
+  // A twin (same client_request_id, accepted a moment ago) is not a new enquiry: answer it as a replay, never as a limit.
+  const refuseOrReplay = async () => {
+    const twin = await store.findByRequest(caller.id, v.value.client_request_id)
+    return twin ? replay(twin) : { status: 429, body: { error: 'rate_limited' } }
+  }
+  if (hour >= LIMITS.perUserHour || day >= LIMITS.perUserDay || all >= LIMITS.globalDay) return refuseOrReplay()
 
   let lead
   try {
@@ -220,7 +225,7 @@ export async function handleLead({ caller, body, deps }) {
       consent: true, consent_text_version: v.value.consent_text_version, status: 'pending',
     })
   } catch (e) {
-    if (e?.code === RATE_LIMIT_CODE || e?.message === 'dovec_rate_limited') return { status: 429, body: { error: 'rate_limited' } }
+    if (e?.code === RATE_LIMIT_CODE || e?.message === 'dovec_rate_limited') return refuseOrReplay()
     if (e?.code === '23505') {
       const again = await store.findByRequest(caller.id, v.value.client_request_id)
       if (again) return replay(again)

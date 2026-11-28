@@ -177,6 +177,49 @@ console.log('atomic limits (the DB trigger raises DV429)')
   t('another user is accepted (positive control)', (await post({ ...clone(BODY), client_request_id: rid(8) }, store, d, { kind: 'user', id: 'user-b' })).status, 200)
 }
 
+console.log('429 never answers a twin of an accepted request (same client_request_id)')
+{
+  const rid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const crid = BODY.client_request_id.toLowerCase()
+  const withTwin = async (extra = {}) => {   // user-a already holds 3 leads this hour; one of them IS this request (the twin that won the race)
+    const hash = await payloadHash(validateLead(BODY).value)
+    const row = (i, c, h) => ({ id: i, external_id: `ADA-${i}`, user_id: 'user-a', client_request_id: c, payload_hash: h, status: 'mock', created_at: T0.toISOString() })
+    const store = makeStore({ ...extra, preload: [row(1, crid, hash), row(2, rid(2), 'x'), row(3, rid(3), 'y')] })
+    const orig = store.findByRequest; let first = true
+    store.findByRequest = async (u, c) => { if (first) { first = false; return null } return orig(u, c) }   // the twin's row appears AFTER our first look
+    return store
+  }
+  {
+    const store = await withTwin(); const r = await post(BODY, store)
+    t('exit (a) pre-check over the limit, twin found: replay of the original, not 429', [r.status, r.body], [200, { ok: true, external_id: 'ADA-1', status: 'mock' }])
+  }
+  {
+    const store = await withTwin(); const r = await post({ ...clone(BODY), phone: '+441234567891' }, store)
+    t('exit (a) twin with a DIFFERENT payload: 409 request_changed', [r.status, r.body], [409, { error: 'request_changed' }])
+  }
+  {
+    const store = makeStore({ preload: ['a', 'b', 'c'].map((c, i) => ({ id: i + 1, external_id: `ADA-${i + 1}`, user_id: 'user-a', client_request_id: rid(i + 10), payload_hash: c, status: 'mock', created_at: T0.toISOString() })) })
+    const r = await post(BODY, store)
+    t('exit (a) no twin: still 429 (positive control)', [r.status, r.body, store.leads.length], [429, { error: 'rate_limited' }, 3])
+  }
+  {
+    const store = await withTwin({ dbLimits: true }); store.countLeads = async () => 0   // pre-check blind: the race reaches the trigger
+    const r = await post(BODY, store)
+    t('exit (b) trigger raised DV429, twin found: replay of the original, not 429', [r.status, r.body], [200, { ok: true, external_id: 'ADA-1', status: 'mock' }])
+  }
+  {
+    const store = await withTwin({ dbLimits: true }); store.countLeads = async () => 0
+    const r = await post({ ...clone(BODY), phone: '+441234567891' }, store)
+    t('exit (b) twin with a DIFFERENT payload: 409 request_changed', [r.status, r.body], [409, { error: 'request_changed' }])
+  }
+  {
+    const store = makeStore({ dbLimits: true, preload: ['a', 'b', 'c'].map((c, i) => ({ id: i + 1, external_id: `ADA-${i + 1}`, user_id: 'user-a', client_request_id: rid(i + 10), payload_hash: c, status: 'mock', created_at: T0.toISOString() })) })
+    store.countLeads = async () => 0
+    const r = await post(BODY, store)
+    t('exit (b) no twin: still 429 (positive control)', [r.status, r.body, store.leads.length], [429, { error: 'rate_limited' }, 3])
+  }
+}
+
 console.log('outgoing host is fixed')
 {
   const f = stub(); const store = makeStore()
