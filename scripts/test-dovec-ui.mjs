@@ -221,5 +221,15 @@ check('all 9 languages carry the three labels, non-empty', ['English', 'Turkish'
   check('AdminScreen: the language choice only calls the setter', /onDovecPreviewLang\(l\.key\)/.test(admin) && !/dovecPreviewLang[^\n]*(AsyncStorage|supabase)/.test(admin))
 }
 
+// Server-Timing parsing, run from the source (loadDovec.js imports the supabase client, so only the pure function is evaluated)
+{
+  const src = read('utils/loadDovec.js')
+  const fn = src.slice(src.indexOf('export function parseServerTimingTotal'), src.indexOf('const nowMs'))
+  const parse = new Function(fn.replace('export function', 'function') + '; return parseServerTimingTotal')()
+  check('Server-Timing: full header -> total', parse('auth;dur=12.3,reads;dur=40,insert;dur=55.5,total;dur=620.4') === 620)
+  check('Server-Timing: total alone / with desc', parse('total;dur=7') === 7 && parse('auth;dur=1, total;desc="x";dur=9') === 9)
+  check('Server-Timing: no total, missing, garbage -> null', parse('auth;dur=12') === null && parse(null) === null && parse(undefined) === null && parse('total;dur=abc') === null && parse('') === null && parse('subtotal;dur=5') === null)
+}
+
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

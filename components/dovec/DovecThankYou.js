@@ -9,7 +9,7 @@ import { logContactEvent } from '../../utils/logContactEvent'
 
 // After an accepted enquiry. WhatsApp shows only when dovec_settings.whatsapp_e164 is set; each tap is counted
 // (module 'dovec', entity = the project's entity_uuid) on the line before the handoff.
-export default function DovecThankYou({ project, reference, whatsapp, lang, onBack }) {
+export default function DovecThankYou({ project, reference, whatsapp, lang, onBack, timing }) {
   const insets = useSafeAreaInsets()
   const text = dovecWaText(project.name, reference, lang)
   const waUrl = whatsapp ? dovecWaUrl(whatsapp, text) : null
@@ -32,6 +32,7 @@ export default function DovecThankYou({ project, reference, whatsapp, lang, onBa
       )}
       {!!waUrl && <Button fullWidth icon="logo-whatsapp" title={t('dovecThanksWa', lang)} onPress={openWa} style={s.btn} />}
       <Button fullWidth variant="secondary" title={t('dovecThanksBack', lang)} onPress={onBack} style={s.btn} />
+      {!!timing && <Text style={s.timing}>{`${timing.ms} ms${timing.serverMs != null ? ` · server ${timing.serverMs} ms` : ''}`}</Text>}
     </ScrollView>
   )
 }
@@ -44,5 +45,6 @@ const s = StyleSheet.create({
   refCard:  { alignSelf: 'stretch', alignItems: 'center', marginTop: 24, borderRadius: radii.card },
   refLabel: { ...type.meta, color: colors.textSecondary },
   ref:      { ...type.sectionHeading, color: colors.textPrimary, marginTop: 4 },
+  timing:   { ...type.meta, color: colors.textSecondary, opacity: 0.6, marginTop: 16, textAlign: 'center' },
   btn:      { alignSelf: 'stretch', marginTop: 12 },
 })

@@ -2912,7 +2912,7 @@ export default function App() {
     // Döveç projects, as a customer sees them (feed, project, enquiry form). Only AdminScreen's button sets this; it skips the Emlak
     // entry gate (flag + published) and nothing else: the rows come from RLS, which lets an admin read them while published = false.
     // No admin chrome here on purpose. Lead sending is still mocked server-side (dovec-lead locks).
-    content = <DovecProjectsScreen lang={dovecPreviewLang || lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} />
+    content = <DovecProjectsScreen lang={dovecPreviewLang || lang} onClose={() => setAdminPreview(null)} onRequireAccount={requireAccount} backRef={dovecBackRef} isAdmin={isAdmin} />
   } else if (showLiveScores) {
     content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and
