@@ -90,6 +90,7 @@
     "weather:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normalize.mjs",
     "drift:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs --check",
     "dovec:test": "node scripts/test-dovec-lock-proof.mjs && node scripts/test-dovec-sync.mjs && node scripts/test-dovec-lead.mjs && node scripts/test-dovec-sql.mjs && node scripts/test-dovec-ui.mjs && node scripts/test-dovec-logo.mjs && node scripts/test-dovec-health.mjs && node scripts/test-dovec-access.mjs",
+    "dovec:health-watchdog:test": "node scripts/test-dovec-health-watchdog-sql.mjs",
     "drift:regen": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs",
     "migration:next": "node scripts/check-migration-numbers.mjs --next",
     "check:contact-events-vocab": "node scripts/check-contact-events-vocab.mjs",

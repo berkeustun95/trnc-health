@@ -1291,6 +1291,11 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('dovec_leads', 'created_at', true, 'now()', 'timestamp with time zone'),
     ('dovec_leads', 'pii_wiped_at', false, NULL, 'timestamp with time zone'),
     ('dovec_leads', 'is_test', true, 'false', 'boolean'),
+    ('dovec_leads', 'status_changed_at', true, 'now()', 'timestamp with time zone'),
+    ('dovec_health_alert_state', 'condition', true, NULL, 'text'),
+    ('dovec_health_alert_state', 'last_red', true, NULL, 'boolean'),
+    ('dovec_health_alert_state', 'alerted_at', false, NULL, 'timestamp with time zone'),
+    ('dovec_health_alert_state', 'last_failure_at', false, NULL, 'timestamp with time zone'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1436,6 +1441,8 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('dealers_slug_key', '', 'slug'),
     ('dealers_website_check', '^https://', 'website'),
     ('dealers_whatsapp_check', '0|15|7|9|^\+?[0-9]{7,15}$', 'whatsapp'),
+    ('dovec_health_alert_state_condition_check', 'failed|last_status|stale|stuck|suspended', 'condition'),
+    ('dovec_health_alert_state_pkey', '', 'condition'),
     ('dovec_leads_attempts_check', '0', 'attempts'),
     ('dovec_leads_consent_check', '', 'consent'),
     ('dovec_leads_consent_version_check', '1|100', 'consent_text_version'),
