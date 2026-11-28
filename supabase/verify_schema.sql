@@ -810,6 +810,8 @@ WITH report AS (
     -- 20261242 Döveç undelivered notice: the notifier (cron, owner-only) and its text lookup; red until applied.
     ('20261242_dovec_undelivered_notice','dovec_notify_undelivered'),
     ('20261242_dovec_undelivered_notice','dovec_undelivered_text'),
+    -- 20261243 Döveç forget one enquiry: the service-role-only wipe by reference; red until applied.
+    ('20261243_dovec_lead_forget','dovec_lead_forget'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
@@ -2587,6 +2589,27 @@ WITH report AS (
       AND NOT has_column_privilege('authenticated', to_regclass('public.dovec_leads'), 'undelivered_notified_at', 'SELECT')
       AND COALESCE(has_column_privilege('service_role', to_regclass('public.dovec_leads'), 'send_live', 'SELECT'), false)
     -- 1242-END
+    -- 1243-BEGIN
+    -- 20261243 Dovec forget one enquiry (dovec_lead_forget): owns the function's posture and body anchors. Red until applied, never an error (to_regprocedure / catalogs). No G row: nothing here is EXECUTE for authenticated.
+    UNION ALL SELECT '20261243_dovec_lead_forget','dovec_lead_forget(text, boolean): owner postgres, SECURITY DEFINER, search_path pinned to empty, jsonb, EXECUTE for exactly the owner and service_role (not PUBLIC, anon, authenticated)',
+      COALESCE((SELECT p.proowner = 'postgres'::regrole AND p.prosecdef AND p.proconfig = ARRAY['search_path=""'] AND p.prorettype = 'jsonb'::regtype
+                  AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                  AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+                  AND NOT EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                                   WHERE a.privilege_type = 'EXECUTE' AND a.grantee IS DISTINCT FROM p.proowner AND a.grantee IS DISTINCT FROM 'service_role'::regrole::oid)
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_lead_forget(text,boolean)')), false)
+      AND (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'dovec_lead_forget') = 1
+    UNION ALL SELECT '20261243_dovec_lead_forget','dovec_lead_forget body: locks the row on apply, accepts only ^ADA-[0-9]+$, refuses is_test, settles only sent/rejected/failed/mock, and its UPDATE wipes the five fields without ever naming status',
+      COALESCE((SELECT strpos(pg_get_functiondef(p.oid), 'FOR UPDATE') > 0
+                   AND strpos(pg_get_functiondef(p.oid), 'p_reference ~ ''^ADA-[0-9]+$''') > 0
+                   AND strpos(pg_get_functiondef(p.oid), 'NOT v_is_test') > 0
+                   AND strpos(pg_get_functiondef(p.oid), '''sent'',''rejected'',''failed'',''mock''') > 0
+                   AND strpos(substr(pg_get_functiondef(p.oid), position('UPDATE public.dovec_leads' IN pg_get_functiondef(p.oid)),
+                                     position('WHERE id = v_id' IN pg_get_functiondef(p.oid)) - position('UPDATE public.dovec_leads' IN pg_get_functiondef(p.oid))), 'user_id = NULL') > 0
+                   AND substr(pg_get_functiondef(p.oid), position('UPDATE public.dovec_leads' IN pg_get_functiondef(p.oid)),
+                              position('WHERE id = v_id' IN pg_get_functiondef(p.oid)) - position('UPDATE public.dovec_leads' IN pg_get_functiondef(p.oid))) !~ 'status'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_lead_forget(text,boolean)')), false)
+    -- 1243-END
     -- 1235-BEGIN
     -- 20261235 Döveç privacy URLs: owns the exact readable column set of dovec_settings (one count, one owner; the 20261229 token no longer says "exactly"). Red until applied, never an error: the URL values are read through to_jsonb(s) because a bare s.privacy_url_tr would kill QUERY 1 (42703) before the column exists.
     UNION ALL SELECT '20261235_dovec_privacy_url','dovec_settings privacy URLs: anon and authenticated read EXACTLY id, last_good_sync_at, privacy_url_en, privacy_url_tr, published, suspended, whatsapp_e164 (no run column) and write no column; service_role UPDATEs exactly suspended, last_good_sync_at, last_run_at, last_run_status, last_run_detail (no privacy_url_*); both URL columns are NULL or https with no whitespace, at most 500 chars (named CHECKs dovec_settings_privacy_url_{tr,en}_check); the single row holds exactly https://www.dovecgroup.com/tr/privacy-policy and https://www.dovecgroup.com/en/privacy-policy; published is NOT asserted here (go-live flips it; the 20261229 token owns its DEFAULT false)',
