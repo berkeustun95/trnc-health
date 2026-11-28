@@ -174,7 +174,9 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_settings'),
     ('20261229_dovec_projects','dovec_projects'),
     ('20261229_dovec_projects','dovec_leads'),
-    ('20261229_dovec_projects','dovec_project_coords')
+    ('20261229_dovec_projects','dovec_project_coords'),
+    -- Döveç health watchdog (20261241): what it announced last time; registered ahead of the apply; red until it runs.
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state')
   ) e(m,o)
 
   UNION ALL
@@ -773,7 +775,13 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_leads','created_at'),
     ('20261229_dovec_projects','dovec_leads','pii_wiped_at'),
     ('20261242_dovec_undelivered_notice','dovec_leads','send_live'),
-    ('20261242_dovec_undelivered_notice','dovec_leads','undelivered_notified_at')
+    ('20261242_dovec_undelivered_notice','dovec_leads','undelivered_notified_at'),
+    -- 20261241: when the status last changed (trigger-set, backfilled with created_at); registered ahead of the apply; red until it runs.
+    ('20261241_dovec_health_watchdog','dovec_leads','status_changed_at'),
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state','condition'),
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state','last_red'),
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state','alerted_at'),
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state','last_failure_at')
 
   ) e(m,t,c)
 
@@ -1034,7 +1042,10 @@ WITH report AS (
     ('20261210_data_jobs_switches','data_job_gate'),
     ('20261210_data_jobs_switches','data_job_paused'),
     ('20261211_data_jobs_watchdog','data_jobs_watchdog'),
-    ('20261211_data_jobs_watchdog','data_jobs_watchdog_age')
+    ('20261211_data_jobs_watchdog','data_jobs_watchdog_age'),
+    -- 20261241 Döveç health watchdog and the status-stamp trigger function; registered ahead of the apply; red until it runs.
+    ('20261241_dovec_health_watchdog','dovec_health_watchdog'),
+    ('20261241_dovec_health_watchdog','dovec_leads_stamp_status')
   ) e(m,o)
 
   UNION ALL
@@ -1048,6 +1059,8 @@ WITH report AS (
     -- 20261229 Döveç: wipes a deleted user's enquiry PII (AFTER DELETE on profiles) and the atomic enquiry limits (BEFORE INSERT on dovec_leads, advisory lock); registered ahead of the apply; red until it runs.
     ('20261229_dovec_projects','dovec_leads_forget_user'),
     ('20261229_dovec_projects','dovec_leads_rate_limit'),
+    -- 20261241: stamps dovec_leads.status_changed_at (BEFORE INSERT OR UPDATE OF status); registered ahead of the apply; red until it runs.
+    ('20261241_dovec_health_watchdog','dovec_leads_stamp_status'),
     -- Ask Oli chat history (20261163): registered ahead of the apply; red until it runs.
     ('20261163_oli_messages','oli_messages_rate_guard'),
     -- Araçlar (20261165/20261166): registered ahead of the apply; red until it runs.
@@ -1228,6 +1241,9 @@ WITH report AS (
     -- 20261211: the watchdog state table; registered ahead of the apply; red until it runs.
     ('20261211_data_jobs_watchdog','data_jobs_alert_state_pkey'),
     ('20261211_data_jobs_watchdog','data_jobs_alert_state_job_key_fkey'),
+    -- 20261241: the health watchdog state table; registered ahead of the apply; red until it runs.
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state_pkey'),
+    ('20261241_dovec_health_watchdog','dovec_health_alert_state_condition_check'),
     -- 20261217: the admin-push ledger; no FK on admin_id on purpose (account deletion). Registered ahead of the apply; red until it runs.
     ('20261217_admin_push_sends','admin_push_sends_pkey'),
     ('20261217_admin_push_sends','admin_push_sends_kind_check'),
@@ -2880,6 +2896,44 @@ WITH report AS (
            AND NOT has_function_privilege('anon', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE')
            AND NOT has_function_privilege('authenticated', to_regprocedure('public.weekend_digest_due(timestamptz)'), 'EXECUTE'), false)
     -- 1238-END
+    -- 1241-BEGIN
+    -- 20261241 Döveç health watchdog. Registered ahead of the apply; red until it runs. Own facts: dovec_leads.status_changed_at is NOT NULL
+    --   DEFAULT now() and the stamp trigger fires on INSERT or UPDATE OF status (row level, SECURITY INVOKER, EXECUTE owner only, search_path
+    --   pinned); the state table has RLS on, zero policies and no privilege for anon / authenticated / service_role (table or column); the
+    --   watchdog is DEFINER with pinned search_path and EXECUTE for the owner only; its body reads the five conditions, admins only, type
+    --   admin_alert, push data screen admin / tab datajobs, the 24 h repeat and the status_changed_at failure window. dovec_leads itself keeps
+    --   its 20261229 posture (token above). The job and its minutes are the Q2 token '20261241_dovec_health_watchdog'.
+    --   1066_notification_type: this is the NINTH notification writer (the watchdog inserts one admin_alert row per admin); the count in that
+    --   token goes 8 -> 9 in the same PR (Berke, 2026-11-13 rule).
+    UNION ALL SELECT '20261241_dovec_health_watchdog','status_changed_at NOT NULL DEFAULT now(); stamp trigger BEFORE INSERT OR UPDATE OF status, INVOKER, owner-only EXECUTE; state table RLS on, 0 policies, no grants; watchdog DEFINER, owner-only EXECUTE, admins only, 24 h repeat, failure window on status_changed_at',
+      COALESCE((SELECT a.attnotnull AND pg_get_expr(d.adbin, d.adrelid) = 'now()' AND a.atttypid = 'timestamptz'::regtype
+                  FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                 WHERE a.attrelid = to_regclass('public.dovec_leads') AND a.attname = 'status_changed_at' AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT count(*) = 1 AND bool_and(pg_get_triggerdef(tg.oid) LIKE 'CREATE TRIGGER dovec_leads_stamp_status BEFORE INSERT OR UPDATE OF status ON public.dovec_leads FOR EACH ROW EXECUTE FUNCTION%')
+                      FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname = 'dovec_leads_stamp_status' AND tg.tgrelid = to_regclass('public.dovec_leads')), false)
+      AND COALESCE((SELECT NOT p.prosecdef AND p.proacl IS NOT NULL AND p.proconfig = ARRAY['search_path=public']
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+                       AND pg_get_functiondef(p.oid) LIKE '%ELSIF NEW.status IS DISTINCT FROM OLD.status THEN%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_stamp_status()')), false)
+      AND COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.dovec_health_alert_state')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_health_alert_state') = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.dovec_health_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.dovec_health_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT has_table_privilege('service_role', to_regclass('public.dovec_health_alert_state'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+               AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = to_regclass('public.dovec_health_alert_state') AND a.attnum > 0 AND NOT a.attisdropped
+                                AND (has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') OR has_column_privilege('authenticated', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
+                                     OR has_column_privilege('service_role', a.attrelid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES'))), false)
+      AND COALESCE((SELECT p.prosecdef AND p.proacl IS NOT NULL AND p.proconfig = ARRAY['search_path=public']
+                       AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner)
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_health_watchdog(timestamptz)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%FOR r IN SELECT id, push_token FROM profiles WHERE role = ''admin'' LOOP%'
+           AND pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES (r.id, ttl, bdy, ''admin_alert'')%'
+           AND pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%jsonb_build_object(''screen'', ''admin'', ''tab'', ''datajobs'')%'
+           AND pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%v_alerted < p_now - interval ''24 hours''%'
+           AND pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%l.status_changed_at > p_now - interval ''24 hours''%'
+           AND pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%IF s.last_run_at IS NULL THEN%'
+           AND pg_get_functiondef(to_regprocedure('public.dovec_health_watchdog(timestamptz)')) LIKE '%NOT l.is_test%', false)
+    -- 1241-END
     -- 1103: the Thursday closing time is SEASONAL. Winter 17:30 (push 17:00), summer 13:30.
     -- Changing it is a CREATE OR REPLACE that keeps the name: bump this token in the same commit.
     UNION ALL SELECT '1103_duty_push_famagusta','duty_thursday_closing_local() = 17:30 (winter); duty_push_due reads Asia/Famagusta',
@@ -6594,15 +6648,17 @@ WITH report AS (
     --     since 20261196 added marketplace_photo_review_reminder (admin push when Bandabuliya
     --     photos wait; it sets type 'admin_alert'); probe run 43428984651 printed exactly these
     --     seven. A legitimate new writer bumps the count in the same PR, saying why.
+    --     Nine since 20261241 added dovec_health_watchdog (admin push when the Döveç sync or an enquiry goes wrong; sets type
+    --     'admin_alert', 4-column INSERT, one row per admin).
     --     Eight since 20261211 added data_jobs_watchdog (admin push when a data job needs attention;
     --     it sets type 'admin_alert', 4-column INSERT, one row per admin).
     --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
     --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
-    --     Nine since 20261242 added dovec_notify_undelivered (the one in-app notice when a Dovec enquiry could not be
+    --     Ten since 20261241 added dovec_health_watchdog (admin alerts) and 20261242 added dovec_notify_undelivered (the one in-app notice when a Dovec enquiry could not be
     --     delivered; it sets type 'dovec_undelivered', 4-column INSERT, one row per enquiry). It is the first writer with
     --     search_path '' and so writes `public.notifications`: the anchors accept the qualified spelling too.
-    UNION ALL SELECT '1066_notification_type','9 notification writers, all nine set type, none uses the 3-column INSERT',
-      COALESCE((SELECT count(*) = 9
+    UNION ALL SELECT '1066_notification_type','10 notification writers, all ten set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 10
                    AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%'
                              OR p.prosrc LIKE '%INSERT INTO public.notifications (user_id, title, body, type%) VALUES%')
                    AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%'
@@ -7638,6 +7694,16 @@ SELECT '20261232_dovec_cron', 'dovec-leads-wipe: schedule 30 3 * * * and the exa
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-leads-wipe' AND active
                     AND schedule = '30 3 * * *'
                     AND btrim(command) = 'SELECT public.dovec_leads_wipe_pii();') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261241: dovec-health-check every 15 minutes at :09 :24 :39 :54, the exact watchdog call ───
+SELECT '20261241_dovec_health_watchdog', 'dovec-health-check: schedule 9,24,39,54 * * * * and the exact watchdog call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-health-check') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-health-check' AND active
+                    AND schedule = '9,24,39,54 * * * *'
+                    AND btrim(command) = 'SELECT public.dovec_health_watchdog();') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 
