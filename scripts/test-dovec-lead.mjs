@@ -26,14 +26,16 @@ const t = (name, got, want) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? '' : `  — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`)
 }
 
+const TP0 = '+441234567899'
 const DPOINT = { id: 'dp-fixture-1', name: 'D-Point' }
 const makeStore = ({ visible = true, preload = [], dob = null, dbLimits = false, published = true, admin = false, testProject = DPOINT } = {}) => {
-  const s = { leads: [...preload], seq: preload.length, updates: [], calls: { isPublished: 0, isAdmin: 0, getVisibleProject: 0, insertLead: 0 } }
+  const s = { leads: [...preload], seq: preload.length, updates: [], calls: { isPublished: 0, isAdmin: 0, getListedProject: 0, insertLead: 0 } }
   s.isPublished = async () => { s.calls.isPublished++; return published }
   s.isAdmin = async () => { s.calls.isAdmin++; return admin }
   s.getDateOfBirth = async () => dob
   s.findByRequest = async (u, c) => s.leads.find(l => l.user_id === u && l.client_request_id === c) ?? null
-  s.getVisibleProject = async id => (s.calls.getVisibleProject++, visible ? PROJECTS.find(p => p.id === id) ?? null : null)
+  s.isFeedFresh = async () => visible
+  s.getListedProject = async id => (s.calls.getListedProject++, PROJECTS.find(p => p.id === id) ?? null)
   s.countLeads = async ({ userId, sinceIso }) => s.leads.filter(l => (!userId || l.user_id === userId) && l.created_at >= sinceIso).length
   s.insertLead = async row => {
     s.calls.insertLead++
@@ -491,8 +493,8 @@ console.log('logs carry no personal data')
 {
   const lines = []; const store = makeStore(); const d = { ...deps(store, { mode: 'live', live: true, fetchImpl: stub(202) }), log: s => lines.push(s) }
   await post(BODY, store, d)
-  t('one log line: external id, status, http code', lines, ['dovec-lead ADA-1 sent http=202'])
-  t('no name, phone, e-mail or user id in it', lines.some(l => /Test Person|441234|example\.com|user-a/.test(l)), false)
+  t('the delivery log line: external id, status, http code (then the timing line, see the timing section)', lines.filter(l => !l.startsWith('dovec-lead timing')), ['dovec-lead ADA-1 sent http=202'])
+  t('no name, phone, e-mail or user id in any line', lines.some(l => /Test Person|441234|example\.com|user-a/.test(l)), false)
 }
 
 console.log('B1: no enquiry while the module is unpublished (admins excepted)')
@@ -500,7 +502,7 @@ console.log('B1: no enquiry while the module is unpublished (admins excepted)')
   const store = makeStore({ published: false })
   const r = await post(BODY, store)
   t('customer + unpublished: 404 project_unavailable, same as not-found', [r.status, r.body], [404, { error: 'project_unavailable' }])
-  t('  ... insertLead 0 calls, getVisibleProject 0 calls, isAdmin asked once', [store.calls.insertLead, store.calls.getVisibleProject, store.calls.isAdmin, store.leads.length], [0, 0, 1, 0])
+  t('  ... nothing written before the gate: insertLead 0 calls, no row, isAdmin asked once', [store.calls.insertLead, store.leads.length, store.calls.isAdmin], [0, 0, 1])
   t('  ... identical to the answer for an unknown project', (await post({ ...clone(BODY), project_id: 'nope' }, makeStore())).body, r.body)
   const g = makeStore({ published: false }); const f = stub()
   await post(BODY, g, deps(g, { mode: 'live', live: true, fetchImpl: f }))
@@ -516,7 +518,122 @@ console.log('B1: no enquiry while the module is unpublished (admins excepted)')
 {
   const store = makeStore({ published: true })
   const r = await post(BODY, store)
-  t('customer + published: proceeds (positive control), one insert, isAdmin not asked', [r.status, r.body.status, store.calls.insertLead, store.calls.isAdmin], [200, 'mock', 1, 0])
+  t('customer + published: proceeds (positive control), one insert', [r.status, r.body.status, store.calls.insertLead], [200, 'mock', 1])
+}
+
+console.log('slice 3: one wave of reads, answers picked in the fixed precedence')
+{
+  const rid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const hashOf = async b => payloadHash(validateLead(b).value)
+  const mk = async (o = {}) => {
+    const { dark, minor, replay, gone, rateLimited, badUnit, errs = {} } = o
+    const store = makeStore({ published: !dark, dob: minor ? '2008-11-24' : null, visible: !gone })
+    if (replay) store.leads.push({ id: 1, external_id: 'ADA-1', user_id: 'user-a', client_request_id: BODY.client_request_id.toLowerCase(), payload_hash: await hashOf(BODY), status: 'mock', created_at: T0.toISOString() })
+    if (rateLimited) for (let i = 0; i < 3; i++) store.leads.push({ id: 10 + i, external_id: `ADA-${10 + i}`, user_id: 'user-a', client_request_id: rid(50 + i), payload_hash: 'z', status: 'mock', created_at: T0.toISOString() })
+    store.seq = store.leads.length
+    for (const [k, m] of Object.entries(errs)) store[k] = async () => { throw new Error(m) }
+    return { store, body: badUnit ? { ...clone(BODY), unit_type: '9+9' } : BODY }
+  }
+  const run = async o => { const { store, body } = await mk(o); const r = await post(body, store); return [r.status, r.body.error ?? r.body.status, store.leads.length] }
+  const n0 = (await mk({ replay: true })).store.leads.length
+  // every pair of conditions: the earlier step in the precedence wins
+  t('dark + under_18 -> 404 (dark gate first)', (await run({ dark: true, minor: true }))[0], 404)
+  t('dark + replay -> 404', (await run({ dark: true, replay: true }))[0], 404)
+  t('dark + project gone + rate limited -> 404', (await run({ dark: true, gone: true, rateLimited: true }))[0], 404)
+  t('under_18 + replay -> 403', (await run({ minor: true, replay: true }))[0], 403)
+  t('under_18 + project gone -> 403', (await run({ minor: true, gone: true }))[0], 403)
+  t('replay + project gone -> the replay (200, the original)', await run({ replay: true, gone: true }), [200, 'mock', n0])
+  t('replay + rate limited -> the replay', (await run({ replay: true, rateLimited: true }))[0], 200)
+  t('replay row + bad unit_type (a changed payload) -> 409 request_changed, before the unit_type 400', await run({ replay: true, badUnit: true }).then(x => x.slice(0, 2)), [409, 'request_changed'])
+  t('project gone + rate limited -> 404', (await run({ gone: true, rateLimited: true }))[0], 404)
+  t('project gone + bad unit_type -> 404', (await run({ gone: true, badUnit: true }))[0], 404)
+  t('bad unit_type + rate limited -> 400', (await run({ badUnit: true, rateLimited: true }))[0], 400)
+  t('rate limited alone -> 429 (positive control)', (await run({ rateLimited: true }))[0], 429)
+  t('nothing wrong -> 200 mock, one row (positive control)', await run({}), [200, 'mock', 1])
+  // an error in a LATER step never masks an earlier answer
+  for (const [label, o, want] of [
+    ['project read fails + dark gate', { dark: true, errs: { getListedProject: 'x' } }, 404],
+    ['feed read fails + dark gate', { dark: true, errs: { isFeedFresh: 'x' } }, 404],
+    ['count fails + dark gate', { dark: true, errs: { countLeads: 'x' } }, 404],
+    ['count fails + under_18', { minor: true, errs: { countLeads: 'x' } }, 403],
+    ['project read fails + replay', { replay: true, errs: { getListedProject: 'x' } }, 200],
+    ['count fails + replay', { replay: true, errs: { countLeads: 'x' } }, 200],
+    ['count fails + project gone', { gone: true, errs: { countLeads: 'x' } }, 404],
+    ['project read fails + feed stale', { gone: true, errs: { getListedProject: 'x' } }, 404],
+    ['count fails + bad unit_type', { badUnit: true, errs: { countLeads: 'x' } }, 400],
+    ['admin read fails while published (never needed)', { errs: { isAdmin: 'x' } }, 200],
+    ['dob read fails + dark gate', { dark: true, errs: { getDateOfBirth: 'x' } }, 404],
+  ]) t(`${label}: ${want}, not 500`, (await run(o).catch(() => ['threw']))[0], want)
+  // an error in the step the precedence reaches still surfaces (the edge function maps a throw to 500)
+  for (const [label, o] of [
+    ['dark-gate read (isPublished) fails', { errs: { isPublished: 'x' } }], ['admin read fails while dark', { dark: true, errs: { isAdmin: 'x' } }],
+    ['dob read fails', { errs: { getDateOfBirth: 'x' } }], ['replay lookup fails', { errs: { findByRequest: 'x' } }],
+    ['project read fails', { errs: { getListedProject: 'x' } }], ['feed read fails', { errs: { isFeedFresh: 'x' } }], ['count fails', { errs: { countLeads: 'x' } }],
+  ]) t(`${label}: thrown (500 upstream)`, await run(o).then(() => 'answered', () => 'threw'), 'threw')
+  // no write before the dark gate, whatever the reads do
+  for (const o of [{ dark: true }, { dark: true, minor: true }, { dark: true, errs: { countLeads: 'x' } }]) {
+    const { store, body } = await mk(o); await post(body, store).catch(() => {})
+    t(`dark gate ${JSON.stringify(Object.keys(o))}: no insert, no update, no row`, [store.calls.insertLead, store.updates.length, store.leads.length], [0, 0, 0])
+  }
+  // the reads really are one wave: all started before any resolves
+  {
+    const order = []; const { store, body } = await mk({})
+    for (const k of ['isPublished', 'isAdmin', 'getDateOfBirth', 'findByRequest', 'isFeedFresh', 'getListedProject', 'countLeads']) {
+      const f = store[k]; store[k] = async (...a) => { order.push(`start:${k}`); await new Promise(r => setTimeout(r, 5)); const v = await f(...a); order.push(`end:${k}`); return v }
+    }
+    await post(body, store)
+    const firstEnd = order.findIndex(x => x.startsWith('end:'))
+    t('the nine reads all start before the first one ends', [order.slice(0, firstEnd).length, firstEnd], [9, 9])
+  }
+}
+
+console.log('slice 3: the mock path is one insert; the live path is unchanged')
+{
+  const store = makeStore(); const f = stub()
+  const r = await post(BODY, store, deps(store, { fetchImpl: f }))
+  t('not live: inserted with status mock, no update, no fetch, the user sees mock', [store.leads[0].status, store.updates.length, f.calls.length, r.body.status], ['mock', 0, 0, 'mock'])
+  const lines = []; const s2 = makeStore()
+  await post(BODY, s2, { ...deps(s2), log: l => lines.push(l) })
+  t('not live: the same "dovec-lead <ext> mock" line as before', lines.filter(l => !l.includes('timing')), ['dovec-lead ADA-1 mock'])
+  const sL = makeStore(); const fL = stub(202)
+  const rL = await post(BODY, sL, deps(sL, { mode: 'live', live: true, fetchImpl: fL }))
+  t('live (both locks): insert pending, one fetch, then ONE update to sent', [sL.insertedAs, sL.updates.length, sL.updates[0]?.status, fL.calls.length, rL.body.status], [undefined, 1, 'sent', 1, 'sent'])
+  const sT = makeStore(); const fT = stub()
+  await post(BODY, sT, deps(sT, { mode: 'test_once', live: true, testAllowed: true, testPhone: TP0, fetchImpl: fT }))
+  t('test_once: a user lead is stored mock directly, nothing sent', [sT.leads[0].status, sT.updates.length, fT.calls.length], ['mock', 0, 0])
+  const noKey = makeStore(); await post(BODY, noKey, deps(noKey, { mode: 'live', live: true, apiKey: null }))
+  t('both locks but no partner key: stored mock directly', [noKey.leads[0].status, noKey.updates.length], ['mock', 0])
+  const tl1 = makeStore(); const ftl = stub(202)
+  const rt = await handleLead({ caller: { kind: 'service' }, body: { mode: 'test_lead', dry: false }, deps: deps(tl1, { mode: 'test_once', testAllowed: true, testPhone: TP0, fetchImpl: ftl }) })
+  t('TEST-1 is still inserted pending, then sent (never mock)', [rt.body.status, tl1.leads[0].status, tl1.updates.map(u => u.status), ftl.calls.length], ['sent', 'sent', ['sent'], 1])
+  const sR = makeStore(); await post(BODY, sR, deps(sR, { mode: 'live', live: true, fetchImpl: stub(500) }))
+  t('live + 500 -> retry as before', [sR.leads[0].status, sR.leads[0].attempts], ['retry', 1])
+}
+
+console.log('slice 3: the timing line and the Server-Timing header carry no personal data')
+{
+  const lines = []; let tick = 0
+  const store = makeStore({ preload: [] }); const d = { ...deps(store), log: l => lines.push(l), clock: () => (tick += 7), timing: { auth: 41.6, body: 2.2 } }
+  const r = await post({ ...clone(BODY), name: 'Zelda Quartz', phone: '+905551230987', email: 'zelda@quartz.example', message: 'Secret message text' }, store, d)
+  const re = /^dovec-lead timing (ADA-\d+|-) auth=\d+ body=\d+ reads=\d+ insert=\d+ deliver=\d+ total=\d+$/
+  const tline = lines.filter(l => l.startsWith('dovec-lead timing'))
+  t('exactly one timing line per request, in the agreed shape', [tline.length, re.test(tline[0] ?? '')], [1, true])
+  t('it carries the auth and body ms the caller measured, rounded', /auth=42 body=2 /.test(tline[0]), true)
+  const PII = [/Zelda/i, /Quartz/i, /905551230987/, /5551230987/, /zelda@/i, /Secret message/i, /user-a/, /Fictional|fx-harbour/i]
+  const all = [...lines, r.serverTiming]
+  t('no name, phone, e-mail, message, project or user id in any log line or in Server-Timing', all.map(l => PII.some(p => p.test(l))), all.map(() => false))
+  t('Server-Timing is step names and durations only', /^auth;dur=\d+,body;dur=\d+,reads;dur=\d+,insert;dur=\d+,deliver;dur=\d+,total;dur=\d+$/.test(r.serverTiming), true)
+  for (const [label, o] of [['a 400', { ...clone(BODY), phone: 'nope' }], ['a 404', { ...clone(BODY), project_id: 'nope' }]]) {
+    const ls = []; const s3 = makeStore(); const rr = await post(o, s3, { ...deps(s3), log: l => ls.push(l) })
+    t(`${label} also logs one timing line with "-" for the external id`, [ls.filter(l => l.startsWith('dovec-lead timing -')).length, ls.some(l => PII.some(p => p.test(l))), rr.status >= 400], [1, false, true])
+  }
+  const lt = []; const s4 = makeStore(); await post(BODY, s4, { ...deps(s4, { mode: 'live', live: true, fetchImpl: stub(202) }), log: l => lt.push(l) })
+  t('a live send logs its delivery line and one timing line with the external id', [lt.length, lt.some(l => l.startsWith('dovec-lead timing ADA-1 '))], [2, true])
+  const thrown = []; const s5 = makeStore(); s5.countLeads = async () => { throw new Error('db down') }
+  await post(BODY, s5, { ...deps(s5), log: l => thrown.push(l) }).catch(() => {})
+  t('a request that throws still logs its timing line', thrown.filter(l => l.startsWith('dovec-lead timing')).length, 1)
+  const src = readFileSync(new URL('../supabase/functions/dovec-lead/index.ts', import.meta.url), 'utf8')
+  t('index.ts passes the auth and body ms and sets Server-Timing', [src.includes('timing: { auth: authMs, body: bodyMs }'), src.includes("'Server-Timing': res.serverTiming")], [true, true])
 }
 
 console.log('T9: lead locks as shipped')
