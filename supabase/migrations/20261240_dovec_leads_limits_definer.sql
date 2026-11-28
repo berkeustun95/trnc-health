@@ -16,7 +16,8 @@
 -- WHO CAN READ/WRITE WHAT. Unchanged for every table: dovec_leads stays RLS on, zero policies, no privilege for anon / authenticated,
 -- service_role SELECT/INSERT/UPDATE only. The function is now callable by nobody directly (the owner and the trigger only).
 --
--- PRINTS no user data and no counts of user rows. The behaviour block runs inside a deliberate exception: nothing it writes survives.
+-- PRINTS no user data and no counts of user rows. The behaviour block runs inside a deliberate exception: no row it writes survives.
+-- Sequences are not rolled back: the behaviour block burns values of public.dovec_lead_external_seq, so the ADA-n numbers will show a gap.
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.dovec_leads_enforce_limits()
@@ -165,7 +166,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261240_dovec_leads_limits_definer.sql', 'dcae6b5ae1061202ffda9b11576103f9c06983bde63e0e2b709096fd3210ea13')
+VALUES ('20261240_dovec_leads_limits_definer.sql', '5a61bac582fb357d3219271cde39c7afb09435bdcc4043c5ef41ead293e1fde0')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

@@ -338,7 +338,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261236_events_gisekibris_rekey_borrowed_banner_ids.sql', '407ae31d7a3e78ef8b48b02ca907d3f68d273aa89e4b1d1f1781323b275fea28'),
   ('20261237_dovec_mock_lead_cleanup_2.sql', 'b392995ec731c5b33bf35ae93bc35fe1c866c8868b984c9f944737ac55a6ff75'),
   ('20261238_weekend_digest_shift_3min.sql', 'af30ea25c2bea3d0be24118b7debb1f4fe0016cfe6fcfa90e59d532a67709195'),
-  ('20261240_dovec_leads_limits_definer.sql', 'dcae6b5ae1061202ffda9b11576103f9c06983bde63e0e2b709096fd3210ea13')
+  ('20261240_dovec_leads_limits_definer.sql', '5a61bac582fb357d3219271cde39c7afb09435bdcc4043c5ef41ead293e1fde0')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
