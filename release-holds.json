@@ -355,6 +355,14 @@
       "since": "2026-11-27",
       "cleared": false,
       "clear": "Only after Berke has seen it on Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's only commit (merge commit, not squash)."
+    },
+    {
+      "pr": 624,
+      "commit": "677d250929177d1a0e3ece6922bbbe62c4d6533f",
+      "what": "Döveç leads: notes 1-3 + slow-send timing (admin-only timing line on the thank-you), still dark",
+      "since": "2026-11-28",
+      "cleared": false,
+      "clear": "Only after Berke has seen it on Preview and says go in chat. Then set cleared to true in a PR. The commit is this PR's only commit (merge commit, not squash)."
     }
   ]
 }
