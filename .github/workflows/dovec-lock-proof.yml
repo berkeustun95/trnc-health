@@ -52,7 +52,7 @@ jobs:
           node scripts/dovec-lock-proof.mjs
 
   approve:
-    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && inputs.apply }}
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply) }}
     needs: dry
     runs-on: ubuntu-24.04
     environment: production-db
@@ -62,7 +62,7 @@ jobs:
       - run: echo "Rolled-back lock proof approved for production. Nothing is committed; sequence values are burnt."
 
   apply:
-    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && inputs.apply }}
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply) }}
     needs: approve
     runs-on: ubuntu-24.04
     environment: production
