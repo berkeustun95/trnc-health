@@ -1,0 +1,96 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 20261246 — Döveç: put dovec-sync back to normal (the backstop for 20261245's pause)
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- WHAT IT DOES, IN PLAIN ENGLISH
+--   * If the one-shot job 'dovec-sync-resume' still exists (the pause is still running), it is removed together with its registry
+--     rows (data_job_runs, data_jobs_alert_state, data_jobs). If it does not exist (it already fired and removed itself, or 20261245
+--     was never applied) that part does nothing.
+--   * dovec-sync is switched on with its schedule set to '*/10 * * * *' (cron.alter_job). The file REFUSES if dovec-sync does not
+--     exist: recreating it is 20261232's job and needs the Vault key.
+--   * The end state is asserted: dovec-sync exactly once, active, the exact schedule and the 20261232 command checks; no
+--     dovec-sync-resume job and no registry row with that key; every cron job covered by exactly one data_jobs row;
+--     dovec_settings.published unchanged.
+-- Safe to apply before or after the fallback fired, and when 20261245 never ran.
+--
+-- WHO CAN READ / WRITE WHAT: no table, policy, grant or function is added. Runs as postgres; no app role is involved.
+-- Public logs: NOTICEs print booleans and job names only.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+SET ROLE postgres;
+
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+
+DO $$
+DECLARE
+  v_jobid     bigint;
+  v_pub       boolean;
+  v_pub_after boolean;
+  v_n         int;
+  v_names     text;
+BEGIN
+  IF to_regclass('cron.job') IS NULL OR to_regprocedure('cron.alter_job(bigint,text,text,text,text,boolean)') IS NULL
+     OR to_regprocedure('cron.unschedule(text)') IS NULL THEN
+    RAISE EXCEPTION 'REFUSING: pg_cron (alter_job / unschedule) is missing. Nothing applied.';
+  END IF;
+  IF to_regclass('public.data_jobs') IS NULL OR to_regclass('public.data_job_runs') IS NULL OR to_regclass('public.data_jobs_alert_state') IS NULL
+     OR to_regclass('public.dovec_settings') IS NULL THEN
+    RAISE EXCEPTION 'REFUSING: data_jobs registry or dovec_settings is missing. Nothing applied.';
+  END IF;
+  IF (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync') IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'REFUSING: expected exactly one dovec-sync cron job (20261232 creates it, with the Vault key). Nothing applied.';
+  END IF;
+  SELECT published INTO v_pub FROM public.dovec_settings WHERE id = 1;
+
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync-resume') THEN PERFORM cron.unschedule('dovec-sync-resume'); END IF;
+  DELETE FROM public.data_job_runs WHERE job_key = 'dovec-sync-resume';
+  DELETE FROM public.data_jobs_alert_state WHERE job_key = 'dovec-sync-resume';
+  DELETE FROM public.data_jobs WHERE key = 'dovec-sync-resume';
+
+  SELECT jobid INTO v_jobid FROM cron.job WHERE jobname = 'dovec-sync';
+  PERFORM cron.alter_job(job_id := v_jobid, schedule := '*/10 * * * *', active := true);
+
+  SELECT count(*) INTO v_n FROM cron.job WHERE jobname = 'dovec-sync' AND active AND schedule = '*/10 * * * *'
+     AND command LIKE '%/functions/v1/sync-dovec%'
+     AND command LIKE '%vault.decrypted_secrets WHERE name = ''novest_sync_key''%'
+     AND command LIKE '%timeout_milliseconds := 60000%'
+     AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%';
+  IF v_n IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'dovec-sync is not exactly one active job with schedule */10 * * * * and the 20261232 command'; END IF;
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync-resume') THEN RAISE EXCEPTION 'dovec-sync-resume still exists'; END IF;
+  IF EXISTS (SELECT 1 FROM public.data_jobs WHERE key = 'dovec-sync-resume' OR 'dovec-sync-resume' = ANY (cron_jobnames)) THEN
+    RAISE EXCEPTION 'a data_jobs row for dovec-sync-resume still exists';
+  END IF;
+
+  SELECT string_agg(j.jobname, ', ' ORDER BY j.jobname) INTO v_names
+    FROM cron.job j WHERE (SELECT count(*) FROM public.data_jobs d WHERE j.jobname = ANY (d.cron_jobnames)) IS DISTINCT FROM 1;
+  IF v_names IS NOT NULL THEN RAISE EXCEPTION 'cron jobs not covered by exactly one data_jobs row: %', v_names; END IF;
+  SELECT string_agg(DISTINCT n, ', ' ORDER BY n) INTO v_names
+    FROM public.data_jobs d, unnest(d.cron_jobnames) AS n WHERE NOT EXISTS (SELECT 1 FROM cron.job j WHERE j.jobname = n);
+  IF v_names IS NOT NULL THEN RAISE EXCEPTION 'data_jobs lists cron jobs that do not exist: %', v_names; END IF;
+
+  SELECT published INTO v_pub_after FROM public.dovec_settings WHERE id = 1;
+  IF v_pub_after IS DISTINCT FROM v_pub THEN RAISE EXCEPTION 'dovec_settings.published changed'; END IF;
+
+  RAISE NOTICE '20261246 OK: dovec-sync active at */10 * * * *; dovec-sync-resume gone (job and registry rows); coverage holds; published unchanged: true';
+END $$;
+
+-- ─── ledger:stamp:begin ──────────────────────────────────────────────
+-- Machine-generated by scripts/migration-ledger.mjs --stamp. Do not hand-edit.
+-- The checksum is of THIS FILE WITH THIS BLOCK STRIPPED, which is what lets the file
+-- carry its own stamp. Everything between the markers is excluded from the checksum
+-- but still runs — so it may contain NOTHING but this INSERT. See the note in the
+-- generator: anything else here would execute on paste while leaving no trace in the
+-- hash, and the ledger would be attesting a file it never actually verified.
+--
+-- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
+-- it, COMMIT is never reached and nothing applies.
+INSERT INTO public.schema_migrations_applied (filename, checksum)
+VALUES ('20261246_dovec_sync_restart.sql', '6092340eb45808110c9170a2ab1b785005076a527304c19763ea30d5abe301ef')
+ON CONFLICT (filename) DO UPDATE
+  SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
+-- ─── ledger:stamp:end ────────────────────────────────────────────────
+COMMIT;
+
+RESET ROLE;
