@@ -771,7 +771,9 @@ WITH report AS (
     ('20261229_dovec_projects','dovec_leads','next_attempt_at'),
     ('20261229_dovec_projects','dovec_leads','sent_at'),
     ('20261229_dovec_projects','dovec_leads','created_at'),
-    ('20261229_dovec_projects','dovec_leads','pii_wiped_at')
+    ('20261229_dovec_projects','dovec_leads','pii_wiped_at'),
+    ('20261242_dovec_undelivered_notice','dovec_leads','send_live'),
+    ('20261242_dovec_undelivered_notice','dovec_leads','undelivered_notified_at')
 
   ) e(m,t,c)
 
@@ -797,6 +799,9 @@ WITH report AS (
     -- 20261231 Dovec read gate: the visibility helper inside the read policy and the private pin report; red until applied.
     ('20261231_dovec_read_gate','dovec_projects_visible'),
     ('20261231_dovec_read_gate','dovec_coord_report'),
+    -- 20261242 Döveç undelivered notice: the notifier (cron, owner-only) and its text lookup; red until applied.
+    ('20261242_dovec_undelivered_notice','dovec_notify_undelivered'),
+    ('20261242_dovec_undelivered_notice','dovec_undelivered_text'),
     -- 20261219: age_confirmed_at server stamp; registered ahead of the apply; red until it runs.
     ('20261219_age_confirmed_at','stamp_age_confirmed_at'),
     -- Duty push on TRNC local time (1103): registered ahead of the apply; red until it runs.
@@ -2539,6 +2544,33 @@ WITH report AS (
                       FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner, pg_class c
                      WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()') AND c.oid = to_regclass('public.dovec_leads')), false)
     -- 1240-END
+    -- 1242-BEGIN
+    -- 20261242 Dovec undelivered notice. Owns: the two columns' type/default, the notifications type value (and that older values survive), the owner-only EXECUTE and pinned search_path of both functions, the notifier's picker shape, and that dovec_leads stays service-role only. Red until applied, never an error (to_regprocedure / catalogs).
+    UNION ALL SELECT '20261242_dovec_undelivered_notice','send_live boolean NOT NULL DEFAULT false; undelivered_notified_at nullable timestamptz; notifications_type_check admits dovec_undelivered and still admits message and admin_alert',
+      COALESCE((SELECT a.attnotnull AND a.atttypid = 'boolean'::regtype AND pg_get_expr(d.adbin, d.adrelid) = 'false'
+                  FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                 WHERE a.attrelid = to_regclass('public.dovec_leads') AND a.attname = 'send_live' AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT NOT a.attnotnull AND a.atttypid = 'timestamptz'::regtype
+                  FROM pg_attribute a WHERE a.attrelid = to_regclass('public.dovec_leads') AND a.attname = 'undelivered_notified_at' AND NOT a.attisdropped), false)
+      AND COALESCE((SELECT strpos(pg_get_constraintdef(k.oid), '''dovec_undelivered''::text') > 0 AND strpos(pg_get_constraintdef(k.oid), '''message''::text') > 0
+                           AND strpos(pg_get_constraintdef(k.oid), '''admin_alert''::text') > 0
+                  FROM pg_constraint k WHERE k.conrelid = to_regclass('public.notifications') AND k.conname = 'notifications_type_check'), false)
+    UNION ALL SELECT '20261242_dovec_undelivered_notice','dovec_notify_undelivered() and dovec_undelivered_text(): owner postgres, search_path pinned to empty, EXECUTE for nobody but the owner; the notifier is SECURITY DEFINER and picks only NOT is_test + send_live + user + not wiped + not yet notified, with a row lock',
+      COALESCE((SELECT bool_and(p.proowner = 'postgres'::regrole AND p.proconfig = ARRAY['search_path=""']
+                  AND NOT EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a WHERE a.privilege_type = 'EXECUTE' AND a.grantee IS DISTINCT FROM p.proowner)
+                  AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                  AND NOT has_function_privilege('service_role', p.oid, 'EXECUTE'))
+                  FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.dovec_notify_undelivered()'), to_regprocedure('public.dovec_undelivered_text(text,text,text)'))), false)
+      AND (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.dovec_notify_undelivered()'), to_regprocedure('public.dovec_undelivered_text(text,text,text)'))) = 2
+      AND COALESCE((SELECT p.prosecdef AND strpos(pg_get_functiondef(p.oid), 'NOT l.is_test AND l.send_live AND l.user_id IS NOT NULL AND l.pii_wiped_at IS NULL AND l.undelivered_notified_at IS NULL') > 0
+                           AND strpos(pg_get_functiondef(p.oid), 'FOR UPDATE OF l SKIP LOCKED') > 0
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_notify_undelivered()')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_leads') = 0
+      AND NOT has_column_privilege('anon', to_regclass('public.dovec_leads'), 'send_live', 'SELECT')
+      AND NOT has_column_privilege('authenticated', to_regclass('public.dovec_leads'), 'send_live', 'SELECT')
+      AND NOT has_column_privilege('authenticated', to_regclass('public.dovec_leads'), 'undelivered_notified_at', 'SELECT')
+      AND COALESCE(has_column_privilege('service_role', to_regclass('public.dovec_leads'), 'send_live', 'SELECT'), false)
+    -- 1242-END
     -- 1235-BEGIN
     -- 20261235 Döveç privacy URLs: owns the exact readable column set of dovec_settings (one count, one owner; the 20261229 token no longer says "exactly"). Red until applied, never an error: the URL values are read through to_jsonb(s) because a bare s.privacy_url_tr would kill QUERY 1 (42703) before the column exists.
     UNION ALL SELECT '20261235_dovec_privacy_url','dovec_settings privacy URLs: anon and authenticated read EXACTLY id, last_good_sync_at, privacy_url_en, privacy_url_tr, published, suspended, whatsapp_e164 (no run column) and write no column; service_role UPDATEs exactly suspended, last_good_sync_at, last_run_at, last_run_status, last_run_detail (no privacy_url_*); both URL columns are NULL or https with no whitespace, at most 500 chars (named CHECKs dovec_settings_privacy_url_{tr,en}_check); the single row holds exactly https://www.dovecgroup.com/tr/privacy-policy and https://www.dovecgroup.com/en/privacy-policy; published is NOT asserted here (go-live flips it; the 20261229 token owns its DEFAULT false)',
@@ -6566,10 +6598,15 @@ WITH report AS (
     --     it sets type 'admin_alert', 4-column INSERT, one row per admin).
     --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
     --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
-    UNION ALL SELECT '1066_notification_type','8 notification writers, all eight set type, none uses the 3-column INSERT',
-      COALESCE((SELECT count(*) = 8
-                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%')
-                   AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
+    --     Nine since 20261242 added dovec_notify_undelivered (the one in-app notice when a Dovec enquiry could not be
+    --     delivered; it sets type 'dovec_undelivered', 4-column INSERT, one row per enquiry). It is the first writer with
+    --     search_path '' and so writes `public.notifications`: the anchors accept the qualified spelling too.
+    UNION ALL SELECT '1066_notification_type','9 notification writers, all nine set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 9
+                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%'
+                             OR p.prosrc LIKE '%INSERT INTO public.notifications (user_id, title, body, type%) VALUES%')
+                   AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%'
+                                OR p.prosrc LIKE '%INSERT INTO public.notifications (user_id, title, body) VALUES%')
                   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                  WHERE n.nspname = 'public' AND p.prosrc ~* 'insert\s+into\s+(public\.)?notifications\M'), false)
     -- ── 1067: the ledger table's comment names the supabase-migrate workflow ────
@@ -7601,6 +7638,16 @@ SELECT '20261232_dovec_cron', 'dovec-leads-wipe: schedule 30 3 * * * and the exa
             WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-leads-wipe' AND active
                     AND schedule = '30 3 * * *'
                     AND btrim(command) = 'SELECT public.dovec_leads_wipe_pii();') = 1
+              THEN 'OK'
+            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+
+UNION ALL
+-- ─── 20261242: dovec-notify-undelivered runs every 10 minutes at :07 and calls the notifier (no edge function) ───
+SELECT '20261242_dovec_undelivered_notice', 'dovec-notify-undelivered: schedule 7,17,27,37,47,57 * * * * and the exact call',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-notify-undelivered') THEN 'MISSING'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-notify-undelivered' AND active
+                    AND schedule = '7,17,27,37,47,57 * * * *'
+                    AND btrim(command) = 'SELECT public.dovec_notify_undelivered();') = 1
               THEN 'OK'
             ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
 

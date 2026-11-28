@@ -710,5 +710,104 @@ console.log('T11: secret-key service caller')
   t('no CREATE POLICY on dovec_leads in any migration', pols, [])
 }
 
+console.log('answer first, send right after (live mode)')
+{
+  const sleep = ms => new Promise(r => setTimeout(r, ms))
+  const HUNG = 'HUNG'
+  const first = p => Promise.race([p, sleep(300).then(() => HUNG)])
+  const gate = () => { let go; const p = new Promise(r => { go = r }); const f = async (u, o) => { f.calls.push({ u, o }); await p; return { status: 202, headers: { get: () => null } } }; f.calls = []; f.release = go; return f }
+  // The fake store honours the real due semantics: COALESCE(next_attempt_at, created_at + 10 min) <= now (index.ts dueFilter, 20261232).
+  const dueStore = () => {
+    const s = makeStore()
+    const due = (l, nowIso) => (l.next_attempt_at ?? new Date(new Date(l.created_at).getTime() + 600000).toISOString()) <= nowIso
+    s.dueLeads = async (limit, nowIso, statuses) => s.leads.filter(l => !l.is_test && statuses.includes(l.status) && due(l, nowIso)).slice(0, limit)
+    s.claimLead = async (id, nowIso, untilIso) => {
+      const l = s.leads.find(x => x.id === id)
+      if (!l || !['retry', 'pending'].includes(l.status) || !due(l, nowIso)) return null
+      s.claims++; l.next_attempt_at = untilIso; return { ...l }
+    }
+    return s
+  }
+  const liveDeps = (store, o = {}) => ({ ...deps(store, { mode: 'live', live: true, ...o }), waitUntil: p => { liveDeps.bg.push(p) } })
+  liveDeps.bg = []
+  const unhandled = []
+  const onUnhandled = e => unhandled.push(e?.name ?? 'x')
+  process.on('unhandledRejection', onUnhandled)
+
+  {   // saved before the response, response before the send settles
+    liveDeps.bg = []
+    const store = dueStore(); const f = gate()
+    const r = await first(post(BODY, store, liveDeps(store, { fetchImpl: f })))
+    t('the response returned while the fake fetch is still pending (not HUNG)', r === HUNG, false)
+    t('the row was saved (pending) before the response', [store.leads.length, store.leads[0]?.status], [1, 'pending'])
+    t('public answer: 200 ok, external id, status pending (classifyLead -> ok)', [r.status, r.body], [200, { ok: true, external_id: 'ADA-1', status: 'pending' }])
+    await sleep(20)
+    t('delivery started after the insert resolved (one fetch in flight)', f.calls.length, 1)
+    t('timing: deliver dur=0 in Server-Timing when backgrounded', /deliver;dur=0,/.test(r.serverTiming ?? ''), true)
+    f.release(); await Promise.all(liveDeps.bg)
+    t('after the background send: sent, attempts 1, next_attempt_at cleared, sent_at set', [store.leads[0].status, store.leads[0].attempts, store.leads[0].next_attempt_at, !!store.leads[0].sent_at], ['sent', 1, null, true])
+  }
+  {   // the inserted row is its own claim
+    liveDeps.bg = []
+    const store = dueStore(); const f = gate()
+    await first(post(BODY, store, liveDeps(store, { fetchImpl: f })))
+    const row = store.leads[0]
+    t('inserted pending with next_attempt_at = now + 15 min and send_live true', [row.status, row.next_attempt_at, row.send_live], ['pending', new Date(T0.getTime() + 15 * 60000).toISOString(), true])
+    f.release(); await Promise.all(liveDeps.bg)
+  }
+  {   // no double send while the background send runs; resend exactly once after a death mid-send
+    liveDeps.bg = []
+    const store = dueStore(); const f = gate()
+    await first(post(BODY, store, liveDeps(store, { fetchImpl: f })))
+    const cronF = stub(202)
+    const during = await retryDue({ ...deps(store, { mode: 'live', live: true, fetchImpl: cronF }), now: () => new Date(T0.getTime() + 11 * 60000) })
+    t('a retryDue run during the background send claims nothing and sends nothing', [during.body.processed, store.claims, cronF.calls.length], [0, 0, 0])
+    // the function dies mid-send: the gate fetch never settles, nobody writes the row
+    t('the row still waits, claimed until +15 min', [store.leads[0].status, store.leads[0].next_attempt_at], ['pending', new Date(T0.getTime() + 15 * 60000).toISOString()])
+    const after = await retryDue({ ...deps(store, { mode: 'live', live: true, fetchImpl: cronF }), now: () => new Date(T0.getTime() + 16 * 60000) })
+    t('at +16 min a retryDue run claims and sends it exactly once', [after.body.processed, after.body.sent, store.claims, cronF.calls.length, store.leads[0].status], [1, 1, 1, 1, 'sent'])
+    t('the resend carries the same external_id', JSON.parse(cronF.calls[0].o.body).external_id, 'ADA-1')
+    const again = await retryDue({ ...deps(store, { mode: 'live', live: true, fetchImpl: cronF }), now: () => new Date(T0.getTime() + 40 * 60000) })
+    t('and a later run sends nothing more', [again.body.processed, cronF.calls.length], [0, 1])
+    f.release()
+  }
+  {   // no waitUntil: today's behaviour, awaited inline
+    const store = dueStore(); const f = gate()
+    const d = deps(store, { mode: 'live', live: true, fetchImpl: f })
+    const pending = post(BODY, store, d)
+    const early = await Promise.race([pending, sleep(200).then(() => HUNG)])
+    t('fallback: the response waits for the send (inline)', early, HUNG)
+    f.release()
+    const r = await pending
+    t('fallback: status sent in the answer', [r.body.status, store.leads[0].status], ['sent', 'sent'])
+    t('fallback: timing still measures deliver (not 0)', /deliver;dur=0,/.test(r.serverTiming), false)
+    t('fallback: the claim time is cleared by the inline send', store.leads[0].next_attempt_at, null)
+  }
+  {   // a failing background send is caught and logged without PII
+    liveDeps.bg = []
+    const store = dueStore(); const lines = []
+    const origUpdate = store.updateLead
+    store.updateLead = async () => { throw Object.assign(new Error('boom Probe Person +441234567890'), { name: 'DbDown' }) }
+    const r = await post(BODY, store, { ...liveDeps(store, { fetchImpl: stub(202) }), log: s => lines.push(s) })
+    t('a background failure does not change the answer', [r.status, r.body.status], [200, 'pending'])
+    await Promise.all(liveDeps.bg); await sleep(10)
+    t('the background promise never rejects (waitUntil got a settled-safe promise)', await Promise.allSettled(liveDeps.bg).then(a => a.map(x => x.status)), ['fulfilled'])
+    t('logged exactly: background_error with the error name', lines.filter(l => l.includes('background_error')), ['dovec-lead ADA-1 background_error DbDown'])
+    t('no log line carries a name, phone, message or the error text', lines.some(l => /Probe Person|441234567890|boom/i.test(l)), false)
+    store.updateLead = origUpdate
+    t('no unhandled rejection was raised', unhandled, [])
+  }
+  {   // mock mode and the test enquiry are untouched
+    const store = dueStore(); const bg = []
+    const d = { ...deps(store, {}), waitUntil: p => bg.push(p) }
+    const r = await post(BODY, store, d)
+    t('mock: stored mock, no claim time, not send_live, nothing backgrounded', [store.leads[0].status, store.leads[0].next_attempt_at ?? null, store.leads[0].send_live ?? null, bg.length, r.body.status], ['mock', null, null, 0, 'mock'])
+    const ts = dueStore(); const f = stub(202); const tbg = []
+    const tr = await handleLead({ caller: SVC, body: { mode: 'test_lead', dry: false }, deps: { ...deps(ts, { mode: 'test_once', testAllowed: true, testPhone: TP, fetchImpl: f }), waitUntil: p => tbg.push(p) } })
+    t('test lead: awaited inline (status sent in the answer), no send_live, nothing backgrounded', [tr.body.status, ts.leads[0].send_live ?? null, ts.leads[0].next_attempt_at ?? null, tbg.length, f.calls.length], ['sent', null, null, 0, 1])
+  }
+  process.off('unhandledRejection', onUnhandled)
+}
+
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

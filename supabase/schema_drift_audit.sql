@@ -1291,6 +1291,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('dovec_leads', 'created_at', true, 'now()', 'timestamp with time zone'),
     ('dovec_leads', 'pii_wiped_at', false, NULL, 'timestamp with time zone'),
     ('dovec_leads', 'is_test', true, 'false', 'boolean'),
+    ('dovec_leads', 'send_live', true, 'false', 'boolean'),
+    ('dovec_leads', 'undelivered_notified_at', false, NULL, 'timestamp with time zone'),
     ('connectivity_operators', 'logo_key', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
@@ -1796,7 +1798,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('notifications_conversation_id_fkey', '', 'conversation_id|id'),
     ('notifications_listing_id_fkey', '', 'id|listing_id'),
     ('notifications_pkey', '', 'id'),
-    ('notifications_type_check', 'admin_alert|admin_message|duty|featured|general|marketplace|message|question|waitlist|weekend', 'type'),
+    ('notifications_type_check', 'admin_alert|admin_message|dovec_undelivered|duty|featured|general|marketplace|message|question|waitlist|weekend', 'type'),
     ('notifications_user_id_fkey', '', 'id|user_id'),
     ('oli_messages_payload_check', '8000|object', 'payload'),
     ('oli_messages_pkey', '', 'id'),
