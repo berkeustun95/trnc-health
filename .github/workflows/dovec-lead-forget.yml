@@ -59,7 +59,11 @@ jobs:
           trimmed=$(printf '%s' "$email" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
           lowered=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
           for x in "$ref" "$email" "$trimmed" "$lowered"; do
-            printf '%s\n' "$x" | while IFS= read -r l; do [ -z "$l" ] || echo "::add-mask::$l"; done
+            printf '%s\n' "$x" | tr '\r' '\n' | while IFS= read -r l; do
+              [ -z "$l" ] && continue
+              printf '::add-mask::%s\n' "$l"
+              [ "${l//%/%25}" = "$l" ] || printf '::add-mask::%s\n' "${l//%/%25}"
+            done
           done
           case "$ref$email" in
             *$'\n'*|*$'\r'*) echo "::error::the reference and the e-mail must each be one line"; exit 1 ;;
@@ -108,7 +112,11 @@ jobs:
           trimmed=$(printf '%s' "$email" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
           lowered=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
           for x in "$ref" "$email" "$trimmed" "$lowered"; do
-            printf '%s\n' "$x" | while IFS= read -r l; do [ -z "$l" ] || echo "::add-mask::$l"; done
+            printf '%s\n' "$x" | tr '\r' '\n' | while IFS= read -r l; do
+              [ -z "$l" ] && continue
+              printf '::add-mask::%s\n' "$l"
+              [ "${l//%/%25}" = "$l" ] || printf '::add-mask::%s\n' "${l//%/%25}"
+            done
           done
           case "$ref$email" in
             *$'\n'*|*$'\r'*) echo "::error::the reference and the e-mail must each be one line"; exit 1 ;;

@@ -167,18 +167,19 @@ for (const job of ['dry', 'apply']) {
   t(`workflow ${job}: first step refuses a line break in the ref or the e-mail (exit 1, error without a value)`, [/\$'\\n'|\$'\\r'/.test(first), /::error::[^"]*"; exit 1/.test(first)], [true, true])
   const script = (first.split(/run: \|\n/)[1] ?? '').split('\n').map(l => l.replace(/^ {10}/, '')).join('\n')
   const SECRET_LINES = ['Zq.Line-One@Example.INVALID', '  Zq.Line-Two  ']
-  for (const [what, inputs] of [['email', { ref: 'ADA-1', email: SECRET_LINES.join('\n') }], ['ref', { ref: 'ADA-1\n' + SECRET_LINES[0], email: 'a@b.invalid' }], ['leading newline in ref', { ref: '\nADA-2', email: 'a@b.invalid' }]]) {
+  for (const [what, inputs] of [['email', { ref: 'ADA-1', email: SECRET_LINES.join('\n') }], ['ref', { ref: 'ADA-1\n' + SECRET_LINES[0], email: 'a@b.invalid' }], ['leading newline in ref', { ref: '\nADA-2', email: 'a@b.invalid' }], ['CR-only email', { ref: 'ADA-1', email: 'a@b.invalid\rZq-Tail' }], ['CR-only ref', { ref: 'ADA-1\rZq-RefTail', email: 'a@b.invalid' }], ['CRLF email', { ref: 'ADA-1', email: 'a@b.invalid\r\nZq-Crlf' }], ['percent-escape email', { ref: 'ADA-1', email: 'x%0Ay\nZq-Pct' }]]) {
     const dir = mkdtempSync(join(tmpdir(), 'mask-'))
     const ev = join(dir, 'event.json')
     writeFileSync(ev, JSON.stringify({ inputs }))
     const r = spawnSync('bash', ['-c', script], { env: { PATH: process.env.PATH, GITHUB_EVENT_PATH: ev }, encoding: 'utf8' })
-    const out = r.stdout.split('\n').filter(Boolean)
+    const out = r.stdout.split(/[\r\n]/).filter(Boolean)
     const masked = new Set(out.filter(l => l.startsWith('::add-mask::')).map(l => l.slice(12)))
     const firstOther = out.findIndex(l => !l.startsWith('::add-mask::'))
     const lastMask = out.map(l => l.startsWith('::add-mask::')).lastIndexOf(true)
-    const lines = [...inputs.ref.split('\n'), ...inputs.email.split('\n')].filter(Boolean)
+    const lines = [...inputs.ref.split(/[\r\n]/), ...inputs.email.split(/[\r\n]/)].filter(Boolean)
+    const escapedOk = lines.filter(l => l.includes('%')).every(l => masked.has(l.replace(/%/g, '%25')))
     t(`workflow ${job}: mask step, multi-line ${what}: every non-empty line is masked before any other output, then exit 1, and the error prints no value`,
-      [r.status, lines.filter(l => !masked.has(l)), firstOther === -1 || firstOther > lastMask, out.some(l => l.startsWith('::error::')) && !lines.some(l => out.filter(o => !o.startsWith('::add-mask::')).join('\n').includes(l))], [1, [], true, true])
+      [r.status, lines.filter(l => !masked.has(l)), firstOther === -1 || firstOther > lastMask, out.some(l => l.startsWith('::error::')) && !lines.some(l => out.filter(o => !o.startsWith('::add-mask::')).join('\n').includes(l)), escapedOk], [1, [], true, true, true])
   }
 }
 t('workflow: no run-name, no inputs.email outside the two env lines, none in the approve job, no echo of it', [/^run-name:/m.test(wf), (wf.match(/\$\{\{\s*inputs\.email/g) || []).length - (wf.match(/^[^#\n]*DOVEC_FORGET_EMAIL: \$\{\{ inputs\.email \}\}$/gm) || []).length, /inputs\.(email|ref)\s*\}\}/.test(jobBody('approve')), /echo[^\n]*(IN_EMAIL|DOVEC_FORGET_EMAIL|inputs\.email)/.test(wf)], [false, 0, false, false])
