@@ -342,7 +342,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261241_dovec_health_watchdog.sql', 'c5ec224c9af68113fde13a88a334ac39b7d4805af796aaf7b5b1b0154f98e92d'),
   ('20261242_dovec_undelivered_notice.sql', '704219fd998a41b9eebb23db05402088a2197e502dae6c4b796d336a283cc661'),
   ('20261243_dovec_lead_forget.sql', '18610ad542d8f01b9b09eb18f193601397aecb5570024b0bd16ad22cec6a9227'),
-  ('20261244_dovec_lead_forget_email.sql', '38106c34ed0f3b69f613355108918abbccdccd36dd764a19b1ce148ce7dea1a6')
+  ('20261244_dovec_lead_forget_email.sql', 'd843b59d21a71a27dbae1b5c302c1c850d2263216237f71426e4b1fc62f6eceb')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

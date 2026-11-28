@@ -27,7 +27,7 @@
 -- ASSERTIONS INSIDE (one transaction): pre-flight, the function's shape (exactly one overload, the (text, boolean) signature gone,
 -- SECURITY DEFINER, search_path empty, owner-only plus service_role EXECUTE with a positive control, body anchors, no RAISE in the
 -- body), and a behaviour probe whose rows all roll back. The probe INSERTS NOTHING into auth.users (that would fire the profile
--- trigger): it borrows one existing account that has an e-mail and points probe enquiries at its id; if no account has an e-mail it
+-- trigger): it borrows one existing account that has a plain-ASCII e-mail and points probe enquiries at its id; if none does it
 -- stops with a plain message and nothing is applied. It PRINTS no ids, no counts, no e-mail. Probe references ADA-9000000301 to 306
 -- are far beyond the sequence, so public.dovec_lead_external_seq is not touched.
 --
@@ -239,9 +239,9 @@ DECLARE
 BEGIN
   SELECT id INTO v_proj FROM public.dovec_projects ORDER BY id LIMIT 1;
   IF v_proj IS NULL THEN RAISE EXCEPTION 'need one dovec_projects row to run the behaviour probe with'; END IF;
-  SELECT u.id, u.email INTO v_uid, v_mail FROM auth.users u WHERE u.email IS NOT NULL AND btrim(u.email) <> '' ORDER BY u.id LIMIT 1;
+  SELECT u.id, u.email INTO v_uid, v_mail FROM auth.users u WHERE u.email IS NOT NULL AND u.email ~ '^[!-~]+$' ORDER BY u.id LIMIT 1;
   IF v_uid IS NULL THEN
-    RAISE EXCEPTION 'REFUSING: no account has an e-mail yet, so the e-mail match cannot be probed against a real account (the probe borrows one and inserts nothing into auth.users). Nothing applied.';
+    RAISE EXCEPTION 'REFUSING: no account has a plain-ASCII e-mail yet, so the e-mail match cannot be probed against a real account (the probe borrows one and inserts nothing into auth.users). Nothing applied.';
   END IF;
 
   BEGIN
@@ -383,7 +383,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261244_dovec_lead_forget_email.sql', '38106c34ed0f3b69f613355108918abbccdccd36dd764a19b1ce148ce7dea1a6')
+VALUES ('20261244_dovec_lead_forget_email.sql', 'd843b59d21a71a27dbae1b5c302c1c850d2263216237f71426e4b1fc62f6eceb')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

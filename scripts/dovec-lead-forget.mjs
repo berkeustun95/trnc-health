@@ -5,7 +5,7 @@
 //   DOVEC_FORGET_EMAIL=<address> node scripts/dovec-lead-forget.mjs --ref=ADA-123 --apply    # wipes name, phone, e-mail, message, user id of that one enquiry
 //
 // The e-mail the person wrote from comes in the environment variable DOVEC_FORGET_EMAIL (never argv: a --email= argument is refused). It
-// is sent to the function and compared there with the e-mail of the account that sent the enquiry; it is never printed or echoed.//
+// is sent to the function and compared there with the e-mail of the account that sent the enquiry; it is never printed or echoed.
 // Runs only from .github/workflows/dovec-lead-forget.yml (GitHub production environment): this Mac has no service key. The
 // work is the database function public.dovec_lead_forget (20261244); this script is a thin caller. The function answers whether the e-mail
 // matches the sending account; Berke reads that answer in the dry run before approving. Actions logs are public: only the ten agreed booleans are printed (an allowlist,

@@ -55,13 +55,15 @@ jobs:
       - name: Mask the reference and the e-mail
         run: |
           ref=$(jq -r '.inputs.ref // empty' "$GITHUB_EVENT_PATH")
-          [ -z "$ref" ] || echo "::add-mask::$ref"
           email=$(jq -r '.inputs.email // empty' "$GITHUB_EVENT_PATH")
-          [ -z "$email" ] || echo "::add-mask::$email"
           trimmed=$(printf '%s' "$email" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-          [ -z "$trimmed" ] || echo "::add-mask::$trimmed"
           lowered=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
-          [ -z "$lowered" ] || echo "::add-mask::$lowered"
+          for x in "$ref" "$email" "$trimmed" "$lowered"; do
+            printf '%s\n' "$x" | while IFS= read -r l; do [ -z "$l" ] || echo "::add-mask::$l"; done
+          done
+          case "$ref$email" in
+            *$'\n'*|*$'\r'*) echo "::error::the reference and the e-mail must each be one line"; exit 1 ;;
+          esac
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -102,13 +104,15 @@ jobs:
       - name: Mask the reference and the e-mail
         run: |
           ref=$(jq -r '.inputs.ref // empty' "$GITHUB_EVENT_PATH")
-          [ -z "$ref" ] || echo "::add-mask::$ref"
           email=$(jq -r '.inputs.email // empty' "$GITHUB_EVENT_PATH")
-          [ -z "$email" ] || echo "::add-mask::$email"
           trimmed=$(printf '%s' "$email" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-          [ -z "$trimmed" ] || echo "::add-mask::$trimmed"
           lowered=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
-          [ -z "$lowered" ] || echo "::add-mask::$lowered"
+          for x in "$ref" "$email" "$trimmed" "$lowered"; do
+            printf '%s\n' "$x" | while IFS= read -r l; do [ -z "$l" ] || echo "::add-mask::$l"; done
+          done
+          case "$ref$email" in
+            *$'\n'*|*$'\r'*) echo "::error::the reference and the e-mail must each be one line"; exit 1 ;;
+          esac
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1

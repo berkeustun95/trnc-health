@@ -5,9 +5,9 @@
 // an apply outside CI is refused by prodWriteGuard; the log carries only the ten allowlisted booleans and never the e-mail (an injected name/phone is dropped), an HTTP error prints status + code only, the exit codes and
 // the exact result lines. NOT evidence of: the SQL function (test-dovec-lead-forget-sql.mjs) or the workflow's approval gate.
 import http from 'node:http'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { REF_RE, KEYS, allowlisted, errorCode, verdict } from './lib/dovec-lead-forget.mjs'
@@ -160,10 +160,26 @@ for (const job of ['dry', 'apply']) {
   const maskAt = steps.findIndex(x => x.includes('::add-mask::'))
   const useAt = steps.findIndex(x => EXPR.test(x))
   t(`workflow ${job}: first step masks the ref AND the e-mail from GITHUB_EVENT_PATH (no set -x, no inputs expression in it)`,
-    [maskAt, first.includes('GITHUB_EVENT_PATH'), first.includes('.inputs.ref'), first.includes('.inputs.email'), (first.match(/::add-mask::/g) || []).length >= 3, /set -x|xtrace/.test(first), EXPR.test(first)],
+    [maskAt, first.includes('GITHUB_EVENT_PATH'), first.includes('.inputs.ref'), first.includes('.inputs.email'), (first.match(/::add-mask::/g) || []).length >= 1, /set -x|xtrace/.test(first), EXPR.test(first)],
     [0, true, true, true, true, false, false])
   t(`workflow ${job}: first step also masks the lower-cased / trimmed e-mail`, /tr '\[:upper:\]' '\[:lower:\]'/.test(first) && /sed -e/.test(first), true)
   t(`workflow ${job}: the e-mail expression appears once, as the env of a step after the mask`, [useAt > maskAt && maskAt === 0, (jobBody(job).match(/\$\{\{\s*inputs\.email/g) || []).length, /^ {10}DOVEC_FORGET_EMAIL: \$\{\{ inputs\.email \}\}$/m.test(jobBody(job))], [true, 1, true])
+  t(`workflow ${job}: first step refuses a line break in the ref or the e-mail (exit 1, error without a value)`, [/\$'\\n'|\$'\\r'/.test(first), /::error::[^"]*"; exit 1/.test(first)], [true, true])
+  const script = (first.split(/run: \|\n/)[1] ?? '').split('\n').map(l => l.replace(/^ {10}/, '')).join('\n')
+  const SECRET_LINES = ['Zq.Line-One@Example.INVALID', '  Zq.Line-Two  ']
+  for (const [what, inputs] of [['email', { ref: 'ADA-1', email: SECRET_LINES.join('\n') }], ['ref', { ref: 'ADA-1\n' + SECRET_LINES[0], email: 'a@b.invalid' }], ['leading newline in ref', { ref: '\nADA-2', email: 'a@b.invalid' }]]) {
+    const dir = mkdtempSync(join(tmpdir(), 'mask-'))
+    const ev = join(dir, 'event.json')
+    writeFileSync(ev, JSON.stringify({ inputs }))
+    const r = spawnSync('bash', ['-c', script], { env: { PATH: process.env.PATH, GITHUB_EVENT_PATH: ev }, encoding: 'utf8' })
+    const out = r.stdout.split('\n').filter(Boolean)
+    const masked = new Set(out.filter(l => l.startsWith('::add-mask::')).map(l => l.slice(12)))
+    const firstOther = out.findIndex(l => !l.startsWith('::add-mask::'))
+    const lastMask = out.map(l => l.startsWith('::add-mask::')).lastIndexOf(true)
+    const lines = [...inputs.ref.split('\n'), ...inputs.email.split('\n')].filter(Boolean)
+    t(`workflow ${job}: mask step, multi-line ${what}: every non-empty line is masked before any other output, then exit 1, and the error prints no value`,
+      [r.status, lines.filter(l => !masked.has(l)), firstOther === -1 || firstOther > lastMask, out.some(l => l.startsWith('::error::')) && !lines.some(l => out.filter(o => !o.startsWith('::add-mask::')).join('\n').includes(l))], [1, [], true, true])
+  }
 }
 t('workflow: no run-name, no inputs.email outside the two env lines, none in the approve job, no echo of it', [/^run-name:/m.test(wf), (wf.match(/\$\{\{\s*inputs\.email/g) || []).length - (wf.match(/^[^#\n]*DOVEC_FORGET_EMAIL: \$\{\{ inputs\.email \}\}$/gm) || []).length, /inputs\.(email|ref)\s*\}\}/.test(jobBody('approve')), /echo[^\n]*(IN_EMAIL|DOVEC_FORGET_EMAIL|inputs\.email)/.test(wf)], [false, 0, false, false])
 t('workflow: email is a required string input, its description carries no address', [/^      email:\n[^\n]*\n {8}type: string\n {8}required: true/m.test(wf), /^      email:\n {8}description: '[^'@]*'/m.test(wf)], [true, true])
