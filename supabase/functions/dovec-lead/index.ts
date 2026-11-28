@@ -25,6 +25,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serviceCaller, secretKeyCaller } from '../_shared/caller-auth.mjs'
 import { handleLead, STALE_LEAD_MS, TEST_PROJECT_SEED } from '../_shared/dovec-lead.mjs'
 
+declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined
+
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...extra } })
 const ONE_JWT = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/
@@ -146,6 +148,8 @@ Deno.serve(async (req) => {
       caller, body,
       deps: {
         store, log: (s: string) => console.log(s), timing: { auth: authMs, body: bodyMs },
+        // Supabase Background Tasks: EdgeRuntime.waitUntil(promise) keeps the instance alive until the promise settles.
+        waitUntil: typeof EdgeRuntime !== 'undefined' && typeof EdgeRuntime.waitUntil === 'function' ? (p: Promise<unknown>) => EdgeRuntime!.waitUntil(p) : undefined,
         env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY'), testPhone: Deno.env.get('DOVEC_TEST_LEAD_PHONE') },
       },
     })

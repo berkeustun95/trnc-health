@@ -200,7 +200,7 @@ export async function handleLead({ caller, body, deps }) {
   } finally {
     const fmt = x => (typeof x === 'number' && Number.isFinite(x) ? String(Math.round(x)) : '-')
     const total = clock() - t0 + (tm.auth ?? 0) + (tm.body ?? 0)
-    log(`dovec-lead timing ${ext.id ?? '-'} auth=${fmt(tm.auth)} body=${fmt(tm.body)} reads=${fmt(tm.reads)} insert=${fmt(tm.insert)} deliver=${fmt(tm.deliver)} total=${fmt(total)}`)
+    log(`dovec-lead timing ${ext.id ?? '-'} auth=${fmt(tm.auth)} body=${fmt(tm.body)} reads=${fmt(tm.reads)} insert=${fmt(tm.insert)} deliver=${tm.async ? 'async' : fmt(tm.deliver)} total=${fmt(total)}`)
     if (res) res.serverTiming = `auth;dur=${fmt(tm.auth)},body;dur=${fmt(tm.body)},reads;dur=${fmt(tm.reads)},insert;dur=${fmt(tm.insert)},deliver;dur=${fmt(tm.deliver)},total;dur=${fmt(total)}`.replace(/dur=-/g, 'dur=0')
   }
 }
@@ -251,6 +251,12 @@ async function userLead({ caller, body, deps, tm, ext, timed }) {
 
   // Not live (either lock closed, or no partner key): nothing is ever sent, so the row is stored 'mock' in the one insert.
   const sendsLive = isLive(deps.env?.mode, deps.liveAllowed ?? LEADS_LIVE_ALLOWED) && !!deps.env?.apiKey
+  // A live row is saved 'pending' WITH next_attempt_at = now + CLAIM_MS in the same insert: that is the claim. The retry cron
+  // (dueFilter, and the WHERE EXISTS of dovec-lead-retry) cannot pick the row for 15 minutes, far beyond SEND_TIMEOUT_MS, so the
+  // background send below and a cron tick never both send it. If this function dies mid-send the row stays pending with that
+  // time and the cron resends it once it has passed. Döveç dedupes on external_id, so even "202 received but our update never
+  // written" cannot open a second enquiry there.
+  const claimUntil = new Date(t + CLAIM_MS).toISOString()
   let lead
   try {
     lead = await timed('insert', () => store.insertLead({
@@ -258,6 +264,7 @@ async function userLead({ caller, body, deps, tm, ext, timed }) {
       project_name: project.name, unit_type: v.value.unit_type, name: v.value.name, phone: v.value.phone,
       email: v.value.email, message: v.value.message, language: v.value.language, language_code: languageCode(v.value.language),
       consent: true, consent_text_version: v.value.consent_text_version, status: sendsLive ? 'pending' : 'mock',
+      ...(sendsLive ? { send_live: true, next_attempt_at: claimUntil } : {}),
     }))
   } catch (e) {
     if (e?.code === RATE_LIMIT_CODE || e?.message === 'dovec_rate_limited') return refuseOrReplay()
@@ -269,6 +276,13 @@ async function userLead({ caller, body, deps, tm, ext, timed }) {
   }
   ext.id = lead.external_id ?? null
   if (!sendsLive) { log(`dovec-lead ${lead.external_id} mock`); return publicResult(lead) }
+  // Answer first, send right after: with a waitUntil the user gets the thank-you as soon as the row is saved and the send runs in
+  // the background. Without one (no EdgeRuntime) the send is awaited inline, as before.
+  if (typeof deps.waitUntil === 'function') {
+    deps.waitUntil(deliver(lead, deps).catch(e => { try { log(`dovec-lead ${lead.external_id} background_error ${e?.name ?? 'Error'}`) } catch { /* the log must never reject */ } }))
+    tm.async = true
+    return publicResult({ ...lead, status: 'pending' })
+  }
   const status = await timed('deliver', () => deliver(lead, deps))
   return publicResult({ ...lead, status })
 }
