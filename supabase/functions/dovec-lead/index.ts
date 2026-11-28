@@ -5,6 +5,9 @@
 //     -> 200 { ok: true, external_id, status }  | 200 { ok: false, error: 'rejected', external_id }
 //     -> 400 invalid_request{field} / consent_required · 403 sign_in_required / under_18 · 404 project_unavailable
 //        409 request_changed · 429 rate_limited
+//   Every user enquiry logs ONE timing line (`dovec-lead timing <ADA-n or -> auth=<ms> body=<ms> reads=<ms> insert=<ms> deliver=<ms>
+//   total=<ms>`) and answers with a Server-Timing header of the same step names: milliseconds only, never a name, phone, e-mail,
+//   message or user id.
 //   POST { mode: 'retry' }                                         (service key only: cron 20261230)
 //   POST { mode: 'test_lead', dry?: boolean }                      (service key only: workflow dovec-test-lead; dry by default)
 //   Service modes accept the runtime key, a service_role JWT (cron) or an sb_secret_ key the database accepts as service_role.
@@ -22,8 +25,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serviceCaller, secretKeyCaller } from '../_shared/caller-auth.mjs'
 import { handleLead, STALE_LEAD_MS, TEST_PROJECT_SEED } from '../_shared/dovec-lead.mjs'
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...extra } })
 const ONE_JWT = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/
 const PENDING_GRACE_MS = 10 * 60000
 const COLS = 'id,external_id,status,payload_hash,attempts,project_id,unit_type,name,phone,email,message,language_code,consent,created_at,next_attempt_at,is_test'
@@ -44,6 +47,7 @@ Deno.serve(async (req) => {
   }
 
   let caller: { kind: 'user'; id: string } | { kind: 'service' }
+  const authStart = performance.now()
   if (await serviceCaller(authz, key) || await secretKeyCaller(authz, holdsServiceKey)) {
     caller = { kind: 'service' }
   } else {
@@ -55,9 +59,12 @@ Deno.serve(async (req) => {
     if (user.is_anonymous === true) return json(403, { error: 'sign_in_required' })
     caller = { kind: 'user', id: user.id }
   }
+  const authMs = performance.now() - authStart
 
   let body: unknown = null
+  const bodyStart = performance.now()
   try { body = await req.json() } catch { return json(400, { error: 'invalid_request', field: 'body' }) }
+  const bodyMs = performance.now() - bodyStart
 
   const store = {
     async isPublished() {
@@ -75,10 +82,12 @@ Deno.serve(async (req) => {
       if (error) throw error
       return data
     },
-    async getVisibleProject(id: string) {
+    async isFeedFresh() {
       const fresh = await admin.rpc('dovec_feed_is_fresh')
       if (fresh.error) throw fresh.error
-      if (fresh.data !== true) return null
+      return fresh.data === true
+    },
+    async getListedProject(id: string) {
       const { data, error } = await admin.from('dovec_projects').select('id,name,unit_types').eq('id', id).eq('listed', true).maybeSingle()
       if (error) throw error
       return data
@@ -136,11 +145,11 @@ Deno.serve(async (req) => {
     const res = await handleLead({
       caller, body,
       deps: {
-        store, log: (s: string) => console.log(s),
+        store, log: (s: string) => console.log(s), timing: { auth: authMs, body: bodyMs },
         env: { mode: Deno.env.get('DOVEC_LEADS_MODE'), apiKey: Deno.env.get('DOVEC_PARTNER_KEY'), testPhone: Deno.env.get('DOVEC_TEST_LEAD_PHONE') },
       },
     })
-    return json(res.status, res.body)
+    return json(res.status, res.body, res.serverTiming ? { 'Server-Timing': res.serverTiming } : {})
   } catch {
     console.error('dovec-lead: failed')
     return json(500, { error: 'server_error' })

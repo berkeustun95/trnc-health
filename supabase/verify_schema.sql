@@ -2536,6 +2536,25 @@ WITH report AS (
       AND COALESCE((SELECT strpos(pg_get_functiondef(p.oid), 'NEW.is_test') > 0 AND strpos(pg_get_functiondef(p.oid), 'AND NOT is_test') > 0
                   FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()')), false)
     -- 1229-END
+    -- 1240-BEGIN
+    -- 20261240 Dovec enquiry limits: the trigger function runs as its owner and skips a repeated request. Owns the SECURITY shape of dovec_leads_enforce_limits (the 20261229 token above keeps only its is_test halves; one count, one owner). Red until applied, never an error (to_regprocedure / catalogs / COALESCE).
+    UNION ALL SELECT '20261240_dovec_leads_limits_definer','dovec_leads_enforce_limits(): SECURITY DEFINER with search_path pinned (one search_path config entry, no public in it); body skips a repeat of (user_id, client_request_id) so the unique constraint answers 23505, not DV429; EXECUTE held by none of anon, authenticated, service_role, PUBLIC; exactly one BEFORE INSERT row trigger on dovec_leads uses it; dovec_leads has zero policies and its function owner can read every row (BYPASSRLS or superuser, or the table owner under plain, non-forced RLS)',
+      COALESCE((SELECT p.prosecdef
+                  AND (SELECT count(*) FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%') = 1
+                  AND NOT EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%' AND c LIKE '%public%')
+                  AND strpos(pg_get_functiondef(p.oid), 'NEW.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.dovec_leads WHERE user_id = NEW.user_id AND client_request_id = NEW.client_request_id)') > 0
+                  AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')
+                  AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+                  AND NOT has_function_privilege('service_role', p.oid, 'EXECUTE')
+                  AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()')), false)
+      AND (SELECT count(*) FROM pg_trigger tg WHERE tg.tgrelid = to_regclass('public.dovec_leads') AND NOT tg.tgisinternal
+              AND tg.tgfoid = to_regprocedure('public.dovec_leads_enforce_limits()') AND tg.tgtype & 7 = 7) = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'dovec_leads') = 0
+      AND COALESCE((SELECT r.rolbypassrls OR r.rolsuper OR (c.relowner = p.proowner AND NOT c.relforcerowsecurity)
+                      FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner, pg_class c
+                     WHERE p.oid = to_regprocedure('public.dovec_leads_enforce_limits()') AND c.oid = to_regclass('public.dovec_leads')), false)
+    -- 1240-END
     -- 1235-BEGIN
     -- 20261235 Döveç privacy URLs: owns the exact readable column set of dovec_settings (one count, one owner; the 20261229 token no longer says "exactly"). Red until applied, never an error: the URL values are read through to_jsonb(s) because a bare s.privacy_url_tr would kill QUERY 1 (42703) before the column exists.
     UNION ALL SELECT '20261235_dovec_privacy_url','dovec_settings privacy URLs: anon and authenticated read EXACTLY id, last_good_sync_at, privacy_url_en, privacy_url_tr, published, suspended, whatsapp_e164 (no run column) and write no column; service_role UPDATEs exactly suspended, last_good_sync_at, last_run_at, last_run_status, last_run_detail (no privacy_url_*); both URL columns are NULL or https with no whitespace, at most 500 chars (named CHECKs dovec_settings_privacy_url_{tr,en}_check); the single row holds exactly https://www.dovecgroup.com/tr/privacy-policy and https://www.dovecgroup.com/en/privacy-policy; published is NOT asserted here (go-live flips it; the 20261229 token owns its DEFAULT false)',

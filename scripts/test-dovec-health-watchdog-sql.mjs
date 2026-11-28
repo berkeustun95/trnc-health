@@ -99,7 +99,7 @@ UPDATE cron.job SET schedule = '0,30 * * * *', command = $dc$${DUTY_CMD_TEXT}$dc
 UPDATE cron.job SET schedule = '0,30 * * * 5,6', command = $wc$${WEEK_CMD_TEXT}$wc$ WHERE jobname = 'weekend-digest';
 `
 const CHAIN = [find(/^20261205_data_jobs\.sql$/), find(/^20261210_data_jobs_switches\.sql$/), find(/^20261211_data_jobs_watchdog\.sql$/),
-  find(/^20261229_dovec_projects\.sql$/), find(/^20261231_dovec_read_gate\.sql$/), find(/^20261232_dovec_cron\.sql$/)]
+  find(/^20261229_dovec_projects\.sql$/), find(/^20261231_dovec_read_gate\.sql$/), find(/^20261232_dovec_cron\.sql$/), find(/^20261240_dovec_leads_limits_definer\.sql$/)]
 const base = async () => {
   const d = await freshDb(SEED)
   // the cron names 20261205 lists as existing jobs, so the coverage assertion has something real to hold
@@ -201,6 +201,8 @@ await mutant('second failure while red stays silent', "ELSIF v_red AND v_key = '
 await mutant('recovery line dropped', "ELSIF NOT v_red AND v_last_red THEN\n      v_lines := v_lines || v_done;", "ELSIF NOT v_red AND v_last_red THEN\n      v_lines := v_lines;", 'probe results differ')
 await mutant('alerts go to every profile, not admins only', "FOR r IN SELECT id, push_token FROM profiles WHERE role = 'admin' LOOP", 'FOR r IN SELECT id, push_token FROM profiles LOOP', 'probe results differ')
 await mutant('trigger stamps on every update', 'ELSIF NEW.status IS DISTINCT FROM OLD.status THEN\n    NEW.status_changed_at := now();', 'ELSE\n    NEW.status_changed_at := now();', 'probe results differ')
+await mutant('a probe insert takes a generated external_id (sequence burnt)', "VALUES ('ADA-9000000005', gen_random_uuid()", 'VALUES (DEFAULT, gen_random_uuid()', 'moved dovec_lead_external_seq')
+await mutant('a probe insert as the postgres owner takes a generated external_id', "VALUES ($3, gen_random_uuid()", "VALUES ('ADA-' || nextval('public.dovec_lead_external_seq')::text || left($3, 0), gen_random_uuid()", 'moved dovec_lead_external_seq')
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

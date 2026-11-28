@@ -1,0 +1,87 @@
+# ─── Döveç: rolled-back live proof of the enquiry limit trigger (dry by default) ─────────────────────────────────
+#
+# Proves, on the live database, that the 20261240 limit trigger (a) serialises two inserts for one person on its advisory
+# lock and (b) answers a twin request at the per-person limit with a unique violation, never DV429. Every write runs inside
+# a DO block that ends in a deliberate exception: nothing is committed. The only trace is burnt values of
+# public.dovec_lead_external_seq (a gap in the ADA-n numbers), since sequences are not rolled back.
+#
+#   gh workflow run dovec-lock-proof                 # DRY: reads the catalog (SELECT only), prints the plan, writes nothing
+#   gh workflow run dovec-lock-proof -f apply=true   # waits for Berke's approval in `production-db`, then runs the two cases
+#
+# Refuses unless the LIVE trigger function is the 20261240 definition. Runs from main only (the `production` environment is
+# deployable from main only, and the script refuses any other ref). Connects like supabase-migrate: the Management API SQL
+# endpoint with SUPABASE_ACCESS_TOKEN; each call is its own session. Output: booleans and milliseconds only (public log).
+# Engine: scripts/dovec-lock-proof.mjs; pure parts and tests: scripts/lib/dovec-lock-proof.mjs, scripts/test-dovec-lock-proof.mjs.
+
+name: dovec-lock-proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'true = run the rolled-back proof (needs approval); anything else = dry report'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: { group: dovec-lock-proof, cancel-in-progress: false }
+
+jobs:
+  dry:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Main only
+        run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Dry run (catalog read only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          APPLY: 'false'
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          node scripts/dovec-lock-proof.mjs
+
+  approve:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply) }}
+    needs: dry
+    runs-on: ubuntu-24.04
+    environment: production-db
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - run: echo "Rolled-back lock proof approved for production. Nothing is committed; sequence values are burnt."
+
+  apply:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply) }}
+    needs: approve
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Main only
+        run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Proof (rolled back)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          APPLY: 'true'
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          node scripts/dovec-lock-proof.mjs

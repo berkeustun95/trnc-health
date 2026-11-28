@@ -33,6 +33,8 @@
 --      CHECK id = 1), so a missing row is a broken database, not a Döveç problem. The raise makes the pg_cron run fail, the
 --      data_jobs registry row below turns 'failed', and the existing data-jobs watchdog announces it to the admins through its
 --      own channel (change-only, daily nag). Quiet would hide it; a push line here would need a sixth condition.
+--      Deleting the account of a user with an unsent enquiry (dovec_leads_forget_user sets it to 'failed') raises the failed alert, on
+--      purpose: that enquiry was never sent.
 --   3. Alerts (admins only, profiles.role = 'admin'): one notifications row per admin, type 'admin_alert', title 'Döveç', ONE
 --      combined notice per tick; an Expo push with data {"screen":"admin","tab":"datajobs"}; one push_log row per admin, kind
 --      'dovec_health_alert', request_id NULL when the admin has no push token. Only when something CHANGED: a condition turns
@@ -334,7 +336,6 @@ DECLARE
   v_priv   text;
   v_oid    regclass;
   v_admin  uuid;
-  v_cust   uuid;
   v_adm_n  int;
   v_def    text;
 BEGIN
@@ -489,9 +490,8 @@ BEGIN
   END IF;
 
   SELECT id INTO v_admin FROM public.profiles WHERE role = 'admin' ORDER BY id LIMIT 1;
-  SELECT id INTO v_cust FROM public.profiles WHERE role IS DISTINCT FROM 'admin' ORDER BY id LIMIT 1;
   SELECT count(*) INTO v_adm_n FROM public.profiles WHERE role = 'admin';
-  IF v_admin IS NULL OR v_cust IS NULL THEN RAISE EXCEPTION 'need one admin and one non-admin profile to run the positive controls with'; END IF;
+  IF v_admin IS NULL THEN RAISE EXCEPTION 'need one admin profile to run the positive controls with'; END IF;
 
   -- behaviour probes, ALL rolled back (ZZ_PROBE_ROLLBACK). Nothing below changes a real row for good.
   DECLARE
@@ -509,13 +509,14 @@ BEGIN
     v_auth_call text;
     v_q       text := $q$SELECT coalesce(string_agg(l, ' | ' ORDER BY l), '-') FROM public.notifications n, regexp_split_to_table(n.body, E'\n') l WHERE n.user_id = $1 AND n.title = 'Döveç'$q$;
     v_clr     text := $q$DELETE FROM public.notifications WHERE title = 'Döveç' AND user_id IN (SELECT id FROM public.profiles WHERE role = 'admin')$q$;
-    v_lead    text := $q$INSERT INTO public.dovec_leads (client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status, created_at)
-                         VALUES (gen_random_uuid(), repeat('d', 64), 'zz-probe-dv', 'Probe Person', '+441234567890', 'English', 'en', true, 'v', $1, $2) RETURNING id$q$;
+    v_lead    text := $q$INSERT INTO public.dovec_leads (external_id, client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status, created_at)
+                         VALUES ($3, gen_random_uuid(), repeat('d', 64), 'zz-probe-dv', 'Probe Person', '+441234567890', 'English', 'en', true, 'v', $1, $2) RETURNING id$q$;
     -- what exists before the probes: restored by the rollback, compared at the end
     v_set_before text := (SELECT row(published, suspended, last_good_sync_at, last_run_at, last_run_status, last_run_detail)::text FROM public.dovec_settings WHERE id = 1);
     v_notes_before int := (SELECT count(*) FROM public.notifications WHERE title = 'Döveç');
     v_plog_before int := (SELECT count(*) FROM public.push_log WHERE kind = 'dovec_health_alert');
     v_state_before int := (SELECT count(*) FROM public.dovec_health_alert_state);
+    v_seq_before text := (SELECT row(last_value, is_called)::text FROM public.dovec_lead_external_seq);
     v_leads_before text := (SELECT md5(coalesce(string_agg(l::text, '|' ORDER BY l.id), '')) FROM public.dovec_leads l);
   BEGIN
     BEGIN
@@ -531,11 +532,11 @@ BEGIN
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
       SELECT count(*) INTO v_cnt2 FROM public.dovec_health_alert_state;
-      v_res := v_res || ('healthy_unpublished=' || v_cnt || '/' || v_cnt2);
+      v_res := v_res || ('healthy_unpublished=' || (v_cnt = 0 AND v_cnt2 = 0)::text);
       UPDATE public.dovec_settings SET published = true WHERE id = 1;
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('healthy_published=' || v_cnt);
+      v_res := v_res || ('healthy_published=' || (v_cnt = 0)::text);
       UPDATE public.dovec_settings SET published = false WHERE id = 1;
 
       -- 2. not armed (the sync has never run): nothing, even with conditions red
@@ -543,7 +544,7 @@ BEGIN
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
       SELECT count(*) INTO v_cnt2 FROM public.dovec_health_alert_state;
-      v_res := v_res || ('not_armed=' || v_cnt || '/' || v_cnt2);
+      v_res := v_res || ('not_armed=' || (v_cnt = 0 AND v_cnt2 = 0)::text);
       UPDATE public.dovec_settings SET last_run_at = now(), suspended = false, last_run_status = 'ok', last_good_sync_at = now() WHERE id = 1;
 
       -- 3. suspended: the exact line, admins only, push iff a token; again = nothing; fixed = "düzeldi", then silence
@@ -554,16 +555,16 @@ BEGIN
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç' AND type = 'admin_alert';
       v_res := v_res || ('notices_equal_admins=' || (v_cnt = v_adm_n)::text);
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç' AND user_id IN (SELECT id FROM public.profiles WHERE role IS DISTINCT FROM 'admin');
-      v_res := v_res || ('notices_to_non_admins=' || v_cnt);
+      v_res := v_res || ('notices_to_non_admins=' || (v_cnt = 0)::text);
       SELECT count(*) INTO v_cnt FROM public.push_log WHERE kind = 'dovec_health_alert' AND user_id IN (SELECT id FROM public.profiles WHERE role IS DISTINCT FROM 'admin');
-      v_res := v_res || ('push_log_to_non_admins=' || v_cnt);
+      v_res := v_res || ('push_log_to_non_admins=' || (v_cnt = 0)::text);
       SELECT bool_and((pl.request_id IS NULL) = (p.push_token IS NULL)) AND count(*) = v_adm_n INTO v_ok
         FROM public.push_log pl JOIN public.profiles p ON p.id = pl.user_id WHERE pl.kind = 'dovec_health_alert';
       v_res := v_res || ('push_iff_token=' || coalesce(v_ok, false)::text);
       EXECUTE v_clr;
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('suspended_again=' || v_cnt);
+      v_res := v_res || ('suspended_again=' || (v_cnt = 0)::text);
       UPDATE public.dovec_settings SET suspended = false WHERE id = 1;
       PERFORM public.dovec_health_watchdog(now());
       EXECUTE v_q INTO v_r USING v_admin;
@@ -571,7 +572,7 @@ BEGIN
       EXECUTE v_clr;
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('suspended_silent=' || v_cnt);
+      v_res := v_res || ('suspended_silent=' || (v_cnt = 0)::text);
 
       -- 4. last_status: the status word is the only variable part
       UPDATE public.dovec_settings SET last_run_status = 'http_401' WHERE id = 1;
@@ -589,7 +590,7 @@ BEGIN
       UPDATE public.dovec_settings SET last_good_sync_at = now() - interval '29 minutes' WHERE id = 1;
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('stale_29min=' || v_cnt);
+      v_res := v_res || ('stale_29min=' || (v_cnt = 0)::text);
       UPDATE public.dovec_settings SET last_good_sync_at = now() - interval '31 minutes' WHERE id = 1;
       PERFORM public.dovec_health_watchdog(now());
       EXECUTE v_q INTO v_r USING v_admin;
@@ -610,10 +611,10 @@ BEGIN
       EXECUTE v_clr;
 
       -- 6. stuck: a retry enquiry 59 minutes old is fine, 61 is red; sent again = "düzeldi"
-      EXECUTE v_lead INTO v_id USING 'retry', now() - interval '59 minutes';
+      EXECUTE v_lead INTO v_id USING 'retry', now() - interval '59 minutes', 'ADA-9000000001';
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('stuck_59min=' || v_cnt);
+      v_res := v_res || ('stuck_59min=' || (v_cnt = 0)::text);
       UPDATE public.dovec_leads SET created_at = now() - interval '61 minutes' WHERE id = v_id;
       PERFORM public.dovec_health_watchdog(now());
       EXECUTE v_q INTO v_r USING v_admin;
@@ -633,18 +634,18 @@ BEGIN
       UPDATE public.dovec_leads SET status = 'failed' WHERE is_test;
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt2 FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('test_enquiry_ignored=' || v_cnt || '/' || v_cnt2);
+      v_res := v_res || ('test_enquiry_ignored=' || (v_cnt = 0 AND v_cnt2 = 0)::text);
 
       -- 8. failed: the exact line; a SECOND failure while red = a fresh line; both older than 24 h = "düzeldi"
-      EXECUTE v_lead INTO v_id USING 'rejected', now();
+      EXECUTE v_lead INTO v_id USING 'rejected', now(), 'ADA-9000000002';
       PERFORM public.dovec_health_watchdog(now());
       EXECUTE v_q INTO v_r USING v_admin;
       v_res := v_res || ('failed=' || v_r);
       EXECUTE v_clr;
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('failed_again=' || v_cnt);
-      EXECUTE v_lead INTO v_id2 USING 'failed', now();
+      v_res := v_res || ('failed_again=' || (v_cnt = 0)::text);
+      EXECUTE v_lead INTO v_id2 USING 'failed', now(), 'ADA-9000000003';
       UPDATE public.dovec_leads SET status_changed_at = now() + interval '5 minutes' WHERE id = v_id2;
       PERFORM public.dovec_health_watchdog(now() + interval '10 minutes');
       EXECUTE v_q INTO v_r USING v_admin;
@@ -652,7 +653,7 @@ BEGIN
       EXECUTE v_clr;
       PERFORM public.dovec_health_watchdog(now() + interval '11 minutes');
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('second_failure_again=' || v_cnt);
+      v_res := v_res || ('second_failure_again=' || (v_cnt = 0)::text);
       UPDATE public.dovec_leads SET status_changed_at = now() - interval '25 hours' WHERE id IN (v_id, v_id2);
       PERFORM public.dovec_health_watchdog(now() + interval '12 minutes');
       EXECUTE v_q INTO v_r USING v_admin;
@@ -660,7 +661,7 @@ BEGIN
       EXECUTE v_clr;
       PERFORM public.dovec_health_watchdog(now() + interval '13 minutes');
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('failed_silent=' || v_cnt);
+      v_res := v_res || ('failed_silent=' || (v_cnt = 0)::text);
 
       -- 9. still red and last announced 25 h ago: the same line + (hâlâ); 23 h ago: quiet
       UPDATE public.dovec_settings SET suspended = true WHERE id = 1;
@@ -669,7 +670,7 @@ BEGIN
       UPDATE public.dovec_health_alert_state SET alerted_at = now() - interval '23 hours' WHERE condition = 'suspended';
       PERFORM public.dovec_health_watchdog(now());
       SELECT count(*) INTO v_cnt FROM public.notifications WHERE title = 'Döveç';
-      v_res := v_res || ('realert_23h=' || v_cnt);
+      v_res := v_res || ('realert_23h=' || (v_cnt = 0)::text);
       UPDATE public.dovec_health_alert_state SET alerted_at = now() - interval '25 hours' WHERE condition = 'suspended';
       PERFORM public.dovec_health_watchdog(now());
       EXECUTE v_q INTO v_r USING v_admin;
@@ -682,7 +683,7 @@ BEGIN
       -- 10. the 7-day settle: an 8-day-old retry enquiry is already "stuck" (announced), dovec_leads_wipe_pii() settles it to
       --     failed, and the failed line fires from status_changed_at although created_at is 8 days old
       DELETE FROM public.dovec_leads WHERE NOT is_test;
-      EXECUTE v_lead INTO v_id USING 'retry', now() - interval '8 days';
+      EXECUTE v_lead INTO v_id USING 'retry', now() - interval '8 days', 'ADA-9000000004';
       PERFORM public.dovec_health_watchdog(now());
       EXECUTE v_clr;
       PERFORM public.dovec_leads_wipe_pii();
@@ -697,8 +698,8 @@ BEGIN
       -- 11. the trigger: stamp on insert, kept on a non-status update, kept when the status is "changed" to itself, restamped on a real
       --     change. Run as service_role (the edge function's role), which holds no EXECUTE on the trigger function (positive control).
       SET LOCAL ROLE service_role;
-      INSERT INTO public.dovec_leads (client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status)
-        VALUES (gen_random_uuid(), repeat('f', 64), 'zz-probe-dv', 'Probe Person', '+441234567890', 'English', 'en', true, 'v', 'pending')
+      INSERT INTO public.dovec_leads (external_id, client_request_id, payload_hash, project_id, name, phone, language, language_code, consent, consent_text_version, status)
+        VALUES ('ADA-9000000005', gen_random_uuid(), repeat('f', 64), 'zz-probe-dv', 'Probe Person', '+441234567890', 'English', 'en', true, 'v', 'pending')
         RETURNING id INTO v_id;
       UPDATE public.dovec_leads SET status_changed_at = now() - interval '3 days' WHERE id = v_id;
       UPDATE public.dovec_leads SET attempts = 1 WHERE id = v_id;
@@ -736,16 +737,16 @@ BEGIN
     SET LOCAL ROLE postgres;
 
     v_expect := ARRAY[
-      'healthy_unpublished=0/0', 'healthy_published=0', 'not_armed=0/0',
-      'suspended=Döveç: talepler iletilemiyor (anahtar reddedildi)', 'notices_equal_admins=true', 'notices_to_non_admins=0', 'push_log_to_non_admins=0', 'push_iff_token=true',
-      'suspended_again=0', 'suspended_fixed=Döveç: düzeldi (anahtar)', 'suspended_silent=0',
+      'healthy_unpublished=true', 'healthy_published=true', 'not_armed=true',
+      'suspended=Döveç: talepler iletilemiyor (anahtar reddedildi)', 'notices_equal_admins=true', 'notices_to_non_admins=true', 'push_log_to_non_admins=true', 'push_iff_token=true',
+      'suspended_again=true', 'suspended_fixed=Döveç: düzeldi (anahtar)', 'suspended_silent=true',
       'last_status=Döveç: son eşitleme hatalı (http_401)', 'last_status_fixed=Döveç: düzeldi (eşitleme durumu)',
-      'stale_29min=0', 'stale_31min=Döveç: 30 dakikadır başarılı eşitleme yok', 'stale_fixed=Döveç: düzeldi (eşitleme)', 'stale_null=Döveç: 30 dakikadır başarılı eşitleme yok',
-      'stuck_59min=0', 'stuck_61min=Döveç: bir talep 1 saattir gönderilemiyor', 'stuck_fixed=Döveç: düzeldi (bekleyen talep)',
-      'test_enquiry_ignored=0/0',
-      'failed=Döveç: bir talep reddedildi ya da gönderilemedi', 'failed_again=0', 'second_failure=Döveç: bir talep reddedildi ya da gönderilemedi', 'second_failure_again=0',
-      'failed_fixed=Döveç: düzeldi (reddedilen talep)', 'failed_silent=0',
-      'realert_23h=0', 'realert_25h=Döveç: talepler iletilemiyor (anahtar reddedildi) (hâlâ)',
+      'stale_29min=true', 'stale_31min=Döveç: 30 dakikadır başarılı eşitleme yok', 'stale_fixed=Döveç: düzeldi (eşitleme)', 'stale_null=Döveç: 30 dakikadır başarılı eşitleme yok',
+      'stuck_59min=true', 'stuck_61min=Döveç: bir talep 1 saattir gönderilemiyor', 'stuck_fixed=Döveç: düzeldi (bekleyen talep)',
+      'test_enquiry_ignored=true',
+      'failed=Döveç: bir talep reddedildi ya da gönderilemedi', 'failed_again=true', 'second_failure=Döveç: bir talep reddedildi ya da gönderilemedi', 'second_failure_again=true',
+      'failed_fixed=Döveç: düzeldi (reddedilen talep)', 'failed_silent=true',
+      'realert_23h=true', 'realert_25h=Döveç: talepler iletilemiyor (anahtar reddedildi) (hâlâ)',
       'settle=Döveç: bir talep reddedildi ya da gönderilemedi | Döveç: düzeldi (bekleyen talep)', 'settle_old_created_at_fresh_stamp=true/true/true',
       'stamp_kept_kept_restamped=true/true/true',
       'anon_state=denied', 'admin_state=denied', 'admin_leads=denied', 'service_state=denied', 'service_leads_read=ok',
@@ -763,6 +764,11 @@ BEGIN
        OR (SELECT md5(coalesce(string_agg(l::text, '|' ORDER BY l.id), '')) FROM public.dovec_leads l) IS DISTINCT FROM v_leads_before THEN
       RAISE EXCEPTION 'probe rows leaked';
     END IF;
+    -- a sequence is not rolled back: every probe enquiry carries an explicit ADA-9000000xxx id, so the real ADA-n numbering is untouched
+    -- (the value itself is a user total and is never printed)
+    IF (SELECT row(last_value, is_called)::text FROM public.dovec_lead_external_seq) IS DISTINCT FROM v_seq_before THEN
+      RAISE EXCEPTION 'the probe block moved dovec_lead_external_seq (a probe enquiry took a generated external_id)';
+    END IF;
   END;
   RAISE NOTICE '20261241 OK: dovec health watchdog (owner only), state table (RLS on, no policies, no grants), stamp trigger, job at :09 :24 :39 :54, coverage holds';
 END $$;
@@ -778,7 +784,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261241_dovec_health_watchdog.sql', 'd4baae1864d004c60576aa6332d82ef0bbfed365482847f24b4ad2f48bd6ba14')
+VALUES ('20261241_dovec_health_watchdog.sql', 'c5ec224c9af68113fde13a88a334ac39b7d4805af796aaf7b5b1b0154f98e92d')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
