@@ -720,5 +720,111 @@ console.log('20261235 — privacy notice URLs on dovec_settings, on top of 20261
   }
 }
 
+console.log('20261240 — limit trigger runs as its owner; a repeated request is never judged by the limit')
+{
+  const LIM = fileURLToPath(new URL('../supabase/migrations/20261240_dovec_leads_limits_definer.sql', import.meta.url))
+  const LSQL = readFileSync(LIM, 'utf8')
+  const P1 = `INSERT INTO public.dovec_projects (id, name, city, status, website_url) VALUES ('p1', 'Fictional Heights', 'Testville', 'on_sale', 'https://example.com/p1')`
+  const rid = n => `'00000000-0000-4000-8000-${String(n).padStart(12, '0')}'`
+  const code = async (d, role, sql) => {   // the SQLSTATE, as that role ('ok' when it ran)
+    await d.exec(`SET ROLE ${role};`)
+    try { await d.query(sql); return 'ok' } catch (e) { return e.code ?? e.sqlState ?? String(e.message).split('\n')[0] } finally { await d.exec('RESET ROLE;') }
+  }
+  const mutL = (from, to) => {
+    if (!LSQL.includes(from)) { bad++; console.log(`  ✗ mutant anchor missing: ${from.slice(0, 60)}`); return null }
+    const p = join(mkdtempSync(join(tmpdir(), 'dovec-')), 'm.sql')
+    writeFileSync(p, LSQL.replace(from, () => to))
+    return p
+  }
+  const base = async () => { const { d, r } = await ready(); if (!r.ok) { console.log(r.msg); process.exit(1) } await d.exec(P1); return d }
+  const fresh = async () => { const d = await base(); const r = await applyFile(d, LIM); if (!r.ok) { console.log(r.msg); process.exit(1) } return d }
+
+  {
+    const d = await base()
+    t('before: the 20261229 trigger is SECURITY INVOKER (control: the change is real)', (await d.query(`SELECT prosecdef FROM pg_proc WHERE oid = 'public.dovec_leads_enforce_limits()'::regprocedure`)).rows[0].prosecdef, false)
+    t('before: a repeated request at the limit is judged by it: DV429, not 23505 (the defect this file removes)', await (async () => {
+      for (let i = 1; i <= 3; i++) await d.exec(ins(LU, { client_request_id: rid(i) }))
+      return code(d, 'service_role', ins(LU, { client_request_id: rid(1) }))
+    })(), 'DV429')
+    const vsrc = readFileSync(new URL('../supabase/verify_schema.sql', import.meta.url), 'utf8')
+    const h40 = vsrc.slice(vsrc.indexOf('-- 1240-BEGIN'), vsrc.indexOf('-- 1240-END'))
+    assertAnchor(h40.includes('20261240_dovec_leads_limits_definer'), 'verify_schema 1240 token slice')
+    const tok40 = async db => (await db.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h40}`)).rows.map(x => x.ok)
+    const h29 = vsrc.slice(vsrc.indexOf('-- 1229-BEGIN'), vsrc.indexOf('-- 1229-END'))
+    const tok29 = async db => (await db.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h29}`)).rows.every(x => x.ok === true)
+    t('before: the 20261240 token is red (control)', await tok40(d), [false])
+    const r = await applyFile(d, LIM)
+    t('applies, including its own assertions and its behaviour block', r, { ok: true, msg: null })
+    if (!r.ok) { console.log(r.msg); process.exit(1) }
+    t('the 20261240 token is green after the file; the 20261229 token still green', [await tok40(d), await tok29(d)], [[true], true])
+    const f = (await d.query(`SELECT prosecdef, proconfig, has_function_privilege('service_role', oid, 'EXECUTE') AS svc, has_function_privilege('anon', oid, 'EXECUTE') AS anon,
+      has_function_privilege('authenticated', oid, 'EXECUTE') AS auth, EXISTS (SELECT 1 FROM aclexplode(proacl) a WHERE a.grantee = 0) AS pub FROM pg_proc WHERE oid = 'public.dovec_leads_enforce_limits()'::regprocedure`)).rows[0]
+    console.log(`    live-shape: prosecdef=${f.prosecdef} proconfig=${JSON.stringify(f.proconfig)} execute svc/anon/auth/public=${f.svc}/${f.anon}/${f.auth}/${f.pub}`)
+    t('definer, search_path pinned empty, EXECUTE held by none of service_role / anon / authenticated / PUBLIC', [f.prosecdef, f.proconfig, f.svc, f.anon, f.auth, f.pub], [true, ['search_path=""'], false, false, false, false])
+    t('the one BEFORE INSERT row trigger is still in place', (await d.query(`SELECT count(*)::int n FROM pg_trigger WHERE tgrelid = 'public.dovec_leads'::regclass AND NOT tgisinternal AND tgfoid = 'public.dovec_leads_enforce_limits()'::regprocedure AND tgtype & 1 = 1 AND tgtype & 2 = 2 AND tgtype & 4 = 4`)).rows[0].n, 1)
+    t('service_role with EXECUTE revoked: the trigger still fires, the 4th new request is refused DV429', await code(d, 'service_role', ins(LU, { client_request_id: rid(4) })), 'DV429')
+    t('... and a repeat of an accepted request at the limit is a unique violation 23505, never DV429', await code(d, 'service_role', ins(LU, { client_request_id: rid(1) })), '23505')
+    t('... and another user is accepted (positive control)', await code(d, 'service_role', ins(LV, { client_request_id: rid(1) })), 'ok')
+    t('... and a different payload with the same request id is also 23505 (the edge function then answers 409)', await code(d, 'service_role', ins(LU, { client_request_id: rid(2), payload_hash: "repeat('e', 64)" })), '23505')
+    t('an app role still cannot call the function directly', [(await asRole(d, 'authenticated', LU, `SELECT public.dovec_leads_enforce_limits()`)).ok, (await asRole(d, 'service_role', SVC, `SELECT public.dovec_leads_enforce_limits()`)).ok], [false, false])
+    t('the test enquiry is still outside the limit (positive control: the 4th real one is refused, the test row is not)', [await code(d, 'service_role', ins(null, { is_test: 'true', project_id: 'NULL', external_id: "'TEST-1'" })), await code(d, 'service_role', ins(LU, { client_request_id: rid(5) }))], ['ok', 'DV429'])
+    await d.exec(`DELETE FROM public.dovec_leads`)
+    const old = Array.from({ length: 10 }, (_, i) => ins(LW, { client_request_id: rid(20 + i), created_at: "now() - interval '5 hours'" })).join(';\n')
+    await d.exec(old)
+    t('10 a day still refuses (old rows counted by the definer)', await code(d, 'service_role', ins(LW, { client_request_id: rid(40) })), 'DV429')
+    t('... and a repeat of one of those ten is 23505, not DV429', await code(d, 'service_role', ins(LW, { client_request_id: rid(20) })), '23505')
+  }
+  {
+    // The failure the definer change is for, modelled: a function owner that cannot read the table (FORCE RLS, zero policies, no BYPASSRLS) counts 0.
+    const d = await fresh()
+    await d.exec(`CREATE ROLE blind_owner NOLOGIN; GRANT SELECT ON public.dovec_leads TO blind_owner; ALTER TABLE public.dovec_leads FORCE ROW LEVEL SECURITY;
+      ALTER FUNCTION public.dovec_leads_enforce_limits() OWNER TO blind_owner;`)
+    const codes = []
+    for (let i = 1; i <= 4; i++) codes.push(await code(d, 'service_role', ins(LU, { client_request_id: rid(i) })))
+    t('red-first: owner blind to the rows (FORCE RLS, no bypass) counts 0 and the 4th is ACCEPTED, so the 4th-refused tests above can fail', codes, ['ok', 'ok', 'ok', 'ok'])
+    const d2 = await fresh()
+    const ok = []
+    for (let i = 1; i <= 4; i++) ok.push(await code(d2, 'service_role', ins(LU, { client_request_id: rid(i) })))
+    t('control: the real file (owner reads the table) refuses the 4th', ok, ['ok', 'ok', 'ok', 'DV429'])
+    // the migration itself refuses that owner/RLS state
+    const d3 = await base()
+    await d3.exec(`CREATE ROLE blind_owner NOLOGIN; GRANT CREATE, USAGE ON SCHEMA public TO blind_owner; ALTER TABLE public.dovec_leads OWNER TO blind_owner; ALTER FUNCTION public.dovec_leads_enforce_limits() OWNER TO blind_owner;
+      ALTER TABLE public.dovec_leads FORCE ROW LEVEL SECURITY; SET ROLE blind_owner;`)
+    const r3 = await applyFile(d3, LIM)
+    await d3.exec('ROLLBACK; RESET ROLE;')
+    t('the migration REFUSES to run when dovec_leads is FORCE RLS and the function owner has no BYPASSRLS', [r3.ok, /FORCE ROW LEVEL SECURITY|cannot read every dovec_leads row/.test(r3.msg || '')], [false, true])
+    if (r3.ok === false && !/FORCE ROW LEVEL SECURITY|cannot read every dovec_leads row/.test(r3.msg || '')) console.log('    refused for a different reason:', r3.msg)
+  }
+  {
+    const d = await fresh()
+    const vsrc = readFileSync(new URL('../supabase/verify_schema.sql', import.meta.url), 'utf8')
+    const h40 = vsrc.slice(vsrc.indexOf('-- 1240-BEGIN'), vsrc.indexOf('-- 1240-END'))
+    const tok = async () => (await d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h40}`)).rows.map(x => x.ok)
+    await d.exec(`GRANT EXECUTE ON FUNCTION public.dovec_leads_enforce_limits() TO service_role`)
+    t('red-first token: EXECUTE re-granted to service_role turns the H token red', await tok(), [false])
+    await d.exec(`REVOKE ALL ON FUNCTION public.dovec_leads_enforce_limits() FROM service_role; ALTER FUNCTION public.dovec_leads_enforce_limits() SECURITY INVOKER`)
+    t('red-first token: back to SECURITY INVOKER turns the H token red', await tok(), [false])
+    await d.exec(`ALTER FUNCTION public.dovec_leads_enforce_limits() SECURITY DEFINER`)
+    t('control: restored, the token is green again', await tok(), [true])
+  }
+  console.log('20261240 — red-first mutants (each must be refused by the migration itself)')
+  for (const [name, from, to, re] of [
+    ['still SECURITY INVOKER', ` SECURITY DEFINER\n`, ``, /not SECURITY DEFINER/],
+    ['search_path left at public', `SET search_path TO ''`, `SET search_path TO 'public'`, /search_path is not pinned/],
+    ['EXECUTE left with service_role', `FROM PUBLIC, anon, authenticated, service_role;`, `FROM PUBLIC, anon, authenticated;`, /executable by anon, authenticated, service_role or PUBLIC/],
+    ['EXECUTE granted to authenticated', `FROM PUBLIC, anon, authenticated, service_role;`, `FROM PUBLIC, anon, authenticated, service_role;\nGRANT EXECUTE ON FUNCTION public.dovec_leads_enforce_limits() TO authenticated;`, /executable by anon, authenticated, service_role or PUBLIC/],
+    ['the repeat skip is dropped', `IF NEW.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.dovec_leads WHERE user_id = NEW.user_id AND client_request_id = NEW.client_request_id) THEN\n    RETURN NEW;\n  END IF;`, ``, /body is not the expected one/],
+    ['the limit weakened to 30 an hour', `created_at >= now() - interval '1 hour') >= 3`, `created_at >= now() - interval '1 hour') >= 30`, /4th enquiry in an hour was not refused/],
+    ['the repeat skip fires for every row', `AND client_request_id = NEW.client_request_id) THEN`, `AND client_request_id = NEW.client_request_id) OR true THEN`, /4th enquiry in an hour was not refused/],
+  ]) {
+    const p = mutL(from, to)
+    if (!p) continue
+    const d = await base()
+    const r = await applyFile(d, p)
+    t(`${name}: refused`, [r.ok, re.test(r.msg || '')], [false, true])
+    if (r.ok === false && !re.test(r.msg || '')) console.log('    refused for a different reason:', r.msg)
+  }
+}
+
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

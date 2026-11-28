@@ -24,7 +24,7 @@ function Field({ label, error, children }) {
   )
 }
 
-// The enquiry form for one project. onSent(externalId) when Döveç's endpoint accepted it.
+// The enquiry form for one project. onSent(externalId, { ms, serverMs }) when Döveç's endpoint accepted it.
 export default function DovecEnquiryForm({ project, lang, settings, onSent }) {
   const insets = useSafeAreaInsets()
   const [name, setName] = useState('')
@@ -55,6 +55,7 @@ export default function DovecEnquiryForm({ project, lang, settings, onSent }) {
   const submit = async () => {
     if (busy || !canSend) return
     setBusy(true); setErrorKey(null)
+    const tapAt = Date.now()
     const draft = buildLeadPayload({ ...fields, requestId: '', projectId: project.id, unitType: unit, lang })
     let netRetried = false, changedRetried = false
     for (;;) {
@@ -62,7 +63,7 @@ export default function DovecEnquiryForm({ project, lang, settings, onSent }) {
       const res = await sendDovecLead({ ...draft, client_request_id: idRef.current.id })
       if (!alive.current) return
       const out = res.status === 0 ? { kind: 'network' } : classifyLead(res.status, res.body)
-      if (out.kind === 'ok') { setBusy(false); onSent(out.externalId); return }
+      if (out.kind === 'ok') { setBusy(false); onSent(out.externalId, { ms: Date.now() - tapAt, serverMs: res.serverMs ?? null }); return }
       // The same payload may be retried under the same id once; a refused or changed request starts over under a new id.
       if (out.kind === 'network' && !netRetried) { netRetried = true; continue }
       if (out.kind === 'changed' && !changedRetried) { changedRetried = true; idRef.current = null; continue }

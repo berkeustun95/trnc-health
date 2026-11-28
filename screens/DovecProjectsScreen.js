@@ -17,7 +17,7 @@ import { loadDovec } from '../utils/loadDovec'
 // A guest is stopped by onRequireAccount (App's sign-up sheet) before the form.
 const TITLE_KEY = 'dovecTitle'
 
-export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, backRef }) {
+export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, backRef, isAdmin }) {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const [data, setData] = useState(null)       // { settings, projects }
@@ -54,10 +54,10 @@ export default function DovecProjectsScreen({ lang, onClose, onRequireAccount, b
   if (layer.name === 'detail') {
     content = <DovecProjectScreen project={project} lang={lang} onEnquire={enquire} />
   } else if (layer.name === 'form') {
-    content = <DovecEnquiryForm project={project} lang={lang} settings={data?.settings} onSent={ref => setLayer({ name: 'thanks', project, reference: ref })} />
+    content = <DovecEnquiryForm project={project} lang={lang} settings={data?.settings} onSent={(ref, timing) => setLayer({ name: 'thanks', project, reference: ref, timing })} />
   } else if (layer.name === 'thanks') {
     content = (
-      <DovecThankYou project={project} reference={layer.reference} whatsapp={data?.settings?.whatsapp_e164 ?? null} lang={lang}
+      <DovecThankYou project={project} reference={layer.reference} whatsapp={data?.settings?.whatsapp_e164 ?? null} lang={lang} timing={isAdmin === true ? layer.timing : null}
         onBack={() => setLayer({ name: 'detail', project })} />
     )
   } else if (loading) {

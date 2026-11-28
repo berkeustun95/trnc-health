@@ -169,65 +169,107 @@ const publicResult = lead => lead.status === 'rejected'
 
 // caller: { kind: 'user', id } | { kind: 'service' }  (the edge function resolves it; guests never get here)
 // store: isPublished() -> bool (dovec_settings.published, anything but true is false) · isAdmin(userId) -> bool
-//        findByRequest(userId, crid) · getVisibleProject(id) · getDateOfBirth(userId) · countLeads({ userId?, sinceIso })
-//        insertLead(row) · updateLead(id, patch) · dueLeads(limit, nowIso, statuses) · claimLead(id, nowIso, untilIso) -> row | null
+//        findByRequest(userId, crid) · isFeedFresh() -> bool · getListedProject(id) · getDateOfBirth(userId)
+//        countLeads({ userId?, sinceIso }) · insertLead(row) · updateLead(id, patch) · dueLeads(limit, nowIso, statuses)
+//        claimLead(id, nowIso, untilIso) -> row | null
 // The count below is only a courtesy pre-check; the limits are enforced atomically by the BEFORE INSERT trigger on
 // dovec_leads (20261229, SQLSTATE DV429), which insertLead surfaces and this function maps to 429.
-// -> { status, body } for the HTTP response.
+//
+// ONE wave of reads (parallel), then the answers are picked in a FIXED precedence, so the response is the same as when the reads
+// ran one after another: validation 400 -> dark gate 404 -> under_18 403 -> replay / 409 -> 404 project_unavailable (feed stale,
+// project unlisted or gone) -> 400 unit_type -> 429 (a twin of an accepted request is a replay, never a 429) -> insert.
+// An error in a read is thrown only when the precedence actually reaches that step (a failing project read never turns the dark
+// gate's 404 into a 500). Nothing is WRITTEN before the dark gate. While not live, the lead is inserted as 'mock' directly
+// (no second round trip). deps.timing = { auth, body } (ms, measured by the caller) and deps.clock (ms) are optional.
+// -> { status, body, serverTiming? } for the HTTP response.
 export async function handleLead({ caller, body, deps }) {
-  const { store, now = () => new Date() } = deps
   if (isObj(body) && 'mode' in body) {
     if (caller.kind !== 'service' || (body.mode !== 'retry' && body.mode !== 'test_lead')) return { status: 403, body: { error: 'forbidden' } }
     return body.mode === 'retry' ? retryDue(deps) : handleTestLead({ body, deps })
   }
   if (caller.kind !== 'user') return { status: 403, body: { error: 'forbidden' } }
+  const { log = () => {}, clock = () => performance.now() } = deps
+  const t0 = clock()
+  const tm = { auth: deps.timing?.auth, body: deps.timing?.body, reads: 0, insert: 0, deliver: 0 }
+  const ext = { id: null }
+  const timed = async (key, fn) => { const s = clock(); try { return await fn() } finally { tm[key] += clock() - s } }
+  let res
+  try {
+    res = await userLead({ caller, body, deps, tm, ext, timed })
+    return res
+  } finally {
+    const fmt = x => (typeof x === 'number' && Number.isFinite(x) ? String(Math.round(x)) : '-')
+    const total = clock() - t0 + (tm.auth ?? 0) + (tm.body ?? 0)
+    log(`dovec-lead timing ${ext.id ?? '-'} auth=${fmt(tm.auth)} body=${fmt(tm.body)} reads=${fmt(tm.reads)} insert=${fmt(tm.insert)} deliver=${fmt(tm.deliver)} total=${fmt(total)}`)
+    if (res) res.serverTiming = `auth;dur=${fmt(tm.auth)},body;dur=${fmt(tm.body)},reads;dur=${fmt(tm.reads)},insert;dur=${fmt(tm.insert)},deliver;dur=${fmt(tm.deliver)},total;dur=${fmt(total)}`.replace(/dur=-/g, 'dur=0')
+  }
+}
+
+async function userLead({ caller, body, deps, tm, ext, timed }) {
+  const { store, now = () => new Date(), log = () => {} } = deps
   const v = validateLead(body)
   if (!v.ok) return { status: v.status, body: { error: v.error, ...(v.field ? { field: v.field } : {}) } }
-  // Dark module: while dovec_settings.published is not true, only an admin (the admin preview form) may enquire; everyone
-  // else gets the not-found answer, before any other read or write. getVisibleProject keeps its freshness check (suspended,
-  // 24 h) for admins too: stricter than the DB read gate on a stale feed, accepted because nothing can be delivered then.
-  if ((await store.isPublished()) !== true && (await store.isAdmin(caller.id)) !== true) return { status: 404, body: { error: 'project_unavailable' } }
-  const dob = await store.getDateOfBirth(caller.id)
-  if (isUnder18(dob, now())) return { status: 403, body: { error: 'under_18' } }
-  const hash = await payloadHash(v.value)
+  const hashPromise = payloadHash(v.value)
+  const crid = v.value.client_request_id
+  const t = now().getTime()
+  const iso = ms => new Date(t - ms).toISOString()
+  const [pub, adm, dobR, priorR, feedR, projR, hourR, dayR, allR] = await timed('reads', () => Promise.allSettled([
+    store.isPublished(), store.isAdmin(caller.id), store.getDateOfBirth(caller.id), store.findByRequest(caller.id, crid),
+    store.isFeedFresh(), store.getListedProject(v.value.project_id),
+    store.countLeads({ userId: caller.id, sinceIso: iso(3600000) }), store.countLeads({ userId: caller.id, sinceIso: iso(86400000) }),
+    store.countLeads({ sinceIso: iso(86400000) }),
+  ]))
+  const val = r => { if (r.status === 'rejected') throw r.reason; return r.value }
 
-  const replay = async existing => existing.payload_hash === hash
-    ? publicResult(existing) : { status: 409, body: { error: 'request_changed' } }
-  const prior = await store.findByRequest(caller.id, v.value.client_request_id)
+  // Dark module: while dovec_settings.published is not true, only an admin (the admin preview form) may enquire; everyone
+  // else gets the not-found answer. The feed-freshness check below applies to admins too: stricter than the DB read gate on a
+  // stale feed, accepted because nothing can be delivered then.
+  if (val(pub) !== true && val(adm) !== true) return { status: 404, body: { error: 'project_unavailable' } }
+  if (isUnder18(val(dobR), now())) return { status: 403, body: { error: 'under_18' } }
+  const hash = await hashPromise
+
+  const replay = async existing => {
+    ext.id = existing.external_id ?? null
+    return existing.payload_hash === hash ? publicResult(existing) : { status: 409, body: { error: 'request_changed' } }
+  }
+  const prior = val(priorR)
   if (prior) return replay(prior)
 
-  const project = await store.getVisibleProject(v.value.project_id)
+  if (val(feedR) !== true) return { status: 404, body: { error: 'project_unavailable' } }
+  const project = val(projR)
   if (!project) return { status: 404, body: { error: 'project_unavailable' } }
   if (v.value.unit_type !== null && !(project.unit_types ?? []).some(u => u.type === v.value.unit_type)) {
     return { status: 400, body: { error: 'invalid_request', field: 'unit_type' } }
   }
 
-  const t = now().getTime()
-  const iso = ms => new Date(t - ms).toISOString()
-  const [hour, day, all] = await Promise.all([
-    store.countLeads({ userId: caller.id, sinceIso: iso(3600000) }),
-    store.countLeads({ userId: caller.id, sinceIso: iso(86400000) }),
-    store.countLeads({ sinceIso: iso(86400000) }),
-  ])
-  if (hour >= LIMITS.perUserHour || day >= LIMITS.perUserDay || all >= LIMITS.globalDay) return { status: 429, body: { error: 'rate_limited' } }
+  // A twin (same client_request_id, accepted a moment ago) is not a new enquiry: answer it as a replay, never as a limit.
+  const refuseOrReplay = async () => {
+    const twin = await timed('reads', () => store.findByRequest(caller.id, crid))
+    return twin ? replay(twin) : { status: 429, body: { error: 'rate_limited' } }
+  }
+  if (val(hourR) >= LIMITS.perUserHour || val(dayR) >= LIMITS.perUserDay || val(allR) >= LIMITS.globalDay) return refuseOrReplay()
 
+  // Not live (either lock closed, or no partner key): nothing is ever sent, so the row is stored 'mock' in the one insert.
+  const sendsLive = isLive(deps.env?.mode, deps.liveAllowed ?? LEADS_LIVE_ALLOWED) && !!deps.env?.apiKey
   let lead
   try {
-    lead = await store.insertLead({
-      user_id: caller.id, client_request_id: v.value.client_request_id, payload_hash: hash, project_id: project.id,
+    lead = await timed('insert', () => store.insertLead({
+      user_id: caller.id, client_request_id: crid, payload_hash: hash, project_id: project.id,
       project_name: project.name, unit_type: v.value.unit_type, name: v.value.name, phone: v.value.phone,
       email: v.value.email, message: v.value.message, language: v.value.language, language_code: languageCode(v.value.language),
-      consent: true, consent_text_version: v.value.consent_text_version, status: 'pending',
-    })
+      consent: true, consent_text_version: v.value.consent_text_version, status: sendsLive ? 'pending' : 'mock',
+    }))
   } catch (e) {
-    if (e?.code === RATE_LIMIT_CODE || e?.message === 'dovec_rate_limited') return { status: 429, body: { error: 'rate_limited' } }
+    if (e?.code === RATE_LIMIT_CODE || e?.message === 'dovec_rate_limited') return refuseOrReplay()
     if (e?.code === '23505') {
-      const again = await store.findByRequest(caller.id, v.value.client_request_id)
+      const again = await timed('reads', () => store.findByRequest(caller.id, crid))
       if (again) return replay(again)
     }
     throw e
   }
-  const status = await deliver(lead, deps)
+  ext.id = lead.external_id ?? null
+  if (!sendsLive) { log(`dovec-lead ${lead.external_id} mock`); return publicResult(lead) }
+  const status = await timed('deliver', () => deliver(lead, deps))
   return publicResult({ ...lead, status })
 }
 
