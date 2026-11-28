@@ -11,7 +11,9 @@
 # BEFORE APPROVING: check by hand that the requester is the person who sent that enquiry. The tool takes the reference only.
 # Refused (nothing changes): a reference that is not exactly ADA-<number>, an unknown reference, the test enquiry, and an enquiry still
 # pending / retrying (wait until it is sent / rejected / failed, then run again). A second apply on a wiped enquiry changes nothing.
-# Runs from main only (the `production` environment is deployable from main only). Public log: seven booleans, nothing else.
+# Runs from main only (the `production` environment is deployable from main only). Public log: seven booleans, nothing else; the reference is
+# never printed: the FIRST step of the dry and apply jobs masks it (read from the event payload, never from an env block or a command line),
+# so the later `IN_REF` env header shows ***. The approve job never sees it.
 # Not scheduled, so no data_jobs heartbeat row. Needs migration 20261243 applied first (otherwise the call answers an HTTP error).
 
 name: dovec-lead-forget
@@ -42,6 +44,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Mask the reference
+        run: |
+          ref=$(jq -r '.inputs.ref // empty' "$GITHUB_EVENT_PATH")
+          [ -z "$ref" ] || echo "::add-mask::$ref"
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -78,6 +84,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Mask the reference
+        run: |
+          ref=$(jq -r '.inputs.ref // empty' "$GITHUB_EVENT_PATH")
+          [ -z "$ref" ] || echo "::add-mask::$ref"
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1

@@ -111,6 +111,20 @@ console.log('── the engine, as a subprocess')
   r = await call(['--ref=ADA-12'], () => ({ status: 500, body: '<html>Jane Q Person</html>' }))
   t('HTTP 500 with a non-JSON body: status + unknown code, nothing echoed', [r.code, r.so.includes('  http 500, error code unknown'), /Jane|html/.test(r.all)], [1, true, false])
 }
+
+// Workflow text: the enquiry reference must be masked before anything can print it (the log of a public repo).
+const WF = process.env.DOVEC_FORGET_WORKFLOW || fileURLToPath(new URL('../.github/workflows/dovec-lead-forget.yml', import.meta.url))
+const wf = readFileSync(WF, 'utf8')
+for (const job of ['dry', 'apply']) {
+  const body = wf.split(new RegExp(`^  ${job}:\\n`, 'm'))[1]?.split(/^  \\S[^\\n]*:\\n/m)[0] ?? ''
+  const steps = body.split(/^      - /m).slice(1)
+  const first = steps[0] ?? ''
+  const EXPR = /\$\{\{\s*inputs\.ref/
+  const maskAt = steps.findIndex(x => x.includes('::add-mask::'))
+  const useAt = steps.findIndex(x => EXPR.test(x))
+  t(`workflow ${job}: first step masks the ref from GITHUB_EVENT_PATH (no set -x, no inputs.ref expression in it)`, [maskAt, first.includes('GITHUB_EVENT_PATH'), /set -x|xtrace/.test(first), EXPR.test(first)], [0, true, false, false])
+  t(`workflow ${job}: the ref expression appears only in a step after the mask step`, [useAt > maskAt && maskAt === 0], [true])
+}
 server.close()
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)
