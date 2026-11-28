@@ -1,0 +1,95 @@
+# ─── Döveç: forget ONE enquiry by its reference (the privacy policy's early deletion on request) ────────────────────
+#
+# Wipes name, phone, e-mail, message and user id of a single enquiry (reference ADA-<number>), keeps the row, never touches status.
+# The work is the database function public.dovec_lead_forget (migration 20261243), called with the service key over PostgREST RPC.
+# Engine: scripts/dovec-lead-forget.mjs (pure parts and tests: scripts/lib/dovec-lead-forget.mjs, scripts/test-dovec-lead-forget.mjs).
+# Dry and apply call the SAME function, so the dry run is a faithful preview.
+#
+#   gh workflow run dovec-lead-forget -f ref=ADA-123                 # DRY: prints true/false answers, writes nothing
+#   gh workflow run dovec-lead-forget -f ref=ADA-123 -f apply=true   # after a clean dry: waits for Berke in `production-db`, then wipes
+#
+# BEFORE APPROVING: check by hand that the requester is the person who sent that enquiry. The tool takes the reference only.
+# Refused (nothing changes): a reference that is not exactly ADA-<number>, an unknown reference, the test enquiry, and an enquiry still
+# pending / retrying (wait until it is sent / rejected / failed, then run again). A second apply on a wiped enquiry changes nothing.
+# Runs from main only (the `production` environment is deployable from main only). Public log: seven booleans, nothing else.
+# Not scheduled, so no data_jobs heartbeat row. Needs migration 20261243 applied first (otherwise the call answers an HTTP error).
+
+name: dovec-lead-forget
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Enquiry reference, exactly ADA-<number>'
+        type: string
+        required: true
+      apply:
+        description: 'true = wipe the personal fields (needs approval); anything else = dry report'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: { group: dovec-lead-forget, cancel-in-progress: false }
+
+jobs:
+  dry:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    outputs:
+      ok: ${{ steps.dry.outputs.ok }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Main only
+        run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Dry run
+        id: dry
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          IN_REF: ${{ inputs.ref }}
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          node scripts/dovec-lead-forget.mjs --ref="$IN_REF"
+
+  approve:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply && needs.dry.outputs.ok == 'true') }}
+    needs: dry
+    runs-on: ubuntu-24.04
+    environment: production-db
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - run: echo "Forgetting one enquiry approved for production. Check the dry job's answer first; nothing else runs in this job."
+
+  apply:
+    if: ${{ !(github.actor == 'ada-dispatcher[bot]' || github.actor_id == '357529844' || github.triggering_actor == 'ada-dispatcher[bot]') && (inputs.apply && needs.dry.outputs.ok == 'true') }}
+    needs: [dry, approve]
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Main only
+        run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Wipe
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          IN_REF: ${{ inputs.ref }}
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          node scripts/dovec-lead-forget.mjs --ref="$IN_REF" --apply
