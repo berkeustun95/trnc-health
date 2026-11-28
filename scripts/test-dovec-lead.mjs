@@ -324,6 +324,24 @@ console.log('retry mode')
   t('retry while NOT live settles a stuck pending lead as mock', [store.leads.find(l => l.id === 99).status, nofetch.calls.length], ['mock', 0])
 }
 {
+  // Döveç's API document: "Successful response (HTTP 202) ... the same for every accepted enquiry: whether it opens a new
+  // record, is added to the person's existing record, or was already sent with the same external_id." So a resend of an
+  // enquiry Döveç already holds (background send cut off after Döveç received it, our status update never landed) is delivered.
+  const store = makeStore()
+  await post(BODY, store, deps(store, { mode: 'live', live: true, fetchImpl: stub(500) }))
+  const lead = store.leads[0]
+  lead.status = 'pending'; lead.attempts = 1; lead.next_attempt_at = '2026-11-23T10:00:00.000Z'   // claim expired, row never updated
+  const held = new Set(['ADA-1'])   // Döveç already holds ADA-1 from the cut-off send
+  const dovec = async (u, o) => { dovec.calls.push(JSON.parse(o.body).external_id); held.add(JSON.parse(o.body).external_id); return { status: 202, headers: { get: () => null } } }
+  dovec.calls = []
+  const at = new Date('2026-11-23T10:16:00Z')
+  await retryDue({ ...deps(store, { mode: 'live', live: true, fetchImpl: dovec }), now: () => at })
+  t('resend of an external_id Döveç already holds: same ADA-n, 202 -> sent (not rejected), sent_at set, no further retry',
+    [dovec.calls, lead.status, lead.last_http_status, lead.sent_at, lead.next_attempt_at, held.size],
+    [['ADA-1'], 'sent', 202, '2026-11-23T10:16:00.000Z', null, 1])
+  t('a sent lead is outside the undelivered notice (status sent)', ['rejected', 'failed', 'pending', 'retry'].includes(lead.status), false)
+}
+{
   // a store that IGNORES the statuses argument (as the edge function's did): retry rows still come back
   const store = makeStore(); const f = stub(500)
   await post(BODY, store, deps(store, { mode: 'live', live: true, fetchImpl: f }))
