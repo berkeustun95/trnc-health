@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // ─── Döveç: forget ONE enquiry by its reference (dry report, or wipe) ────────────────────────────────────────────────────
 //
-//   node scripts/dovec-lead-forget.mjs --ref=ADA-123            # dry: the SQL function runs every check, writes nothing
-//   node scripts/dovec-lead-forget.mjs --ref=ADA-123 --apply    # wipes name, phone, e-mail, message, user id of that one enquiry
+//   DOVEC_FORGET_EMAIL=<address> node scripts/dovec-lead-forget.mjs --ref=ADA-123            # dry: the SQL function runs every check, writes nothing
+//   DOVEC_FORGET_EMAIL=<address> node scripts/dovec-lead-forget.mjs --ref=ADA-123 --apply    # wipes name, phone, e-mail, message, user id of that one enquiry
 //
+// The e-mail the person wrote from comes in the environment variable DOVEC_FORGET_EMAIL (never argv: a --email= argument is refused). It
+// is sent to the function and compared there with the e-mail of the account that sent the enquiry; it is never printed or echoed.
 // Runs only from .github/workflows/dovec-lead-forget.yml (GitHub production environment): this Mac has no service key. The
-// work is the database function public.dovec_lead_forget (20261243); this script is a thin caller. Berke checks by hand that the
-// requester is the sender before approving. Actions logs are public: only the seven agreed booleans are printed (an allowlist,
+// work is the database function public.dovec_lead_forget (20261244); this script is a thin caller. The function answers whether the e-mail
+// matches the sending account; Berke reads that answer in the dry run before approving. Actions logs are public: only the ten agreed booleans are printed (an allowlist,
 // scripts/lib/dovec-lead-forget.mjs); an HTTP error prints the status and the error code only, never the body.
 import { appendFileSync } from 'node:fs'
 import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
@@ -21,6 +23,12 @@ if (ref === null || !REF_RE.test(ref)) {
   console.error('REFUSED: --ref must be given once and be exactly ADA-<number>. Nothing was sent.')
   process.exit(2)
 }
+const EMAIL_RAW = process.env.DOVEC_FORGET_EMAIL
+const email = typeof EMAIL_RAW === 'string' ? EMAIL_RAW.trim() : ''
+if (process.argv.slice(2).some(a => a.startsWith('--email')) || email === '' || !email.includes('@') || email.length > 320 || /[\u0000-\u001f\u007f]/.test(email)) {
+  console.error('REFUSED: the e-mail must come in DOVEC_FORGET_EMAIL (not on the command line), non-empty, with an @, at most 320 characters, no control characters. Nothing was sent.')
+  process.exit(2)
+}
 const out = (ok) => { if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `ok=${ok}\n`) }
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL
@@ -31,7 +39,7 @@ try {
   res = await fetch(`${url}/rest/v1/rpc/dovec_lead_forget`, {
     method: 'POST',
     headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_reference: ref, p_apply: apply }),
+    body: JSON.stringify({ p_reference: ref, p_email: email, p_apply: apply }),
     signal: AbortSignal.timeout(30000),
   })
 } catch {
@@ -47,7 +55,7 @@ if (!res.ok) {
 }
 const a = allowlisted(body)
 if (a === null) {
-  console.log(`  http ${res.status}, the answer is not the expected seven true/false values (not printed)`)
+  console.log(`  http ${res.status}, the answer is not the expected ten true/false values (not printed)`)
   out(false); process.exit(1)
 }
 const v = verdict(a, apply)

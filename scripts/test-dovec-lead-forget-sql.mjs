@@ -15,6 +15,8 @@ const read = f => readFileSync(MIG + f, 'utf8')
 const nonotify = s => s.replace(/^NOTIFY pgrst.*$/m, '')
 const NEW = find(/^20261243_dovec_lead_forget\.sql$/)
 const NEW_SQL = read(NEW)
+const NEW44 = find(/^20261244_dovec_lead_forget_email\.sql$/)
+const NEW44_SQL = read(NEW44)
 const ADMIN = '00000000-0000-4000-8000-0000000000a1', ADMIN2 = '00000000-0000-4000-8000-0000000000a2', CUST = '00000000-0000-4000-8000-0000000000d1'
 const U1 = '00000000-0000-4000-8000-0000000000e1', U2 = '00000000-0000-4000-8000-0000000000e2'
 const SVC = '00000000-0000-4000-8000-0000000000f1'
@@ -92,6 +94,7 @@ CREATE TABLE public.marketplace_photo_reminder_state (id boolean NOT NULL DEFAUL
 ${grab(F196, 'CREATE OR REPLACE FUNCTION public.marketplace_photo_review_reminder()', ['$function$;'])}
 REVOKE ALL ON FUNCTION public.marketplace_photo_review_reminder() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.marketplace_photo_review_reminder() TO service_role;
+ALTER TABLE auth.users ADD COLUMN email text;
 INSERT INTO auth.users (id) VALUES ('${ADMIN}'), ('${ADMIN2}'), ('${CUST}'), ('${U1}'), ('${U2}');
 INSERT INTO public.profiles (id, role, push_token) VALUES ('${ADMIN}', 'admin', 'ExponentPushToken[aaa]'), ('${ADMIN2}', 'admin', NULL), ('${CUST}', 'customer', 'ExponentPushToken[ccc]'), ('${U1}', 'customer', NULL), ('${U2}', 'customer', NULL);
 INSERT INTO cron.job (jobname, schedule, command) SELECT n, '0 3 * * *', 'SELECT 1' FROM unnest(ARRAY[${cronNames.map(n => `'${n}'`).join(',')}]) n;
@@ -264,21 +267,11 @@ console.log('── watchdog and notifier see nothing')
   t('  and no notice is ever written for it (the notifier skips wiped rows)', [await undeliv(), (await leadState(early.id)).un], [u0, null])
 }
 
-console.log('── verify_schema.sql registration')
+console.log('── verify_schema.sql registration (1243: the C row stays, the H block is retired by 20261244)')
 {
   const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
   const a = vs.indexOf('-- 1243-BEGIN'), b = vs.indexOf('-- 1243-END')
-  t('the 1243 H block exists', a > 0 && b > a, true)
-  const h = a > 0 ? vs.slice(a, b) : ''
-  const want = (h.match(/UNION ALL SELECT/g) || []).length
-  const runTok = () => d.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`).then(r => r.rows, e => ({ err: e.message }))
-  const tok = await runTok()
-  t('H tokens run and are all true', Array.isArray(tok) ? [tok.length === want && want > 0, tok.every(r => r.ok === true)] : tok, [true, true])
-  await d.exec(`GRANT EXECUTE ON FUNCTION public.dovec_lead_forget(text, boolean) TO authenticated`)
-  const tok2 = await runTok()
-  t('red: a stray EXECUTE grant turns a token false', Array.isArray(tok2) ? tok2.filter(r => r.ok !== true).length > 0 : tok2, true)
-  await d.exec(`REVOKE ALL ON FUNCTION public.dovec_lead_forget(text, boolean) FROM PUBLIC, anon, authenticated`)
-  t('green again after the revoke', (await runTok()).every(r => r.ok === true), true)
+  t('the 1243 block exists and holds no token any more (20261244 owns the function)', [a > 0 && b > a, a > 0 ? (vs.slice(a, b).match(/UNION ALL SELECT/g) || []).length : -1, a > 0 && /20261244 supersedes/.test(vs.slice(a, b))], [true, 0, true])
   const c = [...vs.matchAll(/\('20261243_dovec_lead_forget','([a-z0-9_]+)'\)/g)].map(m => m[1])
   const fns = (await q(`SELECT proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace`)).map(r => r.proname)
   t('registered C function(s) exist in the catalog', [c, c.every(x => fns.includes(x))], [['dovec_lead_forget'], true])
@@ -323,6 +316,179 @@ await mutate('search_path not pinned', " SET search_path TO ''\nAS $function$\nD
 await mutate('not SECURITY DEFINER', " SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_apply", " SET search_path TO ''\nAS $function$\nDECLARE\n  v_apply", 'SECURITY DEFINER')
 await mutate('the row is not locked on apply', 'FROM public.dovec_leads l WHERE l.external_id = p_reference FOR UPDATE;', 'FROM public.dovec_leads l WHERE l.external_id = p_reference;', 'row lock')
 await mutate('writes a notification', 'v_wiped := true;', "v_wiped := true;\n    INSERT INTO public.notifications (user_id, title, body, type) SELECT id, 'x', 'y', 'other' FROM public.profiles LIMIT 1;")
+
+
+// ═════════════════ 20261244: the e-mail has to match the account that sent the enquiry ═════════════════
+const OWNER_EMAIL = 'Probe.Owner@Example.invalid'
+const TEN = ['valid_reference', 'found', 'is_test', 'settled', 'account_linked', 'account_has_email', 'email_matches_account', 'already_wiped', 'wiped', 'applied']
+const ans10 = (...on) => Object.fromEntries(TEN.map(k => [k, on.includes(k)]))
+const OKF = ['valid_reference', 'found', 'settled', 'account_linked', 'account_has_email']
+const base44 = async ({ emails = true } = {}) => {
+  const b = await base()
+  const r = await run(b, nonotify(read(find(/^20261243_dovec_lead_forget\.sql$/))))
+  if (!r.ok) { console.log(`  ✗ prerequisite 20261243 did not apply: ${r.msg}`); process.exit(1) }
+  if (emails) await b.exec(`UPDATE auth.users SET email = '${OWNER_EMAIL}' WHERE id = '${U1}'; UPDATE auth.users SET email = '   ' WHERE id = '${U2}'`)
+  return b
+}
+const call3 = async (d, ref, email, apply, role = 'service_role') => {
+  const r = await asRole(d, role, SVC, `SELECT public.dovec_lead_forget($1::text, $2::text, $3::boolean) AS r`, [ref, email, apply])
+  return r.ok ? r.rows[0].r : { error: r.msg }
+}
+const LEAK = /probe\.owner|example\.invalid/i
+
+async function battery44(d) {
+  const out = []
+  const norm = x => (x && typeof x === 'object' && !Array.isArray(x)) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, norm(x[k])])) : x
+  const eq = (label, got, want) => { if (JSON.stringify(norm(got)) !== JSON.stringify(norm(want))) out.push(`${label}: got ${JSON.stringify(got)}`) }
+  const c3 = async (ref, email, apply) => { const r = await call3(d, ref, email, apply); if (LEAK.test(JSON.stringify(r))) out.push(`an answer carries the e-mail: ${JSON.stringify(r)}`); return r }
+  const own = { user_id: `'${U1}'` }
+  const m1 = await addLead(d, 'sent', own), m2 = await addLead(d, 'mock', own), pend = await addLead(d, 'pending', own)
+  const blank = await addLead(d, 'sent', { user_id: `'${U2}'` }), noemail = await addLead(d, 'sent', { user_id: `'${CUST}'` })
+  const nouser = await addLead(d, 'sent', { user_id: 'NULL' }), ghost = await addLead(d, 'sent', { user_id: 'gen_random_uuid()' })
+  const all = ans10(...OKF, 'email_matches_account')
+  let before = await rowText(d, m1.id)
+  eq('exact e-mail, dry', await c3(m1.external_id, OWNER_EMAIL, false), all)
+  eq('lower-cased, dry', await c3(m1.external_id, OWNER_EMAIL.toLowerCase(), false), all)
+  eq('upper-cased with spaces and tabs around, dry', await c3(m1.external_id, ` \t${OWNER_EMAIL.toUpperCase()}\t `, false), all)
+  eq('dry leaves the row identical', await rowText(d, m1.id), before)
+  for (const [label, e] of [['a different address', 'x' + OWNER_EMAIL], ['a longer address', OWNER_EMAIL + '.uk'], ['an address inside spaces and a word', 'a ' + OWNER_EMAIL], ['a wildcard', '%'], ['NULL', null], ['empty', ''], ['spaces only', '   '], ['tabs only', '\t\t']]) {
+    eq(`${label}: no match, dry`, await c3(m1.external_id, e, false), ans10(...OKF))
+    eq(`${label}: apply refused, nothing applied`, await c3(m1.external_id, e, true), ans10(...OKF))
+    eq(`${label}: row unchanged after the refused apply`, await rowText(d, m1.id), before)
+  }
+  eq('p_apply NULL is a dry run', (await asRole(d, 'service_role', SVC, `SELECT public.dovec_lead_forget('${m1.external_id}', '${OWNER_EMAIL}', NULL) AS r`)).rows?.[0]?.r?.wiped, false)
+  eq('p_apply omitted is a dry run', (await asRole(d, 'service_role', SVC, `SELECT public.dovec_lead_forget('${m1.external_id}', '${OWNER_EMAIL}') AS r`)).rows?.[0]?.r?.applied, false)
+  eq('still intact after the dry calls', await rowText(d, m1.id), before)
+  const k0 = await kept(d, m2.id)
+  eq('apply on a match (shouted, padded): wiped', await c3(m2.external_id, `  ${OWNER_EMAIL.toUpperCase()} `, true), ans10(...OKF, 'email_matches_account', 'wiped', 'applied'))
+  eq('  five fields gone, stamped', await pii(d, m2.id), { gone: true, stamped: true })
+  eq('  every other column unchanged', await kept(d, m2.id), k0)
+  before = await rowText(d, m2.id)
+  eq('a second apply with the right address is refused (no account any more)', await c3(m2.external_id, OWNER_EMAIL, true), ans10('valid_reference', 'found', 'settled', 'already_wiped'))
+  eq('  and issues no UPDATE', await rowText(d, m2.id), before)
+  for (const [label, L] of [['user_id NULL', nouser], ['a user id with no account', ghost]]) {
+    before = await rowText(d, L.id)
+    eq(`${label}: refused (dry)`, await c3(L.external_id, OWNER_EMAIL, false), ans10('valid_reference', 'found', 'settled'))
+    eq(`${label}: refused (apply)`, await c3(L.external_id, OWNER_EMAIL, true), ans10('valid_reference', 'found', 'settled'))
+    eq(`${label}: untouched`, await rowText(d, L.id), before)
+  }
+  for (const [label, L] of [['an account whose e-mail is only spaces', blank], ['an account with no e-mail', noemail]]) {
+    before = await rowText(d, L.id)
+    for (const e of [null, '', '   ', OWNER_EMAIL]) eq(`${label}, p_email ${JSON.stringify(e)}: linked, no e-mail, no match`, await c3(L.external_id, e, true), ans10('valid_reference', 'found', 'settled', 'account_linked'))
+    eq(`${label}: untouched`, await rowText(d, L.id), before)
+  }
+  before = await rowText(d, pend.id)
+  eq('pending with the right address: refused as unsettled', await c3(pend.external_id, OWNER_EMAIL, true), ans10('valid_reference', 'found', 'account_linked', 'account_has_email', 'email_matches_account'))
+  eq('  untouched', await rowText(d, pend.id), before)
+  for (const ref of ['ADA-', 'ada-1', 'TEST-1', '', "ADA-1';--"]) eq(`malformed ${JSON.stringify(ref)} refused outright`, await c3(ref, OWNER_EMAIL, true), ans10())
+  eq('NULL reference refused', (await asRole(d, 'service_role', SVC, `SELECT public.dovec_lead_forget(NULL, '${OWNER_EMAIL}', true) AS r`)).rows?.[0]?.r, ans10())
+  eq('unknown reference', await c3('ADA-99999999999999999999', OWNER_EMAIL, true), ans10('valid_reference'))
+  await d.exec(`INSERT INTO public.dovec_leads (external_id, client_request_id, payload_hash, name, phone, email, message, language, language_code, consent, consent_text_version, status, is_test, user_id)
+                VALUES ('TEST-1', gen_random_uuid(), repeat('d', 64), 'Test', '+441234567890', 'x@example.invalid', 'm', 'English', 'en', true, 'v', 'sent', true, '${U1}')`)
+  const t1id = await idOf(d, 'TEST-1'), t1 = await rowText(d, t1id)
+  eq('TEST-1 with the right address: refused', await c3('TEST-1', OWNER_EMAIL, true), ans10())
+  eq('  untouched', await rowText(d, t1id), t1)
+  const dry = await c3(m1.external_id, OWNER_EMAIL, false)
+  eq('the answer keys are exactly the ten, all boolean', [Object.keys(dry).sort(), Object.values(dry).every(v => typeof v === 'boolean')], [[...TEN].sort(), true])
+  const old = await asRole(d, 'service_role', SVC, `SELECT public.dovec_lead_forget('${m1.external_id}', false) AS r`)
+  eq('the old two-argument call no longer exists', old.ok, false)
+  return out
+}
+
+console.log('── 20261244 applied on top of 20261243')
+{
+  const e = await base44()
+  const r = await run(e, nonotify(NEW44_SQL))
+  t('the exact file applies (its own assertions + rolled-back probe ran clean)', [r.ok, r.msg ?? null], [true, null])
+  if (!r.ok) process.exit(1)
+  for (const m of r.notices) console.log('    NOTICE ' + m)
+  t('NOTICEs carry no uuid, e-mail, token or phone', r.notices.every(m => !/[0-9a-f]{8}-[0-9a-f]{4}-|@|example\.invalid|ExponentPushToken|\+44/i.test(m)), true)
+  t('final OK notice', r.notices.some(m => m.startsWith('20261244 OK:')), true)
+  t('the probe left nothing behind', (await e.query(`SELECT (SELECT count(*)::int FROM public.dovec_leads) l, (SELECT count(*)::int FROM auth.users WHERE email IS NOT NULL) u`)).rows, [{ l: 0, u: 2 }])
+  t('re-applying is safe', (await run(e, nonotify(NEW44_SQL))).ok, true)
+  const sh = (await e.query(`SELECT pg_get_function_identity_arguments(oid) a, prosecdef, proconfig = ARRAY['search_path=""'] c, prorettype::regtype::text r, proowner::regrole::text o, prosrc FROM pg_proc WHERE proname = 'dovec_lead_forget'`)).rows
+  t('exactly one overload, three arguments, definer, search_path empty, jsonb, owner postgres', sh.map(x => [x.a, x.prosecdef, x.c, x.r, x.o]), [['p_reference text, p_email text, p_apply boolean', true, true, 'jsonb', 'postgres']])
+  t('the (text, boolean) signature is gone', (await e.query(`SELECT to_regprocedure('public.dovec_lead_forget(text,boolean)')::text AS x`)).rows[0].x, null)
+  t('the body has no RAISE and never selects the e-mail into a variable', [/RAISE/.test(sh[0].prosrc), /v_\w*email\w*\s+text/i.test(sh[0].prosrc)], [false, false])
+  const q3 = `SELECT public.dovec_lead_forget('ADA-1', 'a@b.c', false) AS r`
+  t('anon and authenticated cannot call it', [(await asRole(e, 'anon', null, q3)).ok, (await asRole(e, 'authenticated', CUST, q3)).ok], [false, false])
+  t('positive control: service_role and the owner can', [(await asRole(e, 'service_role', SVC, q3)).ok, (await asRole(e, null, null, q3)).ok], [true, true])
+  t('ACL grantees from aclexplode: only the owner and service_role hold EXECUTE', (await e.query(`SELECT array_agg(g ORDER BY g) g FROM (SELECT DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS g
+    FROM pg_proc p, aclexplode(p.proacl) a WHERE p.proname = 'dovec_lead_forget' AND a.privilege_type = 'EXECUTE') x`)).rows, [{ g: ['postgres', 'service_role'] }])
+  t('dovec_leads: still zero policies, no app-role read (positive control: service_role reads)',
+    [(await e.query(`SELECT count(*)::int n FROM pg_policies WHERE tablename = 'dovec_leads'`)).rows[0].n, (await asRole(e, 'authenticated', U1, `SELECT 1 FROM public.dovec_leads`)).ok, (await asRole(e, 'service_role', SVC, `SELECT 1 FROM public.dovec_leads`)).ok], [0, false, true])
+}
+console.log('── 20261244 refuses when no account has an e-mail to borrow')
+{
+  const nb = await base44({ emails: false })
+  const r = await run(nb, nonotify(NEW44_SQL))
+  t('refused with a plain message, nothing applied', [r.ok, /no account|no e-mail/i.test(r.msg ?? ''), LEAK.test(r.msg ?? '')], [false, true, false])
+  await nb.exec('ROLLBACK; RESET ROLE')
+  t('  and the old function is still there (the whole file rolled back)', (await nb.query(`SELECT to_regprocedure('public.dovec_lead_forget(text,boolean)') IS NOT NULL AS x`)).rows[0].x, true)
+}
+console.log('── behaviour battery on the real 20261244')
+{
+  const bd = await base44()
+  t('applies on a fresh chain', (await run(bd, nonotify(NEW44_SQL))).ok, true)
+  t('every behaviour line holds', await battery44(bd), [])
+}
+console.log('── verify_schema.sql registration (1244)')
+{
+  const vs = readFileSync(fileURLToPath(new URL('../supabase/verify_schema.sql', import.meta.url)), 'utf8')
+  const a = vs.indexOf('-- 1244-BEGIN'), b = vs.indexOf('-- 1244-END')
+  t('the 1244 H block exists', a > 0 && b > a, true)
+  const h = a > 0 ? vs.slice(a, b) : ''
+  const want = (h.match(/UNION ALL SELECT/g) || []).length
+  const e = await base44()
+  const runTok = db => db.query(`SELECT 'x'::text AS m, 'x'::text AS o, true AS ok WHERE false ${h}`).then(r => r.rows, x => ({ err: x.message }))
+  const before = await runTok(e)
+  t('red until applied: with only 20261243 the tokens run without error and are all false', Array.isArray(before) ? [before.length === want && want > 0, before.every(r => r.ok === false)] : before, [true, true])
+  await run(e, nonotify(NEW44_SQL))
+  const tok = await runTok(e)
+  t('H tokens run and are all true once applied', Array.isArray(tok) ? [tok.length === want && want > 0, tok.every(r => r.ok === true)] : tok, [true, true])
+  const ident = 'public.dovec_lead_forget(text, text, boolean)'
+  await e.exec(`GRANT EXECUTE ON FUNCTION ${ident} TO authenticated`)
+  const tok2 = await runTok(e)
+  t('red: a stray EXECUTE grant turns a token false', Array.isArray(tok2) ? tok2.filter(r => r.ok !== true).length > 0 : tok2, true)
+  await e.exec(`REVOKE ALL ON FUNCTION ${ident} FROM PUBLIC, anon, authenticated`)
+  t('green again after the revoke', (await runTok(e)).every(r => r.ok === true), true)
+  await e.exec(`CREATE FUNCTION public.dovec_lead_forget(text, boolean) RETURNS jsonb LANGUAGE sql AS 'SELECT ''{}''::jsonb'`)
+  t('red: a resurrected (text, boolean) overload turns a token false', (await runTok(e)).some(r => r.ok !== true), true)
+  const c = [...vs.matchAll(/\('20261244_dovec_lead_forget_email','([a-z0-9_]+)'\)/g)].map(m => m[1])
+  t('the C row for 20261244 names the function', c, ['dovec_lead_forget'])
+}
+console.log('── red-first mutants of 20261244')
+const mutate44 = async (label, from, to, want) => {
+  if (!Array.isArray(from) && !NEW44_SQL.includes(from)) { bad++; console.log(`  ✗ anchor missing for ${label}: ${from.slice(0, 60)}`); return }
+  const pairs = Array.isArray(from) ? from : [[from, to]]
+  const miss = pairs.find(([f]) => !NEW44_SQL.includes(f))
+  if (miss) { bad++; console.log(`  ✗ anchor missing for ${label}: ${miss[0].slice(0, 60)}`); return }
+  const mutated = pairs.reduce((acc, [f, x]) => acc.replace(f, () => x), NEW44_SQL)
+  if (mutated === NEW44_SQL) { bad++; console.log(`  ✗ mutation did not change the file: ${label}`); return }
+  const dd = await base44()
+  const r = await run(dd, nonotify(mutated))
+  let how
+  if (!r.ok) how = (want && !r.msg.includes(want)) ? `refused for another reason: ${r.msg}` : `caught by the migration: ${r.msg}`
+  else { const problems = await battery44(dd); how = problems.length ? `caught by the battery: ${problems[0]}` : 'NOT CAUGHT (applied and every battery line held)' }
+  t(`mutant "${label}"`, how.startsWith('caught'), true)
+  console.log(`      ${how.slice(0, 200)}`)
+}
+const OKLINE = 'v_ok      := v_valid AND v_found AND NOT v_is_test AND v_settled AND v_match;'
+const CMP = "COALESCE(lower(btrim(u.email, v_ws)) = lower(btrim(p_email, v_ws)) AND btrim(p_email, v_ws) <> '', false)"
+const MLINE = 'v_match    := COALESCE(v_match, false) AND v_has_mail;'
+await mutate44('the e-mail condition is dropped from v_ok', OKLINE, 'v_ok      := v_valid AND v_found AND NOT v_is_test AND v_settled; -- v_match')
+const NOGUARD = [MLINE, 'v_match    := COALESCE(v_match, false);']
+await mutate44('NULL matches a NULL account e-mail (both guards gone)', [[CMP, 'lower(btrim(u.email, v_ws)) IS NOT DISTINCT FROM lower(btrim(p_email, v_ws))'], NOGUARD])
+await mutate44('a blank e-mail matches a blank account e-mail (both guards gone)', [[CMP, 'COALESCE(lower(btrim(u.email, v_ws)) = lower(btrim(p_email, v_ws)), false)'], NOGUARD])
+await mutate44('the compare is case sensitive', 'lower(btrim(u.email, v_ws)) = lower(btrim(p_email, v_ws))', 'btrim(u.email, v_ws) = btrim(p_email, v_ws)')
+await mutate44('tabs are not trimmed', 'lower(btrim(p_email, v_ws)) AND', 'lower(btrim(p_email)) AND')
+await mutate44('answer returns the e-mail', "'applied',               v_apply AND v_ok\n", "'applied',               v_apply AND v_ok,\n    'email', p_email\n")
+await mutate44('the e-mail is raised', 'BEGIN\n  v_valid :=', "BEGIN\n  RAISE NOTICE 'e-mail %', p_email;\n  v_valid :=", 'must not raise')
+await mutate44('the old (text, boolean) overload is kept', 'DROP FUNCTION IF EXISTS public.dovec_lead_forget(text, boolean);', '-- kept', 'overloads')
+await mutate44('granted to authenticated', 'TO service_role;', 'TO service_role, authenticated;', 'anon or authenticated')
+await mutate44('service_role not granted (positive control)', 'TO service_role;', 'TO postgres;\nREVOKE EXECUTE ON FUNCTION public.dovec_lead_forget(text, text, boolean) FROM service_role;', 'service_role')
+await mutate44('the row is not locked on apply', 'WHERE l.external_id = p_reference FOR UPDATE;', 'WHERE l.external_id = p_reference;', 'row lock')
+await mutate44('wipe also sets status', "pii_wiped_at = COALESCE(pii_wiped_at, now())\n     WHERE id = v_id;", "pii_wiped_at = COALESCE(pii_wiped_at, now()), status = 'failed'\n     WHERE id = v_id;")
 
 console.log(bad ? `\n${bad} FAILED` : '\nall passed')
 process.exit(bad ? 1 : 0)

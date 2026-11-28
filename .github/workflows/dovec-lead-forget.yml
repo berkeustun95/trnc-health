@@ -1,20 +1,24 @@
 # ─── Döveç: forget ONE enquiry by its reference (the privacy policy's early deletion on request) ────────────────────
 #
 # Wipes name, phone, e-mail, message and user id of a single enquiry (reference ADA-<number>), keeps the row, never touches status.
-# The work is the database function public.dovec_lead_forget (migration 20261243), called with the service key over PostgREST RPC.
+# The work is the database function public.dovec_lead_forget (migration 20261244), called with the service key over PostgREST RPC.
 # Engine: scripts/dovec-lead-forget.mjs (pure parts and tests: scripts/lib/dovec-lead-forget.mjs, scripts/test-dovec-lead-forget.mjs).
 # Dry and apply call the SAME function, so the dry run is a faithful preview.
 #
-#   gh workflow run dovec-lead-forget -f ref=ADA-123                 # DRY: prints true/false answers, writes nothing
-#   gh workflow run dovec-lead-forget -f ref=ADA-123 -f apply=true   # after a clean dry: waits for Berke in `production-db`, then wipes
+#   gh workflow run dovec-lead-forget -f ref=ADA-123 -f email=<address the person wrote from>                 # DRY: prints true/false answers, writes nothing
+#   gh workflow run dovec-lead-forget -f ref=ADA-123 -f email=<address> -f apply=true   # after a clean dry: waits for Berke in `production-db`, then wipes
 #
-# BEFORE APPROVING: check by hand that the requester is the person who sent that enquiry. The tool takes the reference only.
-# Refused (nothing changes): a reference that is not exactly ADA-<number>, an unknown reference, the test enquiry, and an enquiry still
-# pending / retrying (wait until it is sent / rejected / failed, then run again). A second apply on a wiped enquiry changes nothing.
-# Runs from main only (the `production` environment is deployable from main only). Public log: seven booleans, nothing else; the reference is
-# never printed: the FIRST step of the dry and apply jobs masks it (read from the event payload, never from an env block or a command line),
-# so the later `IN_REF` env header shows ***. The approve job never sees it.
-# Not scheduled, so no data_jobs heartbeat row. Needs migration 20261243 applied first (otherwise the call answers an HTTP error).
+# The tool takes the reference plus the e-mail address the person wrote from; the dry run answers yes/no "does that e-mail match the
+# account that sent this enquiry" (no e-mail is ever printed). Apply refuses unless the answer is yes. BEFORE APPROVING: read the dry
+# job's answer (email_matches_account must be true).
+# Refused (nothing changes): a reference that is not exactly ADA-<number>, an unknown reference, the test enquiry, an enquiry still
+# pending / retrying (wait until it is sent / rejected / failed, then run again), an enquiry with no linked account (already wiped or
+# account deleted: a second apply on a wiped enquiry is refused), an account with no e-mail, and an e-mail that does not match.
+# Runs from main only (the `production` environment is deployable from main only). Public log: ten booleans, nothing else; the reference and
+# the e-mail are never printed: the FIRST step of the dry and apply jobs masks both (also the lower-cased / trimmed e-mail), read from the
+# event payload, never from an env block or a command line, so the later `IN_REF` / `DOVEC_FORGET_EMAIL` env headers show ***. The e-mail
+# reaches the engine only as that env variable (never argv). The approve job never sees either.
+# Not scheduled, so no data_jobs heartbeat row. Needs migration 20261244 applied first (otherwise the call answers an HTTP error).
 
 name: dovec-lead-forget
 
@@ -23,6 +27,10 @@ on:
     inputs:
       ref:
         description: 'Enquiry reference, exactly ADA-<number>'
+        type: string
+        required: true
+      email:
+        description: 'E-mail address the person wrote from (compared with the sending account; never printed)'
         type: string
         required: true
       apply:
@@ -44,10 +52,22 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Mask the reference
+      - name: Mask the reference and the e-mail
         run: |
           ref=$(jq -r '.inputs.ref // empty' "$GITHUB_EVENT_PATH")
-          [ -z "$ref" ] || echo "::add-mask::$ref"
+          email=$(jq -r '.inputs.email // empty' "$GITHUB_EVENT_PATH")
+          trimmed=$(printf '%s' "$email" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          lowered=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
+          for x in "$ref" "$email" "$trimmed" "$lowered"; do
+            printf '%s\n' "$x" | tr '\r' '\n' | while IFS= read -r l; do
+              [ -z "$l" ] && continue
+              printf '::add-mask::%s\n' "$l"
+              [ "${l//%/%25}" = "$l" ] || printf '::add-mask::%s\n' "${l//%/%25}"
+            done
+          done
+          case "$ref$email" in
+            *$'\n'*|*$'\r'*) echo "::error::the reference and the e-mail must each be one line"; exit 1 ;;
+          esac
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -59,6 +79,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           IN_REF: ${{ inputs.ref }}
+          DOVEC_FORGET_EMAIL: ${{ inputs.email }}
         run: |
           for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
             [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
@@ -84,10 +105,22 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Mask the reference
+      - name: Mask the reference and the e-mail
         run: |
           ref=$(jq -r '.inputs.ref // empty' "$GITHUB_EVENT_PATH")
-          [ -z "$ref" ] || echo "::add-mask::$ref"
+          email=$(jq -r '.inputs.email // empty' "$GITHUB_EVENT_PATH")
+          trimmed=$(printf '%s' "$email" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          lowered=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
+          for x in "$ref" "$email" "$trimmed" "$lowered"; do
+            printf '%s\n' "$x" | tr '\r' '\n' | while IFS= read -r l; do
+              [ -z "$l" ] && continue
+              printf '::add-mask::%s\n' "$l"
+              [ "${l//%/%25}" = "$l" ] || printf '::add-mask::%s\n' "${l//%/%25}"
+            done
+          done
+          case "$ref$email" in
+            *$'\n'*|*$'\r'*) echo "::error::the reference and the e-mail must each be one line"; exit 1 ;;
+          esac
       - name: Main only
         run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::runs from main only"; exit 1; }'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -98,6 +131,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           IN_REF: ${{ inputs.ref }}
+          DOVEC_FORGET_EMAIL: ${{ inputs.email }}
         run: |
           for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
             [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
