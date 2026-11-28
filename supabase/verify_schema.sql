@@ -7684,16 +7684,35 @@ SELECT '20261228_live_scores_ktff', 'live-scores-ktff: schedule 7,22,37,52 * * *
 
 UNION ALL
 -- ─── 20261232: dovec-sync every 10 minutes, POSTs the function with the Vault key (no inline key) ───
-SELECT '20261232_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key novest_sync_key, 60 s timeout, no inline key',
+-- 20261245 may pause dovec-sync for about two hours (switch it off, schedule and command untouched) and schedules a one-shot job
+-- 'dovec-sync-resume' that switches it back on and removes itself. So an INACTIVE dovec-sync reads OK ONLY while exactly one active
+-- dovec-sync-resume job with the re-activate + self-unschedule command exists. When that fallback is gone (it fired, or 20261246
+-- removed it) the leniency ends by itself: an inactive dovec-sync with no resume job is red again.
+SELECT '20261232_dovec_cron', 'dovec-sync: schedule */10 * * * *, function URL, Vault key novest_sync_key, 60 s timeout, no inline key (active, or paused with its one-shot dovec-sync-resume still waiting)',
        CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync') THEN 'MISSING'
-            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync' AND active
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync'
                     AND schedule = '*/10 * * * *'
                     AND command LIKE '%/functions/v1/sync-dovec%'
                     AND command LIKE '%name = ''novest_sync_key''%'
                     AND command LIKE '%timeout_milliseconds := 60000%'
-                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') = 1
+                    AND command NOT LIKE '%eyJ%' AND command NOT LIKE '%sb_secret%') IS DISTINCT FROM 1
+              THEN 'WRONG SCHEDULE OR COMMAND ← FIX'
+            WHEN (SELECT active FROM cron.job WHERE jobname = 'dovec-sync') THEN 'OK'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync-resume' AND active
+                    AND command LIKE '%cron.alter_job(job_id := (SELECT jobid FROM cron.job WHERE jobname = ''dovec-sync''), active := true)%'
+                    AND command LIKE '%cron.unschedule(''dovec-sync-resume'')%') = 1
               THEN 'OK'
-            ELSE 'WRONG SCHEDULE OR COMMAND ← FIX' END
+            ELSE 'dovec-sync IS OFF AND NOTHING WILL RESTART IT (apply 20261246) ← FIX' END
+
+UNION ALL
+-- ─── 20261245: a dovec-sync-resume job may exist ONLY while dovec-sync is switched off ───
+-- A resume job next to an ACTIVE dovec-sync is a leftover (its schedule names a day and month, so it would fire again in a year).
+SELECT '20261245_dovec_sync_pause', 'dovec-sync-resume exists only while dovec-sync is inactive (a leftover next to an active dovec-sync is red)',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'dovec-sync-resume') THEN 'OK'
+            WHEN (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync-resume') = 1
+                 AND (SELECT count(*) FROM cron.job WHERE jobname = 'dovec-sync' AND NOT active) = 1
+              THEN 'OK'
+            ELSE 'LEFTOVER dovec-sync-resume ← apply 20261246' END
 
 UNION ALL
 -- ─── 20261232: dovec-lead-retry every 10 minutes at :05, POSTs {"mode":"retry"} only when a retry or old pending lead exists ───
